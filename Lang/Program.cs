@@ -1,18 +1,14 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Lang;
+using Lang.Parsing;
+using Lang.Project;
+using Microsoft.Extensions.DependencyInjection;
 
-namespace Lang
-{
-    class Program
-    {
-        static void Main(string[] args)
-        {
-            var serviceCollection = new ServiceCollection();
-            serviceCollection.AddTransient<ICompiler, Compiler>();
+var serviceCollection = new ServiceCollection();
+serviceCollection.AddTransient<ICompiler, Compiler>();
+serviceCollection.AddTransient<IParser, Parser>();
+serviceCollection.AddTransient<IProjectInterpreter, ProjectInterpreter>();
 
-            var container = serviceCollection.BuildServiceProvider();
+var container = serviceCollection.BuildServiceProvider();
 
-            var compiler = container.GetService<ICompiler>();
-            compiler.Compile(args);
-        }
-    }
-}
+var compiler = container.GetService<ICompiler>();
+compiler.Compile(args);
