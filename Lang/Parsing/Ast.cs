@@ -34,6 +34,6 @@ namespace Lang.Parsing
     public class TypeDefinition
     {
         public string Type { get; set; }
-        public List<string> Generics { get; set; } = new();
+        public List<string> Generics { get; } = new();
     }
 }
