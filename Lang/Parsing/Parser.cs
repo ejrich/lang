@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace Lang.Parsing
 {
@@ -40,6 +39,7 @@ namespace Lang.Parsing
             var function = new FunctionAst();
             var parsingArgs = false;
             var parsingBody = false;
+            var parsingGeneric = false;
             Variable argument = null;
             ReturnAst returnAst = null;
             foreach (var token in tokens)
@@ -54,7 +54,13 @@ namespace Lang.Parsing
                         else if (parsingArgs)
                         {
                             if (argument == null)
-                                argument = new Variable { Type = token.Value };
+                            {
+                                argument = new Variable { Type = new TypeDefinition { Type = token.Value } };
+                            }
+                            else if (parsingGeneric)
+                            {
+                                argument.Type.Generics.Add(token.Value);
+                            }
                             else
                             {
                                 argument.Name = token.Value;
@@ -112,8 +118,10 @@ namespace Lang.Parsing
                     case TokenType.Quote:
                         break;
                     case TokenType.LessThan:
+                        parsingGeneric = true;
                         break;
                     case TokenType.GreaterThan:
+                        parsingGeneric = false;
                         break;
                     case TokenType.Comma:
                         break;
@@ -121,7 +129,6 @@ namespace Lang.Parsing
                         break;
                 }
             }
-            Console.WriteLine($"{function.Name} {function.ReturnType}");
         }
     }
 }
