@@ -2,13 +2,14 @@
 {
     public class Token
     {
-        public TokenType Type { get; init; }
+        public TokenType Type { get; set; }
         public string Value { get; set; }
     }
 
     public enum TokenType
     {
         Token,
+        Comment,
         OpenParen = '(',
         CloseParen = ')',
         OpenBrace = '{',
@@ -27,6 +28,6 @@
         LessThan = '<',
         GreaterThan = '>',
         Comma = ',',
-        Period = '.'
+        Period = '.',
     }
 }
