@@ -32,8 +32,21 @@ namespace Lang
 
             // 2. Parse source files to tokens
             stopwatch.Restart();
-            var parseResult = _parser.Parse(project.BuildFiles);
+            var parseResults = _parser.Parse(project.BuildFiles);
             var parseTime = stopwatch.Elapsed;
+
+            if (parseResults.Any(_ => !_.Success))
+            {
+                foreach (var failedParse in parseResults.Where(_ => !_.Success))
+                {
+                    Console.WriteLine($"Failed to parse file: \"{failedParse.File}\":\n");
+                    foreach (var parseError in failedParse.Errors)
+                    {
+                        Console.WriteLine($"\t{parseError.Error} at line {parseError.Token.Line}:{parseError.Token.Column}\n");
+                    }
+                }
+                Environment.Exit(ErrorCodes.ParsingError);
+            }
 
             // 3. Build dependency graph
             // 4. Generate assembly code
