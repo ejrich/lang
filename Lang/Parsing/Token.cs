@@ -4,8 +4,8 @@
     {
         public TokenType Type { get; set; }
         public string Value { get; set; }
-        public int Line { get; set; }
-        public int Column { get; set; }
+        public int Line { get; init; }
+        public int Column { get; init; }
     }
 
     public enum TokenType
