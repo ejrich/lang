@@ -15,8 +15,12 @@
 ### Syntax
 
 ```
-int main(int argc, List<string> args)
+int Main(List<string> args)
 {
+    // Single line comment
+    /*
+        Multi line comment
+    */
     return 0;
 }
 ```
