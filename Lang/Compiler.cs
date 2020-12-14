@@ -4,6 +4,7 @@ using System.Linq;
 using Lang.Backend;
 using Lang.Parsing;
 using Lang.Project;
+using Lang.Translation;
 
 namespace Lang
 {
@@ -16,15 +17,17 @@ namespace Lang
     {
         private readonly IProjectInterpreter _projectInterpreter;
         private readonly IParser _parser;
+        private readonly IProgramGraphBuilder _graphBuilder;
         private readonly IWriter _writer;
         private readonly IBuilder _builder;
         private readonly ILinker _linker;
 
-        public Compiler(IProjectInterpreter projectInterpreter, IParser parser, IWriter writer, IBuilder builder,
-            ILinker linker)
+        public Compiler(IProjectInterpreter projectInterpreter, IParser parser, IProgramGraphBuilder graphBuilder,
+            IWriter writer, IBuilder builder, ILinker linker)
         {
             _projectInterpreter = projectInterpreter;
             _parser = parser;
+            _graphBuilder = graphBuilder;
             _writer = writer;
             _builder = builder;
             _linker = linker;
@@ -58,7 +61,7 @@ namespace Lang
 
             // 3. Build program graph
             stopwatch.Restart();
-            var programGraph = new ProgramGraph(); // TODO Insert graph builder here
+            var programGraph = _graphBuilder.CreateProgramGraph(parseResults, out var errors);
             var graphTime = stopwatch.Elapsed;
 
             // 4. Generate translated code
