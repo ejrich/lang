@@ -12,9 +12,6 @@ namespace Lang.Parsing
 
     public class Lexer : ILexer
     {
-        private bool _readingComment;
-        private bool _multiLineComment;
-
         public List<Token> LoadFileTokens(string filePath)
         {
             var fileContents = File.ReadAllText(filePath);
@@ -24,6 +21,8 @@ namespace Lang.Parsing
 
         private IEnumerable<Token> GetTokens(string fileContents)
         {
+            var lexerStatus = new LexerStatus();
+
             Token currentToken = null;
             var closingMultiLineComment = false;
             var line = 1;
@@ -36,14 +35,14 @@ namespace Lang.Parsing
                     line++;
                     column = 0;
                 }
-                if (_readingComment)
+                if (lexerStatus.ReadingComment)
                 {
-                    if (_multiLineComment)
+                    if (lexerStatus.MultiLineComment)
                     {
                         if (closingMultiLineComment && character == '/')
                         {
-                            _multiLineComment = false;
-                            _readingComment = false;
+                            lexerStatus.MultiLineComment = false;
+                            lexerStatus.ReadingComment = false;
                             currentToken = null;
                         }
 
@@ -51,7 +50,7 @@ namespace Lang.Parsing
                     }
                     else if (character == '\n')
                     {
-                        _readingComment = false;
+                        lexerStatus.ReadingComment = false;
                         currentToken = null;
                     }
 
@@ -69,7 +68,7 @@ namespace Lang.Parsing
                 // Get token from character, determine to emit value
                 var tokenType = GetTokenType(character);
 
-                if (ContinueToken(currentToken, tokenType))
+                if (ContinueToken(currentToken, tokenType, lexerStatus))
                 {
                     currentToken.Value += character;
                 }
@@ -90,6 +89,7 @@ namespace Lang.Parsing
 
             if (currentToken != null) yield return currentToken;
         }
+        
 
         private static TokenType GetTokenType(char character)
         {
@@ -98,7 +98,7 @@ namespace Lang.Parsing
             return Enum.IsDefined(typeof(TokenType), token) ? token : TokenType.Token;
         }
 
-        private bool ContinueToken(Token currentToken, TokenType type)
+        private bool ContinueToken(Token currentToken, TokenType type, LexerStatus lexerStatus)
         {
             if (currentToken == null) return false;
 
@@ -111,12 +111,12 @@ namespace Lang.Parsing
                     {
                         case TokenType.Divide:
                             currentToken.Type = TokenType.Comment;
-                            _readingComment = true;
+                            lexerStatus.ReadingComment = true;
                             return true;
                         case TokenType.Multiply:
                             currentToken.Type = TokenType.Comment;
-                            _readingComment = true;
-                            _multiLineComment = true;
+                            lexerStatus.ReadingComment = true;
+                            lexerStatus.MultiLineComment = true;
                             return true;
                         default:
                             return false;
@@ -125,6 +125,12 @@ namespace Lang.Parsing
                 default:
                     return false;
             }
+        }
+
+        private class LexerStatus
+        {
+            public bool ReadingComment { get; set; }
+            public bool MultiLineComment { get; set; }
         }
     }
 }
