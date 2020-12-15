@@ -4,7 +4,8 @@
     {
         public string WriteTranslatedFile(ProgramGraph programGraph)
         {
-            throw new System.NotImplementedException();
+            // TODO Implement me
+            return string.Empty;
         }
     }
 }
