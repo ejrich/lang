@@ -37,6 +37,8 @@ namespace Lang
 
     public class Function
     {
+        public string Name { get; set; }
+        public string ReturnType { get; set; }
         public List<Variable> Arguments { get; set; }
         //public List<IAst> Body { get; set; }
     }
