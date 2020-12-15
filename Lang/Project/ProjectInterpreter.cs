@@ -29,14 +29,9 @@ namespace Lang.Project
             }
 
             // 2. Load the project file
-            var projectFileContents = File.ReadAllText(projectPath);
+            var projectFile = LoadProjectFile(projectPath);
 
-            // 3. Parse project file
-            // @PerformanceCheck - this takes about 40x longer than the rest of the steps ~130 ms
-            var projectFile = JsonSerializer.Deserialize<ProjectFile>(projectFileContents,
-                new JsonSerializerOptions(JsonSerializerDefaults.Web));
-
-            // 4. Recurse through the directories and load the files to build
+            // 3. Recurse through the directories and load the files to build
             var sourceFiles = GetSourceFiles(new DirectoryInfo(Path.GetDirectoryName(Path.GetFullPath(projectPath))));
 
             return new Project
@@ -60,6 +55,47 @@ namespace Lang.Project
             }
 
             return projectPath;
+        }
+
+        private static ProjectFile LoadProjectFile(string projectPath)
+        {
+            var projectFile = new ProjectFile();
+
+            var currentSection = ProjectFileSection.None;
+            foreach (var line in File.ReadLines(projectPath))
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    currentSection = ProjectFileSection.None;
+                }
+                else if (currentSection != ProjectFileSection.None)
+                {
+                    switch (currentSection)
+                    {
+                        case ProjectFileSection.Name:
+                            projectFile.Name = line;
+                            break;
+                        case ProjectFileSection.Dependencies:
+                            projectFile.Dependencies.Add(line);
+                            break;
+                        case ProjectFileSection.Packages:
+                            projectFile.Packages.Add(line);
+                            break;
+                    }
+                }
+                else
+                {
+                    currentSection = line switch
+                    {
+                        "#name" => ProjectFileSection.Name,
+                        "#dependencies" => ProjectFileSection.Dependencies,
+                        "#packages" => ProjectFileSection.Packages,
+                        _ => ProjectFileSection.None,
+                    };
+                }
+            }
+
+            return projectFile;
         }
 
         private static IEnumerable<string> GetSourceFiles(DirectoryInfo directory)

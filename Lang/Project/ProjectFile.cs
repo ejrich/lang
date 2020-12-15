@@ -2,6 +2,14 @@
 
 namespace Lang.Project
 {
+    public enum ProjectFileSection
+    {
+        None,
+        Name,
+        Dependencies,
+        Packages
+    }
+
     public class ProjectFile
     {
         public string Name { get; set; }
