@@ -12,6 +12,7 @@
     {
         Token,
         Comment,
+        Literal,
         OpenParen = '(',
         CloseParen = ')',
         OpenBrace = '{',
