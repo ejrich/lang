@@ -1,5 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using Lang.Parsing;
+using Type = Lang.Parsing.Type;
 
 namespace Lang.Translation
 {
@@ -11,7 +14,9 @@ namespace Lang.Translation
     public class ProgramGraphBuilder : IProgramGraphBuilder
     {
         private readonly IDictionary<string, FunctionAst> _functions = new Dictionary<string, FunctionAst>();
-        
+        private readonly List<CallAst> _undefinedCalls = new();
+        private readonly ISet<string> _undefinedTypes = new HashSet<string>();
+
         public ProgramGraph CreateProgramGraph(ParseResult parseResult, out List<TranslationError> errors)
         {
             errors = new List<TranslationError>();
@@ -19,7 +24,6 @@ namespace Lang.Translation
 
             foreach (var syntaxTree in parseResult.SyntaxTrees)
             {
-                // TODO Interpret syntax tree and add to program graph
                 switch (syntaxTree)
                 {
                     case FunctionAst function:
@@ -31,11 +35,89 @@ namespace Lang.Translation
                         {
                             _functions.Add(function.Name, function);
                         }
+                        var functionErrors = StepThroughFunction(function);
+                        if (functionErrors.Any())
+                            errors.AddRange(functionErrors);
                         break;
+                    // TODO Handle more type of ASTs
                 }
             }
 
+            // TODO Verify undefined calls and types
+
             return graph;
+        }
+
+        private List<TranslationError> StepThroughFunction(FunctionAst function)
+        {
+            var translationErrors = new List<TranslationError>();
+            foreach (var syntaxTree in function.Children)
+            {
+                switch (syntaxTree)
+                {
+                    case ReturnAst returnAst:
+                        var error = VerifyReturnStatement(returnAst, function.ReturnType);
+                        if (error != null)
+                            translationErrors.Add(error);
+                        break;
+                    // TODO Handle more syntax trees
+                }
+            }
+
+            return translationErrors;
+        }
+
+        private TranslationError VerifyReturnStatement(ReturnAst returnAst, TypeDefinition functionReturnType)
+        {
+            var type = functionReturnType.InferType(out _);
+
+            if (type == Type.Void)
+            {
+                return returnAst.Value == null ? null : new TranslationError {Error = "Function return should be void"};
+            }
+
+            switch (returnAst.Value)
+            {
+                case ConstantAst constant:
+                    switch (type)
+                    {
+                        case Type.Int:
+                            if (int.TryParse(constant.Value, out _))
+                            {
+                                return null;
+                            }
+                            else
+                            {
+                                return new TranslationError {Error = "Expected to return type int"};
+                            }
+                        case Type.Float:
+                            if (float.TryParse(constant.Value, out _))
+                            {
+                                return null;
+                            }
+                            else
+                            {
+                                return new TranslationError {Error = "Expected to return type float"};
+                            }
+                        case Type.String:
+                            // TODO Haven't implemented string lexing/parsing yet
+                            break;
+                        case Type.Other:
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException();
+                    }
+                    break;
+                // TODO Implement these branches
+                case CallAst call:
+                    break;
+                case ExpressionAst expression:
+                    break;
+                case null:
+                    return new TranslationError {Error = $"Expected to return type: {type}"};
+            }
+
+            return null;
         }
     }
 }
