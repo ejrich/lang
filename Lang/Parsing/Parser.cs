@@ -303,7 +303,15 @@ namespace Lang.Parsing
                 switch (token.Type)
                 {
                     case TokenType.Token:
-                        returnAst.Value = new ConstantAst {Value = token.Value};
+                    case TokenType.Number:
+                    case TokenType.Literal:
+                        returnAst.Value = new ConstantAst
+                        {
+                            Type = token.InferType(out var error),
+                            Value = token.Value
+                        };
+                        if (error != null)
+                            parseResult.Errors.Add(error);
                         // TODO Add support for expressions and calls
                         break;
                     default:

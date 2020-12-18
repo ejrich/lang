@@ -12,6 +12,7 @@
     public enum TokenType
     {
         Token,
+        Number,
         Comment,
         Literal,
         OpenParen = '(',
