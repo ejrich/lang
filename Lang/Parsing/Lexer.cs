@@ -113,7 +113,7 @@ namespace Lang.Parsing
 
                 if (ContinueToken(currentToken, tokenType, lexerStatus))
                 {
-                    currentToken.Value += character;
+                    currentToken!.Value += character;
                 }
                 else
                 {
