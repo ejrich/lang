@@ -6,6 +6,7 @@
         public string Value { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
+        public bool Error { get; set; }
     }
 
     public enum TokenType

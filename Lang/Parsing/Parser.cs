@@ -13,7 +13,7 @@ namespace Lang.Parsing
 
     public class ParseResult
     {
-        public bool Success { get; set; } = true;
+        public bool Success => !Errors.Any();
         public List<IAst> SyntaxTrees { get; } = new();
         public List<ParseError> Errors { get; } = new();
     }
@@ -43,7 +43,6 @@ namespace Lang.Parsing
                         error.File = file;
                     }
                     parseResult.Errors.AddRange(fileParseResult.Errors);
-                    parseResult.Success = false;
                 }
                 else if (parseResult.Success)
                 {
@@ -59,7 +58,17 @@ namespace Lang.Parsing
             // 1. Load file tokens
             var tokens = _lexer.LoadFileTokens(file);
 
+            // 2. Determine if any errors happened while lexing
             var parseResult = new FileParseResult {File = file};
+            foreach (var token in tokens.Where(token => token.Error))
+            {
+                parseResult.Errors.Add(new ParseError
+                {
+                    File = file,
+                    Error = $"Unexpected token '{token.Value}'",
+                    Token = token
+                });
+            }
 
             // 2. Iterate through tokens, tracking different ASTs
             IEnumerator<Token> enumerator = tokens.GetEnumerator();
@@ -75,7 +84,7 @@ namespace Lang.Parsing
                     default:
                         parseResult.Errors.Add(new ParseError
                         {
-                            Error = "Unexpected token", Token = enumerator.Current
+                            Error = $"Unexpected token '{token.Value}'", Token = enumerator.Current
                         });
                         break;
                 }
