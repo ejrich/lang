@@ -100,6 +100,7 @@ namespace Lang.Parsing
                     continue;
                 }
 
+                // Skip over whitespace and emit the current token if not null
                 if (char.IsWhiteSpace(character))
                 {
                     if (currentToken != null)
