@@ -81,18 +81,11 @@ namespace Lang.Parsing
         private FileParseResult ParseFile(string file)
         {
             // 1. Load file tokens
-            var tokens = _lexer.LoadFileTokens(file);
+            var tokens = _lexer.LoadFileTokens(file, out var errors);
 
-            // 2. Determine if any errors happened while lexing
+            // 2. Initialize parse result with any lexing errors
             var parseResult = new FileParseResult {File = file};
-            foreach (var token in tokens.Where(token => token.Error))
-            {
-                parseResult.Errors.Add(new ParseError
-                {
-                    Error = $"Unexpected token '{token.Value}'",
-                    Token = token
-                });
-            }
+            parseResult.Errors.AddRange(errors);
 
             // 3. Iterate through tokens, tracking different ASTs
             var enumerator = new TokenEnumerator(tokens);
@@ -329,6 +322,7 @@ namespace Lang.Parsing
                 {
                     case TokenType.Token:
                     case TokenType.Number:
+                    case TokenType.Boolean:
                     case TokenType.Literal:
                         returnAst.Value = new ConstantAst
                         {

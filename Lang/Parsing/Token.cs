@@ -13,8 +13,9 @@
     {
         Token,
         Number,
-        Comment,
+        Boolean,
         Literal,
+        Comment,
         OpenParen = '(',
         CloseParen = ')',
         OpenBrace = '{',
