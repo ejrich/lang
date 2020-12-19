@@ -49,6 +49,13 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
+    public class DeclarationAst : IAst
+    {
+        public string Name { get; set; }
+        public IAst Value { get; set; }
+        public List<IAst> Children => null;
+    }
+
     public class Variable
     {
         public TypeDefinition Type { get; init; }

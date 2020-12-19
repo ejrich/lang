@@ -224,15 +224,90 @@ namespace Lang.Parsing
                 switch (token.Type)
                 {
                     case TokenType.Token:
-                        if (token.Value == "return")
+                        switch (token.Value)
                         {
-                            function.Children.Add(ParseReturn(enumerator, parseResult));
+                            case "return":
+                                function.Children.Add(ParseReturn(enumerator, parseResult));
+                                break;
+                            case "var":
+                                function.Children.Add(ParseDeclaration(enumerator, parseResult));
+                                break;
                         }
                         // TODO Add more cases
                         break;
                 }
             }
             return function;
+        }
+
+        private static IAst ParseDeclaration(TokenEnumerator enumerator, FileParseResult parseResult)
+        {
+            var declaration = new DeclarationAst();
+
+            // 1. Expect to get variable name
+            enumerator.MoveNext();
+            switch (enumerator.Current.Type)
+            {
+                case TokenType.Token:
+                    declaration.Name = enumerator.Current.Value;
+                    break;
+                case TokenType.SemiColon:
+                    parseResult.Errors.Add(new ParseError
+                    {
+                        Error = $"Unexpected token in declaration '{enumerator.Current.Value}'",
+                        Token = enumerator.Current
+                    });
+                    return declaration;
+                default:
+                    parseResult.Errors.Add(new ParseError
+                    {
+                        Error = $"Unexpected token in declaration '{enumerator.Current.Value}'",
+                        Token = enumerator.Current
+                    });
+                    break;
+            }
+
+            // 2. Expect to get equals sign
+            enumerator.MoveNext();
+            if (enumerator.Current.Type != TokenType.Equals)
+            {
+                parseResult.Errors.Add(new ParseError
+                {
+                    Error = $"Expected '=' in declaration'",
+                    Token = enumerator.Current
+                });
+            }
+
+            // 3. Parse expression, constant, or another token as the value
+            enumerator.MoveNext();
+            switch (enumerator.Current.Type)
+            {
+                case TokenType.Number:
+                case TokenType.Boolean:
+                case TokenType.Literal:
+                    if (enumerator.Peek()?.Type == TokenType.SemiColon)
+                    {
+                        declaration.Value = new ConstantAst
+                        {
+                            Type = enumerator.Current.InferType(out var error),
+                            Value = enumerator.Current.Value
+                        };
+                        enumerator.MoveNext();
+                    }
+                    // TODO Handle expressions
+                    break;
+                case TokenType.Token:
+                    // TODO Handle calls, expressions, or variables
+                    break;
+                default:
+                    parseResult.Errors.Add(new ParseError
+                    {
+                        Error = $"Unexpected token in declaration '{enumerator.Current.Value}'",
+                        Token = enumerator.Current
+                    });
+                    break;
+            }
+            return declaration;
         }
 
         private static TypeDefinition ParseType(TokenEnumerator enumerator, FileParseResult parseResult)
