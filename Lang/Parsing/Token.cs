@@ -23,10 +23,12 @@
         Not = '!',
         And = '&',
         Or = '|',
+        Xor = '^',
         Add = '+',
         Minus = '-',
         Multiply = '*',
         Divide = '/',
+        Ampersand = '%',
         Equals = '=',
         Colon = ':',
         SemiColon = ';',
@@ -34,6 +36,6 @@
         LessThan = '<',
         GreaterThan = '>',
         Comma = ',',
-        Period = '.',
+        Period = '.'
     }
 }
