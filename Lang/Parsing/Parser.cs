@@ -99,7 +99,7 @@ namespace Lang.Parsing
             return syntaxTrees;
         }
 
-        private static IAst ParseFunction(TokenEnumerator enumerator, List<ParseError> errors)
+        private static FunctionAst ParseFunction(TokenEnumerator enumerator, List<ParseError> errors)
         {
             // 1. Determine return type and name of the function
             var function = new FunctionAst
@@ -229,7 +229,7 @@ namespace Lang.Parsing
             return function;
         }
 
-        private static IAst ParseDeclaration(TokenEnumerator enumerator, List<ParseError> errors)
+        private static DeclarationAst ParseDeclaration(TokenEnumerator enumerator, List<ParseError> errors)
         {
             var declaration = new DeclarationAst();
 
@@ -269,34 +269,165 @@ namespace Lang.Parsing
 
             // 3. Parse expression, constant, or another token as the value
             enumerator.MoveNext();
-            switch (enumerator.Current.Type)
+            var token = enumerator.Current;
+
+            // 3a. Constant or variable case
+            if (enumerator.Peek()?.Type == TokenType.SemiColon)
             {
-                case TokenType.Number:
-                case TokenType.Boolean:
-                case TokenType.Literal:
-                    if (enumerator.Peek()?.Type == TokenType.SemiColon)
-                    {
+                switch (token.Type)
+                {
+                    case TokenType.Number:
+                    case TokenType.Boolean:
+                    case TokenType.Literal:
                         declaration.Value = new ConstantAst
                         {
-                            Type = enumerator.Current.InferType(out var error),
-                            Value = enumerator.Current.Value
+                            Type = token.InferType(out var error),
+                            Value = token.Value
                         };
+                        if (error != null)
+                            errors.Add(error);
                         enumerator.MoveNext();
-                    }
-                    // TODO Handle expressions
-                    break;
-                case TokenType.Token:
-                    // TODO Handle calls, expressions, or variables
-                    break;
-                default:
+                        break;
+                    case TokenType.Token:
+                        declaration.Value = new VariableAst {Name = token.Value};
+                        break;
+                    default:
+                        errors.Add(new ParseError
+                        {
+                            Error = $"Expected token '{token.Value}'",
+                            Token = token
+                        });
+                        break;
+                }
+            }
+            else
+            {
+                var expression = ParseExpression(enumerator, errors);
+                if (expression.HasErrors)
+                {
                     errors.Add(new ParseError
                     {
-                        Error = $"Unexpected token in declaration '{enumerator.Current.Value}'",
-                        Token = enumerator.Current
+                        Error = "Expected declaration to have value",
+                        Token = token
                     });
-                    break;
+                }
             }
+
             return declaration;
+        }
+
+        private static ExpressionAst ParseExpression(TokenEnumerator enumerator, List<ParseError> errors)
+        {
+            var expression = new ExpressionAst();
+
+            while (enumerator.Current.Type != TokenType.SemiColon)
+            {
+                switch (enumerator.Current.Type)
+                {
+                    case TokenType.Number:
+                    case TokenType.Boolean:
+                    case TokenType.Literal:
+                        // TODO Implement me
+                        break;
+                    case TokenType.Token:
+                        // Parse call
+                        var nextToken = enumerator.Peek();
+                        switch (nextToken.Type)
+                        {
+                            case TokenType.OpenParen:
+                                var call = ParseCall(enumerator, errors);
+                                break;
+                        }
+                        break;
+                }
+                enumerator.MoveNext();
+            }
+
+            return expression;
+        }
+
+        private static CallAst ParseCall(TokenEnumerator enumerator, List<ParseError> errors)
+        {
+            var callAst = new CallAst
+            {
+                Function = enumerator.Current.Value
+            };
+
+            // This enumeration is the open paren
+            enumerator.MoveNext();
+            // Enumerate over the first argument
+            var commaRequired = false;
+            while (enumerator.MoveNext())
+            {
+                var token = enumerator.Current;
+
+                if (enumerator.Current.Type == TokenType.CloseParen)
+                {
+                    if (!commaRequired && callAst.Arguments.Any())
+                    {
+                        errors.Add(new ParseError
+                        {
+                            Error = "Unexpected comma in call",
+                            Token = new Token {Type = TokenType.Comma, Line = token.Line}
+                        });
+                    }
+                    break;
+                }
+
+                if (commaRequired)
+                {
+                    if (token.Type == TokenType.Comma)
+                    {
+                        commaRequired = false;
+                    }
+                    else
+                    {
+                        errors.Add(new ParseError
+                        {
+                            Error = "Expected comma before next argument",
+                            Token = token
+                        });
+                    }
+                }
+                else
+                {
+                    switch (token.Type)
+                    {
+                        case TokenType.Number:
+                        case TokenType.Boolean:
+                        case TokenType.Literal:
+                            var constant = new ConstantAst
+                            {
+                                Type = token.InferType(out var error),
+                                Value = token.Value
+                            };
+                            if (error != null)
+                                errors.Add(error);
+                            callAst.Arguments.Add(constant);
+                            commaRequired = true;
+                            break;
+                        case TokenType.Token:
+                            // Parse call
+                            var nextToken = enumerator.Peek();
+                            switch (nextToken.Type)
+                            {
+                                case TokenType.OpenParen:
+                                    var call = ParseCall(enumerator, errors);
+                                    break;
+                                // TODO Implement expressions
+                            }
+                            break;
+                        default:
+                            errors.Add(new ParseError
+                            {
+                                Error = $"Unexpected token in '{token.Value}' function call '{callAst.Function}'",
+                                Token = token
+                            });
+                    }
+                }
+            }
+
+            return callAst;
         }
 
         private static TypeDefinition ParseType(TokenEnumerator enumerator, List<ParseError> errors)
@@ -369,7 +500,7 @@ namespace Lang.Parsing
             return typeDefinition;
         }
 
-        private static IAst ParseReturn(TokenEnumerator enumerator, List<ParseError> errors)
+        private static ReturnAst ParseReturn(TokenEnumerator enumerator, List<ParseError> errors)
         {
             var returnAst = new ReturnAst();
 
