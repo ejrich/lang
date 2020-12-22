@@ -76,7 +76,7 @@ namespace Lang.Parsing
             // 1. Load file tokens
             var tokens = _lexer.LoadFileTokens(file, out errors);
 
-            // 3. Iterate through tokens, tracking different ASTs
+            // 2. Iterate through tokens, tracking different ASTs
             var syntaxTrees = new List<IAst>();
             var enumerator = new TokenEnumerator(tokens);
             while (enumerator.MoveNext())
@@ -214,21 +214,34 @@ namespace Lang.Parsing
 
                 switch (token.Type)
                 {
+                    case TokenType.Return:
+                        function.Children.Add(ParseReturn(enumerator, errors));
+                        break;
+                    case TokenType.Var:
+                        function.Children.Add(ParseDeclaration(enumerator, errors));
+                        break;
+                    case TokenType.If:
+                        function.Children.Add(ParseConditional(enumerator, errors));
+                        break;
                     case TokenType.Token:
-                        switch (token.Value)
+                        // TODO Handle assignments and other things
+                        break;
+                    default:
+                        errors.Add(new ParseError
                         {
-                            case "return":
-                                function.Children.Add(ParseReturn(enumerator, errors));
-                                break;
-                            case "var":
-                                function.Children.Add(ParseDeclaration(enumerator, errors));
-                                break;
-                        }
-                        // TODO Add more cases
+                            Error = $"Unexpected token '{token.Value}'",
+                            Token = token
+                        });
                         break;
                 }
             }
             return function;
+        }
+
+        private static IAst ParseConditional(TokenEnumerator enumerator, List<ParseError> errors)
+        {
+            // TODO Implement me
+            return null;
         }
 
         private static DeclarationAst ParseDeclaration(TokenEnumerator enumerator, List<ParseError> errors)

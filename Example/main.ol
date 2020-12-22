@@ -15,5 +15,9 @@ int foo() {
 }
 
 int bar(int a, string b, float c) {
+    if a == 4 then return a;
+    if a == 3 {
+        return 5;
+    }
     return a + 3;
 }
