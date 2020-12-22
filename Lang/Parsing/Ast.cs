@@ -18,7 +18,7 @@ namespace Lang.Parsing
 
     public class FunctionAst : IAst
     {
-        public string Name { get; init; }
+        public string Name { get; set; }
         public TypeDefinition ReturnType { get; init; }
         public List<Variable> Arguments { get; } = new();
         public List<IAst> Children { get; } = new();
