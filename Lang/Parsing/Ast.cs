@@ -80,7 +80,7 @@ namespace Lang.Parsing
     public class TypeDefinition
     {
         public string Type { get; init; }
-        public List<string> Generics { get; } = new();
+        public List<TypeDefinition> Generics { get; } = new();
     }
 
     public enum Operator
