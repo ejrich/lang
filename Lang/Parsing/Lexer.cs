@@ -24,7 +24,7 @@ namespace Lang.Parsing
             { "else", TokenType.Else },
             { "then", TokenType.Then },
             { "while", TokenType.While },
-            { "each", TokenType.Each },
+            { "each", TokenType.Each }, // TODO Implement each blocks
         };
 
         public List<Token> LoadFileTokens(string filePath, out List<ParseError> errors)
