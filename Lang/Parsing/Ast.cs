@@ -83,6 +83,12 @@ namespace Lang.Parsing
         public IAst Else { get; set; }
     }
 
+    public class WhileAst : IAst
+    {
+        public IAst Condition { get; set; }
+        public List<IAst> Children { get; } = new();
+    }
+
     public class Variable
     {
         public TypeDefinition Type { get; init; }

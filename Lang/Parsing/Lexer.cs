@@ -23,6 +23,8 @@ namespace Lang.Parsing
             { "if", TokenType.If },
             { "else", TokenType.Else },
             { "then", TokenType.Then },
+            { "while", TokenType.While },
+            { "each", TokenType.Each },
         };
 
         public List<Token> LoadFileTokens(string filePath, out List<ParseError> errors)
