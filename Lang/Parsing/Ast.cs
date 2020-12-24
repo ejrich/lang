@@ -10,6 +10,11 @@ namespace Lang.Parsing
         List<IAst> Children { get; }
     }
 
+    public class ScopeAst : IAst
+    {
+        public List<IAst> Children { get; } = new();
+    }
+
     public class ParseError
     {
         public string File { get; set; }
@@ -64,11 +69,18 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
+    public class AssignmentAst : IAst
+    {
+        public string Name { get; set; }
+        public IAst Value { get; set; }
+        public List<IAst> Children => null;
+    }
+
     public class ConditionalAst : IAst
     {
         public IAst Condition { get; set; }
         public List<IAst> Children { get; } = new();
-        public List<IAst> ElseChildren { get; } = new();
+        public IAst Else { get; set; }
     }
 
     public class Variable

@@ -1,7 +1,5 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
-using Microsoft.VisualBasic;
 
 namespace Lang.Parsing
 {
@@ -246,8 +244,18 @@ namespace Lang.Parsing
                 case TokenType.If:
                     return ParseConditional(enumerator, errors);
                 case TokenType.Token:
+                    var nextToken = enumerator.Peek();
+                    switch (nextToken?.Type)
+                    {
+                        case TokenType.OpenParen:
+                            return ParseCall(enumerator, errors);
+                        case TokenType.Equals:
+                            return ParseAssignment(enumerator, errors);
+                    }
                     // TODO Handle calls, assignments, and other things
                     return null;
+                case TokenType.OpenBrace:
+                    return ParseScope(enumerator, errors);
                 case null:
                     errors.Add(new ParseError
                     {
@@ -263,6 +271,36 @@ namespace Lang.Parsing
                     });
                     return null;
             }
+        }
+
+        private static ScopeAst ParseScope(TokenEnumerator enumerator, List<ParseError> errors)
+        {
+            var scopeAst = new ScopeAst();
+
+            var closed = false;
+            while (enumerator.MoveNext())
+            {
+                if (enumerator.Current.Type == TokenType.CloseBrace)
+                {
+                    closed = true;
+                    break;
+                }
+
+                var ast = ParseLine(enumerator, errors);
+                if (ast != null)
+                    scopeAst.Children.Add(ast);
+            }
+
+            if (!closed)
+            {
+                errors.Add(new ParseError
+                {
+                    Error = "Scope not closed by '}'",
+                    Token = enumerator.Current ?? enumerator.Last
+                });
+            }
+
+            return scopeAst;
         }
 
         private static ConditionalAst ParseConditional(TokenEnumerator enumerator, List<ParseError> errors)
@@ -333,30 +371,18 @@ namespace Lang.Parsing
                         enumerator.MoveNext();
                         var ast = ParseLine(enumerator, errors);
                         if (ast != null)
-                            conditionalAst.ElseChildren.Add(ast);
+                            conditionalAst.Else = ast;
                         break;
                     }
                     case TokenType.OpenBrace:
                     {
                         // Parse until close brace
-                        while (enumerator.MoveNext())
-                        {
-                            var token = enumerator.Current;
-
-                            if (token.Type == TokenType.CloseBrace)
-                            {
-                                break;
-                            }
-
-                            var ast = ParseLine(enumerator, errors);
-                            if (ast != null)
-                                conditionalAst.ElseChildren.Add(ast);
-                        }
+                        conditionalAst.Else = ParseScope(enumerator, errors);
                         break;
                     }
                     case TokenType.If:
                         // Nest another conditional in else children
-                        conditionalAst.ElseChildren.Add(ParseConditional(enumerator, errors));
+                        conditionalAst.Else = ParseConditional(enumerator, errors);
                         break;
                     case null:
                         errors.Add(new ParseError
@@ -424,6 +450,39 @@ namespace Lang.Parsing
             }
 
             // 3. Parse expression, constant, or another token as the value
+            declaration.Value = ParseRightHandSide(enumerator, errors);
+
+            return declaration;
+        }
+
+        private static AssignmentAst ParseAssignment(TokenEnumerator enumerator, List<ParseError> errors)
+        {
+            // 1. Get the variable name
+            var assignment = new AssignmentAst
+            {
+                Name = enumerator.Current.Value
+            };
+
+            // 2. Expect to get equals sign
+            enumerator.MoveNext();
+            if (enumerator.Current?.Type != TokenType.Equals)
+            {
+                errors.Add(new ParseError
+                {
+                    Error = "Expected '=' in declaration'",
+                    Token = enumerator.Current ?? enumerator.Last
+                });
+            }
+
+            // 3. Parse expression, constant, or another token as the value
+            assignment.Value = ParseRightHandSide(enumerator, errors);
+
+            return assignment;
+        }
+
+        private static IAst ParseRightHandSide(TokenEnumerator enumerator, List<ParseError> errors)
+        {
+            // Step over '=' sign
             enumerator.MoveNext();
             var token = enumerator.Current;
 
@@ -431,47 +490,44 @@ namespace Lang.Parsing
             {
                 errors.Add(new ParseError
                 {
-                    Error = "Expected declaration to have value",
+                    Error = "Expected to have a value",
                     Token = enumerator.Last
                 });
-                return declaration;
+                return null;
             }
 
-            // 3a. Constant or variable case
+            // Constant or variable case
             if (enumerator.Peek()?.Type == TokenType.SemiColon)
             {
+                enumerator.MoveNext();
                 switch (token.Type)
                 {
                     case TokenType.Number:
                     case TokenType.Boolean:
                     case TokenType.Literal:
-                        declaration.Value = new ConstantAst
+                        var constant = new ConstantAst
                         {
                             Type = token.InferType(out var error),
                             Value = token.Value
                         };
                         if (error != null)
                             errors.Add(error);
-                        break;
+                        return constant;
                     case TokenType.Token:
-                        declaration.Value = new VariableAst {Name = token.Value};
-                        break;
+                        var variable = new VariableAst {Name = token.Value};
+                        return variable;
                     default:
                         errors.Add(new ParseError
                         {
                             Error = $"Unexpected token '{token.Value}'",
                             Token = token
                         });
-                        break;
+                        return null;
                 }
-                enumerator.MoveNext();
-            }
-            else
-            {
-                declaration.Value = ParseExpression(enumerator, errors);
             }
 
-            return declaration;
+            // Expression case
+            return ParseExpression(enumerator, errors);
         }
 
         private static ExpressionAst ParseExpression(TokenEnumerator enumerator, List<ParseError> errors, params TokenType[] endToken)
@@ -508,6 +564,7 @@ namespace Lang.Parsing
                             Error = $"Unexpected token '{token.Value}' when operator was expected",
                             Token = token
                         });
+                        return null;
                     }
                 }
                 else
