@@ -255,13 +255,11 @@ namespace Lang.Parsing
                             return ParseAssignment(enumerator, errors);
                         // TODO Handle other things
                         default:
-                            errors.Add(new ParseError
-                            {
-                                Error = $"Unexpected token '{token.Value}'",
-                                Token = token
-                            });
-                            return null;
+                            return ParseExpression(enumerator, errors);
                     }
+                case TokenType.Increment:
+                case TokenType.Decrement:
+                    return ParseExpression(enumerator, errors);
                 case TokenType.OpenBrace:
                     return ParseScope(enumerator, errors);
                 case null:
@@ -619,8 +617,20 @@ namespace Lang.Parsing
                     var op = token.ConvertOperator();
                     if (op != Operator.None)
                     {
-                        expression.Operators.Add(op);
-                        operatorRequired = false;
+                        if (op == Operator.Increment || op == Operator.Decrement)
+                        {
+                            // Create subexpression to hold the operation
+                            // This case would be `var b = 4 + a++`, where we have a value before the operator
+                            expression.Children[^1] = new ChangeByOneAst
+                            {
+                                Operator = op, Children = {expression.Children[^1]},
+                            };
+                        }
+                        else
+                        {
+                            expression.Operators.Add(op);
+                            operatorRequired = false;
+                        }
                     }
                     else
                     {
@@ -634,63 +644,9 @@ namespace Lang.Parsing
                 }
                 else
                 {
-                    var nextToken = enumerator.Peek();
-                    switch (token.Type)
-                    {
-                        case TokenType.Number:
-                        case TokenType.Boolean:
-                        case TokenType.Literal:
-                            // Parse constant or expression
-                            expression.Children.Add(new ConstantAst
-                            {
-                                Type = token.InferType(out var error), Value = token.Value
-                            });
-                            if (error != null)
-                                errors.Add(error);
-                            operatorRequired = true;
-                            break;
-                        case TokenType.Token:
-                            // Parse variable, call, or expression
-                            switch (nextToken?.Type)
-                            {
-                                case TokenType.OpenParen:
-                                    expression.Children.Add(ParseCall(enumerator, errors));
-                                    break;
-                                case null:
-                                    errors.Add(new ParseError
-                                    {
-                                        Error = $"Expected token to follow '{token.Value}'",
-                                        Token = token
-                                    });
-                                    break;
-                                default:
-                                    expression.Children.Add(new VariableAst {Name = token.Value});
-                                    break;
-                            }
-                            operatorRequired = true;
-                            break;
-                        case TokenType.OpenParen:
-                            if (enumerator.MoveNext())
-                            {
-                                expression.Children.Add(ParseExpression(enumerator, errors, TokenType.CloseParen));
-                            }
-                            else
-                            {
-                                errors.Add(new ParseError
-                                {
-                                    Error = $"Expected token to follow '{token.Value}'",
-                                    Token = token
-                                });
-                            }
-                            operatorRequired = true;
-                            break;
-                        default:
-                            errors.Add(new ParseError
-                            {
-                                Error = $"Unexpected token '{token.Value}' in expression", Token = token
-                            });
-                            break;
-                    }
+                    var ast = ParseNextExpressionUnit(enumerator, errors, out operatorRequired);
+                    if (ast != null)
+                        expression.Children.Add(ast);
                 }
 
             } while (enumerator.MoveNext());
@@ -713,6 +669,83 @@ namespace Lang.Parsing
             }
 
             return expression;
+        }
+
+        private static IAst ParseNextExpressionUnit(TokenEnumerator enumerator, List<ParseError> errors, out bool operatorRequired)
+        {
+            var token = enumerator.Current;
+            var nextToken = enumerator.Peek();
+            operatorRequired = true;
+            switch (token.Type)
+            {
+                case TokenType.Number:
+                case TokenType.Boolean:
+                case TokenType.Literal:
+                    // Parse constant or expression
+                    var constant = new ConstantAst
+                    {
+                        Type = token.InferType(out var error), Value = token.Value
+                    };
+                    if (error != null)
+                        errors.Add(error);
+                    return constant;
+                case TokenType.Token:
+                    // Parse variable, call, or expression
+                    switch (nextToken?.Type)
+                    {
+                        case TokenType.OpenParen:
+                            return ParseCall(enumerator, errors);
+                        case null:
+                            errors.Add(new ParseError
+                            {
+                                Error = $"Expected token to follow '{token.Value}'",
+                                Token = token
+                            });
+                            return null;
+                        default:
+                            return new VariableAst {Name = token.Value};
+                    }
+                case TokenType.Increment:
+                case TokenType.Decrement:
+                    var op = token.ConvertOperator();
+                    if (enumerator.MoveNext())
+                    {
+                        return new ChangeByOneAst
+                        {
+                            Prefix = true, Operator = op, Children = { ParseNextExpressionUnit(enumerator, errors, out operatorRequired) }
+                        };
+                    }
+                    else
+                    {
+                        errors.Add(new ParseError
+                        {
+                            Error = $"Expected token to follow '{token.Value}'",
+                            Token = token
+                        });
+                        return null;
+                    }
+                case TokenType.OpenParen:
+                    if (enumerator.MoveNext())
+                    {
+                        return ParseExpression(enumerator, errors, TokenType.CloseParen);
+                    }
+                    else
+                    {
+                        errors.Add(new ParseError
+                        {
+                            Error = $"Expected token to follow '{token.Value}'",
+                            Token = token
+                        });
+                        return null;
+                    }
+                default:
+                    errors.Add(new ParseError
+                    {
+                        Error = $"Unexpected token '{token.Value}' in expression", Token = token
+                    });
+                    operatorRequired = false;
+                    return null;
+             }
         }
 
         private static CallAst ParseCall(TokenEnumerator enumerator, List<ParseError> errors)

@@ -235,30 +235,28 @@ namespace Lang.Parsing
                             return false;
                     }
                 case TokenType.Ampersand:
-                    if (type == TokenType.Ampersand)
-                    {
-                        currentToken.Type = TokenType.And;
-                        return true;
-                    }
-                    return false;
+                    return ChangeTypeIfSame(currentToken, type, TokenType.And);
                 case TokenType.Pipe:
-                    if (type == TokenType.Pipe)
-                    {
-                        currentToken.Type = TokenType.Or;
-                        return true;
-                    }
-                    return false;
+                    return ChangeTypeIfSame(currentToken, type, TokenType.Or);
                 case TokenType.Equals:
-                    if (type == TokenType.Equals)
-                    {
-                        currentToken.Type = TokenType.Equality;
-                        return true;
-                    }
-                    return false;
+                    return ChangeTypeIfSame(currentToken, type, TokenType.Equality);
+                case TokenType.Plus:
+                    return ChangeTypeIfSame(currentToken, type, TokenType.Increment);
+                case TokenType.Minus:
+                    return ChangeTypeIfSame(currentToken, type, TokenType.Decrement);
                 // TODO More validation eventually
                 default:
                     return false;
             }
+        }
+
+        private static bool ChangeTypeIfSame(Token token, TokenType type, TokenType newType)
+        {
+            if (token.Type != type)
+                return false;
+
+            token.Type = newType;
+            return true;
         }
 
         private class LexerStatus

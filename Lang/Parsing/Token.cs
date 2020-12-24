@@ -12,6 +12,7 @@
     public enum TokenType
     {
         Token,
+        Comment,
         Number,
         Boolean,
         Literal,
@@ -25,7 +26,8 @@
         And,
         Or,
         Equality,
-        Comment,
+        Increment,
+        Decrement,
         OpenParen = '(',
         CloseParen = ')',
         OpenBrace = '{',
