@@ -42,3 +42,13 @@ int fib(int n) {
     if n == 1 then return 1;
     return n * fib(n - 1);
 }
+
+struct MyStruct {
+    int field;
+    float something = 4.2;
+    OtherStruct subValue;
+}
+
+struct OtherStruct {
+    int something = 5;
+}
