@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Lang.Parsing
@@ -295,7 +296,7 @@ namespace Lang.Parsing
                                 errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}' in struct", Token = token});
                             }
                             // Add the field to the struct and continue
-                            structAst.Children.Add(currentField);
+                            structAst.Fields.Add(currentField);
                             currentField = null;
                             parsingFieldDefault = false;
                         }
@@ -315,7 +316,10 @@ namespace Lang.Parsing
                     case TokenType.Literal:
                         if (currentField != null && parsingFieldDefault)
                         {
-                            currentField.DefaultValue = token.Value;
+                            var constant = new ConstantAst {Type = InferType(token, out var error), Value = token.Value};
+                            if (error != null)
+                                errors.Add(error);
+                            currentField.DefaultValue = constant;
                             parsingFieldDefault = false;
                         }
                         else
@@ -726,7 +730,7 @@ namespace Lang.Parsing
             var token = enumerator.Current;
             if (token.Type != TokenType.Equals)
             {
-                var op = token.ConvertOperator();
+                var op = ConvertOperator(token);
                 if (op != Operator.None)
                 {
                     assignment.Operator = op;
@@ -834,7 +838,7 @@ namespace Lang.Parsing
 
                 if (operatorRequired)
                 {
-                    var op = token.ConvertOperator();
+                    var op = ConvertOperator(token);
                     if (op != Operator.None)
                     {
                         if (op == Operator.Increment || op == Operator.Decrement)
@@ -899,7 +903,7 @@ namespace Lang.Parsing
                 case TokenType.Boolean:
                 case TokenType.Literal:
                     // Parse constant or expression
-                    var constant = new ConstantAst {Type = token.InferType(out var error), Value = token.Value};
+                    var constant = new ConstantAst {Type = InferType(token, out var error), Value = token.Value};
                     if (error != null)
                         errors.Add(error);
                     return constant;
@@ -922,7 +926,7 @@ namespace Lang.Parsing
                     }
                 case TokenType.Increment:
                 case TokenType.Decrement:
-                    var op = token.ConvertOperator();
+                    var op = ConvertOperator(token);
                     if (enumerator.MoveNext())
                     {
                         return new ChangeByOneAst
@@ -1089,6 +1093,59 @@ namespace Lang.Parsing
             }
 
             return typeDefinition;
+        }
+
+        private static Type InferType(Token token, out ParseError error)
+        {
+            error = null;
+
+            switch (token.Type)
+            {
+                case TokenType.Literal:
+                    return Type.String;
+                case TokenType.Number:
+                    if (int.TryParse(token.Value, out _))
+                    {
+                        return Type.Int;
+                    }
+                    else if (float.TryParse(token.Value, out _))
+                    {
+                        return Type.Float;
+                    }
+                    else
+                    {
+                        return Type.Other;
+                    }
+                case TokenType.Boolean:
+                    return Type.Boolean;
+                // TODO This isn't right, but works for now
+                case TokenType.Token:
+                    return Type.Other;
+                default:
+                    return Type.Other;
+            }
+        }
+
+        private static Operator ConvertOperator(Token token)
+        {
+            switch (token.Type)
+            {
+                // Multi-character operators
+                case TokenType.And:
+                    return Operator.And;
+                case TokenType.Or:
+                    return Operator.Or;
+                case TokenType.Equality:
+                    return Operator.Equality;
+                case TokenType.Increment:
+                    return Operator.Increment;
+                case TokenType.Decrement:
+                    return Operator.Decrement;
+                // Handle single character operators
+                default:
+                    var op = (Operator)token.Value[0];
+                    return Enum.IsDefined(typeof(Operator), op) ? op : Operator.None;
+            }
         }
     }
 }
