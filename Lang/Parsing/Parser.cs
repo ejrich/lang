@@ -428,7 +428,7 @@ namespace Lang.Parsing
 
             // 1. Parse the conditional expression by first iterating over the initial 'if'
             enumerator.MoveNext();
-            conditionalAst.Condition = ParseExpression(enumerator, errors, TokenType.OpenBrace, TokenType.Then);
+            conditionalAst.Condition = ParseExpression(enumerator, errors, null, TokenType.OpenBrace, TokenType.Then);
 
             // 2. Determine how many lines to parse
             switch (enumerator.Current?.Type)
@@ -510,7 +510,7 @@ namespace Lang.Parsing
 
             // 1. Parse the conditional expression by first iterating over the initial 'while'
             enumerator.MoveNext();
-            whileAst.Condition = ParseExpression(enumerator, errors, TokenType.OpenBrace, TokenType.Then);
+            whileAst.Condition = ParseExpression(enumerator, errors, null, TokenType.OpenBrace, TokenType.Then);
 
             // 2. Determine how many lines to parse
             switch (enumerator.Current?.Type)
@@ -577,7 +577,7 @@ namespace Lang.Parsing
 
             // 3. Determine the iterator
             enumerator.MoveNext();
-            var expression = ParseExpression(enumerator, errors, TokenType.OpenBrace, TokenType.Then, TokenType.Range);
+            var expression = ParseExpression(enumerator, errors, null, TokenType.OpenBrace, TokenType.Then, TokenType.Range);
 
             // 3a. Check if the next token is a range
             switch (enumerator.Current?.Type)
@@ -591,7 +591,7 @@ namespace Lang.Parsing
                         return eachAst;
                     }
 
-                    eachAst.RangeEnd = ParseExpression(enumerator, errors, TokenType.OpenBrace, TokenType.Then);
+                    eachAst.RangeEnd = ParseExpression(enumerator, errors, null, TokenType.OpenBrace, TokenType.Then);
                     if (enumerator.Current == null)
                     {
                         errors.Add(new ParseError
@@ -766,24 +766,41 @@ namespace Lang.Parsing
             var structField = ParseStructField(enumerator, errors);
 
             // 2. Determine if expression or assignment
-            var token = enumerator.Current;
-            switch (token?.Type)
+            var nextToken = enumerator.Peek();
+            switch (nextToken?.Type)
             {
                 case TokenType.SemiColon:
+                    enumerator.MoveNext();
                     return structField;
                 case TokenType.Equals:
                     return ParseAssignment(enumerator, errors, structField);
+                case TokenType.Increment:
+                case TokenType.Decrement:
+                    enumerator.MoveNext();
+                    var changeByOneAst = new ChangeByOneAst
+                    {
+                        Operator = enumerator.Current.Type == TokenType.Increment ? Operator.Increment : Operator.Decrement,
+                        Variable = structField
+                    };
+                    enumerator.MoveNext();
+                    if (enumerator.Current?.Type == TokenType.SemiColon)
+                    {
+                        return changeByOneAst;
+                    }
+
+                    var expression = new ExpressionAst {Children = {changeByOneAst}};
+                    return ParseExpression(enumerator, errors, expression);
                 case null:
                     errors.Add(new ParseError {Error = "Expected value", Token = enumerator.Last});
                     return null;
                 default:
-                    if (enumerator.Peek()?.Type == TokenType.Equals)
+                    if (enumerator.Peek(1)?.Type == TokenType.Equals)
                     {
                         return ParseAssignment(enumerator, errors, structField);
                     }
                     else
                     {
-                        errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}'", Token = token});
+                        errors.Add(new ParseError {Error = $"Unexpected token '{enumerator.Current.Value}'", Token = enumerator.Current});
                         return structField;
                     }
             }
@@ -814,16 +831,16 @@ namespace Lang.Parsing
             return structField;
         }
 
-        private static IAst ParseExpression(TokenEnumerator enumerator, List<ParseError> errors,
+        private static IAst ParseExpression(TokenEnumerator enumerator, List<ParseError> errors, ExpressionAst initial = null,
             params TokenType[] endToken)
         {
-            var expression = new ExpressionAst();
+            var operatorRequired = initial != null;
+
+            var expression = initial ?? new ExpressionAst();
             if (!endToken.Any())
             {
                 endToken = new[] {TokenType.SemiColon};
             }
-
-            var operatorRequired = false;
 
             do
             {
@@ -845,7 +862,7 @@ namespace Lang.Parsing
                             // This case would be `var b = 4 + a++`, where we have a value before the operator
                             expression.Children[^1] = new ChangeByOneAst
                             {
-                                Operator = op, Children = {expression.Children[^1]},
+                                Operator = op, Variable = expression.Children[^1]
                             };
                         }
                         else
@@ -929,7 +946,7 @@ namespace Lang.Parsing
                         {
                             Prefix = true,
                             Operator = op,
-                            Children = {ParseNextExpressionUnit(enumerator, errors, out operatorRequired)}
+                            Variable = ParseNextExpressionUnit(enumerator, errors, out operatorRequired)
                         };
                     }
                     else
@@ -941,7 +958,7 @@ namespace Lang.Parsing
                     // Parse subexpression
                     if (enumerator.MoveNext())
                     {
-                        return ParseExpression(enumerator, errors, TokenType.CloseParen);
+                        return ParseExpression(enumerator, errors, null, TokenType.CloseParen);
                     }
                     else
                     {
@@ -980,7 +997,7 @@ namespace Lang.Parsing
                 }
                 else
                 {
-                    callAst.Arguments.Add(ParseExpression(enumerator, errors, TokenType.Comma, TokenType.CloseParen));
+                    callAst.Arguments.Add(ParseExpression(enumerator, errors, null, TokenType.Comma, TokenType.CloseParen));
                     
                     if (enumerator.Current?.Type == TokenType.CloseParen)
                     {
