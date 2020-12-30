@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Lang.Parsing;
-using Type = Lang.Parsing.Type;
+using Type = Lang.Translation.Type;
 
 namespace Lang.Translation
 {
@@ -189,7 +189,13 @@ namespace Lang.Translation
                     case AssignmentAst assignment:
                         VerifyAssignment(assignment, localVariables, errors);
                         break;
-                    // TODO Handle more syntax trees
+                    // TODO Implement these syntax trees
+                    case ConditionalAst conditional:
+                        break;
+                    case WhileAst whileAst:
+                        break;
+                    case EachAst each:
+                        break;
                     default:
                         VerifyExpression(syntaxTree, localVariables, errors);
                         break;
@@ -400,6 +406,11 @@ namespace Lang.Translation
                     return function?.ReturnType;
                 // TODO Implement these branches
                 case ExpressionAst expression:
+                    break;
+                case null:
+                    return null;
+                default:
+                    errors.Add(new TranslationError {Error = $"Unexpected Ast '{ast}'"});
                     break;
             }
 
