@@ -8,7 +8,7 @@ namespace Lang.Parsing
 {
     public interface ILexer
     {
-        List<Token> LoadFileTokens(string filePath, out List<ParseError> errors);
+        List<Token> LoadFileTokens(string filePath, int fileIndex, out List<ParseError> errors);
     }
 
     public class Lexer : ILexer
@@ -29,15 +29,15 @@ namespace Lang.Parsing
             {"struct", TokenType.Struct},
         };
 
-        public List<Token> LoadFileTokens(string filePath, out List<ParseError> errors)
+        public List<Token> LoadFileTokens(string filePath, int fileIndex, out List<ParseError> errors)
         {
             var fileContents = File.ReadAllText(filePath);
 
             errors = new List<ParseError>();
-            return GetTokens(fileContents, filePath, errors).ToList();
+            return GetTokens(fileContents, fileIndex, errors).ToList();
         }
 
-        private IEnumerable<Token> GetTokens(string fileContents, string filePath, List<ParseError> errors)
+        private IEnumerable<Token> GetTokens(string fileContents, int fileIndex, List<ParseError> errors)
         {
             var lexerStatus = new LexerStatus();
 
@@ -84,6 +84,7 @@ namespace Lang.Parsing
                     currentToken.Type = TokenType.Literal;
                     currentToken.Value = string.Empty;
                 }
+
                 if (currentToken?.Type == TokenType.Literal)
                 {
                     if (character == '\\' && !literalEscapeToken)
@@ -97,6 +98,7 @@ namespace Lang.Parsing
                         {
                             currentToken.Error = true;
                         }
+
                         currentToken.Value += character;
                         literalEscapeToken = false;
                     }
@@ -111,6 +113,7 @@ namespace Lang.Parsing
                                     Error = $"Unexpected token '{currentToken.Value}'", Token = currentToken
                                 });
                             }
+
                             yield return currentToken;
                             currentToken = null;
                         }
@@ -135,6 +138,7 @@ namespace Lang.Parsing
                             {
                                 Type = TokenType.Number,
                                 Value = number,
+                                FileIndex = fileIndex,
                                 Line = currentToken.Line,
                                 Column = currentToken.Column
                             };
@@ -171,6 +175,7 @@ namespace Lang.Parsing
                             yield return new Token
                             {
                                 Type = TokenType.Number,
+                                FileIndex = fileIndex,
                                 Value = number,
                                 Line = currentToken.Line,
                                 Column = currentToken.Column
@@ -189,7 +194,11 @@ namespace Lang.Parsing
 
                     currentToken = new Token
                     {
-                        Type = tokenType, Value = character.ToString(), Line = line, Column = column
+                        Type = tokenType,
+                        Value = character.ToString(),
+                        FileIndex = fileIndex,
+                        Line = line,
+                        Column = column
                     };
                 }
             }

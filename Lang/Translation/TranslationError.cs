@@ -2,9 +2,9 @@
 {
     public class TranslationError
     {
-        public string File { get; set; }
-        public string Error { get; set; }
-        public int Line { get; set; }
-        public int Column { get; set; }
+        public int FileIndex { get; init; }
+        public string Error { get; init; }
+        public int Line { get; init; }
+        public int Column { get; init; }
     }
 }
