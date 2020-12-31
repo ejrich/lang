@@ -61,6 +61,10 @@ namespace Lang.Translation
                         VerifyFunction(function, main, errors);
                         if (main)
                         {
+                            if (graph.Main != null)
+                            {
+                                errors.Add(CreateError("Only one main function can be defined", function));
+                            }
                             graph.Main = function;
                         }
                         else
