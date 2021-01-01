@@ -9,6 +9,7 @@ int Main(List<string> args) {
     b := 6 * (4 - 1);
     c := 2;
     d := a + 1 == b + 2 && (1 + b) == 2 || b > 3 + 4 * c - 1;
+    e := !d;
     return 0;
 }
 
