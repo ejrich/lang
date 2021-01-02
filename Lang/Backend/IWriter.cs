@@ -9,6 +9,6 @@
         /// <param name="programGraph">Graph of the program</param>
         /// <param name="projectName">The name of the project</param>
         /// <param name="projectPath">The path to the project</param>
-        string WriteTranslatedFile(ProgramGraph programGraph, string projectName, string projectPath);
+        string WriteFile(ProgramGraph programGraph, string projectName, string projectPath);
     }
 }

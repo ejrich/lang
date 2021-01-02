@@ -18,19 +18,15 @@ namespace Lang
         private readonly IProjectInterpreter _projectInterpreter;
         private readonly IParser _parser;
         private readonly IProgramGraphBuilder _graphBuilder;
-        private readonly IWriter _writer;
-        private readonly IBuilder _builder;
-        private readonly ILinker _linker;
+        private readonly IBackend _backend;
 
         public Compiler(IProjectInterpreter projectInterpreter, IParser parser, IProgramGraphBuilder graphBuilder,
-            IWriter writer, IBuilder builder, ILinker linker)
+            IBackend backend)
         {
             _projectInterpreter = projectInterpreter;
             _parser = parser;
             _graphBuilder = graphBuilder;
-            _writer = writer;
-            _builder = builder;
-            _linker = linker;
+            _backend = backend;
         }
 
         public void Compile(string[] args)
@@ -76,23 +72,17 @@ namespace Lang
                 Environment.Exit(ErrorCodes.CompilationError);
             }
 
-            // 4. Generate translated code
+            // 4. Build program and link binaries
             stopwatch.Restart();
-            var translatedFile = _writer.WriteTranslatedFile(programGraph, project.Name, project.Path);
-            var translationTime = stopwatch.Elapsed;
-
-            // 5. Assemble and link binaries
-            stopwatch.Restart();
-            var objectFile = _builder.BuildTranslatedFile(translatedFile);
-            _linker.Link(objectFile, project.Path);
+            _backend.Build(programGraph, project.Name, project.Path);
+            stopwatch.Stop();
             var buildTime = stopwatch.Elapsed;
 
-            // 6. Log statistics
+            // 5. Log statistics
             stopwatch.Stop();
             Console.WriteLine($"Project time: {projectTime.TotalSeconds} seconds");
             Console.WriteLine($"Lexing/Parsing time: {parseTime.TotalSeconds} seconds");
             Console.WriteLine($"Project Graph time: {graphTime.TotalSeconds} seconds");
-            Console.WriteLine($"Writing time: {translationTime.TotalSeconds} seconds");
             Console.WriteLine($"Building time: {buildTime.TotalSeconds} seconds");
         }
     }
