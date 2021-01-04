@@ -195,12 +195,39 @@ namespace Lang.Backend.LLVM
 
         private void WriteDeclaration(DeclarationAst declaration, IDictionary<string, LLVMValueRef> localVariables)
         {
-            // TODO Implement me
+            // 1. Declare variable on the stack
+            var allocation = _builder.BuildAlloca(ConvertTypeDefinition(declaration.Type), declaration.Name);
+            
+            // 2. Set value if it exists
+            if (declaration.Value != null)
+            {
+                var expressionValue = EvaluateExpression(declaration.Value, localVariables);
+                _builder.BuildStore(expressionValue, allocation);
+                localVariables.Add(declaration.Name, allocation);
+            }
+            else
+            {
+                localVariables.Add(declaration.Name, null);
+            }
         }
         
         private void WriteAssignment(AssignmentAst assignment, IDictionary<string, LLVMValueRef> localVariables)
         {
-            // TODO Implement me
+            // 1. Get the variable on the stack
+            var variableName = assignment.Variable switch
+            {
+                VariableAst var => var.Name,
+                StructFieldRefAst fieldRef => fieldRef.Name,
+                _ => string.Empty
+            };
+            var variable = localVariables[variableName];
+
+            // 2. Evaluate the expression value
+            var expressionValue = EvaluateExpression(assignment.Value, localVariables);
+
+            // 3. Reallocate the value of the variable
+            // TODO Set struct fields
+            _builder.BuildStore(expressionValue, variable);
         }
 
         private void WriteScope(List<IAst> scopeChildren, IDictionary<string, LLVMValueRef> localVariables)
@@ -244,7 +271,8 @@ namespace Lang.Backend.LLVM
                     }
                     break;
                 case VariableAst variable:
-                    // TODO Implement more asts
+                    return localVariables[variable.Name];
+                // TODO Implement more asts
                 default:
                     break;
             }
