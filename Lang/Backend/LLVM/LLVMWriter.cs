@@ -273,7 +273,7 @@ namespace Lang.Backend.LLVM
                     }
                     break;
                 case VariableAst variable:
-                    return localVariables[variable.Name];
+                    return _builder.BuildLoad(localVariables[variable.Name]);
                 // TODO Implement more asts
                 default:
                     break;
