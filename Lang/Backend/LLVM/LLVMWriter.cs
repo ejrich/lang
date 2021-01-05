@@ -295,10 +295,19 @@ namespace Lang.Backend.LLVM
                         var variable = localVariables[changeVariable.Name];
                         var value = _builder.BuildLoad(variable);
 
-                        // TODO Support for floating point increments/decrements
-                        var newValue = changeByOne.Operator == Operator.Increment
-                            ? _builder.BuildAdd(value, LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, 1), "inc")
-                            : _builder.BuildSub(value, LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, 1), "dec");
+                        LLVMValueRef newValue;
+                        if (value.TypeOf.Kind == LLVMTypeKind.LLVMIntegerTypeKind)
+                        {
+                            newValue = changeByOne.Operator == Operator.Increment
+                                ? _builder.BuildAdd(value, LLVMValueRef.CreateConstInt(value.TypeOf, 1), "inc")
+                                : _builder.BuildSub(value, LLVMValueRef.CreateConstInt(value.TypeOf, 1), "dec");
+                        }
+                        else
+                        {
+                            newValue = changeByOne.Operator == Operator.Increment
+                                ? _builder.BuildFAdd(value, LLVMValueRef.CreateConstReal(value.TypeOf, 1), "incf")
+                                : _builder.BuildFSub(value, LLVMValueRef.CreateConstReal(value.TypeOf, 1), "decf");
+                        }
 
                         _builder.BuildStore(newValue, variable);
                         return changeByOne.Prefix ? newValue : value;
