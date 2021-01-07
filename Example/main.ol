@@ -12,7 +12,13 @@ int Main(List<string> args) {
     d := false;
     //d := a + 1 == b + 2 && (1 + b) == 2 || b > 3 + 4 * c - 1;
     e := !d;
+    f := test(3);
     return baz;
+}
+
+bool test(int a) {
+    if a == 3 then return true;
+    else then return false;
 }
 
 int foo() {
