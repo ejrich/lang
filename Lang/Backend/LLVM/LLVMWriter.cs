@@ -177,10 +177,10 @@ namespace Lang.Backend.LLVM
                 case ConditionalAst conditional:
                     return WriteConditional(conditional, localVariables, function);
                 case WhileAst whileAst:
-                    WriteWhile(whileAst, localVariables, function);
+                    return WriteWhile(whileAst, localVariables, function);
                     break;
                 case EachAst each:
-                    WriteEach(each, localVariables);
+                    return WriteEach(each, localVariables, function);
                     break;
                 default:
                     WriteExpression(ast, localVariables);
@@ -313,52 +313,117 @@ namespace Lang.Backend.LLVM
             return false;
         }
 
-        private void WriteWhile(WhileAst whileAst, IDictionary<string, LLVMValueRef> localVariables, LLVMValueRef function)
+        private bool WriteWhile(WhileAst whileAst, IDictionary<string, LLVMValueRef> localVariables, LLVMValueRef function)
         {
             // 1. Break to the while loop
-            var whileConditionBlock = LLVMApi.AppendBasicBlock(function, "whilecond");
-            LLVMApi.BuildBr(_builder, whileConditionBlock);
+            var whileCondition = LLVMApi.AppendBasicBlock(function, "whilecondblock");
+            LLVMApi.BuildBr(_builder, whileCondition);
 
             // 2. Check condition of while loop and break if condition is not met
-            LLVMApi.PositionBuilderAtEnd(_builder, whileConditionBlock);
+            LLVMApi.PositionBuilderAtEnd(_builder, whileCondition);
             var conditionExpression = WriteExpression(whileAst.Condition, localVariables);
             var condition = conditionExpression.TypeOf().TypeKind switch
             {
                 LLVMTypeKind.LLVMIntegerTypeKind => LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntEQ,
-                    conditionExpression, LLVMApi.ConstInt(conditionExpression.TypeOf(), 1, false), "ifcond"),
+                    conditionExpression, LLVMApi.ConstInt(conditionExpression.TypeOf(), 1, false), "whilecond"),
                 LLVMTypeKind.LLVMFloatTypeKind => LLVMApi.BuildFCmp(_builder, LLVMRealPredicate.LLVMRealOEQ,
-                    conditionExpression, LLVMApi.ConstReal(conditionExpression.TypeOf(), 1), "ifcond"),
+                    conditionExpression, LLVMApi.ConstReal(conditionExpression.TypeOf(), 1), "whilecond"),
                 _ => new LLVMValueRef()
             };
-            var whileBodyBlock = LLVMApi.AppendBasicBlock(function, "whilebody");
-            var afterWhileBlock = LLVMApi.AppendBasicBlock(function, "afterwhile");
-            LLVMApi.BuildCondBr(_builder, condition, whileBodyBlock, afterWhileBlock);
+            var whileBody = LLVMApi.AppendBasicBlock(function, "whilebody");
+            var afterWhile = LLVMApi.AppendBasicBlock(function, "afterwhile");
+            LLVMApi.BuildCondBr(_builder, condition, whileBody, afterWhile);
 
             // 3. Write out while body
-            LLVMApi.PositionBuilderAtEnd(_builder, whileBodyBlock);
-            var returned = false;
+            LLVMApi.PositionBuilderAtEnd(_builder, whileBody);
             foreach (var ast in whileAst.Children)
             {
-                returned = WriteFunctionLine(ast, localVariables, function);
+                var returned = WriteFunctionLine(ast, localVariables, function);
                 if (returned)
                 {
-                    break;
+                    LLVMApi.DeleteBasicBlock(afterWhile);
+                    return true;
                 }
             }
 
             // 4. Jump back to the loop
-            if (!returned)
-            {
-                LLVMApi.BuildBr(_builder, whileConditionBlock);
-            }
+            LLVMApi.BuildBr(_builder, whileCondition);
 
             // 5. Position builder to after block
-            LLVMApi.PositionBuilderAtEnd(_builder, afterWhileBlock);
+            LLVMApi.PositionBuilderAtEnd(_builder, afterWhile);
+            return false;
         }
 
-        private void WriteEach(EachAst each, IDictionary<string, LLVMValueRef> localVariables)
+        private bool WriteEach(EachAst each, IDictionary<string, LLVMValueRef> localVariables, LLVMValueRef function)
         {
-            // TODO Implement me
+            var eachVariables = new Dictionary<string, LLVMValueRef>(localVariables);
+
+            LLVMValueRef variable;
+            if (each.Iteration != null)
+            {
+                // TODO Implement iterators
+                variable = new LLVMValueRef();
+            }
+            else
+            {
+                variable = LLVMApi.BuildAlloca(_builder, LLVMTypeRef.Int32Type(), each.IterationVariable);
+                var value = WriteExpression(each.RangeBegin, localVariables);
+                LLVMApi.BuildStore(_builder, value, variable);
+                eachVariables.Add(each.IterationVariable, variable);
+            }
+
+            // 1. Break to the each condition loop
+            var eachCondition = LLVMApi.AppendBasicBlock(function, "eachcond");
+            LLVMApi.BuildBr(_builder, eachCondition);
+
+            // 2. Check condition of each loop and break if condition is not met
+            LLVMApi.PositionBuilderAtEnd(_builder, eachCondition);
+            LLVMValueRef condition;
+            if (each.Iteration != null)
+            {
+                // TODO Implement iterators
+                condition = new LLVMValueRef();
+            }
+            else
+            {
+                var value = LLVMApi.BuildLoad(_builder, variable, "curr");
+                var rangeEnd = WriteExpression(each.RangeEnd, localVariables);
+                condition = LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntSLE, value, rangeEnd, "rangecond");
+            }
+            var eachBody = LLVMApi.AppendBasicBlock(function, "eachbody");
+            var afterEach = LLVMApi.AppendBasicBlock(function, "aftereach");
+            LLVMApi.BuildCondBr(_builder, condition, eachBody, afterEach);
+
+            // 3. Write out each loop body
+            LLVMApi.PositionBuilderAtEnd(_builder, eachBody);
+            foreach (var ast in each.Children)
+            {
+                var returned = WriteFunctionLine(ast, eachVariables, function);
+                if (returned)
+                {
+                    LLVMApi.DeleteBasicBlock(afterEach);
+                    return true;
+                }
+            }
+
+            // 4. Increment or move the iteration variable
+            if (each.Iteration != null)
+            {
+                // TODO Implement iterators
+            }
+            else
+            {
+                var value = LLVMApi.BuildLoad(_builder, variable, "iter");
+                var nextValue = BuildExpression(value, LLVMApi.ConstInt(LLVMApi.Int32Type(), 1, true), Operator.Add);
+                LLVMApi.BuildStore(_builder, nextValue, variable);
+            }
+
+            // 5. Write jump to the loop
+            LLVMApi.BuildBr(_builder, eachCondition);
+
+            // 6. Position builder to after block
+            LLVMApi.PositionBuilderAtEnd(_builder, afterEach);
+            return false;
         }
 
         private LLVMValueRef WriteExpression(IAst ast, IDictionary<string, LLVMValueRef> localVariables)

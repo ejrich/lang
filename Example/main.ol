@@ -13,7 +13,8 @@ int Main(List<string> args) {
     //d := a + 1 == b + 2 && (1 + b) == 2 || b > 3 + 4 * c - 1;
     e := !d;
     f := test(3);
-    return baz;
+    g := test_each();
+    return g;
 }
 
 bool test(int a) {
@@ -41,7 +42,7 @@ int bar(int a) {//, string b, float c) {
     return a + 3;
 }
 
-int baz() {
+int test_each() {
     a := 1;
     each i in 1..10 {
         a = a + i;
