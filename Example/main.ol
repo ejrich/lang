@@ -13,6 +13,7 @@ int Main(List<string> args) {
     e := !d;
     f := test(3);
     g := test_each();
+    h := 3 > a;
     fac6 := factorial(6);
     return g;
 }
