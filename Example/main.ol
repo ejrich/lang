@@ -9,8 +9,7 @@ int Main(List<string> args) {
     baz := foo() + bar(3 + 1);//, "Hello", 1.2);
     b := 6 * (4 - 1);
     c := 2;
-    d := false;
-    //d := a + 1 == b + 2 && (1 + b) == 2 || b > 3 + 4 * c - 1;
+    d := c + 1 == b + 2 && (1 + b) == 2 || b > 3 + 4 * c - 1;
     e := !d;
     f := test(3);
     g := test_each();
@@ -69,7 +68,7 @@ struct OtherStruct {
 MyStruct create() {
     s1: MyStruct;
     s2: OtherStruct;
-    s2.something = 8;
+    s2.something += 8;
     s1.field++;
     s1.subValue.something = s2.something;
     return s1;
