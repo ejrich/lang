@@ -729,14 +729,24 @@ namespace Lang.Backend.LLVM
 
         private LLVMTypeRef ConvertTypeDefinition(TypeDefinition typeDef)
         {
-            return typeDef.Name switch
+            return typeDef.PrimitiveType switch
             {
-                "int" => LLVMTypeRef.Int32Type(),
-                "float" => LLVMTypeRef.FloatType(),
-                "bool" => LLVMTypeRef.Int1Type(),
-                // TODO Implement more types
-                "List" => LLVMTypeRef.DoubleType(),
-                _ => LLVMApi.GetTypeByName(_module, typeDef.Name)
+                IntegerType integerType => integerType.Bytes switch
+                {
+                    1 => LLVMTypeRef.Int8Type(),
+                    2 => LLVMTypeRef.Int16Type(),
+                    4 => LLVMTypeRef.Int32Type(),
+                    8 => LLVMTypeRef.Int64Type(),
+                    _ => LLVMTypeRef.Int32Type()
+                },
+                FloatType floatType => floatType.Double ? LLVMApi.DoubleType() : LLVMTypeRef.FloatType(),
+                _ => typeDef.Name switch
+                {
+                    "bool" => LLVMTypeRef.Int1Type(),
+                    // TODO Implement more types
+                    "List" => LLVMTypeRef.DoubleType(),
+                    _ => LLVMApi.GetTypeByName(_module, typeDef.Name)
+                }
             };
         }
     }
