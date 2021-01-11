@@ -640,7 +640,16 @@ namespace Lang.Translation
 
             // 2. If the type of the field is other, recurse and return
             var value = structField.Value;
-            var field = structDefinition.Fields.FirstOrDefault(_ => _.Name == value.Name);
+            StructFieldAst field = null;
+            for (var i = 0; i < structDefinition.Fields.Count; i++)
+            {
+                if (structDefinition.Fields[i].Name == value.Name)
+                {
+                    structField.ValueIndex = i;
+                    field = structDefinition.Fields[i];
+                    break;
+                }
+            }
             if (field == null)
             {
                 errors.Add(CreateError($"Struct '{structType.Name}' does not contain field '{value.Name}'", structField));
