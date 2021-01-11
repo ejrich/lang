@@ -1,4 +1,4 @@
-﻿namespace Lang.Backend.LLVM
+namespace Lang.Backend.LLVM
 {
     public class LLVMBackend : IBackend
     {

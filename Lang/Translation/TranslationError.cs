@@ -1,4 +1,4 @@
-﻿namespace Lang.Translation
+namespace Lang.Translation
 {
     public class TranslationError
     {
