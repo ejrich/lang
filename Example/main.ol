@@ -16,7 +16,9 @@ int Main(List<string> args) {
     h := 3 > a;
     fac6 := factorial(6);
     my_struct := create();
-    return my_struct.subValue.something;
+    prim := primitives();
+    //return my_struct.subValue.something;
+    return prim;
 }
 
 bool test(int a) {
@@ -58,7 +60,7 @@ int factorial(int n) {
 }
 
 struct MyStruct {
-    int field;
+    u8 field;
     float something = 4.2;
     OtherStruct subValue;
 }
@@ -74,4 +76,17 @@ MyStruct create() {
     s1.field++;
     s1.subValue.something = s2.something;
     return s1;
+}
+
+int primitives() {
+    a: u64 = 123456789;
+    b: s64;
+    c: u32 = 12345;
+    d: s32 = 12345;
+    e: u16 = 32768;
+    f: s16 = 32768;
+    g: u8 = 200;
+    h: s8 = 127;
+    i: float64 = 1.23456;
+    return d;
 }

@@ -266,7 +266,13 @@ namespace Lang.Translation
                 {
                     if (!TypeEquals(declaration.Type, valueType))
                     {
-                        errors.Add(CreateError($"Expected declaration value to be type '{PrintTypeDefinition(declaration.Type)}'", declaration.Type));
+                        errors.Add(CreateError($"Expected declaration value to be type '{PrintTypeDefinition(declaration.Type)}', " +
+                            $"but got '{PrintTypeDefinition(valueType)}'", declaration.Type));
+                    }
+                    // TODO Implement this in other parts of these functions
+                    else if (declaration.Type.PrimitiveType != null && declaration.Value is ConstantAst constant)
+                    {
+                        constant.Type.PrimitiveType = declaration.Type.PrimitiveType;
                     }
                 }
             }
@@ -661,6 +667,19 @@ namespace Lang.Translation
 
         private static bool TypeEquals(TypeDefinition a, TypeDefinition b)
         {
+            // Check by primitive type
+            switch (a.PrimitiveType)
+            {
+                case IntegerType:
+                    return b.PrimitiveType is IntegerType;
+                case FloatType:
+                    return b.PrimitiveType is FloatType;
+                default:
+                    if (b.PrimitiveType != null) return false;
+                    break;
+            }
+
+            // Check by name
             if (a.Name != b.Name) return false;
             if (a.Generics.Count != b.Generics.Count) return false;
             for (var i = 0; i < a.Generics.Count; i++)
