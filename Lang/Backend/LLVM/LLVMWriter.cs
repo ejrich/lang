@@ -16,6 +16,7 @@ namespace Lang.Backend.LLVM
         private LLVMModuleRef _module;
         private LLVMBuilderRef _builder;
         private readonly IDictionary<string, StructAst> _structs = new Dictionary<string, StructAst>();
+        private FunctionAst _currentFunction;
 
         public string WriteFile(ProgramGraph programGraph, string projectName, string projectPath)
         {
@@ -41,10 +42,12 @@ namespace Lang.Backend.LLVM
             // 5. Write Function bodies
             foreach (var function in programGraph.Functions)
             {
+                _currentFunction = function;
                 WriteFunction(function);
             }
 
             // 6. Write Main function
+            _currentFunction = programGraph.Main;
             WriteMainFunction(programGraph.Main);
 
             // 7. Compile to object file
@@ -206,6 +209,7 @@ namespace Lang.Backend.LLVM
             var returnValue = WriteExpression(returnAst.Value, localVariables);
 
             // 2. Write expression as return value
+            returnValue = CastValue(returnValue, _currentFunction.ReturnType);
             LLVMApi.BuildRet(_builder, returnValue);
         }
 
@@ -220,9 +224,9 @@ namespace Lang.Backend.LLVM
             if (declaration.Value != null)
             {
                 var expressionValue = WriteExpression(declaration.Value, localVariables);
-                // var value = CastValue(declaration.Type, expressionValue, type);
+                var value = CastValue(expressionValue, type);
 
-                LLVMApi.BuildStore(_builder, expressionValue, variable);
+                LLVMApi.BuildStore(_builder, value, variable);
             }
             // 3. Initialize struct field default values
             else if (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind)
@@ -285,14 +289,15 @@ namespace Lang.Backend.LLVM
 
             // 2. Evaluate the expression value
             var expressionValue = WriteExpression(assignment.Value, localVariables);
+            var value = LLVMApi.BuildLoad(_builder, variable, variableName);
             if (assignment.Operator != Operator.None)
             {
                 // 2a. Build expression with variable value as the LHS
-                var value = LLVMApi.BuildLoad(_builder, variable, variableName);
                 expressionValue = BuildExpression(value, expressionValue, assignment.Operator);
             }
 
             // 3. Reallocate the value of the variable
+            expressionValue = CastValue(expressionValue, value.TypeOf());
             LLVMApi.BuildStore(_builder, expressionValue, variable);
         }
 
@@ -619,29 +624,63 @@ namespace Lang.Backend.LLVM
 
         private LLVMValueRef BuildCompare(LLVMValueRef lhs, LLVMValueRef rhs, Operator op, string name)
         {
-            switch (lhs.TypeOf().TypeKind)
+            var lhsType = lhs.TypeOf();
+            var rhsType = rhs.TypeOf();
+            switch (lhsType.TypeKind)
             {
                 case LLVMTypeKind.LLVMIntegerTypeKind:
-                    switch (rhs.TypeOf().TypeKind)
+                    switch (rhsType.TypeKind)
                     {
                         case LLVMTypeKind.LLVMIntegerTypeKind:
+                            var lhsWidth = lhsType.GetIntTypeWidth();
+                            var rhsWidth = rhsType.GetIntTypeWidth();
+                            if (lhsWidth > rhsWidth)
+                            {
+                                rhs = CastValue(rhs, lhsType);
+                            }
+                            else if (lhsWidth < rhsWidth)
+                            {
+                                lhs = CastValue(lhs, rhsType);
+                            }
                             return LLVMApi.BuildICmp(_builder, ConvertIntOperator(op), lhs, rhs, name);
                         case LLVMTypeKind.LLVMFloatTypeKind:
-                            lhs = LLVMApi.BuildSIToFP(_builder, lhs, rhs.TypeOf(), "tmpfloat");
+                        case LLVMTypeKind.LLVMDoubleTypeKind:
+                            lhs = LLVMApi.BuildSIToFP(_builder, lhs, rhsType, "tmpfloat");
                             return LLVMApi.BuildFCmp(_builder, ConvertRealOperator(op), lhs, rhs, name);
                     }
                     break;
                 case LLVMTypeKind.LLVMFloatTypeKind:
+                {
                     var predicate = ConvertRealOperator(op);
-                    switch (rhs.TypeOf().TypeKind)
+                    switch (rhsType.TypeKind)
                     {
                         case LLVMTypeKind.LLVMFloatTypeKind:
                             return LLVMApi.BuildFCmp(_builder, predicate, lhs, rhs, name);
+                        case LLVMTypeKind.LLVMDoubleTypeKind:
+                            lhs = LLVMApi.BuildFPExt(_builder, lhs, rhsType, "tmpfloat");
+                            return LLVMApi.BuildFCmp(_builder, predicate, lhs, rhs, name);
                         case LLVMTypeKind.LLVMIntegerTypeKind:
-                            rhs = LLVMApi.BuildSIToFP(_builder, rhs, lhs.TypeOf(), "tmpfloat");
+                            rhs = LLVMApi.BuildSIToFP(_builder, rhs, lhsType, "tmpfloat");
                             return LLVMApi.BuildFCmp(_builder, predicate, lhs, rhs, name);
                     }
                     break;
+                }
+                case LLVMTypeKind.LLVMDoubleTypeKind:
+                {
+                    var predicate = ConvertRealOperator(op);
+                    switch (rhsType.TypeKind)
+                    {
+                        case LLVMTypeKind.LLVMDoubleTypeKind:
+                            return LLVMApi.BuildFCmp(_builder, predicate, lhs, rhs, name);
+                        case LLVMTypeKind.LLVMFloatTypeKind:
+                            rhs = LLVMApi.BuildFPExt(_builder, rhs, lhsType, "tmpfloat");
+                            return LLVMApi.BuildFCmp(_builder, predicate, lhs, rhs, name);
+                        case LLVMTypeKind.LLVMIntegerTypeKind:
+                            rhs = LLVMApi.BuildSIToFP(_builder, rhs, lhsType, "tmpfloat");
+                            return LLVMApi.BuildFCmp(_builder, predicate, lhs, rhs, name);
+                    }
+                    break;
+                }
             }
 
             throw new NotImplementedException($"{op} not compatible with types '{lhs.TypeOf().TypeKind}' and '{rhs.TypeOf().TypeKind}'");
@@ -649,25 +688,54 @@ namespace Lang.Backend.LLVM
 
         private LLVMValueRef BuildBinaryOperation(LLVMValueRef lhs, LLVMValueRef rhs, Operator op)
         {
-            switch (lhs.TypeOf().TypeKind)
+            var lhsType = lhs.TypeOf();
+            var rhsType = rhs.TypeOf();
+            switch (lhsType.TypeKind)
             {
                 case LLVMTypeKind.LLVMIntegerTypeKind:
-                    switch (rhs.TypeOf().TypeKind)
+                    switch (rhsType.TypeKind)
                     {
                         case LLVMTypeKind.LLVMIntegerTypeKind:
+                            var lhsWidth = lhsType.GetIntTypeWidth();
+                            var rhsWidth = rhsType.GetIntTypeWidth();
+                            if (lhsWidth > rhsWidth)
+                            {
+                                rhs = CastValue(rhs, lhsType);
+                            }
+                            else if (lhsWidth < rhsWidth)
+                            {
+                                lhs = CastValue(lhs, rhsType);
+                            }
                             return BuildIntOperation(lhs, rhs, op);
                         case LLVMTypeKind.LLVMFloatTypeKind:
-                            lhs = LLVMApi.BuildSIToFP(_builder, lhs, rhs.TypeOf(), "tmpfloat");
+                        case LLVMTypeKind.LLVMDoubleTypeKind:
+                            lhs = LLVMApi.BuildSIToFP(_builder, lhs, rhsType, "tmpfloat");
                             return BuildRealOperation(lhs, rhs, op);
                     }
                     break;
                 case LLVMTypeKind.LLVMFloatTypeKind:
-                    switch (rhs.TypeOf().TypeKind)
+                    switch (rhsType.TypeKind)
                     {
                         case LLVMTypeKind.LLVMFloatTypeKind:
                             return BuildRealOperation(lhs, rhs, op);
+                        case LLVMTypeKind.LLVMDoubleTypeKind:
+                            lhs = LLVMApi.BuildFPExt(_builder, lhs, rhsType, "tmpfloat");
+                            return BuildRealOperation(lhs, rhs, op);
                         case LLVMTypeKind.LLVMIntegerTypeKind:
-                            rhs = LLVMApi.BuildSIToFP(_builder, rhs, lhs.TypeOf(), "tmpfloat");
+                            rhs = LLVMApi.BuildSIToFP(_builder, rhs, lhsType, "tmpfloat");
+                            return BuildRealOperation(lhs, rhs, op);
+                    }
+                    break;
+                case LLVMTypeKind.LLVMDoubleTypeKind:
+                    switch (rhsType.TypeKind)
+                    {
+                        case LLVMTypeKind.LLVMDoubleTypeKind:
+                            return BuildRealOperation(lhs, rhs, op);
+                        case LLVMTypeKind.LLVMFloatTypeKind:
+                            rhs = LLVMApi.BuildFPExt(_builder, rhs, rhsType, "tmpfloat");
+                            return BuildRealOperation(lhs, rhs, op);
+                        case LLVMTypeKind.LLVMIntegerTypeKind:
+                            rhs = LLVMApi.BuildSIToFP(_builder, rhs, lhsType, "tmpfloat");
                             return BuildRealOperation(lhs, rhs, op);
                     }
                     break;
@@ -676,14 +744,24 @@ namespace Lang.Backend.LLVM
             throw new NotImplementedException($"{op} not compatible with types '{lhs.TypeOf().TypeKind}' and '{rhs.TypeOf().TypeKind}'");
         }
 
-        private LLVMValueRef CastValue(TypeDefinition targetType, LLVMValueRef value, LLVMTypeRef targetLType)
+        private LLVMValueRef CastValue(LLVMValueRef value, TypeDefinition typeDef)
         {
-            switch (targetType.PrimitiveType)
+            return CastValue(value, ConvertTypeDefinition(typeDef));
+        }
+
+        private LLVMValueRef CastValue(LLVMValueRef value, LLVMTypeRef targetType)
+        {
+            var a = value.TypeOf().PrintTypeToString();
+            var b = targetType.PrintTypeToString();
+            if (a == b) return value;
+
+            switch (value.TypeOf().TypeKind)
             {
-                case IntegerType integerType:
-                    return LLVMApi.BuildIntCast(_builder, value, targetLType, "tmpint");
-                case FloatType floatType:
-                    return LLVMApi.BuildFPCast(_builder, value, targetLType, "tmpfp");
+                case LLVMTypeKind.LLVMIntegerTypeKind:
+                    return LLVMApi.BuildIntCast(_builder, value, targetType, "tmpint");
+                case LLVMTypeKind.LLVMFloatTypeKind:
+                case LLVMTypeKind.LLVMDoubleTypeKind:
+                    return LLVMApi.BuildFPCast(_builder, value, targetType, "tmpfp");
             }
 
             return value;
