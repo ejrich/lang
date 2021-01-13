@@ -1269,6 +1269,18 @@ namespace Lang.Parsing
                         typeDefinition.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
                         return typeDefinition;
                     }
+                    else if (long.TryParse(token.Value, out _))
+                    {
+                        typeDefinition.Name = "s64";
+                        typeDefinition.PrimitiveType = new IntegerType {Bytes = 8, Signed = true};
+                        return typeDefinition;
+                    }
+                    else if (ulong.TryParse(token.Value, out _))
+                    {
+                        typeDefinition.Name = "u64";
+                        typeDefinition.PrimitiveType = new IntegerType {Bytes = 8, Signed = false};
+                        return typeDefinition;
+                    }
                     else if (float.TryParse(token.Value, out _))
                     {
                         typeDefinition.Name = "float";
