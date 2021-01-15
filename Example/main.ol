@@ -91,5 +91,6 @@ int primitives() {
     h: s8 = -128;
     //h = 12 + 23;
     i: float64 = -1.23456;
+    j := g > i;
     return d;
 }
