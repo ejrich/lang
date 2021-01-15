@@ -2,7 +2,8 @@ namespace Lang.Parsing
 {
     public interface IPrimitive
     {
-        ushort Bytes { get; init; }
+        ushort Bytes { get; }
+        public bool Signed { get; }
     }
 
     public class IntegerType : IPrimitive
@@ -14,6 +15,6 @@ namespace Lang.Parsing
     public class FloatType : IPrimitive
     {
         public ushort Bytes { get; init; }
-        public bool Double => Bytes == 8;
+        public bool Signed => true;
     }
 }

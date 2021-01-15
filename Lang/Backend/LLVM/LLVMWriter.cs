@@ -290,12 +290,12 @@ namespace Lang.Backend.LLVM
             }
 
             // 2. Evaluate the expression value
-            var (_, expressionValue) = WriteExpression(assignment.Value, localVariables);
+            var (type, expressionValue) = WriteExpression(assignment.Value, localVariables);
             if (assignment.Operator != Operator.None)
             {
                 // 2a. Build expression with variable value as the LHS
                 var value = LLVMApi.BuildLoad(_builder, variable.value, variableName);
-                expressionValue = BuildExpression(value, expressionValue, assignment.Operator);
+                expressionValue = BuildExpression((variable.type, value), (type, expressionValue), assignment.Operator, variable.type);
             }
 
             // 3. Reallocate the value of the variable
@@ -626,6 +626,19 @@ namespace Lang.Backend.LLVM
             return BuildStructField(value, field);
         }
 
+        private LLVMValueRef BuildExpression((TypeDefinition type, LLVMValueRef value) lhs,
+            (TypeDefinition type, LLVMValueRef value) rhs, Operator op, TypeDefinition targetType)
+        {
+            // TODO Actually implement me based on these steps
+            // 1. Check the signage of the input types
+            // 1a. If both are unsigned, expand to larger type and perform unsigned operations
+            // 1b. return
+            // 2. Cast any unsigned values to signed
+            // 3. Do similar to what I'm doing now for signed operators, but considering the target type
+            // 4. return
+            return BuildExpression(lhs.value, rhs.value, op);
+        }
+
         private LLVMValueRef BuildExpression(LLVMValueRef lhs, LLVMValueRef rhs, Operator op)
         {
             return op switch
@@ -871,7 +884,7 @@ namespace Lang.Backend.LLVM
                     8 => LLVMTypeRef.Int64Type(),
                     _ => LLVMTypeRef.Int32Type()
                 },
-                FloatType floatType => floatType.Double ? LLVMApi.DoubleType() : LLVMTypeRef.FloatType(),
+                FloatType floatType => floatType.Bytes == 8 ? LLVMApi.DoubleType() : LLVMTypeRef.FloatType(),
                 _ => typeDef.Name switch
                 {
                     "bool" => LLVMTypeRef.Int1Type(),
