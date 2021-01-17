@@ -185,6 +185,16 @@ namespace Lang.Parsing
         public List<IAst> Children { get; } = new();
     }
 
+    public class IndexAst : IAst
+    {
+        public int FileIndex { get; set; }
+        public int Line { get; init; }
+        public int Column { get; init; }
+        public IAst Variable { get; set; }
+        public IAst Index { get; set; }
+        public List<IAst> Children => null;
+    }
+
     public class Argument : IAst
     {
         public int FileIndex { get; set; }
@@ -203,6 +213,7 @@ namespace Lang.Parsing
         public string Name { get; set; }
         public IPrimitive PrimitiveType { get; set; }
         public List<TypeDefinition> Generics { get; } = new();
+        public IAst Count { get; set; }
         public List<IAst> Children => null;
     }
 

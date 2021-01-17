@@ -17,7 +17,7 @@ int Main(List<string> args) {
     fac6 := factorial(6);
     my_struct := create();
     prim := primitives();
-    //return my_struct.subValue.something;
+    list := create_list(4);
     return prim;
 }
 
@@ -94,4 +94,20 @@ int primitives() {
     j := g + i;
     k := e > e;
     return d;
+}
+
+struct ListStruct {
+    int something = 5;
+    List<int>[6] list;
+}
+
+List<int> create_list(int count) {
+    list: List<int>[count];
+    each i in 1..count {
+        list[i] = i;
+    }
+    a := list[1];
+    s: ListStruct;
+    s.list[0] = 8;
+    return list;
 }

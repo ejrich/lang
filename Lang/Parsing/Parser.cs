@@ -367,6 +367,8 @@ namespace Lang.Parsing
                     {
                         case TokenType.OpenParen:
                             return ParseCall(enumerator, errors);
+                        case TokenType.OpenBracket:
+                            return ParseIndexExpression(enumerator, errors);
                         case TokenType.Colon:
                             return ParseDeclaration(enumerator, errors);
                         case TokenType.Equals:
@@ -804,6 +806,8 @@ namespace Lang.Parsing
                     var expression = CreateAst<ExpressionAst>(enumerator.Current);
                     expression.Children.Add(changeByOneAst);
                     return ParseExpression(enumerator, errors, expression);
+                case TokenType.OpenBracket:
+                    return ParseIndexExpression(enumerator, errors, structField);
                 case null:
                     errors.Add(new ParseError {Error = "Expected value", Token = enumerator.Last});
                     return null;
@@ -946,7 +950,16 @@ namespace Lang.Parsing
                         case TokenType.OpenParen:
                             return ParseCall(enumerator, errors);
                         case TokenType.Period:
-                            return ParseStructField(enumerator, errors);
+                            var structField = ParseStructField(enumerator, errors);
+                            if (enumerator.Peek()?.Type == TokenType.OpenBracket)
+                            {
+                                return ParseIndex(enumerator, errors, structField);
+                            }
+                            return structField;
+                        case TokenType.OpenBracket:
+                            var variableAst = CreateAst<VariableAst>(token);
+                            variableAst.Name = token.Value;
+                            return ParseIndex(enumerator, errors, variableAst);
                         case null:
                             errors.Add(new ParseError
                             {
@@ -1178,6 +1191,83 @@ namespace Lang.Parsing
             return returnAst;
         }
 
+        private static IAst ParseIndexExpression(TokenEnumerator enumerator, List<ParseError> errors, IAst variable = null)
+        {
+            // 1. Parse index until finished
+            if (variable == null)
+            {
+                var variableAst = CreateAst<VariableAst>(enumerator.Current);
+                variableAst.Name = enumerator.Current.Value;
+                variable = variableAst;
+            }
+            var index = ParseIndex(enumerator, errors, variable);
+
+            // 2. Determine if expression or assignment
+            var nextToken = enumerator.Peek();
+            switch (nextToken?.Type)
+            {
+                case TokenType.SemiColon:
+                    enumerator.MoveNext();
+                    return index;
+                case TokenType.Equals:
+                    return ParseAssignment(enumerator, errors, index);
+                case TokenType.Increment:
+                case TokenType.Decrement:
+                    enumerator.MoveNext();
+                    var changeByOneAst = CreateAst<ChangeByOneAst>(enumerator.Current);
+                    changeByOneAst.Positive = enumerator.Current.Type == TokenType.Increment;
+                    changeByOneAst.Variable = index;
+                    enumerator.MoveNext();
+                    if (enumerator.Current?.Type == TokenType.SemiColon)
+                    {
+                        return changeByOneAst;
+                    }
+
+                    var expression = CreateAst<ExpressionAst>(enumerator.Current);
+                    expression.Children.Add(changeByOneAst);
+                    return ParseExpression(enumerator, errors, expression);
+                case null:
+                    errors.Add(new ParseError {Error = "Expected value", Token = enumerator.Last});
+                    return null;
+                default:
+                    if (enumerator.Peek(1)?.Type == TokenType.Equals)
+                    {
+                        return ParseAssignment(enumerator, errors, index);
+                    }
+                    else
+                    {
+                        errors.Add(new ParseError {Error = $"Unexpected token '{enumerator.Current.Value}'", Token = enumerator.Current});
+                        return index;
+                    }
+            }
+        }
+
+        private static IndexAst ParseIndex(TokenEnumerator enumerator, List<ParseError> errors, IAst variable)
+        {
+            // 1. Initialize the index ast
+            enumerator.MoveNext();
+            var index = CreateAst<IndexAst>(enumerator.Current);
+            index.Variable = variable;
+
+            // 2. Expect to get open bracket
+            if (enumerator.Current?.Type != TokenType.OpenBracket)
+            {
+                var errorToken = enumerator.Current ?? enumerator.Last;
+                errors.Add(new ParseError
+                {
+                    Error = $"Unexpected token in List index '{errorToken.Value}'",
+                    Token = errorToken
+                });
+                return index;
+            }
+
+            enumerator.MoveNext();
+            index.Index = ParseExpression(enumerator, errors, null, TokenType.CloseBracket);
+
+            return index;
+        }
+
+
         private static TypeDefinition ParseType(TokenEnumerator enumerator, List<ParseError> errors)
         {
             var typeDefinition = CreateAst<TypeDefinition>(enumerator.Current);
@@ -1204,7 +1294,7 @@ namespace Lang.Parsing
                             });
                         }
 
-                        return typeDefinition;
+                        break;
                     }
 
                     if (!commaRequiredBeforeNextType)
@@ -1249,6 +1339,14 @@ namespace Lang.Parsing
                         Error = "Expected type to contain generics", Token = enumerator.Current ?? enumerator.Last
                     });
                 }
+            }
+
+            if (enumerator.Peek()?.Type == TokenType.OpenBracket)
+            {
+                // Skip over the open bracket and parse the expression
+                enumerator.MoveNext();
+                enumerator.MoveNext();
+                typeDefinition.Count = ParseExpression(enumerator, errors, null, TokenType.CloseBracket);
             }
 
             return typeDefinition;

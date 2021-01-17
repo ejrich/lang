@@ -37,6 +37,8 @@ namespace Lang.Parsing
         NumberRange, // Ignored by parser
         OpenParen = '(',
         CloseParen = ')',
+        OpenBracket = '[',
+        CloseBracket = ']',
         OpenBrace = '{',
         CloseBrace = '}',
         Not = '!',
