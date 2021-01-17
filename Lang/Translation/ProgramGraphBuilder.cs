@@ -683,8 +683,26 @@ namespace Lang.Translation
                     case Operator.BitwiseAnd:
                     case Operator.BitwiseOr:
                     case Operator.Xor:
-                        if (!(type == Type.Boolean && nextType == Type.Boolean) &&
-                            !(type == Type.Int && nextType == Type.Int))
+                        if (type == Type.Int && nextType == Type.Int)
+                        {
+                            var currentIntegerType = expression.Type.PrimitiveType;
+                            var nextIntegerType = nextExpressionType.PrimitiveType;
+                            if (currentIntegerType.Bytes == nextIntegerType.Bytes &&
+                                currentIntegerType.Signed == nextIntegerType.Signed)
+                                break;
+
+                            var integerType = new IntegerType
+                            {
+                                Bytes = currentIntegerType.Bytes > nextIntegerType.Bytes ? currentIntegerType.Bytes : nextIntegerType.Bytes,
+                                Signed = currentIntegerType.Signed || nextIntegerType.Signed
+                            };
+                            expression.Type = new TypeDefinition
+                            {
+                                Name = $"{(integerType.Signed ? "s" : "u")}{integerType.Bytes * 8}",
+                                PrimitiveType = integerType
+                            };
+                        }
+                        else if (!(type == Type.Boolean && nextType == Type.Boolean))
                         {
                             errors.Add(CreateError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]));
                             if (nextType == Type.Boolean || nextType == Type.Int)
