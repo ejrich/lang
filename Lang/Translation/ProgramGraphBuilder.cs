@@ -98,6 +98,20 @@ namespace Lang.Translation
                 {
                     errors.Add(CreateError($"Type '{PrintTypeDefinition(structField.Type)}' of field {structAst.Name}.{structField.Name} is not defined", structField));
                 }
+                else if (structField.Type.Count != null)
+                {
+                    if (structField.Type.Count is ConstantAst constant)
+                    {
+                        if (!uint.TryParse(constant.Value, out _))
+                        {
+                            errors.Add(CreateError($"Expected type count to be positive integer, but got '{constant.Value}'", constant));
+                        }
+                    }
+                    else
+                    {
+                        errors.Add(CreateError("Type count should be a constant value", structField.Type.Count));
+                    }
+                }
 
                 // 1c. Check if the default value has the correct type
                 if (structField.DefaultValue != null)
@@ -120,6 +134,20 @@ namespace Lang.Translation
             if (returnType == Type.Error)
             {
                 errors.Add(CreateError($"Return type '{function.ReturnType.Name}' of function '{function.Name}' is not defined", function.ReturnType));
+            }
+            else if (function.ReturnType.Count != null)
+            {
+                if (function.ReturnType.Count is ConstantAst constant)
+                {
+                    if (!uint.TryParse(constant.Value, out _))
+                    {
+                        errors.Add(CreateError($"Expected type count to be positive integer, but got '{constant.Value}'", constant));
+                    }
+                }
+                else
+                {
+                    errors.Add(CreateError("Type count should be a constant value", function.ReturnType.Count));
+                }
             }
 
             // 2. Verify the argument types
