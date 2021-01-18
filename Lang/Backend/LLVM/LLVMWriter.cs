@@ -236,7 +236,7 @@ namespace Lang.Backend.LLVM
                 InitializeStruct(declaration.Type, variable);
             }
             // 4. Or initialize to 0
-            else
+            else if (type.TypeKind != LLVMTypeKind.LLVMArrayTypeKind)
             {
                 var zero = GetConstZero(type);
                 LLVMApi.BuildStore(_builder, zero, variable);
@@ -249,9 +249,11 @@ namespace Lang.Backend.LLVM
             for (var i = 0; i < structDef.Fields.Count; i++)
             {
                 var structField = structDef.Fields[i];
+                var type = ConvertTypeDefinition(structField.Type);
+                if (type.TypeKind == LLVMTypeKind.LLVMArrayTypeKind) continue;
+
                 var field = LLVMApi.BuildStructGEP(_builder, variable, (uint) i, structField.Name);
 
-                var type = ConvertTypeDefinition(structField.Type);
                 if (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind)
                 {
                     InitializeStruct(structField.Type, field);
@@ -281,12 +283,26 @@ namespace Lang.Backend.LLVM
             {
                 VariableAst var => var.Name,
                 StructFieldRefAst fieldRef => fieldRef.Name,
+                IndexAst index => index.Variable switch
+                {
+                    VariableAst var => var.Name,
+                    StructFieldRefAst fieldRef => fieldRef.Name,
+                    _ => string.Empty
+                },
                 _ => string.Empty
             };
             var variable = localVariables[variableName];
             if (assignment.Variable is StructFieldRefAst structField)
             {
                 variable = BuildStructField(structField, variable.value);
+            }
+            else if (assignment.Variable is IndexAst index)
+            {
+                if (index.Variable is StructFieldRefAst indexStructField)
+                {
+                    variable = BuildStructField(indexStructField, variable.value);
+                }
+                variable = BuildListIndex(index, variable, localVariables);
             }
 
             // 2. Evaluate the expression value
@@ -573,6 +589,23 @@ namespace Lang.Backend.LLVM
                         _ => (null, new LLVMValueRef())
                     };
                 }
+                case IndexAst index:
+                {
+                    var variableName = index.Variable switch
+                    {
+                        VariableAst var => var.Name,
+                        StructFieldRefAst fieldRef => fieldRef.Name,
+                        _ => string.Empty
+                    };
+                    var variable = localVariables[variableName];
+                    if (index.Variable is StructFieldRefAst structField)
+                    {
+                        variable = BuildStructField(structField, variable.value);
+                    }
+
+                    var (elementType, elementValue) = BuildListIndex(index, variable, localVariables);
+                    return (elementType, LLVMApi.BuildLoad(_builder, elementValue, variableName));
+                }
                 case ExpressionAst expression:
                     var expressionValue = WriteExpression(expression.Children[0], localVariables);
                     for (var i = 1; i < expression.Children.Count; i++)
@@ -621,6 +654,15 @@ namespace Lang.Backend.LLVM
             }
 
             return BuildStructField(value, field);
+        }
+
+        private (TypeDefinition type, LLVMValueRef value) BuildListIndex(IndexAst index, (TypeDefinition type, LLVMValueRef value) variable,
+            IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
+        {
+            var indexValue = WriteExpression(index.Index, localVariables);
+            var elementType = variable.type.Generics[0];
+            return (elementType, LLVMApi.BuildGEP(_builder, variable.value,
+                new [] {GetConstZero(ConvertTypeDefinition(elementType)), indexValue.value}, "indexptr"));
         }
 
         private LLVMValueRef BuildExpression((TypeDefinition type, LLVMValueRef value) lhs,
@@ -898,8 +940,8 @@ namespace Lang.Backend.LLVM
                 _ => typeDef.Name switch
                 {
                     "bool" => LLVMTypeRef.Int1Type(),
-                    // TODO Implement more types
-                    "List" => LLVMTypeRef.DoubleType(),
+                    "List" => LLVMTypeRef.ArrayType(ConvertTypeDefinition(typeDef.Generics[0]), 10), // TODO Implement variable sized arrays
+                    "string" => LLVMTypeRef.Int8Type(),
                     _ => LLVMApi.GetTypeByName(_module, typeDef.Name)
                 }
             };
