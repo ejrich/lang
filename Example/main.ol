@@ -18,7 +18,8 @@ int Main(List<string> args) {
     my_struct := create();
     prim := primitives();
     list := create_list(4);
-    return list[2];
+    ptr := pointers();
+    return ptr;
 }
 
 bool test(int a) {
@@ -110,4 +111,11 @@ List<int> create_list(int count) {
     s: ListStruct;
     s.list[0] = 8;
     return list;
+}
+
+int* pointers() {
+    a := 6;
+    b := &a
+    c := *b;
+    return b;
 }
