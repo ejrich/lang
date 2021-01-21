@@ -8,6 +8,7 @@ namespace Lang.Translation
         String,
         List,
         Void,
+        Pointer,
         Other,
         Error
     }
