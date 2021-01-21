@@ -250,7 +250,8 @@ namespace Lang.Backend.LLVM
             {
                 var structField = structDef.Fields[i];
                 var type = ConvertTypeDefinition(structField.Type);
-                if (type.TypeKind == LLVMTypeKind.LLVMArrayTypeKind) continue;
+                if (type.TypeKind == LLVMTypeKind.LLVMArrayTypeKind || type.TypeKind == LLVMTypeKind.LLVMPointerTypeKind)
+                    continue;
 
                 var field = LLVMApi.BuildStructGEP(_builder, variable, (uint) i, structField.Name);
 
@@ -509,7 +510,8 @@ namespace Lang.Backend.LLVM
             return false;
         }
 
-        private (TypeDefinition type, LLVMValueRef value) WriteExpression(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
+        private (TypeDefinition type, LLVMValueRef value) WriteExpression(IAst ast,
+            IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
         {
             switch (ast)
             {
@@ -574,6 +576,26 @@ namespace Lang.Backend.LLVM
                 }
                 case UnaryAst unary:
                 {
+                    if (unary.Operator == UnaryOperator.Reference)
+                    {
+                        var (valueType, pointer) = unary.Value switch
+                        {
+                            VariableAst variable => localVariables[variable.Name],
+                            StructFieldRefAst structField => BuildStructField(structField, localVariables[structField.Name].value),
+                            // @Cleanup this branch should not be hit
+                            _ => (null, new LLVMValueRef())
+                        };
+                        var pointerType = new TypeDefinition
+                        {
+                            Pointer = true,
+                            Name = valueType.Name,
+                            PrimitiveType = valueType.PrimitiveType,
+                            Count = valueType.Count
+                        };
+                        pointerType.Generics.AddRange(valueType.Generics);
+                        return (pointerType, pointer);
+                    }
+
                     var (type, value) = WriteExpression(unary.Value, localVariables);
                     return unary.Operator switch
                     {
@@ -585,9 +607,7 @@ namespace Lang.Backend.LLVM
                             // @Cleanup This branch should not be hit
                             _ => (null, new LLVMValueRef())
                         },
-                        // TODO Implement these
-                        UnaryOperator.Dereference => (null, new LLVMValueRef()),
-                        UnaryOperator.Reference => (null, new LLVMValueRef()),
+                        UnaryOperator.Dereference => (type, LLVMApi.BuildLoad(_builder, value, "tmpderef")),
                         // @Cleanup This branch should not be hit
                         _ => (null, new LLVMValueRef())
                     };
@@ -671,6 +691,7 @@ namespace Lang.Backend.LLVM
         private LLVMValueRef BuildExpression((TypeDefinition type, LLVMValueRef value) lhs,
             (TypeDefinition type, LLVMValueRef value) rhs, Operator op, TypeDefinition targetType)
         {
+            // TODO Handle pointer math
             // 1. Handle simple operators like && and ||
             switch (op)
             {
@@ -836,6 +857,10 @@ namespace Lang.Backend.LLVM
 
         private static bool TypeEquals(TypeDefinition a, TypeDefinition b)
         {
+            // Check if pointers
+            if (a.Pointer != b.Pointer) return false;
+
+            // Check by primitive type
             switch (a.PrimitiveType)
             {
                 case IntegerType aInt:
@@ -929,8 +954,7 @@ namespace Lang.Backend.LLVM
 
         private LLVMTypeRef ConvertTypeDefinition(TypeDefinition typeDef)
         {
-            // TODO Handle pointer types
-            return typeDef.PrimitiveType switch
+            var type = typeDef.PrimitiveType switch
             {
                 IntegerType integerType => integerType.Bytes switch
                 {
@@ -949,6 +973,7 @@ namespace Lang.Backend.LLVM
                     _ => LLVMApi.GetTypeByName(_module, typeDef.Name)
                 }
             };
+            return typeDef.Pointer ? LLVMTypeRef.PointerType(type, 0) : type;
         }
 
         private LLVMTypeRef GetArrayType(TypeDefinition typeDef)
