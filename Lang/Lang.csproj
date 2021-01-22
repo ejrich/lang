@@ -12,7 +12,9 @@
 
   <ItemGroup>
     <None Remove="Runtime\runtime.ol" />
-    <EmbeddedResource Include="Runtime\runtime.ol" />
+    <Content Include="Runtime\runtime.ol">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>
