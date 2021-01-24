@@ -610,22 +610,38 @@ namespace Lang.Backend.LLVM
             }
         }
 
-        private static LLVMValueRef BuildConstant(LLVMTypeRef type, ConstantAst constant)
+        private LLVMValueRef BuildConstant(LLVMTypeRef type, ConstantAst constant)
         {
-            switch (type.TypeKind)
+            switch (constant.Type.PrimitiveType)
             {
-                case LLVMTypeKind.LLVMIntegerTypeKind:
-                    // Specific case for parsing booleans
-                    if (type.ToString() == "i1")
-                    {
-                        return LLVMApi.ConstInt(type, constant.Value == "true" ? 1 : 0, false);
-                    }
+                case IntegerType:
                     return LLVMApi.ConstInt(type, (ulong)long.Parse(constant.Value), false);
-                case LLVMTypeKind.LLVMFloatTypeKind:
-                case LLVMTypeKind.LLVMDoubleTypeKind:
-                    return LLVMApi.ConstRealOfStringAndSize(type, constant.Value, (uint) constant.Value.Length);
+                case FloatType:
+                    return LLVMApi.ConstRealOfStringAndSize(type, constant.Value, (uint)constant.Value.Length);
             }
-            return LLVMApi.ConstInt(LLVMApi.Int32Type(), 0, true);
+
+            switch (constant.Type.Name)
+            {
+                case "bool":
+                    return LLVMApi.ConstInt(type, constant.Value == "true" ? 1 : 0, false);
+                case "string":
+                    var stringStruct = LLVMApi.BuildAlloca(_builder, type, "tmpstringtype");
+                    var stringLength = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (ulong)constant.Value.Length, false);
+                    var lengthPointer = LLVMApi.BuildStructGEP(_builder, stringStruct, 0, "length");
+                    LLVMApi.BuildStore(_builder, stringLength, lengthPointer);
+
+                    var stringPointer = LLVMApi.BuildAlloca(_builder, LLVMTypeRef.ArrayType(LLVMTypeRef.Int8Type(), (uint)constant.Value.Length), "tmpstr");
+                    var constantString = LLVMApi.ConstString(constant.Value, (uint)constant.Value.Length, true);
+                    LLVMApi.BuildStore(_builder, constantString, stringPointer);
+                    var data = LLVMApi.BuildBitCast(_builder, stringPointer, LLVMTypeRef.PointerType(LLVMTypeRef.Int8Type(), 0), "conststr");
+
+                    var dataPointer = LLVMApi.BuildStructGEP(_builder, stringStruct, 1, "data");
+                    LLVMApi.BuildStore(_builder, data, dataPointer);
+
+                    return LLVMApi.BuildLoad(_builder, stringStruct, "tmpstr");
+                default:
+                    return LLVMApi.ConstInt(LLVMApi.Int32Type(), 0, true);
+            }
         }
 
         private (TypeDefinition type, LLVMValueRef value) BuildStructField(StructFieldRefAst structField, LLVMValueRef variable)
@@ -964,7 +980,7 @@ namespace Lang.Backend.LLVM
                 {
                     "bool" => LLVMTypeRef.Int1Type(),
                     "List" => GetArrayType(typeDef),
-                    "string" => LLVMTypeRef.Int8Type(),
+                    "string" => LLVMApi.GetTypeByName(_module, "string"),
                     _ => LLVMApi.GetTypeByName(_module, typeDef.Name)
                 }
             };
