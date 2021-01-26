@@ -139,3 +139,9 @@ int* pointers() {
 string string_test() {
     return "something";
 }
+
+void print(string format, ... args) {
+    
+}
+
+void printf(u8* format, ... args) #extern
