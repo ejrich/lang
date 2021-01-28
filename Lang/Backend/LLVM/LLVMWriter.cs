@@ -1034,6 +1034,7 @@ namespace Lang.Backend.LLVM
                 _ => typeDef.Name switch
                 {
                     "bool" => LLVMTypeRef.Int1Type(),
+                    "void" => LLVMTypeRef.VoidType(),
                     "List" => GetListType(typeDef),
                     "string" => LLVMApi.GetTypeByName(_module, "string"),
                     _ => LLVMApi.GetTypeByName(_module, typeDef.Name)
