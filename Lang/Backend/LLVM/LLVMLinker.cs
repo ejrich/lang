@@ -20,8 +20,9 @@ namespace Lang.Backend.LLVM
             {
                 StartInfo =
                 {
-                    FileName = "gcc",
-                    Arguments = $"{objectFile} -o {executableFile}"
+                    FileName = "ld",
+                    Arguments = $"-static -o {executableFile} /usr/lib64/crt1.o /usr/lib64/crti.o /usr/lib64/gcc/x86_64-pc-linux-gnu/10.2.0/crtbeginT.o -L/usr/lib64/gcc/x86_64-pc-linux-gnu/10.2.0 " +
+                                $"{objectFile} --start-group -lgcc -lgcc_eh -lc --end-group /usr/lib64/gcc/x86_64-pc-linux-gnu/10.2.0/crtend.o /usr/lib64/crtn.o"
                 }
             };
             buildProcess.Start();
