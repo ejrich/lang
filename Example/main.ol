@@ -15,6 +15,7 @@ int Main(List<string> args) {
     g := test_each();
     h := 3 > a;
     fac6 := factorial(6);
+    printf("%d! = %d\n", 6, fac6);
     my_struct := create();
     prim := primitives();
     list := create_list(4);
@@ -140,5 +141,3 @@ int* pointers() {
 string string_test() {
     return "something";
 }
-
-printf(string format, ... args) #extern
