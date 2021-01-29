@@ -1194,10 +1194,7 @@ namespace Lang.Parsing
             {
                 var token = enumerator.Current;
 
-                if (enumerator.Current.Type == TokenType.CloseParen)
-                {
-                    return callAst;
-                }
+                if (enumerator.Current.Type == TokenType.CloseParen) break;
 
                 if (token.Type == TokenType.Comma)
                 {
@@ -1207,30 +1204,31 @@ namespace Lang.Parsing
                 {
                     callAst.Arguments.Add(ParseExpression(enumerator, errors, null, TokenType.Comma, TokenType.CloseParen));
                     
-                    if (enumerator.Current?.Type == TokenType.CloseParen)
-                    {
-                        if (requiresSemicolon)
-                        {
-                            enumerator.MoveNext();
-                            if (enumerator.Current?.Type != TokenType.SemiColon)
-                            {
-                                errors.Add(new ParseError
-                                {
-                                    Error = "Expected ';'", Token = enumerator.Current ?? enumerator.Last
-                                });
-                            }
-                        }
-
-                        // At this point, the call is complete, so return
-                        return callAst;
-                    }
+                    if (enumerator.Current?.Type == TokenType.CloseParen) break;
                 }
             }
 
-            errors.Add(new ParseError
+            if (enumerator.Current == null)
             {
-                Error = "Expected to close call", Token = enumerator.Last
-            });
+                errors.Add(new ParseError
+                {
+                    Error = "Expected to close call", Token = enumerator.Last
+                });
+            }
+            else if (requiresSemicolon)
+            {
+                if (enumerator.Peek()?.Type != TokenType.SemiColon)
+                {
+                    errors.Add(new ParseError
+                    {
+                        Error = "Expected ';'", Token = enumerator.Current ?? enumerator.Last
+                    });
+                }
+                else
+                {
+                    enumerator.MoveNext();
+                }
+            }
 
             return callAst;
         }
@@ -1338,14 +1336,13 @@ namespace Lang.Parsing
 
             if (enumerator.Current.Type == TokenType.VarArgs)
             {
-                if (argument)
+                if (!argument)
                 {
-                    return typeDefinition;
+                    errors.Add(new ParseError
+                    {
+                        Error = "Variable args type can only be used as an argument type", Token = enumerator.Current
+                    });
                 }
-                errors.Add(new ParseError
-                {
-                    Error = "Variable args type can only be used as an argument type", Token = enumerator.Current
-                });
             }
 
             // Determine whether to parse a generic type, otherwise return
