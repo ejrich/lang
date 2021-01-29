@@ -20,9 +20,8 @@ int Main(List<string> args) {
     list := create_list(4);
     ptr := pointers();
     str := string_test();
-    format := "Hello world %d, %d, %d\n";
-    printf(format.data, 1, 2, b);
-    return str.length;
+    printf("%s - Hello world %d, %d, %d\n", str, 1, 2, b);
+    return *ptr;
 }
 
 bool test(int a) {
@@ -142,4 +141,4 @@ string string_test() {
     return "something";
 }
 
-printf(u8* format, ... args) #extern
+printf(string format, ... args) #extern
