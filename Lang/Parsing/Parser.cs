@@ -892,10 +892,7 @@ namespace Lang.Parsing
             var operatorRequired = initial != null;
 
             var expression = initial ?? CreateAst<ExpressionAst>(enumerator.Current);
-            if (!endToken.Any())
-            {
-                endToken = new[] {TokenType.SemiColon};
-            }
+            endToken = endToken.Append(TokenType.SemiColon).ToArray();
 
             do
             {
@@ -972,7 +969,10 @@ namespace Lang.Parsing
                 return expression.Children.First();
             }
 
-            SetOperatorPrecedence(expression);
+            if (!errors.Any())
+            {
+                SetOperatorPrecedence(expression);
+            }
             return expression;
         }
 
@@ -1203,12 +1203,22 @@ namespace Lang.Parsing
                 else
                 {
                     callAst.Arguments.Add(ParseExpression(enumerator, errors, null, TokenType.Comma, TokenType.CloseParen));
-                    
-                    if (enumerator.Current?.Type == TokenType.CloseParen) break;
+
+                    var currentType = enumerator.Current.Type;
+                    if (currentType == TokenType.CloseParen) break;
+                    if (currentType == TokenType.SemiColon)
+                    {
+                        errors.Add(new ParseError
+                        {
+                            Error = "Expected to close call with ')'", Token = enumerator.Current
+                        });
+                        break;
+                    }
                 }
             }
 
-            if (enumerator.Current == null)
+            var current = enumerator.Current;
+            if (current == null)
             {
                 errors.Add(new ParseError
                 {
@@ -1217,6 +1227,9 @@ namespace Lang.Parsing
             }
             else if (requiresSemicolon)
             {
+                if (current.Type == TokenType.SemiColon)
+                    return callAst;
+
                 if (enumerator.Peek()?.Type != TokenType.SemiColon)
                 {
                     errors.Add(new ParseError
