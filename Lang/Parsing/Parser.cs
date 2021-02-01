@@ -1356,6 +1356,7 @@ namespace Lang.Parsing
                         Error = "Variable args type can only be used as an argument type", Token = enumerator.Current
                     });
                 }
+                return typeDefinition;
             }
 
             // Determine whether to parse a generic type, otherwise return
