@@ -38,6 +38,7 @@ namespace Lang.Parsing
         public int Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
+        public List<string> Generics { get; } = new();
         public List<StructFieldAst> Fields { get; } = new();
         public List<IAst> Children => null;
     }
