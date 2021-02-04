@@ -12,7 +12,7 @@ namespace Lang
 
     public class Data
     {
-        public List<Argument> Variables { get; } = new();
-        public List<StructAst> Structs { get; set; }
+        public List<DeclarationAst> Variables { get; } = new();
+        public List<StructAst> Structs { get; init; }
     }
 }

@@ -37,7 +37,7 @@ namespace Lang.Backend.LLVM
             var objectFile = Path.Combine(objectPath, $"{projectName}.o");
 
             // 3. Write Data section
-            WriteData(programGraph.Data);
+            var globals = WriteData(programGraph.Data);
 
             // 4. Write Function definitions
             foreach (var function in programGraph.Functions)
@@ -51,7 +51,7 @@ namespace Lang.Backend.LLVM
             {
                 _currentFunction = functionAst;
                 var function = LLVMApi.GetNamedFunction(_module, functionAst.Name);
-                WriteFunction(functionAst, function);
+                WriteFunction(functionAst, globals, function);
             }
 
             // 6. Write Main function
@@ -59,7 +59,7 @@ namespace Lang.Backend.LLVM
                 var main = programGraph.Main;
                 _currentFunction = main;
                 var function = WriteFunctionDefinition("main", main.Arguments, main.ReturnType);
-                WriteFunction(main, function);
+                WriteFunction(main, globals, function);
             }
 
             // 7. Compile to object file
@@ -74,7 +74,7 @@ namespace Lang.Backend.LLVM
             _builder = LLVMApi.CreateBuilder();
         }
 
-        private void WriteData(Data data)
+        private IDictionary<string, (TypeDefinition type, LLVMValueRef value)> WriteData(Data data)
         {
             // 1. Declare structs
             var structs = new LLVMTypeRef[data.Structs.Count];
@@ -91,7 +91,24 @@ namespace Lang.Backend.LLVM
             }
 
             // 2. Declare variables
-            // TODO Implement me
+            var globals = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>();
+            foreach (var globalVariable in data.Variables)
+            {
+                var type = ConvertTypeDefinition(globalVariable.Type);
+                var global = LLVMApi.AddGlobal(_module, type, globalVariable.Name);
+                LLVMApi.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
+                if (globalVariable.Value != null)
+                {
+                    LLVMApi.SetInitializer(global, BuildConstant(type, globalVariable.Value as ConstantAst));
+                }
+                else if (type.TypeKind != LLVMTypeKind.LLVMStructTypeKind && type.TypeKind != LLVMTypeKind.LLVMArrayTypeKind)
+                {
+                    LLVMApi.SetInitializer(global, GetConstZero(type));
+                }
+                globals.Add(globalVariable.Name, (globalVariable.Type, global));
+            }
+
+            return globals;
         }
 
         private LLVMValueRef WriteFunctionDefinition(string name, List<Argument> arguments, TypeDefinition returnType, bool varargs = false)
@@ -118,11 +135,11 @@ namespace Lang.Backend.LLVM
             return function;
         }
 
-        private void WriteFunction(FunctionAst functionAst, LLVMValueRef function)
+        private void WriteFunction(FunctionAst functionAst, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> globals, LLVMValueRef function)
         {
             // 1. Get function definition
             LLVMApi.PositionBuilderAtEnd(_builder, function.AppendBasicBlock("entry"));
-            var localVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>();
+            var localVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>(globals);
 
             // 2. Allocate arguments on the stack
             var argumentCount = functionAst.Varargs ? functionAst.Arguments.Count - 1 : functionAst.Arguments.Count;
@@ -130,7 +147,7 @@ namespace Lang.Backend.LLVM
             {
                 var arg = functionAst.Arguments[i];
                 var allocation = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(arg.Type), arg.Name);
-                localVariables.Add(arg.Name, (arg.Type, allocation));
+                localVariables[arg.Name] = (arg.Type, allocation);
             }
 
             // 3. Build allocations at the beginning of the function
