@@ -15,6 +15,7 @@ namespace Lang.Translation
     {
         private readonly Dictionary<string, FunctionAst> _functions = new();
         private readonly Dictionary<string, StructAst> _structs = new();
+        private readonly Dictionary<string, StructAst> _polymorphicStructs = new();
         private FunctionAst _currentFunction;
 
         public ProgramGraph CreateProgramGraph(ParseResult parseResult, out List<TranslationError> errors)
@@ -22,12 +23,19 @@ namespace Lang.Translation
             errors = new List<TranslationError>();
 
             // 1. First load the user defined structs
-            var structs = parseResult.SyntaxTrees.Where(ast => ast is StructAst).Cast<StructAst>().ToList();
-            foreach (var structAst in structs)
+            foreach (var structAst in parseResult.Structs)
             {
-                if (!_structs.TryAdd(structAst.Name, structAst))
+                if (_structs.ContainsKey(structAst.Name))
                 {
                     errors.Add(CreateError($"Multiple definitions of struct '{structAst.Name}'", structAst));
+                }
+                else if (structAst.Generics.Any())
+                {
+                    _polymorphicStructs.Add(structAst.Name, structAst);
+                }
+                else
+                {
+                    _structs.Add(structAst.Name, structAst);
                 }
             }
             var graph = new ProgramGraph
@@ -39,14 +47,14 @@ namespace Lang.Translation
             };
 
             // 2. Verify struct bodies
-            foreach (var structAst in structs)
+            foreach (var structAst in parseResult.Structs)
             {
                 VerifyStruct(structAst, errors);
             }
 
             // 3. Verify global variables
             var globalVariables = new Dictionary<string, TypeDefinition>();
-            foreach (var globalVariable in parseResult.SyntaxTrees.Where(ast => ast is DeclarationAst).Cast<DeclarationAst>())
+            foreach (var globalVariable in parseResult.GlobalVariables)
             {
                 if (globalVariable.Value != null && globalVariable.Value is not ConstantAst)
                 {
@@ -57,34 +65,28 @@ namespace Lang.Translation
             }
 
             // 4. Load and verify function return types and arguments
-            foreach (var function in parseResult.SyntaxTrees.Where(ast => ast is FunctionAst).Cast<FunctionAst>())
+            foreach (var function in parseResult.Functions)
             {
                 VerifyFunctionDefinition(function, errors);
             }
 
             // 5. Verify function bodies
-            foreach (var syntaxTree in parseResult.SyntaxTrees)
+            foreach (var function in parseResult.Functions)
             {
-                switch (syntaxTree)
+                _currentFunction = function;
+                var main = function.Name.Equals("main", StringComparison.OrdinalIgnoreCase);
+                VerifyFunction(function, main, globalVariables, errors);
+                if (main)
                 {
-                    case FunctionAst function:
-                        _currentFunction = function;
-                        var main = function.Name.Equals("main", StringComparison.OrdinalIgnoreCase);
-                        VerifyFunction(function, main, globalVariables, errors);
-                        if (main)
-                        {
-                            if (graph.Main != null)
-                            {
-                                errors.Add(CreateError("Only one main function can be defined", function));
-                            }
-                            graph.Main = function;
-                        }
-                        else
-                        {
-                            graph.Functions.Add(function);
-                        }
-                        break;
-                    // @Future Handle more type of ASTs
+                    if (graph.Main != null)
+                    {
+                        errors.Add(CreateError("Only one main function can be defined", function));
+                    }
+                    graph.Main = function;
+                }
+                else
+                {
+                    graph.Functions.Add(function);
                 }
             }
 
@@ -231,7 +233,7 @@ namespace Lang.Translation
                 }
 
                 var argument = function.Arguments.FirstOrDefault();
-                if (!(argument != null && (function.Arguments.Count == 1 && argument.Type.Name == "List" && argument.Type.Generics.FirstOrDefault()?.Name == "string")))
+                if (argument != null && !(function.Arguments.Count == 1 && argument.Type.Name == "List" && argument.Type.Generics.FirstOrDefault()?.Name == "string"))
                 {
                     errors.Add(CreateError("The main function should either have 0 arguments or 'List<string>' argument", function));
                 }
@@ -1203,12 +1205,25 @@ namespace Lang.Translation
                     }
                     return Type.String;
                 case "List":
+                {
                     if (typeDef.Generics.Count != 1)
                     {
                         errors.Add(CreateError($"List type should have 1 generic type, but got {typeDef.Generics.Count}", typeDef));
                         return Type.Error;
                     }
+
+                    if (!_polymorphicStructs.TryGetValue(typeDef.Name, out var structDef))
+                    {
+                        errors.Add(CreateError($"No polymorphic structs with name '{typeDef.Name}'", typeDef));
+                        return Type.Error;
+                    }
+                    else
+                    {
+                        // TODO Create new struct by copying the polymorphic struct
+                        return Type.Error;
+                    }
                     return VerifyType(typeDef.Generics[0], errors) == Type.Error ? Type.Error : Type.List;
+                }
                 case "void":
                     if (hasGenerics)
                     {
@@ -1236,6 +1251,7 @@ namespace Lang.Translation
                     }
                     return Type.VarArgs;
                 case "Params":
+                {
                     if (typeDef.Generics.Count == 1)
                     {
                         return VerifyType(typeDef.Generics[0], errors) == Type.Error ? Type.Error : Type.Params;
@@ -1246,7 +1262,18 @@ namespace Lang.Translation
                         return Type.Error;
                     }
                     return Type.Params;
+                }
                 default:
+                    if (typeDef.Generics.Any())
+                    {
+                        if (!_polymorphicStructs.TryGetValue(typeDef.Name, out var structDef))
+                        {
+                            errors.Add(CreateError($"No polymorphic structs with name '{typeDef.Name}'", typeDef));
+                            return Type.Error;
+                        }
+                        // TODO Create new struct by copying the polymorphic struct
+                        return Type.Error;
+                    }
                     return _structs.ContainsKey(typeDef.Name) ? Type.Other : Type.Error;
             }
         }
