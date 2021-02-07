@@ -992,7 +992,7 @@ namespace Lang.Translation
             List<TranslationError> errors)
         {
             // 1. Load the struct definition in typeDefinition
-            structField.StructName = structType.Name;
+            structField.StructName = structType.Name; // TODO Get the polymorphic struct name
             if (!_structs.TryGetValue(structType.Name, out var structDefinition))
             {
                 errors.Add(CreateError($"Struct '{structType.Name}' not defined", structField));
@@ -1244,8 +1244,8 @@ namespace Lang.Translation
                             errors.Add(CreateError($"No polymorphic structs with name '{typeDef.Name}'", typeDef));
                             return Type.Error;
                         }
-                        // TODO Create new struct by copying the polymorphic struct
-                        return Type.Error;
+                        CreatePolymorphedStruct(structDef, typeDef.Generics.ToArray());
+                        return Type.Other;
                     }
                     return _structs.ContainsKey(typeDef.Name) ? Type.Other : Type.Error;
             }
