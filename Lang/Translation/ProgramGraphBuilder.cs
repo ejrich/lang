@@ -40,10 +40,7 @@ namespace Lang.Translation
             }
             var graph = new ProgramGraph
             {
-                Data = new Data
-                {
-                    Structs = _structs.Values.ToList()
-                }
+                Data = new Data()
             };
 
             // 2. Verify struct bodies
@@ -89,6 +86,8 @@ namespace Lang.Translation
                     graph.Functions.Add(function);
                 }
             }
+
+            graph.Data.Structs = _structs.Values.ToList();
 
             return graph;
         }
@@ -822,7 +821,7 @@ namespace Lang.Translation
             }
         }
 
-        private TypeDefinition VerifyConstant(ConstantAst constant, List<TranslationError> errors)
+        private static void VerifyConstant(ConstantAst constant, List<TranslationError> errors)
         {
             var type = constant.Type;
             switch (type.PrimitiveType)
@@ -848,8 +847,6 @@ namespace Lang.Translation
                     }
                     break;
             }
-
-            return type;
         }
 
         private TypeDefinition VerifyExpressionType(ExpressionAst expression, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
@@ -1153,8 +1150,9 @@ namespace Lang.Translation
                         errors.Add(CreateError($"Type '{typeDef.Name}' cannot have count", typeDef));
                         return Type.Error;
                     }
-                    return VerifyIntegerType(typeDef);
+                    return Type.Int;
                 case "float":
+                case "float64":
                     if (hasGenerics)
                     {
                         errors.Add(CreateError("Type 'float' cannot have generics", typeDef));
@@ -1165,20 +1163,6 @@ namespace Lang.Translation
                         errors.Add(CreateError($"Type '{typeDef.Name}' cannot have count", typeDef));
                         return Type.Error;
                     }
-                    typeDef.PrimitiveType = new FloatType {Bytes = 4};
-                    return Type.Float;
-                case "float64":
-                    if (hasGenerics)
-                    {
-                        errors.Add(CreateError("Type 'float64' cannot have generics", typeDef));
-                        return Type.Error;
-                    }
-                    if (hasCount)
-                    {
-                        errors.Add(CreateError($"Type '{typeDef.Name}' cannot have count", typeDef));
-                        return Type.Error;
-                    }
-                    typeDef.PrimitiveType = new FloatType {Bytes = 8};
                     return Type.Float;
                 case "bool":
                     if (hasGenerics)
@@ -1211,18 +1195,7 @@ namespace Lang.Translation
                         errors.Add(CreateError($"List type should have 1 generic type, but got {typeDef.Generics.Count}", typeDef));
                         return Type.Error;
                     }
-
-                    if (!_polymorphicStructs.TryGetValue(typeDef.Name, out var structDef))
-                    {
-                        errors.Add(CreateError($"No polymorphic structs with name '{typeDef.Name}'", typeDef));
-                        return Type.Error;
-                    }
-                    else
-                    {
-                        // TODO Create new struct by copying the polymorphic struct
-                        return Type.Error;
-                    }
-                    return VerifyType(typeDef.Generics[0], errors) == Type.Error ? Type.Error : Type.List;
+                    return VerifyList(typeDef, errors) ? Type.List : Type.Error; 
                 }
                 case "void":
                     if (hasGenerics)
@@ -1254,9 +1227,9 @@ namespace Lang.Translation
                 {
                     if (typeDef.Generics.Count == 1)
                     {
-                        return VerifyType(typeDef.Generics[0], errors) == Type.Error ? Type.Error : Type.Params;
+                        return VerifyList(typeDef, errors) ? Type.Params : Type.Error; 
                     }
-                    else if (typeDef.Generics.Count > 1)
+                    if (typeDef.Generics.Count > 1)
                     {
                         errors.Add(CreateError($"Params type should have 0 or 1 generic type, but got {typeDef.Generics.Count}", typeDef));
                         return Type.Error;
@@ -1278,19 +1251,74 @@ namespace Lang.Translation
             }
         }
 
-        private static Type VerifyIntegerType(TypeDefinition typeDef)
+        private bool VerifyList(TypeDefinition typeDef, List<TranslationError> errors)
         {
-            if (typeDef.Name == "int")
+            var listType = typeDef.Generics[0];
+            var genericType = VerifyType(listType, errors);
+            if (genericType == Type.Error)
             {
-                typeDef.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
-            }
-            else
-            {
-                var bytes = ushort.Parse(typeDef.Name[1..]) / 8;
-                typeDef.PrimitiveType = new IntegerType {Bytes = (ushort) bytes, Signed = typeDef.Name[0] == 's'};
+                return false;
             }
 
-            return Type.Int;
+            if (_structs.TryGetValue($"List.{listType.Name}", out _))
+            {
+                return true;
+            }
+            if (!_polymorphicStructs.TryGetValue("List", out var structDef))
+            {
+                errors.Add(CreateError($"No polymorphic structs with name '{typeDef.Name}'", typeDef));
+                return false;
+            }
+
+            CreatePolymorphedStruct(structDef, listType);
+            return true;
+        }
+
+        private void CreatePolymorphedStruct(StructAst structAst, params TypeDefinition[] genericTypes)
+        {
+            var polyStruct = new StructAst
+            {
+                Name = structAst.Name
+            };
+            foreach (var field in structAst.Fields)
+            {
+                if (field.HasGeneric)
+                {
+                    polyStruct.Fields.Add(new StructFieldAst
+                    {
+                        Type = CopyType(field.Type, genericTypes), Name = field.Name, DefaultValue = field.DefaultValue
+                    });
+                }
+                else
+                {
+                    polyStruct.Fields.Add(field);
+                }
+            }
+
+            foreach (var generic in genericTypes)
+            {
+                polyStruct.Name += $".{generic.Name}"; 
+            }
+            _structs.Add(polyStruct.Name, polyStruct);
+        }
+        
+        private static TypeDefinition CopyType(TypeDefinition type, TypeDefinition[] genericTypes)
+        {
+            if (type.IsGeneric)
+            {
+                return genericTypes[type.GenericIndex];
+            }
+            var copyType = new TypeDefinition
+            {
+                Name = type.Name, IsGeneric = type.IsGeneric, PrimitiveType = type.PrimitiveType, Count = type.Count
+            };
+
+            foreach (var generic in type.Generics)
+            {
+                copyType.Generics.Add(CopyType(generic, genericTypes));
+            }
+
+            return copyType;
         }
 
         private static string PrintTypeDefinition(TypeDefinition type)
