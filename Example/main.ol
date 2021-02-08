@@ -198,7 +198,7 @@ struct PolyStruct<T, U> {
 }
 
 void poly_test() {
-    a: PolyStruct<int, float64>;
+    a: PolyStruct<int, float>;
     a.field1 = 87;
     a.field2 = 3.14159;
     printf("%d, %f\n", a.field1, a.field2);
