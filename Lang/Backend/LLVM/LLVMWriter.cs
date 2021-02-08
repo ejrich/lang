@@ -502,8 +502,7 @@ namespace Lang.Backend.LLVM
             // 2. Write function lines
             foreach (var ast in scopeChildren)
             {
-                WriteFunctionLine(ast, scopeVariables, function);
-                if (ast is ReturnAst)
+                if (WriteFunctionLine(ast, scopeVariables, function))
                 {
                     return true;
                 }
@@ -527,45 +526,48 @@ namespace Lang.Backend.LLVM
             };
             var thenBlock = LLVMApi.AppendBasicBlock(function, "then");
             var elseBlock = LLVMApi.AppendBasicBlock(function, "else");
-            var endBlock = LLVMApi.AppendBasicBlock(function, "ifcont");
             LLVMApi.BuildCondBr(_builder, condition, thenBlock, elseBlock);
-            
+
             // 3. Write out if body
             LLVMApi.PositionBuilderAtEnd(_builder, thenBlock);
             var ifReturned = false;
             foreach (var ast in conditional.Children)
             {
-                ifReturned = WriteFunctionLine(ast, localVariables, function);
-                if (ifReturned)
+                if (WriteFunctionLine(ast, localVariables, function))
                 {
+                    ifReturned = true;
                     break;
                 }
             }
             if (!ifReturned)
             {
-                LLVMApi.BuildBr(_builder, endBlock);
+                LLVMApi.BuildBr(_builder, elseBlock);
+            }
+
+            LLVMApi.PositionBuilderAtEnd(_builder, elseBlock);
+            
+            if (conditional.Else == null)
+            {
+                return false;
             }
 
             // 4. Write out the else if necessary
             LLVMApi.PositionBuilderAtEnd(_builder, elseBlock);
-            var elseReturned = false;
-            if (conditional.Else != null)
+            var elseReturned = WriteFunctionLine(conditional.Else, localVariables, function);
+
+            // 5. Return if both branches return
+            if (ifReturned && elseReturned)
             {
-                elseReturned = WriteFunctionLine(conditional.Else, localVariables, function);
+                return true;
             }
 
-            // 5. Jump to end block if necessary
+            // 6. Jump to end block if necessary and position builder at end block
+            var endBlock = LLVMApi.AppendBasicBlock(function, "ifcont");
             if (!elseReturned)
             {
                 LLVMApi.BuildBr(_builder, endBlock);
             }
 
-            // 6. Position builder at end block or delete if both branches have returned
-            if (ifReturned && elseReturned)
-            {
-                LLVMApi.DeleteBasicBlock(endBlock);
-                return true;
-            }
             LLVMApi.PositionBuilderAtEnd(_builder, endBlock);
             return false;
         }

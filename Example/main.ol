@@ -37,7 +37,7 @@ global_a := 7;
 global_b: int;
 
 void set_global(int a) {
-    if (a > 10) then global_a = a * 90;
+    if a > 10 then global_a = a * 90;
 }
 
 bool test(int a) {
