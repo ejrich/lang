@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Lang.Parsing
 {
@@ -223,6 +224,7 @@ namespace Lang.Parsing
         public List<TypeDefinition> Generics { get; } = new();
         public IAst Count { get; set; }
         public List<IAst> Children => null;
+        public string GenericName => Generics.Aggregate(Name, (current, generic) => current + $".{generic.GenericName}");
     }
 
     public enum Operator

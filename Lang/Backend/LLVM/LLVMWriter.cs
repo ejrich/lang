@@ -232,7 +232,7 @@ namespace Lang.Backend.LLVM
                     return true;
                 case DeclarationAst declaration:
                     var type = ConvertTypeDefinition(declaration.Type);
-                    if (declaration.Type.Name == "List" || (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind && StructHasList(declaration.Type.Name)))
+                    if (declaration.Type.Name == "List" || (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind && StructHasList(declaration.Type.GenericName)))
                     {
                         BuildStackPointer();
                     }
@@ -293,7 +293,7 @@ namespace Lang.Backend.LLVM
 
         private bool StructHasList(string name)
         {
-            var structDef = _structs[name]; // TODO Use the right name here
+            var structDef = _structs[name];
             foreach (var field in structDef.Fields)
             {
                 if (field.Type.Name == "List")
@@ -303,7 +303,7 @@ namespace Lang.Backend.LLVM
 
                 if (ConvertTypeDefinition(field.Type).TypeKind != LLVMTypeKind.LLVMStructTypeKind) continue;
 
-                if (StructHasList(field.Type.Name))
+                if (StructHasList(field.Type.GenericName))
                 {
                     return true;
                 }
@@ -412,7 +412,7 @@ namespace Lang.Backend.LLVM
 
         private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable)
         {
-            var structDef = _structs[typeDef.Name]; // TODO Get the right name here
+            var structDef = _structs[typeDef.GenericName];
             for (var i = 0; i < structDef.Fields.Count; i++)
             {
                 var structField = structDef.Fields[i];
@@ -462,6 +462,7 @@ namespace Lang.Backend.LLVM
             {
                 LLVMTypeKind.LLVMIntegerTypeKind => LLVMApi.ConstInt(type, 0, false),
                 LLVMTypeKind.LLVMFloatTypeKind => LLVMApi.ConstReal(type, 0),
+                LLVMTypeKind.LLVMDoubleTypeKind => LLVMApi.ConstReal(type, 0),
                 _ => LLVMApi.ConstInt(type, 0, false)
             };
         }
