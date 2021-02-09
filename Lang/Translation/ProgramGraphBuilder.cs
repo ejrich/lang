@@ -71,6 +71,15 @@ namespace Lang.Translation
             foreach (var function in parseResult.Functions)
             {
                 _currentFunction = function;
+                // The __start function does not need to be verified
+                if (function.Name == "__start")
+                {
+                    graph.Start = function;
+                    VerifyFunction(function, false, globalVariables, errors);
+                    continue;
+                }
+
+                // Verify the function body
                 var main = function.Name.Equals("main", StringComparison.OrdinalIgnoreCase);
                 VerifyFunction(function, main, globalVariables, errors);
                 if (main)
