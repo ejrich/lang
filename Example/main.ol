@@ -30,6 +30,10 @@ int Main(List<string> args) {
     printf("'global_b' = %d\n", global_b);
 
     poly_test();
+
+    state := current_state(7);
+    printf("Current state - %d\n", state);
+
     return 0;
 }
 
@@ -202,4 +206,17 @@ void poly_test() {
     a.field1 = 87;
     a.field2 = 3.14159;
     printf("%d, %f\n", a.field1, a.field2);
+}
+
+enum State {
+    Stopped;
+    Stopping;
+    Starting = 5;
+    Running;
+}
+
+State current_state(int a) {
+    if a > 5 then return State.Running;
+    else if a == 5 then return State.Starting;
+    return State.Stopped;
 }

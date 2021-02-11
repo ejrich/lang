@@ -62,6 +62,7 @@ namespace Lang.Parsing
         public int Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
+        public bool IsEnum { get; set; }
         public string StructName { get; set; }
         public StructFieldRefAst Value { get; set; }
         public int ValueIndex { get; set; }

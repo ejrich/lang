@@ -21,7 +21,7 @@ namespace Lang.Backend.LLVM
         private bool _stackSaved;
 
         private readonly Dictionary<string, FunctionAst> _functions = new();
-        private readonly Dictionary<string, StructAst> _structs = new();
+        private readonly Dictionary<string, IAst> _types = new();
         private readonly Queue<LLVMValueRef> _allocationQueue = new();
 
         public string WriteFile(ProgramGraph programGraph, string projectName, string projectPath)
@@ -86,10 +86,15 @@ namespace Lang.Backend.LLVM
             for (var i = 0; i < data.Types.Count; i++)
             {
                 var type = data.Types[i];
-                if (type is StructAst structAst)
+                switch (type)
                 {
-                    structs[i] = LLVMApi.StructCreateNamed(LLVMApi.GetModuleContext(_module), structAst.Name);
-                    _structs.Add(structAst.Name, structAst);
+                    case StructAst structAst:
+                        structs[i] = LLVMApi.StructCreateNamed(LLVMApi.GetModuleContext(_module), structAst.Name);
+                        _types.Add(structAst.Name, structAst);
+                        break;
+                    case EnumAst enumAst:
+                        _types.Add(enumAst.Name, enumAst);
+                        break;
                 }
             }
             for (var i = 0; i < data.Types.Count; i++)
@@ -305,8 +310,8 @@ namespace Lang.Backend.LLVM
 
         private bool StructHasList(string name)
         {
-            var structDef = _structs[name];
-            foreach (var field in structDef.Fields)
+            var structDef = _types[name] as StructAst;
+            foreach (var field in structDef!.Fields)
             {
                 if (field.Type.Name == "List")
                 {
@@ -424,8 +429,8 @@ namespace Lang.Backend.LLVM
 
         private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable)
         {
-            var structDef = _structs[typeDef.GenericName];
-            for (var i = 0; i < structDef.Fields.Count; i++)
+            var structDef = _types[typeDef.GenericName] as StructAst;
+            for (var i = 0; i < structDef!.Fields.Count; i++)
             {
                 var structField = structDef.Fields[i];
                 var type = ConvertTypeDefinition(structField.Type);
@@ -737,6 +742,13 @@ namespace Lang.Backend.LLVM
                 }
                 case StructFieldRefAst structField:
                 {
+                    if (structField.IsEnum)
+                    {
+                        var enumDef = (EnumAst)_types[structField.Name];
+                        var value = enumDef.Values[structField.ValueIndex].Value;
+                        var typeDef = new TypeDefinition {Name = "int", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
+                        return (typeDef, LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (ulong)value, false));
+                    }
                     var (type, field) = BuildStructField(structField, localVariables[structField.Name].value);
                     return (type, LLVMApi.BuildLoad(_builder, field, structField.Name));
                 }
@@ -968,7 +980,7 @@ namespace Lang.Backend.LLVM
 
             if (value.Value == null)
             {
-                var type = _structs[structField.StructName].Fields[structField.ValueIndex].Type;
+                var type = ((StructAst)_types[structField.StructName]).Fields[structField.ValueIndex].Type;
                 return (type, field);
             }
 
@@ -1300,7 +1312,7 @@ namespace Lang.Backend.LLVM
                     "void" => LLVMTypeRef.VoidType(),
                     "List" => GetListType(type),
                     "Params" => GetListType(type, true),
-                    "string" => LLVMTypeRef.PointerType(LLVMTypeRef.Int8Type(), 0), // LLVMApi.GetTypeByName(_module, "string"),
+                    "string" => LLVMTypeRef.PointerType(LLVMTypeRef.Int8Type(), 0),
                     _ => GetStructType(type)
                 }
             };
@@ -1319,13 +1331,12 @@ namespace Lang.Backend.LLVM
 
         private LLVMTypeRef GetStructType(TypeDefinition type)
         {
-            var structName = type.Name;
-            foreach (var generic in type.Generics)
+            if (_types.TryGetValue(type.Name, out var typeDef) && typeDef is EnumAst)
             {
-                structName += $".{generic.Name}";
+                return LLVMTypeRef.Int32Type();
             }
 
-            return LLVMApi.GetTypeByName(_module, structName);
+            return LLVMApi.GetTypeByName(_module, type.GenericName);
         }
     }
 }
