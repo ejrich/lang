@@ -803,6 +803,7 @@ namespace Lang.Translation
                 case CallAst call:
                     if (_functions.TryGetValue(call.Function, out var function))
                     {
+                        call.Params = function.Params;
                         var argumentCount = function.Varargs || function.Params ? function.Arguments.Count - 1 : function.Arguments.Count;
                         var callArgumentCount = call.Arguments.Count;
 
@@ -1324,6 +1325,13 @@ namespace Lang.Translation
                     {
                         errors.Add(CreateError($"Params type should have 0 or 1 generic type, but got {typeDef.Generics.Count}", typeDef));
                         return Type.Error;
+                    }
+
+                    // Create List.Any type if necessary
+                    if (!_types.ContainsKey("List.Any"))
+                    {
+                        var structDef = _polymorphicStructs["List"];
+                        CreatePolymorphedStruct(structDef, "List.Any", new TypeDefinition {Name = "Any"});
                     }
                     return Type.Params;
                 }
