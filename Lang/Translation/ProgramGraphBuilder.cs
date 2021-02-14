@@ -930,11 +930,19 @@ namespace Lang.Translation
                         break;
                     // Requires same types and returns bool
                     case Operator.Equality:
+                    case Operator.NotEqual:
                     case Operator.GreaterThan:
                     case Operator.LessThan:
                     case Operator.GreaterThanEqual:
                     case Operator.LessThanEqual:
-                        if (!(type == Type.Int || type == Type.Float) &&
+                        if (type == Type.Enum && nextType == Type.Enum)
+                        {
+                            if ((op != Operator.Equality && op != Operator.NotEqual) || !TypeEquals(expression.Type, nextExpressionType))
+                            {
+                                errors.Add(CreateError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]));
+                            }
+                        }
+                        else if (!(type == Type.Int || type == Type.Float) &&
                             !(nextType == Type.Int || nextType == Type.Float))
                         {
                             errors.Add(CreateError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]));
@@ -1069,7 +1077,7 @@ namespace Lang.Translation
                 return null;
             }
 
-            return new TypeDefinition {Name = enumAst.Name};
+            return new TypeDefinition {Name = enumAst.Name, PrimitiveType = new EnumType()};
         }
 
         private TypeDefinition VerifyStructFieldRef(StructFieldRefAst structField, TypeDefinition structType,
@@ -1184,7 +1192,7 @@ namespace Lang.Translation
                     return b.PrimitiveType is IntegerType;
                 case FloatType:
                     return b.PrimitiveType is FloatType;
-                default:
+                case null:
                     if (b.PrimitiveType != null) return false;
                     break;
             }
@@ -1340,7 +1348,14 @@ namespace Lang.Translation
                     {
                         return Type.Error;
                     }
-                    return type is StructAst ? Type.Struct : Type.Enum;
+
+                    if (type is StructAst)
+                    {
+                        return Type.Struct;
+                    }
+
+                    typeDef.PrimitiveType ??= new EnumType();
+                    return Type.Enum;
             }
         }
 
