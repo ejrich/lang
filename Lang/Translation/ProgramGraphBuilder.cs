@@ -626,17 +626,8 @@ namespace Lang.Translation
                         eachVariables.TryAdd(each.IterationVariable, iteratorType);
                         break;
                     case "Params":
-                        if (variableTypeDefinition.Generics.Any())
-                        {
-                            each.IteratorType = iteratorType;
-                            eachVariables.TryAdd(each.IterationVariable, iteratorType);
-                        }
-                        else
-                        {
-                            var anyType = new TypeDefinition {Name = "Any"};
-                            each.IteratorType = anyType;
-                            eachVariables.TryAdd(each.IterationVariable, anyType);
-                        }
+                        each.IteratorType = iteratorType;
+                        eachVariables.TryAdd(each.IterationVariable, iteratorType);
                         break;
                     default:
                         errors.Add(CreateError($"Type {PrintTypeDefinition(variableTypeDefinition)} cannot be used as an iterator", each.Iteration));
