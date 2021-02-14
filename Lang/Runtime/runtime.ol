@@ -6,25 +6,6 @@ struct List<T> {
     T* data;
 }
 
-struct Any {
-    TypeKind type;
-    void* data;
-}
-
-enum TypeKind {
-    Int;
-    Float;
-    Boolean;
-    String;
-    List;
-    Void;
-    Pointer;
-    Struct;
-    Enum;
-    VarArgs;
-    Params;
-}
-
 /* @Future Update strings to use this struct
 struct string {
     int length;
