@@ -1245,6 +1245,8 @@ namespace Lang.Parsing
                     constant.Type = InferType(token, errors);
                     constant.Value = token.Value;
                     return constant;
+                case TokenType.Null:
+                    return CreateAst<NullAst>(token);
                 case TokenType.Token:
                     // Parse variable, call, or expression
                     switch (nextToken?.Type)
@@ -1730,10 +1732,8 @@ namespace Lang.Parsing
             switch (token.Type)
             {
                 case TokenType.Literal:
-                {
                     typeDefinition.Name = "string";
                     return typeDefinition;
-                }
                 case TokenType.Number:
                     if (int.TryParse(token.Value, out _))
                     {
@@ -1765,10 +1765,8 @@ namespace Lang.Parsing
                         return null;
                     }
                 case TokenType.Boolean:
-                {
                     typeDefinition.Name = "bool";
                     return typeDefinition;
-                }
                 default:
                     errors.Add(new ParseError {Error = $"Unable to determine type of token '{token.Value}'", Token = token});
                     return null;

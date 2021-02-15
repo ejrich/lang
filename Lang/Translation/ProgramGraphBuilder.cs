@@ -405,34 +405,59 @@ namespace Lang.Translation
             }
 
             // 2. Verify the assignment value
-            var valueType = VerifyExpression(declaration.Value, localVariables, errors);
-
-            // 3. Verify the assignment value matches the type definition if it has been defined
-            if (declaration.Type == null)
+            if (declaration.Value is NullAst nullAst)
             {
-                declaration.Type = valueType;
+                // 2a. Verify null can be assigned
+                if (declaration.Type == null)
+                {
+                    errors.Add(CreateError("Cannot assign null value without declaring a type", declaration.Value));
+                }
+                else
+                {
+                    var type = VerifyType(declaration.Type, errors);
+                    if (type == Type.Error)
+                    {
+                        errors.Add(CreateError($"Undefined type in declaration '{PrintTypeDefinition(declaration.Type)}'", declaration.Type));
+                    }
+                    else if (type != Type.Pointer)
+                    {
+                        errors.Add(CreateError("Cannot assign null to non-pointer type", declaration.Value));
+                    }
+
+                    nullAst.TargetType = declaration.Type;
+                }
             }
             else
             {
-                var type = VerifyType(declaration.Type, errors);
-                if (type == Type.Error)
-                {
-                    errors.Add(CreateError($"Undefined type in declaration '{PrintTypeDefinition(declaration.Type)}'", declaration.Type));
-                }
+                var valueType = VerifyExpression(declaration.Value, localVariables, errors);
 
-                // Verify the type is correct
-                if (valueType != null)
+                // 2b. Verify the assignment value matches the type definition if it has been defined
+                if (declaration.Type == null)
                 {
-                    if (!TypeEquals(declaration.Type, valueType))
+                    declaration.Type = valueType;
+                }
+                else
+                {
+                    var type = VerifyType(declaration.Type, errors);
+                    if (type == Type.Error)
                     {
-                        errors.Add(CreateError($"Expected declaration value to be type '{PrintTypeDefinition(declaration.Type)}', " +
-                            $"but got '{PrintTypeDefinition(valueType)}'", declaration.Type));
+                        errors.Add(CreateError($"Undefined type in declaration '{PrintTypeDefinition(declaration.Type)}'", declaration.Type));
                     }
-                    else if (declaration.Type.PrimitiveType != null && declaration.Value is ConstantAst constant)
+
+                    // Verify the type is correct
+                    if (valueType != null)
                     {
-                        constant.Type.Name = declaration.Type.Name;
-                        constant.Type.PrimitiveType = declaration.Type.PrimitiveType;
-                        VerifyConstant(constant, errors);
+                        if (!TypeEquals(declaration.Type, valueType))
+                        {
+                            errors.Add(CreateError($"Expected declaration value to be type '{PrintTypeDefinition(declaration.Type)}', " +
+                                $"but got '{PrintTypeDefinition(valueType)}'", declaration.Type));
+                        }
+                        else if (declaration.Type.PrimitiveType != null && declaration.Value is ConstantAst constant)
+                        {
+                            constant.Type.Name = declaration.Type.Name;
+                            constant.Type.PrimitiveType = declaration.Type.PrimitiveType;
+                            VerifyConstant(constant, errors);
+                        }
                     }
                 }
             }
@@ -447,6 +472,19 @@ namespace Lang.Translation
             if (variableTypeDefinition == null) return;
 
             // 2. Verify the assignment value
+            if (assignment.Value is NullAst nullAst)
+            {
+                if (assignment.Operator != Operator.None)
+                {
+                    errors.Add(CreateError("Cannot assign null value with operator assignment", assignment.Value));
+                }
+                if (variableTypeDefinition.Name != "*")
+                {
+                    errors.Add(CreateError("Cannot assign null to non-pointer type", assignment.Value));
+                }
+                nullAst.TargetType = variableTypeDefinition;
+                return;
+            }
             var valueType = VerifyExpression(assignment.Value, localVariables, errors);
 
             // 3. Verify the assignment value matches the variable type definition
@@ -673,6 +711,8 @@ namespace Lang.Translation
             {
                 case ConstantAst constant:
                     return constant.Type;
+                case NullAst:
+                    return null;
                 case StructFieldRefAst structField:
                 {
                     if (!localVariables.TryGetValue(structField.Name, out var structType))
@@ -818,12 +858,23 @@ namespace Lang.Translation
                         {
                             var functionType = function.Arguments[i].Type;
                             var argument = call.Arguments[i];
-                            var callType = VerifyExpression(argument, localVariables, errors);
-                            if (callType != null)
+                            if (argument is NullAst nullAst)
                             {
-                                if (!TypeEquals(functionType, callType))
+                                if (functionType.Name != "*")
                                 {
-                                    errors.Add(CreateError($"Call to function '{function.Name}' expected '{PrintTypeDefinition(functionType)}', but got '{PrintTypeDefinition(callType)}'", argument));
+                                    errors.Add(CreateError("Cannot pass null as a non-pointer type", argument));
+                                }
+                                nullAst.TargetType = functionType;
+                            }
+                            else
+                            {
+                                var callType = VerifyExpression(argument, localVariables, errors);
+                                if (callType != null)
+                                {
+                                    if (!TypeEquals(functionType, callType))
+                                    {
+                                        errors.Add(CreateError($"Call to function '{function.Name}' expected '{PrintTypeDefinition(functionType)}', but got '{PrintTypeDefinition(callType)}'", argument));
+                                    }
                                 }
                             }
                         }
@@ -911,7 +962,21 @@ namespace Lang.Translation
             {
                 // 2. Get the next operator and expression type
                 var op = expression.Operators[i - 1];
-                var nextExpressionType = VerifyExpression(expression.Children[i], localVariables, errors);
+                var next = expression.Children[i];
+                if (next is NullAst nullAst)
+                {
+                    if (expression.Type.Name != "*" || (op != Operator.Equality && op != Operator.NotEqual))
+                    {
+                        errors.Add(CreateError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and null", next));
+                    }
+
+                    nullAst.TargetType = expression.Type;
+                    expression.Type = new TypeDefinition {Name = "bool"};
+                    expression.ResultingTypes.Add(expression.Type);
+                    continue;
+                }
+
+                var nextExpressionType = VerifyExpression(next, localVariables, errors);
                 if (nextExpressionType == null) return null;
 
                 // 3. Verify the operator and expression types are compatible and convert the expression type if necessary
