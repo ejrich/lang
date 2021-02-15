@@ -870,7 +870,7 @@ namespace Lang.Translation
                                 return null;
                             }
                         }
-                        else if (argumentCount != callArgumentCount)
+                        else if (argumentCount < callArgumentCount)
                         {
                             errors.Add(CreateError($"Call to function '{function.Name}' expected {argumentCount} arguments, but got {callArgumentCount}", call));
                             return null;
@@ -879,24 +879,35 @@ namespace Lang.Translation
                         // Verify call arguments match the types of the function arguments
                         for (var i = 0; i < argumentCount; i++)
                         {
-                            var functionType = function.Arguments[i].Type;
-                            var argument = call.Arguments[i];
-                            if (argument is NullAst nullAst)
+                            var functionArg = function.Arguments[i];
+                            var argument = call.Arguments.ElementAtOrDefault(i);
+                            if (argument == null)
                             {
-                                if (functionType.Name != "*")
+                                if (functionArg.DefaultValue == null)
+                                {
+                                    errors.Add(CreateError($"Expected to get argument of type '{PrintTypeDefinition(functionArg.Type)}'", call));
+                                }
+                                else
+                                {
+                                    call.Arguments.Add(functionArg.DefaultValue);
+                                }
+                            }
+                            else if (argument is NullAst nullAst)
+                            {
+                                if (functionArg.Type.Name != "*")
                                 {
                                     errors.Add(CreateError("Cannot pass null as a non-pointer type", argument));
                                 }
-                                nullAst.TargetType = functionType;
+                                nullAst.TargetType = functionArg.Type;
                             }
                             else
                             {
                                 var callType = VerifyExpression(argument, localVariables, errors);
                                 if (callType != null)
                                 {
-                                    if (!TypeEquals(functionType, callType))
+                                    if (!TypeEquals(functionArg.Type, callType))
                                     {
-                                        errors.Add(CreateError($"Call to function '{function.Name}' expected '{PrintTypeDefinition(functionType)}', but got '{PrintTypeDefinition(callType)}'", argument));
+                                        errors.Add(CreateError($"Call to function '{function.Name}' expected '{PrintTypeDefinition(functionArg.Type)}', but got '{PrintTypeDefinition(callType)}'", argument));
                                     }
                                 }
                             }
