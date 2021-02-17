@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Lang.Backend
 {
     public interface ILinker
@@ -7,6 +9,7 @@ namespace Lang.Backend
         /// </summary>
         /// <param name="objectFile">Path to the object file</param>
         /// <param name="projectPath">Name of the executable file</param>
-        void Link(string objectFile, string projectPath);
+        /// <param name="dependencies">The library dependencies to link the executable with</param>
+        void Link(string objectFile, string projectPath, List<string> dependencies);
     }
 }

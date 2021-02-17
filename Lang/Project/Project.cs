@@ -4,9 +4,9 @@ namespace Lang.Project
 {
     public class Project
     {
-        public string Name { get; set; }
-        public string Path { get; set; }
-        public List<string> BuildFiles { get; set; }
-        public List<Project> Dependencies { get; set; }
+        public string Name { get; init; }
+        public string Path { get; init; }
+        public List<string> BuildFiles { get; init; }
+        public List<string> Dependencies { get; init; }
     }
 }

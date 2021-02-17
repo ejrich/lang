@@ -75,12 +75,11 @@ namespace Lang
 
             // 4. Build program and link binaries
             stopwatch.Restart();
-            _backend.Build(programGraph, project.Name, project.Path);
+            _backend.Build(programGraph, project.Name, project.Path, project.Dependencies);
             stopwatch.Stop();
             var buildTime = stopwatch.Elapsed;
 
             // 5. Log statistics
-            stopwatch.Stop();
             Console.WriteLine($"Project time: {projectTime.TotalSeconds} seconds");
             Console.WriteLine($"Lexing/Parsing time: {parseTime.TotalSeconds} seconds");
             Console.WriteLine($"Project Graph time: {graphTime.TotalSeconds} seconds");
