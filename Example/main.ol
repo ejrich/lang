@@ -45,9 +45,9 @@ int Main(List<string> args) {
     default_args(8);
     default_args();
 
-    sdl := SDL_Init(32);
-    SDL_CreateWindow("Hello world", 805240832, 805240832, 400, 300, 0);
-    sleep(10);
+    //sdl := SDL_Init(32);
+    //SDL_CreateWindow("Hello world", 805240832, 805240832, 400, 300, 0);
+    //sleep(10);
 
     return 0;
 }
@@ -164,6 +164,14 @@ int* pointers() {
     next: Node;
     next.value = 8;
     node.next = &next;
+    
+    loop_node := &node;
+    i := 1;
+    while loop_node {
+        printf("Value %d = %d\n", i++, loop_node.value);
+        loop_node = loop_node.next;
+    }
+
     list: List<int>[8];
     list_ptr := &list[4];
     a := 6;
