@@ -45,9 +45,11 @@ int Main(List<string> args) {
     default_args(8);
     default_args();
 
-    //sdl := SDL_Init(32);
-    //SDL_CreateWindow("Hello world", 805240832, 805240832, 400, 300, 0);
-    //sleep(10);
+    sdl_video := 0x20;
+    x := 0xfeABD4;
+    sdl := SDL_Init(sdl_video);
+    SDL_CreateWindow("Hello world", 805240832, 805240832, 400, 300, 0);
+    sleep(10);
 
     return 0;
 }
