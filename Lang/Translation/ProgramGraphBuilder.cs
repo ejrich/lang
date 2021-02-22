@@ -674,6 +674,7 @@ namespace Lang.Translation
                 case Type.Int:
                 case Type.Float:
                 case Type.Boolean:
+                case Type.Pointer:
                     // Valid types
                     break;
                 default:
