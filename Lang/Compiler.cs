@@ -31,6 +31,9 @@ namespace Lang
 
         public void Compile(string[] args)
         {
+            // TODO load args into build settings
+            var buildSettings = new BuildSettings();
+
             var stopwatch = new Stopwatch();
             stopwatch.Start();
             // 1. Load files in project
@@ -75,7 +78,7 @@ namespace Lang
 
             // 4. Build program and link binaries
             stopwatch.Restart();
-            _backend.Build(programGraph, project, false);
+            _backend.Build(programGraph, project, buildSettings);
             stopwatch.Stop();
             var buildTime = stopwatch.Elapsed;
 
