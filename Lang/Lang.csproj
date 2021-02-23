@@ -6,7 +6,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="LLVMSharp" Version="5.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Runtime\runtime.ol" />
+    <Content Include="Runtime\runtime.ol">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

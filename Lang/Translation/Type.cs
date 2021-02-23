@@ -1,4 +1,4 @@
-﻿namespace Lang.Translation
+namespace Lang.Translation
 {
     public enum Type
     {
@@ -8,7 +8,11 @@
         String,
         List,
         Void,
-        Other,
+        Pointer,
+        Struct,
+        Enum,
+        VarArgs,
+        Params,
         Error
     }
 }

@@ -1,8 +1,8 @@
-﻿namespace Lang.Backend.Assembly
+namespace Lang.Backend.Assembly
 {
     public class AssemblyWriter : IWriter
     {
-        public string WriteTranslatedFile(ProgramGraph programGraph, string projectName, string projectPath)
+        public string WriteFile(ProgramGraph programGraph, string projectName, string projectPath, BuildSettings buildSettings)
         {
             throw new System.NotImplementedException();
         }

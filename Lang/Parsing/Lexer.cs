@@ -1,8 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 
 namespace Lang.Parsing
 {
@@ -13,7 +12,18 @@ namespace Lang.Parsing
 
     public class Lexer : ILexer
     {
-        private readonly Regex _escapableCharacters = new(@"['""\\abfnrtv]");
+        private readonly IDictionary<char, char> _escapableCharacters = new Dictionary<char, char>
+        {
+            {'"', '"'},
+            {'\\', '\\'},
+            {'a', '\a'},
+            {'b', '\b'},
+            {'f', '\f'},
+            {'n', '\n'},
+            {'r', '\r'},
+            {'t', '\t'},
+            {'v', '\v'}
+        };
 
         private readonly IDictionary<string, TokenType> _reservedTokens = new Dictionary<string, TokenType>
         {
@@ -27,17 +37,20 @@ namespace Lang.Parsing
             {"each", TokenType.Each},
             {"in", TokenType.In},
             {"struct", TokenType.Struct},
+            {"enum", TokenType.Enum},
+            {"null", TokenType.Null}
         };
 
         public List<Token> LoadFileTokens(string filePath, int fileIndex, out List<ParseError> errors)
         {
-            var fileContents = File.ReadAllText(filePath);
+            using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+            using var reader = new StreamReader(fileStream);
 
             errors = new List<ParseError>();
-            return GetTokens(fileContents, fileIndex, errors).ToList();
+            return GetTokens(reader, fileIndex, errors).ToList();
         }
 
-        private IEnumerable<Token> GetTokens(string fileContents, int fileIndex, List<ParseError> errors)
+        private IEnumerable<Token> GetTokens(StreamReader reader, int fileIndex, List<ParseError> errors)
         {
             var lexerStatus = new LexerStatus();
 
@@ -46,8 +59,11 @@ namespace Lang.Parsing
             var literalEscapeToken = false;
             var line = 1;
             var column = 0;
-            foreach (var character in fileContents)
+
+            while (reader.Peek() > 0)
             {
+                var character = (char)reader.Read();
+ 
                 column++;
                 if (character == '\n')
                 {
@@ -85,21 +101,24 @@ namespace Lang.Parsing
                     currentToken.Value = string.Empty;
                 }
 
+                // Add characters to the string literal
                 if (currentToken?.Type == TokenType.Literal)
                 {
                     if (character == '\\' && !literalEscapeToken)
                     {
-                        currentToken.Value += character;
                         literalEscapeToken = true;
                     }
                     else if (literalEscapeToken)
                     {
-                        if (!_escapableCharacters.IsMatch(character.ToString()))
+                        if (_escapableCharacters.TryGetValue(character, out var escapedCharacter))
+                        {
+                            currentToken.Value += escapedCharacter;
+                        }
+                        else
                         {
                             currentToken.Error = true;
+                            currentToken.Value += character;
                         }
-
-                        currentToken.Value += character;
                         literalEscapeToken = false;
                     }
                     else
@@ -160,7 +179,7 @@ namespace Lang.Parsing
                 // Get token from character, determine to emit value
                 var tokenType = GetTokenType(character);
 
-                if (ContinueToken(currentToken, tokenType, lexerStatus))
+                if (ContinueToken(currentToken, tokenType, character, lexerStatus))
                 {
                     currentToken!.Value += character;
                 }
@@ -232,7 +251,7 @@ namespace Lang.Parsing
             return Enum.IsDefined(typeof(TokenType), token) ? token : TokenType.Token;
         }
 
-        private static bool ContinueToken(Token currentToken, TokenType type, LexerStatus lexerStatus)
+        private static bool ContinueToken(Token currentToken, TokenType type, char character, LexerStatus lexerStatus)
         {
             if (currentToken == null) return false;
 
@@ -246,32 +265,43 @@ namespace Lang.Parsing
                         case TokenType.Number:
                             return true;
                         case TokenType.Period:
-                            if (currentToken.Value.Contains('.'))
+                            if (currentToken.Flags.HasFlag(TokenFlags.Float))
                             {
                                 // Handle number ranges
                                 if (currentToken.Value[^1] == '.')
                                 {
+                                    currentToken.Flags &= ~TokenFlags.Float;
                                     currentToken.Type = TokenType.NumberRange;
                                     return true;
                                 }
                                 currentToken.Error = true;
                                 return false;
                             }
+                            currentToken.Flags |= TokenFlags.Float;
                             return true;
                         case TokenType.Token:
+                            if (currentToken.Value == "0" && character == 'x')
+                            {
+                                currentToken.Flags |= TokenFlags.HexNumber;
+                                return true;
+                            }
+                            if (currentToken.Flags.HasFlag(TokenFlags.HexNumber))
+                            {
+                                return true;
+                            }
                             currentToken.Error = true;
                             return false;
                         default:
                             return false;
                     }
-                case TokenType.Divide:
+                case TokenType.ForwardSlash:
                     switch (type)
                     {
-                        case TokenType.Divide:
+                        case TokenType.ForwardSlash:
                             currentToken.Type = TokenType.Comment;
                             lexerStatus.ReadingComment = true;
                             return true;
-                        case TokenType.Multiply:
+                        case TokenType.Asterisk:
                             currentToken.Type = TokenType.Comment;
                             lexerStatus.ReadingComment = true;
                             lexerStatus.MultiLineComment = true;
@@ -308,11 +338,22 @@ namespace Lang.Parsing
                     return ChangeTypeIfSame(currentToken, type, TokenType.Equality);
                 case TokenType.Plus:
                     return ChangeTypeIfSame(currentToken, type, TokenType.Increment);
+                case TokenType.Range:
+                    if (type == TokenType.Period)
+                    {
+                        currentToken.Type = TokenType.VarArgs;
+                        return true;
+                    }
+                    return false;
                 case TokenType.Minus:
+                    if (type == TokenType.Number)
+                    {
+                        currentToken.Type = type;
+                        return true;
+                    }
                     return ChangeTypeIfSame(currentToken, type, TokenType.Decrement);
                 case TokenType.Period:
                     return ChangeTypeIfSame(currentToken, type, TokenType.Range);
-                // TODO More validation eventually
                 default:
                     return false;
             }

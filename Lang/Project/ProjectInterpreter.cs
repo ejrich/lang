@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -33,13 +33,20 @@ namespace Lang.Project
 
             // 3. Recurse through the directories and load the files to build
             var projectDirectory = Path.GetDirectoryName(Path.GetFullPath(projectPath));
-            var sourceFiles = GetSourceFiles(new DirectoryInfo(projectDirectory));
+            var sourceFiles = GetSourceFiles(new DirectoryInfo(projectDirectory!)).ToList();
+
+            // 4. Load runtime and dependency files
+            var libraryDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Runtime");
+            var libraryFiles = GetSourceFiles(new DirectoryInfo(libraryDirectory));
+            sourceFiles.AddRange(libraryFiles);
 
             return new Project
             {
                 Name = projectFile.Name,
                 Path = projectDirectory,
-                BuildFiles = sourceFiles.ToList()
+                Linker = projectFile.Linker,
+                BuildFiles = sourceFiles,
+                Dependencies = projectFile.Dependencies
             };
         }
 
@@ -83,6 +90,9 @@ namespace Lang.Project
                         case ProjectFileSection.Packages:
                             projectFile.Packages.Add(line);
                             break;
+                        case ProjectFileSection.Linker:
+                            projectFile.Linker = (Linker) Enum.Parse(typeof(Linker), line, true);
+                            break;
                     }
                 }
                 else
@@ -92,6 +102,7 @@ namespace Lang.Project
                         "#name" => ProjectFileSection.Name,
                         "#dependencies" => ProjectFileSection.Dependencies,
                         "#packages" => ProjectFileSection.Packages,
+                        "#linker" => ProjectFileSection.Linker,
                         _ => ProjectFileSection.None,
                     };
                 }

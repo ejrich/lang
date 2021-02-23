@@ -2,3 +2,7 @@
 Example
 
 #dependencies
+SDL2
+
+#linker
+dynamic

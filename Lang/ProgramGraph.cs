@@ -1,26 +1,19 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Lang.Parsing;
 
 namespace Lang
 {
     public class ProgramGraph
     {
-        public Data Data { get; init; }
-        // public List<Namespace> Namespaces { get; } = new(); TODO Implement later
+        public Data Data { get; } = new();
         public List<FunctionAst> Functions { get; } = new();
         public FunctionAst Main { get; set; }
-    }
-
-    public class Namespace
-    {
-        public string Name { get; set; }
-        public Data Data { get; set; }
-        public List<FunctionAst> Functions { get; set; } = new();
+        public FunctionAst Start { get; set; }
     }
 
     public class Data
     {
-        public List<Argument> Variables { get; } = new();
-        public List<StructAst> Structs { get; set; }
+        public List<DeclarationAst> Variables { get; } = new();
+        public List<IAst> Types { get; set; }
     }
 }

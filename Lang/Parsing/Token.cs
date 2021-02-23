@@ -1,9 +1,12 @@
-﻿namespace Lang.Parsing
+using System;
+
+namespace Lang.Parsing
 {
     public class Token
     {
         public TokenType Type { get; set; }
         public string Value { get; set; }
+        public TokenFlags Flags { get; set; }
         public int FileIndex { get; init; }
         public int Line { get; init; }
         public int Column { get; set; }
@@ -34,9 +37,14 @@
         LessThanEqual,
         In,
         Range,
+        Enum,
+        Null,
         NumberRange, // Ignored by parser
+        VarArgs, // Ignored by parser
         OpenParen = '(',
         CloseParen = ')',
+        OpenBracket = '[',
+        CloseBracket = ']',
         OpenBrace = '{',
         CloseBrace = '}',
         Not = '!',
@@ -45,8 +53,8 @@
         Caret = '^',
         Plus = '+',
         Minus = '-',
-        Multiply = '*',
-        Divide = '/',
+        Asterisk = '*',
+        ForwardSlash = '/',
         Percent = '%',
         Equals = '=',
         Colon = ':',
@@ -55,6 +63,15 @@
         LessThan = '<',
         GreaterThan = '>',
         Comma = ',',
-        Period = '.'
+        Period = '.',
+        Pound = '#'
+    }
+
+    [Flags]
+    public enum TokenFlags : byte
+    {
+        None = 0,
+        Float = 1,
+        HexNumber = 2
     }
 }
