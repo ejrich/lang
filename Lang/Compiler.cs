@@ -31,16 +31,32 @@ namespace Lang
 
         public void Compile(string[] args)
         {
-            // TODO load args into build settings
+            // 1. Load cli args into build settings
             var buildSettings = new BuildSettings();
+            foreach (var arg in args)
+            {
+                switch (arg)
+                {
+                    case "-R":
+                    case "--release":
+                        buildSettings.Release = true;
+                        break;
+                    case "-S":
+                        buildSettings.OutputAssembly = true;
+                        break;
+                    default:
+                        buildSettings.ProjectPath ??= arg;
+                        break;
+                }
+            }
 
             var stopwatch = new Stopwatch();
             stopwatch.Start();
-            // 1. Load files in project
-            var project = _projectInterpreter.LoadProject(args.FirstOrDefault());
+            // 2. Load files in project
+            var project = _projectInterpreter.LoadProject(buildSettings.ProjectPath);
             var projectTime = stopwatch.Elapsed;
 
-            // 2. Parse source files to tokens
+            // 3. Parse source files to tokens
             stopwatch.Restart();
             var parseResult = _parser.Parse(project.BuildFiles);
             var parseTime = stopwatch.Elapsed;
@@ -61,7 +77,7 @@ namespace Lang
                 Environment.Exit(ErrorCodes.ParsingError);
             }
 
-            // 3. Build program graph
+            // 4. Build program graph
             stopwatch.Restart();
             var programGraph = _graphBuilder.CreateProgramGraph(parseResult, out var errors);
             var graphTime = stopwatch.Elapsed;
@@ -76,17 +92,17 @@ namespace Lang
                 Environment.Exit(ErrorCodes.CompilationError);
             }
 
-            // 4. Build program and link binaries
+            // 5. Build program and link binaries
             stopwatch.Restart();
             _backend.Build(programGraph, project, buildSettings);
             stopwatch.Stop();
             var buildTime = stopwatch.Elapsed;
 
-            // 5. Log statistics
-            Console.WriteLine($"Project time: {projectTime.TotalSeconds} seconds");
-            Console.WriteLine($"Lexing/Parsing time: {parseTime.TotalSeconds} seconds");
-            Console.WriteLine($"Project Graph time: {graphTime.TotalSeconds} seconds");
-            Console.WriteLine($"Building time: {buildTime.TotalSeconds} seconds");
+            // 6. Log statistics
+            Console.WriteLine($"Project time: {projectTime.TotalSeconds} seconds\n" + 
+                              $"Lexing/Parsing time: {parseTime.TotalSeconds} seconds\n" +
+                              $"Project Graph time: {graphTime.TotalSeconds} seconds\n" +
+                              $"Building time: {buildTime.TotalSeconds} seconds");
         }
     }
 }

@@ -25,10 +25,10 @@ namespace Lang.Backend.LLVM
         private readonly Dictionary<string, IAst> _types = new();
         private readonly Queue<LLVMValueRef> _allocationQueue = new();
 
-        public string WriteFile(ProgramGraph programGraph, string projectName, string projectPath, bool optimize)
+        public string WriteFile(ProgramGraph programGraph, string projectName, string projectPath, BuildSettings buildSettings)
         {
             // 1. Initialize the LLVM module and builder
-            InitLLVM(projectName, optimize);
+            InitLLVM(projectName, buildSettings.Release);
 
             // 2. Verify obj directory exists
             var objectPath = Path.Combine(projectPath, ObjectDirectory);
@@ -69,7 +69,7 @@ namespace Lang.Backend.LLVM
             WriteFunction(start, globals, startFunction);
 
             // 8. Compile to object file
-            Compile(objectFile);
+            Compile(objectFile, buildSettings.OutputAssembly);
 
             return objectFile;
         }
@@ -226,7 +226,7 @@ namespace Lang.Backend.LLVM
             #endif
         }
 
-        private void Compile(string objectFile)
+        private void Compile(string objectFile, bool outputIntermediate)
         {
             LLVMApi.InitializeX86TargetInfo();
             LLVMApi.InitializeX86Target();
@@ -242,14 +242,15 @@ namespace Lang.Backend.LLVM
                 LLVMCodeGenOptLevel.LLVMCodeGenLevelNone, LLVMRelocMode.LLVMRelocDefault, LLVMCodeModel.LLVMCodeModelDefault);
             LLVMApi.SetDataLayout(_module, Marshal.PtrToStringAnsi(LLVMApi.CreateTargetDataLayout(targetMachine).Pointer));
 
-            #if DEBUG
-            var llvmIrFile = objectFile[..^1] + "ll";
-            LLVMApi.PrintModuleToFile(_module, llvmIrFile, out _);
+            if (outputIntermediate)
+            {
+                var llvmIrFile = objectFile[..^1] + "ll";
+                LLVMApi.PrintModuleToFile(_module, llvmIrFile, out _);
 
-            var assemblyFile = objectFile[..^1] + "s";
-            var assemblyFilePtr = Marshal.StringToCoTaskMemAnsi(assemblyFile);
-            LLVMApi.TargetMachineEmitToFile(targetMachine, _module, assemblyFilePtr, LLVMCodeGenFileType.LLVMAssemblyFile, out _);
-            #endif
+                var assemblyFile = objectFile[..^1] + "s";
+                var assemblyFilePtr = Marshal.StringToCoTaskMemAnsi(assemblyFile);
+                LLVMApi.TargetMachineEmitToFile(targetMachine, _module, assemblyFilePtr, LLVMCodeGenFileType.LLVMAssemblyFile, out _);
+            }
 
             var file = Marshal.StringToCoTaskMemAnsi(objectFile);
             LLVMApi.TargetMachineEmitToFile(targetMachine, _module, file, LLVMCodeGenFileType.LLVMObjectFile, out _);

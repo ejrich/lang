@@ -10,7 +10,7 @@ namespace Lang.Backend.LLVM
     {
         private const string BinaryDirectory = "bin";
 
-        public void Link(string objectFile, string projectPath, List<string> dependencies)
+        public void Link(string objectFile, string projectPath, List<string> dependencies, BuildSettings buildSettings)
         {
             // 1. Verify bin directory exists
             var binaryPath = Path.Combine(projectPath, BinaryDirectory);

@@ -9,7 +9,7 @@ namespace Lang.Backend
         /// <param name="programGraph">Graph of the program</param>
         /// <param name="projectName">The name of the project</param>
         /// <param name="projectPath">The path to the project</param>
-        /// <param name="optimize">Whether to optimize the build</param>
-        string WriteFile(ProgramGraph programGraph, string projectName, string projectPath, bool optimize);
+        /// <param name="buildSettings">Build settings from the cli args</param>
+        string WriteFile(ProgramGraph programGraph, string projectName, string projectPath, BuildSettings buildSettings);
     }
 }
