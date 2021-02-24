@@ -241,7 +241,8 @@ namespace Lang.Parsing
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
-        public List<IAst> Children { get; } = new();
+        public IAst Value { get; set; }
+        public List<IAst> Children => null;
     }
 
     public class Argument : IAst

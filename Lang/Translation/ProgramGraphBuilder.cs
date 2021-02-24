@@ -378,6 +378,8 @@ namespace Lang.Translation
                     return VerifyWhile(whileAst, localVariables, errors);
                 case EachAst each:
                     return VerifyEach(each, localVariables, errors);
+                case CompilerDirectiveAst directive:
+                    return VerifyCompilerDirective(directive, localVariables, errors);
                 default:
                     VerifyExpression(syntaxTree, localVariables, errors);
                     break;
@@ -774,6 +776,33 @@ namespace Lang.Translation
             }
 
             return returned;
+        }
+
+        private bool VerifyCompilerDirective(CompilerDirectiveAst directive, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        {
+            switch (directive.Value)
+            {
+                case ConditionalAst conditional:
+                    if (EvaluateCompileTimeExpression(conditional.Condition, errors))
+                    {
+                        
+                    }
+                    else if (conditional.Else != null)
+                    {
+                        return VerifyAst(conditional.Else, localVariables, errors);
+                    }
+                    break;
+                default:
+                    errors.Add(CreateError("Compiler directive not supported", directive.Value));
+                    break;
+            }
+
+            return false;
+        }
+
+        private bool EvaluateCompileTimeExpression(IAst ast, List<TranslationError> errors)
+        {
+            return false;
         }
 
         private TypeDefinition VerifyExpression(IAst ast, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)

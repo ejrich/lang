@@ -1623,7 +1623,7 @@ namespace Lang.Parsing
 
             var ast = ParseLine(enumerator, errors);
             if (ast != null)
-                directive.Children.Add(ast);
+                directive.Value = ast;
 
             return directive;
         }
