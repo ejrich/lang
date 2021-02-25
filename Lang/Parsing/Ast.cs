@@ -201,7 +201,7 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public IAst Condition { get; set; }
         public List<IAst> Children { get; } = new();
-        public IAst Else { get; set; }
+        public List<IAst> Else { get; } = new();
     }
 
     public class WhileAst : IAst
