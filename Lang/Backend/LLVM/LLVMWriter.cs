@@ -312,59 +312,39 @@ namespace Lang.Backend.LLVM
                     }
                     break;
                 case ScopeAst:
-                    foreach (var childAst in ast.Children)
-                    {
-                        if (BuildAllocations(childAst))
-                        {
-                            return true;
-                        }
-                    }
-                    break;
+                    return BuildAllocations(ast.Children);
                 case ConditionalAst conditional:
                     BuildAllocations(conditional.Condition);
-                    var ifReturned = false;
-                    foreach (var childAst in conditional.Children)
-                    {
-                        if (BuildAllocations(childAst))
-                        {
-                            ifReturned = true;
-                            break;
-                        }
-                    }
+                    var ifReturned = BuildAllocations(conditional.Children);
 
-                    if (conditional.Else != null)
+                    if (conditional.Else.Any())
                     {
                         var elseReturned = BuildAllocations(conditional.Else);
                         return ifReturned && elseReturned;
                     }
                     break;
-                case WhileAst whileAst:
-                    foreach (var childAst in whileAst.Children)
-                    {
-                        if (BuildAllocations(childAst))
-                        {
-                            return true;
-                        }
-                    }
-                    break;
+                case WhileAst:
+                    return BuildAllocations(ast.Children);
                 case EachAst each:
                     var indexVariable = LLVMApi.BuildAlloca(_builder, LLVMTypeRef.Int32Type(), each.IterationVariable);
                     _allocationQueue.Enqueue(indexVariable);
 
-                    foreach (var childAst in each.Children)
-                    {
-                        if (BuildAllocations(childAst))
-                        {
-                            return true;
-                        }
-                    }
-                    break;
+                    return BuildAllocations(each.Children);
                 case ExpressionAst:
-                    foreach (var childAst in ast.Children)
-                    {
-                        BuildAllocations(childAst);
-                    }
+                    BuildAllocations(ast.Children);
                     break;
+            }
+            return false;
+        }
+
+        private bool BuildAllocations(List<IAst> children)
+        {
+            foreach (var ast in children)
+            {
+                if (BuildAllocations(ast))
+                {
+                    return true;
+                }
             }
             return false;
         }
@@ -614,18 +594,11 @@ namespace Lang.Backend.LLVM
 
             // 3. Write out if body
             LLVMApi.PositionBuilderAtEnd(_builder, thenBlock);
-            var ifReturned = false;
-            foreach (var ast in conditional.Children)
-            {
-                if (WriteFunctionLine(ast, localVariables, function))
-                {
-                    ifReturned = true;
-                    break;
-                }
-            }
+            var ifReturned = WriteScope(conditional.Children, localVariables, function);
+
             if (!ifReturned)
             {
-                if (conditional.Else == null)
+                if (!conditional.Else.Any())
                 {
                     LLVMApi.BuildBr(_builder, elseBlock);
                     LLVMApi.PositionBuilderAtEnd(_builder, elseBlock);
@@ -637,13 +610,13 @@ namespace Lang.Backend.LLVM
 
             LLVMApi.PositionBuilderAtEnd(_builder, elseBlock);
 
-            if (conditional.Else == null)
+            if (!conditional.Else.Any())
             {
                 return false;
             }
 
             // 4. Write out the else if necessary
-            var elseReturned = WriteFunctionLine(conditional.Else, localVariables, function);
+            var elseReturned = WriteScope(conditional.Else, localVariables, function);
 
             // 5. Return if both branches return
             if (ifReturned && elseReturned)
@@ -985,7 +958,7 @@ namespace Lang.Backend.LLVM
                 default:
                     // @Cleanup This branch should not be hit since we've already verified that these ASTs are handled,
                     // but notify the user and exit just in case
-                    Console.WriteLine("Unexpected syntax tree");
+                    Console.WriteLine($"Unexpected syntax tree");
                     Environment.Exit(ErrorCodes.BuildError);
                     return (null, new LLVMValueRef()); // Return never happens
             }
