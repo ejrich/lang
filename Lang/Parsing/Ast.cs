@@ -26,6 +26,7 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public string Name { get; set; }
         public bool Extern { get; set; }
+        public string ExternLib { get; set; }
         public bool Varargs { get; set; }
         public bool Params { get; set; }
         public TypeDefinition ReturnType { get; set; }
