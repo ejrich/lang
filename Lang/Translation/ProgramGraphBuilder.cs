@@ -23,55 +23,56 @@ namespace Lang.Translation
             errors = new List<TranslationError>();
             var graph = new ProgramGraph();
 
-            // 1. Verify enum definitions
-            foreach (var enumAst in parseResult.Enums)
+            // 1. Verify enum and struct definitions
+            foreach (var ast in parseResult.SyntaxTrees)
             {
-                VerifyEnum(enumAst, errors);
+                switch (ast)
+                {
+                    case EnumAst enumAst:
+                        VerifyEnum(enumAst, errors);
+                        break;
+                    case StructAst structAst:
+                        if (_types.ContainsKey(structAst.Name))
+                        {
+                            errors.Add(CreateError($"Multiple definitions of struct '{structAst.Name}'", structAst));
+                        }
+                        else if (structAst.Generics.Any())
+                        {
+                            _polymorphicStructs.Add(structAst.Name, structAst);
+                        }
+                        else
+                        {
+                            _types.Add(structAst.Name, structAst);
+                        }
+                        break;
+                }
             }
 
-            // 2. First load the struct definitions
-            foreach (var structAst in parseResult.Structs)
-            {
-                if (_types.ContainsKey(structAst.Name))
-                {
-                    errors.Add(CreateError($"Multiple definitions of struct '{structAst.Name}'", structAst));
-                }
-                else if (structAst.Generics.Any())
-                {
-                    _polymorphicStructs.Add(structAst.Name, structAst);
-                }
-                else
-                {
-                    _types.Add(structAst.Name, structAst);
-                }
-            }
-
-            // 3. Verify struct bodies
-            foreach (var structAst in parseResult.Structs)
-            {
-                VerifyStruct(structAst, errors);
-            }
-
-            // 4. Verify global variables
+            // 2. Verify struct bodies, global variables, and function return types and arguments
             var globalVariables = new Dictionary<string, TypeDefinition>();
-            foreach (var globalVariable in parseResult.GlobalVariables)
+            foreach (var ast in parseResult.SyntaxTrees)
             {
-                if (globalVariable.Value != null && globalVariable.Value is not ConstantAst)
+                switch (ast)
                 {
-                    errors.Add(CreateError("Global variable must either not be initialized or be initialized to a constant value", globalVariable.Value));
+                    case StructAst structAst:
+                        VerifyStruct(structAst, errors);
+                        break;
+                    case DeclarationAst globalVariable:
+                        if (globalVariable.Value != null && globalVariable.Value is not ConstantAst)
+                        {
+                            errors.Add(CreateError("Global variable must either not be initialized or be initialized to a constant value", globalVariable.Value));
+                        }
+                        VerifyDeclaration(globalVariable, globalVariables, errors);
+                        graph.Data.Variables.Add(globalVariable);
+                        break;
+                    case FunctionAst function:
+                        VerifyFunctionDefinition(function, errors);
+                        break;
                 }
-                VerifyDeclaration(globalVariable, globalVariables, errors);
-                graph.Data.Variables.Add(globalVariable);
             }
 
-            // 5. Load and verify function return types and arguments
-            foreach (var function in parseResult.Functions)
-            {
-                VerifyFunctionDefinition(function, errors);
-            }
-
-            // 6. Verify function bodies
-            foreach (var function in parseResult.Functions)
+            // 3. Verify function bodies
+            foreach (var function in parseResult.SyntaxTrees.Where(ast => ast is FunctionAst).Cast<FunctionAst>())
             {
                 _currentFunction = function;
                 // The __start function does not need to be verified
