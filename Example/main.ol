@@ -1,4 +1,4 @@
-int Main(List<string> args) {
+int main(List<string> args) {
     // Return positive exit code
     /*
         Multi line comment
@@ -49,7 +49,7 @@ int Main(List<string> args) {
     x := 0xfeABD4;
     sdl := SDL_Init(sdl_video);
     SDL_CreateWindow("Hello world", 805240832, 805240832, 400, 300, 0);
-    sleep(10);
+    sleep(5);
 
     return 0;
 }
