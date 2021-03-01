@@ -932,17 +932,20 @@ namespace Lang.Translation
                         {
                             if (argumentCount > callArgumentCount)
                             {
-                                errors.Add(CreateError($"Call to function '{function.Name}' expected at least {argumentCount} arguments, but got {callArgumentCount}", call));
-                                return null;
+                                errors.Add(CreateError($"Call to function '{function.Name}' expected arguments (" +
+                                    $"{string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.Type)))})", call));
+                                return function.ReturnType;
                             }
                         }
                         else if (argumentCount < callArgumentCount)
                         {
-                            errors.Add(CreateError($"Call to function '{function.Name}' expected {argumentCount} arguments, but got {callArgumentCount}", call));
-                            return null;
+                            errors.Add(CreateError($"Call to function '{function.Name}' expected arguments (" +
+                                $"{string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.Type)))})", call));
+                            return function.ReturnType;
                         }
 
                         // Verify call arguments match the types of the function arguments
+                        var callError = false;
                         for (var i = 0; i < argumentCount; i++)
                         {
                             var functionArg = function.Arguments[i];
@@ -951,7 +954,7 @@ namespace Lang.Translation
                             {
                                 if (functionArg.DefaultValue == null)
                                 {
-                                    errors.Add(CreateError($"Expected to get argument of type '{PrintTypeDefinition(functionArg.Type)}'", call));
+                                    callError = true;
                                 }
                                 else
                                 {
@@ -962,7 +965,7 @@ namespace Lang.Translation
                             {
                                 if (functionArg.Type.Name != "*")
                                 {
-                                    errors.Add(CreateError("Cannot pass null as a non-pointer type", argument));
+                                    callError = true;
                                 }
                                 nullAst.TargetType = functionArg.Type;
                             }
@@ -973,7 +976,7 @@ namespace Lang.Translation
                                 {
                                     if (!TypeEquals(functionArg.Type, callType))
                                     {
-                                        errors.Add(CreateError($"Call to function '{function.Name}' expected '{PrintTypeDefinition(functionArg.Type)}', but got '{PrintTypeDefinition(callType)}'", argument));
+                                        callError = true;
                                     }
                                 }
                             }
@@ -1002,11 +1005,21 @@ namespace Lang.Translation
                                     {
                                         if (!TypeEquals(varargsType, callType))
                                         {
-                                            errors.Add(CreateError($"Call to function '{function.Name}' expected '{PrintTypeDefinition(varargsType)}', but got '{PrintTypeDefinition(callType)}'", argument));
+                                            callError = true;
                                         }
+                                    }
+                                    else
+                                    {
+                                        callError = true;
                                     }
                                 }
                             }
+                        }
+
+                        if (callError)
+                        {
+                            errors.Add(CreateError($"Call to function '{function.Name}' expected arguments (" +
+                                $"{string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.Type)))})", call));
                         }
                     }
                     else
