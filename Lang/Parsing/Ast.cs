@@ -242,6 +242,7 @@ namespace Lang.Parsing
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
+        public Directive Directive { get; set; }
         public IAst Value { get; set; }
         public List<IAst> Children => null;
     }
@@ -299,5 +300,12 @@ namespace Lang.Parsing
         Negate = '-',
         Dereference = '*',
         Reference = '&'
+    }
+
+    public enum Directive
+    {
+        None,
+        Run,
+        If
     }
 }
