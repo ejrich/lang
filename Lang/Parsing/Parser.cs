@@ -8,10 +8,7 @@ namespace Lang.Parsing
     public class ParseResult
     {
         public bool Success => !Errors.Any();
-        public List<FunctionAst> Functions { get; } = new();
-        public List<StructAst> Structs { get; } = new();
-        public List<EnumAst> Enums { get; } = new();
-        public List<DeclarationAst> GlobalVariables { get; } = new();
+        public List<IAst> SyntaxTrees { get; } = new();
         public List<ParseError> Errors { get; } = new();
     }
 
@@ -72,25 +69,7 @@ namespace Lang.Parsing
                 }
                 else if (parseResult.Success)
                 {
-                    foreach (var ast in syntaxTrees)
-                    {
-                        ast.FileIndex = fileIndex;
-                        switch (ast)
-                        {
-                            case FunctionAst function:
-                                parseResult.Functions.Add(function);
-                                break;
-                            case StructAst structAst:
-                                parseResult.Structs.Add(structAst);
-                                break;
-                            case EnumAst enumAst:
-                                parseResult.Enums.Add(enumAst);
-                                break;
-                            case DeclarationAst globalVariable:
-                                parseResult.GlobalVariables.Add(globalVariable);
-                                break;
-                        }
-                    }
+                    parseResult.SyntaxTrees.AddRange(syntaxTrees);
                 }
             }
 
@@ -125,7 +104,7 @@ namespace Lang.Parsing
                         syntaxTrees.Add(ParseEnum(enumerator, errors));
                         break;
                     case TokenType.Pound:
-                        // TODO Add this
+                        syntaxTrees.Add(ParseTopLevelDirective(enumerator, errors));
                         break;
                     default:
                         errors.Add(new ParseError
@@ -1645,23 +1624,6 @@ namespace Lang.Parsing
             }
         }
 
-        private static IAst ParseCompilerDirective(TokenEnumerator enumerator, List<ParseError> errors)
-        {
-            var directive = CreateAst<CompilerDirectiveAst>(enumerator.Current);
-
-            if (!enumerator.MoveNext())
-            {
-                errors.Add(new ParseError { Error = "Expected compiler directive to have a value", Token = enumerator.Last});
-                return null;
-            }
-
-            var ast = ParseLine(enumerator, errors);
-            if (ast != null)
-                directive.Value = ast;
-
-            return directive;
-        }
-
         private static IndexAst ParseIndex(TokenEnumerator enumerator, List<ParseError> errors, IAst variable)
         {
             // 1. Initialize the index ast
@@ -1685,6 +1647,40 @@ namespace Lang.Parsing
             index.Index = ParseExpression(enumerator, errors, null, TokenType.CloseBracket);
 
             return index;
+        }
+
+        private static IAst ParseTopLevelDirective(TokenEnumerator enumerator, List<ParseError> errors)
+        {
+            var directive = CreateAst<CompilerDirectiveAst>(enumerator.Current);
+
+            if (!enumerator.MoveNext())
+            {
+                errors.Add(new ParseError { Error = "Expected compiler directive to have a value", Token = enumerator.Last});
+                return null;
+            }
+
+            var ast = ParseLine(enumerator, errors);
+            if (ast != null)
+                directive.Value = ast;
+
+            return directive;
+        }
+
+        private static IAst ParseCompilerDirective(TokenEnumerator enumerator, List<ParseError> errors)
+        {
+            var directive = CreateAst<CompilerDirectiveAst>(enumerator.Current);
+
+            if (!enumerator.MoveNext())
+            {
+                errors.Add(new ParseError { Error = "Expected compiler directive to have a value", Token = enumerator.Last});
+                return null;
+            }
+
+            var ast = ParseLine(enumerator, errors);
+            if (ast != null)
+                directive.Value = ast;
+
+            return directive;
         }
 
         private static readonly HashSet<string> IntegerTypes = new()
