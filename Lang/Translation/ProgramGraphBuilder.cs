@@ -112,7 +112,7 @@ namespace Lang.Translation
                 errors.Add(CreateError("'main' function of the program is not defined", _currentFunction));
             }
 
-            graph.Data.Types = _types.Values.ToList();
+            graph.Data.Types = _types;
 
             return graph;
         }
