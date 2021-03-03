@@ -58,7 +58,7 @@ global_a := 7;
 global_b: int;
 
 set_global(int a) {
-    if a > 10 then global_a = a * 90;
+    if a > 10 then global_a = a;// * 90;
 }
 
 bool test(int a) {
@@ -257,7 +257,13 @@ int SDL_Init(u32 flags) #extern "SDL2"
 SDL_CreateWindow(string title, int x, int y, int w, int h, u32 flags) #extern "SDL2"
 u32 sleep(u32 seconds) #extern "libc"
 
-#run default_args(87);
+#run {
+    default_args(87);
+    //set_global(99);
+    //global_a = 3;
+    if global_b then
+        printf("%d\n", global_a);
+}
 
 /*
 compiler_directives() {

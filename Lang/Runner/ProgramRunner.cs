@@ -25,11 +25,24 @@ namespace Lang.Runner
 
             var name = new AssemblyName("ExternFunctions");
             var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(name, AssemblyBuilderAccess.RunAndCollect);
-            var modelBuilder = assemblyBuilder.DefineDynamicModule("ExternFunctions");
-            var typeBuilder = modelBuilder.DefineType("Functions", TypeAttributes.Class | TypeAttributes.Public);
+            var moduleBuilder = assemblyBuilder.DefineDynamicModule("ExternFunctions");
+            var typeBuilder = moduleBuilder.DefineType("Functions", TypeAttributes.Class | TypeAttributes.Public);
 
-            foreach (var types in programGraph.Data.Types)
+            foreach (var type in programGraph.Data.Types)
             {
+                switch (type)
+                {
+                    case EnumAst enumAst:
+                        break;
+                    case StructAst structAst:
+                        var structBuilder = moduleBuilder.DefineType(structAst.Name, TypeAttributes.Public | TypeAttributes.SequentialLayout);
+                        foreach (var field in structAst.Fields)
+                        {
+                            // TODO Do a first pass over types to get the type object
+                            structBuilder.DefineField(field.Name, GetTypeFromDefinition(field.Type), FieldAttributes.Public);
+                        }
+                        break;
+                }
                 // TODO Make structs as the types
             }
 
@@ -49,7 +62,7 @@ namespace Lang.Runner
             CreateFunction(typeBuilder, "printf", "libc", null, typeof(string), typeof(int));
 
             _library = typeBuilder.CreateType();
-            _functionObject = _library!.GetConstructor(Type.EmptyTypes)!.Invoke(new object[]{});
+            _functionObject = Activator.CreateInstance(_library!);
 
             foreach (var variable in programGraph.Data.Variables)
             {
@@ -119,17 +132,30 @@ namespace Lang.Runner
 
         private static object GetUninitializedValue(TypeDefinition typeDef)
         {
-            return typeDef.PrimitiveType switch
+            switch (typeDef.PrimitiveType)
             {
-                IntegerType => 0,
-                FloatType floatType => floatType.Bytes == 4 ? 0f : 0.0,
-                _ => 0 // TODO Handle more types
-            };
+                case IntegerType integerType:
+                    return 0;
+                case FloatType floatType:
+                    return floatType.Bytes == 4 ? 0f : 0.0;
+                default:
+                    // TODO Handle more types
+                    return 0;
+            }
         }
 
         private void ExecuteAssignment(AssignmentAst assignment, ProgramGraph programGraph, IDictionary<string, (TypeDefinition type, object value)> variables)
         {
-            throw new NotImplementedException();
+            var (type, variable) = GetVariable(assignment.Variable, programGraph, variables);
+
+            var expression = ExecuteExpression(assignment.Value, programGraph, variables);
+            if (assignment.Operator != Operator.None)
+            {
+                // TODO Implement this
+            }
+
+            // TODO This doesn't work, need to get the pointer
+            variable = expression.value;
         }
 
         private (TypeDefinition type, object value) ExecuteScope(List<IAst> asts, ProgramGraph programGraph,
@@ -168,10 +194,17 @@ namespace Lang.Runner
             return (null, null);
         }
 
-        private bool ExecuteCondition(IAst conditionExpression, ProgramGraph programGraph, 
+        private bool ExecuteCondition(IAst expression, ProgramGraph programGraph, 
             IDictionary<string, (TypeDefinition type, object value)> variables)
         {
-            throw new NotImplementedException();
+            var (type, value) = ExecuteExpression(expression, programGraph, variables);
+            return type.PrimitiveType switch
+            {
+                IntegerType => (int)value != 0,
+                FloatType => (float)value != 0f,
+                _ when type.Name == "*" => value != null,
+                _ => (bool)value
+            };
         }
 
         private (TypeDefinition type, object value) ExecuteEach(EachAst each, ProgramGraph programGraph,
@@ -316,6 +349,13 @@ namespace Lang.Runner
                     break;
             }
 
+            return (null, null);
+        }
+
+        private (TypeDefinition type, object value) GetVariable(IAst ast, ProgramGraph programGraph,
+            IDictionary<string, (TypeDefinition type, object value)> variables)
+        {
+            
             return (null, null);
         }
 
