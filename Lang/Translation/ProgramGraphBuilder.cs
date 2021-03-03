@@ -49,6 +49,7 @@ namespace Lang.Translation
 
             // 2. Verify struct bodies, global variables, and function return types and arguments
             var globalVariables = new Dictionary<string, TypeDefinition>();
+            var mainDefined = false;
             foreach (var ast in parseResult.SyntaxTrees)
             {
                 switch (ast)
@@ -65,13 +66,22 @@ namespace Lang.Translation
                         graph.Data.Variables.Add(globalVariable);
                         break;
                     case FunctionAst function:
-                        VerifyFunctionDefinition(function, errors);
+                        var main = function.Name == "main";
+                        if (main)
+                        {
+                            if (mainDefined)
+                            {
+                                errors.Add(CreateError("Only one main function can be defined", function));
+                            }
+                            function.Name = "__main";
+                            mainDefined = true;
+                        }
+                        VerifyFunctionDefinition(function, main, errors);
                         break;
                 }
             }
 
             // 3. Verify function bodies
-            var mainDefined = false;
             foreach (var ast in parseResult.SyntaxTrees)
             {
                 switch (ast)
@@ -82,21 +92,10 @@ namespace Lang.Translation
                         if (function.Name == "__start")
                         {
                             graph.Start = function;
-                            VerifyFunction(function, false, globalVariables, errors);
-                            continue;
                         }
 
                         // Verify the function body
-                        var main = function.Name == "main";
-                        VerifyFunction(function, main, globalVariables, errors);
-                        if (main)
-                        {
-                            if (mainDefined)
-                            {
-                                errors.Add(CreateError("Only one main function can be defined", function));
-                            }
-                            mainDefined = true;
-                        }
+                        VerifyFunction(function, globalVariables, errors);
                         graph.Functions.Add(function.Name, function);
                         break;
                     case CompilerDirectiveAst compilerDirective:
@@ -202,7 +201,7 @@ namespace Lang.Translation
             }
         }
 
-        private void VerifyFunctionDefinition(FunctionAst function, List<TranslationError> errors)
+        private void VerifyFunctionDefinition(FunctionAst function, bool main, List<TranslationError> errors)
         {
             // 1. Verify the return type of the function is valid
             var returnType = VerifyType(function.ReturnType, errors);
@@ -225,17 +224,32 @@ namespace Lang.Translation
                 }
             }
 
-            // 2. Verify the argument types
+            // 2. Verify main function return type and arguments
+            if (main)
+            {
+                if (!(returnType == Type.Void || returnType == Type.Int))
+                {
+                    errors.Add(CreateError("The main function should return type 'int' or 'void'", function));
+                }
+
+                var argument = function.Arguments.FirstOrDefault();
+                if (argument != null && !(function.Arguments.Count == 1 && argument.Type.Name == "List" && argument.Type.Generics.FirstOrDefault()?.Name == "string"))
+                {
+                    errors.Add(CreateError("The main function should either have 0 arguments or 'List<string>' argument", function));
+                }
+            }
+
+            // 3. Verify the argument types
             var argumentNames = new HashSet<string>();
             foreach (var argument in function.Arguments)
             {
-                // 1a. Check if the argument has been previously defined
+                // 3a. Check if the argument has been previously defined
                 if (!argumentNames.Add(argument.Name))
                 {
                     errors.Add(CreateError($"Function '{function.Name}' already contains argument '{argument.Name}'", argument));
                 }
 
-                // 1b. Check for errored or undefined field types
+                // 3b. Check for errored or undefined field types
                 var type = VerifyType(argument.Type, errors);
 
                 switch (type)
@@ -269,6 +283,7 @@ namespace Lang.Translation
                         break;
                 }
 
+                // 3c. Check for default arguments
                 if (argument.DefaultValue != null)
                 {
                     switch (argument.DefaultValue)
@@ -293,14 +308,14 @@ namespace Lang.Translation
                 }
             }
             
-            // 3. Load the function into the dictionary 
+            // 4. Load the function into the dictionary 
             if (!_functions.TryAdd(function.Name, function))
             {
                 errors.Add(CreateError($"Multiple definitions of function '{function.Name}'", function));
             }
         }
 
-        private void VerifyFunction(FunctionAst function, bool main, IDictionary<string, TypeDefinition> globals, List<TranslationError> errors)
+        private void VerifyFunction(FunctionAst function, IDictionary<string, TypeDefinition> globals, List<TranslationError> errors)
         {
             // 1. Initialize local variables
             var localVariables = new Dictionary<string, TypeDefinition>(globals);
@@ -311,22 +326,8 @@ namespace Lang.Translation
             }
             var returnType = VerifyType(function.ReturnType, errors);
 
-            // 2. Verify main function return type and arguments
-            if (main)
-            {
-                if (!(returnType == Type.Void || returnType == Type.Int))
-                {
-                    errors.Add(CreateError("The main function should return type 'int' or 'void'", function));
-                }
 
-                var argument = function.Arguments.FirstOrDefault();
-                if (argument != null && !(function.Arguments.Count == 1 && argument.Type.Name == "List" && argument.Type.Generics.FirstOrDefault()?.Name == "string"))
-                {
-                    errors.Add(CreateError("The main function should either have 0 arguments or 'List<string>' argument", function));
-                }
-            }
-
-            // 3. For extern functions, simply verify there is no body and return
+            // 2. For extern functions, simply verify there is no body and return
             if (function.Extern)
             {
                 if (function.Children.Any())
@@ -336,10 +337,10 @@ namespace Lang.Translation
                 return;
             }
 
-            // 4. Loop through function body and verify all ASTs
+            // 3. Loop through function body and verify all ASTs
             var returned = VerifyAsts(function.Children, localVariables, errors);
 
-            // 5. Verify the function returns on all paths
+            // 4. Verify the function returns on all paths
             if (!returned && returnType != Type.Void)
             {
                 errors.Add(CreateError($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnType)}' on all paths", function));
