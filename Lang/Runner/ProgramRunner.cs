@@ -24,13 +24,13 @@ namespace Lang.Runner
         {
             if (!programGraph.Directives.Any()) return;
 
-            var name = new AssemblyName("ExternFunctions");
-            var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(name, AssemblyBuilderAccess.RunAndCollect);
+            var assemblyName = new AssemblyName("ExternFunctions");
+            var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
             var moduleBuilder = assemblyBuilder.DefineDynamicModule("ExternFunctions");
             var typeBuilder = moduleBuilder.DefineType("Functions", TypeAttributes.Class | TypeAttributes.Public);
 
             var temporaryStructs = new Dictionary<string, TypeBuilder>();
-            foreach (var type in programGraph.Data.Types)
+            foreach (var (_, type) in programGraph.Data.Types)
             {
                 switch (type)
                 {
@@ -40,7 +40,6 @@ namespace Lang.Runner
                         {
                             enumBuilder.DefineLiteral(value.Name, value.Value);
                         }
-
                         _types[enumAst.Name] = enumBuilder.CreateTypeInfo();
                         break;
                     case StructAst structAst:
@@ -48,22 +47,40 @@ namespace Lang.Runner
                         temporaryStructs[structAst.Name] = structBuilder;
                         break;
                 }
-                // TODO Make structs as the types
             }
 
-            foreach (var type in programGraph.Data.Types)
+            var fieldIndices = new Dictionary<string, int>();
+            while (temporaryStructs.Any())
             {
-                if (type is StructAst structAst)
+                foreach (var (name, structBuilder) in temporaryStructs)
                 {
-                    var structBuilder = temporaryStructs[structAst.Name];
-                    foreach (var field in structAst.Fields)
+                    var indexFound = fieldIndices.TryGetValue(name, out var index);
+                    var structAst = programGraph.Data.Types[name] as StructAst;
+                    var count = structAst!.Fields.Count;
+
+                    for (; index < count; index++)
                     {
+                        var field = structAst.Fields[index];
                         var fieldType = GetTypeFromDefinition(field.Type);
                         if (fieldType == null)
                         {
-                            fieldType = temporaryStructs[field.Type.GenericName];
+                            break;
                         }
                         structBuilder.DefineField(field.Name, fieldType, FieldAttributes.Public);
+                    }
+
+                    if (index >= count)
+                    {
+                        _types[name] = structBuilder.CreateType();
+                        if (indexFound)
+                        {
+                            fieldIndices.Remove(name);
+                        }
+                        temporaryStructs.Remove(name);
+                    }
+                    else
+                    {
+                        fieldIndices[name] = index;
                     }
                 }
             }
@@ -443,9 +460,10 @@ namespace Lang.Runner
             {
                 case "string":
                     return typeof(string);
+                case "*":
+                    return typeof(IntPtr);
             }
 
-            // TODO Handle more types
             return _types.TryGetValue(typeDef.GenericName, out var type) ? type : null;
         }
     }
