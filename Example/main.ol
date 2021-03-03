@@ -3,6 +3,7 @@ int main(List<string> args) {
     /*
         Multi line comment
     */
+    each arg in args then printf("Arg: %s\n", arg);
     hello := "This is an \"escaped\" string literal\nWith a new line!";
     a := 4.2;
     a++;
@@ -52,10 +53,10 @@ int main(List<string> args) {
     //sleep(5);
 
     z := 1;
-    each i in create_list(5) {
+    each i in create_list(4) {
         printf("Value %d = %d\n", z++, i);
     }
-    
+
     return 0;
 }
 

@@ -22,17 +22,17 @@ printf(string format, ... args) #extern "libc"
 int __start(int argc, string* argv) {
     args: List<string>[argc-1];
 
-    each i in 1..argc-1 then args[i] = *(argv + i);
+    each i in 1..argc-1 then args[i-1] = *(argv + i);
 
-    return main(args);
+    return __main(args);
 
     /* @Future Add compile time execution to write the correct return
-    #if function(main).return == Type.Void {
-        main(args);
+    #if function(__main).return == Type.Void {
+        __main(args);
         return 0;
     }
     else {
-        #if function(main).arguments.length == 0 then return main();
-        else then return main(args);
+        #if function(__main).arguments.length == 0 then return __main();
+        else then return __main(args);
     }*/
 }
