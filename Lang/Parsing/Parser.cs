@@ -1736,7 +1736,7 @@ namespace Lang.Parsing
             }
             else if (FloatTypes.Contains(typeDefinition.Name))
             {
-                typeDefinition.PrimitiveType = new FloatType {Bytes = typeDefinition.Name == "float" ? 4 : 8};
+                typeDefinition.PrimitiveType = new FloatType {Bytes = typeDefinition.Name == "float" ? (ushort)4 : (ushort)8};
             }
 
             if (enumerator.Current.Type == TokenType.VarArgs)
