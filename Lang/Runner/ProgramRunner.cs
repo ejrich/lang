@@ -17,8 +17,14 @@ namespace Lang.Runner
     {
         private Type _library;
         private object _functionObject;
-        private readonly Dictionary<string, (TypeDefinition type, object value)> _globalVariables = new();
+        private readonly Dictionary<string, ValueType> _globalVariables = new();
         private readonly Dictionary<string, Type> _types = new();
+
+        private class ValueType
+        {
+            public TypeDefinition Type { get; set; }
+            public object Value { get; set; }
+        }
 
         public void RunProgram(ProgramGraph programGraph)
         {
@@ -122,10 +128,10 @@ namespace Lang.Runner
             }
         }
 
-        private (TypeDefinition type, object value) ExecuteAst(IAst ast, ProgramGraph programGraph, IDictionary<string, (TypeDefinition type, object value)> variables, out bool returned)
+        private ValueType ExecuteAst(IAst ast, ProgramGraph programGraph, IDictionary<string, ValueType> variables, out bool returned)
         {
             returned = false;
-            (TypeDefinition type, object value) returnValue = (null, null);
+            ValueType returnValue = null;
             switch (ast)
             {
                 case ReturnAst returnAst:
@@ -156,17 +162,17 @@ namespace Lang.Runner
             return returnValue;
         }
 
-        private (TypeDefinition type, object value) ExecuteReturn(ReturnAst returnAst, ProgramGraph programGraph, IDictionary<string, (TypeDefinition type, object value)> variables)
+        private ValueType ExecuteReturn(ReturnAst returnAst, ProgramGraph programGraph, IDictionary<string, ValueType> variables)
         {
             return ExecuteExpression(returnAst.Value, programGraph, variables);
         }
 
-        private void ExecuteDeclaration(DeclarationAst declaration, ProgramGraph programGraph, IDictionary<string, (TypeDefinition type, object value)> variables)
+        private void ExecuteDeclaration(DeclarationAst declaration, ProgramGraph programGraph, IDictionary<string, ValueType> variables)
         {
             var value = declaration.Value == null ? GetUninitializedValue(declaration.Type) :
-                ExecuteExpression(declaration.Value, programGraph, null).value;
+                ExecuteExpression(declaration.Value, programGraph, null).Value;
 
-            variables[declaration.Name] = (declaration.Type, value);
+            variables[declaration.Name] = new ValueType {Type = declaration.Type, Value = value};
         }
 
         private object GetUninitializedValue(TypeDefinition typeDef)
@@ -184,9 +190,14 @@ namespace Lang.Runner
             }
         }
 
-        private void ExecuteAssignment(AssignmentAst assignment, ProgramGraph programGraph, IDictionary<string, (TypeDefinition type, object value)> variables)
+        private void ExecuteAssignment(AssignmentAst assignment, ProgramGraph programGraph, IDictionary<string, ValueType> variables)
         {
-            var (type, variable) = GetVariable(assignment.Variable, programGraph, variables);
+            var valueType = assignment.Variable switch
+            {
+                VariableAst variable => variables[variable.Name],
+                // TODO Implement StructFieldRef and Index ASTs
+                _ => null
+            };
 
             var expression = ExecuteExpression(assignment.Value, programGraph, variables);
             if (assignment.Operator != Operator.None)
@@ -195,19 +206,19 @@ namespace Lang.Runner
             }
 
             // TODO This doesn't work, need to get the pointer
-            variable = expression.value;
+            valueType!.Value = expression.Value;
         }
 
-        private (TypeDefinition type, object value) ExecuteScope(List<IAst> asts, ProgramGraph programGraph,
-            IDictionary<string, (TypeDefinition type, object value)> variables, out bool returned)
+        private ValueType ExecuteScope(List<IAst> asts, ProgramGraph programGraph,
+            IDictionary<string, ValueType> variables, out bool returned)
         {
-            var scopeVariables = new Dictionary<string, (TypeDefinition type, object value)>(variables);
+            var scopeVariables = new Dictionary<string, ValueType>(variables);
 
             return ExecuteAsts(asts, programGraph, scopeVariables, out returned);
         }
 
-        private (TypeDefinition type, object value) ExecuteConditional(ConditionalAst conditional, ProgramGraph programGraph,
-            IDictionary<string, (TypeDefinition type, object value)> variables, out bool returned)
+        private ValueType ExecuteConditional(ConditionalAst conditional, ProgramGraph programGraph,
+            IDictionary<string, ValueType> variables, out bool returned)
         {
             if (ExecuteCondition(conditional.Condition, programGraph, variables))
             {
@@ -217,8 +228,8 @@ namespace Lang.Runner
             return ExecuteScope(conditional.Else, programGraph, variables, out returned);
         }
 
-        private (TypeDefinition type, object value) ExecuteWhile(WhileAst whileAst, ProgramGraph programGraph,
-            IDictionary<string, (TypeDefinition type, object value)> variables, out bool returned)
+        private ValueType ExecuteWhile(WhileAst whileAst, ProgramGraph programGraph,
+            IDictionary<string, ValueType> variables, out bool returned)
         {
             while (ExecuteCondition(whileAst.Condition, programGraph, variables))
             {
@@ -231,14 +242,15 @@ namespace Lang.Runner
             }
 
             returned = false;
-            return (null, null);
+            return null;
         }
 
-        private bool ExecuteCondition(IAst expression, ProgramGraph programGraph, 
-            IDictionary<string, (TypeDefinition type, object value)> variables)
+        private bool ExecuteCondition(IAst expression, ProgramGraph programGraph, IDictionary<string, ValueType> variables)
         {
-            var (type, value) = ExecuteExpression(expression, programGraph, variables);
-            return type.PrimitiveType switch
+            var valueType = ExecuteExpression(expression, programGraph, variables);
+            var type = valueType.Type;
+            var value = valueType.Value;
+            return valueType.Type.PrimitiveType switch
             {
                 IntegerType => (int)value != 0,
                 FloatType => (float)value != 0f,
@@ -247,14 +259,13 @@ namespace Lang.Runner
             };
         }
 
-        private (TypeDefinition type, object value) ExecuteEach(EachAst each, ProgramGraph programGraph,
-            IDictionary<string, (TypeDefinition type, object value)> variables, out bool returned)
+        private ValueType ExecuteEach(EachAst each, ProgramGraph programGraph, IDictionary<string, ValueType> variables, out bool returned)
         {
             throw new NotImplementedException();
         }
 
-        private (TypeDefinition type, object value) ExecuteAsts(List<IAst> asts, ProgramGraph programGraph,
-            IDictionary<string, (TypeDefinition type, object value)> variables, out bool returned)
+        private ValueType ExecuteAsts(List<IAst> asts, ProgramGraph programGraph,
+            IDictionary<string, ValueType> variables, out bool returned)
         {
             foreach (var ast in asts)
             {
@@ -267,10 +278,10 @@ namespace Lang.Runner
             }
 
             returned = false;
-            return (null, null);
+            return null;
         }
 
-        private (TypeDefinition type, object value) ExecuteExpression(IAst ast, ProgramGraph programGraph, IDictionary<string, (TypeDefinition type, object value)> variables)
+        private ValueType ExecuteExpression(IAst ast, ProgramGraph programGraph, IDictionary<string, ValueType> variables)
         {
             switch (ast)
             {
@@ -282,13 +293,12 @@ namespace Lang.Runner
                         FloatType => float.Parse(constant.Value),
                         _ => constant.Value
                     };
-                    return (type, value);
+                    return new ValueType {Type = type, Value = value};
                 case NullAst:
-                    return (null, null);
+                    return null;
                 case StructFieldRefAst structField:
-                    var (_, structVariable) = variables[structField.Name];
-                    var structType = _types[structField.StructName];
-                    return GetStructFieldRef(structField, programGraph, structVariable, structType);
+                    var structVariable = variables[structField.Name];
+                    return GetStructFieldRef(structField, programGraph, structVariable.Value);
                 case VariableAst variable:
                     return variables[variable.Name];
                 case ChangeByOneAst changeByOne:
@@ -354,7 +364,7 @@ namespace Lang.Runner
                         // TODO Handle params
                     }
 
-                    var arguments = call.Arguments.Select(arg => ExecuteExpression(arg, programGraph, variables).value).ToArray();
+                    var arguments = call.Arguments.Select(arg => ExecuteExpression(arg, programGraph, variables).Value).ToArray();
                     if (function.Extern)
                     {
                         if (function.Varargs)
@@ -364,7 +374,7 @@ namespace Lang.Runner
 
                         var functionDecl = _library.GetMethod(call.Function);
                         var returnValue = functionDecl!.Invoke(_functionObject, arguments);
-                        return (function.ReturnType, returnValue);
+                        return new ValueType {Type = function.ReturnType, Value = returnValue};
                     }
                     else
                     {
@@ -377,42 +387,35 @@ namespace Lang.Runner
                     break;
             }
 
-            return (null, null);
+            return null;
         }
 
-        private (TypeDefinition type, object value) GetStructFieldRef(StructFieldRefAst structField, ProgramGraph programGraph,
-            object structVariable, Type structType)
+        private ValueType GetStructFieldRef(StructFieldRefAst structField, ProgramGraph programGraph,
+            object structVariable)
         {
             var value = structField.Value;
             var structDefinition = (StructAst) programGraph.Data.Types[structField.StructName];
 
-            var field = structType.GetField(value.Name);
+            var field = structVariable.GetType().GetField(value.Name);
             var fieldValue = field!.GetValue(structVariable);
 
             if (value.Value == null)
             {
                 var fieldType = structDefinition.Fields[structField.ValueIndex].Type;
-                return (fieldType, fieldValue);
+                return new ValueType {Type = fieldType, Value = fieldValue};
             }
 
-            return GetStructFieldRef(value, programGraph, fieldValue, field.GetType());
+            return GetStructFieldRef(value, programGraph, fieldValue);
         }
 
-        private (TypeDefinition type, object value) GetVariable(IAst ast, ProgramGraph programGraph,
-            IDictionary<string, (TypeDefinition type, object value)> variables)
+        private ValueType CallFunction(FunctionAst function, ProgramGraph programGraph, object[] arguments)
         {
-            
-            return (null, null);
-        }
-
-        private (TypeDefinition type, object value) CallFunction(FunctionAst function, ProgramGraph programGraph, object[] arguments)
-        {
-            var variables = new Dictionary<string, (TypeDefinition type, object value)>(_globalVariables);
+            var variables = new Dictionary<string, ValueType>(_globalVariables);
 
             for (var i = 0; i < function.Arguments.Count; i++)
             {
                 var arg = function.Arguments[i];
-                variables[arg.Name] = (arg.Type, arguments[i]);
+                variables[arg.Name] = new ValueType {Type = arg.Type, Value = arguments[i]};
             }
 
             foreach (var ast in function.Children)
@@ -425,7 +428,7 @@ namespace Lang.Runner
                 }
             }
 
-            return (null, null);
+            return null;
         }
 
         private static void CreateFunction(TypeBuilder typeBuilder, string name, string library, Type returnType, params Type[] args)
