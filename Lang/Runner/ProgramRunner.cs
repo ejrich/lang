@@ -224,8 +224,20 @@ namespace Lang.Runner
                 }
                 else if (field.DefaultValue != null)
                 {
-                    var value = GetConstant(field.Type, field.DefaultValue.Value);
-                    fieldInstance!.SetValue(instance, value);
+                    switch (field.DefaultValue)
+                    {
+                        case ConstantAst constant:
+                            var constantValue = GetConstant(field.Type, constant.Value);
+                            fieldInstance!.SetValue(instance, constantValue);
+                            break;
+                        case StructFieldRefAst structField:
+                            var enumDef = (EnumAst)programGraph.Data.Types[structField.Name];
+                            var value = enumDef.Values[structField.ValueIndex].Value;
+                            var enumType = _types[structField.Name];
+                            var enumInstance = Enum.ToObject(enumType, value);
+                            fieldInstance!.SetValue(instance, enumInstance);
+                            break;
+                    }
                 }
                 else if (field.Type.Name == "*")
                 {

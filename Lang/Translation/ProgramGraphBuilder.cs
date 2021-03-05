@@ -191,12 +191,17 @@ namespace Lang.Translation
                 }
 
                 // 1c. Check if the default value has the correct type
-                if (structField.DefaultValue != null)
+                switch (structField.DefaultValue)
                 {
-                    if (!TypeEquals(structField.Type, structField.DefaultValue.Type))
-                    {
-                        errors.Add(CreateError($"Type of field {structAst.Name}.{structField.Name} is '{type}', but default value is type '{structField.DefaultValue.Type}'", structField.DefaultValue));
-                    }
+                    case ConstantAst constant:
+                        if (!TypeEquals(structField.Type, constant.Type))
+                        {
+                            errors.Add(CreateError($"Type of field {structAst.Name}.{structField.Name} is '{type}', but default value is type '{PrintTypeDefinition(constant.Type)}'", structField.DefaultValue));
+                        }
+                        break;
+                    case StructFieldRefAst structFieldRef:
+                        // TODO Verify me
+                        break;
                 }
             }
         }
