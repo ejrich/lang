@@ -250,7 +250,15 @@ enum State {
     Running;
 }
 
+struct StateStruct {
+    State state = State.Running;
+    int something;
+}
+
 State current_state(int a) {
+    state: StateStruct;
+    printf("State is %d\n", state.state);   
+
     if a > 5 then return State.Running;
     else if a == 5 then return State.Starting;
     return State.Stopped;
@@ -281,8 +289,8 @@ u32 sleep(u32 seconds) #extern "libc"
     my_struct: MyStruct;
     my_struct.subValue.something = 8;
     printf("Struct field value = %d\n", my_struct.subValue.something);
-    state := State.Running;
-    printf("State = %d\n", state);
+    state: StateStruct = { something = 8; }
+    printf("State = %d\n", state.state);
 }
 
 /*

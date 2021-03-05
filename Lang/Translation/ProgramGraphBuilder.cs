@@ -196,11 +196,29 @@ namespace Lang.Translation
                     case ConstantAst constant:
                         if (!TypeEquals(structField.Type, constant.Type))
                         {
-                            errors.Add(CreateError($"Type of field {structAst.Name}.{structField.Name} is '{type}', but default value is type '{PrintTypeDefinition(constant.Type)}'", structField.DefaultValue));
+                            errors.Add(CreateError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(constant.Type)}'", constant));
                         }
                         break;
                     case StructFieldRefAst structFieldRef:
-                        // TODO Verify me
+                        if (_types.TryGetValue(structFieldRef.Name, out var fieldType))
+                        {
+                            if (fieldType is EnumAst enumAst)
+                            {
+                                var enumType = VerifyEnumValue(structFieldRef, enumAst, errors);
+                                if (enumType != null && !TypeEquals(structField.Type, enumType))
+                                {
+                                    errors.Add(CreateError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(enumType)}'", structFieldRef));
+                                }
+                            }
+                            else
+                            {
+                                errors.Add(CreateError($"Default value must be constant or enum value, but got field of '{structFieldRef.Name}'", structFieldRef));
+                            }
+                        }
+                        else
+                        {
+                            errors.Add(CreateError($"Type '{structFieldRef.Name}' not defined", structFieldRef));
+                        }
                         break;
                 }
             }
@@ -855,7 +873,6 @@ namespace Lang.Translation
                         {
                             if (type is EnumAst enumAst)
                             {
-                                structField.IsEnum = true;
                                 return VerifyEnumValue(structField, enumAst, errors);
                             }
                             errors.Add(CreateError($"Cannot reference static field of type '{structField.Name}'", ast));
@@ -1276,8 +1293,9 @@ namespace Lang.Translation
             return expression.Type;
         }
 
-        private TypeDefinition VerifyEnumValue(StructFieldRefAst enumRef, EnumAst enumAst, List<TranslationError> errors)
+        private static TypeDefinition VerifyEnumValue(StructFieldRefAst enumRef, EnumAst enumAst, List<TranslationError> errors)
         {
+            enumRef.IsEnum = true;
             var value = enumRef.Value;
 
             if (value.Value != null)
@@ -1417,21 +1435,21 @@ namespace Lang.Translation
         private static bool TypeEquals(TypeDefinition a, TypeDefinition b)
         {
             // Check by primitive type
-            switch (a.PrimitiveType)
+            switch (a?.PrimitiveType)
             {
                 case IntegerType:
-                    return b.PrimitiveType is IntegerType;
+                    return b?.PrimitiveType is IntegerType;
                 case FloatType:
-                    return b.PrimitiveType is FloatType;
+                    return b?.PrimitiveType is FloatType;
                 case null:
-                    if (b.PrimitiveType != null) return false;
+                    if (b?.PrimitiveType != null) return false;
                     break;
             }
 
             // Check by name
-            if (a.Name != b.Name) return false;
-            if (a.Generics.Count != b.Generics.Count) return false;
-            for (var i = 0; i < a.Generics.Count; i++)
+            if (a?.Name != b?.Name) return false;
+            if (a?.Generics.Count != b?.Generics.Count) return false;
+            for (var i = 0; i < a?.Generics.Count; i++)
             {
                 var ai = a.Generics[i];
                 var bi = b.Generics[i];
