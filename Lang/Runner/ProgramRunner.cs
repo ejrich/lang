@@ -202,9 +202,7 @@ namespace Lang.Runner
                         return InitializeStruct(instanceType, structAst, programGraph, variables, values);
                     }
 
-                    var enumAst = type as EnumAst;
-                    var value = Activator.CreateInstance(instanceType);
-                    return value;
+                    return Activator.CreateInstance(instanceType);
             }
         }
 
@@ -229,7 +227,11 @@ namespace Lang.Runner
                     var value = GetConstant(field.Type, field.DefaultValue.Value);
                     fieldInstance!.SetValue(instance, value);
                 }
-                else if (field.Type.PrimitiveType == null && field.Type.Name != "*")
+                else if (field.Type.Name == "*")
+                {
+                    // TODO Implement pointers
+                }
+                else if (field.Type.PrimitiveType == null)
                 {
                     var fieldType = _types[field.Type.GenericName];
                     var fieldTypeDef = programGraph.Data.Types[field.Type.GenericName];
@@ -386,6 +388,14 @@ namespace Lang.Runner
                 case NullAst:
                     return new ValueType();
                 case StructFieldRefAst structField:
+                    if (structField.IsEnum)
+                    {
+                        var enumDef = (EnumAst)programGraph.Data.Types[structField.Name];
+                        var value = enumDef.Values[structField.ValueIndex].Value;
+                        var enumType = _types[structField.Name];
+                        var enumInstance = Enum.ToObject(enumType, value);
+                        return new ValueType {Type = new TypeDefinition {Name = structField.Name}, Value = enumInstance};
+                    }
                     var structVariable = variables[structField.Name];
                     return GetStructFieldRef(structField, programGraph, structVariable.Value);
                 case VariableAst variable:
