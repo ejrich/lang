@@ -507,8 +507,18 @@ namespace Lang.Backend.LLVM
                         InitializeStruct(structField.Type, field);
                         break;
                     default:
-                        var defaultValue = structField.DefaultValue == null ? GetConstZero(type) : BuildConstant(type, structField.DefaultValue);
-                        LLVMApi.BuildStore(_builder, defaultValue, field);
+                        switch (structField.DefaultValue)
+                        {
+                            case ConstantAst constant:
+                                BuildConstant(type, constant);
+                                break;
+                            case StructFieldRefAst structFieldRef:
+                                // TODO Implement this
+                                break;
+                            case null:
+                                LLVMApi.BuildStore(_builder, GetConstZero(type), field);
+                                break;
+                        }
                         break;
                 }
             }
