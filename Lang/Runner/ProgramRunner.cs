@@ -543,7 +543,13 @@ namespace Lang.Runner
                         return CallFunction(function, programGraph, arguments);
                     }
                 case ExpressionAst expression:
-                    // return VerifyExpressionType(expression, localVariables, errors);
+                    var expressionValue = ExecuteExpression(expression.Children[0], programGraph, variables);
+                    for (var i = 1; i < expression.Children.Count; i++)
+                    {
+                        var rhs = ExecuteExpression(expression.Children[i], programGraph, variables);
+                        expressionValue = BuildExpression(expressionValue, rhs, expression.Operators[i - 1], expression.ResultingTypes[i - 1]);
+                    }
+                    return expressionValue;
                 case IndexAst index:
                     // return VerifyIndexType(index, localVariables, errors, out _);
                     break;
@@ -607,8 +613,69 @@ namespace Lang.Runner
 
         private ValueType BuildExpression(ValueType lhs, ValueType rhs, Operator op, TypeDefinition targetType)
         {
+            // TODO Implement pointers
+            // 1. Handle pointer math 
+            // if (lhs.Type.Name == "*")
+            // {
+            //     return BuildPointerOperation(lhs.value, rhs.value, op);
+            // }
+            // if (rhs.Type.Name == "*")
+            // {
+            //     return BuildPointerOperation(rhs.value, lhs.value, op);
+            // }
+
+            // 2. Handle simple operators like && and ||
+            if (op == Operator.And || op == Operator.Or)
+            {
+                var lhsBool = (bool)lhs.Value;
+                var rhsBool = (bool)rhs.Value;
+                return new ValueType
+                {
+                    Type = targetType, Value = op == Operator.And ? lhsBool && rhsBool : lhsBool || rhsBool
+                };
+            }
+
+            // 3. Handle compares, since the lhs and rhs should not be cast to the target type 
+            switch (op)
+            {
+                case Operator.Equality:
+                case Operator.NotEqual:
+                case Operator.GreaterThanEqual:
+                case Operator.LessThanEqual:
+                case Operator.GreaterThan:
+                case Operator.LessThan:
+                    return new ValueType {Type = targetType, Value = Compare(lhs, rhs, op)};
+            }
+
+            // 4. Cast lhs and rhs to the target types
+            var lhsValue = CastValue(lhs, targetType);
+            var rhsValue = CastValue(rhs, targetType);
+
+            // 5. Handle the rest of the simple operators
+            switch (op)
+            {
+                case Operator.BitwiseAnd:
+                case Operator.BitwiseOr:
+                case Operator.Xor:
+                    // TODO Implement me
+                    return new ValueType {Type = targetType, Value = null};
+            }
+
+            // 6. Handle binary operations
+            var signed = lhs.Type.PrimitiveType.Signed || rhs.Type.PrimitiveType.Signed;
+            return PerformOperation(targetType, lhsValue, rhsValue, op, signed);
+        }
+
+        private object Compare(ValueType lhs, ValueType rhs, Operator op)
+        {
             // TODO Implement me
-            return null;
+            return true;
+        }
+
+        private ValueType PerformOperation(TypeDefinition targetType, object lhsValue, object rhsValue, Operator op, bool signed)
+        {
+            // TODO Implement me
+            return new() {Type = targetType, Value = null};
         }
 
         private object CastValue(ValueType expression, TypeDefinition targetType)
