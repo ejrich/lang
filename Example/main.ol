@@ -164,7 +164,7 @@ List<int> create_list(int count) {
 manipulate_list_struct() {
     s: ListStruct;
     s.list[0] = 8.9;
-    printf("%.2f\n", s.list[0]);
+    //printf("%.2f\n", s.list[0]);
 }
 
 struct Node {
@@ -299,8 +299,8 @@ u32 sleep(u32 seconds) #extern "libc"
         printf("Looping %d\n", i);
     }
 
-    //list := create_list(4);
-    list: List<int>[90];
+    list := create_list(4);
+    printf("%d\n", list[3]);
 }
 
 /*
