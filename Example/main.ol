@@ -179,16 +179,16 @@ int* pointers() {
     
     loop_node := &node;
     i := 1;
-    while loop_node {
-        printf("Value %d = %d\n", i++, loop_node.value);
-        loop_node = loop_node.next;
-    }
+    //while loop_node {
+    //    printf("Value %d = %d\n", i++, loop_node.value);
+    //    loop_node = loop_node.next;
+    //}
 
     list: List<int>[8];
     list_ptr := &list[4];
     a := 6;
     b := &a;
-    d := &a + 1;
+    d := &a + 1; // Value will be garbage
     c := *b;
     return b;
 }
@@ -208,7 +208,7 @@ sum_test() {
     sum_list[6] = 23;
 
     printf("Sum of List   = %d\n", sum(sum_list));
-    printf("Sum of Params = %d\n", sum2(4, 41, 544, 244, 42, 14, 23));
+    //printf("Sum of Params = %d\n", sum2(4, 41, 544, 244, 42, 14, 23));
 }
 
 int sum(List<int> args) {
@@ -301,6 +301,9 @@ u32 sleep(u32 seconds) #extern "libc"
 
     list := create_list(4);
     printf("%d\n", list[3]);
+
+    sum_test();
+    printf("Pointer Result = %d\n", *pointers());
 }
 
 /*

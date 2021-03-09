@@ -404,7 +404,34 @@ namespace Lang.Runner
             var eachVariables = new Dictionary<string, ValueType>(variables);
             if (each.Iteration != null)
             {
-                // TODO Implement me
+                var iterator = ExecuteExpression(each.Iteration, programGraph, variables);
+                var lengthField = iterator.Value.GetType().GetField("length");
+                var length = (int)lengthField!.GetValue(iterator.Value)!;
+
+                var dataField = iterator.Value.GetType().GetField("data");
+                var elementType = iterator.Type.Generics[0];
+                var type = GetTypeFromDefinition(elementType);
+                var iterationVariable = new ValueType {Type = elementType};
+                eachVariables.Add(each.IterationVariable, iterationVariable);
+
+                for (var i = 0; i < length; i++)
+                {
+                    unsafe
+                    {
+                        var data = dataField!.GetValue(iterator.Value);
+                        var dataPointer = Pointer.Unbox(data!);
+
+                        var valuePointer = IntPtr.Add((IntPtr)dataPointer, Marshal.SizeOf(type) * i);
+                        iterationVariable.Value = Marshal.PtrToStructure(valuePointer, type);
+                    }
+
+                    var value = ExecuteAsts(each.Children, programGraph, eachVariables, out returned);
+
+                    if (returned)
+                    {
+                        return value;
+                    }
+                }
             }
             else
             {
@@ -582,17 +609,31 @@ namespace Lang.Runner
                                 var floatValue = (float)valueType.Value;
                                 return new ValueType {Type = valueType.Type, Value = -floatValue};
                             }
-                        // TODO Implement pointers
                         case UnaryOperator.Dereference:
-                            // return valueType.Generics[0];
+                            unsafe
+                            {
+                                var pointer = valueType.Value switch
+                                {
+                                    Pointer => (IntPtr)Pointer.Unbox(valueType.Type),
+                                    _ => (IntPtr) valueType.Value
+                                };
+                                var pointerType = valueType.Type.Generics[0];
+                                var pointerValue = Marshal.PtrToStructure(pointer, GetTypeFromDefinition(pointerType));
+
+                                return new ValueType {Type = pointerType, Value = pointerValue};
+                            }
                         case UnaryOperator.Reference:
-                            // if (unary.Value is VariableAst || unary.Value is StructFieldRefAst || unary.Value is IndexAst || type == Type.Pointer)
-                            // {
-                            //     var pointerType = new TypeDefinition {Name = "*"};
-                            //     pointerType.Generics.Add(valueType);
-                            //     return pointerType;
-                            // }
-                            break;
+                        {
+                            var pointerType = new TypeDefinition {Name = "*"};
+                            pointerType.Generics.Add(valueType.Type);
+                            var type = GetTypeFromDefinition(valueType.Type);
+
+                            // TODO Fix this for index pointers
+                            var pointer = Marshal.AllocHGlobal(Marshal.SizeOf(type));
+                            Marshal.StructureToPtr(valueType.Value, pointer, false);
+
+                            return new ValueType {Type = pointerType, Value = pointer};
+                        }
                     }
                     break;
                 case CallAst call:
@@ -663,8 +704,7 @@ namespace Lang.Runner
             return result;
         }
 
-        private ValueType GetStructFieldRef(StructFieldRefAst structField, ProgramGraph programGraph,
-            object structVariable)
+        private ValueType GetStructFieldRef(StructFieldRefAst structField, ProgramGraph programGraph, object structVariable)
         {
             var value = structField.Value;
             var structDefinition = (StructAst) programGraph.Data.Types[structField.StructName];
@@ -708,14 +748,14 @@ namespace Lang.Runner
         {
             // TODO Implement pointers
             // 1. Handle pointer math 
-            // if (lhs.Type.Name == "*")
-            // {
-            //     return BuildPointerOperation(lhs.value, rhs.value, op);
-            // }
-            // if (rhs.Type.Name == "*")
-            // {
-            //     return BuildPointerOperation(rhs.value, lhs.value, op);
-            // }
+            if (lhs.Type.Name == "*")
+            {
+                return PointerOperation(lhs.Value, rhs.Value, op);
+            }
+            if (rhs.Type.Name == "*")
+            {
+                return PointerOperation(rhs.Value, lhs.Value, op);
+            }
 
             // 2. Handle compares, since the lhs and rhs should not be cast to the target type 
             switch (op)
@@ -890,6 +930,32 @@ namespace Lang.Runner
 
             // 5. Handle binary operations
             return PerformOperation(targetType, lhsValue, rhsValue, op);
+        }
+
+        private static object PointerOperation(object lhs, object rhs, Operator op)
+        {
+            var lhsPointer = (IntPtr)lhs;
+            if (op == Operator.Equality)
+            {
+                if (rhs == null)
+                {
+                    return lhsPointer == IntPtr.Zero;
+                }
+                return lhsPointer == (IntPtr)rhs;
+            }
+            if (op == Operator.NotEqual)
+            {
+                if (rhs == null)
+                {
+                    return lhsPointer != IntPtr.Zero;
+                }
+                return lhsPointer == (IntPtr)rhs;
+            }
+            if (op == Operator.Subtract)
+            {
+                return IntPtr.Subtract(lhsPointer, (int)rhs);
+            }
+            return IntPtr.Add(lhsPointer, (int)rhs);
         }
 
         private static object Compare(ValueType lhs, ValueType rhs, Operator op)
