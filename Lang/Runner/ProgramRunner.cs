@@ -341,17 +341,8 @@ namespace Lang.Runner
                     break;
                 }
                 case IndexAst indexAst:
-                    var index = (int)ExecuteExpression(indexAst.Index, programGraph, variables).Value;
-
-                    var indexVariable = ExecuteExpression(indexAst.Variable, programGraph, variables);
-                    var dataField = indexVariable.Value.GetType().GetField("data");
-                    var type = GetTypeFromDefinition(indexVariable.Type.Generics[0]);
-
-                    var data = dataField!.GetValue(indexVariable.Value);
-                    var dataPointer = GetPointer(data!);
-
-                    var valuePointer = IntPtr.Add(dataPointer, Marshal.SizeOf(type) * index);
-                    Marshal.StructureToPtr(expression.Value, valuePointer, false);
+                    var (_, _, pointer) = GetListPointer(indexAst, programGraph, variables);
+                    Marshal.StructureToPtr(expression.Value, pointer, false);
                     break;
             }
         }
@@ -564,39 +555,39 @@ namespace Lang.Runner
                         }
                         case IndexAst indexAst:
                         {
-                            var index = (int)ExecuteExpression(indexAst.Index, programGraph, variables).Value;
-
-                            var indexVariable = ExecuteExpression(indexAst.Variable, programGraph, variables);
-                            var elementType = indexVariable.Type.Generics[0];
-                            var type = GetTypeFromDefinition(elementType);
-                            var dataField = indexVariable.Value.GetType().GetField("data");
-
-                            var data = dataField!.GetValue(indexVariable.Value);
-                            var dataPointer = GetPointer(data!);
-
-                            var valuePointer = IntPtr.Add(dataPointer, Marshal.SizeOf(type) * index);
-                            var previousValue = Marshal.PtrToStructure(valuePointer, type);
+                            var (typeDef, elementType, pointer) = GetListPointer(indexAst, programGraph, variables);
+                            var previousValue = Marshal.PtrToStructure(pointer, elementType);
                             object newValue;
 
-                            if (elementType.PrimitiveType is IntegerType)
+                            if (typeDef.PrimitiveType is IntegerType)
                             {
                                 var value = (int)previousValue!;
                                 newValue = changeByOne.Positive ? value + 1 : value - 1;
-                                Marshal.StructureToPtr(newValue, valuePointer, false);
+                                Marshal.StructureToPtr(newValue, pointer, false);
                             }
                             else
                             {
                                 var value = (float)previousValue!;
                                 newValue = changeByOne.Positive ? value + 1 : value - 1;
-                                Marshal.StructureToPtr(newValue, valuePointer, false);
+                                Marshal.StructureToPtr(newValue, pointer, false);
                             }
 
-                            return new ValueType {Type = elementType, Value = changeByOne.Prefix ? newValue : previousValue};
+                            return new ValueType {Type = typeDef, Value = changeByOne.Prefix ? newValue : previousValue};
                         }
                     }
                     break;
                 case UnaryAst unary:
                 {
+                    if (unary.Operator == UnaryOperator.Reference && unary.Value is IndexAst indexAst)
+                    {
+                        var (typeDef, _, pointer) = GetListPointer(indexAst, programGraph, variables);
+
+                        var pointerType = new TypeDefinition {Name = "*"};
+                        pointerType.Generics.Add(typeDef);
+
+                        return new ValueType {Type = pointerType, Value = pointer};
+                    }
+
                     var valueType = ExecuteExpression(unary.Value, programGraph, variables);
                     switch (unary.Operator)
                     {
@@ -628,7 +619,6 @@ namespace Lang.Runner
                             pointerType.Generics.Add(valueType.Type);
                             var type = GetTypeFromDefinition(valueType.Type);
 
-                            // TODO Fix this for index pointers
                             var pointer = Marshal.AllocHGlobal(Marshal.SizeOf(type));
                             Marshal.StructureToPtr(valueType.Value, pointer, false);
 
@@ -719,18 +709,8 @@ namespace Lang.Runner
                     return expressionValue;
                 case IndexAst indexAst:
                 {
-                    var index = (int)ExecuteExpression(indexAst.Index, programGraph, variables).Value;
-
-                    var variable = ExecuteExpression(indexAst.Variable, programGraph, variables);
-                    var dataField = variable.Value.GetType().GetField("data");
-                    var elementType = variable.Type.Generics[0];
-                    var type = GetTypeFromDefinition(elementType);
-
-                    var data = dataField!.GetValue(variable.Value);
-                    var dataPointer = GetPointer(data!);
-
-                    var valuePointer = IntPtr.Add(dataPointer, Marshal.SizeOf(type) * index);
-                    return new ValueType {Type = elementType, Value = Marshal.PtrToStructure(valuePointer, type)};
+                    var (typeDef, elementType, pointer) = GetListPointer(indexAst, programGraph, variables);
+                    return new ValueType {Type = typeDef, Value = Marshal.PtrToStructure(pointer, elementType)};
                 }
             }
 
@@ -769,6 +749,24 @@ namespace Lang.Runner
             }
 
             return GetStructFieldRef(value, programGraph, fieldValue);
+        }
+
+        private (TypeDefinition typeDef, Type elementType, IntPtr pointer) GetListPointer(IndexAst indexAst,
+            ProgramGraph programGraph, IDictionary<string, ValueType> variables)
+        {
+            var index = (int)ExecuteExpression(indexAst.Index, programGraph, variables).Value;
+
+            var variable = ExecuteExpression(indexAst.Variable, programGraph, variables);
+            var dataField = variable.Value.GetType().GetField("data");
+            var typeDef = variable.Type.Generics[0];
+            var elementType = GetTypeFromDefinition(typeDef);
+
+            var data = dataField!.GetValue(variable.Value);
+            var dataPointer = GetPointer(data!);
+
+            var valuePointer = IntPtr.Add(dataPointer, Marshal.SizeOf(elementType) * index);
+
+            return (typeDef, elementType, valuePointer);
         }
 
         private static IntPtr GetPointer(object value)
