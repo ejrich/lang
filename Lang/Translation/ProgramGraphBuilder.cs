@@ -283,6 +283,7 @@ namespace Lang.Translation
                             errors.Add(CreateError($"Function '{function.Name}' cannot have multiple varargs", argument.Type));
                         }
                         function.Varargs = true;
+                        function.VarargsCalls = new List<List<TypeDefinition>>();
                         break;
                     case Type.Params:
                         if (function.Varargs || function.Params)
@@ -983,11 +984,18 @@ namespace Lang.Translation
                     }
                 }
                 case CallAst call:
-                    if (_functions.TryGetValue(call.Function, out var function))
+                    if (!_functions.TryGetValue(call.Function, out var function))
+                    {
+                        errors.Add(CreateError($"Call to undefined function '{call.Function}'", call));
+                    }
+
+                    var arguments = call.Arguments.Select(arg => VerifyExpression(arg, localVariables, errors)).ToList();
+
+                    if (function != null)
                     {
                         call.Params = function.Params;
                         var argumentCount = function.Varargs || function.Params ? function.Arguments.Count - 1 : function.Arguments.Count;
-                        var callArgumentCount = call.Arguments.Count;
+                        var callArgumentCount = arguments.Count;
 
                         // Verify function argument count
                         if (function.Varargs || function.Params)
@@ -1011,8 +1019,8 @@ namespace Lang.Translation
                         for (var i = 0; i < argumentCount; i++)
                         {
                             var functionArg = function.Arguments[i];
-                            var argument = call.Arguments.ElementAtOrDefault(i);
-                            if (argument == null)
+                            var argumentAst = call.Arguments.ElementAtOrDefault(i);
+                            if (argumentAst == null)
                             {
                                 if (functionArg.DefaultValue == null)
                                 {
@@ -1023,7 +1031,7 @@ namespace Lang.Translation
                                     call.Arguments.Insert(i, functionArg.DefaultValue);
                                 }
                             }
-                            else if (argument is NullAst nullAst)
+                            else if (argumentAst is NullAst nullAst)
                             {
                                 if (functionArg.Type.Name != "*")
                                 {
@@ -1033,10 +1041,10 @@ namespace Lang.Translation
                             }
                             else
                             {
-                                var callType = VerifyExpression(argument, localVariables, errors);
-                                if (callType != null)
+                                var argument = arguments[i];
+                                if (argument != null)
                                 {
-                                    if (!TypeEquals(functionArg.Type, callType))
+                                    if (!TypeEquals(functionArg.Type, argument))
                                     {
                                         callError = true;
                                     }
@@ -1045,36 +1053,72 @@ namespace Lang.Translation
                         }
 
                         // Verify varargs call arguments
-                        if (function.Varargs || function.Params)
+                        if (function.Params)
                         {
-                            var varargsType = function.Arguments[argumentCount].Type.Generics.FirstOrDefault();
+                            var paramsType = function.Arguments[argumentCount].Type.Generics.FirstOrDefault();
 
-                            // If no generic type, simply verify the rest of the arguments do not have errors
-                            if (varargsType == null)
+                            if (paramsType != null)
                             {
                                 for (var i = argumentCount; i < callArgumentCount; i++)
                                 {
-                                    VerifyExpression(call.Arguments[i], localVariables, errors);
-                                }
-                            }
-                            else
-                            {
-                                for (var i = argumentCount; i < callArgumentCount; i++)
-                                {
-                                    var argument = call.Arguments[i];
-                                    var callType = VerifyExpression(argument, localVariables, errors);
-                                    if (callType != null)
+                                    var argumentAst = call.Arguments[i];
+                                    if (argumentAst is NullAst nullAst)
                                     {
-                                        if (!TypeEquals(varargsType, callType))
+                                        if (paramsType.Name != "*")
                                         {
                                             callError = true;
                                         }
+                                        nullAst.TargetType = paramsType;
                                     }
                                     else
                                     {
-                                        callError = true;
+                                        var argument = arguments[i];
+                                        if (argument != null)
+                                        {
+                                            if (!TypeEquals(paramsType, argument))
+                                            {
+                                                callError = true;
+                                            }
+                                        }
                                     }
                                 }
+                            }
+                        }
+                        else if (function.Varargs)
+                        {
+                            var found = false;
+                            foreach (var callTypes in function.VarargsCalls)
+                            {
+                                if (callTypes.Count == arguments.Count)
+                                {
+                                    var callMatches = true;
+                                    for (var i = 0; i < callTypes.Count; i++)
+                                    {
+                                        var argument = arguments[i];
+                                        // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
+                                        // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
+                                        if (argument.PrimitiveType is FloatType floatType)
+                                        {
+                                            floatType.Bytes = 8;
+                                        }
+                                        if (!TypeEquals(callTypes[i], argument, true))
+                                        {
+                                            callMatches = false;
+                                            break;
+                                        }
+                                    }
+
+                                    if (callMatches)
+                                    {
+                                        found = true;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (!found)
+                            {
+                                function.VarargsCalls.Add(arguments);
                             }
                         }
 
@@ -1083,10 +1127,6 @@ namespace Lang.Translation
                             errors.Add(CreateError($"Call to function '{function.Name}' expected arguments (" +
                                 $"{string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.Type)))})", call));
                         }
-                    }
-                    else
-                    {
-                        errors.Add(CreateError($"Call to undefined function '{call.Function}'", call));
                     }
                     return function?.ReturnType;
                 case ExpressionAst expression:
@@ -1432,15 +1472,25 @@ namespace Lang.Translation
             return indexType;
         }
 
-        private static bool TypeEquals(TypeDefinition a, TypeDefinition b)
+        private static bool TypeEquals(TypeDefinition a, TypeDefinition b, bool checkPrimitives = false)
         {
             // Check by primitive type
             switch (a?.PrimitiveType)
             {
-                case IntegerType:
-                    return b?.PrimitiveType is IntegerType;
-                case FloatType:
-                    return b?.PrimitiveType is FloatType;
+                case IntegerType aInt:
+                    if (b?.PrimitiveType is IntegerType bInt)
+                    {
+                        if (!checkPrimitives) return true;
+                        return aInt.Bytes == bInt.Bytes && aInt.Signed == bInt.Signed;
+                    }
+                    return false;
+                case FloatType aFloat:
+                    if (b?.PrimitiveType is FloatType bFloat)
+                    {
+                        if (!checkPrimitives) return true;
+                        return aFloat.Bytes == bFloat.Bytes;
+                    }
+                    return false;
                 case null:
                     if (b?.PrimitiveType != null) return false;
                     break;
@@ -1453,7 +1503,7 @@ namespace Lang.Translation
             {
                 var ai = a.Generics[i];
                 var bi = b.Generics[i];
-                if (!TypeEquals(ai, bi)) return false;
+                if (!TypeEquals(ai, bi, checkPrimitives)) return false;
             }
             return true;
         }
