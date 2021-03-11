@@ -44,16 +44,24 @@ namespace Lang.Backend.LLVM
             _functions = programGraph.Functions;
             foreach (var (name, function) in programGraph.Functions)
             {
-                WriteFunctionDefinition(name, function.Arguments, function.ReturnType, function.Varargs);
+                if (name == "main")
+                {
+                    function.Name = "__main";
+                    WriteFunctionDefinition("__main", function.Arguments, function.ReturnType, function.Varargs);
+                }
+                else
+                {
+                    WriteFunctionDefinition(name, function.Arguments, function.ReturnType, function.Varargs);
+                }
             }
 
             // 5. Write Function bodies
-            foreach (var (name, functionAst) in programGraph.Functions)
+            foreach (var (_, functionAst) in programGraph.Functions)
             {
                 if (functionAst.Extern) continue;
 
                 _currentFunction = functionAst;
-                var function = LLVMApi.GetNamedFunction(_module, name);
+                var function = LLVMApi.GetNamedFunction(_module, functionAst.Name);
                 WriteFunction(functionAst, globals, function);
             }
 
@@ -846,7 +854,7 @@ namespace Lang.Backend.LLVM
                     return (type, LLVMApi.BuildLoad(_builder, field, structField.Name));
                 }
                 case CallAst call:
-                    var function = LLVMApi.GetNamedFunction(_module, call.Function);
+                    var function = LLVMApi.GetNamedFunction(_module, call.Function == "main" ? "__main" : call.Function);
                     var functionDef = _functions[call.Function];
 
                     if (functionDef.Params)
