@@ -280,8 +280,8 @@ u32 sleep(u32 seconds) #extern "libc"
 
 #run {
     //args: List<string>[0];
-    //__main(args);
-    __main();
+    //main(args);
+    main();
     /*default_args(87);
     set_global(11);
     node: Node;
