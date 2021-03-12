@@ -1,9 +1,9 @@
-int main() {//List<string> args) {
+int main(List<string> args) {
     // Return positive exit code
     /*
         Multi line comment
     */
-    //each arg in args then printf("Arg: %s\n", arg);
+    each arg in args then printf("Arg: %s\n", arg);
     hello := "This is an \"escaped\" string literal\nWith a new line!";
     a := 4.2;
     a++;
@@ -279,10 +279,9 @@ SDL_CreateWindow(string title, int x, int y, int w, int h, u32 flags) #extern "S
 u32 sleep(u32 seconds) #extern "libc"
 
 #run {
-    //args: List<string>[1];
-    //args[0] = "Hello world";
-    //main(args);
-    main();
+    args: List<string>[1];
+    args[0] = "Hello world";
+    main(args);
     /*default_args(87);
     set_global(11);
     node: Node;
