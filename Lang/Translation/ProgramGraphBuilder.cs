@@ -831,10 +831,12 @@ namespace Lang.Translation
 
         private bool VerifyCompilerDirective(CompilerDirectiveAst directive, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
-            switch (directive.Value)
+            _currentFunction.HasDirectives = true;
+            switch (directive.Type)
             {
-                case ConditionalAst conditional:
-                    VerifyExpression(conditional.Condition, localVariables, errors);
+                case DirectiveType.If:
+                    var conditional = directive.Value as ConditionalAst;
+                    VerifyExpression(conditional!.Condition, localVariables, errors);
                     break;
                 default:
                     errors.Add(CreateError("Compiler directive not supported", directive.Value));
