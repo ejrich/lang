@@ -48,14 +48,16 @@ int main(List<string> args) {
 
     sdl_video := 0x20;
     x := 0xfeABD4;
-    sdl := SDL_Init(sdl_video);
-    SDL_CreateWindow("Hello world", 805240832, 805240832, 400, 300, 0);
-    sleep(5);
+    //sdl := SDL_Init(sdl_video);
+    //SDL_CreateWindow("Hello world", 805240832, 805240832, 400, 300, 0);
+    //sleep(5);
 
     z := 1;
     each i in create_list(5) {
         printf("Value %d = %d\n", z++, i);
     }
+
+    compiler_directives();
 
     return 0;
 }
@@ -282,37 +284,11 @@ u32 sleep(u32 seconds) #extern "libc"
     args: List<string>[1];
     args[0] = "Hello world";
     main(args);
-    /*default_args(87);
-    set_global(11);
-    node: Node;
-    node.value = 7;
-    printf("Node Value = %d\n", node.value);
-    global_a = 3;
-    ++global_a;
-    if global_a then
-        printf("Global variable = %d\n", global_a);
-    my_struct: MyStruct;
-    my_struct.subValue.something = 8;
-    my_struct.subValue.something++;
-    printf("Struct field value = %d\n", -my_struct.subValue.something);
-    state: StateStruct = { something = 8; }
-    state.flag = !state.flag;
-
-    each i in 0..global_a {
-        printf("Looping %d\n", i);
-    }
-
-    list := create_list(4);
-    printf("%d\n", list[3]);
-
-    sum_test();
-    printf("Pointer Result = %d\n", *pointers());*/
 }
 
-/*
 compiler_directives() {
     #if true then
-        printf("Hello world");
+        printf("Hello world\n");
     else then
-        printf("Hello wrong branch");
-}*/
+        printf("Hello wrong branch\n");
+}
