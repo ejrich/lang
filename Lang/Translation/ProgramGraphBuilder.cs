@@ -97,6 +97,9 @@ namespace Lang.Translation
                         if (directive.Type == DirectiveType.If)
                         {
                             // TODO Implement me
+                            // 1. Init program runner
+                            // 2. Run the condition
+                            // 3. Verify the ASTs in the block
                             parseResult.SyntaxTrees.RemoveAt(i--);
                         }
                         break;
