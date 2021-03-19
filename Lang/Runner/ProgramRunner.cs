@@ -36,7 +36,7 @@ namespace Lang.Runner
             var typeBuilder = moduleBuilder.DefineType("Functions", TypeAttributes.Class | TypeAttributes.Public);
 
             var temporaryStructs = new Dictionary<string, TypeBuilder>();
-            foreach (var (_, type) in programGraph.Data.Types)
+            foreach (var (_, type) in programGraph.Types)
             {
                 switch (type)
                 {
@@ -61,7 +61,7 @@ namespace Lang.Runner
                 foreach (var (name, structBuilder) in temporaryStructs)
                 {
                     var indexFound = fieldIndices.TryGetValue(name, out var index);
-                    var structAst = programGraph.Data.Types[name] as StructAst;
+                    var structAst = programGraph.Types[name] as StructAst;
                     var count = structAst!.Fields.Count;
 
                     for (; index < count; index++)
@@ -112,7 +112,7 @@ namespace Lang.Runner
             _library = typeBuilder.CreateType();
             _functionObject = Activator.CreateInstance(_library!);
 
-            foreach (var variable in programGraph.Data.Variables)
+            foreach (var variable in programGraph.Variables)
             {
                 ExecuteDeclaration(variable, programGraph, _globalVariables);
             }
@@ -241,7 +241,7 @@ namespace Lang.Runner
                             return IntPtr.Zero;
                     }
                     var instanceType = _types[typeDef.GenericName];
-                    var type = programGraph.Data.Types[typeDef.GenericName];
+                    var type = programGraph.Types[typeDef.GenericName];
                     if (type is StructAst structAst)
                     {
                         return InitializeStruct(instanceType, structAst, programGraph, variables, values);
@@ -276,7 +276,7 @@ namespace Lang.Runner
                             fieldInstance!.SetValue(instance, constantValue);
                             break;
                         case StructFieldRefAst structField:
-                            var enumDef = (EnumAst)programGraph.Data.Types[structField.Name];
+                            var enumDef = (EnumAst)programGraph.Types[structField.Name];
                             var value = enumDef.Values[structField.ValueIndex].Value;
                             var enumType = _types[structField.Name];
                             var enumInstance = Enum.ToObject(enumType, value);
@@ -297,7 +297,7 @@ namespace Lang.Runner
                         if (field.Type.PrimitiveType == null)
                         {
                             var fieldType = _types[field.Type.GenericName];
-                            var fieldTypeDef = programGraph.Data.Types[field.Type.GenericName];
+                            var fieldTypeDef = programGraph.Types[field.Type.GenericName];
                             if (fieldTypeDef is StructAst fieldStructAst)
                             {
                                 var value = InitializeStruct(fieldType, fieldStructAst, programGraph, variables);
@@ -532,7 +532,7 @@ namespace Lang.Runner
                 case StructFieldRefAst structField:
                     if (structField.IsEnum)
                     {
-                        var enumDef = (EnumAst)programGraph.Data.Types[structField.Name];
+                        var enumDef = (EnumAst)programGraph.Types[structField.Name];
                         var value = enumDef.Values[structField.ValueIndex].Value;
                         var enumType = _types[structField.Name];
                         var enumInstance = Enum.ToObject(enumType, value);
@@ -562,7 +562,7 @@ namespace Lang.Runner
                             var structFieldValue = structField.Value;
                             FieldInfo field;
                             TypeDefinition fieldType;
-                            var structDefinition = (StructAst) programGraph.Data.Types[structField.StructName];
+                            var structDefinition = (StructAst) programGraph.Types[structField.StructName];
                             while (true)
                             {
                                 field = fieldObject!.GetType().GetField(structFieldValue.Name);
@@ -573,7 +573,7 @@ namespace Lang.Runner
                                 }
 
                                 fieldObject = field!.GetValue(fieldObject);
-                                structDefinition = (StructAst) programGraph.Data.Types[structFieldValue.StructName];
+                                structDefinition = (StructAst) programGraph.Types[structFieldValue.StructName];
                                 structFieldValue = structFieldValue.Value;
                             }
 
@@ -782,7 +782,7 @@ namespace Lang.Runner
         private ValueType GetStructFieldRef(StructFieldRefAst structField, ProgramGraph programGraph, object structVariable)
         {
             var value = structField.Value;
-            var structDefinition = (StructAst) programGraph.Data.Types[structField.StructName];
+            var structDefinition = (StructAst) programGraph.Types[structField.StructName];
 
             if (structField.IsPointer)
             {
