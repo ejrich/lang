@@ -370,8 +370,8 @@ namespace Lang.Translation
                     }
                 }
             }
-            
-            // 4. Load the function into the dictionary 
+
+            // 4. Load the function into the dictionary
             if (!_programGraph.Functions.TryAdd(function.Name, function))
             {
                 errors.Add(CreateError($"Multiple definitions of function '{function.Name}'", function));
@@ -1484,8 +1484,8 @@ namespace Lang.Translation
                     return null;
             }
         }
-        
-        
+
+
         private TypeDefinition VerifyIndex(IndexAst index, TypeDefinition typeDef, IDictionary<string, TypeDefinition> localVariables,
             List<TranslationError> errors)
         {
@@ -1626,7 +1626,7 @@ namespace Lang.Translation
                         errors.Add(CreateError($"List type should have 1 generic type, but got {typeDef.Generics.Count}", typeDef));
                         return Type.Error;
                     }
-                    return VerifyList(typeDef, errors) ? Type.List : Type.Error; 
+                    return VerifyList(typeDef, errors) ? Type.List : Type.Error;
                 }
                 case "void":
                     if (hasGenerics)
@@ -1661,7 +1661,7 @@ namespace Lang.Translation
                         errors.Add(CreateError($"Params type should have 1 generic type, but got {typeDef.Generics.Count}", typeDef));
                         return Type.Error;
                     }
-                    return VerifyList(typeDef, errors) ? Type.Params : Type.Error; 
+                    return VerifyList(typeDef, errors) ? Type.Params : Type.Error;
                 }
                 default:
                     if (typeDef.Generics.Any())
@@ -1743,7 +1743,7 @@ namespace Lang.Translation
 
             _programGraph.Types.Add(name, polyStruct);
         }
-        
+
         private static TypeDefinition CopyType(TypeDefinition type, TypeDefinition[] genericTypes)
         {
             if (type.IsGeneric)
