@@ -10,6 +10,7 @@ namespace Lang.Runner
 {
     public interface IProgramRunner
     {
+        void Init(ProgramGraph programGraph);
         void RunProgram(ProgramGraph programGraph);
     }
 
@@ -24,6 +25,11 @@ namespace Lang.Runner
         {
             public TypeDefinition Type { get; set; }
             public object Value { get; set; }
+        }
+
+        public void Init(ProgramGraph programGraph)
+        {
+            // Initialize the runner
         }
 
         public void RunProgram(ProgramGraph programGraph)
@@ -901,7 +907,7 @@ namespace Lang.Runner
 
         private static object RunExpression(ValueType lhs, ValueType rhs, Operator op, TypeDefinition targetType)
         {
-            // 1. Handle pointer math 
+            // 1. Handle pointer math
             if (lhs.Type.Name == "*")
             {
                 return PointerOperation(lhs.Value, rhs.Value, op);
@@ -911,7 +917,7 @@ namespace Lang.Runner
                 return PointerOperation(rhs.Value, lhs.Value, op);
             }
 
-            // 2. Handle compares, since the lhs and rhs should not be cast to the target type 
+            // 2. Handle compares, since the lhs and rhs should not be cast to the target type
             switch (op)
             {
                 case Operator.And:
