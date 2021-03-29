@@ -283,6 +283,7 @@ u32 sleep(u32 seconds) #extern "libc"
     args: List<string>[1];
     args[0] = "Hello world";
     main(args);
+    XOpenDisplay("Hello");
 }
 
 compiler_directives() {

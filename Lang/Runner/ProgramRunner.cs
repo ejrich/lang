@@ -12,10 +12,12 @@ namespace Lang.Runner
     {
         void Init(ProgramGraph programGraph);
         void RunProgram(ProgramGraph programGraph);
+        bool ExecuteCondition(IAst expression, ProgramGraph programGraph);
     }
 
     public class ProgramRunner : IProgramRunner
     {
+        private ModuleBuilder _moduleBuilder;
         private Type _library;
         private object _functionObject;
         private readonly Dictionary<string, ValueType> _globalVariables = new();
@@ -30,16 +32,14 @@ namespace Lang.Runner
         public void Init(ProgramGraph programGraph)
         {
             // Initialize the runner
-        }
-
-        public void RunProgram(ProgramGraph programGraph)
-        {
-            if (!programGraph.Directives.Any()) return;
-
-            var assemblyName = new AssemblyName("ExternFunctions");
-            var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
-            var moduleBuilder = assemblyBuilder.DefineDynamicModule("ExternFunctions");
-            var typeBuilder = moduleBuilder.DefineType("Functions", TypeAttributes.Class | TypeAttributes.Public);
+            if (_moduleBuilder == null)
+            {
+                var assemblyName = new AssemblyName("Runner");
+                var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
+                _moduleBuilder = assemblyBuilder.DefineDynamicModule("ExternFunctions");
+            }
+            // TODO Delete previous functions type
+            var typeBuilder = _moduleBuilder.DefineType("Functions", TypeAttributes.Class | TypeAttributes.Public);
 
             var temporaryStructs = new Dictionary<string, TypeBuilder>();
             foreach (var (_, type) in programGraph.Types)
@@ -47,7 +47,8 @@ namespace Lang.Runner
                 switch (type)
                 {
                     case EnumAst enumAst:
-                        var enumBuilder = moduleBuilder.DefineEnum(enumAst.Name, TypeAttributes.Public, typeof(int));
+                        if (enumAst.Registered) break;
+                        var enumBuilder = _moduleBuilder.DefineEnum(enumAst.Name, TypeAttributes.Public, typeof(int));
                         foreach (var value in enumAst.Values)
                         {
                             enumBuilder.DefineLiteral(value.Name, value.Value);
@@ -55,7 +56,8 @@ namespace Lang.Runner
                         _types[enumAst.Name] = enumBuilder.CreateTypeInfo();
                         break;
                     case StructAst structAst:
-                        var structBuilder = moduleBuilder.DefineType(structAst.Name, TypeAttributes.Public | TypeAttributes.SequentialLayout);
+                        if (structAst.Registered) break;
+                        var structBuilder = _moduleBuilder.DefineType(structAst.Name, TypeAttributes.Public | TypeAttributes.SequentialLayout);
                         temporaryStructs[structAst.Name] = structBuilder;
                         break;
                 }
@@ -122,11 +124,13 @@ namespace Lang.Runner
             {
                 ExecuteDeclaration(variable, programGraph, _globalVariables);
             }
+        }
 
-            foreach (var function in programGraph.Functions.Values.Where(_ => _.HasDirectives))
-            {
-                ResolveCompilerDirectives(function.Children, programGraph);
-            }
+        public void RunProgram(ProgramGraph programGraph)
+        {
+            if (!programGraph.Directives.Any()) return;
+
+            Init(programGraph);
 
             foreach (var directive in programGraph.Directives)
             {
@@ -440,6 +444,11 @@ namespace Lang.Runner
 
             returned = false;
             return null;
+        }
+
+        public bool ExecuteCondition(IAst expression, ProgramGraph programGraph)
+        {
+            return ExecuteCondition(expression, programGraph, _globalVariables);
         }
 
         private bool ExecuteCondition(IAst expression, ProgramGraph programGraph, IDictionary<string, ValueType> variables)

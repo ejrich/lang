@@ -105,6 +105,7 @@ namespace Lang.Translation
                 }
 
                 verifyAdditional = false;
+                var additionalAsts = new List<IAst>();
                 // 3. Verify and run top-level static ifs
                 for (int i = 0; i < parseResult.SyntaxTrees.Count; i++)
                 {
@@ -114,14 +115,31 @@ namespace Lang.Translation
                             if (directive.Type == DirectiveType.If)
                             {
                                 // TODO Implement me
-                                // 1. Init program runner
-                                // 2. Run the condition
-                                // 3. Verify the ASTs in the block
-                                verifyAdditional = true;
+                                var conditional = directive.Value as ConditionalAst;
+                                // 1. Verify condition
+                                if (VerifyCondition(conditional.Condition, _globalVariables, errors))
+                                {
+                                    // 2. Init program runner
+                                    _programRunner.Init(_programGraph);
+                                    // 3. Run the condition
+                                    if (_programRunner.ExecuteCondition(conditional!.Condition, _programGraph))
+                                    {
+                                        additionalAsts.AddRange(conditional.Children);
+                                    }
+                                    else if (conditional.Else.Any())
+                                    {
+                                        additionalAsts.AddRange(conditional.Else);
+                                    }
+                                }
                                 parseResult.SyntaxTrees.RemoveAt(i--);
                             }
                             break;
                     }
+                }
+                if (additionalAsts.Any())
+                {
+                    parseResult.SyntaxTrees.AddRange(additionalAsts);
+                    verifyAdditional = true;
                 }
             } while (verifyAdditional);
 
@@ -129,7 +147,6 @@ namespace Lang.Translation
             foreach (var (_, function) in _programGraph.Functions)
             {
                 if (function.Verified) continue;
-                _currentFunction = function;
                 VerifyFunction(function, errors);
             }
             VerifyFunction(_programGraph.Start, errors);
@@ -387,6 +404,7 @@ namespace Lang.Translation
                 // Arguments with the same name as a global variable will be used instead of the global
                 localVariables[argument.Name] = argument.Type;
             }
+            _currentFunction = function;
             var returnType = VerifyType(function.ReturnType, errors);
 
             // 2. For extern functions, simply verify there is no body and return
@@ -785,7 +803,7 @@ namespace Lang.Translation
             return VerifyScope(whileAst.Children, localVariables, errors);
         }
 
-        private void VerifyCondition(IAst ast, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        private bool VerifyCondition(IAst ast, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             var conditionalType = VerifyExpression(ast, localVariables, errors);
             switch (VerifyType(conditionalType, errors))
@@ -795,10 +813,10 @@ namespace Lang.Translation
                 case Type.Boolean:
                 case Type.Pointer:
                     // Valid types
-                    break;
+                    return true;
                 default:
                     errors.Add(CreateError($"Expected condition to be bool, int, float, or pointer, but got '{PrintTypeDefinition(conditionalType)}'", ast));
-                    break;
+                    return false;
             }
         }
 
@@ -861,10 +879,10 @@ namespace Lang.Translation
                 case DirectiveType.Run:
                     VerifyAst(directive.Value, _globalVariables, errors);
                     break;
-                case DirectiveType.If:
-                    var conditional = directive.Value as ConditionalAst;
-                    VerifyExpression(conditional!.Condition, _globalVariables, errors);
-                    break;
+                // case DirectiveType.If:
+                //     var conditional = directive.Value as ConditionalAst;
+                //     VerifyExpression(conditional!.Condition, _globalVariables, errors);
+                //     break;
                 default:
                     errors.Add(CreateError("Compiler directive not supported", directive.Value));
                     break;
