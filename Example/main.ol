@@ -57,7 +57,7 @@ int main(List<string> args) {
         printf("Value %d = %d\n", z++, i);
     }
 
-    compiler_directives();
+    // compiler_directives();
 
     return 0;
 }
@@ -286,13 +286,13 @@ u32 sleep(u32 seconds) #extern "libc"
     XOpenDisplay("Hello");
 }
 
-compiler_directives() {
-    #if true then
-        printf("Hello world\n");
-    else then
-        printf("Hello wrong branch\n");
-}
+// compiler_directives() {
+//     #if true then
+//         printf("Hello world\n");
+//     else then
+//         printf("Hello wrong branch\n");
+// }
 
 #if true /*os == OS.Linux*/ {
-    XOpenDisplay(string name) #extern "X"
+    XOpenDisplay(string name) #extern "X11"
 }
