@@ -293,6 +293,6 @@ compiler_directives() {
         printf("Hello wrong branch\n");
 }
 
-#if true /*os == OS.Linux*/ {
+#if os == OS.Linux {
     XOpenDisplay(string name) #extern "X11"
 }
