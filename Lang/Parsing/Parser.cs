@@ -1070,6 +1070,17 @@ namespace Lang.Parsing
                 declaration.Value = ParseExpression(enumerator, errors);
             }
 
+            // 6. Parse compiler directives
+            if (enumerator.Peek()?.Type == TokenType.Pound)
+            {
+                switch (enumerator.Peek(1)?.Value)
+                {
+                    case "const":
+                        declaration.Constant = true;
+                        break;
+                }
+            }
+
             return declaration;
         }
 

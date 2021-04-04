@@ -184,6 +184,7 @@ namespace Lang.Parsing
         public string Name { get; set; }
         public TypeDefinition Type { get; set; }
         public IAst Value { get; set; }
+        public bool Constant { get; set; }
         public List<AssignmentAst> Assignments { get; } = new();
         public List<IAst> Children => null;
     }
