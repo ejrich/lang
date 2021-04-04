@@ -270,6 +270,7 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public string Name { get; set; }
         public bool IsGeneric { get; set; }
+        public bool Constant { get; set; }
         public int GenericIndex { get; set; }
         public IPrimitive PrimitiveType { get; set; }
         public List<TypeDefinition> Generics { get; } = new();
