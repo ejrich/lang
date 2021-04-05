@@ -11,19 +11,26 @@ namespace Lang.Runner
     public interface IProgramRunner
     {
         void Init(ProgramGraph programGraph, BuildSettings buildSettings);
-        void RunProgram(IAst ast, ProgramGraph programGraph);
-        bool ExecuteCondition(IAst expression, ProgramGraph programGraph);
+        void RunProgram(IAst ast);
+        bool ExecuteCondition(IAst expression);
     }
 
     public class ProgramRunner : IProgramRunner
     {
         private ModuleBuilder _moduleBuilder;
         private int _version;
+
+        private ProgramGraph _programGraph;
         private BuildSettings _buildSettings;
+
         private readonly Dictionary<string, List<int>> _functionIndices = new();
         private readonly List<(Type type, object libraryObject)> _functionLibraries = new();
         private readonly Dictionary<string, ValueType> _globalVariables = new();
         private readonly Dictionary<string, Type> _types = new();
+
+        private readonly Dictionary<string, string> _compilerFunctions = new() {
+            { "add_dependency", "AddDependency" }
+        };
 
         private class ValueType
         {
@@ -33,6 +40,7 @@ namespace Lang.Runner
 
         public void Init(ProgramGraph programGraph, BuildSettings buildSettings)
         {
+            _programGraph = programGraph;
             _buildSettings = buildSettings;
             // Initialize the runner
             if (_moduleBuilder == null)
@@ -143,14 +151,14 @@ namespace Lang.Runner
             {
                 if (!_globalVariables.ContainsKey(variable.Name))
                 {
-                    ExecuteDeclaration(variable, programGraph, _globalVariables);
+                    ExecuteDeclaration(variable, _globalVariables);
                 }
             }
         }
 
-        public void RunProgram(IAst ast, ProgramGraph programGraph)
+        public void RunProgram(IAst ast)
         {
-            ExecuteAst(ast, programGraph, _globalVariables, out _);
+            ExecuteAst(ast, _globalVariables, out _);
         }
 
         private void CreateFunction(TypeBuilder typeBuilder, string name, string library, Type returnType, Type[] args)
@@ -160,7 +168,7 @@ namespace Lang.Runner
             method.SetCustomAttribute(caBuilder);
         }
 
-        private ValueType ExecuteAst(IAst ast, ProgramGraph programGraph, IDictionary<string, ValueType> variables, out bool returned)
+        private ValueType ExecuteAst(IAst ast, IDictionary<string, ValueType> variables, out bool returned)
         {
             returned = false;
             ValueType returnValue = null;
@@ -168,46 +176,46 @@ namespace Lang.Runner
             {
                 case ReturnAst returnAst:
                     returned = true;
-                    return ExecuteReturn(returnAst, programGraph, variables);
+                    return ExecuteReturn(returnAst, variables);
                 case DeclarationAst declaration:
-                    ExecuteDeclaration(declaration, programGraph, variables);
+                    ExecuteDeclaration(declaration, variables);
                     break;
                 case AssignmentAst assignment:
-                    ExecuteAssignment(assignment, programGraph, variables);
+                    ExecuteAssignment(assignment, variables);
                     break;
                 case ScopeAst scope:
-                    returnValue = ExecuteScope(scope.Children, programGraph, variables, out returned);
+                    returnValue = ExecuteScope(scope.Children, variables, out returned);
                     break;
                 case ConditionalAst conditional:
-                    returnValue = ExecuteConditional(conditional, programGraph, variables, out returned);
+                    returnValue = ExecuteConditional(conditional, variables, out returned);
                     break;
                 case WhileAst whileAst:
-                    returnValue = ExecuteWhile(whileAst, programGraph, variables, out returned);
+                    returnValue = ExecuteWhile(whileAst, variables, out returned);
                     break;
                 case EachAst each:
-                    returnValue = ExecuteEach(each, programGraph, variables, out returned);
+                    returnValue = ExecuteEach(each, variables, out returned);
                     break;
                 default:
-                    return ExecuteExpression(ast, programGraph, variables);
+                    return ExecuteExpression(ast, variables);
             }
 
             return returnValue;
         }
 
-        private ValueType ExecuteReturn(ReturnAst returnAst, ProgramGraph programGraph, IDictionary<string, ValueType> variables)
+        private ValueType ExecuteReturn(ReturnAst returnAst, IDictionary<string, ValueType> variables)
         {
-            return ExecuteExpression(returnAst.Value, programGraph, variables);
+            return ExecuteExpression(returnAst.Value, variables);
         }
 
-        private void ExecuteDeclaration(DeclarationAst declaration, ProgramGraph programGraph, IDictionary<string, ValueType> variables)
+        private void ExecuteDeclaration(DeclarationAst declaration, IDictionary<string, ValueType> variables)
         {
             var value = declaration.Name switch
             {
                 "os" => GetOSVersion(),
                 "build_env" => GetBuildEnv(),
                 _ => declaration.Value == null ?
-                    GetUninitializedValue(declaration.Type, programGraph, variables, declaration.Assignments) :
-                    ExecuteExpression(declaration.Value, programGraph, variables).Value
+                    GetUninitializedValue(declaration.Type, variables, declaration.Assignments) :
+                    ExecuteExpression(declaration.Value, variables).Value
             };
 
             variables[declaration.Name] = new ValueType {Type = declaration.Type, Value = value};
@@ -230,7 +238,7 @@ namespace Lang.Runner
             return _buildSettings.Release ? 2 : 1;
         }
 
-        private object GetUninitializedValue(TypeDefinition typeDef, ProgramGraph programGraph,
+        private object GetUninitializedValue(TypeDefinition typeDef,
             IDictionary<string, ValueType> variables, List<AssignmentAst> values)
         {
             switch (typeDef.PrimitiveType)
@@ -243,22 +251,22 @@ namespace Lang.Runner
                     switch (typeDef.Name)
                     {
                         case "List":
-                            return InitializeList(typeDef, programGraph, variables);
+                            return InitializeList(typeDef, variables);
                         case "*":
                             return IntPtr.Zero;
                     }
                     var instanceType = _types[typeDef.GenericName];
-                    var type = programGraph.Types[typeDef.GenericName];
+                    var type = _programGraph.Types[typeDef.GenericName];
                     if (type is StructAst structAst)
                     {
-                        return InitializeStruct(instanceType, structAst, programGraph, variables, values);
+                        return InitializeStruct(instanceType, structAst, variables, values);
                     }
 
                     return Activator.CreateInstance(instanceType);
             }
         }
 
-        private object InitializeStruct(Type type, StructAst structAst, ProgramGraph programGraph,
+        private object InitializeStruct(Type type, StructAst structAst,
             IDictionary<string, ValueType> variables, List<AssignmentAst> values = null)
         {
             var assignments = values?.ToDictionary(_ => (_.Variable as VariableAst)!.Name);
@@ -269,7 +277,7 @@ namespace Lang.Runner
 
                 if (assignments != null && assignments.TryGetValue(field.Name, out var assignment))
                 {
-                    var expression = ExecuteExpression(assignment.Value, programGraph, variables);
+                    var expression = ExecuteExpression(assignment.Value, variables);
                     var value = CastValue(expression.Value, field.Type);
 
                     fieldInstance!.SetValue(instance, value);
@@ -283,7 +291,7 @@ namespace Lang.Runner
                             fieldInstance!.SetValue(instance, constantValue);
                             break;
                         case StructFieldRefAst structField:
-                            var enumDef = (EnumAst)programGraph.Types[structField.Name];
+                            var enumDef = (EnumAst)_programGraph.Types[structField.Name];
                             var value = enumDef.Values[structField.ValueIndex].Value;
                             var enumType = _types[structField.Name];
                             var enumInstance = Enum.ToObject(enumType, value);
@@ -294,7 +302,7 @@ namespace Lang.Runner
                 else switch (field.Type.Name)
                 {
                     case "List":
-                        var list = InitializeList(field.Type, programGraph, variables);
+                        var list = InitializeList(field.Type, variables);
                         fieldInstance!.SetValue(instance, list);
                         break;
                     case "*":
@@ -304,10 +312,10 @@ namespace Lang.Runner
                         if (field.Type.PrimitiveType == null)
                         {
                             var fieldType = _types[field.Type.GenericName];
-                            var fieldTypeDef = programGraph.Types[field.Type.GenericName];
+                            var fieldTypeDef = _programGraph.Types[field.Type.GenericName];
                             if (fieldTypeDef is StructAst fieldStructAst)
                             {
-                                var value = InitializeStruct(fieldType, fieldStructAst, programGraph, variables);
+                                var value = InitializeStruct(fieldType, fieldStructAst, variables);
                                 fieldInstance!.SetValue(instance, value);
                             }
                             else
@@ -323,14 +331,14 @@ namespace Lang.Runner
             return instance;
         }
 
-        private object InitializeList(TypeDefinition typeDef, ProgramGraph programGraph, IDictionary<string, ValueType> variables)
+        private object InitializeList(TypeDefinition typeDef, IDictionary<string, ValueType> variables)
         {
             var listType = _types[typeDef.GenericName];
             var genericType = GetTypeFromDefinition(typeDef.Generics[0]);
 
             if (typeDef.Count != null)
             {
-                var length = (int)ExecuteExpression(typeDef.Count, programGraph, variables).Value;
+                var length = (int)ExecuteExpression(typeDef.Count, variables).Value;
                 return InitializeConstList(listType, genericType, length);
             }
 
@@ -355,12 +363,12 @@ namespace Lang.Runner
             return list;
         }
 
-        private void ExecuteAssignment(AssignmentAst assignment, ProgramGraph programGraph, IDictionary<string, ValueType> variables)
+        private void ExecuteAssignment(AssignmentAst assignment, IDictionary<string, ValueType> variables)
         {
-            var expression = ExecuteExpression(assignment.Value, programGraph, variables);
+            var expression = ExecuteExpression(assignment.Value, variables);
             if (assignment.Operator != Operator.None)
             {
-                var lhs = ExecuteExpression(assignment.Variable, programGraph, variables);
+                var lhs = ExecuteExpression(assignment.Variable, variables);
                 expression.Value = RunExpression(lhs, expression, assignment.Operator, lhs.Type);
                 expression.Type = lhs.Type;
             }
@@ -395,43 +403,43 @@ namespace Lang.Runner
                     break;
                 }
                 case IndexAst indexAst:
-                    var (_, _, pointer) = GetListPointer(indexAst, programGraph, variables);
+                    var (_, _, pointer) = GetListPointer(indexAst, variables);
                     Marshal.StructureToPtr(expression.Value, pointer, false);
                     break;
             }
         }
 
-        private ValueType ExecuteScope(List<IAst> asts, ProgramGraph programGraph,
+        private ValueType ExecuteScope(List<IAst> asts,
             IDictionary<string, ValueType> variables, out bool returned)
         {
             var scopeVariables = new Dictionary<string, ValueType>(variables);
 
-            return ExecuteAsts(asts, programGraph, scopeVariables, out returned);
+            return ExecuteAsts(asts, scopeVariables, out returned);
         }
 
-        private ValueType ExecuteConditional(ConditionalAst conditional, ProgramGraph programGraph,
+        private ValueType ExecuteConditional(ConditionalAst conditional,
             IDictionary<string, ValueType> variables, out bool returned)
         {
-            if (ExecuteCondition(conditional.Condition, programGraph, variables))
+            if (ExecuteCondition(conditional.Condition, variables))
             {
-                return ExecuteScope(conditional.Children, programGraph, variables, out returned);
+                return ExecuteScope(conditional.Children, variables, out returned);
             }
 
             if (conditional.Else.Any())
             {
-                return ExecuteScope(conditional.Else, programGraph, variables, out returned);
+                return ExecuteScope(conditional.Else, variables, out returned);
             }
 
             returned = false;
             return null;
         }
 
-        private ValueType ExecuteWhile(WhileAst whileAst, ProgramGraph programGraph,
+        private ValueType ExecuteWhile(WhileAst whileAst,
             IDictionary<string, ValueType> variables, out bool returned)
         {
-            while (ExecuteCondition(whileAst.Condition, programGraph, variables))
+            while (ExecuteCondition(whileAst.Condition, variables))
             {
-                var value = ExecuteScope(whileAst.Children, programGraph, variables, out returned);
+                var value = ExecuteScope(whileAst.Children, variables, out returned);
 
                 if (returned)
                 {
@@ -443,14 +451,14 @@ namespace Lang.Runner
             return null;
         }
 
-        public bool ExecuteCondition(IAst expression, ProgramGraph programGraph)
+        public bool ExecuteCondition(IAst expression)
         {
-            return ExecuteCondition(expression, programGraph, _globalVariables);
+            return ExecuteCondition(expression, _globalVariables);
         }
 
-        private bool ExecuteCondition(IAst expression, ProgramGraph programGraph, IDictionary<string, ValueType> variables)
+        private bool ExecuteCondition(IAst expression, IDictionary<string, ValueType> variables)
         {
-            var valueType = ExecuteExpression(expression, programGraph, variables);
+            var valueType = ExecuteExpression(expression, variables);
             var value = valueType.Value;
             return valueType.Type.PrimitiveType switch
             {
@@ -461,12 +469,12 @@ namespace Lang.Runner
             };
         }
 
-        private ValueType ExecuteEach(EachAst each, ProgramGraph programGraph, IDictionary<string, ValueType> variables, out bool returned)
+        private ValueType ExecuteEach(EachAst each, IDictionary<string, ValueType> variables, out bool returned)
         {
             var eachVariables = new Dictionary<string, ValueType>(variables);
             if (each.Iteration != null)
             {
-                var iterator = ExecuteExpression(each.Iteration, programGraph, variables);
+                var iterator = ExecuteExpression(each.Iteration, variables);
                 var lengthField = iterator.Value.GetType().GetField("length");
                 var length = (int)lengthField!.GetValue(iterator.Value)!;
 
@@ -484,7 +492,7 @@ namespace Lang.Runner
                     var valuePointer = IntPtr.Add(dataPointer, Marshal.SizeOf(type) * i);
                     iterationVariable.Value = Marshal.PtrToStructure(valuePointer, type);
 
-                    var value = ExecuteAsts(each.Children, programGraph, eachVariables, out returned);
+                    var value = ExecuteAsts(each.Children, eachVariables, out returned);
 
                     if (returned)
                     {
@@ -494,14 +502,14 @@ namespace Lang.Runner
             }
             else
             {
-                var rangeBegin = ExecuteExpression(each.RangeBegin, programGraph, variables);
-                var rangeEnd = ExecuteExpression(each.RangeEnd, programGraph, variables);
+                var rangeBegin = ExecuteExpression(each.RangeBegin, variables);
+                var rangeEnd = ExecuteExpression(each.RangeEnd, variables);
                 var iterationVariable = new ValueType {Type = rangeBegin.Type, Value = rangeBegin.Value};
                 eachVariables.Add(each.IterationVariable, iterationVariable);
 
                 while ((bool)RunExpression(iterationVariable, rangeEnd, Operator.LessThanEqual, iterationVariable.Type))
                 {
-                    var value = ExecuteAsts(each.Children, programGraph, eachVariables, out returned);
+                    var value = ExecuteAsts(each.Children, eachVariables, out returned);
 
                     if (returned)
                     {
@@ -516,12 +524,12 @@ namespace Lang.Runner
             return null;
         }
 
-        private ValueType ExecuteAsts(List<IAst> asts, ProgramGraph programGraph,
+        private ValueType ExecuteAsts(List<IAst> asts,
             IDictionary<string, ValueType> variables, out bool returned)
         {
             foreach (var ast in asts)
             {
-                var value = ExecuteAst(ast, programGraph, variables, out returned);
+                var value = ExecuteAst(ast, variables, out returned);
 
                 if (returned)
                 {
@@ -533,7 +541,7 @@ namespace Lang.Runner
             return null;
         }
 
-        private ValueType ExecuteExpression(IAst ast, ProgramGraph programGraph, IDictionary<string, ValueType> variables)
+        private ValueType ExecuteExpression(IAst ast, IDictionary<string, ValueType> variables)
         {
             switch (ast)
             {
@@ -544,14 +552,14 @@ namespace Lang.Runner
                 case StructFieldRefAst structField:
                     if (structField.IsEnum)
                     {
-                        var enumDef = (EnumAst)programGraph.Types[structField.Name];
+                        var enumDef = (EnumAst)_programGraph.Types[structField.Name];
                         var value = enumDef.Values[structField.ValueIndex].Value;
                         var enumType = _types[structField.Name];
                         var enumInstance = Enum.ToObject(enumType, value);
                         return new ValueType {Type = new TypeDefinition {Name = structField.Name}, Value = enumInstance};
                     }
                     var structVariable = variables[structField.Name];
-                    return GetStructFieldRef(structField, programGraph, structVariable.Value);
+                    return GetStructFieldRef(structField, structVariable.Value);
                 case VariableAst variableAst:
                     return variables[variableAst.Name];
                 case ChangeByOneAst changeByOne:
@@ -574,7 +582,7 @@ namespace Lang.Runner
                             var structFieldValue = structField.Value;
                             FieldInfo field;
                             TypeDefinition fieldType;
-                            var structDefinition = (StructAst) programGraph.Types[structField.StructName];
+                            var structDefinition = (StructAst) _programGraph.Types[structField.StructName];
                             while (true)
                             {
                                 field = fieldObject!.GetType().GetField(structFieldValue.Name);
@@ -585,7 +593,7 @@ namespace Lang.Runner
                                 }
 
                                 fieldObject = field!.GetValue(fieldObject);
-                                structDefinition = (StructAst) programGraph.Types[structFieldValue.StructName];
+                                structDefinition = (StructAst) _programGraph.Types[structFieldValue.StructName];
                                 structFieldValue = structFieldValue.Value;
                             }
 
@@ -597,7 +605,7 @@ namespace Lang.Runner
                         }
                         case IndexAst indexAst:
                         {
-                            var (typeDef, elementType, pointer) = GetListPointer(indexAst, programGraph, variables);
+                            var (typeDef, elementType, pointer) = GetListPointer(indexAst, variables);
 
                             var previousValue = Marshal.PtrToStructure(pointer, elementType);
                             var newValue = PerformOperation(typeDef, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
@@ -611,7 +619,7 @@ namespace Lang.Runner
                 {
                     if (unary.Operator == UnaryOperator.Reference && unary.Value is IndexAst indexAst)
                     {
-                        var (typeDef, _, pointer) = GetListPointer(indexAst, programGraph, variables);
+                        var (typeDef, _, pointer) = GetListPointer(indexAst, variables);
 
                         var pointerType = new TypeDefinition {Name = "*"};
                         pointerType.Generics.Add(typeDef);
@@ -619,7 +627,7 @@ namespace Lang.Runner
                         return new ValueType {Type = pointerType, Value = pointer};
                     }
 
-                    var valueType = ExecuteExpression(unary.Value, programGraph, variables);
+                    var valueType = ExecuteExpression(unary.Value, variables);
                     switch (unary.Operator)
                     {
                         case UnaryOperator.Not:
@@ -659,13 +667,13 @@ namespace Lang.Runner
                     break;
                 }
                 case CallAst call:
-                    var function = programGraph.Functions[call.Function];
+                    var function = _programGraph.Functions[call.Function];
                     if (call.Params)
                     {
                         var arguments = new object[function.Arguments.Count];
                         for (var i = 0; i < function.Arguments.Count - 1; i++)
                         {
-                            var value = ExecuteExpression(call.Arguments[i], programGraph, variables).Value;
+                            var value = ExecuteExpression(call.Arguments[i], variables).Value;
                             arguments[i] = value;
                         }
 
@@ -681,7 +689,7 @@ namespace Lang.Runner
                         var paramsIndex = 0;
                         for (var i = function.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
                         {
-                            var value = ExecuteExpression(call.Arguments[i], programGraph, variables).Value;
+                            var value = ExecuteExpression(call.Arguments[i], variables).Value;
 
                             var valuePointer = IntPtr.Add(dataPointer, Marshal.SizeOf(paramsType) * paramsIndex);
                             Marshal.StructureToPtr(value, valuePointer, false);
@@ -689,7 +697,7 @@ namespace Lang.Runner
 
                         arguments[function.Arguments.Count - 1] = paramsList;
 
-                        return CallFunction(call.Function, function, programGraph, arguments);
+                        return CallFunction(call.Function, function, arguments);
                     }
                     else if (function.Varargs)
                     {
@@ -697,7 +705,7 @@ namespace Lang.Runner
                         var types = new Type[call.Arguments.Count];
                         for (var i = 0; i < function.Arguments.Count - 1; i++)
                         {
-                            var valueType = ExecuteExpression(call.Arguments[i], programGraph, variables);
+                            var valueType = ExecuteExpression(call.Arguments[i], variables);
                             arguments[i] = valueType.Value;
                             types[i] = GetTypeFromDefinition(valueType.Type, cCall: true);
                         }
@@ -706,7 +714,7 @@ namespace Lang.Runner
                         // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
                         for (var i = function.Arguments.Count - 1; i < call.Arguments.Count; i++)
                         {
-                            var valueType = ExecuteExpression(call.Arguments[i], programGraph, variables);
+                            var valueType = ExecuteExpression(call.Arguments[i], variables);
                             if (valueType.Type.Name == "float")
                             {
                                 arguments[i] = Convert.ToDouble(valueType.Value);
@@ -719,7 +727,7 @@ namespace Lang.Runner
                             }
                         }
 
-                        return CallFunction(call.Function, function, programGraph, arguments, types);
+                        return CallFunction(call.Function, function, arguments, types);
                     }
                     else
                     {
@@ -728,19 +736,19 @@ namespace Lang.Runner
                         for (var i = 0; i < call.Arguments.Count; i++)
                         {
                             var argument = call.Arguments[i];
-                            var valueType = ExecuteExpression(argument, programGraph, variables);
+                            var valueType = ExecuteExpression(argument, variables);
                             arguments[i] = valueType.Value;
                             types[i] = GetTypeFromDefinition(valueType.Type, cCall: function.Extern);
                         }
 
-                        return CallFunction(call.Function, function, programGraph, arguments, types);
+                        return CallFunction(call.Function, function, arguments, types);
                     }
                 case ExpressionAst expression:
-                    var firstValue = ExecuteExpression(expression.Children[0], programGraph, variables);
+                    var firstValue = ExecuteExpression(expression.Children[0], variables);
                     var expressionValue = new ValueType {Type = firstValue.Type, Value = firstValue.Value};
                     for (var i = 1; i < expression.Children.Count; i++)
                     {
-                        var rhs = ExecuteExpression(expression.Children[i], programGraph, variables);
+                        var rhs = ExecuteExpression(expression.Children[i], variables);
                         var nextType = expression.ResultingTypes[i - 1];
                         expressionValue.Value = RunExpression(expressionValue, rhs, expression.Operators[i - 1], nextType);
                         expressionValue.Type = nextType;
@@ -748,7 +756,7 @@ namespace Lang.Runner
                     return expressionValue;
                 case IndexAst indexAst:
                 {
-                    var (typeDef, elementType, pointer) = GetListPointer(indexAst, programGraph, variables);
+                    var (typeDef, elementType, pointer) = GetListPointer(indexAst, variables);
                     return new ValueType {Type = typeDef, Value = PointerToTargetType(pointer, typeDef, elementType)};
                 }
             }
@@ -791,10 +799,10 @@ namespace Lang.Runner
             }
         }
 
-        private ValueType GetStructFieldRef(StructFieldRefAst structField, ProgramGraph programGraph, object structVariable)
+        private ValueType GetStructFieldRef(StructFieldRefAst structField, object structVariable)
         {
             var value = structField.Value;
-            var structDefinition = (StructAst) programGraph.Types[structField.StructName];
+            var structDefinition = (StructAst) _programGraph.Types[structField.StructName];
 
             if (structField.IsPointer)
             {
@@ -810,15 +818,14 @@ namespace Lang.Runner
                 return new ValueType {Type = fieldType, Value = fieldValue};
             }
 
-            return GetStructFieldRef(value, programGraph, fieldValue);
+            return GetStructFieldRef(value, fieldValue);
         }
 
-        private (TypeDefinition typeDef, Type elementType, IntPtr pointer) GetListPointer(IndexAst indexAst,
-            ProgramGraph programGraph, IDictionary<string, ValueType> variables)
+        private (TypeDefinition typeDef, Type elementType, IntPtr pointer) GetListPointer(IndexAst indexAst, IDictionary<string, ValueType> variables)
         {
-            var index = (int)ExecuteExpression(indexAst.Index, programGraph, variables).Value;
+            var index = (int)ExecuteExpression(indexAst.Index, variables).Value;
 
-            var variable = ExecuteExpression(indexAst.Variable, programGraph, variables);
+            var variable = ExecuteExpression(indexAst.Variable, variables);
             var typeDef = variable.Type.Generics[0];
             var elementType = GetTypeFromDefinition(typeDef);
 
@@ -859,8 +866,7 @@ namespace Lang.Runner
             return Marshal.PtrToStructure(pointer, type);
         }
 
-        private ValueType CallFunction(string functionName, FunctionAst function, ProgramGraph programGraph,
-            object[] arguments, Type[] argumentTypes = null, int callIndex = 0)
+        private ValueType CallFunction(string functionName, FunctionAst function, object[] arguments, Type[] argumentTypes = null, int callIndex = 0)
         {
             if (function.Extern)
             {
@@ -883,6 +889,26 @@ namespace Lang.Runner
                 }
             }
 
+            if (function.Compiler)
+            {
+                if (!_compilerFunctions.TryGetValue(function.Name, out var name))
+                {
+                    _programGraph.Errors.Add(new Translation.TranslationError
+                    {
+                        Error = $"Undefined compiler function '{function.Name}'",
+                        FileIndex = function.FileIndex,
+                        Line = function.Line,
+                        Column = function.Column
+                    });
+                    return null;
+                }
+                var args = arguments.Select(GetManagedArg).ToArray();
+
+                var functionDecl = typeof(ProgramRunner).GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance);
+                var returnValue = functionDecl.Invoke(this, args);
+                return new ValueType {Type = function.ReturnType, Value = returnValue};
+            }
+
             var variables = new Dictionary<string, ValueType>(_globalVariables);
 
             for (var i = 0; i < function.Arguments.Count; i++)
@@ -893,7 +919,7 @@ namespace Lang.Runner
 
             foreach (var ast in function.Children)
             {
-                var value = ExecuteAst(ast, programGraph, variables, out var returned);
+                var value = ExecuteAst(ast, variables, out var returned);
 
                 if (returned)
                 {
@@ -913,6 +939,24 @@ namespace Lang.Runner
             }
 
             return argument;
+        }
+
+        private static object GetManagedArg(object argument)
+        {
+            var type = argument.GetType();
+            if (type.Name == "string")
+            {
+                var dataField = type.GetField("data");
+                var pointer = GetPointer(dataField!.GetValue(argument));
+                return Marshal.PtrToStringAnsi(pointer);
+            }
+
+            return argument;
+        }
+
+        private void AddDependency(string library)
+        {
+            _programGraph.Dependencies.Add(library);
         }
 
         private static object RunExpression(ValueType lhs, ValueType rhs, Operator op, TypeDefinition targetType)

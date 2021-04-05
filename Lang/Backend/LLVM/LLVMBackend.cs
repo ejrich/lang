@@ -1,3 +1,5 @@
+using Lang.Project;
+
 namespace Lang.Backend.LLVM
 {
     public class LLVMBackend : IBackend
@@ -11,13 +13,13 @@ namespace Lang.Backend.LLVM
             _linker = linker;
         }
 
-        public void Build(ProgramGraph programGraph, Project.Project project, BuildSettings buildSettings)
+        public void Build(ProjectFile project, ProgramGraph programGraph, BuildSettings buildSettings)
         {
             // 1. Build the object file
-            var objectFile = _writer.WriteFile(programGraph, project.Name, project.Path, buildSettings);
+            var objectFile = _writer.WriteFile(project.Path, programGraph, buildSettings);
 
             // 2. Link binaries
-            _linker.Link(objectFile, project, buildSettings);
+            _linker.Link(objectFile, project, programGraph, buildSettings);
         }
     }
 }
