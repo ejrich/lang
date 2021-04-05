@@ -422,7 +422,13 @@ namespace Lang.Translation
             // 4. Loop through function body and verify all ASTs
             var returned = VerifyAsts(function.Children, function, localVariables);
 
-            // 5. Verify the function returns on all paths
+            // 5. Verify the main function doesn't call the compiler
+            if (function.Name == "main" && function.CallsCompiler)
+            {
+                AddError("The main function cannot call the compiler", function);
+            }
+
+            // 6. Verify the function returns on all paths
             if (!returned && returnType != Type.Void)
             {
                 AddError($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnType)}' on all paths", function);
@@ -1090,6 +1096,11 @@ namespace Lang.Translation
                         if (!function.Verified && function != currentFunction)
                         {
                             VerifyFunction(function);
+                        }
+
+                        if (currentFunction != null && !currentFunction.CallsCompiler && (function.Compiler || function.CallsCompiler))
+                        {
+                            currentFunction.CallsCompiler = true;
                         }
 
                         call.Params = function.Params;
