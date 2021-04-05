@@ -26,10 +26,16 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public string Name { get; set; }
         public bool Extern { get; set; }
+        public bool Compiler { get; set; }
+        public string ExternLib { get; set; }
         public bool Varargs { get; set; }
         public bool Params { get; set; }
+        public bool Verified { get; set; }
+        public bool HasDirectives { get; set; }
+        public bool CallsCompiler { get; set; }
         public TypeDefinition ReturnType { get; set; }
         public List<Argument> Arguments { get; } = new();
+        public List<List<TypeDefinition>> VarargsCalls { get; set; }
         public List<IAst> Children { get; } = new();
     }
 
@@ -52,7 +58,7 @@ namespace Lang.Parsing
         public bool HasGeneric { get; set; }
         public string Name { get; set; }
         public TypeDefinition Type { get; set; }
-        public ConstantAst DefaultValue { get; set; }
+        public IAst DefaultValue { get; set; }
         public List<IAst> Children => null;
     }
 
@@ -167,6 +173,7 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public string Function { get; set; }
         public bool Params { get; set; }
+        public int VarargsIndex { get; set; }
         public List<IAst> Arguments { get; } = new();
         public List<IAst> Children => null;
     }
@@ -179,6 +186,7 @@ namespace Lang.Parsing
         public string Name { get; set; }
         public TypeDefinition Type { get; set; }
         public IAst Value { get; set; }
+        public bool Constant { get; set; }
         public List<AssignmentAst> Assignments { get; } = new();
         public List<IAst> Children => null;
     }
@@ -201,7 +209,7 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public IAst Condition { get; set; }
         public List<IAst> Children { get; } = new();
-        public IAst Else { get; set; }
+        public List<IAst> Else { get; } = new();
     }
 
     public class WhileAst : IAst
@@ -236,6 +244,16 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
+    public class CompilerDirectiveAst : IAst
+    {
+        public int FileIndex { get; set; }
+        public int Line { get; init; }
+        public int Column { get; init; }
+        public DirectiveType Type { get; set; }
+        public IAst Value { get; set; }
+        public List<IAst> Children => null;
+    }
+
     public class Argument : IAst
     {
         public int FileIndex { get; set; }
@@ -254,12 +272,23 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public string Name { get; set; }
         public bool IsGeneric { get; set; }
+        public bool Constant { get; set; }
         public int GenericIndex { get; set; }
         public IPrimitive PrimitiveType { get; set; }
         public List<TypeDefinition> Generics { get; } = new();
         public IAst Count { get; set; }
         public List<IAst> Children => null;
-        public string GenericName => Generics.Aggregate(Name, (current, generic) => current + $".{generic.GenericName}");
+
+        private string _genericName;
+        public string GenericName
+        {
+            get
+            {
+                if (_genericName == null)
+                    return _genericName = Generics.Aggregate(Name, (current, generic) => current + $".{generic.GenericName}");
+                return _genericName;
+            }
+        }
     }
 
     public enum Operator
@@ -289,5 +318,13 @@ namespace Lang.Parsing
         Negate = '-',
         Dereference = '*',
         Reference = '&'
+    }
+
+    public enum DirectiveType
+    {
+        None,
+        Run,
+        If,
+        Assert
     }
 }

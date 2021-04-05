@@ -1,19 +1,17 @@
 using System.Collections.Generic;
 using Lang.Parsing;
+using Lang.Translation;
 
 namespace Lang
 {
     public class ProgramGraph
     {
-        public Data Data { get; } = new();
-        public List<FunctionAst> Functions { get; } = new();
-        public FunctionAst Main { get; set; }
-        public FunctionAst Start { get; set; }
-    }
-
-    public class Data
-    {
+        public string Name { get; set; }
         public List<DeclarationAst> Variables { get; } = new();
-        public List<IAst> Types { get; set; }
+        public Dictionary<string, IAst> Types { get; } = new();
+        public Dictionary<string, FunctionAst> Functions { get; } = new();
+        public FunctionAst Start { get; set; }
+        public List<string> Dependencies { get; set; }
+        public List<TranslationError> Errors { get; } = new();
     }
 }

@@ -1,8 +1,9 @@
-int Main(List<string> args) {
+int main(List<string> args) {
     // Return positive exit code
     /*
         Multi line comment
     */
+    each arg in args then printf("Arg: %s\n", arg);
     hello := "This is an \"escaped\" string literal\nWith a new line!";
     a := 4.2;
     a++;
@@ -23,7 +24,7 @@ int Main(List<string> args) {
     str := string_test();
     printf("%s - Hello world %d, %d, %d\n", str, 1, 2, b);
     sum_test();
-    overflow_test();
+    // overflow_test();
 
     set_global(8);
     printf("'global_a' = %d\n", global_a);
@@ -47,15 +48,24 @@ int Main(List<string> args) {
 
     sdl_video := 0x20;
     x := 0xfeABD4;
-    sdl := SDL_Init(sdl_video);
-    SDL_CreateWindow("Hello world", 805240832, 805240832, 400, 300, 0);
-    sleep(10);
+    // sdl := SDL_Init(sdl_video);
+    // SDL_CreateWindow("Hello world", 805240832, 805240832, 400, 300, 0);
+    // sleep(5);
+
+    z := 1;
+    each i in create_list(5) {
+        printf("Value %d = %d\n", z++, i);
+    }
+
+    compiler_directives();
+
+    open_window();
 
     return 0;
 }
 
 global_a := 7;
-global_b: int;
+global_b: int = 456; #const
 
 set_global(int a) {
     if a > 10 then global_a = a * 90;
@@ -149,10 +159,15 @@ List<int> create_list(int count) {
     a := list[count-2];
     list[0]++;
     ++list[0];
+
+    manipulate_list_struct();
+    return list;
+}
+
+manipulate_list_struct() {
     s: ListStruct;
     s.list[0] = 8.9;
     printf("%.2f\n", s.list[0]);
-    return list;
 }
 
 struct Node {
@@ -164,7 +179,7 @@ int* pointers() {
     node: Node = { value = 9; }
     next: Node = { value = 8; }
     node.next = &next;
-    
+
     loop_node := &node;
     i := 1;
     while loop_node {
@@ -176,7 +191,7 @@ int* pointers() {
     list_ptr := &list[4];
     a := 6;
     b := &a;
-    d := &a + 1;
+    d := &a + 1; // Value will be garbage
     c := *b;
     return b;
 }
@@ -214,7 +229,7 @@ int sum2(Params<int> args) {
 overflow_test() {
     each i in 1..1000000 {
         a := i * 9;
-        //printf("%d\n", a);
+        printf("%d\n", a);
     }
     a := 4;
 }
@@ -238,7 +253,16 @@ enum State {
     Running;
 }
 
+struct StateStruct {
+    State state = State.Running;
+    int something;
+    bool flag = true;
+}
+
 State current_state(int a) {
+    state: StateStruct;
+    printf("State is %d\n", state.state);
+
     if a > 5 then return State.Running;
     else if a == 5 then return State.Starting;
     return State.Stopped;
@@ -253,6 +277,43 @@ default_args(int val = 5) {
     printf("Value = %d\n", val);
 }
 
-int SDL_Init(u32 flags) #extern
-SDL_CreateWindow(string title, int x, int y, int w, int h, u32 flags) #extern
-u32 sleep(u32 seconds) #extern
+open_window() {
+    #if os == OS.Linux {
+        XOpenDisplay("Hello");
+        printf("Opening X11 window\n");
+    }
+}
+
+int SDL_Init(u32 flags) #extern "SDL2"
+SDL_CreateWindow(string title, int x, int y, int w, int h, u32 flags) #extern "SDL2"
+u32 sleep(u32 seconds) #extern "libc"
+
+#run {
+    args: List<string>[1];
+    args[0] = "Hello world";
+    main(args);
+
+    build();
+}
+
+compiler_directives() {
+    const_value := 7; #const
+    printf("Constant value = %d\n", const_value);
+    #assert factorial(6) == 720;
+    #if build_env == BuildEnv.Debug then
+        printf("Running Debug code\n");
+    #if build_env == BuildEnv.Release then
+        printf("Running Release code\n");
+}
+
+build() {
+    if os == OS.Linux {
+        add_dependency("X11");
+    }
+}
+
+#assert global_b > 0;
+
+#if os == OS.Linux {
+    XOpenDisplay(string name) #extern "X11"
+}

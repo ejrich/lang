@@ -2,7 +2,6 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using Lang.Project;
 
 namespace Lang.Backend.LLVM
 {
@@ -10,7 +9,7 @@ namespace Lang.Backend.LLVM
     {
         private const string BinaryDirectory = "bin";
 
-        public void Link(string objectFile, Project.Project project, BuildSettings buildSettings)
+        public void Link(string objectFile, ProjectFile project, ProgramGraph programGraph, BuildSettings buildSettings)
         {
             // 1. Verify bin directory exists
             var binaryPath = Path.Combine(project.Path, BinaryDirectory);
@@ -25,18 +24,23 @@ namespace Lang.Backend.LLVM
 
             // 3. Run the linker
             var executableFile = Path.Combine(project.Path, BinaryDirectory, Path.GetFileNameWithoutExtension(objectFile));
-            var dependencyList = string.Join(' ', project.Dependencies.Select(d => $"-l{d}"));
+            var dependencyList = string.Join(' ', programGraph.Dependencies.Select(d => $"-l{d}"));
             var buildProcess = new Process
             {
                 StartInfo =
                 {
                     FileName = "ld",
                     Arguments = $"{linker} -o {executableFile} {objectFile} {defaultObjects} " +
-                                $"{dependencyList} -L{gccDirectory} --start-group -lgcc -lgcc_eh -lc --end-group"
+                                $"-L{gccDirectory} --start-group {dependencyList} -lgcc -lgcc_eh -lc --end-group"
                 }
             };
             buildProcess.Start();
             buildProcess.WaitForExit();
+            if (buildProcess.ExitCode != 0)
+            {
+                Console.WriteLine("Unable to link executable, please see output");
+                Environment.Exit(ErrorCodes.LinkError);
+            }
         }
 
         private static DirectoryInfo DetermineLibDirectory()

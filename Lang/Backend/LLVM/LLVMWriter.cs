@@ -21,54 +21,59 @@ namespace Lang.Backend.LLVM
         private bool _stackPointerExists;
         private bool _stackSaved;
 
-        private readonly Dictionary<string, FunctionAst> _functions = new();
+        private Dictionary<string, FunctionAst> _functions;
         private readonly Dictionary<string, IAst> _types = new();
         private readonly Queue<LLVMValueRef> _allocationQueue = new();
 
-        public string WriteFile(ProgramGraph programGraph, string projectName, string projectPath, BuildSettings buildSettings)
+        public string WriteFile(string projectPath, ProgramGraph programGraph, BuildSettings buildSettings)
         {
             // 1. Initialize the LLVM module and builder
-            InitLLVM(projectName, buildSettings.Release);
+            InitLLVM(programGraph.Name, buildSettings.Release);
 
             // 2. Verify obj directory exists
             var objectPath = Path.Combine(projectPath, ObjectDirectory);
             if (!Directory.Exists(objectPath))
                 Directory.CreateDirectory(objectPath);
 
-            var objectFile = Path.Combine(objectPath, $"{projectName}.o");
+            var objectFile = Path.Combine(objectPath, $"{programGraph.Name}.o");
 
             // 3. Write Data section
-            var globals = WriteData(programGraph.Data);
+            var globals = WriteData(programGraph);
 
             // 4. Write Function definitions
-            foreach (var function in programGraph.Functions)
+            _functions = programGraph.Functions;
+            foreach (var (name, function) in programGraph.Functions)
             {
-                _functions.Add(function.Name, function);
-                WriteFunctionDefinition(function.Name, function.Arguments, function.ReturnType, function.Varargs);
+                if (function.Compiler || function.CallsCompiler) continue;
+
+                if (name == "main")
+                {
+                    function.Name = "__main";
+                    WriteFunctionDefinition("__main", function.Arguments, function.ReturnType, function.Varargs);
+                }
+                else
+                {
+                    WriteFunctionDefinition(name, function.Arguments, function.ReturnType, function.Varargs);
+                }
             }
 
             // 5. Write Function bodies
-            foreach (var functionAst in programGraph.Functions.Where(func => !func.Extern))
+            foreach (var (_, functionAst) in programGraph.Functions)
             {
+                if (functionAst.Extern || functionAst.Compiler || functionAst.CallsCompiler) continue;
+
                 _currentFunction = functionAst;
                 var function = LLVMApi.GetNamedFunction(_module, functionAst.Name);
                 WriteFunction(functionAst, globals, function);
             }
 
-            // 6. Write Main function
-            var main = programGraph.Main;
-            _currentFunction = main;
-            _functions.Add("Main", main);
-            var mainFunction = WriteFunctionDefinition("Main", main.Arguments, main.ReturnType);
-            WriteFunction(main, globals, mainFunction);
-
-            // 7. Write __start function
+            // 6. Write __start function
             var start = programGraph.Start;
             _currentFunction = start;
             var startFunction = WriteFunctionDefinition("main", start.Arguments, start.ReturnType);
             WriteFunction(start, globals, startFunction);
 
-            // 8. Compile to object file
+            // 7. Compile to object file
             Compile(objectFile, buildSettings.OutputAssembly);
 
             return objectFile;
@@ -92,17 +97,16 @@ namespace Lang.Backend.LLVM
             }
         }
 
-        private IDictionary<string, (TypeDefinition type, LLVMValueRef value)> WriteData(Data data)
+        private IDictionary<string, (TypeDefinition type, LLVMValueRef value)> WriteData(ProgramGraph programGraph)
         {
             // 1. Declare structs
-            var structs = new LLVMTypeRef[data.Types.Count];
-            for (var i = 0; i < data.Types.Count; i++)
+            var structs = new Dictionary<string, LLVMTypeRef>();
+            foreach (var (name, type) in programGraph.Types)
             {
-                var type = data.Types[i];
                 switch (type)
                 {
                     case StructAst structAst:
-                        structs[i] = LLVMApi.StructCreateNamed(LLVMApi.GetModuleContext(_module), structAst.Name);
+                        structs[name] = LLVMApi.StructCreateNamed(LLVMApi.GetModuleContext(_module), structAst.Name);
                         _types.Add(structAst.Name, structAst);
                         break;
                     case EnumAst enumAst:
@@ -110,32 +114,39 @@ namespace Lang.Backend.LLVM
                         break;
                 }
             }
-            for (var i = 0; i < data.Types.Count; i++)
+            foreach (var (name, type) in programGraph.Types)
             {
-                var type = data.Types[i];
                 if (type is StructAst structAst)
                 {
                     var fields = structAst.Fields.Select(field => ConvertTypeDefinition(field.Type)).ToArray();
-                    LLVMApi.StructSetBody(structs[i], fields, false);
+                    LLVMApi.StructSetBody(structs[name], fields, false);
                 }
             }
 
             // 2. Declare variables
             var globals = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>();
-            foreach (var globalVariable in data.Variables)
+            foreach (var globalVariable in programGraph.Variables)
             {
-                var type = ConvertTypeDefinition(globalVariable.Type);
-                var global = LLVMApi.AddGlobal(_module, type, globalVariable.Name);
-                LLVMApi.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
-                if (globalVariable.Value != null)
+                if (globalVariable.Constant)
                 {
-                    LLVMApi.SetInitializer(global, BuildConstant(type, globalVariable.Value as ConstantAst));
+                    var (_, constant) = WriteExpression(globalVariable.Value, null);
+                    globals.Add(globalVariable.Name, (globalVariable.Type, constant));
                 }
-                else if (type.TypeKind != LLVMTypeKind.LLVMStructTypeKind && type.TypeKind != LLVMTypeKind.LLVMArrayTypeKind)
+                else
                 {
-                    LLVMApi.SetInitializer(global, GetConstZero(type));
+                    var type = ConvertTypeDefinition(globalVariable.Type);
+                    var global = LLVMApi.AddGlobal(_module, type, globalVariable.Name);
+                    LLVMApi.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
+                    if (globalVariable.Value != null)
+                    {
+                        LLVMApi.SetInitializer(global, BuildConstant(type, globalVariable.Value as ConstantAst));
+                    }
+                    else if (type.TypeKind != LLVMTypeKind.LLVMStructTypeKind && type.TypeKind != LLVMTypeKind.LLVMArrayTypeKind)
+                    {
+                        LLVMApi.SetInitializer(global, GetConstZero(type));
+                    }
+                    globals.Add(globalVariable.Name, (globalVariable.Type, global));
                 }
-                globals.Add(globalVariable.Name, (globalVariable.Type, global));
             }
 
             return globals;
@@ -209,14 +220,14 @@ namespace Lang.Backend.LLVM
                     break;
                 }
             }
-            
+
             // 6. Write returns for void functions
             if (!returned && functionAst.ReturnType.Name == "void")
             {
                 BuildStackRestore();
                 LLVMApi.BuildRetVoid(_builder);
             }
-            _stackPointerExists = false; 
+            _stackPointerExists = false;
             _stackSaved = false;
 
             // 7. Verify the function
@@ -287,6 +298,8 @@ namespace Lang.Backend.LLVM
                     break;
                 }
                 case DeclarationAst declaration:
+                    if (declaration.Constant) break;
+
                     var type = ConvertTypeDefinition(declaration.Type);
                     var variable = LLVMApi.BuildAlloca(_builder, type, declaration.Name);
                     _allocationQueue.Enqueue(variable);
@@ -312,59 +325,50 @@ namespace Lang.Backend.LLVM
                     }
                     break;
                 case ScopeAst:
-                    foreach (var childAst in ast.Children)
-                    {
-                        if (BuildAllocations(childAst))
-                        {
-                            return true;
-                        }
-                    }
-                    break;
+                    return BuildAllocations(ast.Children);
                 case ConditionalAst conditional:
                     BuildAllocations(conditional.Condition);
-                    var ifReturned = false;
-                    foreach (var childAst in conditional.Children)
-                    {
-                        if (BuildAllocations(childAst))
-                        {
-                            ifReturned = true;
-                            break;
-                        }
-                    }
+                    var ifReturned = BuildAllocations(conditional.Children);
 
-                    if (conditional.Else != null)
+                    if (conditional.Else.Any())
                     {
                         var elseReturned = BuildAllocations(conditional.Else);
                         return ifReturned && elseReturned;
                     }
                     break;
-                case WhileAst whileAst:
-                    foreach (var childAst in whileAst.Children)
-                    {
-                        if (BuildAllocations(childAst))
-                        {
-                            return true;
-                        }
-                    }
-                    break;
+                case WhileAst:
+                    return BuildAllocations(ast.Children);
                 case EachAst each:
                     var indexVariable = LLVMApi.BuildAlloca(_builder, LLVMTypeRef.Int32Type(), each.IterationVariable);
                     _allocationQueue.Enqueue(indexVariable);
 
-                    foreach (var childAst in each.Children)
+                    switch (each.Iteration)
                     {
-                        if (BuildAllocations(childAst))
-                        {
-                            return true;
-                        }
+                        // @PotentialBug I can't really think of other cases that would fall under here, but this may
+                        // become an issue if there are some new ways to creates lists
+                        case CallAst call:
+                            var function = _functions[call.Function];
+                            var iterationValue = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(function.ReturnType), "iterval");
+                            _allocationQueue.Enqueue(iterationValue);
+                            break;
                     }
-                    break;
+
+                    return BuildAllocations(each.Children);
                 case ExpressionAst:
-                    foreach (var childAst in ast.Children)
-                    {
-                        BuildAllocations(childAst);
-                    }
+                    BuildAllocations(ast.Children);
                     break;
+            }
+            return false;
+        }
+
+        private bool BuildAllocations(List<IAst> children)
+        {
+            foreach (var ast in children)
+            {
+                if (BuildAllocations(ast))
+                {
+                    return true;
+                }
             }
             return false;
         }
@@ -444,6 +448,15 @@ namespace Lang.Backend.LLVM
         {
             // 1. Declare variable on the stack
             var type = ConvertTypeDefinition(declaration.Type);
+
+            if (declaration.Constant)
+            {
+                var (_, constant) = WriteExpression(declaration.Value, localVariables);
+
+                localVariables.Add(declaration.Name, (declaration.Type, constant));
+                return;
+            }
+
             var variable = _allocationQueue.Dequeue();
             localVariables.Add(declaration.Name, (declaration.Type, variable));
 
@@ -493,7 +506,7 @@ namespace Lang.Backend.LLVM
         private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable,
             IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables = null, List<AssignmentAst> values = null)
         {
-            var assignments = values == null ? new Dictionary<string, AssignmentAst>() : values.ToDictionary(_ => (_.Variable as VariableAst)!.Name);
+            var assignments = values?.ToDictionary(_ => (_.Variable as VariableAst)!.Name);
             var structDef = _types[typeDef.GenericName] as StructAst;
             for (var i = 0; i < structDef!.Fields.Count; i++)
             {
@@ -504,7 +517,7 @@ namespace Lang.Backend.LLVM
 
                 var field = LLVMApi.BuildStructGEP(_builder, variable, (uint) i, structField.Name);
 
-                if (assignments.TryGetValue(structField.Name, out var assignment))
+                if (assignments != null && assignments.TryGetValue(structField.Name, out var assignment))
                 {
                     var expression = WriteExpression(assignment.Value, localVariables);
                     var value = CastValue(expression, structField.Type);
@@ -525,8 +538,22 @@ namespace Lang.Backend.LLVM
                         InitializeStruct(structField.Type, field);
                         break;
                     default:
-                        var defaultValue = structField.DefaultValue == null ? GetConstZero(type) : BuildConstant(type, structField.DefaultValue);
-                        LLVMApi.BuildStore(_builder, defaultValue, field);
+                        switch (structField.DefaultValue)
+                        {
+                            case ConstantAst constant:
+                                var constantValue = BuildConstant(type, constant);
+                                LLVMApi.BuildStore(_builder, constantValue, field);
+                                break;
+                            case StructFieldRefAst structFieldRef:
+                                var enumDef = (EnumAst)_types[structFieldRef.Name];
+                                var value = enumDef.Values[structFieldRef.ValueIndex].Value;
+                                var enumValue = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (ulong)value, false);
+                                LLVMApi.BuildStore(_builder, enumValue, field);
+                                break;
+                            case null:
+                                LLVMApi.BuildStore(_builder, GetConstZero(type), field);
+                                break;
+                        }
                         break;
                 }
             }
@@ -564,7 +591,7 @@ namespace Lang.Backend.LLVM
             var (type, variable) = assignment.Variable switch
             {
                 VariableAst var => localVariables[var.Name],
-                StructFieldRefAst structField => BuildStructField(structField,  localVariables[structField.Name].value),
+                StructFieldRefAst structField => BuildStructField(structField, localVariables[structField.Name].value),
                 IndexAst index => GetListPointer(index, localVariables),
                 // @Cleanup This branch should never be hit
                 _ => (null, new LLVMValueRef())
@@ -614,18 +641,11 @@ namespace Lang.Backend.LLVM
 
             // 3. Write out if body
             LLVMApi.PositionBuilderAtEnd(_builder, thenBlock);
-            var ifReturned = false;
-            foreach (var ast in conditional.Children)
-            {
-                if (WriteFunctionLine(ast, localVariables, function))
-                {
-                    ifReturned = true;
-                    break;
-                }
-            }
+            var ifReturned = WriteScope(conditional.Children, localVariables, function);
+
             if (!ifReturned)
             {
-                if (conditional.Else == null)
+                if (!conditional.Else.Any())
                 {
                     LLVMApi.BuildBr(_builder, elseBlock);
                     LLVMApi.PositionBuilderAtEnd(_builder, elseBlock);
@@ -637,13 +657,13 @@ namespace Lang.Backend.LLVM
 
             LLVMApi.PositionBuilderAtEnd(_builder, elseBlock);
 
-            if (conditional.Else == null)
+            if (!conditional.Else.Any())
             {
                 return false;
             }
 
             // 4. Write out the else if necessary
-            var elseReturned = WriteFunctionLine(conditional.Else, localVariables, function);
+            var elseReturned = WriteScope(conditional.Else, localVariables, function);
 
             // 5. Return if both branches return
             if (ifReturned && elseReturned)
@@ -720,20 +740,35 @@ namespace Lang.Backend.LLVM
             var indexVariable = _allocationQueue.Dequeue();
             var listData = new LLVMValueRef();
             var compareTarget = new LLVMValueRef();
-            var (iterationType, iterationValue) = each.Iteration switch
+            TypeDefinition iterationType = null;
+            var iterationValue = new LLVMValueRef();
+            switch (each.Iteration)
             {
-                VariableAst var => localVariables[var.Name],
-                StructFieldRefAst structField => BuildStructField(structField, localVariables[structField.Name].value),
-                IndexAst index => GetListPointer(index, localVariables),
-                _ => (null, new LLVMValueRef())
-            };
+                case VariableAst var:
+                    (iterationType, iterationValue) = localVariables[var.Name];
+                    break;
+                case StructFieldRefAst structField:
+                    (iterationType, iterationValue) = BuildStructField(structField, localVariables[structField.Name].value);
+                    break;
+                case IndexAst index:
+                    (iterationType, iterationValue) = GetListPointer(index, localVariables);
+                    break;
+                case null:
+                    break;
+                default:
+                    var (type, value) = WriteExpression(each.Iteration, localVariables);
+                    iterationType = type;
+                    iterationValue = _allocationQueue.Dequeue();
+                    LLVMApi.BuildStore(_builder, value, iterationValue);
+                    break;
+            }
 
             // 2. Initialize the first variable in the loop and the compare target
             if (each.Iteration != null)
             {
                 LLVMApi.BuildStore(_builder, GetConstZero(LLVMTypeRef.Int32Type()), indexVariable);
 
-                switch (iterationType.Name)
+                switch (iterationType!.Name)
                 {
                     case "List":
                     case "Params":
@@ -769,7 +804,7 @@ namespace Lang.Backend.LLVM
                 indexValue, compareTarget, "listcmp");
             if (each.Iteration != null)
             {
-                switch (iterationType.Name)
+                switch (iterationType!.Name)
                 {
                     case "List":
                     case "Params":
@@ -825,7 +860,11 @@ namespace Lang.Backend.LLVM
                 case VariableAst variable:
                 {
                     var (type, value) = localVariables[variable.Name];
-                    return (type, LLVMApi.BuildLoad(_builder, value, variable.Name));
+                    if (!type.Constant)
+                    {
+                        value = LLVMApi.BuildLoad(_builder, value, variable.Name);
+                    }
+                    return (type, value);
                 }
                 case StructFieldRefAst structField:
                 {
@@ -840,7 +879,7 @@ namespace Lang.Backend.LLVM
                     return (type, LLVMApi.BuildLoad(_builder, field, structField.Name));
                 }
                 case CallAst call:
-                    var function = LLVMApi.GetNamedFunction(_module, call.Function);
+                    var function = LLVMApi.GetNamedFunction(_module, call.Function == "main" ? "__main" : call.Function);
                     var functionDef = _functions[call.Function];
 
                     if (functionDef.Params)
@@ -985,7 +1024,7 @@ namespace Lang.Backend.LLVM
                 default:
                     // @Cleanup This branch should not be hit since we've already verified that these ASTs are handled,
                     // but notify the user and exit just in case
-                    Console.WriteLine("Unexpected syntax tree");
+                    Console.WriteLine($"Unexpected syntax tree");
                     Environment.Exit(ErrorCodes.BuildError);
                     return (null, new LLVMValueRef()); // Return never happens
             }
@@ -1049,7 +1088,7 @@ namespace Lang.Backend.LLVM
             switch (constant.Type.Name)
             {
                 case "bool":
-                    return LLVMApi.ConstInt(type, constant.Value == "true" ? 1 : 0, false);
+                    return LLVMApi.ConstInt(type, constant.Value == "true" ? (ulong)1 : 0, false);
                 case "string":
                     return LLVMApi.BuildGlobalStringPtr(_builder, constant.Value, "str");
                 default:
@@ -1100,7 +1139,7 @@ namespace Lang.Backend.LLVM
         private LLVMValueRef BuildExpression((TypeDefinition type, LLVMValueRef value) lhs,
             (TypeDefinition type, LLVMValueRef value) rhs, Operator op, TypeDefinition targetType)
         {
-            // 1. Handle pointer math 
+            // 1. Handle pointer math
             if (lhs.type.Name == "*")
             {
                 return BuildPointerOperation(lhs.value, rhs.value, op);
@@ -1119,7 +1158,7 @@ namespace Lang.Backend.LLVM
                     return LLVMApi.BuildOr(_builder, lhs.value, rhs.value, "tmpor");
             }
 
-            // 3. Handle compares, since the lhs and rhs should not be cast to the target type 
+            // 3. Handle compares, since the lhs and rhs should not be cast to the target type
             switch (op)
             {
                 case Operator.Equality:

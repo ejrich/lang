@@ -3,6 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net5.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
@@ -11,8 +12,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Remove="Runtime\runtime.ol" />
-    <Content Include="Runtime\runtime.ol">
+    <None Remove="Runtime\*.ol" />
+    <Content Include="Runtime\*.ol">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
