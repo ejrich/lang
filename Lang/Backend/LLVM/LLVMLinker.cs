@@ -2,7 +2,6 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using Lang.Project;
 
 namespace Lang.Backend.LLVM
 {

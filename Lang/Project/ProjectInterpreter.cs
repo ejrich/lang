@@ -16,6 +16,15 @@ namespace Lang.Project
         private const string ProjectFilePattern = "*.olproj";
         private const string SourceFilePattern = "*.ol";
 
+        private enum ProjectFileSection
+        {
+            None,
+            Name,
+            Dependencies,
+            Packages,
+            Linker
+        }
+
         public ProjectFile LoadProject(string projectPath)
         {
             // 1. Check if project file is null or a directory
