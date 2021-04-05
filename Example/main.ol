@@ -299,6 +299,7 @@ u32 sleep(u32 seconds) #extern "libc"
 compiler_directives() {
     const_value := 7; #const
     printf("Constant value = %d\n", const_value);
+    #assert factorial(6) == 720;
     #if build_env == BuildEnv.Debug then
         printf("Running Debug code\n");
     #if build_env == BuildEnv.Release then
@@ -310,6 +311,8 @@ build() {
         add_dependency("X11");
     }
 }
+
+#assert global_b > 0;
 
 #if os == OS.Linux {
     XOpenDisplay(string name) #extern "X11"

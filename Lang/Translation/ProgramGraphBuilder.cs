@@ -111,24 +111,35 @@ namespace Lang.Translation
                     switch (parseResult.SyntaxTrees[i])
                     {
                         case CompilerDirectiveAst directive:
-                            if (directive.Type == DirectiveType.If)
+                            switch (directive.Type)
                             {
-                                var conditional = directive.Value as ConditionalAst;
-                                if (VerifyCondition(conditional!.Condition, null, _globalVariables))
-                                {
-                                    // Initialize program runner
-                                    _programRunner.Init(_programGraph, buildSettings);
-                                    // Run the condition
-                                    if (_programRunner.ExecuteCondition(conditional!.Condition))
+                                case DirectiveType.If:
+                                    var conditional = directive.Value as ConditionalAst;
+                                    if (VerifyCondition(conditional!.Condition, null, _globalVariables))
                                     {
-                                        additionalAsts.AddRange(conditional.Children);
+                                        _programRunner.Init(_programGraph, buildSettings);
+                                        if (_programRunner.ExecuteCondition(conditional!.Condition))
+                                        {
+                                            additionalAsts.AddRange(conditional.Children);
+                                        }
+                                        else if (conditional.Else.Any())
+                                        {
+                                            additionalAsts.AddRange(conditional.Else);
+                                        }
                                     }
-                                    else if (conditional.Else.Any())
+                                    parseResult.SyntaxTrees.RemoveAt(i--);
+                                    break;
+                                case DirectiveType.Assert:
+                                    if (VerifyCondition(directive.Value, null, _globalVariables))
                                     {
-                                        additionalAsts.AddRange(conditional.Else);
+                                        _programRunner.Init(_programGraph, buildSettings);
+                                        if (!_programRunner.ExecuteCondition(directive.Value))
+                                        {
+                                            AddError("Assertion failed", directive.Value);
+                                        }
                                     }
-                                }
-                                parseResult.SyntaxTrees.RemoveAt(i--);
+                                    parseResult.SyntaxTrees.RemoveAt(i--);
+                                    break;
                             }
                             break;
                     }
@@ -453,17 +464,15 @@ namespace Lang.Translation
                         ResolveCompilerDirectives(conditional.Else);
                         break;
                     case CompilerDirectiveAst directive:
+                        asts.RemoveAt(i);
                         switch (directive.Type)
                         {
                             case DirectiveType.If:
-                                asts.RemoveAt(i);
 
                                 var conditional = directive.Value as ConditionalAst;
                                 if (VerifyCondition(conditional!.Condition, null, _globalVariables))
                                 {
-                                    // Initialize program runner
                                     _programRunner.Init(_programGraph, _buildSettings);
-                                    // Run the condition
                                     if (_programRunner.ExecuteCondition(conditional!.Condition))
                                     {
                                         asts.InsertRange(i, conditional.Children);
@@ -473,9 +482,19 @@ namespace Lang.Translation
                                         asts.InsertRange(i, conditional.Else);
                                     }
                                 }
-                                i--;
+                                break;
+                            case DirectiveType.Assert:
+                                if (VerifyCondition(directive.Value, null, _globalVariables))
+                                {
+                                    _programRunner.Init(_programGraph, _buildSettings);
+                                    if (!_programRunner.ExecuteCondition(directive.Value))
+                                    {
+                                        AddError("Assertion failed", directive.Value);
+                                    }
+                                }
                                 break;
                         }
+                        i--;
                         break;
                 }
             }
