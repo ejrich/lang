@@ -58,8 +58,10 @@ int main(List<string> args) {
     }
 
     compiler_directives();
-
     open_window();
+
+    type_info := type_of(5);
+    printf("Type Name = %s, Type Kind = %d\n", type_info.name, type_info.type);
 
     return 0;
 }
@@ -291,7 +293,7 @@ u32 sleep(u32 seconds) #extern "libc"
 #run {
     args: List<string>[1];
     args[0] = "Hello world";
-    main(args);
+    // main(args);
 
     build();
 }
