@@ -150,25 +150,29 @@ namespace Lang.Backend.LLVM
             }
 
             // 3. Write type table
-            var typeTable = globals["type_table"].value;
+            var typeTable = globals["__type_table"].value;
             SetPrivateConstant(typeTable);
             var typeInfoType = structs["TypeInfo"];
 
-            var types = new LLVMValueRef[programGraph.Types.Count];
+            var types = new LLVMValueRef[programGraph.Types.Count + 13];
             var i = 0;
+            types[i++] = CreateTypeInfo("void", TypeKind.Void, typeInfoType);
+            types[i++] = CreateTypeInfo("bool", TypeKind.Boolean, typeInfoType);
+            types[i++] = CreateTypeInfo("s8", TypeKind.Integer, typeInfoType);
+            types[i++] = CreateTypeInfo("u8", TypeKind.Integer, typeInfoType);
+            types[i++] = CreateTypeInfo("s16", TypeKind.Integer, typeInfoType);
+            types[i++] = CreateTypeInfo("u16", TypeKind.Integer, typeInfoType);
+            types[i++] = CreateTypeInfo("s32", TypeKind.Integer, typeInfoType);
+            types[i++] = CreateTypeInfo("u32", TypeKind.Integer, typeInfoType);
+            types[i++] = CreateTypeInfo("s64", TypeKind.Integer, typeInfoType);
+            types[i++] = CreateTypeInfo("u64", TypeKind.Integer, typeInfoType);
+            types[i++] = CreateTypeInfo("float", TypeKind.Float, typeInfoType);
+            types[i++] = CreateTypeInfo("float64", TypeKind.Float, typeInfoType);
+            types[i++] = CreateTypeInfo("string", TypeKind.String, typeInfoType);
             foreach (var (name, type) in programGraph.Types)
             {
-                var typeInfo = LLVMApi.AddGlobal(_module, typeInfoType, "____type_info");
-                SetPrivateConstant(typeInfo);
-
-                var typeName = LLVMApi.ConstString(name, (uint)name.Length, false);
-                var typeNameString = LLVMApi.AddGlobal(_module, typeName.TypeOf(), "str");
-                SetPrivateConstant(typeNameString);
-                LLVMApi.SetInitializer(typeNameString, typeName);
-
-                var typeKind = GetTypeKind(type is StructAst ? TypeKind.Struct : TypeKind.Enum);
-                LLVMApi.SetInitializer(typeInfo, LLVMApi.ConstStruct(new [] {typeNameString, typeKind}, false));
-                types[i++] = typeInfo;
+                var typeKind = name.StartsWith("List") ? TypeKind.List : type is StructAst ? TypeKind.Struct : TypeKind.Enum;
+                types[i++] = CreateTypeInfo(name, typeKind, typeInfoType);
             }
 
             var typeArray = LLVMApi.ConstArray(LLVMApi.PointerType(typeInfoType, 0), types);
@@ -180,6 +184,22 @@ namespace Lang.Backend.LLVM
             LLVMApi.SetInitializer(typeTable, LLVMApi.ConstStruct(new [] {typeCount, typeArrayGlobal}, false));
 
             return globals;
+        }
+
+        private LLVMValueRef CreateTypeInfo(string name, TypeKind type, LLVMTypeRef typeInfoType)
+        {
+            var typeInfo = LLVMApi.AddGlobal(_module, typeInfoType, "____type_info");
+            SetPrivateConstant(typeInfo);
+
+            var typeName = LLVMApi.ConstString(name, (uint)name.Length, false);
+            var typeNameString = LLVMApi.AddGlobal(_module, typeName.TypeOf(), "str");
+            SetPrivateConstant(typeNameString);
+            LLVMApi.SetInitializer(typeNameString, typeName);
+
+            var typeKind = GetTypeKind(type);
+            LLVMApi.SetInitializer(typeInfo, LLVMApi.ConstStruct(new [] {typeNameString, typeKind}, false));
+
+            return typeInfo;
         }
 
         private void SetPrivateConstant(LLVMValueRef variable)
