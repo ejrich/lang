@@ -634,13 +634,13 @@ namespace Lang.Translation
                     foreach (var assignment in declaration.Assignments)
                     {
                         StructFieldAst field = null;
-                        if (assignment.Variable is not VariableAst variableAst)
+                        if (assignment.Variable is not IdentifierAst identifier)
                         {
                             AddError("Expected to get field in object initializer", assignment.Variable);
                         }
-                        else if (!fields.TryGetValue(variableAst.Name, out field))
+                        else if (!fields.TryGetValue(identifier.Name, out field))
                         {
-                            AddError($"Field '{variableAst.Name}' not present in struct '{PrintTypeDefinition(declaration.Type)}'", assignment.Variable);
+                            AddError($"Field '{identifier.Name}' not present in struct '{PrintTypeDefinition(declaration.Type)}'", assignment.Variable);
                         }
 
                         if (assignment.Operator != Operator.None)
@@ -737,7 +737,7 @@ namespace Lang.Translation
 
             if (variableTypeDefinition.Constant)
             {
-                var variable = assignment.Variable as VariableAst;
+                var variable = assignment.Variable as IdentifierAst;
                 AddError($"Cannot reassign value of constant variable '{variable?.Name}'", assignment);
             }
 
@@ -826,11 +826,11 @@ namespace Lang.Translation
             // 2. Get the variable name
             var variableName = ast switch
             {
-                VariableAst variable => variable.Name,
+                IdentifierAst identifier => identifier.Name,
                 StructFieldRefAst fieldRef => fieldRef.Name,
                 IndexAst index => index.Variable switch
                 {
-                    VariableAst variable => variable.Name,
+                    IdentifierAst identifier => identifier.Name,
                     StructFieldRefAst fieldRef => fieldRef.Name,
                     _ => string.Empty
                 },
@@ -1003,28 +1003,28 @@ namespace Lang.Translation
                     }
                     return VerifyStructFieldRef(structField, structType);
                 }
-                case VariableAst variable:
-                    if (!localVariables.TryGetValue(variable.Name, out var typeDefinition))
+                case IdentifierAst identifier:
+                    if (!localVariables.TryGetValue(identifier.Name, out var typeDefinition))
                     {
-                        AddError($"Variable '{variable.Name}' not defined", ast);
+                        AddError($"Variable '{identifier.Name}' not defined", ast);
                     }
                     return typeDefinition;
                 case ChangeByOneAst changeByOne:
                     switch (changeByOne.Variable)
                     {
-                        case VariableAst variable:
-                            if (localVariables.TryGetValue(variable.Name, out var variableType))
+                        case IdentifierAst identifier:
+                            if (localVariables.TryGetValue(identifier.Name, out var variableType))
                             {
                                 var type = VerifyType(variableType);
                                 if (type == Type.Int || type == Type.Float) return variableType;
 
                                 var op = changeByOne.Positive ? "increment" : "decrement";
-                                AddError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(variableType)}'", variable);
+                                AddError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(variableType)}'", identifier);
                                 return null;
                             }
                             else
                             {
-                                AddError($"Variable '{variable.Name}' not defined", variable);
+                                AddError($"Variable '{identifier.Name}' not defined", identifier);
                                 return null;
                             }
                         case StructFieldRefAst structField:
@@ -1089,7 +1089,7 @@ namespace Lang.Translation
                             AddError($"Cannot dereference type '{PrintTypeDefinition(valueType)}'", unary.Value);
                             return null;
                         case UnaryOperator.Reference:
-                            if (unary.Value is VariableAst || unary.Value is StructFieldRefAst || unary.Value is IndexAst || type == Type.Pointer)
+                            if (unary.Value is IdentifierAst || unary.Value is StructFieldRefAst || unary.Value is IndexAst || type == Type.Pointer)
                             {
                                 var pointerType = new TypeDefinition {Name = "*"};
                                 pointerType.Generics.Add(valueType);
@@ -1554,15 +1554,15 @@ namespace Lang.Translation
         {
             switch (index.Variable)
             {
-                case VariableAst variable:
-                    variableAst = variable;
-                    if (localVariables.TryGetValue(variable.Name, out var variableType))
+                case IdentifierAst identifier:
+                    variableAst = identifier;
+                    if (localVariables.TryGetValue(identifier.Name, out var variableType))
                     {
                         return VerifyIndex(index, variableType, currentFunction, localVariables);
                     }
                     else
                     {
-                        AddError($"Variable '{variable.Name}' not defined", variable);
+                        AddError($"Variable '{identifier.Name}' not defined", identifier);
                         return null;
                     }
                 case StructFieldRefAst structField:

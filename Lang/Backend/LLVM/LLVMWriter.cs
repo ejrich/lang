@@ -565,7 +565,7 @@ namespace Lang.Backend.LLVM
         private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable,
             IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables = null, List<AssignmentAst> values = null)
         {
-            var assignments = values?.ToDictionary(_ => (_.Variable as VariableAst)!.Name);
+            var assignments = values?.ToDictionary(_ => (_.Variable as IdentifierAst)!.Name);
             var structDef = _types[typeDef.GenericName] as StructAst;
             for (var i = 0; i < structDef!.Fields.Count; i++)
             {
@@ -649,7 +649,7 @@ namespace Lang.Backend.LLVM
             // 1. Get the variable on the stack
             var (type, variable) = assignment.Variable switch
             {
-                VariableAst var => localVariables[var.Name],
+                IdentifierAst identifier => localVariables[identifier.Name],
                 StructFieldRefAst structField => BuildStructField(structField, localVariables[structField.Name].value),
                 IndexAst index => GetListPointer(index, localVariables),
                 // @Cleanup This branch should never be hit
@@ -803,8 +803,8 @@ namespace Lang.Backend.LLVM
             var iterationValue = new LLVMValueRef();
             switch (each.Iteration)
             {
-                case VariableAst var:
-                    (iterationType, iterationValue) = localVariables[var.Name];
+                case IdentifierAst identifier:
+                    (iterationType, iterationValue) = localVariables[identifier.Name];
                     break;
                 case StructFieldRefAst structField:
                     (iterationType, iterationValue) = BuildStructField(structField, localVariables[structField.Name].value);
@@ -916,12 +916,12 @@ namespace Lang.Backend.LLVM
                     var type = ConvertTypeDefinition(nullAst.TargetType);
                     return (nullAst.TargetType, LLVMApi.ConstNull(type));
                 }
-                case VariableAst variable:
+                case IdentifierAst identifier:
                 {
-                    var (type, value) = localVariables[variable.Name];
+                    var (type, value) = localVariables[identifier.Name];
                     if (!type.Constant)
                     {
-                        value = LLVMApi.BuildLoad(_builder, value, variable.Name);
+                        value = LLVMApi.BuildLoad(_builder, value, identifier.Name);
                     }
                     return (type, value);
                 }
@@ -1006,7 +1006,7 @@ namespace Lang.Backend.LLVM
                 {
                     var (variableType, pointer) = changeByOne.Variable switch
                     {
-                        VariableAst variableAst => localVariables[variableAst.Name],
+                        IdentifierAst identifier => localVariables[identifier.Name],
                         StructFieldRefAst structField => BuildStructField(structField, localVariables[structField.Name].value),
                         IndexAst index => GetListPointer(index, localVariables),
                         // @Cleanup This branch should never be hit
@@ -1039,7 +1039,7 @@ namespace Lang.Backend.LLVM
                     {
                         var (valueType, pointer) = unary.Value switch
                         {
-                            VariableAst variable => localVariables[variable.Name],
+                            IdentifierAst identifier => localVariables[identifier.Name],
                             StructFieldRefAst structField => BuildStructField(structField, localVariables[structField.Name].value),
                             IndexAst index => GetListPointer(index, localVariables),
                             // @Cleanup this branch should not be hit
@@ -1179,7 +1179,7 @@ namespace Lang.Backend.LLVM
             // 1. Get the variable pointer
             var (type, variable) = index.Variable switch
             {
-                VariableAst var => localVariables[var.Name],
+                IdentifierAst identifier => localVariables[identifier.Name],
                 StructFieldRefAst structField => BuildStructField(structField, localVariables[structField.Name].value),
                 // @Cleanup This branch should never be hit
                 _ => (null, new LLVMValueRef())

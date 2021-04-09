@@ -1103,7 +1103,7 @@ namespace Lang.Parsing
             assignment.Variable = variable;
             if (variable == null)
             {
-                var variableAst = CreateAst<VariableAst>(enumerator.Current);
+                var variableAst = CreateAst<IdentifierAst>(enumerator.Current);
                 variableAst.Name = enumerator.Current.Value;
                 assignment.Variable = variableAst;
             }
@@ -1343,7 +1343,7 @@ namespace Lang.Parsing
                             }
                             return structField;
                         case TokenType.OpenBracket:
-                            var variableAst = CreateAst<VariableAst>(token);
+                            var variableAst = CreateAst<IdentifierAst>(token);
                             variableAst.Name = token.Value;
                             return ParseIndex(enumerator, errors, variableAst);
                         case null:
@@ -1352,10 +1352,11 @@ namespace Lang.Parsing
                                 Error = $"Expected token to follow '{token.Value}'", Token = token
                             });
                             return null;
+                        case TokenType.LessThan:
                         default:
-                            var variable = CreateAst<VariableAst>(token);
-                            variable.Name = token.Value;
-                            return variable;
+                            var identifier = CreateAst<IdentifierAst>(token);
+                            identifier.Name = token.Value;
+                            return identifier;
                     }
                 case TokenType.Increment:
                 case TokenType.Decrement:
@@ -1607,7 +1608,7 @@ namespace Lang.Parsing
             // 1. Parse index until finished
             if (variable == null)
             {
-                var variableAst = CreateAst<VariableAst>(enumerator.Current);
+                var variableAst = CreateAst<IdentifierAst>(enumerator.Current);
                 variableAst.Name = enumerator.Current.Value;
                 variable = variableAst;
             }
@@ -1768,13 +1769,13 @@ namespace Lang.Parsing
                 }
                 else
                 {
-                    var bytes = ushort.Parse(typeDefinition.Name[1..]) / 8;
-                    typeDefinition.PrimitiveType = new IntegerType {Bytes = (ushort) bytes, Signed = typeDefinition.Name[0] == 's'};
+                    var bytes = byte.Parse(typeDefinition.Name[1..]) / 8;
+                    typeDefinition.PrimitiveType = new IntegerType {Bytes = (byte)bytes, Signed = typeDefinition.Name[0] == 's'};
                 }
             }
             else if (FloatTypes.Contains(typeDefinition.Name))
             {
-                typeDefinition.PrimitiveType = new FloatType {Bytes = typeDefinition.Name == "float" ? (ushort)4 : (ushort)8};
+                typeDefinition.PrimitiveType = new FloatType {Bytes = typeDefinition.Name == "float" ? (byte)4 : (byte)8};
             }
 
             if (enumerator.Current.Type == TokenType.VarArgs)
