@@ -1596,20 +1596,21 @@ namespace Lang.Translation
             }
 
             // 2. Load the list element type definition
-            var indexType = typeDef.Generics.FirstOrDefault();
-            if (indexType == null)
+            var elementType = typeDef.Generics.FirstOrDefault();
+            if (elementType == null)
             {
                 AddError("Unable to determine element type of the List", index);
             }
 
             // 3. Verify the count expression is an integer
-            var countType = VerifyExpression(index.Index, currentFunction, localVariables);
-            if (VerifyType(countType) != Type.Int)
+            var indexValue = VerifyExpression(index.Index, currentFunction, localVariables);
+            var indexType = VerifyType(indexValue);
+            if (indexType != Type.Int && indexType != Type.Type)
             {
-                AddError($"Expected List index to be type 'int', but got '{PrintTypeDefinition(countType)}'", index);
+                AddError($"Expected List index to be type 'int', but got '{PrintTypeDefinition(indexValue)}'", index);
             }
 
-            return indexType;
+            return elementType;
         }
 
         private static bool TypeEquals(TypeDefinition a, TypeDefinition b, bool checkPrimitives = false)
@@ -1696,7 +1697,7 @@ namespace Lang.Translation
                 case "bool":
                     if (hasGenerics)
                     {
-                        AddError("boolean type cannot have generics", typeDef);
+                        AddError("Type 'bool' cannot have generics", typeDef);
                         return Type.Error;
                     }
                     if (hasCount)
@@ -1708,7 +1709,7 @@ namespace Lang.Translation
                 case "string":
                     if (hasGenerics)
                     {
-                        AddError("string type cannot have generics", typeDef);
+                        AddError("Type 'string' cannot have generics", typeDef);
                         return Type.Error;
                     }
                     if (hasCount)
@@ -1721,7 +1722,7 @@ namespace Lang.Translation
                 {
                     if (typeDef.Generics.Count != 1)
                     {
-                        AddError($"List type should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
+                        AddError($"Type 'List' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
                         return Type.Error;
                     }
                     return VerifyList(typeDef) ? Type.List : Type.Error;
@@ -1729,7 +1730,7 @@ namespace Lang.Translation
                 case "void":
                     if (hasGenerics)
                     {
-                        AddError("void type cannot have generics", typeDef);
+                        AddError("Type 'void' cannot have generics", typeDef);
                         return Type.Error;
                     }
                     if (hasCount)
@@ -1748,7 +1749,7 @@ namespace Lang.Translation
                 case "...":
                     if (hasGenerics)
                     {
-                        AddError("Varargs type cannot have generics", typeDef);
+                        AddError("Type 'varargs' cannot have generics", typeDef);
                         return Type.Error;
                     }
                     return Type.VarArgs;
@@ -1756,11 +1757,18 @@ namespace Lang.Translation
                 {
                     if (typeDef.Generics.Count != 1)
                     {
-                        AddError($"Params type should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
+                        AddError($"Type 'Params' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
                         return Type.Error;
                     }
                     return VerifyList(typeDef) ? Type.Params : Type.Error;
                 }
+                case "Type":
+                    if (hasGenerics)
+                    {
+                        AddError("Type 'Type' cannot have generics", typeDef);
+                        return Type.Error;
+                    }
+                    return Type.Type;
                 default:
                     if (typeDef.Generics.Any())
                     {
