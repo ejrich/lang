@@ -7,7 +7,6 @@ namespace Lang.Parsing
 {
     public class ParseResult
     {
-        public bool Success => !Errors.Any();
         public List<IAst> SyntaxTrees { get; } = new();
         public List<ParseError> Errors { get; } = new();
     }
@@ -56,19 +55,21 @@ namespace Lang.Parsing
             var parseResult = new ParseResult();
 
             // 1. Parse project files
+            var success = true;
             for (var fileIndex = 0; fileIndex < projectFiles.Count; fileIndex++)
             {
                 var file = projectFiles[fileIndex];
                 var syntaxTrees = ParseFile(file, fileIndex, out var errors);
                 if (errors.Any())
                 {
+                    success = false;
                     foreach (var error in errors)
                     {
                         error.FileIndex = fileIndex;
                     }
                     parseResult.Errors.AddRange(errors);
                 }
-                else if (parseResult.Success)
+                else if (success)
                 {
                     parseResult.SyntaxTrees.AddRange(syntaxTrees);
                 }
@@ -1353,6 +1354,7 @@ namespace Lang.Parsing
                             });
                             return null;
                         case TokenType.LessThan:
+                            // TODO Try to parse types
                         default:
                             var identifier = CreateAst<IdentifierAst>(token);
                             identifier.Name = token.Value;
