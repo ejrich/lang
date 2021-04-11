@@ -10,7 +10,7 @@ namespace Lang.Runner
 {
     public interface IProgramRunner
     {
-        void Init(ProgramGraph programGraph, BuildSettings buildSettings);
+        void Init(ProgramGraph programGraph);
         void RunProgram(IAst ast);
         bool ExecuteCondition(IAst expression);
     }
@@ -21,7 +21,6 @@ namespace Lang.Runner
         private int _version;
 
         private ProgramGraph _programGraph;
-        private BuildSettings _buildSettings;
 
         private readonly Dictionary<string, List<int>> _functionIndices = new();
         private readonly List<(Type type, object libraryObject)> _functionLibraries = new();
@@ -38,10 +37,9 @@ namespace Lang.Runner
             public object Value { get; set; }
         }
 
-        public void Init(ProgramGraph programGraph, BuildSettings buildSettings)
+        public void Init(ProgramGraph programGraph)
         {
             _programGraph = programGraph;
-            _buildSettings = buildSettings;
             // Initialize the runner
             if (_moduleBuilder == null)
             {
@@ -209,33 +207,11 @@ namespace Lang.Runner
 
         private void ExecuteDeclaration(DeclarationAst declaration, IDictionary<string, ValueType> variables)
         {
-            var value = declaration.Name switch
-            {
-                "os" => GetOSVersion(),
-                "build_env" => GetBuildEnv(),
-                _ => declaration.Value == null ?
-                    GetUninitializedValue(declaration.Type, variables, declaration.Assignments) :
-                    ExecuteExpression(declaration.Value, variables).Value
-            };
+            var value = declaration.Value == null ?
+                GetUninitializedValue(declaration.Type, variables, declaration.Assignments) :
+                ExecuteExpression(declaration.Value, variables).Value;
 
             variables[declaration.Name] = new ValueType {Type = declaration.Type, Value = value};
-        }
-
-        private int GetOSVersion()
-        {
-            var platform = Environment.OSVersion.Platform;
-            return platform switch
-            {
-                PlatformID.Unix => 1,
-                PlatformID.Win32NT => 2,
-                PlatformID.MacOSX => 3,
-                _ => 0
-            };
-        }
-
-        private int GetBuildEnv()
-        {
-            return _buildSettings.Release ? 2 : 1;
         }
 
         private object GetUninitializedValue(TypeDefinition typeDef,
