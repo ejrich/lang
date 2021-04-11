@@ -35,18 +35,18 @@ namespace Lang.Translation
             bool verifyAdditional;
 
             // Add primitive types to global identifiers
-            AddPrimitive("void");
-            AddPrimitive("bool");
-            AddPrimitive("s8", new IntegerType {Signed = true, Bytes = 1});
-            AddPrimitive("u8", new IntegerType {Bytes = 1});
-            AddPrimitive("s16", new IntegerType {Signed = true, Bytes = 2});
-            AddPrimitive("u16", new IntegerType {Bytes = 2});
-            AddPrimitive("s32", new IntegerType {Signed = true, Bytes = 4});
-            AddPrimitive("u32", new IntegerType {Bytes = 4});
-            AddPrimitive("s64", new IntegerType {Signed = true, Bytes = 8});
-            AddPrimitive("u64", new IntegerType {Bytes = 8});
-            AddPrimitive("float", new FloatType {Bytes = 4});
-            AddPrimitive("float64", new FloatType {Bytes = 8});
+            AddPrimitive("void", TypeKind.Void);
+            AddPrimitive("bool", TypeKind.Boolean);
+            AddPrimitive("s8", TypeKind.Integer, new IntegerType {Signed = true, Bytes = 1});
+            AddPrimitive("u8", TypeKind.Integer, new IntegerType {Bytes = 1});
+            AddPrimitive("s16", TypeKind.Integer, new IntegerType {Signed = true, Bytes = 2});
+            AddPrimitive("u16", TypeKind.Integer, new IntegerType {Bytes = 2});
+            AddPrimitive("s32", TypeKind.Integer, new IntegerType {Signed = true, Bytes = 4});
+            AddPrimitive("u32", TypeKind.Integer, new IntegerType {Bytes = 4});
+            AddPrimitive("s64", TypeKind.Integer, new IntegerType {Signed = true, Bytes = 8});
+            AddPrimitive("u64", TypeKind.Integer, new IntegerType {Bytes = 8});
+            AddPrimitive("float", TypeKind.Float, new FloatType {Bytes = 4});
+            AddPrimitive("float64", TypeKind.Float, new FloatType {Bytes = 8});
 
             do
             {
@@ -72,6 +72,7 @@ namespace Lang.Translation
                             else
                             {
                                 structAst.TypeIndex = _typeIndex++;
+                                structAst.TypeKind = structAst.Name == "string" ? TypeKind.String : TypeKind.Struct;
                                 _programGraph.Types.Add(structAst.Name, structAst);
                                 _globalIdentifiers.Add(structAst.Name, structAst);
                             }
@@ -197,10 +198,11 @@ namespace Lang.Translation
             return _programGraph;
         }
 
-        private void AddPrimitive(string name, IPrimitive primitive = null)
+        private void AddPrimitive(string name, TypeKind typeKind, IPrimitive primitive = null)
         {
-            var primitiveAst = new PrimitiveAst {Name = name, TypeIndex = _typeIndex++, Primitive = primitive};
-            _globalIdentifiers[name] = primitiveAst;
+            var primitiveAst = new PrimitiveAst {Name = name, TypeIndex = _typeIndex++, TypeKind = typeKind, Primitive = primitive};
+            _globalIdentifiers.Add(name, primitiveAst);
+            _programGraph.Types.Add(name, primitiveAst);
         }
 
         private void VerifyEnum(EnumAst enumAst)
@@ -1883,7 +1885,7 @@ namespace Lang.Translation
                             AddError($"Expected type '{typeDef.Name}' to have {structDef.Generics.Count} generic(s), but got {typeDef.Generics.Count}", typeDef);
                             return Type.Error;
                         }
-                        CreatePolymorphedStruct(structDef, genericName, typeDef.Generics.ToArray());
+                        CreatePolymorphedStruct(structDef, genericName, TypeKind.Struct, typeDef.Generics.ToArray());
                         return Type.Struct;
                     }
                     if (!_programGraph.Types.TryGetValue(typeDef.Name, out var type))
@@ -1921,13 +1923,13 @@ namespace Lang.Translation
                 return false;
             }
 
-            CreatePolymorphedStruct(structDef, genericName, listType);
+            CreatePolymorphedStruct(structDef, genericName, TypeKind.List, listType);
             return true;
         }
 
-        private void CreatePolymorphedStruct(StructAst structAst, string name, params TypeDefinition[] genericTypes)
+        private void CreatePolymorphedStruct(StructAst structAst, string name, TypeKind typeKind, params TypeDefinition[] genericTypes)
         {
-            var polyStruct = new StructAst {Name = name, TypeIndex = _typeIndex++};
+            var polyStruct = new StructAst {Name = name, TypeIndex = _typeIndex++, TypeKind = typeKind};
             foreach (var field in structAst.Fields)
             {
                 if (field.HasGeneric)
