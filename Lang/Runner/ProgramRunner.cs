@@ -161,13 +161,12 @@ namespace Lang.Runner
                 // Save the previous pointer
                 var listType = _types[typeTable.Type.GenericName];
                 var dataField = listType.GetField("data");
-                var typeDataPointer = GetPointer(dataField.GetValue(typeTable.Value));
 
                 // Reallocate array
                 var genericType = GetTypeFromDefinition(typeTable.Type.Generics[0]);
                 var size = Marshal.SizeOf(genericType);
                 InitializeConstList(typeTable.Value, listType, genericType, programGraph.Types.Count);
-                var newDataPointer = GetPointer(dataField.GetValue(typeTable.Value));
+                var typeDataPointer = GetPointer(dataField.GetValue(typeTable.Value));
 
                 // Create TypeInfo pointers
                 var typeInfoType = _types["TypeInfo"];
@@ -180,7 +179,7 @@ namespace Lang.Runner
                     var typeKindField = typeInfoType.GetField("type");
                     typeKindField.SetValue(typeInfo, type.TypeKind);
 
-                    var pointer = IntPtr.Add(newDataPointer, size * type.TypeIndex);
+                    var pointer = IntPtr.Add(typeDataPointer, size * type.TypeIndex);
                     Marshal.StructureToPtr(typeInfo, pointer, false);
                 }
 
