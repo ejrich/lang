@@ -875,7 +875,7 @@ namespace Lang.Runner
         {
             if (targetType.Name == "*")
             {
-                return pointer;
+                return Marshal.ReadIntPtr(pointer);
             }
 
             type ??= GetTypeFromDefinition(targetType);
