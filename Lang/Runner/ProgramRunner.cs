@@ -27,6 +27,7 @@ namespace Lang.Runner
         private readonly List<(Type type, object libraryObject)> _functionLibraries = new();
         private readonly Dictionary<string, ValueType> _globalVariables = new();
         private readonly Dictionary<string, Type> _types = new();
+        private readonly Dictionary<string, IntPtr> _typeInfoPointers = new();
 
         private readonly Dictionary<string, string> _compilerFunctions = new() {
             { "add_dependency", "AddDependency" }
@@ -161,26 +162,31 @@ namespace Lang.Runner
                 // Save the previous pointer
                 var listType = _types[typeTable.Type.GenericName];
                 var dataField = listType.GetField("data");
+                var oldDataPointer = GetPointer(dataField.GetValue(typeTable.Value));
 
                 // Reallocate array
                 var genericType = GetTypeFromDefinition(typeTable.Type.Generics[0]);
                 var size = Marshal.SizeOf(genericType);
                 InitializeConstList(typeTable.Value, listType, genericType, programGraph.Types.Count);
                 var typeDataPointer = GetPointer(dataField.GetValue(typeTable.Value));
+                Marshal.FreeHGlobal(oldDataPointer);
 
                 // Create TypeInfo pointers
                 var typeInfoType = _types["TypeInfo"];
                 foreach (var (name, type) in programGraph.Types)
                 {
-                    var typeInfo = Activator.CreateInstance(typeInfoType);
+                    if (!_typeInfoPointers.TryGetValue(name, out var typeInfoPointer))
+                    {
+                        var typeInfo = Activator.CreateInstance(typeInfoType);
 
-                    var typeNameField = typeInfoType.GetField("name");
-                    typeNameField.SetValue(typeInfo, GetString(name));
-                    var typeKindField = typeInfoType.GetField("type");
-                    typeKindField.SetValue(typeInfo, type.TypeKind);
+                        var typeNameField = typeInfoType.GetField("name");
+                        typeNameField.SetValue(typeInfo, GetString(name));
+                        var typeKindField = typeInfoType.GetField("type");
+                        typeKindField.SetValue(typeInfo, type.TypeKind);
 
-                    var typeInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoType));
-                    Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
+                        _typeInfoPointers[name] = typeInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoType));
+                        Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
+                    }
 
                     var listPointer = IntPtr.Add(typeDataPointer, size * type.TypeIndex);
                     Marshal.StructureToPtr(typeInfoPointer, listPointer, false);
