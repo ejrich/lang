@@ -17,7 +17,12 @@ struct string {
 struct TypeInfo {
     string name;
     TypeKind type;
-    List<string> fields;
+    List<TypeField> fields;
+}
+
+struct TypeField {
+    string name;
+    TypeInfo* type_info;
 }
 
 enum TypeKind {
