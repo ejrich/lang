@@ -738,7 +738,7 @@ namespace Lang.Runner
                             }
                         }
 
-                        return CallFunction(call.Function, function, arguments, types);
+                        return CallFunction(call.Function, function, arguments, types, call.VarargsIndex);
                     }
                     else
                     {
