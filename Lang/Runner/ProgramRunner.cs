@@ -160,14 +160,14 @@ namespace Lang.Runner
                 var typeTable = _globalVariables["__type_table"];
 
                 // Save the previous pointer
-                var listType = _types[typeTable.Type.GenericName];
-                var dataField = listType.GetField("data");
+                var typeInfoListType = _types[typeTable.Type.GenericName];
+                var dataField = typeInfoListType.GetField("data");
                 var oldDataPointer = GetPointer(dataField.GetValue(typeTable.Value));
 
                 // Reallocate array
-                var genericType = GetTypeFromDefinition(typeTable.Type.Generics[0]);
-                var size = Marshal.SizeOf(genericType);
-                InitializeConstList(typeTable.Value, listType, genericType, programGraph.Types.Count);
+                var typeInfoPointerType = GetTypeFromDefinition(typeTable.Type.Generics[0]);
+                var pointerSize = Marshal.SizeOf(typeInfoPointerType);
+                InitializeConstList(typeTable.Value, typeInfoListType, typeInfoPointerType, programGraph.Types.Count);
                 var typeDataPointer = GetPointer(dataField.GetValue(typeTable.Value));
                 Marshal.FreeHGlobal(oldDataPointer);
 
@@ -190,13 +190,42 @@ namespace Lang.Runner
                         Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
                     }
 
-                    var listPointer = IntPtr.Add(typeDataPointer, size * type.TypeIndex);
+                    var listPointer = IntPtr.Add(typeDataPointer, pointerSize * type.TypeIndex);
                     Marshal.StructureToPtr(typeInfoPointer, listPointer, false);
                 }
 
+                // Set fields on TypeInfo objects
+                var typeFieldListType = _types["List.TypeField"];
+                var typeFieldType = _types["TypeField"];
+                var typeFieldSize = Marshal.SizeOf(typeFieldType);
                 foreach (var (name, (type, typeInfo)) in newTypeInfos)
                 {
-                    // TODO Iterate througn fields and get the name and the type pointer
+                    if (type is StructAst structAst)
+                    {
+                        var typeFieldList = Activator.CreateInstance(typeFieldListType);
+                        InitializeConstList(typeFieldList, typeFieldListType, typeFieldType, structAst.Fields.Count);
+
+                        var typeFieldsField = typeInfoType.GetField("fields");
+                        typeFieldsField.SetValue(typeInfo, typeFieldList);
+
+                        var typeFieldListDataField = typeFieldListType.GetField("data");
+                        var typeFieldsDataPointer = GetPointer(typeFieldListDataField.GetValue(typeFieldList));
+
+                        for (var i = 0; i < structAst.Fields.Count; i++)
+                        {
+                            var field = structAst.Fields[i];
+                            var typeField = Activator.CreateInstance(typeFieldType);
+
+                            var typeFieldName = typeFieldType.GetField("name");
+                            typeFieldName.SetValue(typeField, GetString(field.Name));
+                            var typeFieldInfo = typeFieldType.GetField("type_info");
+                            var typePointer = _typeInfoPointers[field.Type.GenericName];
+                            typeFieldInfo.SetValue(typeField, typePointer);
+
+                            var listPointer = IntPtr.Add(typeFieldsDataPointer, typeFieldSize * i);
+                            Marshal.StructureToPtr(typeField, listPointer, false);
+                        }
+                    }
                 }
 
                 _typeCount = programGraph.Types.Count;

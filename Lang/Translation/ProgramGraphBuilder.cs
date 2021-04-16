@@ -1892,7 +1892,17 @@ namespace Lang.Translation
                         AddError($"pointer type should have reference to 1 type, but got {typeDef.Generics.Count}", typeDef);
                         return Type.Error;
                     }
-                    return VerifyType(typeDef.Generics[0]) == Type.Error ? Type.Error : Type.Pointer;
+                    if (VerifyType(typeDef.Generics[0]) == Type.Error)
+                    {
+                        return Type.Error;
+                    }
+
+                    if (!_programGraph.Types.ContainsKey(typeDef.GenericName))
+                    {
+                        var pointer = new PrimitiveAst {Name = typeDef.GenericName, TypeIndex = _typeIndex++, TypeKind = TypeKind.Pointer};
+                        _programGraph.Types.Add(typeDef.GenericName, pointer);
+                    }
+                    return Type.Pointer;
                 case "...":
                     if (hasGenerics)
                     {
@@ -1924,6 +1934,15 @@ namespace Lang.Translation
                         {
                             return Type.Struct;
                         }
+                        var generics = typeDef.Generics.ToArray();
+                        var error = false;
+                        foreach (var generic in generics)
+                        {
+                            if (VerifyType(generic) == Type.Error)
+                            {
+                                error = true;
+                            }
+                        }
                         if (!_polymorphicStructs.TryGetValue(typeDef.Name, out var structDef))
                         {
                             AddError($"No polymorphic structs of type '{typeDef.Name}'", typeDef);
@@ -1934,7 +1953,8 @@ namespace Lang.Translation
                             AddError($"Expected type '{typeDef.Name}' to have {structDef.Generics.Count} generic(s), but got {typeDef.Generics.Count}", typeDef);
                             return Type.Error;
                         }
-                        CreatePolymorphedStruct(structDef, genericName, TypeKind.Struct, typeDef.Generics.ToArray());
+                        if (error) return Type.Error;
+                        CreatePolymorphedStruct(structDef, genericName, TypeKind.Struct, generics);
                         return Type.Struct;
                     }
                     if (!_programGraph.Types.TryGetValue(typeDef.Name, out var type))
