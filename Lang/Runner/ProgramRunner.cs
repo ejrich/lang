@@ -172,7 +172,7 @@ namespace Lang.Runner
                 Marshal.FreeHGlobal(oldDataPointer);
 
                 // Create TypeInfo pointers
-                var newTypeInfos = new Dictionary<string, (IType type, object typeInfo)>();
+                var newTypeInfos = new Dictionary<string, (IType type, object typeInfo, IntPtr typeInfoPointer)>();
                 var typeInfoType = _types["TypeInfo"];
                 foreach (var (name, type) in programGraph.Types)
                 {
@@ -186,8 +186,7 @@ namespace Lang.Runner
                         typeKindField.SetValue(typeInfo, type.TypeKind);
 
                         _typeInfoPointers[name] = typeInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoType));
-                        newTypeInfos[name] = (type, typeInfo);
-                        Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
+                        newTypeInfos[name] = (type, typeInfo, typeInfoPointer);
                     }
 
                     var listPointer = IntPtr.Add(typeDataPointer, pointerSize * type.TypeIndex);
@@ -195,36 +194,40 @@ namespace Lang.Runner
                 }
 
                 // Set fields on TypeInfo objects
-                var typeFieldListType = _types["List.TypeField"];
-                var typeFieldType = _types["TypeField"];
-                var typeFieldSize = Marshal.SizeOf(typeFieldType);
-                foreach (var (name, (type, typeInfo)) in newTypeInfos)
+                if (newTypeInfos.Any())
                 {
-                    if (type is StructAst structAst)
+                    var typeFieldListType = _types["List.TypeField"];
+                    var typeFieldType = _types["TypeField"];
+                    var typeFieldSize = Marshal.SizeOf(typeFieldType);
+                    foreach (var (name, (type, typeInfo, typeInfoPointer)) in newTypeInfos)
                     {
-                        var typeFieldList = Activator.CreateInstance(typeFieldListType);
-                        InitializeConstList(typeFieldList, typeFieldListType, typeFieldType, structAst.Fields.Count);
-
-                        var typeFieldsField = typeInfoType.GetField("fields");
-                        typeFieldsField.SetValue(typeInfo, typeFieldList);
-
-                        var typeFieldListDataField = typeFieldListType.GetField("data");
-                        var typeFieldsDataPointer = GetPointer(typeFieldListDataField.GetValue(typeFieldList));
-
-                        for (var i = 0; i < structAst.Fields.Count; i++)
+                        if (type is StructAst structAst)
                         {
-                            var field = structAst.Fields[i];
-                            var typeField = Activator.CreateInstance(typeFieldType);
+                            var typeFieldList = Activator.CreateInstance(typeFieldListType);
+                            InitializeConstList(typeFieldList, typeFieldListType, typeFieldType, structAst.Fields.Count);
 
-                            var typeFieldName = typeFieldType.GetField("name");
-                            typeFieldName.SetValue(typeField, GetString(field.Name));
-                            var typeFieldInfo = typeFieldType.GetField("type_info");
-                            var typePointer = _typeInfoPointers[field.Type.GenericName];
-                            typeFieldInfo.SetValue(typeField, typePointer);
+                            var typeFieldsField = typeInfoType.GetField("fields");
+                            typeFieldsField.SetValue(typeInfo, typeFieldList);
 
-                            var listPointer = IntPtr.Add(typeFieldsDataPointer, typeFieldSize * i);
-                            Marshal.StructureToPtr(typeField, listPointer, false);
+                            var typeFieldListDataField = typeFieldListType.GetField("data");
+                            var typeFieldsDataPointer = GetPointer(typeFieldListDataField.GetValue(typeFieldList));
+
+                            for (var i = 0; i < structAst.Fields.Count; i++)
+                            {
+                                var field = structAst.Fields[i];
+                                var typeField = Activator.CreateInstance(typeFieldType);
+
+                                var typeFieldName = typeFieldType.GetField("name");
+                                typeFieldName.SetValue(typeField, GetString(field.Name));
+                                var typeFieldInfo = typeFieldType.GetField("type_info");
+                                var typePointer = _typeInfoPointers[field.Type.GenericName];
+                                typeFieldInfo.SetValue(typeField, typePointer);
+
+                                var listPointer = IntPtr.Add(typeFieldsDataPointer, typeFieldSize * i);
+                                Marshal.StructureToPtr(typeField, listPointer, false);
+                            }
                         }
+                        Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
                     }
                 }
 

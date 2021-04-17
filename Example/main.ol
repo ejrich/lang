@@ -62,9 +62,9 @@ int main(List<string> args) {
     open_window();
 
     type_info := type_of(MyStruct);
-    printf("Type Name = %s, Type Kind = %d\n", type_info.name, type_info.type);
+    printf("Type Name = %s, Type Kind = %d, Field Count = %d\n", type_info.name, type_info.type, type_info.fields.length);
     each field in type_info.fields then
-        printf("Field name = %s", field.name);
+        printf("Field name = %s, Field type name = %s\n", field.name, field.type_info.name);
 
     return 0;
 }
