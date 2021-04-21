@@ -183,7 +183,7 @@ namespace Lang.Backend.LLVM
                     {
                         var field = structAst.Fields[i];
 
-                        var fieldName = LLVMApi.ConstString(name, (uint)name.Length, false);
+                        var fieldName = LLVMApi.ConstString(field.Name, (uint)field.Name.Length, false);
                         var fieldNameString = LLVMApi.AddGlobal(_module, typeName.TypeOf(), "str");
                         SetPrivateConstant(fieldNameString);
                         LLVMApi.SetInitializer(fieldNameString, fieldName);

@@ -1411,6 +1411,18 @@ namespace Lang.Translation
                     return VerifyExpressionType(expression, currentFunction, scopeIdentifiers);
                 case IndexAst index:
                     return VerifyIndexType(index, currentFunction, scopeIdentifiers, out _);
+                case TypeDefinition typeDef:
+                {
+                    if (VerifyType(typeDef) == Type.Error)
+                    {
+                        return null;
+                    }
+                    if (!_programGraph.Types.TryGetValue(typeDef.GenericName, out var type))
+                    {
+                        return null;
+                    }
+                    return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
+                }
                 case null:
                     return null;
                 default:
