@@ -1361,9 +1361,9 @@ namespace Lang.Parsing
                             });
                             return null;
                         case TokenType.LessThan:
-                            if (TryParseType(enumerator, errors))
+                            if (TryParseType(enumerator, errors, out var typeDefinition))
                             {
-                                return ParseType(enumerator, errors);
+                                return typeDefinition;
                             }
                             break;
                     }
@@ -1890,20 +1890,46 @@ namespace Lang.Parsing
             return typeDefinition;
         }
 
-        private static bool TryParseType(TokenEnumerator enumerator, List<ParseError> errors)
+        private static bool TryParseType(TokenEnumerator enumerator, List<ParseError> errors, out TypeDefinition typeDef)
         {
             var steps = 0;
-            return TryParseType(enumerator, errors, ref steps);
+            if (TryParseType(enumerator.Current, enumerator, errors, ref steps, out typeDef))
+            {
+                enumerator.Move(steps);
+                return true;
+            }
+            return false;
         }
 
-        private static bool TryParseType(TokenEnumerator enumerator, List<ParseError> errors, ref int steps)
+        private static bool TryParseType(Token name, TokenEnumerator enumerator, List<ParseError> errors, ref int steps, out TypeDefinition typeDefinition)
         {
+            typeDefinition = CreateAst<TypeDefinition>(name);
+            typeDefinition.Name = name.Value;
+
+            // Set the primitive type if necessary
+            if (IntegerTypes.Contains(typeDefinition.Name))
+            {
+                if (typeDefinition.Name == "int")
+                {
+                    typeDefinition.Name = "s32";
+                    typeDefinition.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
+                }
+                else
+                {
+                    var bytes = byte.Parse(typeDefinition.Name[1..]) / 8;
+                    typeDefinition.PrimitiveType = new IntegerType {Bytes = (byte)bytes, Signed = typeDefinition.Name[0] == 's'};
+                }
+            }
+            else if (FloatTypes.Contains(typeDefinition.Name))
+            {
+                typeDefinition.PrimitiveType = new FloatType {Bytes = typeDefinition.Name == "float" ? (byte)4 : (byte)8};
+            }
+
             // Determine whether to parse a generic type, otherwise return
             if (enumerator.Peek(steps)?.Type == TokenType.LessThan)
             {
                 // Clear the '<' before entering loop
                 steps++;
-                var hasGenerics = false;
                 var commaRequiredBeforeNextType = false;
                 while (enumerator.Peek(steps) != null)
                 {
@@ -1911,7 +1937,7 @@ namespace Lang.Parsing
 
                     if (token.Type == TokenType.GreaterThan)
                     {
-                        if (!commaRequiredBeforeNextType && hasGenerics)
+                        if (!commaRequiredBeforeNextType && typeDefinition.Generics.Any())
                         {
                             return false;
                         }
@@ -1923,11 +1949,11 @@ namespace Lang.Parsing
                         switch (token.Type)
                         {
                             case TokenType.Token:
-                                if (!TryParseType(enumerator, errors, ref steps))
+                                if (!TryParseType(token, enumerator, errors, ref steps, out var genericType))
                                 {
                                     return false;
                                 }
-                                hasGenerics = true;
+                                typeDefinition.Generics.Add(genericType);
                                 commaRequiredBeforeNextType = true;
                                 break;
                             default:
@@ -1947,7 +1973,7 @@ namespace Lang.Parsing
                     }
                 }
 
-                if (!hasGenerics)
+                if (!typeDefinition.Generics.Any())
                 {
                     return false;
                 }
@@ -1955,6 +1981,10 @@ namespace Lang.Parsing
 
             while (enumerator.Peek(steps)?.Type == TokenType.Asterisk)
             {
+                var pointerType = CreateAst<TypeDefinition>(enumerator.Peek(steps));
+                pointerType.Name = "*";
+                pointerType.Generics.Add(typeDefinition);
+                typeDefinition = pointerType;
                 steps++;
             }
 
