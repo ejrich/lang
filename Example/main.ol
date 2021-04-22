@@ -66,7 +66,7 @@ int main(List<string> args) {
     print_type_info(List<string>);
     print_type_info(PolyStruct<int*, float>);
     print_type_info(PolyStruct<List<int>, float>);
-    // print_type_info(s32*);
+    print_type_info(s32*);
 
     return 0;
 }
