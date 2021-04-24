@@ -291,27 +291,27 @@ namespace Lang.Translation
                             AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(constant.Type)}'", constant);
                         }
                         break;
-                    case StructFieldRefAst structFieldRef:
-                        if (_programGraph.Types.TryGetValue(structFieldRef.Name, out var fieldType))
-                        {
-                            if (fieldType is EnumAst enumAst)
-                            {
-                                var enumType = VerifyEnumValue(structFieldRef, enumAst);
-                                if (enumType != null && !TypeEquals(structField.Type, enumType))
-                                {
-                                    AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(enumType)}'", structFieldRef);
-                                }
-                            }
-                            else
-                            {
-                                AddError($"Default value must be constant or enum value, but got field of '{structFieldRef.Name}'", structFieldRef);
-                            }
-                        }
-                        else
-                        {
-                            AddError($"Type '{structFieldRef.Name}' not defined", structFieldRef);
-                        }
-                        break;
+                    // case StructFieldRefAst structFieldRef:
+                    //     if (_programGraph.Types.TryGetValue(structFieldRef.Value, out var fieldType))
+                    //     {
+                    //         if (fieldType is EnumAst enumAst)
+                    //         {
+                    //             var enumType = VerifyEnumValue(structFieldRef, enumAst);
+                    //             if (enumType != null && !TypeEquals(structField.Type, enumType))
+                    //             {
+                    //                 AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(enumType)}'", structFieldRef);
+                    //             }
+                    //         }
+                    //         else
+                    //         {
+                    //             AddError($"Default value must be constant or enum value, but got field of '{structFieldRef.Value}'", structFieldRef);
+                    //         }
+                    //     }
+                    //     else
+                    //     {
+                    //         AddError($"Type '{structFieldRef.Value}' not defined", structFieldRef);
+                    //     }
+                    //     break;
                 }
             }
         }
@@ -709,10 +709,10 @@ namespace Lang.Translation
                     switch (declaration.Name)
                     {
                         case "os":
-                            declaration.Value = GetOSVersion();
+                            // declaration.Value = GetOSVersion();
                             break;
                         case "build_env":
-                            declaration.Value = GetBuildEnv();
+                            // declaration.Value = GetBuildEnv();
                             break;
                     }
                 }
@@ -769,7 +769,7 @@ namespace Lang.Translation
                 switch (declaration.Value)
                 {
                     case ConstantAst:
-                    case StructFieldRefAst structField when structField.IsEnum:
+                    // case StructFieldRefAst structField when structField.IsEnum:
                         break;
                     default:
                         AddError($"Constant variable '{declaration.Name}' should be assigned a constant value", declaration);
@@ -784,35 +784,35 @@ namespace Lang.Translation
             scopeIdentifiers.Add(declaration.Name, declaration);
         }
 
-        private StructFieldRefAst GetOSVersion()
-        {
-            return new StructFieldRefAst
-            {
-                Name = "OS",
-                Value = new StructFieldRefAst
-                {
-                    Name = Environment.OSVersion.Platform switch
-                    {
-                        PlatformID.Unix => "Linux",
-                        PlatformID.Win32NT => "Windows",
-                        PlatformID.MacOSX => "Mac",
-                        _ => "None"
-                    }
-                }
-            };
-        }
+        // private StructFieldRefAst GetOSVersion()
+        // {
+        //     return new StructFieldRefAst
+        //     {
+        //         Value = "OS",
+        //         Value = new StructFieldRefAst
+        //         {
+        //             Value = Environment.OSVersion.Platform switch
+        //             {
+        //                 PlatformID.Unix => "Linux",
+        //                 PlatformID.Win32NT => "Windows",
+        //                 PlatformID.MacOSX => "Mac",
+        //                 _ => "None"
+        //             }
+        //         }
+        //     };
+        // }
 
-        private StructFieldRefAst GetBuildEnv()
-        {
-            return new StructFieldRefAst
-            {
-                Name = "BuildEnv",
-                Value = new StructFieldRefAst
-                {
-                    Name = _buildSettings.Release ? "Release" : "Debug"
-                }
-            };
-        }
+        // private StructFieldRefAst GetBuildEnv()
+        // {
+        //     return new StructFieldRefAst
+        //     {
+        //         Value = "BuildEnv",
+        //         Value = new StructFieldRefAst
+        //         {
+        //             Value = _buildSettings.Release ? "Release" : "Debug"
+        //         }
+        //     };
+        // }
 
         private void VerifyAssignment(AssignmentAst assignment, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
@@ -912,11 +912,11 @@ namespace Lang.Translation
             var variableName = ast switch
             {
                 IdentifierAst identifierAst => identifierAst.Name,
-                StructFieldRefAst fieldRef => fieldRef.Name,
+                // StructFieldRefAst fieldRef => fieldRef.Value,
                 IndexAst index => index.Variable switch
                 {
                     IdentifierAst identifierAst => identifierAst.Name,
-                    StructFieldRefAst fieldRef => fieldRef.Name,
+                    // StructFieldRefAst fieldRef => fieldRef.Value,
                     _ => string.Empty
                 },
                 _ => string.Empty
@@ -934,18 +934,18 @@ namespace Lang.Translation
             var type = declaration.Type;
 
             // 2. Get the exact type definition
-            if (ast is StructFieldRefAst structField)
+            if (false)//ast is StructFieldRefAst structField)
             {
-                type = VerifyStructFieldRef(structField, type);
-                if (type == null) return null;
+                // type = VerifyStructFieldRef(structField, type);
+                // if (type == null) return null;
             }
             else if (ast is IndexAst index)
             {
-                if (index.Variable is StructFieldRefAst indexStructField)
-                {
-                    type = VerifyStructFieldRef(indexStructField, type);
-                    if (type == null) return null;
-                }
+                // if (index.Variable is StructFieldRefAst indexStructField)
+                // {
+                //     type = VerifyStructFieldRef(indexStructField, type);
+                //     if (type == null) return null;
+                // }
                 type = VerifyIndex(index, type, currentFunction, scopeIdentifiers);
                 if (type == null) return null;
             }
@@ -1080,24 +1080,24 @@ namespace Lang.Translation
                     return constant.Type;
                 case NullAst:
                     return null;
-                case StructFieldRefAst structField:
-                {
-                    if (!scopeIdentifiers.TryGetValue(structField.Name, out var identifier))
-                    {
-                        AddError($"Identifier '{structField.Name}' not defined", ast);
-                        return null;
-                    }
-                    switch (identifier)
-                    {
-                        case EnumAst enumAst:
-                            return VerifyEnumValue(structField, enumAst);
-                        case DeclarationAst declaration:
-                            return VerifyStructFieldRef(structField, declaration.Type);
-                        default:
-                            AddError($"Cannot reference static field of type '{structField.Name}'", ast);
-                            return null;
-                    }
-                }
+                // case StructFieldRefAst structField:
+                // {
+                //     if (!scopeIdentifiers.TryGetValue(structField.Value, out var identifier))
+                //     {
+                //         AddError($"Identifier '{structField.Value}' not defined", ast);
+                //         return null;
+                //     }
+                //     switch (identifier)
+                //     {
+                //         case EnumAst enumAst:
+                //             return VerifyEnumValue(structField, enumAst);
+                //         case DeclarationAst declaration:
+                //             return VerifyStructFieldRef(structField, declaration.Type);
+                //         default:
+                //             AddError($"Cannot reference static field of type '{structField.Value}'", ast);
+                //             return null;
+                //     }
+                // }
                 case IdentifierAst identifierAst:
                 {
                     if (!scopeIdentifiers.TryGetValue(identifierAst.Name, out var identifier))
@@ -1146,30 +1146,30 @@ namespace Lang.Translation
                                 AddError($"Variable '{identifierAst.Name}' not defined", identifierAst);
                                 return null;
                             }
-                        case StructFieldRefAst structField:
-                            if (scopeIdentifiers.TryGetValue(structField.Name, out var structIdentifier))
-                            {
-                                if (structIdentifier is not DeclarationAst declaration)
-                                {
-                                    AddError($"Identifier '{structField.Name}' is not a variable", structField);
-                                    return null;
-                                }
+                        // case StructFieldRefAst structField:
+                        //     if (scopeIdentifiers.TryGetValue(structField.Value, out var structIdentifier))
+                        //     {
+                        //         if (structIdentifier is not DeclarationAst declaration)
+                        //         {
+                        //             AddError($"Identifier '{structField.Value}' is not a variable", structField);
+                        //             return null;
+                        //         }
 
-                                var fieldType = VerifyStructFieldRef(structField, declaration.Type);
-                                if (fieldType == null) return null;
+                        //         var fieldType = VerifyStructFieldRef(structField, declaration.Type);
+                        //         if (fieldType == null) return null;
 
-                                var type = VerifyType(fieldType);
-                                if (type == Type.Int || type == Type.Float) return fieldType;
+                        //         var type = VerifyType(fieldType);
+                        //         if (type == Type.Int || type == Type.Float) return fieldType;
 
-                                var op = changeByOne.Positive ? "increment" : "decrement";
-                                AddError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(fieldType)}'", structField);
-                                return null;
-                            }
-                            else
-                            {
-                                AddError($"Variable '{structField.Name}' not defined", structField);
-                                return null;
-                            }
+                        //         var op = changeByOne.Positive ? "increment" : "decrement";
+                        //         AddError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(fieldType)}'", structField);
+                        //         return null;
+                        //     }
+                        //     else
+                        //     {
+                        //         AddError($"Variable '{structField.Value}' not defined", structField);
+                        //         return null;
+                        //     }
                         case IndexAst index:
                             var indexType = VerifyIndexType(index, currentFunction, scopeIdentifiers, out var variable);
                             if (indexType != null)
@@ -1214,7 +1214,7 @@ namespace Lang.Translation
                             AddError($"Cannot dereference type '{PrintTypeDefinition(valueType)}'", unary.Value);
                             return null;
                         case UnaryOperator.Reference:
-                            if (unary.Value is IdentifierAst || unary.Value is StructFieldRefAst || unary.Value is IndexAst || type == Type.Pointer)
+                            if (unary.Value is IdentifierAst || /*unary.Value is StructFieldRefAst ||*/ unary.Value is IndexAst || type == Type.Pointer)
                             {
                                 var pointerType = new TypeDefinition {Name = "*"};
                                 pointerType.Generics.Add(valueType);
@@ -1623,78 +1623,79 @@ namespace Lang.Translation
             return expression.Type;
         }
 
-        private TypeDefinition VerifyEnumValue(StructFieldRefAst enumRef, EnumAst enumAst)
+        private TypeDefinition VerifyEnumValue(ExpressionAst enumRef, EnumAst enumAst)
         {
-            enumRef.IsEnum = true;
-            var value = enumRef.Value;
+            // enumRef.IsEnum = true;
+            // var value = enumRef.Value;
 
-            if (value.Value != null)
-            {
-                AddError("Cannot get a value of an enum value", value.Value);
-                return null;
-            }
+            // if (value.Value != null)
+            // {
+            //     AddError("Cannot get a value of an enum value", value.Value);
+            //     return null;
+            // }
 
-            EnumValueAst enumValue = null;
-            for (var i = 0; i < enumAst.Values.Count; i++)
-            {
-                if (enumAst.Values[i].Name == value.Name)
-                {
-                    enumRef.ValueIndex = i;
-                    enumValue = enumAst.Values[i];
-                    break;
-                }
-            }
+            // EnumValueAst enumValue = null;
+            // for (var i = 0; i < enumAst.Values.Count; i++)
+            // {
+            //     if (enumAst.Values[i].Name == value.Name)
+            //     {
+            //         enumRef.ValueIndex = i;
+            //         enumValue = enumAst.Values[i];
+            //         break;
+            //     }
+            // }
 
-            if (enumValue == null)
-            {
-                AddError($"Enum '{enumAst.Name}' does not contain value '{value.Name}'", value);
-                return null;
-            }
+            // if (enumValue == null)
+            // {
+            //     AddError($"Enum '{enumAst.Name}' does not contain value '{value.Name}'", value);
+            //     return null;
+            // }
 
             return new TypeDefinition {Name = enumAst.Name, PrimitiveType = new EnumType()};
         }
 
-        private TypeDefinition VerifyStructFieldRef(StructFieldRefAst structField, TypeDefinition structType)
+        private TypeDefinition VerifyStructFieldRef(ExpressionAst structField, TypeDefinition structType)
         {
             // 1. Load the struct definition in typeDefinition
-            var genericName = structType.GenericName;
-            if (structType.Name == "*")
-            {
-                genericName = structType.Generics[0].GenericName;
-                structField.IsPointer = true;
-            }
-            structField.StructName = genericName;
-            if (!_programGraph.Types.TryGetValue(genericName, out var typeDefinition))
-            {
-                AddError($"Struct '{PrintTypeDefinition(structType)}' not defined", structField);
-                return null;
-            }
-            if (typeDefinition is not StructAst)
-            {
-                AddError($"Type '{PrintTypeDefinition(structType)}' is not a struct", structField);
-                return null;
-            }
-            var structDefinition = (StructAst) typeDefinition;
+            // var genericName = structType.GenericName;
+            // if (structType.Name == "*")
+            // {
+            //     genericName = structType.Generics[0].GenericName;
+            //     structField.IsPointer = true;
+            // }
+            // structField.StructName = genericName;
+            // if (!_programGraph.Types.TryGetValue(genericName, out var typeDefinition))
+            // {
+            //     AddError($"Struct '{PrintTypeDefinition(structType)}' not defined", structField);
+            //     return null;
+            // }
+            // if (typeDefinition is not StructAst)
+            // {
+            //     AddError($"Type '{PrintTypeDefinition(structType)}' is not a struct", structField);
+            //     return null;
+            // }
+            // var structDefinition = (StructAst) typeDefinition;
 
-            // 2. If the type of the field is other, recurse and return
-            var value = structField.Value;
-            StructFieldAst field = null;
-            for (var i = 0; i < structDefinition.Fields.Count; i++)
-            {
-                if (structDefinition.Fields[i].Name == value.Name)
-                {
-                    structField.ValueIndex = i;
-                    field = structDefinition.Fields[i];
-                    break;
-                }
-            }
-            if (field == null)
-            {
-                AddError($"Struct '{PrintTypeDefinition(structType)}' does not contain field '{value.Name}'", structField);
-                return null;
-            }
+            // // 2. If the type of the field is other, recurse and return
+            // var value = structField.Value;
+            // StructFieldAst field = null;
+            // for (var i = 0; i < structDefinition.Fields.Count; i++)
+            // {
+            //     if (structDefinition.Fields[i].Name == value.Name)
+            //     {
+            //         structField.ValueIndex = i;
+            //         field = structDefinition.Fields[i];
+            //         break;
+            //     }
+            // }
+            // if (field == null)
+            // {
+            //     AddError($"Struct '{PrintTypeDefinition(structType)}' does not contain field '{value.Name}'", structField);
+            //     return null;
+            // }
 
-            return value.Value == null ? field.Type : VerifyStructFieldRef(value, field.Type);
+            // return value.Value == null ? field.Type : VerifyStructFieldRef(value, field.Type);
+            return null;
         }
 
         private TypeDefinition VerifyIndexType(IndexAst index, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers, out IAst variableAst)
@@ -1717,23 +1718,23 @@ namespace Lang.Translation
                         AddError($"Variable '{identifierAst.Name}' not defined", identifierAst);
                         return null;
                     }
-                case StructFieldRefAst structField:
-                    variableAst = structField;
-                    if (scopeIdentifiers.TryGetValue(structField.Name, out var structIdentifier))
-                    {
-                        if (structIdentifier is not DeclarationAst declaration)
-                        {
-                            AddError($"Identifier '{structField.Name}' is not a variable", structField);
-                            return null;
-                        }
-                        var fieldType = VerifyStructFieldRef(structField, declaration.Type);
-                        return fieldType == null ? null : VerifyIndex(index, fieldType, currentFunction, scopeIdentifiers);
-                    }
-                    else
-                    {
-                        AddError($"Variable '{structField.Name}' not defined", structField);
-                        return null;
-                    }
+                // case StructFieldRefAst structField:
+                //     variableAst = structField;
+                //     if (scopeIdentifiers.TryGetValue(structField.Value, out var structIdentifier))
+                //     {
+                //         if (structIdentifier is not DeclarationAst declaration)
+                //         {
+                //             AddError($"Identifier '{structField.Value}' is not a variable", structField);
+                //             return null;
+                //         }
+                //         var fieldType = VerifyStructFieldRef(structField, declaration.Type);
+                //         return fieldType == null ? null : VerifyIndex(index, fieldType, currentFunction, scopeIdentifiers);
+                //     }
+                //     else
+                //     {
+                //         AddError($"Variable '{structField.Value}' not defined", structField);
+                //         return null;
+                //     }
                 default:
                     variableAst = null;
                     AddError("Expected to index a variable", index);

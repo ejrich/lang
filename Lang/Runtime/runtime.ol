@@ -17,6 +17,7 @@ struct string {
 struct TypeInfo {
     string name;
     TypeKind type;
+    int size;
     List<TypeField> fields;
 }
 
@@ -41,6 +42,12 @@ __type_table: List<TypeInfo*>;
 
 TypeInfo type_of(Type type) {
     return *__type_table[type];
+}
+
+int size_of(Type type) {
+    return __type_table[type].size;
+    // type_info := __type_table[type];
+    // return type_info.size;
 }
 
 
