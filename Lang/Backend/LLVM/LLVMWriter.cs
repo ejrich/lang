@@ -1202,13 +1202,7 @@ namespace Lang.Backend.LLVM
             IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
         {
             // 1. Get the variable pointer
-            var (type, variable) = index.Variable switch
-            {
-                IdentifierAst identifier => localVariables[identifier.Name],
-                // StructFieldRefAst structField => BuildStructField(structField, localVariables[structField.Name].value),
-                // @Cleanup This branch should never be hit
-                _ => (null, new LLVMValueRef())
-            };
+            var (type, variable) = localVariables[index.Name];
 
             // 2. Determine the index
             var (_, indexValue) = WriteExpression(index.Index, localVariables);

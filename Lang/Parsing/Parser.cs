@@ -1140,10 +1140,17 @@ namespace Lang.Parsing
                 }
             }
             // 3, Get the operator on the reference expression if the expression ends with an operator
-            else if (reference.Children.Count == reference.Operators.Count)
+            else
             {
-                assignment.Operator = reference.Operators.Last();
-                reference.Operators.RemoveAt(reference.Operators.Count - 1);
+                if (reference.Children.Count == 1)
+                {
+                    assignment.Reference = reference.Children[0];
+                }
+                if (reference.Children.Count == reference.Operators.Count)
+                {
+                    assignment.Operator = reference.Operators.Last();
+                    reference.Operators.RemoveAt(reference.Operators.Count - 1);
+                }
             }
 
             // 4. Step over '=' sign
@@ -1254,8 +1261,7 @@ namespace Lang.Parsing
             return expression;
         }
 
-        private static IAst ParseNextExpressionUnit(TokenEnumerator enumerator, List<ParseError> errors,
-            out bool operatorRequired)
+        private static IAst ParseNextExpressionUnit(TokenEnumerator enumerator, List<ParseError> errors, out bool operatorRequired)
         {
             var token = enumerator.Current;
             var nextToken = enumerator.Peek();
@@ -1279,9 +1285,7 @@ namespace Lang.Parsing
                         case TokenType.OpenParen:
                             return ParseCall(enumerator, errors);
                         case TokenType.OpenBracket:
-                            var variableAst = CreateAst<IdentifierAst>(token);
-                            variableAst.Name = token.Value;
-                            return ParseIndex(enumerator, errors, variableAst);
+                            return ParseIndex(enumerator, errors);
                         case null:
                             errors.Add(new ParseError
                             {
@@ -1557,12 +1561,12 @@ namespace Lang.Parsing
             return returnAst;
         }
 
-        private static IndexAst ParseIndex(TokenEnumerator enumerator, List<ParseError> errors, IAst variable)
+        private static IndexAst ParseIndex(TokenEnumerator enumerator, List<ParseError> errors)
         {
             // 1. Initialize the index ast
-            enumerator.MoveNext();
             var index = CreateAst<IndexAst>(enumerator.Current);
-            index.Variable = variable;
+            index.Name = enumerator.Current.Value;
+            enumerator.MoveNext();
 
             // 2. Expect to get open bracket
             if (enumerator.Current?.Type != TokenType.OpenBracket)
