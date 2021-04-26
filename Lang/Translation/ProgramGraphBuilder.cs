@@ -291,36 +291,48 @@ namespace Lang.Translation
                             AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(constant.Type)}'", constant);
                         }
                         break;
-                    case ExpressionAst expression:
-                        // TODO Check the type and make sure it's an enum
+                    case StructFieldRefAst structFieldRef:
+                        if (structFieldRef.Children.Count != 2)
+                        {
+                            AddError($"Default value of '{structAst.Name}.{structField.Name}' must be constant or enum value", structFieldRef);
+                        }
+                        else if (structFieldRef.Children[0] is IdentifierAst identifier)
+                        {
+                            if (_programGraph.Types.TryGetValue(identifier.Name, out var fieldType))
+                            {
+                                if (fieldType is EnumAst enumAst)
+                                {
+                                    if (structFieldRef.Children[1] is not IdentifierAst enumValue)
+                                    {
+                                        AddError($"Default value of '{structAst.Name}.{structField.Name}' must be constant or enum value", structFieldRef);
+                                        break;
+                                    }
+                                    var enumType = VerifyEnumValue(enumAst, enumValue);
+                                    if (enumType != null && !TypeEquals(structField.Type, enumType))
+                                    {
+                                        AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(enumType)}'", structFieldRef);
+                                    }
+                                }
+                                else
+                                {
+                                    AddError($"Default value of '{structAst.Name}.{structField.Name}' must be constant or enum value", structFieldRef);
+                                }
+                            }
+                            else
+                            {
+                                AddError($"Type '{identifier.Name}' is not defined", identifier);
+                            }
+                        }
+                        else
+                        {
+                            AddError($"Default value of '{structAst.Name}.{structField.Name}' must be constant or enum value", structFieldRef);
+                        }
                         break;
                     case null:
                         break;
                     default:
                         AddError($"Expected default value of {structAst.Name}.{structField.Name} to be a constant value", structField.DefaultValue);
                         break;
-                    // case StructFieldRefAst structFieldRef:
-                    //     if (_programGraph.Types.TryGetValue(structFieldRef.Value, out var fieldType))
-                    //     {
-                    //         if (fieldType is EnumAst enumAst)
-                    //         {
-                    //             var enumType = VerifyEnumValue(structFieldRef, enumAst);
-                    //             if (enumType != null && !TypeEquals(structField.Type, enumType))
-                    //             {
-                    //                 AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(enumType)}'", structFieldRef);
-                    //             }
-                    //         }
-                    //         else
-                    //         {
-                    //             AddError($"Default value must be constant or enum value, but got field of '{structFieldRef.Value}'", structFieldRef);
-                    //         }
-                    //     }
-                    //     else
-                    //     {
-                    //         AddError($"Type '{structFieldRef.Value}' not defined", structFieldRef);
-                    //     }
-                    //     break;
-
                 }
             }
         }
@@ -927,9 +939,9 @@ namespace Lang.Translation
                 case IndexAst index:
                     var type = GetVariable(index.Name, index, scopeIdentifiers);
                     return type != null ? VerifyIndex(index, type, currentFunction, scopeIdentifiers) : null;
-                case ExpressionAst expression:
+                case StructFieldRefAst structFieldRef:
                     TypeDefinition expressionType;
-                    switch (expression.Children[0])
+                    switch (structFieldRef.Children[0])
                     {
                         case IdentifierAst identifier:
                             expressionType = GetVariable(identifier.Name, identifier, scopeIdentifiers, true);
@@ -940,7 +952,7 @@ namespace Lang.Translation
                             expressionType = VerifyIndex(index, variableType, currentFunction, scopeIdentifiers);
                             break;
                         default:
-                            AddError("Expected to have a reference to a variable, field, or pointer", expression.Children[0]);
+                            AddError("Expected to have a reference to a variable, field, or pointer", structFieldRef.Children[0]);
                             return null;
                     }
                     if (expressionType == null)
@@ -948,14 +960,9 @@ namespace Lang.Translation
                         return null;
                     }
 
-                    for (var i = 1; i < expression.Children.Count; i++)
+                    for (var i = 1; i < structFieldRef.Children.Count; i++)
                     {
-                        if (expression.Operators[i-1] != Operator.Dot)
-                        {
-                            AddError("Expected to have a reference to a variable, field, or pointer", expression.Children[i]);
-                            return null;
-                        }
-                        switch (expression.Children[i])
+                        switch (structFieldRef.Children[i])
                         {
                             case IdentifierAst identifier:
                                 expressionType = VerifyStructField(identifier.Name, expressionType, identifier);
@@ -966,7 +973,7 @@ namespace Lang.Translation
                                 expressionType = VerifyIndex(index, fieldType, currentFunction, scopeIdentifiers);
                                 break;
                             default:
-                                AddError("Expected to have a reference to a variable, field, or pointer", expression.Children[i]);
+                                AddError("Expected to have a reference to a variable, field, or pointer", structFieldRef.Children[i]);
                                 return null;
                         }
                         if (expressionType == null)
@@ -1170,7 +1177,9 @@ namespace Lang.Translation
                     return constant.Type;
                 case NullAst:
                     return null;
-                // case StructFieldRefAst structField:
+                case StructFieldRefAst structField:
+                    // TODO Implement me
+                    return null;
                 // {
                 //     if (!scopeIdentifiers.TryGetValue(structField.Value, out var identifier))
                 //     {
@@ -1215,6 +1224,7 @@ namespace Lang.Translation
                 case ChangeByOneAst changeByOne:
                     switch (changeByOne.Variable)
                     {
+                        // TODO use VerifyExpression to clean this up
                         case IdentifierAst identifierAst:
                             if (scopeIdentifiers.TryGetValue(identifierAst.Name, out var identifier))
                             {
@@ -1713,7 +1723,7 @@ namespace Lang.Translation
             return expression.Type;
         }
 
-        private TypeDefinition VerifyEnumValue(ExpressionAst enumRef, EnumAst enumAst)
+        private TypeDefinition VerifyEnumValue(EnumAst enumAst, IdentifierAst value)
         {
             // enumRef.IsEnum = true;
             // var value = enumRef.Value;
@@ -1724,22 +1734,22 @@ namespace Lang.Translation
             //     return null;
             // }
 
-            // EnumValueAst enumValue = null;
-            // for (var i = 0; i < enumAst.Values.Count; i++)
-            // {
-            //     if (enumAst.Values[i].Name == value.Name)
-            //     {
-            //         enumRef.ValueIndex = i;
-            //         enumValue = enumAst.Values[i];
-            //         break;
-            //     }
-            // }
+            EnumValueAst enumValue = null;
+            for (var i = 0; i < enumAst.Values.Count; i++)
+            {
+                if (enumAst.Values[i].Name == value.Name)
+                {
+                    // enumRef.ValueIndex = i;
+                    enumValue = enumAst.Values[i];
+                    break;
+                }
+            }
 
-            // if (enumValue == null)
-            // {
-            //     AddError($"Enum '{enumAst.Name}' does not contain value '{value.Name}'", value);
-            //     return null;
-            // }
+            if (enumValue == null)
+            {
+                AddError($"Enum '{enumAst.Name}' does not contain value '{value.Name}'", value);
+                return null;
+            }
 
             return new TypeDefinition {Name = enumAst.Name, PrimitiveType = new EnumType()};
         }
