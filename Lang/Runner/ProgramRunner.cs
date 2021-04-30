@@ -642,7 +642,6 @@ namespace Lang.Runner
                         return new ValueType {Type = new TypeDefinition {Name = enumName}, Value = enumInstance};
                     }
                     var structVariable = ExecuteExpression(structField.Children[0], variables);
-                    // TODO Fix bug from line 21
                     return GetStructFieldRef(structField, structVariable.Value, variables);
                 case IdentifierAst identifier:
                     return variables[identifier.Name];
