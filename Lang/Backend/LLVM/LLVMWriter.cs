@@ -357,29 +357,8 @@ namespace Lang.Backend.LLVM
                     BuildAllocations(returnAst.Value);
                     return true;
                 case CallAst call:
-                {
-                    if (call.Params)
-                    {
-                        var functionDef = _functions[call.Function];
-
-                        var paramsTypeDef = functionDef.Arguments[^1].Type;
-                        var paramsType = ConvertTypeDefinition(paramsTypeDef);
-
-                        var paramsVariable = LLVMApi.BuildAlloca(_builder, paramsType, "params");
-                        _allocationQueue.Enqueue(paramsVariable);
-
-                        var targetType = ConvertTypeDefinition(paramsTypeDef);
-                        var arrayType = LLVMTypeRef.ArrayType(targetType, (uint)(call.Arguments.Count - functionDef.Arguments.Count + 1));
-                        var listData = LLVMApi.BuildAlloca(_builder, arrayType, "listdata");
-                        _allocationQueue.Enqueue(listData);
-                    }
-
-                    foreach (var argument in call.Arguments)
-                    {
-                        BuildAllocations(argument);
-                    }
+                    BuildCallAllocations(call);
                     break;
-                }
                 case DeclarationAst declaration:
                     if (declaration.Constant) break;
 
@@ -419,9 +398,13 @@ namespace Lang.Backend.LLVM
                     {
                         // To get the field of a call, the value needs to be stored on the stack to use GetElementPtr
                         case CallAst call:
-                            var function = _functions[call.Function];
-                            var iterationValue = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(function.ReturnType), function.Name);
-                            _allocationQueue.Enqueue(iterationValue);
+                            BuildCallAllocations(call);
+                            if (!structField.Pointers[0])
+                            {
+                                var function = _functions[call.Function];
+                                var iterationValue = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(function.ReturnType), function.Name);
+                                _allocationQueue.Enqueue(iterationValue);
+                            }
                             break;
                     }
                     break;
@@ -449,9 +432,27 @@ namespace Lang.Backend.LLVM
                         // @PotentialBug I can't really think of other cases that would fall under here, but this may
                         // become an issue if there are some new ways to creates lists
                         case CallAst call:
+                        {
+                            BuildCallAllocations(call);
                             var function = _functions[call.Function];
                             var iterationValue = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(function.ReturnType), function.Name);
                             _allocationQueue.Enqueue(iterationValue);
+                            break;
+                        }
+                        case StructFieldRefAst structField:
+                            switch (structField.Children[0])
+                            {
+                                // To get the field of a call, the value needs to be stored on the stack to use GetElementPtr
+                                case CallAst call:
+                                    BuildCallAllocations(call);
+                                    if (!structField.Pointers[0])
+                                    {
+                                        var function = _functions[call.Function];
+                                        var iterationValue = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(function.ReturnType), function.Name);
+                                        _allocationQueue.Enqueue(iterationValue);
+                                    }
+                                    break;
+                            }
                             break;
                     }
 
@@ -473,6 +474,30 @@ namespace Lang.Backend.LLVM
                 }
             }
             return false;
+        }
+
+        private void BuildCallAllocations(CallAst call)
+        {
+            if (call.Params)
+            {
+                var functionDef = _functions[call.Function];
+
+                var paramsTypeDef = functionDef.Arguments[^1].Type;
+                var paramsType = ConvertTypeDefinition(paramsTypeDef);
+
+                var paramsVariable = LLVMApi.BuildAlloca(_builder, paramsType, "params");
+                _allocationQueue.Enqueue(paramsVariable);
+
+                var targetType = ConvertTypeDefinition(paramsTypeDef);
+                var arrayType = LLVMTypeRef.ArrayType(targetType, (uint)(call.Arguments.Count - functionDef.Arguments.Count + 1));
+                var listData = LLVMApi.BuildAlloca(_builder, arrayType, "listdata");
+                _allocationQueue.Enqueue(listData);
+            }
+
+            foreach (var argument in call.Arguments)
+            {
+                BuildAllocations(argument);
+            }
         }
 
         private void BuildStructAllocations(string name)
@@ -646,7 +671,6 @@ namespace Lang.Backend.LLVM
                                 var constantValue = BuildConstant(type, constant);
                                 LLVMApi.BuildStore(_builder, constantValue, field);
                                 break;
-                            // TODO Check if this is working
                             case StructFieldRefAst structFieldRef:
                                 var enumName = structFieldRef.TypeNames[0];
                                 var enumDef = (EnumAst)_types[enumName];
@@ -695,8 +719,7 @@ namespace Lang.Backend.LLVM
             var (type, variable) = assignment.Reference switch
             {
                 IdentifierAst identifier => localVariables[identifier.Name],
-                // TODO Get this working
-                // StructFieldRefAst structField => BuildStructField(structField, localVariables[structField.Name].value),
+                StructFieldRefAst structField => BuildStructField(structField, localVariables),
                 IndexAst index => GetListPointer(index, localVariables),
                 // @Cleanup This branch should never be hit
                 _ => (null, new LLVMValueRef())
@@ -852,10 +875,9 @@ namespace Lang.Backend.LLVM
                 case IdentifierAst identifier:
                     (iterationType, iterationValue) = localVariables[identifier.Name];
                     break;
-                // TODO Get this working
-                // case StructFieldRefAst structField:
-                //     (iterationType, iterationValue) = BuildStructField(structField, localVariables[structField.Name].value);
-                //     break;
+                case StructFieldRefAst structField:
+                    (iterationType, iterationValue) = BuildStructField(structField, localVariables);
+                    break;
                 case IndexAst index:
                     (iterationType, iterationValue) = GetListPointer(index, localVariables);
                     break;
@@ -971,7 +993,6 @@ namespace Lang.Backend.LLVM
                     }
                     return (type, value);
                 }
-                // TODO Make sure this is working
                 case StructFieldRefAst structField:
                 {
                     if (structField.IsEnum)
@@ -1055,8 +1076,7 @@ namespace Lang.Backend.LLVM
                     var (variableType, pointer) = changeByOne.Variable switch
                     {
                         IdentifierAst identifier => localVariables[identifier.Name],
-                        // TODO Get this working
-                        // StructFieldRefAst structField => BuildStructField(structField, localVariables[structField.Name].value),
+                        StructFieldRefAst structField => BuildStructField(structField, localVariables),
                         IndexAst index => GetListPointer(index, localVariables),
                         // @Cleanup This branch should never be hit
                         _ => (null, new LLVMValueRef())
@@ -1204,7 +1224,6 @@ namespace Lang.Backend.LLVM
             }
         }
 
-        // TODO Make sure this is working
         private (TypeDefinition type, LLVMValueRef value) BuildStructField(StructFieldRefAst structField, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
         {
             TypeDefinition type = null;
@@ -1221,8 +1240,15 @@ namespace Lang.Backend.LLVM
                 case CallAst call:
                     var (callType, callValue) = WriteExpression(call, localVariables);
                     type = callType;
-                    value = _allocationQueue.Dequeue();
-                    LLVMApi.BuildStore(_builder, callValue, value);
+                    if (structField.Pointers[0])
+                    {
+                        value = callValue;
+                    }
+                    else
+                    {
+                        value = _allocationQueue.Dequeue();
+                        LLVMApi.BuildStore(_builder, callValue, value);
+                    }
                     break;
                 default:
                     // @Cleanup this branch shouldn't be hit
