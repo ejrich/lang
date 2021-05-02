@@ -71,6 +71,7 @@ int main(List<string> args) {
     print_type_info(PolyStruct<int*, float>);
     print_type_info(PolyStruct<List<int>, float>);
     print_type_info(s32*);
+    print_type_info(State);
     print_type_info(my_struct.subValue);
 
     return 0;
@@ -332,7 +333,7 @@ build() {
 
 print_type_info(Type type) {
     type_info := type_of(type);
-    printf("Type Name = %s, Type Kind = %d, Field Count = %d\n", type_info.name, type_info.type, type_info.fields.length);
+    printf("Type Name = %s, Type Kind = %d, Type Size = %d, Field Count = %d\n", type_info.name, type_info.type, type_info.size, type_info.fields.length);
     each field in type_info.fields then
         printf("Field name = %s, Field type name = %s\n", field.name, field.type_info.name);
 }
