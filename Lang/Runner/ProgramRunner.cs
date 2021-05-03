@@ -195,12 +195,16 @@ namespace Lang.Runner
                     Marshal.StructureToPtr(typeInfoPointer, listPointer, false);
                 }
 
-                // Set fields on TypeInfo objects
+                // Set fields and enum values on TypeInfo objects
                 if (newTypeInfos.Any())
                 {
                     var typeFieldListType = _types["List.TypeField"];
                     var typeFieldType = _types["TypeField"];
                     var typeFieldSize = Marshal.SizeOf(typeFieldType);
+
+                    var enumValueListType = _types["List.EnumValue"];
+                    var enumValueType = _types["EnumValue"];
+                    var enumValueSize = Marshal.SizeOf(enumValueType);
                     foreach (var (type, typeInfo, typeInfoPointer) in newTypeInfos)
                     {
                         if (type is StructAst structAst)
@@ -227,6 +231,31 @@ namespace Lang.Runner
 
                                 var listPointer = IntPtr.Add(typeFieldsDataPointer, typeFieldSize * i);
                                 Marshal.StructureToPtr(typeField, listPointer, false);
+                            }
+                        }
+                        else if (type is EnumAst enumAst)
+                        {
+                            var enumValueList = Activator.CreateInstance(enumValueListType);
+                            InitializeConstList(enumValueList, enumValueListType, enumValueType, enumAst.Values.Count);
+
+                            var enumValuesField = typeInfoType.GetField("enum_values");
+                            enumValuesField.SetValue(typeInfo, enumValueList);
+
+                            var enumValuesListDataField = enumValueListType.GetField("data");
+                            var enumValuesDataPointer = GetPointer(enumValuesListDataField.GetValue(enumValueList));
+
+                            for (var i = 0; i < enumAst.Values.Count; i++)
+                            {
+                                var value = enumAst.Values[i];
+                                var enumValue = Activator.CreateInstance(enumValueType);
+
+                                var enumValueName = enumValueType.GetField("name");
+                                enumValueName.SetValue(enumValue, GetString(value.Name));
+                                var enumValueValue = enumValueType.GetField("value");
+                                enumValueValue.SetValue(enumValue, value.Value);
+
+                                var listPointer = IntPtr.Add(enumValuesDataPointer, enumValueSize * i);
+                                Marshal.StructureToPtr(enumValue, listPointer, false);
                             }
                         }
                         Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
