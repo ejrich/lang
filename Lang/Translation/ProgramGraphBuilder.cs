@@ -64,20 +64,25 @@ namespace Lang.Translation
                             if (_programGraph.Types.ContainsKey(structAst.Name))
                             {
                                 AddError($"Multiple definitions of struct '{structAst.Name}'", structAst);
+                                break;
                             }
-                            else if (structAst.Generics.Any())
+
+                            if (structAst.Generics.Any())
                             {
-                                _polymorphicStructs.Add(structAst.Name, structAst);
-                                _globalIdentifiers.Add(structAst.Name, structAst);
+                                if (_polymorphicStructs.ContainsKey(structAst.Name))
+                                {
+                                    AddError($"Multiple definitions of polymorphic struct '{structAst.Name}'", structAst);
+                                }
+                                _polymorphicStructs[structAst.Name] = structAst;
                             }
                             else
                             {
                                 structAst.TypeIndex = _typeIndex++;
                                 structAst.TypeKind = structAst.Name == "string" ? TypeKind.String : TypeKind.Struct;
                                 _programGraph.Types.Add(structAst.Name, structAst);
-                                _globalIdentifiers.Add(structAst.Name, structAst);
                             }
 
+                            _globalIdentifiers[structAst.Name] = structAst;
                             break;
                     }
                 }
@@ -105,8 +110,7 @@ namespace Lang.Translation
                             parseResult.SyntaxTrees.RemoveAt(i--);
                             break;
                         case FunctionAst function:
-                            var main = function.Name == "main";
-                            if (main)
+                            if (function.Name == "main")
                             {
                                 if (mainDefined)
                                 {
@@ -115,12 +119,8 @@ namespace Lang.Translation
 
                                 mainDefined = true;
                             }
-                            else if (function.Name == "__start")
-                            {
-                                _programGraph.Start = function;
-                            }
 
-                            VerifyFunctionDefinition(function, main);
+                            VerifyFunctionDefinition(function);
                             parseResult.SyntaxTrees.RemoveAt(i--);
                             break;
                     }
@@ -180,7 +180,6 @@ namespace Lang.Translation
                 if (function.Verified) continue;
                 VerifyFunction(function);
             }
-            VerifyFunction(_programGraph.Start);
 
             // 5. Execute any other compiler directives
             foreach (var ast in parseResult.SyntaxTrees)
@@ -367,7 +366,7 @@ namespace Lang.Translation
             structAst.Verified = true;
         }
 
-        private void VerifyFunctionDefinition(FunctionAst function, bool main)
+        private void VerifyFunctionDefinition(FunctionAst function, bool main = false)
         {
             // 1. Verify the return type of the function is valid
             var returnType = VerifyType(function.ReturnType);
@@ -476,11 +475,11 @@ namespace Lang.Translation
             }
 
             // 4. Load the function into the dictionary
+            function.TypeIndex = _typeIndex++;
             if (!_programGraph.Functions.TryAdd(function.Name, function))
             {
                 AddError($"Multiple definitions of function '{function.Name}'", function);
             }
-            // TODO Add functions to global identifiers
         }
 
         private void VerifyFunction(FunctionAst function)
@@ -1110,6 +1109,7 @@ namespace Lang.Translation
 
         private bool VerifyCondition(IAst ast, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
+            var errorCount = _programGraph.Errors.Count;
             var conditionalType = VerifyExpression(ast, currentFunction, scopeIdentifiers);
             switch (VerifyType(conditionalType))
             {
@@ -1118,7 +1118,10 @@ namespace Lang.Translation
                 case Type.Boolean:
                 case Type.Pointer:
                     // Valid types
-                    return true;
+                    return errorCount == _programGraph.Errors.Count;
+                case Type.Error:
+                    AddError($"Expected condition to be bool, int, float, or pointer", ast);
+                    return false;
                 default:
                     AddError($"Expected condition to be bool, int, float, or pointer, but got '{PrintTypeDefinition(conditionalType)}'", ast);
                     return false;
@@ -1268,22 +1271,22 @@ namespace Lang.Translation
                 {
                     if (!scopeIdentifiers.TryGetValue(identifierAst.Name, out var identifier))
                     {
+                        if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functionAst))
+                        {
+                            return new TypeDefinition {Name = "Type", TypeIndex = functionAst.TypeIndex};
+                        }
                         AddError($"Identifier '{identifierAst.Name}' not defined", identifierAst);
                     }
                     switch (identifier)
                     {
                         case DeclarationAst declaration:
                             return declaration.Type;
-                        case PrimitiveAst primitive:
-                            return new TypeDefinition {Name = "Type", TypeIndex = primitive.TypeIndex};
-                        case EnumAst enumAst:
-                            return new TypeDefinition {Name = "Type", TypeIndex = enumAst.TypeIndex};
-                        case StructAst structAst:
-                            if (structAst.Generics.Any())
+                        case IType type:
+                            if (type is StructAst structAst && structAst.Generics.Any())
                             {
                                 AddError($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
                             }
-                            return new TypeDefinition {Name = "Type", TypeIndex = structAst.TypeIndex};
+                            return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
                         default:
                             return null;
                     }
@@ -1615,6 +1618,7 @@ namespace Lang.Translation
         {
             // 1. Get the type of the initial child
             expression.Type = VerifyExpression(expression.Children[0], currentFunction, scopeIdentifiers);
+            if (expression.Type == null) return null;
             for (var i = 1; i < expression.Children.Count; i++)
             {
                 // 2. Get the next operator and expression type

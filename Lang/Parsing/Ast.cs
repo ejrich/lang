@@ -27,12 +27,15 @@ namespace Lang.Parsing
         public List<IAst> Children { get; } = new();
     }
 
-    public class FunctionAst : IAst
+    public class FunctionAst : IAst, IType
     {
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
+        public int TypeIndex { get; set; }
+        public TypeKind TypeKind { get; set; } = TypeKind.Function;
+        public uint Size { get; set; } // Will always be 0
         public bool Extern { get; set; }
         public bool Compiler { get; set; }
         public string ExternLib { get; set; }
@@ -355,6 +358,7 @@ namespace Lang.Parsing
         Pointer,
         List,
         Enum,
-        Struct
+        Struct,
+        Function
     }
 }
