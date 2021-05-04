@@ -155,8 +155,8 @@ namespace Lang.Runner
                 }
             }
 
-            // TODO Also store function type infos
-            if (_typeCount != programGraph.Types.Count)
+            var typeInfoCount = programGraph.Types.Count + programGraph.Functions.Count;
+            if (_typeCount != typeInfoCount)
             {
                 var typeTable = _globalVariables["__type_table"];
 
@@ -168,7 +168,7 @@ namespace Lang.Runner
                 // Reallocate array
                 var typeInfoPointerType = GetTypeFromDefinition(typeTable.Type.Generics[0]);
                 var pointerSize = Marshal.SizeOf(typeInfoPointerType);
-                InitializeConstList(typeTable.Value, typeInfoListType, typeInfoPointerType, programGraph.Types.Count);
+                InitializeConstList(typeTable.Value, typeInfoListType, typeInfoPointerType, typeInfoCount);
                 var typeDataPointer = GetPointer(dataField.GetValue(typeTable.Value));
                 Marshal.FreeHGlobal(oldDataPointer);
 
@@ -196,6 +196,25 @@ namespace Lang.Runner
                     Marshal.StructureToPtr(typeInfoPointer, listPointer, false);
                 }
 
+                foreach (var (name, function) in programGraph.Functions)
+                {
+                    if (!_typeInfoPointers.TryGetValue(name, out var typeInfoPointer))
+                    {
+                        var typeInfo = Activator.CreateInstance(typeInfoType);
+
+                        var typeNameField = typeInfoType.GetField("name");
+                        typeNameField.SetValue(typeInfo, GetString(function.Name));
+                        var typeKindField = typeInfoType.GetField("type");
+                        typeKindField.SetValue(typeInfo, function.TypeKind);
+
+                        _typeInfoPointers[name] = typeInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoType));
+                        newTypeInfos.Add((function, typeInfo, typeInfoPointer));
+                    }
+
+                    var listPointer = IntPtr.Add(typeDataPointer, pointerSize * function.TypeIndex);
+                    Marshal.StructureToPtr(typeInfoPointer, listPointer, false);
+                }
+
                 // Set fields and enum values on TypeInfo objects
                 if (newTypeInfos.Any())
                 {
@@ -206,58 +225,103 @@ namespace Lang.Runner
                     var enumValueListType = _types["List.EnumValue"];
                     var enumValueType = _types["EnumValue"];
                     var enumValueSize = Marshal.SizeOf(enumValueType);
+
+                    var argumentListType = _types["List.ArgumentType"];
+                    var argumentType = _types["ArgumentType"];
+                    var argumentSize = Marshal.SizeOf(argumentType);
+
                     foreach (var (type, typeInfo, typeInfoPointer) in newTypeInfos)
                     {
-                        if (type is StructAst structAst)
+                        switch (type)
                         {
-                            var typeFieldList = Activator.CreateInstance(typeFieldListType);
-                            InitializeConstList(typeFieldList, typeFieldListType, typeFieldType, structAst.Fields.Count);
+                            case StructAst structAst:
+                                var typeFieldList = Activator.CreateInstance(typeFieldListType);
+                                InitializeConstList(typeFieldList, typeFieldListType, typeFieldType, structAst.Fields.Count);
 
-                            var typeFieldsField = typeInfoType.GetField("fields");
-                            typeFieldsField.SetValue(typeInfo, typeFieldList);
+                                var typeFieldsField = typeInfoType.GetField("fields");
+                                typeFieldsField.SetValue(typeInfo, typeFieldList);
 
-                            var typeFieldListDataField = typeFieldListType.GetField("data");
-                            var typeFieldsDataPointer = GetPointer(typeFieldListDataField.GetValue(typeFieldList));
+                                var typeFieldListDataField = typeFieldListType.GetField("data");
+                                var typeFieldsDataPointer = GetPointer(typeFieldListDataField.GetValue(typeFieldList));
 
-                            for (var i = 0; i < structAst.Fields.Count; i++)
-                            {
-                                var field = structAst.Fields[i];
-                                var typeField = Activator.CreateInstance(typeFieldType);
+                                for (var i = 0; i < structAst.Fields.Count; i++)
+                                {
+                                    var field = structAst.Fields[i];
+                                    var typeField = Activator.CreateInstance(typeFieldType);
 
-                                var typeFieldName = typeFieldType.GetField("name");
-                                typeFieldName.SetValue(typeField, GetString(field.Name));
-                                var typeFieldInfo = typeFieldType.GetField("type_info");
-                                var typePointer = _typeInfoPointers[field.Type.GenericName];
-                                typeFieldInfo.SetValue(typeField, typePointer);
+                                    var typeFieldName = typeFieldType.GetField("name");
+                                    typeFieldName.SetValue(typeField, GetString(field.Name));
+                                    var typeFieldInfo = typeFieldType.GetField("type_info");
+                                    var typePointer = _typeInfoPointers[field.Type.GenericName];
+                                    typeFieldInfo.SetValue(typeField, typePointer);
 
-                                var listPointer = IntPtr.Add(typeFieldsDataPointer, typeFieldSize * i);
-                                Marshal.StructureToPtr(typeField, listPointer, false);
-                            }
-                        }
-                        else if (type is EnumAst enumAst)
-                        {
-                            var enumValueList = Activator.CreateInstance(enumValueListType);
-                            InitializeConstList(enumValueList, enumValueListType, enumValueType, enumAst.Values.Count);
+                                    var listPointer = IntPtr.Add(typeFieldsDataPointer, typeFieldSize * i);
+                                    Marshal.StructureToPtr(typeField, listPointer, false);
+                                }
+                                break;
+                            case EnumAst enumAst:
+                                var enumValueList = Activator.CreateInstance(enumValueListType);
+                                InitializeConstList(enumValueList, enumValueListType, enumValueType, enumAst.Values.Count);
 
-                            var enumValuesField = typeInfoType.GetField("enum_values");
-                            enumValuesField.SetValue(typeInfo, enumValueList);
+                                var enumValuesField = typeInfoType.GetField("enum_values");
+                                enumValuesField.SetValue(typeInfo, enumValueList);
 
-                            var enumValuesListDataField = enumValueListType.GetField("data");
-                            var enumValuesDataPointer = GetPointer(enumValuesListDataField.GetValue(enumValueList));
+                                var enumValuesListDataField = enumValueListType.GetField("data");
+                                var enumValuesDataPointer = GetPointer(enumValuesListDataField.GetValue(enumValueList));
 
-                            for (var i = 0; i < enumAst.Values.Count; i++)
-                            {
-                                var value = enumAst.Values[i];
-                                var enumValue = Activator.CreateInstance(enumValueType);
+                                for (var i = 0; i < enumAst.Values.Count; i++)
+                                {
+                                    var value = enumAst.Values[i];
+                                    var enumValue = Activator.CreateInstance(enumValueType);
 
-                                var enumValueName = enumValueType.GetField("name");
-                                enumValueName.SetValue(enumValue, GetString(value.Name));
-                                var enumValueValue = enumValueType.GetField("value");
-                                enumValueValue.SetValue(enumValue, value.Value);
+                                    var enumValueName = enumValueType.GetField("name");
+                                    enumValueName.SetValue(enumValue, GetString(value.Name));
+                                    var enumValueValue = enumValueType.GetField("value");
+                                    enumValueValue.SetValue(enumValue, value.Value);
 
-                                var listPointer = IntPtr.Add(enumValuesDataPointer, enumValueSize * i);
-                                Marshal.StructureToPtr(enumValue, listPointer, false);
-                            }
+                                    var listPointer = IntPtr.Add(enumValuesDataPointer, enumValueSize * i);
+                                    Marshal.StructureToPtr(enumValue, listPointer, false);
+                                }
+                                break;
+                            case FunctionAst function:
+                                var returnTypeField = typeInfoType.GetField("return_type");
+                                returnTypeField.SetValue(typeInfo, _typeInfoPointers[function.ReturnType.GenericName]);
+
+                                var argumentList = Activator.CreateInstance(argumentListType);
+                                var argumentCount = function.Varargs ? function.Arguments.Count - 1 : function.Arguments.Count;
+                                InitializeConstList(argumentList, argumentListType, argumentType, argumentCount);
+
+                                var argumentsField = typeInfoType.GetField("arguments");
+                                argumentsField.SetValue(typeInfo, argumentList);
+
+                                var argumentListDataField = argumentListType.GetField("data");
+                                var argumentListDataPointer = GetPointer(argumentListDataField.GetValue(argumentList));
+
+                                for (var i = 0; i < argumentCount; i++)
+                                {
+                                    var argument = function.Arguments[i];
+                                    var argumentValue = Activator.CreateInstance(argumentType);
+
+                                    var argumentName = argumentType.GetField("name");
+                                    argumentName.SetValue(argumentValue, GetString(argument.Name));
+                                    var argumentTypeField = argumentType.GetField("type_info");
+                                    if (argument.Type.Name == "Type")
+                                    {
+                                        argumentTypeField.SetValue(argumentValue, _typeInfoPointers["s32"]);
+                                    }
+                                    else if (argument.Type.Name == "Params")
+                                    {
+                                        argumentTypeField.SetValue(argumentValue, _typeInfoPointers[$"List.{argument.Type.Generics[0].GenericName}"]);
+                                    }
+                                    else
+                                    {
+                                        argumentTypeField.SetValue(argumentValue, _typeInfoPointers[argument.Type.GenericName]);
+                                    }
+
+                                    var listPointer = IntPtr.Add(argumentListDataPointer, argumentSize * i);
+                                    Marshal.StructureToPtr(argumentValue, listPointer, false);
+                                }
+                                break;
                         }
                         Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
                     }

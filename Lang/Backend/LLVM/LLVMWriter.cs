@@ -153,7 +153,8 @@ namespace Lang.Backend.LLVM
             SetPrivateConstant(typeTable);
             var typeInfoType = structs["TypeInfo"];
 
-            var types = new LLVMValueRef[programGraph.Types.Count];
+            var typeInfoCount = programGraph.Types.Count + programGraph.Functions.Count;
+            var types = new LLVMValueRef[typeInfoCount];
             var typePointers = new Dictionary<string, (IType type, LLVMValueRef typeInfo)>();
             foreach (var (name, type) in programGraph.Types)
             {
