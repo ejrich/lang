@@ -75,6 +75,8 @@ int main(List<string> args) {
     print_type_info(my_struct.subValue);
     print_type_info(bar);
 
+    type_casts();
+
     return 0;
 }
 
@@ -346,4 +348,10 @@ print_type_info(Type type) {
         each arg in type_info.arguments then
             printf("Argument name = %s, Argument type name = %s, Argument type kind = %d\n", arg.name, arg.type_info.name, arg.type_info.type);
     }
+}
+
+type_casts() {
+    a: u64 = 0xFFFFFFFFFFFFFFFF;
+    b := cast(s32, a);
+    printf("a = %llu, b = %d\n", a, b);
 }

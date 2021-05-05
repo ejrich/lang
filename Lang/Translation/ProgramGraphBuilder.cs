@@ -1575,6 +1575,10 @@ namespace Lang.Translation
                     }
                     return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
                 }
+                case CastAst cast:
+                    // TODO Type checking
+
+                    return cast.TargetType;
                 case null:
                     return null;
                 default:
