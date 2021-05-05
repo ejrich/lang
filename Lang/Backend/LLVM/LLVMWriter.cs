@@ -163,10 +163,17 @@ namespace Lang.Backend.LLVM
                 types[type.TypeIndex] = typeInfo;
                 typePointers[name] = (type, typeInfo);
             }
-            // TODO Also store function type infos
+            foreach (var (name, function) in programGraph.Functions)
+            {
+                var typeInfo = LLVMApi.AddGlobal(_module, typeInfoType, "____type_info");
+                SetPrivateConstant(typeInfo);
+                types[function.TypeIndex] = typeInfo;
+                typePointers[name] = (function, typeInfo);
+            }
 
             var typeFieldType = LLVMApi.GetTypeByName(_module, "TypeField");
             var enumValueType = LLVMApi.GetTypeByName(_module, "EnumValue");
+            var argumentType = LLVMApi.GetTypeByName(_module, "ArgumentType");
             foreach (var (_, (type, typeInfo)) in typePointers)
             {
                 var typeName = LLVMApi.ConstString(type.Name, (uint)type.Name.Length, false);
@@ -255,7 +262,57 @@ namespace Lang.Backend.LLVM
                     }, false);
                 }
 
-                LLVMApi.SetInitializer(typeInfo, LLVMApi.ConstStruct(new [] {typeNameString, typeKind, typeSize, fields, enumValues}, false));
+                LLVMValueRef returnType;
+                LLVMValueRef arguments;
+                if (type is FunctionAst function)
+                {
+                    returnType = typePointers[function.ReturnType.GenericName].typeInfo;
+
+                    var argumentCount = function.Varargs ? function.Arguments.Count - 1 : function.Arguments.Count;
+                    var argumentValues = new LLVMValueRef[argumentCount];
+                    for (var i = 0; i < argumentCount; i++)
+                    {
+                        var argument = function.Arguments[i];
+
+                        var argName = LLVMApi.ConstString(argument.Name, (uint)argument.Name.Length, false);
+                        var argNameString = LLVMApi.AddGlobal(_module, typeName.TypeOf(), "str");
+                        SetPrivateConstant(argNameString);
+                        LLVMApi.SetInitializer(argNameString, argName);
+
+                        var argumentTypeInfo = argument.Type.Name switch
+                        {
+                            "Type" => typePointers["s32"].typeInfo,
+                            "Params" => typePointers[$"List.{argument.Type.Generics[0].GenericName}"].typeInfo,
+                            _ => typePointers[argument.Type.GenericName].typeInfo
+                        };
+
+                        var argumentValue = LLVMApi.ConstStruct(new [] {argNameString, argumentTypeInfo}, false);
+
+                        argumentValues[i] = argumentValue;
+                    }
+
+                    var argumentArray = LLVMApi.ConstArray(typeInfoType, argumentValues);
+                    var argumentArrayGlobal = LLVMApi.AddGlobal(_module, argumentArray.TypeOf(), "____type_fields");
+                    SetPrivateConstant(argumentArrayGlobal);
+                    LLVMApi.SetInitializer(argumentArrayGlobal, argumentArray);
+
+                    arguments = LLVMApi.ConstStruct(new []
+                    {
+                        LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (ulong)function.Arguments.Count, false),
+                        argumentArrayGlobal
+                    }, false);
+                }
+                else
+                {
+                    returnType = LLVMApi.ConstNull(LLVMTypeRef.PointerType(typeFieldType, 0));
+                    arguments = LLVMApi.ConstStruct(new []
+                    {
+                        LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 0, false),
+                        LLVMApi.ConstNull(LLVMTypeRef.PointerType(argumentType, 0))
+                    }, false);
+                }
+
+                LLVMApi.SetInitializer(typeInfo, LLVMApi.ConstStruct(new [] {typeNameString, typeKind, typeSize, fields, enumValues, returnType, arguments}, false));
             }
 
             var typeArray = LLVMApi.ConstArray(LLVMApi.PointerType(typeInfoType, 0), types);

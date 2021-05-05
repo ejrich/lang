@@ -73,6 +73,7 @@ int main(List<string> args) {
     print_type_info(s32*);
     print_type_info(State);
     print_type_info(my_struct.subValue);
+    print_type_info(bar);
 
     return 0;
 }
@@ -338,4 +339,10 @@ print_type_info(Type type) {
         printf("Field name = %s, Field type name = %s\n", field.name, field.type_info.name);
     each enum_value in type_info.enum_values then
         printf("Enum value name = %s, Value = %d\n", enum_value.name, enum_value.value);
+
+    if type_info.type == TypeKind.Function {
+        printf("Return type = %s\n", type_info.return_type.name);
+        each arg in type_info.arguments then
+            printf("Argument name = %s, Argument type name = %s, Argument type kind = %d\n", arg.name, arg.type_info.name, arg.type_info.type);
+    }
 }
