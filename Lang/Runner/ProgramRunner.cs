@@ -10,7 +10,7 @@ namespace Lang.Runner
 {
     public interface IProgramRunner
     {
-        void Init(ProgramGraph programGraph, BuildSettings buildSettings);
+        void Init(ProgramGraph programGraph);
         void RunProgram(IAst ast);
         bool ExecuteCondition(IAst expression);
     }
@@ -21,12 +21,13 @@ namespace Lang.Runner
         private int _version;
 
         private ProgramGraph _programGraph;
-        private BuildSettings _buildSettings;
+        private int _typeCount;
 
         private readonly Dictionary<string, List<int>> _functionIndices = new();
         private readonly List<(Type type, object libraryObject)> _functionLibraries = new();
         private readonly Dictionary<string, ValueType> _globalVariables = new();
         private readonly Dictionary<string, Type> _types = new();
+        private readonly Dictionary<string, IntPtr> _typeInfoPointers = new();
 
         private readonly Dictionary<string, string> _compilerFunctions = new() {
             { "add_dependency", "AddDependency" }
@@ -38,10 +39,9 @@ namespace Lang.Runner
             public object Value { get; set; }
         }
 
-        public void Init(ProgramGraph programGraph, BuildSettings buildSettings)
+        public void Init(ProgramGraph programGraph)
         {
             _programGraph = programGraph;
-            _buildSettings = buildSettings;
             // Initialize the runner
             if (_moduleBuilder == null)
             {
@@ -51,7 +51,7 @@ namespace Lang.Runner
             }
 
             var temporaryStructs = new Dictionary<string, TypeBuilder>();
-            foreach (var (_, type) in programGraph.Types)
+            foreach (var (name, type) in programGraph.Types)
             {
                 switch (type)
                 {
@@ -65,9 +65,9 @@ namespace Lang.Runner
                         _types[enumAst.Name] = enumBuilder.CreateTypeInfo();
                         break;
                     case StructAst structAst:
-                        if (_types.ContainsKey(structAst.Name)) break;
-                        var structBuilder = _moduleBuilder.DefineType(structAst.Name, TypeAttributes.Public | TypeAttributes.SequentialLayout);
-                        temporaryStructs[structAst.Name] = structBuilder;
+                        if (_types.ContainsKey(name)) break;
+                        var structBuilder = _moduleBuilder.DefineType(name, TypeAttributes.Public | TypeAttributes.SequentialLayout);
+                        temporaryStructs[name] = structBuilder;
                         break;
                 }
             }
@@ -84,7 +84,7 @@ namespace Lang.Runner
                     for (; index < count; index++)
                     {
                         var field = structAst.Fields[index];
-                        var fieldType = GetTypeFromDefinition(field.Type, name, structBuilder);
+                        var fieldType = GetTypeFromDefinition(field.Type, temporaryStructs);
                         if (fieldType == null)
                         {
                             break;
@@ -154,6 +154,181 @@ namespace Lang.Runner
                     ExecuteDeclaration(variable, _globalVariables);
                 }
             }
+
+            var typeInfoCount = programGraph.Types.Count + programGraph.Functions.Count;
+            if (_typeCount != typeInfoCount)
+            {
+                var typeTable = _globalVariables["__type_table"];
+
+                // Save the previous pointer
+                var typeInfoListType = _types[typeTable.Type.GenericName];
+                var dataField = typeInfoListType.GetField("data");
+                var oldDataPointer = GetPointer(dataField.GetValue(typeTable.Value));
+
+                // Reallocate array
+                var typeInfoPointerType = GetTypeFromDefinition(typeTable.Type.Generics[0]);
+                var pointerSize = Marshal.SizeOf(typeInfoPointerType);
+                InitializeConstList(typeTable.Value, typeInfoListType, typeInfoPointerType, typeInfoCount);
+                var typeDataPointer = GetPointer(dataField.GetValue(typeTable.Value));
+                Marshal.FreeHGlobal(oldDataPointer);
+
+                // Create TypeInfo pointers
+                var newTypeInfos = new List<(IType type, object typeInfo, IntPtr typeInfoPointer)>();
+                var typeInfoType = _types["TypeInfo"];
+                foreach (var (name, type) in programGraph.Types)
+                {
+                    if (!_typeInfoPointers.TryGetValue(name, out var typeInfoPointer))
+                    {
+                        var typeInfo = Activator.CreateInstance(typeInfoType);
+
+                        var typeNameField = typeInfoType.GetField("name");
+                        typeNameField.SetValue(typeInfo, GetString(type.Name));
+                        var typeKindField = typeInfoType.GetField("type");
+                        typeKindField.SetValue(typeInfo, type.TypeKind);
+                        var typeSizeField = typeInfoType.GetField("size");
+                        typeSizeField.SetValue(typeInfo, type.Size);
+
+                        _typeInfoPointers[name] = typeInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoType));
+                        newTypeInfos.Add((type, typeInfo, typeInfoPointer));
+                    }
+
+                    var listPointer = IntPtr.Add(typeDataPointer, pointerSize * type.TypeIndex);
+                    Marshal.StructureToPtr(typeInfoPointer, listPointer, false);
+                }
+
+                foreach (var (name, function) in programGraph.Functions)
+                {
+                    if (!_typeInfoPointers.TryGetValue(name, out var typeInfoPointer))
+                    {
+                        var typeInfo = Activator.CreateInstance(typeInfoType);
+
+                        var typeNameField = typeInfoType.GetField("name");
+                        typeNameField.SetValue(typeInfo, GetString(function.Name));
+                        var typeKindField = typeInfoType.GetField("type");
+                        typeKindField.SetValue(typeInfo, function.TypeKind);
+
+                        _typeInfoPointers[name] = typeInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoType));
+                        newTypeInfos.Add((function, typeInfo, typeInfoPointer));
+                    }
+
+                    var listPointer = IntPtr.Add(typeDataPointer, pointerSize * function.TypeIndex);
+                    Marshal.StructureToPtr(typeInfoPointer, listPointer, false);
+                }
+
+                // Set fields and enum values on TypeInfo objects
+                if (newTypeInfos.Any())
+                {
+                    var typeFieldListType = _types["List.TypeField"];
+                    var typeFieldType = _types["TypeField"];
+                    var typeFieldSize = Marshal.SizeOf(typeFieldType);
+
+                    var enumValueListType = _types["List.EnumValue"];
+                    var enumValueType = _types["EnumValue"];
+                    var enumValueSize = Marshal.SizeOf(enumValueType);
+
+                    var argumentListType = _types["List.ArgumentType"];
+                    var argumentType = _types["ArgumentType"];
+                    var argumentSize = Marshal.SizeOf(argumentType);
+
+                    foreach (var (type, typeInfo, typeInfoPointer) in newTypeInfos)
+                    {
+                        switch (type)
+                        {
+                            case StructAst structAst:
+                                var typeFieldList = Activator.CreateInstance(typeFieldListType);
+                                InitializeConstList(typeFieldList, typeFieldListType, typeFieldType, structAst.Fields.Count);
+
+                                var typeFieldsField = typeInfoType.GetField("fields");
+                                typeFieldsField.SetValue(typeInfo, typeFieldList);
+
+                                var typeFieldListDataField = typeFieldListType.GetField("data");
+                                var typeFieldsDataPointer = GetPointer(typeFieldListDataField.GetValue(typeFieldList));
+
+                                for (var i = 0; i < structAst.Fields.Count; i++)
+                                {
+                                    var field = structAst.Fields[i];
+                                    var typeField = Activator.CreateInstance(typeFieldType);
+
+                                    var typeFieldName = typeFieldType.GetField("name");
+                                    typeFieldName.SetValue(typeField, GetString(field.Name));
+                                    var typeFieldInfo = typeFieldType.GetField("type_info");
+                                    var typePointer = _typeInfoPointers[field.Type.GenericName];
+                                    typeFieldInfo.SetValue(typeField, typePointer);
+
+                                    var listPointer = IntPtr.Add(typeFieldsDataPointer, typeFieldSize * i);
+                                    Marshal.StructureToPtr(typeField, listPointer, false);
+                                }
+                                break;
+                            case EnumAst enumAst:
+                                var enumValueList = Activator.CreateInstance(enumValueListType);
+                                InitializeConstList(enumValueList, enumValueListType, enumValueType, enumAst.Values.Count);
+
+                                var enumValuesField = typeInfoType.GetField("enum_values");
+                                enumValuesField.SetValue(typeInfo, enumValueList);
+
+                                var enumValuesListDataField = enumValueListType.GetField("data");
+                                var enumValuesDataPointer = GetPointer(enumValuesListDataField.GetValue(enumValueList));
+
+                                for (var i = 0; i < enumAst.Values.Count; i++)
+                                {
+                                    var value = enumAst.Values[i];
+                                    var enumValue = Activator.CreateInstance(enumValueType);
+
+                                    var enumValueName = enumValueType.GetField("name");
+                                    enumValueName.SetValue(enumValue, GetString(value.Name));
+                                    var enumValueValue = enumValueType.GetField("value");
+                                    enumValueValue.SetValue(enumValue, value.Value);
+
+                                    var listPointer = IntPtr.Add(enumValuesDataPointer, enumValueSize * i);
+                                    Marshal.StructureToPtr(enumValue, listPointer, false);
+                                }
+                                break;
+                            case FunctionAst function:
+                                var returnTypeField = typeInfoType.GetField("return_type");
+                                returnTypeField.SetValue(typeInfo, _typeInfoPointers[function.ReturnType.GenericName]);
+
+                                var argumentList = Activator.CreateInstance(argumentListType);
+                                var argumentCount = function.Varargs ? function.Arguments.Count - 1 : function.Arguments.Count;
+                                InitializeConstList(argumentList, argumentListType, argumentType, argumentCount);
+
+                                var argumentsField = typeInfoType.GetField("arguments");
+                                argumentsField.SetValue(typeInfo, argumentList);
+
+                                var argumentListDataField = argumentListType.GetField("data");
+                                var argumentListDataPointer = GetPointer(argumentListDataField.GetValue(argumentList));
+
+                                for (var i = 0; i < argumentCount; i++)
+                                {
+                                    var argument = function.Arguments[i];
+                                    var argumentValue = Activator.CreateInstance(argumentType);
+
+                                    var argumentName = argumentType.GetField("name");
+                                    argumentName.SetValue(argumentValue, GetString(argument.Name));
+                                    var argumentTypeField = argumentType.GetField("type_info");
+                                    if (argument.Type.Name == "Type")
+                                    {
+                                        argumentTypeField.SetValue(argumentValue, _typeInfoPointers["s32"]);
+                                    }
+                                    else if (argument.Type.Name == "Params")
+                                    {
+                                        argumentTypeField.SetValue(argumentValue, _typeInfoPointers[$"List.{argument.Type.Generics[0].GenericName}"]);
+                                    }
+                                    else
+                                    {
+                                        argumentTypeField.SetValue(argumentValue, _typeInfoPointers[argument.Type.GenericName]);
+                                    }
+
+                                    var listPointer = IntPtr.Add(argumentListDataPointer, argumentSize * i);
+                                    Marshal.StructureToPtr(argumentValue, listPointer, false);
+                                }
+                                break;
+                        }
+                        Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
+                    }
+                }
+
+                _typeCount = programGraph.Types.Count;
+            }
         }
 
         public void RunProgram(IAst ast)
@@ -209,33 +384,11 @@ namespace Lang.Runner
 
         private void ExecuteDeclaration(DeclarationAst declaration, IDictionary<string, ValueType> variables)
         {
-            var value = declaration.Name switch
-            {
-                "os" => GetOSVersion(),
-                "build_env" => GetBuildEnv(),
-                _ => declaration.Value == null ?
-                    GetUninitializedValue(declaration.Type, variables, declaration.Assignments) :
-                    ExecuteExpression(declaration.Value, variables).Value
-            };
+            var value = declaration.Value == null ?
+                GetUninitializedValue(declaration.Type, variables, declaration.Assignments) :
+                ExecuteExpression(declaration.Value, variables).Value;
 
             variables[declaration.Name] = new ValueType {Type = declaration.Type, Value = value};
-        }
-
-        private int GetOSVersion()
-        {
-            var platform = Environment.OSVersion.Platform;
-            return platform switch
-            {
-                PlatformID.Unix => 1,
-                PlatformID.Win32NT => 2,
-                PlatformID.MacOSX => 3,
-                _ => 0
-            };
-        }
-
-        private int GetBuildEnv()
-        {
-            return _buildSettings.Release ? 2 : 1;
         }
 
         private object GetUninitializedValue(TypeDefinition typeDef,
@@ -269,7 +422,7 @@ namespace Lang.Runner
         private object InitializeStruct(Type type, StructAst structAst,
             IDictionary<string, ValueType> variables, List<AssignmentAst> values = null)
         {
-            var assignments = values?.ToDictionary(_ => (_.Variable as VariableAst)!.Name);
+            var assignments = values?.ToDictionary(_ => (_.Reference as IdentifierAst)!.Name);
             var instance = Activator.CreateInstance(type);
             foreach (var field in structAst.Fields)
             {
@@ -291,9 +444,10 @@ namespace Lang.Runner
                             fieldInstance!.SetValue(instance, constantValue);
                             break;
                         case StructFieldRefAst structField:
-                            var enumDef = (EnumAst)_programGraph.Types[structField.Name];
-                            var value = enumDef.Values[structField.ValueIndex].Value;
-                            var enumType = _types[structField.Name];
+                            var enumName = structField.TypeNames[0];
+                            var enumDef = (EnumAst)_programGraph.Types[enumName];
+                            var value = enumDef.Values[structField.ValueIndices[0]].Value;
+                            var enumType = _types[enumName];
                             var enumInstance = Enum.ToObject(enumType, value);
                             fieldInstance!.SetValue(instance, enumInstance);
                             break;
@@ -336,31 +490,29 @@ namespace Lang.Runner
             var listType = _types[typeDef.GenericName];
             var genericType = GetTypeFromDefinition(typeDef.Generics[0]);
 
+            var list = Activator.CreateInstance(listType);
             if (typeDef.Count != null)
             {
                 var length = (int)ExecuteExpression(typeDef.Count, variables).Value;
-                return InitializeConstList(listType, genericType, length);
+                InitializeConstList(list, listType, genericType, length);
             }
-
-            var list = Activator.CreateInstance(listType);
-            var dataField = listType.GetField("data");
-            var array = Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * 10);
-            dataField!.SetValue(list, array);
+            else
+            {
+                var dataField = listType.GetField("data");
+                var array = Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * 10);
+                dataField!.SetValue(list, array);
+            }
 
             return list;
         }
 
-        private static object InitializeConstList(Type listType, Type genericType, int length)
+        private static void InitializeConstList(object list, Type listType, Type genericType, int length)
         {
-            var list = Activator.CreateInstance(listType);
-            var dataField = listType.GetField("data");
-
             var countField = listType.GetField("length");
             countField!.SetValue(list, length);
+            var dataField = listType.GetField("data");
             var array = Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * length);
             dataField!.SetValue(list, array);
-
-            return list;
         }
 
         private void ExecuteAssignment(AssignmentAst assignment, IDictionary<string, ValueType> variables)
@@ -368,38 +520,64 @@ namespace Lang.Runner
             var expression = ExecuteExpression(assignment.Value, variables);
             if (assignment.Operator != Operator.None)
             {
-                var lhs = ExecuteExpression(assignment.Variable, variables);
+                var lhs = ExecuteExpression(assignment.Reference, variables);
                 expression.Value = RunExpression(lhs, expression, assignment.Operator, lhs.Type);
                 expression.Type = lhs.Type;
             }
 
-            switch (assignment.Variable)
+            switch (assignment.Reference)
             {
-                case VariableAst variableAst:
+                case IdentifierAst identifier:
                 {
-                    var variable = variables[variableAst.Name];
+                    var variable = variables[identifier.Name];
                     variable.Value = expression.Value;
                     break;
                 }
                 case StructFieldRefAst structField:
                 {
-                    var variable = variables[structField.Name];
+                    var variable = ExecuteExpression(structField.Children[0], variables).Value;
 
-                    var fieldObject = variable.Value;
-                    var value = structField.Value;
-                    FieldInfo field;
-                    while (true)
+                    for (var i = 1; i < structField.Children.Count; i++)
                     {
-                        field = fieldObject!.GetType().GetField(value.Name);
-                        if (value.Value == null)
+                        var structName = structField.TypeNames[i-1];
+                        var structDefinition = (StructAst) _programGraph.Types[structName];
+
+                        if (structField.Pointers[i-1])
                         {
-                            break;
+                            var type = _types[structName];
+                            variable = Marshal.PtrToStructure(GetPointer(variable), type);
                         }
 
-                        fieldObject = field!.GetValue(fieldObject);
-                        value = value.Value;
+                        switch (structField.Children[i])
+                        {
+                            case IdentifierAst identifier:
+                                var field = variable!.GetType().GetField(identifier.Name);
+                                if (i == structField.Children.Count - 1)
+                                {
+                                    field!.SetValue(variable, expression.Value);
+                                }
+                                else
+                                {
+                                    variable = field!.GetValue(variable);
+                                }
+                                break;
+                            case IndexAst index:
+                                var list = variable!.GetType().GetField(index.Name);
+                                var listValue = list!.GetValue(variable);
+                                var fieldType = structDefinition.Fields[structField.ValueIndices[i-1]].Type;
+                                var elementType = fieldType.Generics[0];
+                                var (_, _, listPointer) = GetListPointer(index, variables, listValue, elementType);
+                                if (i == structField.Children.Count - 1)
+                                {
+                                    Marshal.StructureToPtr(expression.Value, listPointer, false);
+                                }
+                                else
+                                {
+                                    variable = PointerToTargetType(listPointer, elementType);
+                                }
+                                break;
+                        }
                     }
-                    field!.SetValue(fieldObject, expression.Value);
                     break;
                 }
                 case IndexAst indexAst:
@@ -552,22 +730,23 @@ namespace Lang.Runner
                 case StructFieldRefAst structField:
                     if (structField.IsEnum)
                     {
-                        var enumDef = (EnumAst)_programGraph.Types[structField.Name];
-                        var value = enumDef.Values[structField.ValueIndex].Value;
-                        var enumType = _types[structField.Name];
+                        var enumName = structField.TypeNames[0];
+                        var enumDef = (EnumAst)_programGraph.Types[enumName];
+                        var value = enumDef.Values[structField.ValueIndices[0]].Value;
+                        var enumType = _types[enumName];
                         var enumInstance = Enum.ToObject(enumType, value);
-                        return new ValueType {Type = new TypeDefinition {Name = structField.Name}, Value = enumInstance};
+                        return new ValueType {Type = new TypeDefinition {Name = enumName}, Value = enumInstance};
                     }
-                    var structVariable = variables[structField.Name];
-                    return GetStructFieldRef(structField, structVariable.Value);
-                case VariableAst variableAst:
-                    return variables[variableAst.Name];
+                    var structVariable = ExecuteExpression(structField.Children[0], variables);
+                    return GetStructFieldRef(structField, structVariable.Value, variables);
+                case IdentifierAst identifier:
+                    return variables[identifier.Name];
                 case ChangeByOneAst changeByOne:
-                    switch (changeByOne.Variable)
+                    switch (changeByOne.Value)
                     {
-                        case VariableAst variableAst:
+                        case IdentifierAst identifier:
                         {
-                            var variable = variables[variableAst.Name];
+                            var variable = variables[identifier.Name];
 
                             var previousValue = new ValueType {Type = variable.Type, Value = variable.Value};
                             variable.Value = PerformOperation(variable.Type, variable.Value, changeByOne.Positive ? 1 : -1, Operator.Add);
@@ -576,31 +755,53 @@ namespace Lang.Runner
                         }
                         case StructFieldRefAst structField:
                         {
-                            var variable = variables[structField.Name];
+                            var variable = ExecuteExpression(structField.Children[0], variables).Value;
+                            TypeDefinition fieldType = null;
+                            object newValue = null, previousValue = null;
 
-                            var fieldObject = variable.Value;
-                            var structFieldValue = structField.Value;
-                            FieldInfo field;
-                            TypeDefinition fieldType;
-                            var structDefinition = (StructAst) _programGraph.Types[structField.StructName];
-                            while (true)
+                            for (var i = 1; i < structField.Children.Count; i++)
                             {
-                                field = fieldObject!.GetType().GetField(structFieldValue.Name);
-                                if (structFieldValue.Value == null)
+                                var structName = structField.TypeNames[i-1];
+                                var structDefinition = (StructAst) _programGraph.Types[structName];
+                                fieldType = structDefinition.Fields[structField.ValueIndices[i-1]].Type;
+
+                                if (structField.Pointers[i-1])
                                 {
-                                    fieldType = structDefinition.Fields[structFieldValue.ValueIndex].Type;
-                                    break;
+                                    var type = _types[structName];
+                                    variable = Marshal.PtrToStructure(GetPointer(variable), type);
                                 }
 
-                                fieldObject = field!.GetValue(fieldObject);
-                                structDefinition = (StructAst) _programGraph.Types[structFieldValue.StructName];
-                                structFieldValue = structFieldValue.Value;
+                                switch (structField.Children[i])
+                                {
+                                    case IdentifierAst identifier:
+                                        var field = variable!.GetType().GetField(identifier.Name);
+                                        var fieldValue = field!.GetValue(variable);
+                                        if (i == structField.Children.Count - 1)
+                                        {
+                                            previousValue = fieldValue;
+                                            newValue = PerformOperation(fieldType, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
+                                            field.SetValue(variable, newValue);
+                                        }
+                                        else
+                                        {
+                                            variable = fieldValue;
+                                        }
+                                        break;
+                                    case IndexAst index:
+                                        var list = variable!.GetType().GetField(index.Name);
+                                        var listValue = list!.GetValue(variable);
+                                        var elementType = fieldType.Generics[0];
+                                        var (_, _, listPointer) = GetListPointer(index, variables, listValue, elementType);
+                                        variable = PointerToTargetType(listPointer, elementType);
+                                        if (i == structField.Children.Count - 1)
+                                        {
+                                            previousValue = variable;
+                                            newValue = PerformOperation(elementType, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
+                                            Marshal.StructureToPtr(newValue, listPointer, false);
+                                        }
+                                        break;
+                                }
                             }
-
-                            var previousValue = field!.GetValue(fieldObject);
-                            var newValue = PerformOperation(fieldType, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
-                            field.SetValue(fieldObject, newValue);
-
                             return new ValueType {Type = fieldType, Value = changeByOne.Prefix ? newValue : previousValue};
                         }
                         case IndexAst indexAst:
@@ -680,9 +881,10 @@ namespace Lang.Runner
                         var elementType = function.Arguments[^1].Type.Generics[0];
                         var paramsType = GetTypeFromDefinition(elementType);
                         var listType = _types[$"List.{elementType.GenericName}"];
-                        var paramsList = InitializeConstList(listType, paramsType, call.Arguments.Count - function.Arguments.Count + 1);
+                        var paramsList = Activator.CreateInstance(listType);
+                        InitializeConstList(paramsList, listType, paramsType, call.Arguments.Count - function.Arguments.Count + 1);
 
-                        var dataField = paramsList.GetType().GetField("data");
+                        var dataField = listType.GetField("data");
                         var data = dataField!.GetValue(paramsList);
                         var dataPointer = GetPointer(data!);
 
@@ -707,7 +909,7 @@ namespace Lang.Runner
                         {
                             var valueType = ExecuteExpression(call.Arguments[i], variables);
                             arguments[i] = valueType.Value;
-                            types[i] = GetTypeFromDefinition(valueType.Type, cCall: true);
+                            types[i] = GetTypeFromDefinition(valueType.Type, true);
                         }
 
                         // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
@@ -723,11 +925,11 @@ namespace Lang.Runner
                             else
                             {
                                 arguments[i] = valueType.Value;
-                                types[i] = GetTypeFromDefinition(valueType.Type, cCall: true);
+                                types[i] = GetTypeFromDefinition(valueType.Type, true);
                             }
                         }
 
-                        return CallFunction(call.Function, function, arguments, types);
+                        return CallFunction(call.Function, function, arguments, types, call.VarargsIndex);
                     }
                     else
                     {
@@ -738,7 +940,7 @@ namespace Lang.Runner
                             var argument = call.Arguments[i];
                             var valueType = ExecuteExpression(argument, variables);
                             arguments[i] = valueType.Value;
-                            types[i] = GetTypeFromDefinition(valueType.Type, cCall: function.Extern);
+                            types[i] = GetTypeFromDefinition(valueType.Type, function.Extern);
                         }
 
                         return CallFunction(call.Function, function, arguments, types);
@@ -786,61 +988,84 @@ namespace Lang.Runner
                         return value == "true";
                     }
 
-                    var stringType = _types["string"];
-                    var stringInstance = Activator.CreateInstance(stringType);
-                    var lengthField = stringType.GetField("length");
-                    lengthField!.SetValue(stringInstance, value.Length);
-
-                    var dataField = stringType.GetField("data");
-                    var stringPointer = Marshal.StringToHGlobalAnsi(value);
-                    dataField!.SetValue(stringInstance, stringPointer);
-
-                    return stringInstance;
+                    return GetString(value);
             }
         }
 
-        private ValueType GetStructFieldRef(StructFieldRefAst structField, object structVariable)
+        private object GetString(string value)
         {
-            var value = structField.Value;
-            var structDefinition = (StructAst) _programGraph.Types[structField.StructName];
+            var stringType = _types["string"];
+            var stringInstance = Activator.CreateInstance(stringType);
+            var lengthField = stringType.GetField("length");
+            lengthField!.SetValue(stringInstance, value.Length);
 
-            if (structField.IsPointer)
-            {
-                var type = _types[structField.StructName];
-                structVariable = Marshal.PtrToStructure(GetPointer(structVariable), type);
-            }
-            var field = structVariable!.GetType().GetField(value.Name);
-            var fieldValue = field!.GetValue(structVariable);
+            var dataField = stringType.GetField("data");
+            var stringPointer = Marshal.StringToHGlobalAnsi(value);
+            dataField!.SetValue(stringInstance, stringPointer);
 
-            if (value.Value == null)
-            {
-                var fieldType = structDefinition.Fields[structField.ValueIndex].Type;
-                return new ValueType {Type = fieldType, Value = fieldValue};
-            }
-
-            return GetStructFieldRef(value, fieldValue);
+            return stringInstance;
         }
 
-        private (TypeDefinition typeDef, Type elementType, IntPtr pointer) GetListPointer(IndexAst indexAst, IDictionary<string, ValueType> variables)
+        private ValueType GetStructFieldRef(StructFieldRefAst structField, object structVariable, IDictionary<string, ValueType> variables)
+        {
+            TypeDefinition fieldType = null;
+
+            for (var i = 1; i < structField.Children.Count; i++)
+            {
+                var structName = structField.TypeNames[i-1];
+                var structDefinition = (StructAst) _programGraph.Types[structName];
+                fieldType = structDefinition.Fields[structField.ValueIndices[i-1]].Type;
+
+                if (structField.Pointers[i-1])
+                {
+                    var type = _types[structName];
+                    structVariable = Marshal.PtrToStructure(GetPointer(structVariable), type);
+                }
+
+                switch (structField.Children[i])
+                {
+                    case IdentifierAst identifier:
+                        var field = structVariable!.GetType().GetField(identifier.Name);
+                        var fieldValue = field!.GetValue(structVariable);
+                        structVariable = fieldValue;
+                        break;
+                    case IndexAst index:
+                        var list = structVariable!.GetType().GetField(index.Name);
+                        var listValue = list!.GetValue(structVariable);
+                        fieldType = fieldType.Generics[0];
+                        var (_, _, listPointer) = GetListPointer(index, variables, listValue, fieldType);
+                        structVariable = PointerToTargetType(listPointer, fieldType);
+                        break;
+                }
+            }
+
+            return new ValueType {Type = fieldType, Value = structVariable};
+        }
+
+        private (TypeDefinition typeDef, Type elementType, IntPtr pointer) GetListPointer(IndexAst indexAst, IDictionary<string, ValueType> variables, object listObject = null, TypeDefinition elementTypeDef = null)
         {
             var index = (int)ExecuteExpression(indexAst.Index, variables).Value;
 
-            var variable = ExecuteExpression(indexAst.Variable, variables);
-            var typeDef = variable.Type.Generics[0];
-            var elementType = GetTypeFromDefinition(typeDef);
+            if (listObject == null)
+            {
+                var variable = variables[indexAst.Name];
+                listObject = variable.Value;
+                elementTypeDef ??= variable.Type.Generics[0];
+            }
+            var elementType = GetTypeFromDefinition(elementTypeDef);
 
-            var dataField = variable.Value.GetType().GetField("data");
-            var data = dataField!.GetValue(variable.Value);
+            var dataField = listObject.GetType().GetField("data");
+            var data = dataField!.GetValue(listObject);
             var dataPointer = GetPointer(data!);
 
             if (index == 0)
             {
-                return (typeDef, elementType, dataPointer);
+                return (elementTypeDef, elementType, dataPointer);
             }
 
             var valuePointer = IntPtr.Add(dataPointer, Marshal.SizeOf(elementType) * index);
 
-            return (typeDef, elementType, valuePointer);
+            return (elementTypeDef, elementType, valuePointer);
         }
 
         private static IntPtr GetPointer(object value)
@@ -859,7 +1084,7 @@ namespace Lang.Runner
         {
             if (targetType.Name == "*")
             {
-                return pointer;
+                return Marshal.ReadIntPtr(pointer);
             }
 
             type ??= GetTypeFromDefinition(targetType);
@@ -1400,30 +1625,43 @@ namespace Lang.Runner
             };
         }
 
-        private Type GetTypeFromDefinition(TypeDefinition typeDef, string parentName = null, Type parentType = null, bool cCall = false)
+        private Type GetTypeFromDefinition(TypeDefinition typeDef, IDictionary<string, TypeBuilder> temporaryTypes)
         {
             switch (typeDef.PrimitiveType)
             {
                 case IntegerType integerType:
-                    if (integerType.Signed)
+                    return GetIntegerType(integerType);
+                case FloatType floatType:
+                    return floatType.Bytes == 4 ? typeof(float) : typeof(double);
+            }
+
+            switch (typeDef.Name)
+            {
+                case "bool":
+                    return typeof(bool);
+                case "*":
+                    var pointerType = GetTypeFromDefinition(typeDef.Generics[0], temporaryTypes);
+                    if (pointerType == null)
                     {
-                        return integerType.Bytes switch
-                        {
-                            1 => typeof(sbyte),
-                            2 => typeof(short),
-                            4 => typeof(int),
-                            8 => typeof(long),
-                            _ => typeof(int)
-                        };
+                        return null;
                     }
-                    return integerType.Bytes switch
-                    {
-                        1 => typeof(byte),
-                        2 => typeof(ushort),
-                        4 => typeof(uint),
-                        8 => typeof(ulong),
-                        _ => typeof(uint)
-                    };
+                    return pointerType.MakePointerType();
+            }
+
+            if (_types.TryGetValue(typeDef.GenericName, out var type))
+            {
+                return type;
+            }
+
+            return temporaryTypes.TryGetValue(typeDef.GenericName, out var tempType) ? tempType : null;
+        }
+
+        private Type GetTypeFromDefinition(TypeDefinition typeDef, bool cCall = false)
+        {
+            switch (typeDef.PrimitiveType)
+            {
+                case IntegerType integerType:
+                    return GetIntegerType(integerType);
                 case FloatType floatType:
                     return floatType.Bytes == 4 ? typeof(float) : typeof(double);
             }
@@ -1436,7 +1674,7 @@ namespace Lang.Runner
                     if (!cCall) break;
                     return typeof(char).MakePointerType();
                 case "*":
-                    var pointerType = GetTypeFromDefinition(typeDef.Generics[0], parentName, parentType);
+                    var pointerType = GetTypeFromDefinition(typeDef.Generics[0], cCall);
                     if (pointerType == null)
                     {
                         return null;
@@ -1444,11 +1682,30 @@ namespace Lang.Runner
                     return pointerType.MakePointerType();
             }
 
-            if (typeDef.GenericName == parentName)
-            {
-                return parentType;
-            }
             return _types.TryGetValue(typeDef.GenericName, out var type) ? type : null;
+        }
+
+        private Type GetIntegerType(IntegerType integerType)
+        {
+            if (integerType.Signed)
+            {
+                return integerType.Bytes switch
+                {
+                    1 => typeof(sbyte),
+                    2 => typeof(short),
+                    4 => typeof(int),
+                    8 => typeof(long),
+                    _ => typeof(int)
+                };
+            }
+            return integerType.Bytes switch
+            {
+                1 => typeof(byte),
+                2 => typeof(ushort),
+                4 => typeof(uint),
+                8 => typeof(ulong),
+                _ => typeof(uint)
+            };
         }
     }
 }

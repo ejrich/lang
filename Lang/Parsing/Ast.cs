@@ -11,6 +11,14 @@ namespace Lang.Parsing
         List<IAst> Children { get; }
     }
 
+    public interface IType
+    {
+        string Name { get; set; }
+        int TypeIndex { get; set; }
+        TypeKind TypeKind { get; set; }
+        uint Size { get; set; }
+    }
+
     public class ScopeAst : IAst
     {
         public int FileIndex { get; set; }
@@ -19,12 +27,15 @@ namespace Lang.Parsing
         public List<IAst> Children { get; } = new();
     }
 
-    public class FunctionAst : IAst
+    public class FunctionAst : IAst, IType
     {
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
+        public int TypeIndex { get; set; }
+        public TypeKind TypeKind { get; set; } = TypeKind.Function;
+        public uint Size { get; set; } // Will always be 0
         public bool Extern { get; set; }
         public bool Compiler { get; set; }
         public string ExternLib { get; set; }
@@ -34,17 +45,21 @@ namespace Lang.Parsing
         public bool HasDirectives { get; set; }
         public bool CallsCompiler { get; set; }
         public TypeDefinition ReturnType { get; set; }
-        public List<Argument> Arguments { get; } = new();
+        public List<DeclarationAst> Arguments { get; } = new();
         public List<List<TypeDefinition>> VarargsCalls { get; set; }
         public List<IAst> Children { get; } = new();
     }
 
-    public class StructAst : IAst
+    public class StructAst : IAst, IType
     {
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
+        public int TypeIndex { get; set; }
+        public TypeKind TypeKind { get; set; }
+        public uint Size { get; set; }
+        public bool Verified { get; set; }
         public List<string> Generics { get; } = new();
         public List<StructFieldAst> Fields { get; } = new();
         public List<IAst> Children => null;
@@ -67,21 +82,22 @@ namespace Lang.Parsing
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
-        public string Name { get; set; }
         public bool IsEnum { get; set; }
-        public bool IsPointer { get; set; }
-        public string StructName { get; set; }
-        public StructFieldRefAst Value { get; set; }
-        public int ValueIndex { get; set; }
-        public List<IAst> Children => null;
+        public bool[] Pointers { get; set; }
+        public string[] TypeNames { get; set; }
+        public int[] ValueIndices { get; set; }
+        public List<IAst> Children { get; } = new();
     }
 
-    public class EnumAst : IAst
+    public class EnumAst : IAst, IType
     {
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
+        public int TypeIndex { get; set; }
+        public uint Size { get; set; } = 4;
+        public TypeKind TypeKind { get; set; } = TypeKind.Enum;
         public List<EnumValueAst> Values { get; } = new();
         public List<IAst> Children => null;
     }
@@ -106,6 +122,19 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
+    public class PrimitiveAst : IAst, IType
+    {
+        public int FileIndex { get; set; }
+        public int Line { get; init; }
+        public int Column { get; init; }
+        public string Name { get; set; }
+        public int TypeIndex { get; set; }
+        public uint Size { get; set; }
+        public TypeKind TypeKind { get; set; }
+        public IPrimitive Primitive { get; set; }
+        public List<IAst> Children => null;
+    }
+
     public class ConstantAst : IAst
     {
         public int FileIndex { get; set; }
@@ -125,7 +154,7 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
-    public class VariableAst : IAst
+    public class IdentifierAst : IAst
     {
         public int FileIndex { get; set; }
         public int Line { get; init; }
@@ -152,7 +181,7 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public bool Prefix { get; set; }
         public bool Positive { get; set; }
-        public IAst Variable { get; set; }
+        public IAst Value { get; set; }
         public List<IAst> Children => null;
     }
 
@@ -196,7 +225,7 @@ namespace Lang.Parsing
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
-        public IAst Variable { get; set; }
+        public IAst Reference { get; set; }
         public Operator Operator { get; set; }
         public IAst Value { get; set; }
         public List<IAst> Children => null;
@@ -239,7 +268,7 @@ namespace Lang.Parsing
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
-        public IAst Variable { get; set; }
+        public string Name { get; set; }
         public IAst Index { get; set; }
         public List<IAst> Children => null;
     }
@@ -254,17 +283,6 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
-    public class Argument : IAst
-    {
-        public int FileIndex { get; set; }
-        public int Line { get; init; }
-        public int Column { get; init; }
-        public string Name { get; set; }
-        public TypeDefinition Type { get; set; }
-        public IAst DefaultValue { get; set; }
-        public List<IAst> Children => null;
-    }
-
     public class TypeDefinition : IAst
     {
         public int FileIndex { get; set; }
@@ -274,6 +292,7 @@ namespace Lang.Parsing
         public bool IsGeneric { get; set; }
         public bool Constant { get; set; }
         public int GenericIndex { get; set; }
+        public int? TypeIndex { get; set; }
         public IPrimitive PrimitiveType { get; set; }
         public List<TypeDefinition> Generics { get; } = new();
         public IAst Count { get; set; }
@@ -310,6 +329,7 @@ namespace Lang.Parsing
         BitwiseAnd = '&',
         Xor = '^',
         Modulus = '%',
+        Dot = '.'
     }
 
     public enum UnaryOperator
@@ -326,5 +346,19 @@ namespace Lang.Parsing
         Run,
         If,
         Assert
+    }
+
+    public enum TypeKind
+    {
+        Void,
+        Boolean,
+        Integer,
+        Float,
+        String,
+        Pointer,
+        List,
+        Enum,
+        Struct,
+        Function
     }
 }

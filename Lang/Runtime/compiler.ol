@@ -14,7 +14,7 @@ enum BuildEnv {
     Other;
 }
 
-os: OS;
-build_env: BuildEnv;
+os: OS; #const
+build_env: BuildEnv; #const
 
 add_dependency(string library) #compiler

@@ -13,6 +13,56 @@ struct string {
 }
 
 
+// Runtime type information data
+struct TypeInfo {
+    string name;
+    TypeKind type;
+    u32 size;
+    List<TypeField> fields;
+    List<EnumValue> enum_values;
+    TypeInfo* return_type;
+    List<ArgumentType> arguments;
+}
+
+enum TypeKind {
+    Void;
+    Boolean;
+    Integer;
+    Float;
+    String;
+    Pointer;
+    List;
+    Enum;
+    Struct;
+    Function;
+}
+
+struct TypeField {
+    string name;
+    TypeInfo* type_info;
+}
+
+struct EnumValue {
+    string name;
+    int value;
+}
+
+struct ArgumentType {
+    string name;
+    TypeInfo* type_info;
+}
+
+__type_table: List<TypeInfo*>;
+
+TypeInfo type_of(Type type) {
+    return *__type_table[type];
+}
+
+u32 size_of(Type type) {
+    return __type_table[type].size;
+}
+
+
 // Basic IO functions
 printf(string format, ... args) #extern "libc"
 
@@ -23,16 +73,14 @@ int __start(int argc, string* argv) {
 
     each i in 1..argc-1 then args[i-1] = *(argv + i);
 
-    return main(args);
-
-    /* @Future Add compile time execution to write the correct return
-    #if function(main).return == Type.Void {
-        #if function(main).arguments.length == 0 then main();
+    #assert type_of(main).type == TypeKind.Function;
+    #if type_of(main).return_type.type == TypeKind.Void {
+        #if type_of(main).arguments.length == 0 then main();
         else then main(args);
         return 0;
     }
     else {
-        #if function(main).arguments.length == 0 then return main();
+        #if type_of(main).arguments.length == 0 then return main();
         else then return main(args);
-    }*/
+    }
 }

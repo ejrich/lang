@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -17,7 +18,8 @@ namespace Lang.Translation
         private readonly ProgramGraph _programGraph = new();
         private BuildSettings _buildSettings;
         private readonly Dictionary<string, StructAst> _polymorphicStructs = new();
-        private readonly Dictionary<string, TypeDefinition> _globalVariables = new();
+        private readonly Dictionary<string, IAst> _globalIdentifiers = new();
+        private int _typeIndex;
 
         public ProgramGraphBuilder(IProgramRunner programRunner)
         {
@@ -32,6 +34,20 @@ namespace Lang.Translation
             _buildSettings = buildSettings;
             var mainDefined = false;
             bool verifyAdditional;
+
+            // Add primitive types to global identifiers
+            AddPrimitive("void", TypeKind.Void);
+            AddPrimitive("bool", TypeKind.Boolean, size: 1);
+            AddPrimitive("s8", TypeKind.Integer, new IntegerType {Signed = true, Bytes = 1});
+            AddPrimitive("u8", TypeKind.Integer, new IntegerType {Bytes = 1});
+            AddPrimitive("s16", TypeKind.Integer, new IntegerType {Signed = true, Bytes = 2});
+            AddPrimitive("u16", TypeKind.Integer, new IntegerType {Bytes = 2});
+            AddPrimitive("s32", TypeKind.Integer, new IntegerType {Signed = true, Bytes = 4});
+            AddPrimitive("u32", TypeKind.Integer, new IntegerType {Bytes = 4});
+            AddPrimitive("s64", TypeKind.Integer, new IntegerType {Signed = true, Bytes = 8});
+            AddPrimitive("u64", TypeKind.Integer, new IntegerType {Bytes = 8});
+            AddPrimitive("float", TypeKind.Float, new FloatType {Bytes = 4});
+            AddPrimitive("float64", TypeKind.Float, new FloatType {Bytes = 8});
 
             do
             {
@@ -48,16 +64,25 @@ namespace Lang.Translation
                             if (_programGraph.Types.ContainsKey(structAst.Name))
                             {
                                 AddError($"Multiple definitions of struct '{structAst.Name}'", structAst);
+                                break;
                             }
-                            else if (structAst.Generics.Any())
+
+                            if (structAst.Generics.Any())
                             {
-                                _polymorphicStructs.Add(structAst.Name, structAst);
+                                if (_polymorphicStructs.ContainsKey(structAst.Name))
+                                {
+                                    AddError($"Multiple definitions of polymorphic struct '{structAst.Name}'", structAst);
+                                }
+                                _polymorphicStructs[structAst.Name] = structAst;
                             }
                             else
                             {
+                                structAst.TypeIndex = _typeIndex++;
+                                structAst.TypeKind = structAst.Name == "string" ? TypeKind.String : TypeKind.Struct;
                                 _programGraph.Types.Add(structAst.Name, structAst);
                             }
 
+                            _globalIdentifiers[structAst.Name] = structAst;
                             break;
                     }
                 }
@@ -68,7 +93,10 @@ namespace Lang.Translation
                     switch (parseResult.SyntaxTrees[i])
                     {
                         case StructAst structAst:
-                            VerifyStruct(structAst);
+                            if (!structAst.Verified)
+                            {
+                                VerifyStruct(structAst);
+                            }
                             parseResult.SyntaxTrees.RemoveAt(i--);
                             break;
                         case DeclarationAst globalVariable:
@@ -77,13 +105,12 @@ namespace Lang.Translation
                                 AddError("Global variable must either not be initialized or be initialized to a constant value", globalVariable.Value);
                             }
 
-                            VerifyDeclaration(globalVariable, null, _globalVariables);
+                            VerifyDeclaration(globalVariable, null, _globalIdentifiers);
                             _programGraph.Variables.Add(globalVariable);
                             parseResult.SyntaxTrees.RemoveAt(i--);
                             break;
                         case FunctionAst function:
-                            var main = function.Name == "main";
-                            if (main)
+                            if (function.Name == "main")
                             {
                                 if (mainDefined)
                                 {
@@ -92,12 +119,8 @@ namespace Lang.Translation
 
                                 mainDefined = true;
                             }
-                            else if (function.Name == "__start")
-                            {
-                                _programGraph.Start = function;
-                            }
 
-                            VerifyFunctionDefinition(function, main);
+                            VerifyFunctionDefinition(function);
                             parseResult.SyntaxTrees.RemoveAt(i--);
                             break;
                     }
@@ -115,9 +138,9 @@ namespace Lang.Translation
                             {
                                 case DirectiveType.If:
                                     var conditional = directive.Value as ConditionalAst;
-                                    if (VerifyCondition(conditional!.Condition, null, _globalVariables))
+                                    if (VerifyCondition(conditional!.Condition, null, _globalIdentifiers))
                                     {
-                                        _programRunner.Init(_programGraph, buildSettings);
+                                        _programRunner.Init(_programGraph);
                                         if (_programRunner.ExecuteCondition(conditional!.Condition))
                                         {
                                             additionalAsts.AddRange(conditional.Children);
@@ -130,9 +153,9 @@ namespace Lang.Translation
                                     parseResult.SyntaxTrees.RemoveAt(i--);
                                     break;
                                 case DirectiveType.Assert:
-                                    if (VerifyCondition(directive.Value, null, _globalVariables))
+                                    if (VerifyCondition(directive.Value, null, _globalIdentifiers))
                                     {
-                                        _programRunner.Init(_programGraph, buildSettings);
+                                        _programRunner.Init(_programGraph);
                                         if (!_programRunner.ExecuteCondition(directive.Value))
                                         {
                                             AddError("Assertion failed", directive.Value);
@@ -152,12 +175,11 @@ namespace Lang.Translation
             } while (verifyAdditional);
 
             // 4. Verify function bodies
-            foreach (var (_, function) in _programGraph.Functions)
+            foreach (var function in _programGraph.Functions.Values)
             {
                 if (function.Verified) continue;
                 VerifyFunction(function);
             }
-            VerifyFunction(_programGraph.Start);
 
             // 5. Execute any other compiler directives
             foreach (var ast in parseResult.SyntaxTrees)
@@ -179,6 +201,17 @@ namespace Lang.Translation
             return _programGraph;
         }
 
+        private void AddPrimitive(string name, TypeKind typeKind, IPrimitive primitive = null, uint size = 0)
+        {
+            var primitiveAst = new PrimitiveAst
+            {
+                Name = name, TypeIndex = _typeIndex++, TypeKind = typeKind,
+                Size = primitive?.Bytes ?? size, Primitive = primitive
+            };
+            _globalIdentifiers.Add(name, primitiveAst);
+            _programGraph.Types.Add(name, primitiveAst);
+        }
+
         private void VerifyEnum(EnumAst enumAst)
         {
             // 1. Verify enum has not already been defined
@@ -186,6 +219,8 @@ namespace Lang.Translation
             {
                 AddError($"Multiple definitions of enum '{enumAst.Name}'", enumAst);
             }
+            enumAst.TypeIndex = _typeIndex++;
+            _globalIdentifiers.Add(enumAst.Name, enumAst);
 
             // 2. Verify enums don't have repeated values
             var valueNames = new HashSet<string>();
@@ -222,12 +257,14 @@ namespace Lang.Translation
         private void VerifyStruct(StructAst structAst)
         {
             // 1. Verify struct fields have valid types
+            var invalid = false;
             var fieldNames = new HashSet<string>();
             foreach (var structField in structAst.Fields)
             {
                 // 1a. Check if the field has been previously defined
                 if (!fieldNames.Add(structField.Name))
                 {
+                    invalid = true;
                     AddError($"Struct '{structAst.Name}' already contains field '{structField.Name}'", structField);
                 }
 
@@ -236,6 +273,7 @@ namespace Lang.Translation
 
                 if (type == Type.Error)
                 {
+                    invalid = true;
                     AddError($"Type '{PrintTypeDefinition(structField.Type)}' of field {structAst.Name}.{structField.Name} is not defined", structField);
                 }
                 else if (structField.Type.Count != null)
@@ -244,11 +282,13 @@ namespace Lang.Translation
                     {
                         if (!uint.TryParse(constant.Value, out _))
                         {
+                            invalid = true;
                             AddError($"Expected type count to be positive integer, but got '{constant.Value}'", constant);
                         }
                     }
                     else
                     {
+                        invalid = true;
                         AddError("Type count should be a constant value", structField.Type.Count);
                     }
                 }
@@ -259,35 +299,74 @@ namespace Lang.Translation
                     case ConstantAst constant:
                         if (!TypeEquals(structField.Type, constant.Type))
                         {
+                            invalid = true;
                             AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(constant.Type)}'", constant);
                         }
                         break;
                     case StructFieldRefAst structFieldRef:
-                        if (_programGraph.Types.TryGetValue(structFieldRef.Name, out var fieldType))
+                        if (structFieldRef.Children[0] is IdentifierAst identifier)
                         {
-                            if (fieldType is EnumAst enumAst)
+                            if (_programGraph.Types.TryGetValue(identifier.Name, out var fieldType))
                             {
-                                var enumType = VerifyEnumValue(structFieldRef, enumAst);
-                                if (enumType != null && !TypeEquals(structField.Type, enumType))
+                                if (fieldType is EnumAst enumAst)
                                 {
-                                    AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(enumType)}'", structFieldRef);
+                                    var enumType = VerifyEnumValue(enumAst, structFieldRef);
+                                    if (enumType != null && !TypeEquals(structField.Type, enumType))
+                                    {
+                                            invalid = true;
+                                        AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(enumType)}'", structFieldRef);
+                                    }
+                                }
+                                else
+                                {
+                                    invalid = true;
+                                    AddError($"Default value of '{structAst.Name}.{structField.Name}' must be constant or enum value", structFieldRef);
                                 }
                             }
                             else
                             {
-                                AddError($"Default value must be constant or enum value, but got field of '{structFieldRef.Name}'", structFieldRef);
+                                invalid = true;
+                                AddError($"Type '{identifier.Name}' is not defined", identifier);
                             }
                         }
                         else
                         {
-                            AddError($"Type '{structFieldRef.Name}' not defined", structFieldRef);
+                            invalid = true;
+                            AddError($"Default value of '{structAst.Name}.{structField.Name}' must be constant or enum value", structFieldRef);
                         }
                         break;
+                    case null:
+                        break;
+                    default:
+                        invalid = true;
+                        AddError($"Expected default value of {structAst.Name}.{structField.Name} to be a constant value", structField.DefaultValue);
+                        break;
+                }
+
+                // 1d. Check for circular dependencies
+                if (structAst.Name == structField.Type.Name)
+                {
+                    invalid = true;
+                    AddError($"Struct '{structAst.Name}' has circular reference in field '{structField.Name}'", structField);
                 }
             }
+
+            // 2, Empty structs are not allowed
+            if (structAst.Fields.Count == 0)
+            {
+                invalid = true;
+                AddError($"Struct '{structAst.Name}' must have at least 1 field", structAst);
+            }
+
+            // 3. Calculate the size of the struct
+            if (!structAst.Generics.Any() && !invalid)
+            {
+                CalculateStructSize(structAst);
+            }
+            structAst.Verified = true;
         }
 
-        private void VerifyFunctionDefinition(FunctionAst function, bool main)
+        private void VerifyFunctionDefinition(FunctionAst function, bool main = false)
         {
             // 1. Verify the return type of the function is valid
             var returnType = VerifyType(function.ReturnType);
@@ -371,31 +450,32 @@ namespace Lang.Translation
                 }
 
                 // 3c. Check for default arguments
-                if (argument.DefaultValue != null)
+                if (argument.Value != null)
                 {
-                    switch (argument.DefaultValue)
+                    switch (argument.Value)
                     {
                         case ConstantAst constantAst:
                             if (!TypeEquals(argument.Type, constantAst.Type))
                             {
-                                AddError($"Default function argument expected type '{PrintTypeDefinition(argument.Type)}', but got '{PrintTypeDefinition(constantAst.Type)}'", argument.DefaultValue);
+                                AddError($"Default function argument expected type '{PrintTypeDefinition(argument.Type)}', but got '{PrintTypeDefinition(constantAst.Type)}'", argument.Value);
                             }
                             break;
                         case NullAst nullAst:
                             if (type != Type.Pointer)
                             {
-                                AddError("Default function argument can only be null for pointers", argument.DefaultValue);
+                                AddError("Default function argument can only be null for pointers", argument.Value);
                             }
                             nullAst.TargetType = argument.Type;
                             break;
                         default:
-                            AddError("Default function argument should be a constant or null", argument.DefaultValue);
+                            AddError("Default function argument should be a constant or null", argument.Value);
                             break;
                     }
                 }
             }
 
             // 4. Load the function into the dictionary
+            function.TypeIndex = _typeIndex++;
             if (!_programGraph.Functions.TryAdd(function.Name, function))
             {
                 AddError($"Multiple definitions of function '{function.Name}'", function);
@@ -405,11 +485,18 @@ namespace Lang.Translation
         private void VerifyFunction(FunctionAst function)
         {
             // 1. Initialize local variables
-            var localVariables = new Dictionary<string, TypeDefinition>(_globalVariables);
+            var scopeIdentifiers = new Dictionary<string, IAst>(_globalIdentifiers);
             foreach (var argument in function.Arguments)
             {
                 // Arguments with the same name as a global variable will be used instead of the global
-                localVariables[argument.Name] = argument.Type;
+                if (scopeIdentifiers.TryGetValue(argument.Name, out var identifier))
+                {
+                    if (identifier is not DeclarationAst)
+                    {
+                        AddError($"Argument '{argument.Name}' already exists as a type", argument);
+                    }
+                }
+                scopeIdentifiers[argument.Name] = argument;
             }
             var returnType = VerifyType(function.ReturnType);
 
@@ -431,7 +518,7 @@ namespace Lang.Translation
             }
 
             // 4. Loop through function body and verify all ASTs
-            var returned = VerifyAsts(function.Children, function, localVariables);
+            var returned = VerifyAsts(function.Children, function, scopeIdentifiers);
 
             // 5. Verify the main function doesn't call the compiler
             if (function.Name == "main" && function.CallsCompiler)
@@ -470,9 +557,9 @@ namespace Lang.Translation
                             case DirectiveType.If:
 
                                 var conditional = directive.Value as ConditionalAst;
-                                if (VerifyCondition(conditional!.Condition, null, _globalVariables))
+                                if (VerifyCondition(conditional!.Condition, null, _globalIdentifiers))
                                 {
-                                    _programRunner.Init(_programGraph, _buildSettings);
+                                    _programRunner.Init(_programGraph);
                                     if (_programRunner.ExecuteCondition(conditional!.Condition))
                                     {
                                         asts.InsertRange(i, conditional.Children);
@@ -484,9 +571,9 @@ namespace Lang.Translation
                                 }
                                 break;
                             case DirectiveType.Assert:
-                                if (VerifyCondition(directive.Value, null, _globalVariables))
+                                if (VerifyCondition(directive.Value, null, _globalIdentifiers))
                                 {
-                                    _programRunner.Init(_programGraph, _buildSettings);
+                                    _programRunner.Init(_programGraph);
                                     if (!_programRunner.ExecuteCondition(directive.Value))
                                     {
                                         AddError("Assertion failed", directive.Value);
@@ -500,12 +587,12 @@ namespace Lang.Translation
             }
         }
 
-        private bool VerifyAsts(List<IAst> asts, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables)
+        private bool VerifyAsts(List<IAst> asts, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             var returns = false;
             foreach (var ast in asts)
             {
-                if (VerifyAst(ast, currentFunction, localVariables))
+                if (VerifyAst(ast, currentFunction, scopeIdentifiers))
                 {
                     returns = true;
                 }
@@ -513,45 +600,45 @@ namespace Lang.Translation
             return returns;
         }
 
-        private bool VerifyScope(List<IAst> syntaxTrees, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables)
+        private bool VerifyScope(List<IAst> syntaxTrees, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Create scope variables
-            var scopeVariables = new Dictionary<string, TypeDefinition>(localVariables);
+            var scopeVariables = new Dictionary<string, IAst>(scopeIdentifiers);
 
             // 2. Verify function lines
             return VerifyAsts(syntaxTrees, currentFunction, scopeVariables);
         }
 
-        private bool VerifyAst(IAst syntaxTree, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables)
+        private bool VerifyAst(IAst syntaxTree, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             switch (syntaxTree)
             {
                 case ReturnAst returnAst:
-                    VerifyReturnStatement(returnAst, currentFunction, localVariables);
+                    VerifyReturnStatement(returnAst, currentFunction, scopeIdentifiers);
                     return true;
                 case DeclarationAst declaration:
-                    VerifyDeclaration(declaration, currentFunction, localVariables);
+                    VerifyDeclaration(declaration, currentFunction, scopeIdentifiers);
                     break;
                 case AssignmentAst assignment:
-                    VerifyAssignment(assignment, currentFunction, localVariables);
+                    VerifyAssignment(assignment, currentFunction, scopeIdentifiers);
                     break;
                 case ScopeAst scope:
-                    return VerifyScope(scope.Children, currentFunction, localVariables);
+                    return VerifyScope(scope.Children, currentFunction, scopeIdentifiers);
                 case ConditionalAst conditional:
-                    return VerifyConditional(conditional, currentFunction, localVariables);
+                    return VerifyConditional(conditional, currentFunction, scopeIdentifiers);
                 case WhileAst whileAst:
-                    return VerifyWhile(whileAst, currentFunction, localVariables);
+                    return VerifyWhile(whileAst, currentFunction, scopeIdentifiers);
                 case EachAst each:
-                    return VerifyEach(each, currentFunction, localVariables);
+                    return VerifyEach(each, currentFunction, scopeIdentifiers);
                 default:
-                    VerifyExpression(syntaxTree, currentFunction, localVariables);
+                    VerifyExpression(syntaxTree, currentFunction, scopeIdentifiers);
                     break;
             }
 
             return false;
         }
 
-        private void VerifyReturnStatement(ReturnAst returnAst, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables)
+        private void VerifyReturnStatement(ReturnAst returnAst, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Infer the return type of the function
             var returnType = VerifyType(currentFunction.ReturnType);
@@ -567,7 +654,7 @@ namespace Lang.Translation
             }
 
             // 3. Determine if the expression returns the correct value
-            var returnValueType = VerifyExpression(returnAst.Value, currentFunction, localVariables);
+            var returnValueType = VerifyExpression(returnAst.Value, currentFunction, scopeIdentifiers);
             if (returnValueType == null)
             {
                 AddError($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnType)}'", returnAst);
@@ -581,12 +668,12 @@ namespace Lang.Translation
             }
         }
 
-        private void VerifyDeclaration(DeclarationAst declaration, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables)
+        private void VerifyDeclaration(DeclarationAst declaration, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Verify the variable is already defined
-            if (localVariables.ContainsKey(declaration.Name))
+            if (scopeIdentifiers.ContainsKey(declaration.Name))
             {
-                AddError($"Variable '{declaration.Name}' already defined", declaration);
+                AddError($"Identifier '{declaration.Name}' already defined", declaration);
                 return;
             }
 
@@ -634,21 +721,21 @@ namespace Lang.Translation
                     foreach (var assignment in declaration.Assignments)
                     {
                         StructFieldAst field = null;
-                        if (assignment.Variable is not VariableAst variableAst)
+                        if (assignment.Reference is not IdentifierAst identifier)
                         {
-                            AddError("Expected to get field in object initializer", assignment.Variable);
+                            AddError("Expected to get field in object initializer", assignment.Reference);
                         }
-                        else if (!fields.TryGetValue(variableAst.Name, out field))
+                        else if (!fields.TryGetValue(identifier.Name, out field))
                         {
-                            AddError($"Field '{variableAst.Name}' not present in struct '{PrintTypeDefinition(declaration.Type)}'", assignment.Variable);
+                            AddError($"Field '{identifier.Name}' not present in struct '{PrintTypeDefinition(declaration.Type)}'", assignment.Reference);
                         }
 
                         if (assignment.Operator != Operator.None)
                         {
-                            AddError("Cannot have operator assignments in object initializers", assignment.Variable);
+                            AddError("Cannot have operator assignments in object initializers", assignment.Reference);
                         }
 
-                        var valueType = VerifyExpression(assignment.Value, currentFunction, localVariables);
+                        var valueType = VerifyExpression(assignment.Value, currentFunction, scopeIdentifiers);
                         if (valueType != null && field != null)
                         {
                             if (!TypeEquals(field.Type, valueType))
@@ -667,12 +754,25 @@ namespace Lang.Translation
             // 4. Verify declaration values
             else
             {
-                var valueType = VerifyExpression(declaration.Value, currentFunction, localVariables);
+                if (declaration.Value == null)
+                {
+                    switch (declaration.Name)
+                    {
+                        case "os":
+                            declaration.Value = GetOSVersion();
+                            break;
+                        case "build_env":
+                            declaration.Value = GetBuildEnv();
+                            break;
+                    }
+                }
+
+                var valueType = VerifyExpression(declaration.Value, currentFunction, scopeIdentifiers);
 
                 // 4a. Verify the assignment value matches the type definition if it has been defined
                 if (declaration.Type == null)
                 {
-                    if (valueType.Name == "void")
+                    if (valueType?.Name == "void")
                     {
                         AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.Value);
                         return;
@@ -688,7 +788,7 @@ namespace Lang.Translation
                     }
                     else if (type == Type.Void)
                     {
-                        AddError($"Variables cannot be assigned type 'void'", declaration.Type);
+                        AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.Type);
                     }
 
                     // Verify the type is correct
@@ -710,15 +810,20 @@ namespace Lang.Translation
             // 5. Verify the type definition count if necessary
             if (declaration.Type?.Count != null)
             {
-                VerifyExpression(declaration.Type.Count, currentFunction, localVariables);
+                VerifyExpression(declaration.Type.Count, currentFunction, scopeIdentifiers);
             }
 
             // 6. Verify constant values
             if (declaration.Constant)
             {
-                if (declaration.Value == null || declaration.Value is not ConstantAst)
+                switch (declaration.Value)
                 {
-                    AddError($"Constant variable '{declaration.Name}' should be assigned a constant value", declaration);
+                    case ConstantAst:
+                    case StructFieldRefAst structField when structField.IsEnum:
+                        break;
+                    default:
+                        AddError($"Constant variable '{declaration.Name}' should be assigned a constant value", declaration);
+                        break;
                 }
                 if (declaration.Type != null)
                 {
@@ -726,18 +831,49 @@ namespace Lang.Translation
                 }
             }
 
-            localVariables.Add(declaration.Name, declaration.Type);
+            scopeIdentifiers.Add(declaration.Name, declaration);
         }
 
-        private void VerifyAssignment(AssignmentAst assignment, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables)
+        private StructFieldRefAst GetOSVersion()
+        {
+            return new StructFieldRefAst
+            {
+                Children = {
+                    new IdentifierAst {Name = "OS"},
+                    new IdentifierAst
+                    {
+                        Name = Environment.OSVersion.Platform switch
+                        {
+                            PlatformID.Unix => "Linux",
+                            PlatformID.Win32NT => "Windows",
+                            PlatformID.MacOSX => "Mac",
+                            _ => "None"
+                        }
+                    }
+                }
+            };
+        }
+
+        private StructFieldRefAst GetBuildEnv()
+        {
+            return new StructFieldRefAst
+            {
+                Children = {
+                    new IdentifierAst {Name = "BuildEnv"},
+                    new IdentifierAst {Name = _buildSettings.Release ? "Release" : "Debug"}
+                }
+            };
+        }
+
+        private void VerifyAssignment(AssignmentAst assignment, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Verify the variable is already defined and that it is not a constant
-            var variableTypeDefinition = GetVariable(assignment.Variable, currentFunction, localVariables);
+            var variableTypeDefinition = GetReference(assignment.Reference, currentFunction, scopeIdentifiers);
             if (variableTypeDefinition == null) return;
 
             if (variableTypeDefinition.Constant)
             {
-                var variable = assignment.Variable as VariableAst;
+                var variable = assignment.Reference as IdentifierAst;
                 AddError($"Cannot reassign value of constant variable '{variable?.Name}'", assignment);
             }
 
@@ -755,7 +891,7 @@ namespace Lang.Translation
                 nullAst.TargetType = variableTypeDefinition;
                 return;
             }
-            var valueType = VerifyExpression(assignment.Value, currentFunction, localVariables);
+            var valueType = VerifyExpression(assignment.Value, currentFunction, scopeIdentifiers);
 
             // 3. Verify the assignment value matches the variable type definition
             if (valueType != null)
@@ -821,77 +957,160 @@ namespace Lang.Translation
             }
         }
 
-        private TypeDefinition GetVariable(IAst ast, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables)
+        private TypeDefinition GetReference(IAst ast, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
-            // 2. Get the variable name
-            var variableName = ast switch
+            switch (ast)
             {
-                VariableAst variable => variable.Name,
-                StructFieldRefAst fieldRef => fieldRef.Name,
-                IndexAst index => index.Variable switch
-                {
-                    VariableAst variable => variable.Name,
-                    StructFieldRefAst fieldRef => fieldRef.Name,
-                    _ => string.Empty
-                },
-                _ => string.Empty
-            };
-            if (!localVariables.TryGetValue(variableName, out var variableTypeDefinition))
+                case IdentifierAst identifier:
+                    return GetVariable(identifier.Name, identifier, scopeIdentifiers);
+                case IndexAst index:
+                    var type = GetVariable(index.Name, index, scopeIdentifiers);
+                    return type != null ? VerifyIndex(index, type, currentFunction, scopeIdentifiers) : null;
+                case StructFieldRefAst structFieldRef:
+                    structFieldRef.Pointers = new bool[structFieldRef.Children.Count - 1];
+                    structFieldRef.TypeNames = new string[structFieldRef.Children.Count - 1];
+                    structFieldRef.ValueIndices = new int[structFieldRef.Children.Count - 1];
+
+                    TypeDefinition refType;
+                    switch (structFieldRef.Children[0])
+                    {
+                        case IdentifierAst identifier:
+                            refType = GetVariable(identifier.Name, identifier, scopeIdentifiers, true);
+                            break;
+                        case IndexAst index:
+                            var variableType = GetVariable(index.Name, index, scopeIdentifiers);
+                            if (variableType == null) return null;
+                            refType = VerifyIndex(index, variableType, currentFunction, scopeIdentifiers);
+                            break;
+                        default:
+                            AddError("Expected to have a reference to a variable, field, or pointer", structFieldRef.Children[0]);
+                            return null;
+                    }
+                    if (refType == null)
+                    {
+                        return null;
+                    }
+
+                    for (var i = 1; i < structFieldRef.Children.Count; i++)
+                    {
+                        switch (structFieldRef.Children[i])
+                        {
+                            case IdentifierAst identifier:
+                                refType = VerifyStructField(identifier.Name, refType, structFieldRef, i-1, identifier);
+                                break;
+                            case IndexAst index:
+                                var fieldType = VerifyStructField(index.Name, refType, structFieldRef, i-1, index);
+                                if (fieldType == null) return null;
+                                refType = VerifyIndex(index, fieldType, currentFunction, scopeIdentifiers);
+                                break;
+                            default:
+                                AddError("Expected to have a reference to a variable, field, or pointer", structFieldRef.Children[i]);
+                                return null;
+                        }
+                        if (refType == null)
+                        {
+                            return null;
+                        }
+                    }
+
+                    return refType;
+                default:
+                    AddError("Expected to have a reference to a variable, field, or pointer", ast);
+                    return null;
+            }
+        }
+
+        private TypeDefinition GetVariable(string name, IAst ast, IDictionary<string, IAst> scopeIdentifiers, bool allowEnums = false)
+        {
+            if (!scopeIdentifiers.TryGetValue(name, out var identifier))
             {
-                AddError($"Variable '{variableName}' not defined", ast);
+                AddError($"Variable '{name}' not defined", ast);
+                return null;
+            }
+            if (allowEnums && identifier is EnumAst enumAst)
+            {
+                return new TypeDefinition {Name = enumAst.Name};
+            }
+            if (identifier is not DeclarationAst declaration)
+            {
+                AddError($"Identifier '{name}' is not a variable", ast);
+                return null;
+            }
+            return declaration.Type;
+        }
+
+        private TypeDefinition VerifyStructField(string fieldName, TypeDefinition structType, StructFieldRefAst structField, int fieldIndex, IAst ast)
+        {
+            // 1. Load the struct definition in typeDefinition
+            if (structType.Name == "*")
+            {
+                structType = structType.Generics[0];
+                structField.Pointers[fieldIndex] = true;
+            }
+            var genericName = structType.GenericName;
+            structField.TypeNames[fieldIndex] = genericName;
+            if (!_programGraph.Types.TryGetValue(genericName, out var typeDefinition))
+            {
+                AddError($"Struct '{PrintTypeDefinition(structType)}' not defined", ast);
+                return null;
+            }
+            if (typeDefinition is not StructAst structDefinition)
+            {
+                AddError($"Type '{PrintTypeDefinition(structType)}' does not contain field '{fieldName}'", ast);
                 return null;
             }
 
-            // 2. Get the exact type definition
-            if (ast is StructFieldRefAst structField)
+            // 2. Get the field definition and set the field index
+            StructFieldAst field = null;
+            for (var i = 0; i < structDefinition.Fields.Count; i++)
             {
-                variableTypeDefinition = VerifyStructFieldRef(structField, variableTypeDefinition);
-                if (variableTypeDefinition == null) return null;
-            }
-            else if (ast is IndexAst index)
-            {
-                if (index.Variable is StructFieldRefAst indexStructField)
+                if (structDefinition.Fields[i].Name == fieldName)
                 {
-                    variableTypeDefinition = VerifyStructFieldRef(indexStructField, variableTypeDefinition);
-                    if (variableTypeDefinition == null) return null;
+                    structField.ValueIndices[fieldIndex] = i;
+                    field = structDefinition.Fields[i];
+                    break;
                 }
-                variableTypeDefinition = VerifyIndex(index, variableTypeDefinition, currentFunction, localVariables);
-                if (variableTypeDefinition == null) return null;
+            }
+            if (field == null)
+            {
+                AddError($"Struct '{PrintTypeDefinition(structType)}' does not contain field '{fieldName}'", ast);
+                return null;
             }
 
-            return variableTypeDefinition;
+            return field.Type;
         }
 
-        private bool VerifyConditional(ConditionalAst conditional, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables)
+        private bool VerifyConditional(ConditionalAst conditional, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Verify the condition expression
-            VerifyCondition(conditional.Condition, currentFunction, localVariables);
+            VerifyCondition(conditional.Condition, currentFunction, scopeIdentifiers);
 
             // 2. Verify the conditional scope
-            var ifReturned = VerifyScope(conditional.Children, currentFunction, localVariables);
+            var ifReturned = VerifyScope(conditional.Children, currentFunction, scopeIdentifiers);
 
             // 3. Verify the else block if necessary
             if (conditional.Else.Any())
             {
-                var elseReturned = VerifyScope(conditional.Else, currentFunction, localVariables);
+                var elseReturned = VerifyScope(conditional.Else, currentFunction, scopeIdentifiers);
                 return ifReturned && elseReturned;
             }
 
             return false;
         }
 
-        private bool VerifyWhile(WhileAst whileAst, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables)
+        private bool VerifyWhile(WhileAst whileAst, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Verify the condition expression
-            VerifyCondition(whileAst.Condition, currentFunction, localVariables);
+            VerifyCondition(whileAst.Condition, currentFunction, scopeIdentifiers);
 
             // 2. Verify the scope of the while block
-            return VerifyScope(whileAst.Children, currentFunction, localVariables);
+            return VerifyScope(whileAst.Children, currentFunction, scopeIdentifiers);
         }
 
-        private bool VerifyCondition(IAst ast, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables)
+        private bool VerifyCondition(IAst ast, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
-            var conditionalType = VerifyExpression(ast, currentFunction, localVariables);
+            var errorCount = _programGraph.Errors.Count;
+            var conditionalType = VerifyExpression(ast, currentFunction, scopeIdentifiers);
             switch (VerifyType(conditionalType))
             {
                 case Type.Int:
@@ -899,36 +1118,39 @@ namespace Lang.Translation
                 case Type.Boolean:
                 case Type.Pointer:
                     // Valid types
-                    return true;
+                    return errorCount == _programGraph.Errors.Count;
+                case Type.Error:
+                    AddError($"Expected condition to be bool, int, float, or pointer", ast);
+                    return false;
                 default:
                     AddError($"Expected condition to be bool, int, float, or pointer, but got '{PrintTypeDefinition(conditionalType)}'", ast);
                     return false;
             }
         }
 
-        private bool VerifyEach(EachAst each, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables)
+        private bool VerifyEach(EachAst each, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
-            var eachVariables = new Dictionary<string, TypeDefinition>(localVariables);
+            var eachIdentifiers = new Dictionary<string, IAst>(scopeIdentifiers);
             // 1. Verify the iterator or range
-            if (eachVariables.ContainsKey(each.IterationVariable))
+            if (eachIdentifiers.ContainsKey(each.IterationVariable))
             {
                 AddError($"Iteration variable '{each.IterationVariable}' already exists in scope", each);
             };
             if (each.Iteration != null)
             {
-                var variableTypeDefinition = VerifyExpression(each.Iteration, currentFunction, localVariables);
+                var variableTypeDefinition = VerifyExpression(each.Iteration, currentFunction, scopeIdentifiers);
                 if (variableTypeDefinition == null) return false;
-                var iteratorType = variableTypeDefinition.Generics.FirstOrDefault();
+                var iterator = new DeclarationAst {Name = each.IterationVariable, Type = variableTypeDefinition.Generics.FirstOrDefault()};
 
                 switch (variableTypeDefinition.Name)
                 {
                     case "List":
-                        each.IteratorType = iteratorType;
-                        eachVariables.TryAdd(each.IterationVariable, iteratorType);
+                        each.IteratorType = iterator.Type;
+                        eachIdentifiers.TryAdd(each.IterationVariable, iterator);
                         break;
                     case "Params":
-                        each.IteratorType = iteratorType;
-                        eachVariables.TryAdd(each.IterationVariable, iteratorType);
+                        each.IteratorType = iterator.Type;
+                        eachIdentifiers.TryAdd(each.IterationVariable, iterator);
                         break;
                     default:
                         AddError($"Type {PrintTypeDefinition(variableTypeDefinition)} cannot be used as an iterator", each.Iteration);
@@ -937,25 +1159,29 @@ namespace Lang.Translation
             }
             else
             {
-                var beginType = VerifyExpression(each.RangeBegin, currentFunction, localVariables);
+                var beginType = VerifyExpression(each.RangeBegin, currentFunction, scopeIdentifiers);
                 if (VerifyType(beginType) != Type.Int)
                 {
                     AddError($"Expected range to begin with 'int', but got '{PrintTypeDefinition(beginType)}'", each.RangeBegin);
                 }
-                var endType = VerifyExpression(each.RangeEnd, currentFunction, localVariables);
+                var endType = VerifyExpression(each.RangeEnd, currentFunction, scopeIdentifiers);
                 if (VerifyType(endType) != Type.Int)
                 {
                     AddError($"Expected range to end with 'int', but got '{PrintTypeDefinition(endType)}'", each.RangeEnd);
                 }
-                var iterType = new TypeDefinition {Name = "int", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
-                if (!eachVariables.TryAdd(each.IterationVariable, iterType))
+                var iterType = new DeclarationAst
+                {
+                    Name = each.IterationVariable,
+                    Type = new TypeDefinition {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}}
+                };
+                if (!eachIdentifiers.TryAdd(each.IterationVariable, iterType))
                 {
                     AddError($"Iteration variable '{each.IterationVariable}' already exists in scope", each);
                 };
             }
 
             // 2. Verify the scope of the each block
-            return VerifyAsts(each.Children, currentFunction, eachVariables);
+            return VerifyAsts(each.Children, currentFunction, eachIdentifiers);
         }
 
         private void VerifyTopLevelDirective(CompilerDirectiveAst directive)
@@ -963,10 +1189,10 @@ namespace Lang.Translation
             switch (directive.Type)
             {
                 case DirectiveType.Run:
-                    VerifyAst(directive.Value, null, _globalVariables);
+                    VerifyAst(directive.Value, null, _globalIdentifiers);
                     if (!_programGraph.Errors.Any())
                     {
-                        _programRunner.Init(_programGraph, _buildSettings);
+                        _programRunner.Init(_programGraph);
                         _programRunner.RunProgram(directive.Value);
                     }
                     break;
@@ -976,7 +1202,7 @@ namespace Lang.Translation
             }
         }
 
-        private TypeDefinition VerifyExpression(IAst ast, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables)
+        private TypeDefinition VerifyExpression(IAst ast, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Verify the expression value
             switch (ast)
@@ -986,84 +1212,111 @@ namespace Lang.Translation
                 case NullAst:
                     return null;
                 case StructFieldRefAst structField:
-                {
-                    if (!localVariables.TryGetValue(structField.Name, out var structType))
+                    TypeDefinition refType;
+                    switch (structField.Children[0])
                     {
-                        if (_programGraph.Types.TryGetValue(structField.Name, out var type))
-                        {
-                            if (type is EnumAst enumAst)
+                        case IdentifierAst identifier:
+                            if (!scopeIdentifiers.TryGetValue(identifier.Name, out var value))
                             {
-                                return VerifyEnumValue(structField, enumAst);
+                                AddError($"Identifier '{identifier}' not defined", ast);
+                                return null;
                             }
-                            AddError($"Cannot reference static field of type '{structField.Name}'", ast);
-                            return null;
-                        }
-                        AddError($"Variable '{structField.Name}' not defined", ast);
+                            switch (value)
+                            {
+                                case EnumAst enumAst:
+                                    return VerifyEnumValue(enumAst, structField);
+                                case DeclarationAst declaration:
+                                    refType = declaration.Type;
+                                    break;
+                                default:
+                                    AddError($"Cannot reference static field of type '{identifier.Name}'", ast);
+                                    return null;
+                            }
+                            break;
+                        default:
+                            refType = VerifyExpression(structField.Children[0], currentFunction, scopeIdentifiers);
+                            break;
+                    }
+                    if (refType == null)
+                    {
                         return null;
                     }
-                    return VerifyStructFieldRef(structField, structType);
-                }
-                case VariableAst variable:
-                    if (!localVariables.TryGetValue(variable.Name, out var typeDefinition))
-                    {
-                        AddError($"Variable '{variable.Name}' not defined", ast);
-                    }
-                    return typeDefinition;
-                case ChangeByOneAst changeByOne:
-                    switch (changeByOne.Variable)
-                    {
-                        case VariableAst variable:
-                            if (localVariables.TryGetValue(variable.Name, out var variableType))
-                            {
-                                var type = VerifyType(variableType);
-                                if (type == Type.Int || type == Type.Float) return variableType;
+                    structField.Pointers = new bool[structField.Children.Count - 1];
+                    structField.TypeNames = new string[structField.Children.Count - 1];
+                    structField.ValueIndices = new int[structField.Children.Count - 1];
 
-                                var op = changeByOne.Positive ? "increment" : "decrement";
-                                AddError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(variableType)}'", variable);
-                                return null;
-                            }
-                            else
-                            {
-                                AddError($"Variable '{variable.Name}' not defined", variable);
-                                return null;
-                            }
-                        case StructFieldRefAst structField:
-                            if (localVariables.TryGetValue(structField.Name, out var structType))
-                            {
-                                var fieldType = VerifyStructFieldRef(structField, structType);
+                    for (var i = 1; i < structField.Children.Count; i++)
+                    {
+                        switch (structField.Children[i])
+                        {
+                            case IdentifierAst identifier:
+                                refType = VerifyStructField(identifier.Name, refType, structField, i-1, identifier);
+                                break;
+                            case IndexAst index:
+                                var fieldType = VerifyStructField(index.Name, refType, structField, i-1, index);
                                 if (fieldType == null) return null;
-
-                                var type = VerifyType(fieldType);
-                                if (type == Type.Int || type == Type.Float) return fieldType;
-
-                                var op = changeByOne.Positive ? "increment" : "decrement";
-                                AddError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(fieldType)}'", structField);
+                                refType = VerifyIndex(index, fieldType, currentFunction, scopeIdentifiers);
+                                break;
+                            default:
+                                AddError("Expected to have a reference to a variable, field, or pointer", structField.Children[i]);
                                 return null;
-                            }
-                            else
-                            {
-                                AddError($"Variable '{structField.Name}' not defined", structField);
-                                return null;
-                            }
-                        case IndexAst index:
-                            var indexType = VerifyIndexType(index, currentFunction, localVariables, out var variableAst);
-                            if (indexType != null)
-                            {
-                                var type = VerifyType(indexType);
-                                if (type == Type.Int || type == Type.Float) return indexType;
-
-                                var op = changeByOne.Positive ? "increment" : "decrement";
-                                AddError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(indexType)}'", variableAst);
-                            }
+                        }
+                        if (refType == null)
+                        {
                             return null;
+                        }
+                    }
+                    return refType;
+                case IdentifierAst identifierAst:
+                {
+                    if (!scopeIdentifiers.TryGetValue(identifierAst.Name, out var identifier))
+                    {
+                        if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functionAst))
+                        {
+                            return new TypeDefinition {Name = "Type", TypeIndex = functionAst.TypeIndex};
+                        }
+                        AddError($"Identifier '{identifierAst.Name}' not defined", identifierAst);
+                    }
+                    switch (identifier)
+                    {
+                        case DeclarationAst declaration:
+                            return declaration.Type;
+                        case IType type:
+                            if (type is StructAst structAst && structAst.Generics.Any())
+                            {
+                                AddError($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
+                            }
+                            return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
                         default:
-                            var operand = changeByOne.Positive ? "increment" : "decrement";
-                            AddError($"Expected to {operand} variable", changeByOne);
+                            return null;
+                    }
+                }
+                case ChangeByOneAst changeByOne:
+                    var op = changeByOne.Positive ? "increment" : "decrement";
+                    switch (changeByOne.Value)
+                    {
+                        case IdentifierAst:
+                        case StructFieldRefAst:
+                        case IndexAst:
+                            var expressionType = VerifyExpression(changeByOne.Value, currentFunction, scopeIdentifiers);
+                            if (expressionType != null)
+                            {
+                                var type = VerifyType(expressionType);
+                                if (type != Type.Int && type != Type.Float)
+                                {
+                                    AddError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(expressionType)}'", changeByOne.Value);
+                                    return null;
+                                }
+                            }
+
+                            return expressionType;
+                        default:
+                            AddError($"Expected to {op} variable", changeByOne);
                             return null;
                     }
                 case UnaryAst unary:
                 {
-                    var valueType = VerifyExpression(unary.Value, currentFunction, localVariables);
+                    var valueType = VerifyExpression(unary.Value, currentFunction, scopeIdentifiers);
                     var type = VerifyType(valueType);
                     switch (unary.Operator)
                     {
@@ -1072,24 +1325,33 @@ namespace Lang.Translation
                             {
                                 return valueType;
                             }
-                            AddError($"Expected type 'bool', but got type '{PrintTypeDefinition(valueType)}'", unary.Value);
+                            else if (type != Type.Error)
+                            {
+                                AddError($"Expected type 'bool', but got type '{PrintTypeDefinition(valueType)}'", unary.Value);
+                            }
                             return null;
                         case UnaryOperator.Negate:
                             if (type == Type.Int || type == Type.Float)
                             {
                                 return valueType;
                             }
-                            AddError($"Negation not compatible with type '{PrintTypeDefinition(valueType)}'", unary.Value);
+                            else if (type != Type.Error)
+                            {
+                                AddError($"Negation not compatible with type '{PrintTypeDefinition(valueType)}'", unary.Value);
+                            }
                             return null;
                         case UnaryOperator.Dereference:
                             if (type == Type.Pointer)
                             {
                                 return valueType.Generics[0];
                             }
-                            AddError($"Cannot dereference type '{PrintTypeDefinition(valueType)}'", unary.Value);
+                            else if (type != Type.Error)
+                            {
+                                AddError($"Cannot dereference type '{PrintTypeDefinition(valueType)}'", unary.Value);
+                            }
                             return null;
                         case UnaryOperator.Reference:
-                            if (unary.Value is VariableAst || unary.Value is StructFieldRefAst || unary.Value is IndexAst || type == Type.Pointer)
+                            if (unary.Value is IdentifierAst || unary.Value is StructFieldRefAst || unary.Value is IndexAst || type == Type.Pointer)
                             {
                                 var pointerType = new TypeDefinition {Name = "*"};
                                 pointerType.Generics.Add(valueType);
@@ -1108,7 +1370,7 @@ namespace Lang.Translation
                         AddError($"Call to undefined function '{call.Function}'", call);
                     }
 
-                    var arguments = call.Arguments.Select(arg => VerifyExpression(arg, currentFunction, localVariables)).ToList();
+                    var arguments = call.Arguments.Select(arg => VerifyExpression(arg, currentFunction, scopeIdentifiers)).ToList();
 
                     if (function != null)
                     {
@@ -1151,13 +1413,13 @@ namespace Lang.Translation
                             var argumentAst = call.Arguments.ElementAtOrDefault(i);
                             if (argumentAst == null)
                             {
-                                if (functionArg.DefaultValue == null)
+                                if (functionArg.Value == null)
                                 {
                                     callError = true;
                                 }
                                 else
                                 {
-                                    call.Arguments.Insert(i, functionArg.DefaultValue);
+                                    call.Arguments.Insert(i, functionArg.Value);
                                 }
                             }
                             else if (argumentAst is NullAst nullAst)
@@ -1173,7 +1435,29 @@ namespace Lang.Translation
                                 var argument = arguments[i];
                                 if (argument != null)
                                 {
-                                    if (!TypeEquals(functionArg.Type, argument))
+                                    if (functionArg.Type.Name == "Type")
+                                    {
+                                        var typeIndex = new ConstantAst
+                                        {
+                                            Type = new TypeDefinition {PrimitiveType = new IntegerType {Signed = true, Bytes = 4}},
+                                        };
+                                        if (argument.TypeIndex.HasValue)
+                                        {
+                                            typeIndex.Value = argument.TypeIndex.ToString();
+                                        }
+                                        else if (argument.Name == "Type")
+                                        {
+                                            continue;
+                                        }
+                                        else
+                                        {
+                                            var type = _programGraph.Types[argument.GenericName];
+                                            typeIndex.Value = type.TypeIndex.ToString();
+                                        }
+                                        call.Arguments[i] = typeIndex;
+                                        arguments[i] = typeIndex.Type;
+                                    }
+                                    else if (!TypeEquals(functionArg.Type, argument))
                                     {
                                         callError = true;
                                     }
@@ -1223,6 +1507,19 @@ namespace Lang.Translation
                         }
                         else if (function.Varargs)
                         {
+                            for (var i = 0; i < arguments.Count; i++)
+                            {
+                                var argument = arguments[i];
+                                // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
+                                // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
+                                if (argument?.PrimitiveType is FloatType {Bytes: 4})
+                                {
+                                    arguments[i] = argument = new TypeDefinition
+                                    {
+                                        Name = "float64", PrimitiveType = new FloatType {Bytes = 8}
+                                    };
+                                }
+                            }
                             var found = false;
                             for (var index = 0; index < function.VarargsCalls.Count; index++)
                             {
@@ -1232,17 +1529,7 @@ namespace Lang.Translation
                                     var callMatches = true;
                                     for (var i = 0; i < callTypes.Count; i++)
                                     {
-                                        var argument = arguments[i];
-                                        // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
-                                        // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
-                                        if (argument.PrimitiveType is FloatType {Bytes: 4})
-                                        {
-                                            arguments[i] = argument = new TypeDefinition
-                                            {
-                                                Name = "float64", PrimitiveType = new FloatType {Bytes = 8}
-                                            };
-                                        }
-                                        if (!TypeEquals(callTypes[i], argument, true))
+                                        if (!TypeEquals(callTypes[i], arguments[i], true))
                                         {
                                             callMatches = false;
                                             break;
@@ -1273,13 +1560,25 @@ namespace Lang.Translation
                     }
                     return function?.ReturnType;
                 case ExpressionAst expression:
-                    return VerifyExpressionType(expression, currentFunction, localVariables);
+                    return VerifyExpressionType(expression, currentFunction, scopeIdentifiers);
                 case IndexAst index:
-                    return VerifyIndexType(index, currentFunction, localVariables, out _);
+                    return VerifyIndexType(index, currentFunction, scopeIdentifiers);
+                case TypeDefinition typeDef:
+                {
+                    if (VerifyType(typeDef) == Type.Error)
+                    {
+                        return null;
+                    }
+                    if (!_programGraph.Types.TryGetValue(typeDef.GenericName, out var type))
+                    {
+                        return null;
+                    }
+                    return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
+                }
                 case null:
                     return null;
                 default:
-                    AddError($"Unexpected Ast '{ast}'", ast);
+                    AddError($"Invalid expression", ast);
                     return null;
             }
         }
@@ -1315,10 +1614,11 @@ namespace Lang.Translation
             }
         }
 
-        private TypeDefinition VerifyExpressionType(ExpressionAst expression, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables)
+        private TypeDefinition VerifyExpressionType(ExpressionAst expression, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Get the type of the initial child
-            expression.Type = VerifyExpression(expression.Children[0], currentFunction, localVariables);
+            expression.Type = VerifyExpression(expression.Children[0], currentFunction, scopeIdentifiers);
+            if (expression.Type == null) return null;
             for (var i = 1; i < expression.Children.Count; i++)
             {
                 // 2. Get the next operator and expression type
@@ -1337,7 +1637,7 @@ namespace Lang.Translation
                     continue;
                 }
 
-                var nextExpressionType = VerifyExpression(next, currentFunction, localVariables);
+                var nextExpressionType = VerifyExpression(next, currentFunction, scopeIdentifiers);
                 if (nextExpressionType == null) return null;
 
                 // 3. Verify the operator and expression types are compatible and convert the expression type if necessary
@@ -1466,7 +1766,7 @@ namespace Lang.Translation
                             else if (!(type == Type.Boolean || type == Type.Int))
                             {
                                 // If the type can't be determined, default to int
-                                expression.Type = new TypeDefinition {Name = "int"};
+                                expression.Type = new TypeDefinition {Name = "s32"};
                             }
                         }
                         break;
@@ -1476,14 +1776,20 @@ namespace Lang.Translation
             return expression.Type;
         }
 
-        private TypeDefinition VerifyEnumValue(StructFieldRefAst enumRef, EnumAst enumAst)
+        private TypeDefinition VerifyEnumValue(EnumAst enumAst, StructFieldRefAst structField)
         {
-            enumRef.IsEnum = true;
-            var value = enumRef.Value;
+            structField.IsEnum = true;
+            structField.TypeNames = new [] {enumAst.Name};
 
-            if (value.Value != null)
+            if (structField.Children.Count > 2)
             {
-                AddError("Cannot get a value of an enum value", value.Value);
+                AddError("Cannot get a value of an enum value", structField.Children[2]);
+                return null;
+            }
+
+            if (structField.Children[1] is not IdentifierAst value)
+            {
+                AddError($"Value of enum '{enumAst.Name}' should be an identifier", structField.Children[1]);
                 return null;
             }
 
@@ -1492,7 +1798,7 @@ namespace Lang.Translation
             {
                 if (enumAst.Values[i].Name == value.Name)
                 {
-                    enumRef.ValueIndex = i;
+                    structField.ValueIndices = new [] {i};
                     enumValue = enumAst.Values[i];
                     break;
                 }
@@ -1507,109 +1813,47 @@ namespace Lang.Translation
             return new TypeDefinition {Name = enumAst.Name, PrimitiveType = new EnumType()};
         }
 
-        private TypeDefinition VerifyStructFieldRef(StructFieldRefAst structField, TypeDefinition structType)
+        private TypeDefinition VerifyIndexType(IndexAst index, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
-            // 1. Load the struct definition in typeDefinition
-            var genericName = structType.GenericName;
-            if (structType.Name == "*")
+            if (!scopeIdentifiers.TryGetValue(index.Name, out var identifier))
             {
-                genericName = structType.Generics[0].GenericName;
-                structField.IsPointer = true;
-            }
-            structField.StructName = genericName;
-            if (!_programGraph.Types.TryGetValue(genericName, out var typeDefinition))
-            {
-                AddError($"Struct '{PrintTypeDefinition(structType)}' not defined", structField);
+                AddError($"Variable '{index.Name}' not defined", index);
                 return null;
             }
-            if (typeDefinition is not StructAst)
+            if (identifier is not DeclarationAst declaration)
             {
-                AddError($"Type '{PrintTypeDefinition(structType)}' is not a struct", structField);
+                AddError($"Identifier '{index.Name}' is not a variable", index);
                 return null;
             }
-            var structDefinition = (StructAst) typeDefinition;
-
-            // 2. If the type of the field is other, recurse and return
-            var value = structField.Value;
-            StructFieldAst field = null;
-            for (var i = 0; i < structDefinition.Fields.Count; i++)
-            {
-                if (structDefinition.Fields[i].Name == value.Name)
-                {
-                    structField.ValueIndex = i;
-                    field = structDefinition.Fields[i];
-                    break;
-                }
-            }
-            if (field == null)
-            {
-                AddError($"Struct '{PrintTypeDefinition(structType)}' does not contain field '{value.Name}'", structField);
-                return null;
-            }
-
-            return value.Value == null ? field.Type : VerifyStructFieldRef(value, field.Type);
+            return VerifyIndex(index, declaration.Type, currentFunction, scopeIdentifiers);
         }
 
-        private TypeDefinition VerifyIndexType(IndexAst index, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables, out IAst variableAst)
-        {
-            switch (index.Variable)
-            {
-                case VariableAst variable:
-                    variableAst = variable;
-                    if (localVariables.TryGetValue(variable.Name, out var variableType))
-                    {
-                        return VerifyIndex(index, variableType, currentFunction, localVariables);
-                    }
-                    else
-                    {
-                        AddError($"Variable '{variable.Name}' not defined", variable);
-                        return null;
-                    }
-                case StructFieldRefAst structField:
-                    variableAst = structField;
-                    if (localVariables.TryGetValue(structField.Name, out var structType))
-                    {
-                        var fieldType = VerifyStructFieldRef(structField, structType);
-                        return fieldType == null ? null : VerifyIndex(index, fieldType, currentFunction, localVariables);
-                    }
-                    else
-                    {
-                        AddError($"Variable '{structField.Name}' not defined", structField);
-                        return null;
-                    }
-                default:
-                    variableAst = null;
-                    AddError("Expected to index a variable", index);
-                    return null;
-            }
-        }
-
-
-        private TypeDefinition VerifyIndex(IndexAst index, TypeDefinition typeDef, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables)
+        private TypeDefinition VerifyIndex(IndexAst index, TypeDefinition typeDef, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Verify the variable is a list
             var type = VerifyType(typeDef);
             if (type != Type.List && type != Type.Params)
             {
-                AddError($"Cannot index type '{PrintTypeDefinition(typeDef)}'", index.Variable);
+                AddError($"Cannot index type '{PrintTypeDefinition(typeDef)}'", index);
                 return null;
             }
 
             // 2. Load the list element type definition
-            var indexType = typeDef.Generics.FirstOrDefault();
-            if (indexType == null)
+            var elementType = typeDef.Generics.FirstOrDefault();
+            if (elementType == null)
             {
                 AddError("Unable to determine element type of the List", index);
             }
 
             // 3. Verify the count expression is an integer
-            var countType = VerifyExpression(index.Index, currentFunction, localVariables);
-            if (VerifyType(countType) != Type.Int)
+            var indexValue = VerifyExpression(index.Index, currentFunction, scopeIdentifiers);
+            var indexType = VerifyType(indexValue);
+            if (indexType != Type.Int && indexType != Type.Type)
             {
-                AddError($"Expected List index to be type 'int', but got '{PrintTypeDefinition(countType)}'", index);
+                AddError($"Expected List index to be type 'int', but got '{PrintTypeDefinition(indexValue)}'", index);
             }
 
-            return indexType;
+            return elementType;
         }
 
         private static bool TypeEquals(TypeDefinition a, TypeDefinition b, bool checkPrimitives = false)
@@ -1647,6 +1891,7 @@ namespace Lang.Translation
             }
             return true;
         }
+
 
         private Type VerifyType(TypeDefinition typeDef)
         {
@@ -1696,7 +1941,7 @@ namespace Lang.Translation
                 case "bool":
                     if (hasGenerics)
                     {
-                        AddError("boolean type cannot have generics", typeDef);
+                        AddError("Type 'bool' cannot have generics", typeDef);
                         return Type.Error;
                     }
                     if (hasCount)
@@ -1708,7 +1953,7 @@ namespace Lang.Translation
                 case "string":
                     if (hasGenerics)
                     {
-                        AddError("string type cannot have generics", typeDef);
+                        AddError("Type 'string' cannot have generics", typeDef);
                         return Type.Error;
                     }
                     if (hasCount)
@@ -1721,7 +1966,7 @@ namespace Lang.Translation
                 {
                     if (typeDef.Generics.Count != 1)
                     {
-                        AddError($"List type should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
+                        AddError($"Type 'List' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
                         return Type.Error;
                     }
                     return VerifyList(typeDef) ? Type.List : Type.Error;
@@ -1729,7 +1974,7 @@ namespace Lang.Translation
                 case "void":
                     if (hasGenerics)
                     {
-                        AddError("void type cannot have generics", typeDef);
+                        AddError("Type 'void' cannot have generics", typeDef);
                         return Type.Error;
                     }
                     if (hasCount)
@@ -1744,11 +1989,22 @@ namespace Lang.Translation
                         AddError($"pointer type should have reference to 1 type, but got {typeDef.Generics.Count}", typeDef);
                         return Type.Error;
                     }
-                    return VerifyType(typeDef.Generics[0]) == Type.Error ? Type.Error : Type.Pointer;
+                    if (_programGraph.Types.ContainsKey(typeDef.GenericName))
+                    {
+                        return Type.Pointer;
+                    }
+                    if (VerifyType(typeDef.Generics[0]) == Type.Error)
+                    {
+                        return Type.Error;
+                    }
+
+                    var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeIndex = _typeIndex++, TypeKind = TypeKind.Pointer, Size = 8};
+                    _programGraph.Types.Add(typeDef.GenericName, pointer);
+                    return Type.Pointer;
                 case "...":
                     if (hasGenerics)
                     {
-                        AddError("Varargs type cannot have generics", typeDef);
+                        AddError("Type 'varargs' cannot have generics", typeDef);
                         return Type.Error;
                     }
                     return Type.VarArgs;
@@ -1756,11 +2012,18 @@ namespace Lang.Translation
                 {
                     if (typeDef.Generics.Count != 1)
                     {
-                        AddError($"Params type should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
+                        AddError($"Type 'Params' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
                         return Type.Error;
                     }
                     return VerifyList(typeDef) ? Type.Params : Type.Error;
                 }
+                case "Type":
+                    if (hasGenerics)
+                    {
+                        AddError("Type 'Type' cannot have generics", typeDef);
+                        return Type.Error;
+                    }
+                    return Type.Type;
                 default:
                     if (typeDef.Generics.Any())
                     {
@@ -1768,6 +2031,15 @@ namespace Lang.Translation
                         if (_programGraph.Types.ContainsKey(genericName))
                         {
                             return Type.Struct;
+                        }
+                        var generics = typeDef.Generics.ToArray();
+                        var error = false;
+                        foreach (var generic in generics)
+                        {
+                            if (VerifyType(generic) == Type.Error)
+                            {
+                                error = true;
+                            }
                         }
                         if (!_polymorphicStructs.TryGetValue(typeDef.Name, out var structDef))
                         {
@@ -1779,7 +2051,8 @@ namespace Lang.Translation
                             AddError($"Expected type '{typeDef.Name}' to have {structDef.Generics.Count} generic(s), but got {typeDef.Generics.Count}", typeDef);
                             return Type.Error;
                         }
-                        CreatePolymorphedStruct(structDef, genericName, typeDef.Generics.ToArray());
+                        if (error) return Type.Error;
+                        CreatePolymorphedStruct(structDef, PrintTypeDefinition(typeDef), genericName, TypeKind.Struct, generics);
                         return Type.Struct;
                     }
                     if (!_programGraph.Types.TryGetValue(typeDef.Name, out var type))
@@ -1817,13 +2090,13 @@ namespace Lang.Translation
                 return false;
             }
 
-            CreatePolymorphedStruct(structDef, genericName, listType);
+            CreatePolymorphedStruct(structDef, $"List<{PrintTypeDefinition(listType)}>", genericName, TypeKind.List, listType);
             return true;
         }
 
-        private void CreatePolymorphedStruct(StructAst structAst, string name, params TypeDefinition[] genericTypes)
+        private void CreatePolymorphedStruct(StructAst structAst, string name, string genericName, TypeKind typeKind, params TypeDefinition[] genericTypes)
         {
-            var polyStruct = new StructAst {Name = name};
+            var polyStruct = new StructAst {Name = name, TypeIndex = _typeIndex++, TypeKind = typeKind, Verified = true};
             foreach (var field in structAst.Fields)
             {
                 if (field.HasGeneric)
@@ -1839,10 +2112,11 @@ namespace Lang.Translation
                 }
             }
 
-            _programGraph.Types.Add(name, polyStruct);
+            CalculateStructSize(polyStruct);
+            _programGraph.Types.Add(genericName, polyStruct);
         }
 
-        private static TypeDefinition CopyType(TypeDefinition type, TypeDefinition[] genericTypes)
+        private TypeDefinition CopyType(TypeDefinition type, TypeDefinition[] genericTypes)
         {
             if (type.IsGeneric)
             {
@@ -1857,8 +2131,28 @@ namespace Lang.Translation
             {
                 copyType.Generics.Add(CopyType(generic, genericTypes));
             }
+            VerifyType(copyType);
 
             return copyType;
+        }
+
+        private void CalculateStructSize(StructAst structAst)
+        {
+            foreach (var field in structAst.Fields)
+            {
+                // 1. Get the type from program graph
+                var type = _programGraph.Types[field.Type.GenericName];
+
+                // 2. If the type is a struct and the size hasn't been calculated, verify the struct and calculate the size
+                if (type is StructAst fieldStruct)
+                {
+                    if (!fieldStruct.Verified)
+                    {
+                        VerifyStruct(fieldStruct);
+                    }
+                }
+                structAst.Size += type.Size;
+            }
         }
 
         private static string PrintTypeDefinition(TypeDefinition type)

@@ -18,9 +18,14 @@ int main(List<string> args) {
     fac6 := factorial(6);
     printf("%d! = %d\n", 6, fac6);
     my_struct := create();
+    printf("my_struct: field = %d, something = %f, subvalue.something = %d\n", my_struct.field, my_struct.something, my_struct.subValue.something);
+    call_field := create().something;
+    printf("call_field = %f\n", call_field);
+
     prim := primitives();
     list := create_list(4);
-    ptr := *pointers();
+    ptr := pointers();
+    printf("Pointer = %p, Value = %d\n", ptr, *ptr);
     str := string_test();
     printf("%s - Hello world %d, %d, %d\n", str, 1, 2, b);
     sum_test();
@@ -58,8 +63,17 @@ int main(List<string> args) {
     }
 
     compiler_directives();
-
     open_window();
+
+    print_type_info(MyStruct);
+    print_type_info(u8);
+    print_type_info(List<string>);
+    print_type_info(PolyStruct<int*, float>);
+    print_type_info(PolyStruct<List<int>, float>);
+    print_type_info(s32*);
+    print_type_info(State);
+    print_type_info(my_struct.subValue);
+    print_type_info(bar);
 
     return 0;
 }
@@ -167,6 +181,7 @@ List<int> create_list(int count) {
 manipulate_list_struct() {
     s: ListStruct;
     s.list[0] = 8.9;
+    ++s.list[0];
     printf("%.2f\n", s.list[0]);
 }
 
@@ -316,4 +331,19 @@ build() {
 
 #if os == OS.Linux {
     XOpenDisplay(string name) #extern "X11"
+}
+
+print_type_info(Type type) {
+    type_info := type_of(type);
+    printf("Type Name = %s, Type Kind = %d, Type Size = %d, Field Count = %d\n", type_info.name, type_info.type, type_info.size, type_info.fields.length);
+    each field in type_info.fields then
+        printf("Field name = %s, Field type name = %s\n", field.name, field.type_info.name);
+    each enum_value in type_info.enum_values then
+        printf("Enum value name = %s, Value = %d\n", enum_value.name, enum_value.value);
+
+    if type_info.type == TypeKind.Function {
+        printf("Return type = %s\n", type_info.return_type.name);
+        each arg in type_info.arguments then
+            printf("Argument name = %s, Argument type name = %s, Argument type kind = %d\n", arg.name, arg.type_info.name, arg.type_info.type);
+    }
 }
