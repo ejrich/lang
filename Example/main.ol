@@ -181,6 +181,7 @@ List<int> create_list(int count) {
 manipulate_list_struct() {
     s: ListStruct;
     s.list[0] = 8.9;
+    ++s.list[0];
     printf("%.2f\n", s.list[0]);
 }
 

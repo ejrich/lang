@@ -1195,7 +1195,7 @@ namespace Lang.Parsing
                         // This case would be `var b = 4 + a++`, where we have a value before the operator
                         var changeByOneAst = CreateAst<ChangeByOneAst>(token);
                         changeByOneAst.Positive = token.Type == TokenType.Increment;
-                        changeByOneAst.Variable = expression.Children[^1];
+                        changeByOneAst.Value = expression.Children[^1];
                         expression.Children[^1] = changeByOneAst;
                         continue;
                     }
@@ -1358,7 +1358,12 @@ namespace Lang.Parsing
                         var changeByOneAst = CreateAst<ChangeByOneAst>(enumerator.Current);
                         changeByOneAst.Prefix = true;
                         changeByOneAst.Positive = positive;
-                        changeByOneAst.Variable = ParseNextExpressionUnit(enumerator, errors, out operatorRequired);
+                        changeByOneAst.Value = ParseNextExpressionUnit(enumerator, errors, out operatorRequired);
+                        if (enumerator.Peek()?.Type == TokenType.Period)
+                        {
+                            enumerator.MoveNext();
+                            changeByOneAst.Value = ParseStructFieldRef(enumerator, errors, changeByOneAst.Value);
+                        }
                         return changeByOneAst;
                     }
                     else
@@ -1386,6 +1391,11 @@ namespace Lang.Parsing
                         var unaryAst = CreateAst<UnaryAst>(token);
                         unaryAst.Operator = (UnaryOperator)token.Value[0];
                         unaryAst.Value = ParseNextExpressionUnit(enumerator, errors, out operatorRequired);
+                        if (enumerator.Peek()?.Type == TokenType.Period)
+                        {
+                            enumerator.MoveNext();
+                            unaryAst.Value = ParseStructFieldRef(enumerator, errors, unaryAst.Value);
+                        }
                         return unaryAst;
                     }
                     else
