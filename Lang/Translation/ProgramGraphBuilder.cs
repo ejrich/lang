@@ -1578,8 +1578,25 @@ namespace Lang.Translation
                 {
                     var targetType = VerifyType(cast.TargetType);
                     var valueType = VerifyExpression(cast.Value, currentFunction, scopeIdentifiers);
-                    // TODO Make sure types are compatible
-
+                    switch (targetType)
+                    {
+                        case Type.Int:
+                        case Type.Float:
+                            if (valueType != null && valueType.PrimitiveType == null)
+                            {
+                                AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetType)}'", cast.Value);
+                            }
+                            break;
+                        case Type.Error:
+                            // Don't need to report additional errors
+                            return null;
+                        default:
+                            if (valueType != null)
+                            {
+                                AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetType)}'", cast);
+                            }
+                            break;
+                    }
                     return cast.TargetType;
                 }
                 case null:
