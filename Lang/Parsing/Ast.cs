@@ -283,6 +283,16 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
+    public class CastAst : IAst
+    {
+        public int FileIndex { get; set; }
+        public int Line { get; init; }
+        public int Column { get; init; }
+        public TypeDefinition TargetType { get; set; }
+        public IAst Value { get; set; }
+        public List<IAst> Children => null;
+    }
+
     public class TypeDefinition : IAst
     {
         public int FileIndex { get; set; }

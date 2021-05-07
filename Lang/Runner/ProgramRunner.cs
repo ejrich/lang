@@ -961,6 +961,11 @@ namespace Lang.Runner
                     var (typeDef, elementType, pointer) = GetListPointer(indexAst, variables);
                     return new ValueType {Type = typeDef, Value = PointerToTargetType(pointer, typeDef, elementType)};
                 }
+                case CastAst cast:
+                {
+                    var value = ExecuteExpression(cast.Value, variables);
+                    return new ValueType {Type = cast.TargetType, Value = CastValue(value.Value, cast.TargetType)};
+                }
             }
 
             return null;
@@ -1528,14 +1533,30 @@ namespace Lang.Runner
             switch (targetType.PrimitiveType)
             {
                 case IntegerType integerType:
-                    return integerType.Bytes switch
+                    try
                     {
-                        1 => integerType.Signed ? Convert.ToSByte(value) : Convert.ToByte(value),
-                        2 => integerType.Signed ? Convert.ToInt16(value) : Convert.ToUInt16(value),
-                        4 => integerType.Signed ? Convert.ToInt32(value) : Convert.ToUInt32(value),
-                        8 => integerType.Signed ? Convert.ToInt64(value) : Convert.ToUInt64(value),
-                        _ => integerType.Signed ? Convert.ToInt32(value) : Convert.ToUInt32(value)
-                    };
+                        return integerType.Bytes switch
+                        {
+                            1 => integerType.Signed ? Convert.ToSByte(value) : Convert.ToByte(value),
+                            2 => integerType.Signed ? Convert.ToInt16(value) : Convert.ToUInt16(value),
+                            4 => integerType.Signed ? Convert.ToInt32(value) : Convert.ToUInt32(value),
+                            8 => integerType.Signed ? Convert.ToInt64(value) : Convert.ToUInt64(value),
+                            _ => integerType.Signed ? Convert.ToInt32(value) : Convert.ToUInt32(value)
+                        };
+                    }
+                    catch (OverflowException)
+                    {
+                        var bytes = (byte[]) typeof(BitConverter).GetMethod("GetBytes", new [] {value.GetType()}).Invoke(null, new [] {value});
+
+                        return integerType.Bytes switch
+                        {
+                            1 => integerType.Signed ? (sbyte)bytes[0] : bytes[0],
+                            2 => integerType.Signed ? BitConverter.ToInt16(bytes) : (ushort)BitConverter.ToInt16(bytes),
+                            4 => integerType.Signed ? BitConverter.ToInt32(bytes) : (uint)BitConverter.ToInt32(bytes),
+                            8 => integerType.Signed ? BitConverter.ToInt64(bytes) : (ulong)BitConverter.ToInt64(bytes),
+                            _ => integerType.Signed ? BitConverter.ToInt32(bytes) : (uint)BitConverter.ToInt32(bytes),
+                        };
+                    }
                 case FloatType floatType:
                     if (floatType.Bytes == 4) return Convert.ToSingle(value);
                     return Convert.ToDouble(value);

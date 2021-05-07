@@ -1109,7 +1109,6 @@ namespace Lang.Translation
 
         private bool VerifyCondition(IAst ast, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
-            var errorCount = _programGraph.Errors.Count;
             var conditionalType = VerifyExpression(ast, currentFunction, scopeIdentifiers);
             switch (VerifyType(conditionalType))
             {
@@ -1118,7 +1117,7 @@ namespace Lang.Translation
                 case Type.Boolean:
                 case Type.Pointer:
                     // Valid types
-                    return errorCount == _programGraph.Errors.Count;
+                    return !_programGraph.Errors.Any();
                 case Type.Error:
                     AddError($"Expected condition to be bool, int, float, or pointer", ast);
                     return false;
@@ -1574,6 +1573,31 @@ namespace Lang.Translation
                         return null;
                     }
                     return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
+                }
+                case CastAst cast:
+                {
+                    var targetType = VerifyType(cast.TargetType);
+                    var valueType = VerifyExpression(cast.Value, currentFunction, scopeIdentifiers);
+                    switch (targetType)
+                    {
+                        case Type.Int:
+                        case Type.Float:
+                            if (valueType != null && valueType.PrimitiveType == null)
+                            {
+                                AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetType)}'", cast.Value);
+                            }
+                            break;
+                        case Type.Error:
+                            // Don't need to report additional errors
+                            return null;
+                        default:
+                            if (valueType != null)
+                            {
+                                AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetType)}'", cast);
+                            }
+                            break;
+                    }
+                    return cast.TargetType;
                 }
                 case null:
                     return null;
