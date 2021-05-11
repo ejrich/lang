@@ -351,14 +351,7 @@ namespace Lang.Translation
                 }
             }
 
-            // 2, Empty structs are not allowed
-            if (structAst.Fields.Count == 0)
-            {
-                invalid = true;
-                AddError($"Struct '{structAst.Name}' must have at least 1 field", structAst);
-            }
-
-            // 3. Calculate the size of the struct
+            // 2. Calculate the size of the struct
             if (!structAst.Generics.Any() && !invalid)
             {
                 CalculateStructSize(structAst);
