@@ -565,14 +565,14 @@ namespace Lang.Runner
                                 var list = variable!.GetType().GetField(index.Name);
                                 var listValue = list!.GetValue(variable);
                                 var fieldType = structDefinition.Fields[structField.ValueIndices[i-1]].Type;
-                                var elementType = fieldType.Generics[0];
-                                var (_, _, listPointer) = GetListPointer(index, variables, listValue, elementType);
+                                var (_, _, listPointer) = GetListPointer(index, variables, listValue, fieldType);
                                 if (i == structField.Children.Count - 1)
                                 {
                                     Marshal.StructureToPtr(expression.Value, listPointer, false);
                                 }
                                 else
                                 {
+                                    var elementType = fieldType.Generics[0];
                                     variable = PointerToTargetType(listPointer, elementType);
                                 }
                                 break;
@@ -791,7 +791,7 @@ namespace Lang.Runner
                                         var list = variable!.GetType().GetField(index.Name);
                                         var listValue = list!.GetValue(variable);
                                         var elementType = fieldType.Generics[0];
-                                        var (_, _, listPointer) = GetListPointer(index, variables, listValue, elementType);
+                                        var (_, _, listPointer) = GetListPointer(index, variables, listValue, fieldType);
                                         variable = PointerToTargetType(listPointer, elementType);
                                         if (i == structField.Children.Count - 1)
                                         {
@@ -1037,8 +1037,8 @@ namespace Lang.Runner
                     case IndexAst index:
                         var list = structVariable!.GetType().GetField(index.Name);
                         var listValue = list!.GetValue(structVariable);
-                        fieldType = fieldType.Generics[0];
                         var (_, _, listPointer) = GetListPointer(index, variables, listValue, fieldType);
+                        fieldType = fieldType.Generics[0];
                         structVariable = PointerToTargetType(listPointer, fieldType);
                         break;
                 }
@@ -1047,21 +1047,36 @@ namespace Lang.Runner
             return new ValueType {Type = fieldType, Value = structVariable};
         }
 
-        private (TypeDefinition typeDef, Type elementType, IntPtr pointer) GetListPointer(IndexAst indexAst, IDictionary<string, ValueType> variables, object listObject = null, TypeDefinition elementTypeDef = null)
+        private (TypeDefinition typeDef, Type elementType, IntPtr pointer) GetListPointer(IndexAst indexAst, IDictionary<string, ValueType> variables, object listObject = null, TypeDefinition listTypeDef = null)
         {
             var index = (int)ExecuteExpression(indexAst.Index, variables).Value;
 
+            TypeDefinition elementTypeDef;
             if (listObject == null)
             {
                 var variable = variables[indexAst.Name];
                 listObject = variable.Value;
-                elementTypeDef ??= variable.Type.Generics[0];
+                listTypeDef ??= variable.Type;
+                elementTypeDef = variable.Type.Generics[0];
+            }
+            else
+            {
+                elementTypeDef = listTypeDef.Generics[0];
             }
             var elementType = GetTypeFromDefinition(elementTypeDef);
 
-            var dataField = listObject.GetType().GetField("data");
-            var data = dataField!.GetValue(listObject);
-            var dataPointer = GetPointer(data!);
+            IntPtr dataPointer;
+            if (listTypeDef.CArray)
+            {
+                // TODO Implement me
+                dataPointer = IntPtr.Zero;
+            }
+            else
+            {
+                var dataField = listObject.GetType().GetField("data");
+                var data = dataField!.GetValue(listObject);
+                dataPointer = GetPointer(data!);
+            }
 
             if (index == 0)
             {
@@ -1667,6 +1682,9 @@ namespace Lang.Runner
                         return null;
                     }
                     return pointerType.MakePointerType();
+                case "List" when typeDef.CArray:
+                    // TODO Implement me and make sure this works
+                    break;
             }
 
             if (_types.TryGetValue(typeDef.GenericName, out var type))
