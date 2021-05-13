@@ -1208,7 +1208,7 @@ namespace Lang.Backend.LLVM
                         var (valueType, pointer) = unary.Value switch
                         {
                             IdentifierAst identifier => localVariables[identifier.Name],
-                            // StructFieldRefAst structField => BuildStructField(structField, localVariables[structField.Name].value),
+                            StructFieldRefAst structField => BuildStructField(structField, localVariables),
                             IndexAst index => GetListPointer(index, localVariables),
                             // @Cleanup this branch should not be hit
                             _ => (null, new LLVMValueRef())
@@ -1383,13 +1383,11 @@ namespace Lang.Backend.LLVM
                         break;
                     case IndexAst index:
                         value = LLVMApi.BuildStructGEP(_builder, value, (uint)structField.ValueIndices[i-1], index.Name);
-                        type = type.Generics[0];
                         var (_, indexValue) = WriteExpression(index.Index, localVariables);
 
                         LLVMValueRef dataPointer;
                         if (type.CArray)
                         {
-                            // TODO Make sure this works
                             dataPointer = value;
                         }
                         else
@@ -1397,6 +1395,7 @@ namespace Lang.Backend.LLVM
                             var listData = LLVMApi.BuildStructGEP(_builder, value, 1, "listdata");
                             dataPointer = LLVMApi.BuildLoad(_builder, listData, "dataptr");
                         }
+                        type = type.Generics[0];
                         value = LLVMApi.BuildGEP(_builder, dataPointer, new [] {indexValue}, "indexptr");
                         break;
                 }
@@ -1418,7 +1417,6 @@ namespace Lang.Backend.LLVM
             LLVMValueRef dataPointer;
             if (type.CArray)
             {
-                // TODO Make sure this works
                 dataPointer = variable;
             }
             else
@@ -1768,9 +1766,14 @@ namespace Lang.Backend.LLVM
 
             if (type.CArray)
             {
-                var elementType = LLVMApi.GetTypeByName(_module, listType.GenericName);
-                var count = type.Count == null ? 0 : 12; // TODO Implement this
-                return LLVMApi.ArrayType(elementType, (uint)count);
+                var elementType = ConvertTypeDefinition(listType);
+                uint count = 0;
+                if (type.Count != null)
+                {
+                    var constant = (ConstantAst)type.Count;
+                    count = uint.Parse(constant.Value);
+                }
+                return LLVMApi.ArrayType(elementType, count);
             }
 
             return LLVMApi.GetTypeByName(_module, $"List.{listType.GenericName}");

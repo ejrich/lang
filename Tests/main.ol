@@ -4,8 +4,7 @@ int main() {
     if dir {
         file := readdir(dir);
         while file {
-            // printf("File type: %d, File name: %s\n", file.d_type, file.d_name);
-            printf("File type: %d\n", file.d_type);
+            printf("File type: %d, File name: %s\n", file.d_type, &file.d_name);
 
             file = readdir(dir);
         }
