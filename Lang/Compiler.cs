@@ -43,6 +43,9 @@ namespace Lang
                     case "-S":
                         buildSettings.OutputAssembly = true;
                         break;
+                    case "--no-stats":
+                        buildSettings.NoStats = true;
+                        break;
                     default:
                         buildSettings.ProjectPath ??= arg;
                         break;
@@ -71,7 +74,7 @@ namespace Lang
                         currentFile = parseError.FileIndex;
                         Console.WriteLine($"Failed to parse file: \"{project.SourceFiles[currentFile].Replace(project.Path, string.Empty)}\":");
                     }
-                    Console.WriteLine($"\t{parseError.Error} at line {parseError.Token.Line}:{parseError.Token.Column}");
+                    Console.WriteLine($"    {parseError.Error} at line {parseError.Token.Line}:{parseError.Token.Column}");
                 }
                 Environment.Exit(ErrorCodes.ParsingError);
             }
@@ -86,7 +89,7 @@ namespace Lang
                 Console.WriteLine($"{programGraph.Errors.Count} compilation error(s):\n");
                 foreach (var error in programGraph.Errors)
                 {
-                    Console.WriteLine($"\t{project.SourceFiles[error.FileIndex].Replace(project.Path, string.Empty)}: {error.Error} at line {error.Line}:{error.Column}");
+                    Console.WriteLine($"    {project.SourceFiles[error.FileIndex].Replace(project.Path, string.Empty)}: {error.Error} at line {error.Line}:{error.Column}");
                 }
                 Environment.Exit(ErrorCodes.CompilationError);
             }
@@ -98,10 +101,13 @@ namespace Lang
             var buildTime = stopwatch.Elapsed;
 
             // 6. Log statistics
-            Console.WriteLine($"Project time: {projectTime.TotalSeconds} seconds\n" +
-                              $"Lexing/Parsing time: {parseTime.TotalSeconds} seconds\n" +
-                              $"Project Graph time: {graphTime.TotalSeconds} seconds\n" +
-                              $"Building time: {buildTime.TotalSeconds} seconds");
+            if (!buildSettings.NoStats)
+            {
+                Console.WriteLine($"Project time: {projectTime.TotalSeconds} seconds\n" +
+                                  $"Lexing/Parsing time: {parseTime.TotalSeconds} seconds\n" +
+                                  $"Project Graph time: {graphTime.TotalSeconds} seconds\n" +
+                                  $"Building time: {buildTime.TotalSeconds} seconds");
+            }
         }
     }
 }

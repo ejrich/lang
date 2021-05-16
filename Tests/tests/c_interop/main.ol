@@ -1,4 +1,4 @@
-int main() {
+main() {
     // TODO This test will test c interoperability
     // and other functionality such as #c_array types
 
