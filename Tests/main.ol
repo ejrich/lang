@@ -41,7 +41,32 @@ bool run_test(u8* test_dir) {
         return false;
     }
 
-    sprintf(command.data, "./%s/bin/*", test_dir);
+    bin_dir: List<u8>[50];
+    sprintf(bin_dir.data, "%s/bin", test_dir);
+    dir := opendir(bin_dir.data);
+    if dir == null {
+        printf("Test Failed, unable to open directory '%s'\n", bin_dir.data);
+        return false;
+    }
+
+    file := readdir(dir);
+    found_executable := false;
+    while !found_executable && file != null {
+        if file.d_type == FileType.DT_REG {
+            sprintf(command.data, "./%s/%s", bin_dir.data, &file.d_name);
+            found_executable = true;
+        }
+
+        file = readdir(dir);
+    }
+
+    closedir(dir);
+
+    if !found_executable {
+        printf("Test Failed, executable not found in directory '%s'\n", bin_dir.data);
+        return false;
+    }
+
     printf("Running: %s\n", command.data);
     exit_code = system(command.data);
 

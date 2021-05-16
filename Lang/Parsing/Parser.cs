@@ -1512,6 +1512,7 @@ namespace Lang.Parsing
                     return 0;
                 // Value comparisons
                 case Operator.Equality:
+                case Operator.NotEqual:
                 case Operator.GreaterThan:
                 case Operator.LessThan:
                 case Operator.GreaterThanEqual:
