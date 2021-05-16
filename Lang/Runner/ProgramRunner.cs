@@ -57,10 +57,10 @@ namespace Lang.Runner
                 {
                     case EnumAst enumAst:
                         if (_types.ContainsKey(enumAst.Name)) break;
-                        var enumBuilder = _moduleBuilder.DefineEnum(enumAst.Name, TypeAttributes.Public, typeof(int));
+                        var enumBuilder = _moduleBuilder.DefineEnum(enumAst.Name, TypeAttributes.Public, GetTypeFromDefinition(enumAst.BaseType));
                         foreach (var value in enumAst.Values)
                         {
-                            enumBuilder.DefineLiteral(value.Name, value.Value);
+                            enumBuilder.DefineLiteral(value.Name, CastValue(value.Value, enumAst.BaseType));
                         }
                         _types[enumAst.Name] = enumBuilder.CreateTypeInfo();
                         break;
