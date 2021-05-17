@@ -5,6 +5,5 @@
         public bool Release { get; set; }
         public bool OutputAssembly { get; set; }
         public string ProjectPath { get; set; }
-        public bool NoStats { get; set; }
     }
 }

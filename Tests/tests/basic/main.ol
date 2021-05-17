@@ -9,7 +9,7 @@ main() {
 
     sum_test();
 
-    // overflow_test();
+    overflow_test();
 
     set_global(8);
     printf("'global_a' = %d\n", global_a);
