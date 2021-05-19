@@ -24,6 +24,7 @@ namespace Lang.Backend.LLVM
         private Dictionary<string, FunctionAst> _functions;
         private readonly Dictionary<string, IAst> _types = new();
         private readonly Queue<LLVMValueRef> _allocationQueue = new();
+        private readonly LLVMValueRef _zeroInt = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 0, false);
 
         public string WriteFile(string projectPath, ProgramGraph programGraph, BuildSettings buildSettings)
         {
@@ -216,11 +217,7 @@ namespace Lang.Backend.LLVM
                 }
                 else
                 {
-                    fields = LLVMApi.ConstStruct(new []
-                    {
-                        LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 0, false),
-                        LLVMApi.ConstNull(LLVMTypeRef.PointerType(typeFieldType, 0))
-                    }, false);
+                    fields = LLVMApi.ConstStruct(new []{_zeroInt, LLVMApi.ConstNull(LLVMTypeRef.PointerType(typeFieldType, 0))}, false);
                 }
 
                 LLVMValueRef enumValues;
@@ -255,11 +252,7 @@ namespace Lang.Backend.LLVM
                 }
                 else
                 {
-                    enumValues = LLVMApi.ConstStruct(new []
-                    {
-                        LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 0, false),
-                        LLVMApi.ConstNull(LLVMTypeRef.PointerType(enumValueType, 0))
-                    }, false);
+                    enumValues = LLVMApi.ConstStruct(new [] {_zeroInt, LLVMApi.ConstNull(LLVMTypeRef.PointerType(enumValueType, 0))}, false);
                 }
 
                 LLVMValueRef returnType;
@@ -305,11 +298,7 @@ namespace Lang.Backend.LLVM
                 else
                 {
                     returnType = LLVMApi.ConstNull(LLVMTypeRef.PointerType(typeFieldType, 0));
-                    arguments = LLVMApi.ConstStruct(new []
-                    {
-                        LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 0, false),
-                        LLVMApi.ConstNull(LLVMTypeRef.PointerType(argumentType, 0))
-                    }, false);
+                    arguments = LLVMApi.ConstStruct(new []{_zeroInt, LLVMApi.ConstNull(LLVMTypeRef.PointerType(argumentType, 0))}, false);
                 }
 
                 LLVMApi.SetInitializer(typeInfo, LLVMApi.ConstStruct(new [] {typeNameString, typeKind, typeSize, fields, enumValues, returnType, arguments}, false));
@@ -1044,7 +1033,7 @@ namespace Lang.Backend.LLVM
                 {
                     case "List":
                     case "Params":
-                        var pointerIndices = iterationType.CArray ? new []{LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 0, false), indexValue} : new []{indexValue};
+                        var pointerIndices = iterationType.CArray ? new []{_zeroInt, indexValue} : new []{indexValue};
                         var iterationVariable = LLVMApi.BuildGEP(_builder, listData, pointerIndices, each.IterationVariable);
                         eachVariables.TryAdd(each.IterationVariable, (each.IteratorType, iterationVariable));
                         break;
@@ -1112,7 +1101,11 @@ namespace Lang.Backend.LLVM
                         return (enumDef.BaseType, LLVMApi.ConstInt(GetIntegerType(enumDef.BaseType.PrimitiveType), (ulong)value, false));
                     }
                     var (type, field) = BuildStructField(structField, localVariables);
-                    return (type, LLVMApi.BuildLoad(_builder, field, "field"));
+                    if (field.TypeOf().TypeKind == LLVMTypeKind.LLVMPointerTypeKind)
+                    {
+                        field = LLVMApi.BuildLoad(_builder, field, "field");
+                    }
+                    return (type, field);
                 }
                 case CallAst call:
                     var function = LLVMApi.GetNamedFunction(_module, call.Function == "main" ? "__main" : call.Function);
@@ -1344,7 +1337,7 @@ namespace Lang.Backend.LLVM
                 case "string":
                     return LLVMApi.BuildGlobalStringPtr(_builder, constant.Value, "str");
                 default:
-                    return LLVMApi.ConstInt(LLVMApi.Int32Type(), 0, true);
+                    return _zeroInt;
             }
         }
 
@@ -1383,14 +1376,34 @@ namespace Lang.Backend.LLVM
 
             for (var i = 1; i < structField.Children.Count; i++)
             {
-                var structName = structField.TypeNames[i-1];
-                var structDefinition = (StructAst) _types[structName];
-                type = structDefinition.Fields[structField.ValueIndices[i-1]].Type;
-
                 if (structField.Pointers[i-1])
                 {
                     value = LLVMApi.BuildLoad(_builder, value, "pointerval");
+                    type = type.Generics[0];
                 }
+
+                if (type.CArray)
+                {
+                    switch (structField.Children[i])
+                    {
+                        case IdentifierAst identifier:
+                            if (identifier.Name == "length")
+                            {
+                                (type, value) = WriteExpression(type.Count, localVariables);
+                            }
+                            break;
+                        case IndexAst index:
+                            var (_, indexValue) = WriteExpression(index.Index, localVariables);
+                            value = LLVMApi.BuildGEP(_builder, value, new []{_zeroInt, indexValue}, "indexptr");
+                            type = type.Generics[0];
+                            break;
+                    }
+                    continue;
+                }
+
+                var structName = structField.TypeNames[i-1];
+                var structDefinition = (StructAst) _types[structName];
+                type = structDefinition.Fields[structField.ValueIndices[i-1]].Type;
 
                 switch (structField.Children[i])
                 {
@@ -1403,7 +1416,7 @@ namespace Lang.Backend.LLVM
 
                         if (type.CArray)
                         {
-                            value = LLVMApi.BuildGEP(_builder, value, new []{LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 0, false), indexValue}, "indexptr");
+                            value = LLVMApi.BuildGEP(_builder, value, new []{_zeroInt, indexValue}, "indexptr");
                         }
                         else
                         {
@@ -1432,7 +1445,7 @@ namespace Lang.Backend.LLVM
             LLVMValueRef listPointer;
             if (type.CArray)
             {
-                listPointer = LLVMApi.BuildGEP(_builder, variable, new []{LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 0, false), indexValue}, "dataptr");
+                listPointer = LLVMApi.BuildGEP(_builder, variable, new []{_zeroInt, indexValue}, "dataptr");
             }
             else
             {
