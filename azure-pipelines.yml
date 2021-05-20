@@ -20,6 +20,8 @@ steps:
     arguments: '-c $(BuildConfiguration)'
 
 - script: |
+    ls -al
+    pwd
     ./Lang/bin/Debug/net5.0/Lang Tests/tests.csproj
     ./Tests/bin/tests
   displayName: 'Compiler Tests'
