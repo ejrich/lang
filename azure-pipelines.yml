@@ -1,0 +1,25 @@
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  buildConfiguration: 'Debug'
+
+steps:
+- task: UseDotNet@2
+  inputs:
+    version: '5.0.x'
+    includePreviewVersions: true
+
+- task: DotNetCoreCLI@2
+  displayName: 'Build'
+  inputs:
+    command: 'build'
+    arguments: '-c $(BuildConfiguration)'
+
+- script: |
+    ./Lang/bin/Debug/net5.0/Lang Tests/tests.csproj
+    ./Tests/bin/tests
+  displayName: 'Compiler Tests'
