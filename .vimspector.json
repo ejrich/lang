@@ -1,6 +1,6 @@
 {
   "configurations": {
-    "launch - netcoredbg": {
+    "launch - Example": {
       "adapter": "netcoredbg",
       "configuration": {
         "request": "launch",

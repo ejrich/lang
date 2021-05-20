@@ -562,6 +562,13 @@ namespace Lang.Parsing
 
             // 2. Parse over the open brace
             enumerator.MoveNext();
+            if (enumerator.Current?.Type == TokenType.Colon)
+            {
+                enumerator.MoveNext();
+                enumAst.BaseType = ParseType(enumerator, errors);
+                enumerator.MoveNext();
+            }
+
             if (enumerator.Current?.Type != TokenType.OpenBrace)
             {
                 errors.Add(new ParseError
@@ -1505,6 +1512,7 @@ namespace Lang.Parsing
                     return 0;
                 // Value comparisons
                 case Operator.Equality:
+                case Operator.NotEqual:
                 case Operator.GreaterThan:
                 case Operator.LessThan:
                 case Operator.GreaterThanEqual:
@@ -1826,6 +1834,32 @@ namespace Lang.Parsing
                 enumerator.MoveNext();
                 enumerator.MoveNext();
                 typeDefinition.Count = ParseExpression(enumerator, errors, null, TokenType.CloseBracket);
+            }
+
+            if (enumerator.Peek()?.Type == TokenType.Pound)
+            {
+                enumerator.MoveNext();
+                switch (enumerator.Peek()?.Value)
+                {
+                    case "c_array":
+                        typeDefinition.CArray = true;
+                        break;
+                    case null:
+                        errors.Add(new ParseError
+                        {
+                            Error = "Expected compiler directive value",
+                            Token = enumerator.Last
+                        });
+                        break;
+                    default:
+                        errors.Add(new ParseError
+                        {
+                            Error = $"Unexpected compiler directive '{enumerator.Current.Value}'",
+                            Token = enumerator.Current
+                        });
+                        break;
+                }
+                enumerator.MoveNext();
             }
 
             return typeDefinition;

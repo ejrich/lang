@@ -222,9 +222,28 @@ namespace Lang.Translation
             enumAst.TypeIndex = _typeIndex++;
             _globalIdentifiers.Add(enumAst.Name, enumAst);
 
+            if (enumAst.BaseType == null)
+            {
+                enumAst.BaseType = new TypeDefinition {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
+            }
+            else
+            {
+                var baseType = VerifyType(enumAst.BaseType);
+                if (baseType != Type.Int && baseType != Type.Error)
+                {
+                    AddError($"Base type of enum must be an integer, but got '{PrintTypeDefinition(enumAst.BaseType)}'", enumAst.BaseType);
+                    enumAst.BaseType.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
+                }
+            }
+
             // 2. Verify enums don't have repeated values
             var valueNames = new HashSet<string>();
             var values = new HashSet<int>();
+
+            var primitive = enumAst.BaseType.PrimitiveType;
+            var lowestAllowedValue = primitive.Signed ? -Math.Pow(2, 4 * primitive.Bytes - 1) : 0;
+            var largestAllowedValue = primitive.Signed ? Math.Pow(2, 4 * primitive.Bytes - 1) - 1 : Math.Pow(2, 4 * primitive.Bytes) - 1;
+
             var largestValue = -1;
             foreach (var value in enumAst.Values)
             {
@@ -251,6 +270,12 @@ namespace Lang.Translation
                 {
                     value.Value = ++largestValue;
                 }
+
+                // 2d. Verify the value is in the range of the enum
+                if (value.Value < lowestAllowedValue || value.Value > largestAllowedValue)
+                {
+                    AddError($"Enum value '{enumAst.Name}.{value.Name}' value '{value.Value}' is out of range", value);
+                }
             }
         }
 
@@ -269,28 +294,12 @@ namespace Lang.Translation
                 }
 
                 // 1b. Check for errored or undefined field types
-                var type = VerifyType(structField.Type);
+                var type = VerifyType(structField.Type, true);
 
                 if (type == Type.Error)
                 {
                     invalid = true;
                     AddError($"Type '{PrintTypeDefinition(structField.Type)}' of field {structAst.Name}.{structField.Name} is not defined", structField);
-                }
-                else if (structField.Type.Count != null)
-                {
-                    if (structField.Type.Count is ConstantAst constant)
-                    {
-                        if (!uint.TryParse(constant.Value, out _))
-                        {
-                            invalid = true;
-                            AddError($"Expected type count to be positive integer, but got '{constant.Value}'", constant);
-                        }
-                    }
-                    else
-                    {
-                        invalid = true;
-                        AddError("Type count should be a constant value", structField.Type.Count);
-                    }
                 }
 
                 // 1c. Check if the default value has the correct type
@@ -313,7 +322,7 @@ namespace Lang.Translation
                                     var enumType = VerifyEnumValue(enumAst, structFieldRef);
                                     if (enumType != null && !TypeEquals(structField.Type, enumType))
                                     {
-                                            invalid = true;
+                                        invalid = true;
                                         AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(enumType)}'", structFieldRef);
                                     }
                                 }
@@ -351,14 +360,7 @@ namespace Lang.Translation
                 }
             }
 
-            // 2, Empty structs are not allowed
-            if (structAst.Fields.Count == 0)
-            {
-                invalid = true;
-                AddError($"Struct '{structAst.Name}' must have at least 1 field", structAst);
-            }
-
-            // 3. Calculate the size of the struct
+            // 2. Calculate the size of the struct
             if (!structAst.Generics.Any() && !invalid)
             {
                 CalculateStructSize(structAst);
@@ -1158,15 +1160,17 @@ namespace Lang.Translation
             }
             else
             {
-                var beginType = VerifyExpression(each.RangeBegin, currentFunction, scopeIdentifiers);
-                if (VerifyType(beginType) != Type.Int)
+                var begin = VerifyExpression(each.RangeBegin, currentFunction, scopeIdentifiers);
+                var beginType = VerifyType(begin);
+                if (beginType != Type.Int && beginType != Type.Error)
                 {
-                    AddError($"Expected range to begin with 'int', but got '{PrintTypeDefinition(beginType)}'", each.RangeBegin);
+                    AddError($"Expected range to begin with 'int', but got '{PrintTypeDefinition(begin)}'", each.RangeBegin);
                 }
-                var endType = VerifyExpression(each.RangeEnd, currentFunction, scopeIdentifiers);
-                if (VerifyType(endType) != Type.Int)
+                var end = VerifyExpression(each.RangeEnd, currentFunction, scopeIdentifiers);
+                var endType = VerifyType(end);
+                if (endType != Type.Int && endType != Type.Error)
                 {
-                    AddError($"Expected range to end with 'int', but got '{PrintTypeDefinition(endType)}'", each.RangeEnd);
+                    AddError($"Expected range to end with 'int', but got '{PrintTypeDefinition(end)}'", each.RangeEnd);
                 }
                 var iterType = new DeclarationAst
                 {
@@ -1217,7 +1221,7 @@ namespace Lang.Translation
                         case IdentifierAst identifier:
                             if (!scopeIdentifiers.TryGetValue(identifier.Name, out var value))
                             {
-                                AddError($"Identifier '{identifier}' not defined", ast);
+                                AddError($"Identifier '{identifier.Name}' not defined", ast);
                                 return null;
                             }
                             switch (value)
@@ -1353,7 +1357,14 @@ namespace Lang.Translation
                             if (unary.Value is IdentifierAst || unary.Value is StructFieldRefAst || unary.Value is IndexAst || type == Type.Pointer)
                             {
                                 var pointerType = new TypeDefinition {Name = "*"};
-                                pointerType.Generics.Add(valueType);
+                                if (valueType.CArray)
+                                {
+                                    pointerType.Generics.Add(valueType.Generics[0]);
+                                }
+                                else
+                                {
+                                    pointerType.Generics.Add(valueType);
+                                }
                                 return pointerType;
                             }
                             AddError("Can only reference variables, structs, or struct fields", unary.Value);
@@ -1455,6 +1466,22 @@ namespace Lang.Translation
                                         }
                                         call.Arguments[i] = typeIndex;
                                         arguments[i] = typeIndex.Type;
+                                    }
+                                    else if (function.Extern && functionArg.Type.Name == "string")
+                                    {
+                                        if (argument.Name == "string") {} // Valid case
+                                        else if (argument.Name == "*")
+                                        {
+                                            var pointerType = argument.Generics.FirstOrDefault();
+                                            if (pointerType?.Name != "u8" || pointerType.Generics.Any())
+                                            {
+                                                callError = true;
+                                            }
+                                        }
+                                        else
+                                        {
+                                            callError = true;
+                                        }
                                     }
                                     else if (!TypeEquals(functionArg.Type, argument))
                                     {
@@ -1834,7 +1861,8 @@ namespace Lang.Translation
                 return null;
             }
 
-            return new TypeDefinition {Name = enumAst.Name, PrimitiveType = new EnumType()};
+            var primitive = enumAst.BaseType.PrimitiveType;
+            return new TypeDefinition {Name = enumAst.Name, PrimitiveType = new EnumType {Bytes = primitive.Bytes, Signed = primitive.Signed}};
         }
 
         private TypeDefinition VerifyIndexType(IndexAst index, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
@@ -1858,7 +1886,10 @@ namespace Lang.Translation
             var type = VerifyType(typeDef);
             if (type != Type.List && type != Type.Params)
             {
-                AddError($"Cannot index type '{PrintTypeDefinition(typeDef)}'", index);
+                if (typeDef?.Name != "List" && typeDef?.Name != "Params")
+                {
+                    AddError($"Cannot index type '{PrintTypeDefinition(typeDef)}'", index);
+                }
                 return null;
             }
 
@@ -1917,7 +1948,7 @@ namespace Lang.Translation
         }
 
 
-        private Type VerifyType(TypeDefinition typeDef)
+        private Type VerifyType(TypeDefinition typeDef, bool listCountAsConstant = false)
         {
             if (typeDef == null) return Type.Error;
 
@@ -1932,6 +1963,17 @@ namespace Lang.Translation
 
             var hasGenerics = typeDef.Generics.Any();
             var hasCount = typeDef.Count != null;
+
+            if (typeDef.CArray && typeDef.Name != "List")
+            {
+                AddError("Directive #c_array can only be applied to List", typeDef);
+            }
+
+            if (typeDef.Count != null && typeDef.Name != "List")
+            {
+                AddError("Count can only be applied to List", typeDef);
+            }
+
             switch (typeDef.PrimitiveType)
             {
                 case IntegerType:
@@ -1992,6 +2034,36 @@ namespace Lang.Translation
                     {
                         AddError($"Type 'List' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
                         return Type.Error;
+                    }
+                    if (typeDef.Count != null)
+                    {
+                        if (listCountAsConstant)
+                        {
+                            if (typeDef.Count is ConstantAst constant)
+                            {
+                                if (!uint.TryParse(constant.Value, out _))
+                                {
+                                    AddError($"Expected type count to be positive integer, but got '{constant.Value}'", constant);
+                                }
+                            }
+                            else
+                            {
+                                AddError("Type count should be a constant value", typeDef.Count);
+                            }
+                        }
+                        else if (typeDef.CArray)
+                        {
+                            if (typeDef.Count is not ConstantAst constant)
+                            {
+                                AddError("C array should have a constant size", typeDef.Count);
+                                return Type.Error;
+                            }
+                            if (!uint.TryParse(constant.Value, out _))
+                            {
+                                AddError($"Expected type count to be positive integer, but got '{constant.Value}'", constant);
+                                return Type.Error;
+                            }
+                        }
                     }
                     return VerifyList(typeDef) ? Type.List : Type.Error;
                 }
@@ -2084,13 +2156,17 @@ namespace Lang.Translation
                         return Type.Error;
                     }
 
-                    if (type is StructAst)
+                    switch (type)
                     {
-                        return Type.Struct;
+                        case StructAst:
+                            return Type.Struct;
+                        case EnumAst enumAst:
+                            var primitive = enumAst.BaseType.PrimitiveType;
+                            typeDef.PrimitiveType ??= new EnumType {Bytes = primitive.Bytes, Signed = primitive.Signed};
+                            return Type.Enum;
+                        default:
+                            return Type.Error;
                     }
-
-                    typeDef.PrimitiveType ??= new EnumType();
-                    return Type.Enum;
             }
         }
 

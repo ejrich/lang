@@ -71,7 +71,7 @@ namespace Lang
                         currentFile = parseError.FileIndex;
                         Console.WriteLine($"Failed to parse file: \"{project.SourceFiles[currentFile].Replace(project.Path, string.Empty)}\":");
                     }
-                    Console.WriteLine($"\t{parseError.Error} at line {parseError.Token.Line}:{parseError.Token.Column}");
+                    Console.WriteLine($"    {parseError.Error} at line {parseError.Token.Line}:{parseError.Token.Column}");
                 }
                 Environment.Exit(ErrorCodes.ParsingError);
             }
@@ -86,7 +86,7 @@ namespace Lang
                 Console.WriteLine($"{programGraph.Errors.Count} compilation error(s):\n");
                 foreach (var error in programGraph.Errors)
                 {
-                    Console.WriteLine($"\t{project.SourceFiles[error.FileIndex].Replace(project.Path, string.Empty)}: {error.Error} at line {error.Line}:{error.Column}");
+                    Console.WriteLine($"    {project.SourceFiles[error.FileIndex].Replace(project.Path, string.Empty)}: {error.Error} at line {error.Line}:{error.Column}");
                 }
                 Environment.Exit(ErrorCodes.CompilationError);
             }

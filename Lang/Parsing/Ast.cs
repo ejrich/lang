@@ -98,6 +98,7 @@ namespace Lang.Parsing
         public int TypeIndex { get; set; }
         public uint Size { get; set; } = 4;
         public TypeKind TypeKind { get; set; } = TypeKind.Enum;
+        public TypeDefinition BaseType { get; set; }
         public List<EnumValueAst> Values { get; } = new();
         public List<IAst> Children => null;
     }
@@ -303,6 +304,7 @@ namespace Lang.Parsing
         public bool Constant { get; set; }
         public int GenericIndex { get; set; }
         public int? TypeIndex { get; set; }
+        public bool CArray { get; set; }
         public IPrimitive PrimitiveType { get; set; }
         public List<TypeDefinition> Generics { get; } = new();
         public IAst Count { get; set; }
