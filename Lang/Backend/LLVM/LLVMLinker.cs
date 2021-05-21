@@ -84,11 +84,24 @@ namespace Lang.Backend.LLVM
                 return "-static";
             }
 
-            var linker = libDirectory.GetFiles("ld-linux-x86-64.so*").FirstOrDefault();
+            const string linkerPattern = "ld-linux-x86-64.so*";
+            var linker = libDirectory.GetFiles(linkerPattern).FirstOrDefault();
             if (linker == null)
             {
-                Console.WriteLine($"Cannot find linker in directory '{libDirectory.FullName}'");
-                Environment.Exit(ErrorCodes.LinkError);
+                var platformDirectory = libDirectory.GetDirectories("x86_64*gnu").FirstOrDefault();
+                if (platformDirectory == null)
+                {
+                    Console.WriteLine($"Cannot find x86_64 libs in directory '{platformDirectory.FullName}'");
+                    Environment.Exit(ErrorCodes.LinkError);
+                }
+
+                linker = libDirectory.GetFiles(linkerPattern).FirstOrDefault();
+
+                if (linker == null)
+                {
+                    Console.WriteLine($"Cannot find linker in directory '{libDirectory.FullName}'");
+                    Environment.Exit(ErrorCodes.LinkError);
+                }
             }
 
             return $"-dynamic-linker {linker.FullName}";
