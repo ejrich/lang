@@ -20,7 +20,7 @@ steps:
     arguments: '-c $(BuildConfiguration)'
 
 - script: |
-    gcc -v a.cpp
+    ls -al /usr/lib/gcc/x86_64-linux-gnu
     ./Lang/bin/Debug/net5.0/Lang Tests/tests.olproj
     ./Tests/bin/tests
   displayName: 'Compiler Tests'
