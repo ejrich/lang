@@ -20,7 +20,7 @@ namespace Lang.Backend.LLVM
             var libDirectory = DetermineLibDirectory();
             var linker = DetermineLinker(project.Linker, libDirectory);
             var gccDirectory = DetermineGCCDirectory(libDirectory);
-            var defaultObjects = DefaultObjects(libDirectory.FullName);
+            var defaultObjects = DefaultObjects(libDirectory);
 
             // 3. Run the linker
             var executableFile = Path.Combine(project.Path, BinaryDirectory, Path.GetFileNameWithoutExtension(objectFile));
@@ -52,9 +52,29 @@ namespace Lang.Backend.LLVM
             "crt1.o", "crti.o", "crtn.o"
         };
 
-        private string DefaultObjects(string libDirectory)
+        private string DefaultObjects(DirectoryInfo libDirectory)
         {
-            return string.Join(' ', _crtObjects.Select(o => Path.Combine(libDirectory, o)));
+            var files = libDirectory.GetFiles();
+            if (_crtObjects.All(o => files.Any(f => f.Name == o)))
+            {
+                return string.Join(' ', _crtObjects.Select(o => Path.Combine(libDirectory.FullName, o)));
+            }
+
+            var platformDirectory = libDirectory.GetDirectories("x86_64*gnu").FirstOrDefault();
+            if (platformDirectory == null)
+            {
+                Console.WriteLine($"Cannot find x86_64 libs in directory '{libDirectory.FullName}'");
+                Environment.Exit(ErrorCodes.LinkError);
+            }
+            files = platformDirectory.GetFiles();
+            if (_crtObjects.All(o => files.Any(f => f.Name == o)))
+            {
+                return string.Join(' ', _crtObjects.Select(o => Path.Combine(platformDirectory.FullName, o)));
+            }
+
+            Console.WriteLine($"Unable to locate crt object files, valid locations are {libDirectory.FullName} or {platformDirectory.FullName}");
+            Environment.Exit(ErrorCodes.LinkError);
+            return null;
         }
 
         private static string DetermineLinker(Linker linkerType, DirectoryInfo libDirectory)
@@ -63,12 +83,27 @@ namespace Lang.Backend.LLVM
             {
                 return "-static";
             }
-            var linker = libDirectory.GetFiles("ld*.so").FirstOrDefault();
+
+            const string linkerPattern = "ld-linux-x86-64.so*";
+            var linker = libDirectory.GetFiles(linkerPattern).FirstOrDefault();
             if (linker == null)
             {
-                Console.WriteLine($"Cannot find linker in directory '{libDirectory.FullName}'");
-                Environment.Exit(ErrorCodes.LinkError);
+                var platformDirectory = libDirectory.GetDirectories("x86_64*gnu").FirstOrDefault();
+                if (platformDirectory == null)
+                {
+                    Console.WriteLine($"Cannot find x86_64 libs in directory '{platformDirectory.FullName}'");
+                    Environment.Exit(ErrorCodes.LinkError);
+                }
+
+                linker = platformDirectory.GetFiles(linkerPattern).FirstOrDefault();
+
+                if (linker == null)
+                {
+                    Console.WriteLine($"Cannot find linker in directory '{libDirectory.FullName}'");
+                    Environment.Exit(ErrorCodes.LinkError);
+                }
             }
+
             return $"-dynamic-linker {linker.FullName}";
         }
 
