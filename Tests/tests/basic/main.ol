@@ -9,7 +9,8 @@ main() {
 
     sum_test();
 
-    overflow_test();
+    // Don't run this at compile time
+    // overflow_test();
 
     set_global(8);
     printf("'global_a' = %d\n", global_a);
@@ -313,7 +314,10 @@ compiler_directives() {
     open_window();
 }
 
-#run build();
+#run {
+    build();
+    main();
+}
 
 build() {
     if os == OS.Linux {

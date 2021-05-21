@@ -47,4 +47,4 @@ struct ArrayStruct {
     List<int>[5] #c_array array;
 }
 
-// #run main();
+#run main();
