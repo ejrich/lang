@@ -9,7 +9,7 @@ namespace Lang
         public string Name { get; set; }
         public List<DeclarationAst> Variables { get; } = new();
         public Dictionary<string, IType> Types { get; } = new();
-        public Dictionary<string, FunctionAst> Functions { get; } = new();
+        public Dictionary<string, List<FunctionAst>> Functions { get; } = new();
         public List<string> Dependencies { get; set; }
         public List<TranslationError> Errors { get; } = new();
     }

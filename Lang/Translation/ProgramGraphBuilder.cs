@@ -183,10 +183,13 @@ namespace Lang.Translation
             } while (verifyAdditional);
 
             // 5. Verify function bodies
-            foreach (var function in _programGraph.Functions.Values)
+            foreach (var functions in _programGraph.Functions.Values)
             {
-                if (function.Verified) continue;
-                VerifyFunction(function);
+                foreach (var function in functions)
+                {
+                    if (function.Verified) continue;
+                    VerifyFunction(function);
+                }
             }
 
             // 6. Execute any other compiler directives
@@ -492,9 +495,17 @@ namespace Lang.Translation
 
             // 4. Load the function into the dictionary
             function.TypeIndex = _typeIndex++;
-            if (!_programGraph.Functions.TryAdd(function.Name, function))
+            if (!_programGraph.Functions.TryGetValue(function.Name, out var functions))
+            {
+                _programGraph.Functions[function.Name] = functions = new List<FunctionAst>();
+            }
+            if (functions.Any())
             {
                 AddError($"Multiple definitions of function '{function.Name}'", function);
+            }
+            else
+            {
+                functions.Add(function);
             }
         }
 
@@ -1328,9 +1339,14 @@ namespace Lang.Translation
                 case IdentifierAst identifierAst:
                     if (!scopeIdentifiers.TryGetValue(identifierAst.Name, out var identifier))
                     {
-                        if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functionAst))
+                        if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functions))
                         {
-                            return new TypeDefinition {Name = "Type", TypeIndex = functionAst.TypeIndex};
+                            if (functions.Count > 1)
+                            {
+                                AddError($"Cannot determine type for function '{identifierAst.Name}' that has multiple overloads", identifierAst);
+                                return null;
+                            }
+                            return new TypeDefinition {Name = "Type", TypeIndex = functions[0].TypeIndex};
                         }
                         AddError($"Identifier '{identifierAst.Name}' not defined", identifierAst);
                     }
@@ -1375,9 +1391,14 @@ namespace Lang.Translation
                 {
                     if (!scopeIdentifiers.TryGetValue(identifierAst.Name, out var identifier))
                     {
-                        if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functionAst))
+                        if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functions))
                         {
-                            return new TypeDefinition {Name = "Type", TypeIndex = functionAst.TypeIndex};
+                            if (functions.Count > 1)
+                            {
+                                AddError($"Cannot determine type for function '{identifierAst.Name}' that has multiple overloads", identifierAst);
+                                return null;
+                            }
+                            return new TypeDefinition {Name = "Type", TypeIndex = functions[0].TypeIndex};
                         }
                         AddError($"Identifier '{identifierAst.Name}' not defined", identifierAst);
                     }
@@ -1476,10 +1497,13 @@ namespace Lang.Translation
                     }
                 }
                 case CallAst call:
-                    if (!_programGraph.Functions.TryGetValue(call.Function, out var function))
+                {
+                    if (!_programGraph.Functions.TryGetValue(call.Function, out var functions))
                     {
                         AddError($"Call to undefined function '{call.Function}'", call);
                     }
+                    // TODO Update this to find the correct overload
+                    var function = functions?.FirstOrDefault();
 
                     var arguments = call.Arguments.Select(arg => VerifyExpression(arg, currentFunction, scopeIdentifiers)).ToList();
 
@@ -1686,6 +1710,7 @@ namespace Lang.Translation
                         }
                     }
                     return function?.ReturnType;
+                }
                 case ExpressionAst expression:
                     return VerifyExpressionType(expression, currentFunction, scopeIdentifiers);
                 case IndexAst index:
