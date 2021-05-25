@@ -8,6 +8,7 @@ namespace Lang
     {
         public string Name { get; set; }
         public List<DeclarationAst> Variables { get; } = new();
+        public int TypeCount { get; set; }
         public Dictionary<string, IType> Types { get; } = new();
         public Dictionary<string, List<FunctionAst>> Functions { get; } = new();
         public List<string> Dependencies { get; set; }

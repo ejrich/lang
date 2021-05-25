@@ -171,8 +171,7 @@ namespace Lang.Runner
                 }
             }
 
-            var typeInfoCount = programGraph.Types.Count + programGraph.Functions.Count;
-            if (_typeCount != typeInfoCount)
+            if (_typeCount != programGraph.TypeCount)
             {
                 var typeTable = _globalVariables["__type_table"];
 
@@ -184,7 +183,7 @@ namespace Lang.Runner
                 // Reallocate array
                 var typeInfoPointerType = GetTypeFromDefinition(typeTable.Type.Generics[0]);
                 var pointerSize = Marshal.SizeOf(typeInfoPointerType);
-                InitializeConstList(typeTable.Value, typeInfoListType, typeInfoPointerType, typeInfoCount);
+                InitializeConstList(typeTable.Value, typeInfoListType, typeInfoPointerType, programGraph.TypeCount);
                 var typeDataPointer = GetPointer(dataField.GetValue(typeTable.Value));
                 Marshal.FreeHGlobal(oldDataPointer);
 
@@ -1023,9 +1022,7 @@ namespace Lang.Runner
                     break;
                 }
                 case CallAst call:
-                    var functions = _programGraph.Functions[call.Function];
-                    // TODO Use call.FunctionIndex
-                    var function = functions[0];
+                    var function = _programGraph.Functions[call.Function][call.FunctionIndex];
                     if (call.Params)
                     {
                         var arguments = new object[function.Arguments.Count];

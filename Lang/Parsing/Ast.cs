@@ -203,6 +203,7 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public string Function { get; set; }
         public bool Params { get; set; }
+        public int FunctionIndex { get; set; }
         public int VarargsIndex { get; set; }
         public List<IAst> Arguments { get; } = new();
         public List<IAst> Children => null;
