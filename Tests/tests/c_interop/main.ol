@@ -30,7 +30,7 @@ c_array_structs() {
     array_struct: ArrayStruct;
 
     array_struct.array.length = 90; // Essentially a no-op
-    printf("ArrayStruct array size = %d, should be %d. Array pointer = %p\n", array_struct.array.length, struct_array_size, array_struct.array.data);
+    printf("ArrayStruct array size = %d, should be %d. Array pointer = %p, Type size = %d\n", array_struct.array.length, struct_array_size, array_struct.array.data, size_of(array_struct));
     each i in 1..struct_array_size {
         array_struct.array[i - 1] = 5 * i;
         printf("Struct array value %d = %d\n", i, array_struct.array[i - 1]);
