@@ -21,7 +21,7 @@ namespace Lang.Backend.LLVM
         private bool _stackPointerExists;
         private bool _stackSaved;
 
-        private Dictionary<string, FunctionAst> _functions;
+        private Dictionary<string, List<FunctionAst>> _functions;
         private readonly Dictionary<string, IAst> _types = new();
         private readonly Queue<LLVMValueRef> _allocationQueue = new();
         private readonly LLVMValueRef _zeroInt = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 0, false);
@@ -43,34 +43,44 @@ namespace Lang.Backend.LLVM
 
             // 4. Write Function definitions
             _functions = programGraph.Functions;
-            foreach (var (name, function) in programGraph.Functions)
+            foreach (var (name, functions) in programGraph.Functions)
             {
-                if (function.Compiler || function.CallsCompiler) continue;
+                for (var i = 0; i < functions.Count; i++)
+                {
+                    var function = functions[i];
+                    if (function.Compiler || function.CallsCompiler) continue;
 
-                if (name == "main")
-                {
-                    function.Name = "__main";
-                    WriteFunctionDefinition("__main", function.Arguments, function.ReturnType, function.Varargs);
-                }
-                else if (name == "__start")
-                {
-                    function.Name = "main";
-                    WriteFunctionDefinition("main", function.Arguments, function.ReturnType, function.Varargs);
-                }
-                else
-                {
-                    WriteFunctionDefinition(name, function.Arguments, function.ReturnType, function.Varargs);
+                    if (name == "main")
+                    {
+                        function.Name = "__main";
+                        WriteFunctionDefinition("__main", function.Arguments, function.ReturnType, function.Varargs);
+                    }
+                    else if (name == "__start")
+                    {
+                        function.Name = "main";
+                        WriteFunctionDefinition("main", function.Arguments, function.ReturnType, function.Varargs);
+                    }
+                    else
+                    {
+                        var functionName = GetFunctionName(name, i, functions.Count);
+                        WriteFunctionDefinition(functionName, function.Arguments, function.ReturnType, function.Varargs);
+                    }
                 }
             }
 
             // 5. Write Function bodies
-            foreach (var (_, functionAst) in programGraph.Functions)
+            foreach (var (_, functions) in programGraph.Functions)
             {
-                if (functionAst.Extern || functionAst.Compiler || functionAst.CallsCompiler) continue;
+                for (var i = 0; i < functions.Count; i++)
+                {
+                    var functionAst = functions[i];
+                    if (functionAst.Extern || functionAst.Compiler || functionAst.CallsCompiler) continue;
 
-                _currentFunction = functionAst;
-                var function = LLVMApi.GetNamedFunction(_module, functionAst.Name);
-                WriteFunction(functionAst, globals, function);
+                    _currentFunction = functionAst;
+                    var functionName = GetFunctionName(functionAst.Name, i, functions.Count);
+                    var function = LLVMApi.GetNamedFunction(_module, functionName);
+                    WriteFunction(functionAst, globals, function);
+                }
             }
 
             // 6. Compile to object file
@@ -154,8 +164,7 @@ namespace Lang.Backend.LLVM
             SetPrivateConstant(typeTable);
             var typeInfoType = structs["TypeInfo"];
 
-            var typeInfoCount = programGraph.Types.Count + programGraph.Functions.Count;
-            var types = new LLVMValueRef[typeInfoCount];
+            var types = new LLVMValueRef[programGraph.TypeCount];
             var typePointers = new Dictionary<string, (IType type, LLVMValueRef typeInfo)>();
             foreach (var (name, type) in programGraph.Types)
             {
@@ -164,12 +173,17 @@ namespace Lang.Backend.LLVM
                 types[type.TypeIndex] = typeInfo;
                 typePointers[name] = (type, typeInfo);
             }
-            foreach (var (name, function) in programGraph.Functions)
+            foreach (var (name, functions) in programGraph.Functions)
             {
-                var typeInfo = LLVMApi.AddGlobal(_module, typeInfoType, "____type_info");
-                SetPrivateConstant(typeInfo);
-                types[function.TypeIndex] = typeInfo;
-                typePointers[name] = (function, typeInfo);
+                for (var i = 0; i < functions.Count; i++)
+                {
+                    var function = functions[i];
+                    var typeInfo = LLVMApi.AddGlobal(_module, typeInfoType, "____type_info");
+                    SetPrivateConstant(typeInfo);
+                    types[function.TypeIndex] = typeInfo;
+                    var functionName = GetFunctionName(name, i, functions.Count);
+                    typePointers[functionName] = (function, typeInfo);
+                }
             }
 
             var typeFieldType = LLVMApi.GetTypeByName(_module, "TypeField");
@@ -489,7 +503,7 @@ namespace Lang.Backend.LLVM
                             BuildCallAllocations(call);
                             if (!structField.Pointers[0])
                             {
-                                var function = _functions[call.Function];
+                                var function = _functions[call.Function][call.FunctionIndex];
                                 var iterationValue = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(function.ReturnType), function.Name);
                                 _allocationQueue.Enqueue(iterationValue);
                             }
@@ -522,7 +536,7 @@ namespace Lang.Backend.LLVM
                         case CallAst call:
                         {
                             BuildCallAllocations(call);
-                            var function = _functions[call.Function];
+                            var function = _functions[call.Function][call.FunctionIndex];
                             var iterationValue = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(function.ReturnType), function.Name);
                             _allocationQueue.Enqueue(iterationValue);
                             break;
@@ -535,7 +549,7 @@ namespace Lang.Backend.LLVM
                                     BuildCallAllocations(call);
                                     if (!structField.Pointers[0])
                                     {
-                                        var function = _functions[call.Function];
+                                        var function = _functions[call.Function][call.FunctionIndex];
                                         var iterationValue = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(function.ReturnType), function.Name);
                                         _allocationQueue.Enqueue(iterationValue);
                                     }
@@ -568,7 +582,7 @@ namespace Lang.Backend.LLVM
         {
             if (call.Params)
             {
-                var functionDef = _functions[call.Function];
+                var functionDef = _functions[call.Function][call.FunctionIndex];
 
                 var paramsTypeDef = functionDef.Arguments[^1].Type;
                 var paramsType = ConvertTypeDefinition(paramsTypeDef);
@@ -1111,8 +1125,18 @@ namespace Lang.Backend.LLVM
                     return (type, field);
                 }
                 case CallAst call:
-                    var function = LLVMApi.GetNamedFunction(_module, call.Function == "main" ? "__main" : call.Function);
-                    var functionDef = _functions[call.Function];
+                    var functions = _functions[call.Function];
+                    LLVMValueRef function;
+                    if (call.Function == "main")
+                    {
+                        function = LLVMApi.GetNamedFunction(_module, "__main");
+                    }
+                    else
+                    {
+                        var functionName = GetFunctionName(call.Function, call.FunctionIndex, functions.Count);
+                        function = LLVMApi.GetNamedFunction(_module, functionName);
+                    }
+                    var functionDef = functions[call.FunctionIndex];
 
                     if (functionDef.Params)
                     {
@@ -1276,6 +1300,11 @@ namespace Lang.Backend.LLVM
                     Environment.Exit(ErrorCodes.BuildError);
                     return (null, new LLVMValueRef()); // Return never happens
             }
+        }
+
+        private string GetFunctionName(string name, int functionIndex, int functionCount)
+        {
+            return functionCount == 1 ? name : $"{name}_{functionIndex}";
         }
 
         private readonly TypeDefinition _stackPointerType = new()

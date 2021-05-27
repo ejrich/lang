@@ -19,7 +19,6 @@ namespace Lang.Translation
         private BuildSettings _buildSettings;
         private readonly Dictionary<string, StructAst> _polymorphicStructs = new();
         private readonly Dictionary<string, IAst> _globalIdentifiers = new();
-        private int _typeIndex;
 
         public ProgramGraphBuilder(IProgramRunner programRunner)
         {
@@ -77,7 +76,7 @@ namespace Lang.Translation
                             }
                             else
                             {
-                                structAst.TypeIndex = _typeIndex++;
+                                structAst.TypeIndex = _programGraph.TypeCount++;
                                 structAst.TypeKind = structAst.Name == "string" ? TypeKind.String : TypeKind.Struct;
                                 _programGraph.Types.Add(structAst.Name, structAst);
                             }
@@ -183,10 +182,13 @@ namespace Lang.Translation
             } while (verifyAdditional);
 
             // 5. Verify function bodies
-            foreach (var function in _programGraph.Functions.Values)
+            foreach (var functions in _programGraph.Functions.Values)
             {
-                if (function.Verified) continue;
-                VerifyFunction(function);
+                foreach (var function in functions)
+                {
+                    if (function.Verified) continue;
+                    VerifyFunction(function);
+                }
             }
 
             // 6. Execute any other compiler directives
@@ -213,7 +215,7 @@ namespace Lang.Translation
         {
             var primitiveAst = new PrimitiveAst
             {
-                Name = name, TypeIndex = _typeIndex++, TypeKind = typeKind,
+                Name = name, TypeIndex = _programGraph.TypeCount++, TypeKind = typeKind,
                 Size = primitive?.Bytes ?? size, Primitive = primitive
             };
             _globalIdentifiers.Add(name, primitiveAst);
@@ -227,7 +229,7 @@ namespace Lang.Translation
             {
                 AddError($"Multiple definitions of enum '{enumAst.Name}'", enumAst);
             }
-            enumAst.TypeIndex = _typeIndex++;
+            enumAst.TypeIndex = _programGraph.TypeCount++;
             _globalIdentifiers.Add(enumAst.Name, enumAst);
 
             if (enumAst.BaseType == null)
@@ -491,11 +493,47 @@ namespace Lang.Translation
             }
 
             // 4. Load the function into the dictionary
-            function.TypeIndex = _typeIndex++;
-            if (!_programGraph.Functions.TryAdd(function.Name, function))
+            function.TypeIndex = _programGraph.TypeCount++;
+            if (!_programGraph.Functions.TryGetValue(function.Name, out var functions))
             {
-                AddError($"Multiple definitions of function '{function.Name}'", function);
+                _programGraph.Functions[function.Name] = functions = new List<FunctionAst>();
             }
+            if (functions.Any())
+            {
+                if (function.Extern)
+                {
+                    AddError($"Multiple definitions of external function '{function.Name}'", function);
+                }
+                else if (OverloadExistsForFunction(function, functions))
+                {
+                    AddError($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.Type)))})", function);
+                }
+            }
+            functions.Add(function);
+        }
+
+        private bool OverloadExistsForFunction(FunctionAst currentFunction, List<FunctionAst> existingFunctions)
+        {
+            foreach (var existingFunction in existingFunctions)
+            {
+                if (currentFunction.Arguments.Count == existingFunction.Arguments.Count)
+                {
+                    var match = true;
+                    for (var i = 0; i < currentFunction.Arguments.Count; i++)
+                    {
+                        if (!TypeEquals(currentFunction.Arguments[i].Type, existingFunction.Arguments[i].Type, true))
+                        {
+                            match = false;
+                            break;
+                        }
+                    }
+                    if (match)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         private void VerifyFunction(FunctionAst function)
@@ -1328,9 +1366,14 @@ namespace Lang.Translation
                 case IdentifierAst identifierAst:
                     if (!scopeIdentifiers.TryGetValue(identifierAst.Name, out var identifier))
                     {
-                        if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functionAst))
+                        if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functions))
                         {
-                            return new TypeDefinition {Name = "Type", TypeIndex = functionAst.TypeIndex};
+                            if (functions.Count > 1)
+                            {
+                                AddError($"Cannot determine type for function '{identifierAst.Name}' that has multiple overloads", identifierAst);
+                                return null;
+                            }
+                            return new TypeDefinition {Name = "Type", TypeIndex = functions[0].TypeIndex};
                         }
                         AddError($"Identifier '{identifierAst.Name}' not defined", identifierAst);
                     }
@@ -1375,9 +1418,14 @@ namespace Lang.Translation
                 {
                     if (!scopeIdentifiers.TryGetValue(identifierAst.Name, out var identifier))
                     {
-                        if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functionAst))
+                        if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functions))
                         {
-                            return new TypeDefinition {Name = "Type", TypeIndex = functionAst.TypeIndex};
+                            if (functions.Count > 1)
+                            {
+                                AddError($"Cannot determine type for function '{identifierAst.Name}' that has multiple overloads", identifierAst);
+                                return null;
+                            }
+                            return new TypeDefinition {Name = "Type", TypeIndex = functions[0].TypeIndex};
                         }
                         AddError($"Identifier '{identifierAst.Name}' not defined", identifierAst);
                     }
@@ -1476,216 +1524,7 @@ namespace Lang.Translation
                     }
                 }
                 case CallAst call:
-                    if (!_programGraph.Functions.TryGetValue(call.Function, out var function))
-                    {
-                        AddError($"Call to undefined function '{call.Function}'", call);
-                    }
-
-                    var arguments = call.Arguments.Select(arg => VerifyExpression(arg, currentFunction, scopeIdentifiers)).ToList();
-
-                    if (function != null)
-                    {
-                        if (!function.Verified && function != currentFunction)
-                        {
-                            VerifyFunction(function);
-                        }
-
-                        if (currentFunction != null && !currentFunction.CallsCompiler && (function.Compiler || function.CallsCompiler))
-                        {
-                            currentFunction.CallsCompiler = true;
-                        }
-
-                        call.Params = function.Params;
-                        var argumentCount = function.Varargs || function.Params ? function.Arguments.Count - 1 : function.Arguments.Count;
-                        var callArgumentCount = arguments.Count;
-
-                        // Verify function argument count
-                        if (function.Varargs || function.Params)
-                        {
-                            if (argumentCount > callArgumentCount)
-                            {
-                                AddError($"Call to function '{function.Name}' expected arguments (" +
-                                    $"{string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.Type)))})", call);
-                                return function.ReturnType;
-                            }
-                        }
-                        else if (argumentCount < callArgumentCount)
-                        {
-                            AddError($"Call to function '{function.Name}' expected arguments (" +
-                                $"{string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.Type)))})", call);
-                            return function.ReturnType;
-                        }
-
-                        // Verify call arguments match the types of the function arguments
-                        var callError = false;
-                        for (var i = 0; i < argumentCount; i++)
-                        {
-                            var functionArg = function.Arguments[i];
-                            var argumentAst = call.Arguments.ElementAtOrDefault(i);
-                            if (argumentAst == null)
-                            {
-                                if (functionArg.Value == null)
-                                {
-                                    callError = true;
-                                }
-                                else
-                                {
-                                    call.Arguments.Insert(i, functionArg.Value);
-                                }
-                            }
-                            else if (argumentAst is NullAst nullAst)
-                            {
-                                if (functionArg.Type.Name != "*")
-                                {
-                                    callError = true;
-                                }
-                                nullAst.TargetType = functionArg.Type;
-                            }
-                            else
-                            {
-                                var argument = arguments[i];
-                                if (argument != null)
-                                {
-                                    if (functionArg.Type.Name == "Type")
-                                    {
-                                        var typeIndex = new ConstantAst
-                                        {
-                                            Type = new TypeDefinition {PrimitiveType = new IntegerType {Signed = true, Bytes = 4}},
-                                        };
-                                        if (argument.TypeIndex.HasValue)
-                                        {
-                                            typeIndex.Value = argument.TypeIndex.ToString();
-                                        }
-                                        else if (argument.Name == "Type")
-                                        {
-                                            continue;
-                                        }
-                                        else
-                                        {
-                                            var type = _programGraph.Types[argument.GenericName];
-                                            typeIndex.Value = type.TypeIndex.ToString();
-                                        }
-                                        call.Arguments[i] = typeIndex;
-                                        arguments[i] = typeIndex.Type;
-                                    }
-                                    else if (function.Extern && functionArg.Type.Name == "string")
-                                    {
-                                        if (argument.Name == "string") {} // Valid case
-                                        else if (argument.Name == "*")
-                                        {
-                                            var pointerType = argument.Generics.FirstOrDefault();
-                                            if (pointerType?.Name != "u8" || pointerType.Generics.Any())
-                                            {
-                                                callError = true;
-                                            }
-                                        }
-                                        else
-                                        {
-                                            callError = true;
-                                        }
-                                    }
-                                    else if (!TypeEquals(functionArg.Type, argument))
-                                    {
-                                        callError = true;
-                                    }
-                                    else if (argument.PrimitiveType != null && call.Arguments[i] is ConstantAst constant)
-                                    {
-                                        VerifyConstant(constant, functionArg.Type);
-                                    }
-                                }
-                            }
-                        }
-
-                        // Verify varargs call arguments
-                        if (function.Params)
-                        {
-                            var paramsType = function.Arguments[argumentCount].Type.Generics.FirstOrDefault();
-
-                            if (paramsType != null)
-                            {
-                                for (var i = argumentCount; i < callArgumentCount; i++)
-                                {
-                                    var argumentAst = call.Arguments[i];
-                                    if (argumentAst is NullAst nullAst)
-                                    {
-                                        if (paramsType.Name != "*")
-                                        {
-                                            callError = true;
-                                        }
-                                        nullAst.TargetType = paramsType;
-                                    }
-                                    else
-                                    {
-                                        var argument = arguments[i];
-                                        if (argument != null)
-                                        {
-                                            if (!TypeEquals(paramsType, argument))
-                                            {
-                                                callError = true;
-                                            }
-                                            else if (argument.PrimitiveType != null && argumentAst is ConstantAst constant)
-                                            {
-                                                VerifyConstant(constant, paramsType);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        else if (function.Varargs)
-                        {
-                            for (var i = 0; i < arguments.Count; i++)
-                            {
-                                var argument = arguments[i];
-                                // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
-                                // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
-                                if (argument?.PrimitiveType is FloatType {Bytes: 4})
-                                {
-                                    arguments[i] = argument = new TypeDefinition
-                                    {
-                                        Name = "float64", PrimitiveType = new FloatType {Bytes = 8}
-                                    };
-                                }
-                            }
-                            var found = false;
-                            for (var index = 0; index < function.VarargsCalls.Count; index++)
-                            {
-                                var callTypes = function.VarargsCalls[index];
-                                if (callTypes.Count == arguments.Count)
-                                {
-                                    var callMatches = true;
-                                    for (var i = 0; i < callTypes.Count; i++)
-                                    {
-                                        if (!TypeEquals(callTypes[i], arguments[i], true))
-                                        {
-                                            callMatches = false;
-                                            break;
-                                        }
-                                    }
-
-                                    if (callMatches)
-                                    {
-                                        found = true;
-                                        call.VarargsIndex = index;
-                                        break;
-                                    }
-                                }
-                            }
-
-                            if (!found)
-                            {
-                                call.VarargsIndex = function.VarargsCalls.Count;
-                                function.VarargsCalls.Add(arguments);
-                            }
-                        }
-
-                        if (callError)
-                        {
-                            AddError($"Call to function '{function.Name}' expected arguments (" +
-                                $"{string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.Type)))})", call);
-                        }
-                    }
-                    return function?.ReturnType;
+                    return VerifyCall(call, currentFunction, scopeIdentifiers);
                 case ExpressionAst expression:
                     return VerifyExpressionType(expression, currentFunction, scopeIdentifiers);
                 case IndexAst index:
@@ -1764,6 +1603,388 @@ namespace Lang.Translation
                     }
                     break;
             }
+        }
+
+        private TypeDefinition VerifyEnumValue(EnumAst enumAst, StructFieldRefAst structField)
+        {
+            structField.IsEnum = true;
+            structField.TypeNames = new [] {enumAst.Name};
+
+            if (structField.Children.Count > 2)
+            {
+                AddError("Cannot get a value of an enum value", structField.Children[2]);
+                return null;
+            }
+
+            if (structField.Children[1] is not IdentifierAst value)
+            {
+                AddError($"Value of enum '{enumAst.Name}' should be an identifier", structField.Children[1]);
+                return null;
+            }
+
+            EnumValueAst enumValue = null;
+            for (var i = 0; i < enumAst.Values.Count; i++)
+            {
+                if (enumAst.Values[i].Name == value.Name)
+                {
+                    structField.ValueIndices = new [] {i};
+                    enumValue = enumAst.Values[i];
+                    break;
+                }
+            }
+
+            if (enumValue == null)
+            {
+                AddError($"Enum '{enumAst.Name}' does not contain value '{value.Name}'", value);
+                return null;
+            }
+
+            var primitive = enumAst.BaseType.PrimitiveType;
+            return new TypeDefinition {Name = enumAst.Name, PrimitiveType = new EnumType {Bytes = primitive.Bytes, Signed = primitive.Signed}};
+        }
+
+        private TypeDefinition VerifyCall(CallAst call, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        {
+            if (!_programGraph.Functions.TryGetValue(call.Function, out var functions))
+            {
+                AddError($"Call to undefined function '{call.Function}'", call);
+            }
+
+            var arguments = new TypeDefinition[call.Arguments.Count];
+            var argumentsError = false;
+
+            for (var i = 0; i < call.Arguments.Count; i++)
+            {
+                var argument = call.Arguments[i];
+                var argumentType = VerifyExpression(argument, currentFunction, scopeIdentifiers);
+                if (argumentType == null && argument is not NullAst)
+                {
+                    argumentsError = true;
+                }
+                arguments[i] = argumentType;
+            }
+
+            var specifiedArguments = new Dictionary<string, TypeDefinition>();
+            if (call.SpecifiedArguments != null)
+            {
+                foreach (var (name, argument) in call.SpecifiedArguments)
+                {
+                    var argumentType = VerifyExpression(argument, currentFunction, scopeIdentifiers);
+                    if (argumentType == null && argument is not NullAst)
+                    {
+                        argumentsError = true;
+                    }
+                    specifiedArguments[name] = argumentType;
+                }
+            }
+
+            if (argumentsError)
+            {
+                if (functions != null && functions.Count == 1)
+                {
+                    return functions[0].ReturnType;
+                }
+                return null;
+            }
+
+            if (functions != null)
+            {
+                FunctionAst function = null;
+                for (var i = 0; i < functions.Count; i++)
+                {
+                    var functionAst = functions[i];
+                    var match = true;
+                    var callArgIndex = 0;
+                    var functionArgCount = functionAst.Varargs || functionAst.Params ? functionAst.Arguments.Count - 1 : functionAst.Arguments.Count;
+
+                    if (call.SpecifiedArguments != null)
+                    {
+                        var specifiedArgsMatch = true;
+                        foreach (var (name, argument) in call.SpecifiedArguments)
+                        {
+                            var found = false;
+                            for (var argIndex = 0; argIndex < functionAst.Arguments.Count; argIndex++)
+                            {
+                                var functionArg = functionAst.Arguments[argIndex];
+                                if (functionArg.Name == name)
+                                {
+                                    found = VerifyArgument(argument, specifiedArguments[name], functionArg.Type, functionAst.Extern);
+                                    break;
+                                }
+                            }
+                            if (!found)
+                            {
+                                specifiedArgsMatch = false;
+                                break;
+                            }
+                        }
+                        if (!specifiedArgsMatch)
+                        {
+                            continue;
+                        }
+                    }
+
+                    for (var arg = 0; arg < functionArgCount; arg++)
+                    {
+                        var functionArg = functionAst.Arguments[arg];
+                        if (specifiedArguments.ContainsKey(functionArg.Name))
+                        {
+                            continue;
+                        }
+
+                        var argumentAst = call.Arguments.ElementAtOrDefault(callArgIndex);
+                        if (argumentAst == null)
+                        {
+                            if (functionArg.Value == null)
+                            {
+                                match = false;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            if (!VerifyArgument(argumentAst, arguments[callArgIndex], functionArg.Type, functionAst.Extern))
+                            {
+                                match = false;
+                                break;
+                            }
+                            callArgIndex++;
+                        }
+                    }
+
+                    if (match && functionAst.Params)
+                    {
+                        var paramsType = functionAst.Arguments[^1].Type.Generics.FirstOrDefault();
+
+                        if (paramsType != null)
+                        {
+                            for (; callArgIndex < arguments.Length; callArgIndex++)
+                            {
+                                if (!VerifyArgument(call.Arguments[callArgIndex], arguments[callArgIndex], paramsType))
+                                {
+                                    match = false;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (match && (functionAst.Varargs || callArgIndex == call.Arguments.Count))
+                    {
+                        function = functionAst;
+                        call.FunctionIndex = i;
+                        break;
+                    }
+                }
+
+                if (function == null)
+                {
+                    AddError($"No overload of function '{call.Function}' found with given arguments", call);
+                    return null;
+                }
+
+                if (!function.Verified && function != currentFunction)
+                {
+                    VerifyFunction(function);
+                }
+
+                if (currentFunction != null && !currentFunction.CallsCompiler && (function.Compiler || function.CallsCompiler))
+                {
+                    currentFunction.CallsCompiler = true;
+                }
+
+                call.Params = function.Params;
+                var argumentCount = function.Varargs || function.Params ? function.Arguments.Count - 1 : function.Arguments.Count;
+
+                // Verify call arguments match the types of the function arguments
+                for (var i = 0; i < argumentCount; i++)
+                {
+                    var functionArg = function.Arguments[i];
+                    if (call.SpecifiedArguments != null && call.SpecifiedArguments.TryGetValue(functionArg.Name, out var specifiedArgument))
+                    {
+                        call.Arguments.Insert(i, specifiedArgument);
+                        continue;
+                    }
+
+                    var argumentAst = call.Arguments.ElementAtOrDefault(i);
+                    if (argumentAst == null)
+                    {
+                        call.Arguments.Insert(i, functionArg.Value);
+                    }
+                    else if (argumentAst is NullAst nullAst)
+                    {
+                        nullAst.TargetType = functionArg.Type;
+                    }
+                    else
+                    {
+                        var argument = arguments[i];
+                        if (argument != null)
+                        {
+                            if (functionArg.Type.Name == "Type")
+                            {
+                                var typeIndex = new ConstantAst
+                                {
+                                    Type = new TypeDefinition {PrimitiveType = new IntegerType {Signed = true, Bytes = 4}}
+                                };
+                                if (argument.TypeIndex.HasValue)
+                                {
+                                    typeIndex.Value = argument.TypeIndex.ToString();
+                                }
+                                else if (argument.Name == "Type")
+                                {
+                                    continue;
+                                }
+                                else
+                                {
+                                    var type = _programGraph.Types[argument.GenericName];
+                                    typeIndex.Value = type.TypeIndex.ToString();
+                                }
+                                call.Arguments[i] = typeIndex;
+                                arguments[i] = typeIndex.Type;
+                            }
+                            else if (argument.PrimitiveType != null && call.Arguments[i] is ConstantAst constant)
+                            {
+                                VerifyConstant(constant, functionArg.Type);
+                            }
+                        }
+                    }
+                }
+
+                // Verify varargs call arguments
+                if (function.Params)
+                {
+                    var paramsType = function.Arguments[argumentCount].Type.Generics.FirstOrDefault();
+
+                    if (paramsType != null)
+                    {
+                        for (var i = argumentCount; i < arguments.Length; i++)
+                        {
+                            var argumentAst = call.Arguments[i];
+                            if (argumentAst is NullAst nullAst)
+                            {
+                                nullAst.TargetType = paramsType;
+                            }
+                            else
+                            {
+                                var argument = arguments[i];
+                                if (argument != null)
+                                {
+                                    if (paramsType.Name == "Type")
+                                    {
+                                        var typeIndex = new ConstantAst
+                                        {
+                                            Type = new TypeDefinition {PrimitiveType = new IntegerType {Signed = true, Bytes = 4}}
+                                        };
+                                        if (argument.TypeIndex.HasValue)
+                                        {
+                                            typeIndex.Value = argument.TypeIndex.ToString();
+                                        }
+                                        else if (argument.Name == "Type")
+                                        {
+                                            continue;
+                                        }
+
+                                        else
+                                        {
+                                            var type = _programGraph.Types[argument.GenericName];
+                                            typeIndex.Value = type.TypeIndex.ToString();
+                                        }
+                                        call.Arguments[i] = typeIndex;
+                                        arguments[i] = typeIndex.Type;
+                                    }
+                                    else if (argument.PrimitiveType != null && argumentAst is ConstantAst constant)
+                                    {
+                                        VerifyConstant(constant, paramsType);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                else if (function.Varargs)
+                {
+                    for (var i = 0; i < arguments.Length; i++)
+                    {
+                        var argument = arguments[i];
+                        // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
+                        // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
+                        if (argument?.PrimitiveType is FloatType {Bytes: 4})
+                        {
+                            arguments[i] = argument = new TypeDefinition
+                            {
+                                Name = "float64", PrimitiveType = new FloatType {Bytes = 8}
+                            };
+                        }
+                    }
+                    var found = false;
+                    for (var index = 0; index < function.VarargsCalls.Count; index++)
+                    {
+                        var callTypes = function.VarargsCalls[index];
+                        if (callTypes.Count == arguments.Length)
+                        {
+                            var callMatches = true;
+                            for (var i = 0; i < callTypes.Count; i++)
+                            {
+                                if (!TypeEquals(callTypes[i], arguments[i], true))
+                                {
+                                    callMatches = false;
+                                    break;
+                                }
+                            }
+
+                            if (callMatches)
+                            {
+                                found = true;
+                                call.VarargsIndex = index;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!found)
+                    {
+                        call.VarargsIndex = function.VarargsCalls.Count;
+                        function.VarargsCalls.Add(arguments.ToList());
+                    }
+                }
+
+                return function.ReturnType;
+            }
+            return null;
+        }
+
+        private bool VerifyArgument(IAst argumentAst, TypeDefinition argument, TypeDefinition type, bool externCall = false)
+        {
+            if (argumentAst is NullAst)
+            {
+                if (type.Name != "*")
+                {
+                    return false;
+                }
+            }
+            else if (type.Name != "Type")
+            {
+                if (externCall && type.Name == "string")
+                {
+                    if (argument.Name != "string" && argument.Name != "*")
+                    {
+                        return false;
+                    }
+                    else if (argument.Name == "*")
+                    {
+                        var pointerType = argument.Generics.FirstOrDefault();
+                        if (pointerType?.Name != "u8" || pointerType.Generics.Any())
+                        {
+                            return false;
+                        }
+                    }
+                }
+                else if (!TypeEquals(type, argument))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         private TypeDefinition VerifyExpressionType(ExpressionAst expression, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
@@ -1928,44 +2149,6 @@ namespace Lang.Translation
             return expression.Type;
         }
 
-        private TypeDefinition VerifyEnumValue(EnumAst enumAst, StructFieldRefAst structField)
-        {
-            structField.IsEnum = true;
-            structField.TypeNames = new [] {enumAst.Name};
-
-            if (structField.Children.Count > 2)
-            {
-                AddError("Cannot get a value of an enum value", structField.Children[2]);
-                return null;
-            }
-
-            if (structField.Children[1] is not IdentifierAst value)
-            {
-                AddError($"Value of enum '{enumAst.Name}' should be an identifier", structField.Children[1]);
-                return null;
-            }
-
-            EnumValueAst enumValue = null;
-            for (var i = 0; i < enumAst.Values.Count; i++)
-            {
-                if (enumAst.Values[i].Name == value.Name)
-                {
-                    structField.ValueIndices = new [] {i};
-                    enumValue = enumAst.Values[i];
-                    break;
-                }
-            }
-
-            if (enumValue == null)
-            {
-                AddError($"Enum '{enumAst.Name}' does not contain value '{value.Name}'", value);
-                return null;
-            }
-
-            var primitive = enumAst.BaseType.PrimitiveType;
-            return new TypeDefinition {Name = enumAst.Name, PrimitiveType = new EnumType {Bytes = primitive.Bytes, Signed = primitive.Signed}};
-        }
-
         private TypeDefinition VerifyIndexType(IndexAst index, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             if (!scopeIdentifiers.TryGetValue(index.Name, out var identifier))
@@ -2061,9 +2244,6 @@ namespace Lang.Translation
                 return Type.Struct;
             }
 
-            var hasGenerics = typeDef.Generics.Any();
-            var hasCount = typeDef.Count != null;
-
             if (typeDef.CArray && typeDef.Name != "List")
             {
                 AddError("Directive #c_array can only be applied to List", typeDef);
@@ -2071,8 +2251,11 @@ namespace Lang.Translation
 
             if (typeDef.Count != null && typeDef.Name != "List")
             {
-                AddError("Count can only be applied to List", typeDef);
+                AddError($"Type '{PrintTypeDefinition(typeDef)}' cannot have a count", typeDef);
+                return Type.Error;
             }
+
+            var hasGenerics = typeDef.Generics.Any();
 
             switch (typeDef.PrimitiveType)
             {
@@ -2082,21 +2265,11 @@ namespace Lang.Translation
                         AddError($"Type '{typeDef.Name}' cannot have generics", typeDef);
                         return Type.Error;
                     }
-                    if (hasCount)
-                    {
-                        AddError($"Type '{typeDef.Name}' cannot have count", typeDef);
-                        return Type.Error;
-                    }
                     return Type.Int;
                 case FloatType:
                     if (hasGenerics)
                     {
                         AddError($"Type '{typeDef.Name}' cannot have generics", typeDef);
-                        return Type.Error;
-                    }
-                    if (hasCount)
-                    {
-                        AddError($"Type '{typeDef.Name}' cannot have count", typeDef);
                         return Type.Error;
                     }
                     return Type.Float;
@@ -2110,21 +2283,11 @@ namespace Lang.Translation
                         AddError("Type 'bool' cannot have generics", typeDef);
                         return Type.Error;
                     }
-                    if (hasCount)
-                    {
-                        AddError($"Type '{typeDef.Name}' cannot have count", typeDef);
-                        return Type.Error;
-                    }
                     return Type.Boolean;
                 case "string":
                     if (hasGenerics)
                     {
                         AddError("Type 'string' cannot have generics", typeDef);
-                        return Type.Error;
-                    }
-                    if (hasCount)
-                    {
-                        AddError($"Type '{typeDef.Name}' cannot have count", typeDef);
                         return Type.Error;
                     }
                     return Type.String;
@@ -2143,11 +2306,6 @@ namespace Lang.Translation
                         AddError("Type 'void' cannot have generics", typeDef);
                         return Type.Error;
                     }
-                    if (hasCount)
-                    {
-                        AddError($"Type '{typeDef.Name}' cannot have count", typeDef);
-                        return Type.Error;
-                    }
                     return Type.Void;
                 case "*":
                     if (typeDef.Generics.Count != 1)
@@ -2164,7 +2322,7 @@ namespace Lang.Translation
                         return Type.Error;
                     }
 
-                    var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeIndex = _typeIndex++, TypeKind = TypeKind.Pointer, Size = 8};
+                    var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeIndex = _programGraph.TypeCount++, TypeKind = TypeKind.Pointer, Size = 8};
                     _programGraph.Types.Add(typeDef.GenericName, pointer);
                     return Type.Pointer;
                 case "...":
@@ -2266,7 +2424,7 @@ namespace Lang.Translation
 
         private void CreatePolymorphedStruct(StructAst structAst, string name, string genericName, TypeKind typeKind, params TypeDefinition[] genericTypes)
         {
-            var polyStruct = new StructAst {Name = name, TypeIndex = _typeIndex++, TypeKind = typeKind, Verified = true};
+            var polyStruct = new StructAst {Name = name, TypeIndex = _programGraph.TypeCount++, TypeKind = typeKind, Verified = true};
             foreach (var field in structAst.Fields)
             {
                 if (field.HasGeneric)
@@ -2310,8 +2468,8 @@ namespace Lang.Translation
         {
             foreach (var field in structAst.Fields)
             {
-                // 1. Get the type from program graph
-                var type = _programGraph.Types[field.Type.GenericName];
+                // 1. Get the type from type dictionary
+                var type = field.Type.CArray ? _programGraph.Types[field.Type.Generics[0].GenericName] :_programGraph.Types[field.Type.GenericName];
 
                 // 2. If the type is a struct and the size hasn't been calculated, verify the struct and calculate the size
                 if (type is StructAst fieldStruct)
@@ -2321,7 +2479,7 @@ namespace Lang.Translation
                         VerifyStruct(fieldStruct);
                     }
                 }
-                structAst.Size += type.Size;
+                structAst.Size += field.Type.CArray ? type.Size * field.Type.ConstCount.Value : type.Size;
             }
         }
 

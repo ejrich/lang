@@ -122,32 +122,35 @@ namespace Lang.Runner
             }
 
             TypeBuilder functionTypeBuilder = null;
-            foreach (var function in programGraph.Functions.Values.Where(_ => _.Extern))
+            foreach (var functions in programGraph.Functions.Values)
             {
-                var returnType = GetTypeFromDefinition(function.ReturnType);
-
-                if (!_functionIndices.TryGetValue(function.Name, out var functionIndex))
-                    _functionIndices[function.Name] = functionIndex = new List<int>();
-
-                if (function.Varargs)
+                foreach (var function in functions.Where(_ => _.Extern))
                 {
-                    for (var i = functionIndex.Count; i < function.VarargsCalls.Count; i++)
+                    var returnType = GetTypeFromDefinition(function.ReturnType);
+
+                    if (!_functionIndices.TryGetValue(function.Name, out var functionIndex))
+                        _functionIndices[function.Name] = functionIndex = new List<int>();
+
+                    if (function.Varargs)
                     {
-                        functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
-                        var callTypes = function.VarargsCalls[i];
-                        var varargs = callTypes.Select(arg => GetTypeFromDefinition(arg, cCall: true)).ToArray();
-                        CreateFunction(functionTypeBuilder, function.Name, function.ExternLib, returnType, varargs);
-                        functionIndex.Add(_version);
+                        for (var i = functionIndex.Count; i < function.VarargsCalls.Count; i++)
+                        {
+                            functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
+                            var callTypes = function.VarargsCalls[i];
+                            var varargs = callTypes.Select(arg => GetTypeFromDefinition(arg, cCall: true)).ToArray();
+                            CreateFunction(functionTypeBuilder, function.Name, function.ExternLib, returnType, varargs);
+                            functionIndex.Add(_version);
+                        }
                     }
-                }
-                else
-                {
-                    if (!functionIndex.Any())
+                    else
                     {
-                        functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
-                        var args = function.Arguments.Select(arg => GetTypeFromDefinition(arg.Type, cCall: true)).ToArray();
-                        CreateFunction(functionTypeBuilder, function.Name, function.ExternLib, returnType, args);
-                        functionIndex.Add(_version);
+                        if (!functionIndex.Any())
+                        {
+                            functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
+                            var args = function.Arguments.Select(arg => GetTypeFromDefinition(arg.Type, cCall: true)).ToArray();
+                            CreateFunction(functionTypeBuilder, function.Name, function.ExternLib, returnType, args);
+                            functionIndex.Add(_version);
+                        }
                     }
                 }
             }
@@ -168,8 +171,7 @@ namespace Lang.Runner
                 }
             }
 
-            var typeInfoCount = programGraph.Types.Count + programGraph.Functions.Count;
-            if (_typeCount != typeInfoCount)
+            if (_typeCount != programGraph.TypeCount)
             {
                 var typeTable = _globalVariables["__type_table"];
 
@@ -181,7 +183,7 @@ namespace Lang.Runner
                 // Reallocate array
                 var typeInfoPointerType = GetTypeFromDefinition(typeTable.Type.Generics[0]);
                 var pointerSize = Marshal.SizeOf(typeInfoPointerType);
-                InitializeConstList(typeTable.Value, typeInfoListType, typeInfoPointerType, typeInfoCount);
+                InitializeConstList(typeTable.Value, typeInfoListType, typeInfoPointerType, programGraph.TypeCount);
                 var typeDataPointer = GetPointer(dataField.GetValue(typeTable.Value));
                 Marshal.FreeHGlobal(oldDataPointer);
 
@@ -209,23 +211,27 @@ namespace Lang.Runner
                     Marshal.StructureToPtr(typeInfoPointer, listPointer, false);
                 }
 
-                foreach (var (name, function) in programGraph.Functions)
+                foreach (var (name, functions) in programGraph.Functions)
                 {
-                    if (!_typeInfoPointers.TryGetValue(name, out var typeInfoPointer))
+                    for (var i = 0; i < functions.Count; i++)
                     {
-                        var typeInfo = Activator.CreateInstance(typeInfoType);
+                        var function = functions[i];
+                        if (!_typeInfoPointers.TryGetValue($"name.{i}", out var typeInfoPointer))
+                        {
+                            var typeInfo = Activator.CreateInstance(typeInfoType);
 
-                        var typeNameField = typeInfoType.GetField("name");
-                        typeNameField.SetValue(typeInfo, GetString(function.Name));
-                        var typeKindField = typeInfoType.GetField("type");
-                        typeKindField.SetValue(typeInfo, function.TypeKind);
+                            var typeNameField = typeInfoType.GetField("name");
+                            typeNameField.SetValue(typeInfo, GetString(function.Name));
+                            var typeKindField = typeInfoType.GetField("type");
+                            typeKindField.SetValue(typeInfo, function.TypeKind);
 
-                        _typeInfoPointers[name] = typeInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoType));
-                        newTypeInfos.Add((function, typeInfo, typeInfoPointer));
+                            _typeInfoPointers[$"name.{i}"] = typeInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoType));
+                            newTypeInfos.Add((function, typeInfo, typeInfoPointer));
+                        }
+
+                        var listPointer = IntPtr.Add(typeDataPointer, pointerSize * function.TypeIndex);
+                        Marshal.StructureToPtr(typeInfoPointer, listPointer, false);
                     }
-
-                    var listPointer = IntPtr.Add(typeDataPointer, pointerSize * function.TypeIndex);
-                    Marshal.StructureToPtr(typeInfoPointer, listPointer, false);
                 }
 
                 // Set fields and enum values on TypeInfo objects
@@ -1016,7 +1022,7 @@ namespace Lang.Runner
                     break;
                 }
                 case CallAst call:
-                    var function = _programGraph.Functions[call.Function];
+                    var function = _programGraph.Functions[call.Function][call.FunctionIndex];
                     if (call.Params)
                     {
                         var arguments = new object[function.Arguments.Count];
