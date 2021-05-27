@@ -2,6 +2,8 @@ main() {
     function_overloads();
 
     default_arguments();
+
+    polymorphic_functions();
 }
 
 function_overloads() {
@@ -17,6 +19,18 @@ function_overloads() {
 
     printf("Sum of List   = %d\n", sum(sum_list));
     printf("Sum of Params = %d\n", sum(4, 41, 544, 244, 42, 14, 23));
+}
+
+int sum(List<int> args) {
+    sum := 0;
+    each i in args then sum += i;
+    return sum;
+}
+
+int sum(Params<int> args) {
+    sum := 0;
+    each i in args then sum += i;
+    return sum;
 }
 
 default_arguments() {
@@ -36,18 +50,6 @@ default_arguments() {
     foo_params(8, 9, 3.1, 2.8, 5.6);
 }
 
-int sum(List<int> args) {
-    sum := 0;
-    each i in args then sum += i;
-    return sum;
-}
-
-int sum(Params<int> args) {
-    sum := 0;
-    each i in args then sum += i;
-    return sum;
-}
-
 foo(int a, int b = 8, bool c = true) {
     printf("a = %d, b = %d, c = %d\n", a, b, c);
 }
@@ -56,6 +58,18 @@ foo_params(int a, int b = 8, Params<float> args) {
     sum: float;
     each i in args then sum += i;
     printf("a = %d, b = %d, sum = %.2f\n", a, b, sum);
+}
+
+polymorphic_functions() {
+
+}
+
+T bar<T>(T a, int b) {
+    // TODO Add content
+}
+
+baz<T, U>(List<T> list, U* b) {
+    // TODO Add content
 }
 
 #run main();

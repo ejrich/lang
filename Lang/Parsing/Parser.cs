@@ -144,10 +144,102 @@ namespace Lang.Parsing
                 function.ReturnType = ParseType(enumerator, errors);
                 enumerator.MoveNext();
             }
-            function.Name = enumerator.Current?.Value;
 
-            // 2. Find open paren to start parsing arguments
-            enumerator.MoveNext();
+            // 1b. Set the name of the function or get the name from the type
+            switch (enumerator.Current?.Type)
+            {
+                case TokenType.Token:
+                    function.Name = enumerator.Current.Value;
+                    enumerator.MoveNext();
+                    break;
+                case TokenType.OpenParen:
+                    // TODO Switch the return type to be the function name and generics
+                    break;
+                case null:
+                    errors.Add(new ParseError {Error = "Expected the function name to be declared", Token = enumerator.Last});
+                    return null;
+                default:
+                    errors.Add(new ParseError {Error = "Expected the function name to be declared", Token = enumerator.Current});
+                    enumerator.MoveNext();
+                    break;
+            }
+
+            // 2. Parse generics
+            if (enumerator.Current?.Type == TokenType.LessThan)
+            {
+                var commaRequiredBeforeNextType = false;
+                var generics = new HashSet<string>();
+                while (enumerator.MoveNext())
+                {
+                    var token = enumerator.Current;
+
+                    if (token.Type == TokenType.GreaterThan)
+                    {
+                        if (!commaRequiredBeforeNextType)
+                        {
+                            errors.Add(new ParseError
+                            {
+                                Error = $"Expected comma in generics of function '{function.Name}'",
+                                Token = token
+                            });
+                        }
+
+                        break;
+                    }
+
+                    if (!commaRequiredBeforeNextType)
+                    {
+                        switch (token.Type)
+                        {
+                            case TokenType.Token:
+                                if (!generics.Add(token.Value))
+                                {
+                                    errors.Add(new ParseError
+                                    {
+                                        Error = $"Duplicate generic '{token.Value}' in function '{function.Name}'", Token = token
+                                    });
+                                }
+                                commaRequiredBeforeNextType = true;
+                                break;
+                            default:
+                                errors.Add(new ParseError
+                                {
+                                    Error = $"Unexpected token '{token.Value}' in generics of function '{function.Name}'", Token = token
+                                });
+                                commaRequiredBeforeNextType = true;
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        switch (token.Type)
+                        {
+                            case TokenType.Comma:
+                                commaRequiredBeforeNextType = false;
+                                break;
+                            default:
+                                errors.Add(new ParseError
+                                {
+                                    Error = $"Unexpected token '{token.Value}' in function '{function.Name}'", Token = token
+                                });
+                                commaRequiredBeforeNextType = false;
+                                break;
+                        }
+                    }
+                }
+
+                if (!generics.Any())
+                {
+                    errors.Add(new ParseError
+                    {
+                        Error = "Expected function to contain generics", Token = enumerator.Current ?? enumerator.Last
+                    });
+                }
+                enumerator.MoveNext();
+                // TODO function.Generics.AddRange(generics);
+            }
+
+            // 3. Find open paren to start parsing arguments
             if (enumerator.Current?.Type != TokenType.OpenParen)
             {
                 // Add an error to the function AST and continue until open paren
@@ -161,7 +253,7 @@ namespace Lang.Parsing
                     enumerator.MoveNext();
             }
 
-            // 3. Parse arguments until a close paren
+            // 4. Parse arguments until a close paren
             var commaRequiredBeforeNextArgument = false;
             DeclarationAst currentArgument = null;
             while (enumerator.MoveNext())
@@ -237,7 +329,7 @@ namespace Lang.Parsing
             }
 
             enumerator.MoveNext();
-            // 4. Handle compiler directives
+            // 5. Handle compiler directives
             if (enumerator.Current?.Type == TokenType.Pound)
             {
                 enumerator.MoveNext();
@@ -280,7 +372,7 @@ namespace Lang.Parsing
                 enumerator.MoveNext();
             }
 
-            // 5. Find open brace to start parsing body
+            // 6. Find open brace to start parsing body
             if (enumerator.Current?.Type != TokenType.OpenBrace)
             {
                 // Add an error to the function AST and continue until open paren
@@ -294,7 +386,7 @@ namespace Lang.Parsing
                     enumerator.MoveNext();
             }
 
-            // 6. Parse function body
+            // 7. Parse function body
             var closed = false;
             while (enumerator.MoveNext())
             {
@@ -361,8 +453,8 @@ namespace Lang.Parsing
                         {
                             errors.Add(new ParseError
                             {
-                                Error = "Unexpected comma in struct generics",
-                                Token = new Token {Type = TokenType.Comma, Line = token.Line}
+                                Error = $"Expected comma in generics for struct '{structAst.Name}'",
+                                Token = token
                             });
                         }
 
@@ -378,7 +470,7 @@ namespace Lang.Parsing
                                 {
                                     errors.Add(new ParseError
                                     {
-                                        Error = $"Duplicate struct generic '{token.Value}'", Token = token
+                                        Error = $"Duplicate generic '{token.Value}' in struct '{structAst.Name}'", Token = token
                                     });
                                 }
                                 commaRequiredBeforeNextType = true;
@@ -386,7 +478,7 @@ namespace Lang.Parsing
                             default:
                                 errors.Add(new ParseError
                                 {
-                                    Error = $"Unexpected token '{token.Value}' in struct generics", Token = token
+                                    Error = $"Unexpected token '{token.Value}' in generics for struct '{structAst.Name}'", Token = token
                                 });
                                 commaRequiredBeforeNextType = true;
                                 break;
@@ -402,7 +494,7 @@ namespace Lang.Parsing
                             default:
                                 errors.Add(new ParseError
                                 {
-                                    Error = $"Unexpected token '{token.Value}' in struct definition", Token = token
+                                    Error = $"Unexpected token '{token.Value}' in definition of struct '{structAst.Name}'", Token = token
                                 });
                                 commaRequiredBeforeNextType = false;
                                 break;
@@ -414,7 +506,7 @@ namespace Lang.Parsing
                 {
                     errors.Add(new ParseError
                     {
-                        Error = "Expected struct to contain generics", Token = enumerator.Current ?? enumerator.Last
+                        Error = $"Expected struct '{structAst.Name}' to contain generics", Token = enumerator.Current ?? enumerator.Last
                     });
                 }
                 structAst.Generics.AddRange(generics);
