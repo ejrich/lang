@@ -8,11 +8,6 @@ variables:
   buildConfiguration: 'Debug'
 
 steps:
-- task: UseDotNet@2
-  inputs:
-    version: '5.0.x'
-    includePreviewVersions: true
-
 - task: DotNetCoreCLI@2
   displayName: 'Build'
   inputs:
