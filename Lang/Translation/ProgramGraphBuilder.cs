@@ -354,6 +354,10 @@ namespace Lang.Translation
                         {
                             AddError($"Type of field '{structAst.Name}.{structField.Name}' is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(defaultType)}'", structField.DefaultValue);
                         }
+                        else if (structField.Type.PrimitiveType != null && structField.DefaultValue is ConstantAst constant)
+                        {
+                            VerifyConstant(constant, structField.Type);
+                        }
                     }
                     else if (isConstant && type != Type.Pointer && type != Type.Error)
                     {
@@ -487,6 +491,10 @@ namespace Lang.Translation
                         else if (type != Type.Error && !TypeEquals(argument.Type, defaultType))
                         {
                             AddError($"Type of argument '{argument.Name}' in function '{function.Name}' is '{PrintTypeDefinition(argument.Type)}', but default value is type '{PrintTypeDefinition(defaultType)}'", argument.Value);
+                        }
+                        else if (argument.Type.PrimitiveType != null && argument.Value is ConstantAst constant)
+                        {
+                            VerifyConstant(constant, argument.Type);
                         }
                     }
                     else if (isConstant && type != Type.Pointer && type != Type.Error)
@@ -1813,6 +1821,11 @@ namespace Lang.Translation
                     var functionArg = function.Arguments[i];
                     if (call.SpecifiedArguments != null && call.SpecifiedArguments.TryGetValue(functionArg.Name, out var specifiedArgument))
                     {
+                        if (functionArg.Type.PrimitiveType != null && specifiedArgument is ConstantAst constant)
+                        {
+                            VerifyConstant(constant, functionArg.Type);
+                        }
+
                         call.Arguments.Insert(i, specifiedArgument);
                         continue;
                     }
