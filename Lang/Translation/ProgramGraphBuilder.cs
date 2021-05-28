@@ -350,10 +350,14 @@ namespace Lang.Translation
                             AddError($"Expected default value of '{structAst.Name}.{structField.Name}' to be a constant value", structField.DefaultValue);
 
                         }
-                        else if (!TypeEquals(structField.Type, defaultType))
+                        else if (type != Type.Error && !TypeEquals(structField.Type, defaultType))
                         {
-                            AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(defaultType)}'", structField.DefaultValue);
+                            AddError($"Type of field '{structAst.Name}.{structField.Name}' is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(defaultType)}'", structField.DefaultValue);
                         }
+                    }
+                    else if (isConstant && type != Type.Pointer && type != Type.Error)
+                    {
+                        AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is 'null'", structField.DefaultValue);
                     }
                 }
 
@@ -471,24 +475,23 @@ namespace Lang.Translation
                 // 3c. Check for default arguments
                 if (argument.Value != null)
                 {
-                    switch (argument.Value)
+                    var defaultType = VerifyConstantExpression(argument.Value, null, _globalIdentifiers, out var isConstant, out _);
+
+                    if (defaultType != null)
                     {
-                        case ConstantAst constantAst:
-                            if (!TypeEquals(argument.Type, constantAst.Type))
-                            {
-                                AddError($"Default function argument expected type '{PrintTypeDefinition(argument.Type)}', but got '{PrintTypeDefinition(constantAst.Type)}'", argument.Value);
-                            }
-                            break;
-                        case NullAst nullAst:
-                            if (type != Type.Pointer)
-                            {
-                                AddError("Default function argument can only be null for pointers", argument.Value);
-                            }
-                            nullAst.TargetType = argument.Type;
-                            break;
-                        default:
-                            AddError("Default function argument should be a constant or null", argument.Value);
-                            break;
+                        if (!isConstant)
+                        {
+                            AddError($"Expected default value of argument '{argument.Name}' in function '{function.Name}' to be a constant value", argument.Value);
+
+                        }
+                        else if (type != Type.Error && !TypeEquals(argument.Type, defaultType))
+                        {
+                            AddError($"Type of argument '{argument.Name}' in function '{function.Name}' is '{PrintTypeDefinition(argument.Type)}', but default value is type '{PrintTypeDefinition(defaultType)}'", argument.Value);
+                        }
+                    }
+                    else if (isConstant && type != Type.Pointer && type != Type.Error)
+                    {
+                        AddError($"Type of argument '{argument.Name}' in function '{function.Name}' is '{PrintTypeDefinition(argument.Type)}', but default value is 'null'", argument.Value);
                     }
                 }
             }
@@ -1363,6 +1366,9 @@ namespace Lang.Translation
                         int.TryParse(constant.Value, out count);
                     }
                     return constant.Type;
+                case NullAst:
+                    isConstant = true;
+                    return null;
                 case StructFieldRefAst structField:
                     var structFieldType = VerifyStructFieldRef(structField, currentFunction, scopeIdentifiers);
                     isConstant = structFieldType?.PrimitiveType is EnumType;
