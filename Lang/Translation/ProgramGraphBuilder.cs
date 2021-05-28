@@ -494,7 +494,10 @@ namespace Lang.Translation
             }
 
             // 4. Load the function into the dictionary
-            function.TypeIndex = _programGraph.TypeCount++;
+            if (!function.Generics.Any())
+            {
+                function.TypeIndex = _programGraph.TypeCount++;
+            }
             if (!_programGraph.Functions.TryGetValue(function.Name, out var functions))
             {
                 _programGraph.Functions[function.Name] = functions = new List<FunctionAst>();
@@ -567,7 +570,7 @@ namespace Lang.Translation
             }
 
             // 3. Resolve the compiler directives in the function
-            if (function.HasDirectives)
+            if (function.HasDirectives && !function.Generics.Any())
             {
                 ResolveCompilerDirectives(function.Children);
             }
@@ -1773,6 +1776,7 @@ namespace Lang.Translation
                     if (match && (functionAst.Varargs || callArgIndex == call.Arguments.Count))
                     {
                         function = functionAst;
+                        // TODO If the function has generics, create a new copy of the function with the specified types
                         call.FunctionIndex = i;
                         break;
                     }
@@ -1956,6 +1960,7 @@ namespace Lang.Translation
 
         private bool VerifyArgument(IAst argumentAst, TypeDefinition argument, TypeDefinition type, bool externCall = false)
         {
+            // TODO Account for polymorphic functions
             if (argumentAst is NullAst)
             {
                 if (type.Name != "*")
@@ -2402,6 +2407,11 @@ namespace Lang.Translation
         private bool VerifyList(TypeDefinition typeDef)
         {
             var listType = typeDef.Generics[0];
+            if (listType.IsGeneric)
+            {
+                return true;
+            }
+
             var genericType = VerifyType(listType);
             if (genericType == Type.Error)
             {
