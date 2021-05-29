@@ -41,9 +41,7 @@ default_arguments() {
 
     // Specifying arguments, can also move around non-default argument
     foo(5, c = false);
-
     foo(6, b = 7);
-
     foo(b = 7, a = 7);
 
     // Also works with params
@@ -67,6 +65,10 @@ polymorphic_functions() {
     int_value := add_int(35, 10);
     printf("float_value = %.2f, should be 5.1\n", float_value);
     printf("int_value = %d, should be 45\n", int_value);
+
+    int_list: List<int>[8];
+    temp := 3.2;
+    baz(int_list, &temp);
 }
 
 T add_int<T>(T a, int b) {
