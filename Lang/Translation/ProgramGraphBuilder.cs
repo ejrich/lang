@@ -14,6 +14,7 @@ namespace Lang.Translation
 
     public class ProgramGraphBuilder : IProgramGraphBuilder
     {
+        private readonly IPolymorpher _polymorpher;
         private readonly IProgramRunner _programRunner;
         private readonly ProgramGraph _programGraph = new();
         private BuildSettings _buildSettings;
@@ -21,8 +22,9 @@ namespace Lang.Translation
         private readonly Dictionary<string, List<FunctionAst>> _polymorphicFunctions = new();
         private readonly Dictionary<string, IAst> _globalIdentifiers = new();
 
-        public ProgramGraphBuilder(IProgramRunner programRunner)
+        public ProgramGraphBuilder(IPolymorpher polymorpher, IProgramRunner programRunner)
         {
+            _polymorpher = polymorpher;
             _programRunner = programRunner;
         }
 
@@ -49,6 +51,7 @@ namespace Lang.Translation
             AddPrimitive("float", TypeKind.Float, new FloatType {Bytes = 4});
             AddPrimitive("float64", TypeKind.Float, new FloatType {Bytes = 8});
 
+            var functionNames = new HashSet<string>();
             do
             {
                 // 1. Verify enum and struct definitions
@@ -114,7 +117,7 @@ namespace Lang.Translation
                                 mainDefined = true;
                             }
 
-                            VerifyFunctionDefinition(function, main);
+                            VerifyFunctionDefinition(function, functionNames, main);
                             parseResult.SyntaxTrees.RemoveAt(i--);
                             break;
                     }
@@ -184,8 +187,9 @@ namespace Lang.Translation
             } while (verifyAdditional);
 
             // 5. Verify function bodies
-            foreach (var functions in _programGraph.Functions.Values)
+            foreach (var name in functionNames)
             {
+                var functions = _programGraph.Functions[name];
                 foreach (var function in functions)
                 {
                     if (function.Verified) continue;
@@ -376,12 +380,26 @@ namespace Lang.Translation
             // 2. Calculate the size of the struct
             if (!structAst.Generics.Any() && errorCount == _programGraph.Errors.Count)
             {
-                CalculateStructSize(structAst);
+                foreach (var field in structAst.Fields)
+                {
+                    // 1. Get the type from type dictionary
+                    var type = field.Type.CArray ? _programGraph.Types[field.Type.Generics[0].GenericName] :_programGraph.Types[field.Type.GenericName];
+
+                    // 2. If the type is a struct and the size hasn't been calculated, verify the struct and calculate the size
+                    if (type is StructAst fieldStruct)
+                    {
+                        if (!fieldStruct.Verified)
+                        {
+                            VerifyStruct(fieldStruct);
+                        }
+                    }
+                    structAst.Size += field.Type.CArray ? type.Size * field.Type.ConstCount.Value : type.Size;
+                }
             }
             structAst.Verified = true;
         }
 
-        private void VerifyFunctionDefinition(FunctionAst function, bool main)
+        private void VerifyFunctionDefinition(FunctionAst function, HashSet<string> functionNames, bool main)
         {
             // 1. Verify the return type of the function is valid
             var returnType = VerifyType(function.ReturnType);
@@ -529,6 +547,7 @@ namespace Lang.Translation
             }
             else
             {
+                functionNames.Add(function.Name);
                 function.TypeIndex = _programGraph.TypeCount++;
                 if (!_programGraph.Functions.TryGetValue(function.Name, out var functions))
                 {
@@ -2016,9 +2035,9 @@ namespace Lang.Translation
 
             if (_polymorphicFunctions.TryGetValue(call.Function, out var polymorphicFunctions))
             {
-                // TODO If the function matches the arguments, create a new copy of the function with the specified types
-                foreach (var function in polymorphicFunctions)
+                for (var i = 0; i < polymorphicFunctions.Count; i++)
                 {
+                    var function = polymorphicFunctions[i];
                     var match = true;
                     var callArgIndex = 0;
                     var functionArgCount = function.Varargs || function.Params ? function.Arguments.Count - 1 : function.Arguments.Count;
@@ -2131,11 +2150,24 @@ namespace Lang.Translation
 
                     if (match && (function.Varargs || callArgIndex == call.Arguments.Count))
                     {
-                        // TODO Create a new function ast with the generic types
-                        // call.FunctionIndex = i;
-                        // return function;
-                        Console.WriteLine($"Found match, generics are <{string.Join(", ", genericTypes.Select(PrintTypeDefinition))}>");
-                        return null;
+                        var genericName = $"{function.Name}.{i}.{string.Join('.', genericTypes.Select(t => t.GenericName))}";
+                        var name = $"{function.Name}<{string.Join(", ", genericTypes.Select(PrintTypeDefinition))}>";
+                        call.Function = genericName;
+
+                        if (_programGraph.Functions.TryGetValue(genericName, out var implementations))
+                        {
+                            if (implementations.Count > 1)
+                            {
+                                AddError($"Internal compiler error, multiple implementations of polymorphic function '{name}'", call);
+                            }
+                            return implementations[0];
+                        }
+
+                        var polymorphedFunction = _polymorpher.CreatePolymorphedFunction(function, name, _programGraph.TypeCount++, genericTypes);
+                        _programGraph.Functions[genericName] = new List<FunctionAst>{polymorphedFunction};
+                        VerifyFunction(polymorphedFunction);
+
+                        return polymorphedFunction;
                     }
                 }
             }
@@ -2619,7 +2651,9 @@ namespace Lang.Translation
                             return Type.Error;
                         }
                         if (error) return Type.Error;
-                        CreatePolymorphedStruct(structDef, PrintTypeDefinition(typeDef), genericName, TypeKind.Struct, generics);
+                        var polyStruct = _polymorpher.CreatePolymorphedStruct(structDef, PrintTypeDefinition(typeDef), TypeKind.Struct, _programGraph.TypeCount++, generics);
+                        _programGraph.Types.Add(genericName, polyStruct);
+                        VerifyStruct(polyStruct);
                         return Type.Struct;
                     }
                     if (!_programGraph.Types.TryGetValue(typeDef.Name, out var type))
@@ -2666,69 +2700,10 @@ namespace Lang.Translation
                 return false;
             }
 
-            CreatePolymorphedStruct(structDef, $"List<{PrintTypeDefinition(listType)}>", genericName, TypeKind.List, listType);
+            var listStruct = _polymorpher.CreatePolymorphedStruct(structDef, $"List<{PrintTypeDefinition(listType)}>", TypeKind.List, _programGraph.TypeCount++, listType);
+            _programGraph.Types.Add(genericName, listStruct);
+            VerifyStruct(listStruct);
             return true;
-        }
-
-        private void CreatePolymorphedStruct(StructAst structAst, string name, string genericName, TypeKind typeKind, params TypeDefinition[] genericTypes)
-        {
-            var polyStruct = new StructAst {Name = name, TypeIndex = _programGraph.TypeCount++, TypeKind = typeKind, Verified = true};
-            foreach (var field in structAst.Fields)
-            {
-                if (field.HasGeneric)
-                {
-                    polyStruct.Fields.Add(new StructFieldAst
-                    {
-                        Type = CopyType(field.Type, genericTypes), Name = field.Name, DefaultValue = field.DefaultValue
-                    });
-                }
-                else
-                {
-                    polyStruct.Fields.Add(field);
-                }
-            }
-
-            CalculateStructSize(polyStruct);
-            _programGraph.Types.Add(genericName, polyStruct);
-        }
-
-        private TypeDefinition CopyType(TypeDefinition type, TypeDefinition[] genericTypes)
-        {
-            if (type.IsGeneric)
-            {
-                return genericTypes[type.GenericIndex];
-            }
-            var copyType = new TypeDefinition
-            {
-                Name = type.Name, IsGeneric = type.IsGeneric, PrimitiveType = type.PrimitiveType, Count = type.Count
-            };
-
-            foreach (var generic in type.Generics)
-            {
-                copyType.Generics.Add(CopyType(generic, genericTypes));
-            }
-            VerifyType(copyType);
-
-            return copyType;
-        }
-
-        private void CalculateStructSize(StructAst structAst)
-        {
-            foreach (var field in structAst.Fields)
-            {
-                // 1. Get the type from type dictionary
-                var type = field.Type.CArray ? _programGraph.Types[field.Type.Generics[0].GenericName] :_programGraph.Types[field.Type.GenericName];
-
-                // 2. If the type is a struct and the size hasn't been calculated, verify the struct and calculate the size
-                if (type is StructAst fieldStruct)
-                {
-                    if (!fieldStruct.Verified)
-                    {
-                        VerifyStruct(fieldStruct);
-                    }
-                }
-                structAst.Size += field.Type.CArray ? type.Size * field.Type.ConstCount.Value : type.Size;
-            }
         }
 
         private static string PrintTypeDefinition(TypeDefinition type)
