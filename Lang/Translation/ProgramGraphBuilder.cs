@@ -2309,7 +2309,8 @@ namespace Lang.Translation
                     case Operator.LessThan:
                     case Operator.GreaterThanEqual:
                     case Operator.LessThanEqual:
-                        if (type == Type.Enum && nextType == Type.Enum)
+                        if ((type == Type.Enum && nextType == Type.Enum)
+                            || (type == Type.Type && nextType == Type.Type))
                         {
                             if ((op != Operator.Equality && op != Operator.NotEqual) || !TypeEquals(expression.Type, nextExpressionType))
                             {
