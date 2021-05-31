@@ -54,8 +54,8 @@ struct ArgumentType {
 
 __type_table: List<TypeInfo*>;
 
-TypeInfo type_of(Type type) {
-    return *__type_table[type];
+TypeInfo* type_of(Type type) {
+    return __type_table[type];
 }
 
 u32 size_of(Type type) {

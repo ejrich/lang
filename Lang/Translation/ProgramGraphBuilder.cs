@@ -14,14 +14,17 @@ namespace Lang.Translation
 
     public class ProgramGraphBuilder : IProgramGraphBuilder
     {
+        private readonly IPolymorpher _polymorpher;
         private readonly IProgramRunner _programRunner;
         private readonly ProgramGraph _programGraph = new();
         private BuildSettings _buildSettings;
         private readonly Dictionary<string, StructAst> _polymorphicStructs = new();
+        private readonly Dictionary<string, List<FunctionAst>> _polymorphicFunctions = new();
         private readonly Dictionary<string, IAst> _globalIdentifiers = new();
 
-        public ProgramGraphBuilder(IProgramRunner programRunner)
+        public ProgramGraphBuilder(IPolymorpher polymorpher, IProgramRunner programRunner)
         {
+            _polymorpher = polymorpher;
             _programRunner = programRunner;
         }
 
@@ -48,6 +51,7 @@ namespace Lang.Translation
             AddPrimitive("float", TypeKind.Float, new FloatType {Bytes = 4});
             AddPrimitive("float64", TypeKind.Float, new FloatType {Bytes = 8});
 
+            var functionNames = new HashSet<string>();
             do
             {
                 // 1. Verify enum and struct definitions
@@ -102,7 +106,8 @@ namespace Lang.Translation
                             parseResult.SyntaxTrees.RemoveAt(i--);
                             break;
                         case FunctionAst function:
-                            if (function.Name == "main")
+                            var main = function.Name == "main";
+                            if (main)
                             {
                                 if (mainDefined)
                                 {
@@ -112,7 +117,7 @@ namespace Lang.Translation
                                 mainDefined = true;
                             }
 
-                            VerifyFunctionDefinition(function);
+                            VerifyFunctionDefinition(function, functionNames, main);
                             parseResult.SyntaxTrees.RemoveAt(i--);
                             break;
                     }
@@ -182,8 +187,9 @@ namespace Lang.Translation
             } while (verifyAdditional);
 
             // 5. Verify function bodies
-            foreach (var functions in _programGraph.Functions.Values)
+            foreach (var name in functionNames)
             {
+                var functions = _programGraph.Functions[name];
                 foreach (var function in functions)
                 {
                     if (function.Verified) continue;
@@ -349,10 +355,18 @@ namespace Lang.Translation
                             AddError($"Expected default value of '{structAst.Name}.{structField.Name}' to be a constant value", structField.DefaultValue);
 
                         }
-                        else if (!TypeEquals(structField.Type, defaultType))
+                        else if (type != Type.Error && !TypeEquals(structField.Type, defaultType))
                         {
-                            AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(defaultType)}'", structField.DefaultValue);
+                            AddError($"Type of field '{structAst.Name}.{structField.Name}' is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(defaultType)}'", structField.DefaultValue);
                         }
+                        else if (structField.Type.PrimitiveType != null && structField.DefaultValue is ConstantAst constant)
+                        {
+                            VerifyConstant(constant, structField.Type);
+                        }
+                    }
+                    else if (isConstant && type != Type.Pointer && type != Type.Error)
+                    {
+                        AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is 'null'", structField.DefaultValue);
                     }
                 }
 
@@ -366,12 +380,26 @@ namespace Lang.Translation
             // 2. Calculate the size of the struct
             if (!structAst.Generics.Any() && errorCount == _programGraph.Errors.Count)
             {
-                CalculateStructSize(structAst);
+                foreach (var field in structAst.Fields)
+                {
+                    // 1. Get the type from type dictionary
+                    var type = field.Type.CArray ? _programGraph.Types[field.Type.Generics[0].GenericName] :_programGraph.Types[field.Type.GenericName];
+
+                    // 2. If the type is a struct and the size hasn't been calculated, verify the struct and calculate the size
+                    if (type is StructAst fieldStruct)
+                    {
+                        if (!fieldStruct.Verified)
+                        {
+                            VerifyStruct(fieldStruct);
+                        }
+                    }
+                    structAst.Size += field.Type.CArray ? type.Size * field.Type.ConstCount.Value : type.Size;
+                }
             }
             structAst.Verified = true;
         }
 
-        private void VerifyFunctionDefinition(FunctionAst function, bool main = false)
+        private void VerifyFunctionDefinition(FunctionAst function, HashSet<string> functionNames, bool main)
         {
             // 1. Verify the return type of the function is valid
             var returnType = VerifyType(function.ReturnType);
@@ -410,7 +438,7 @@ namespace Lang.Translation
             // 2. Verify main function return type and arguments
             if (main)
             {
-                if (!(returnType == Type.Void || returnType == Type.Int))
+                if (returnType != Type.Void && returnType != Type.Int)
                 {
                     AddError("The main function should return type 'int' or 'void'", function);
                 }
@@ -419,6 +447,11 @@ namespace Lang.Translation
                 if (argument != null && !(function.Arguments.Count == 1 && argument.Type.Name == "List" && argument.Type.Generics.FirstOrDefault()?.Name == "string"))
                 {
                     AddError("The main function should either have 0 arguments or 'List<string>' argument", function);
+                }
+
+                if (function.Generics.Any())
+                {
+                    AddError("The main function cannot have generics", function);
                 }
             }
 
@@ -470,46 +503,74 @@ namespace Lang.Translation
                 // 3c. Check for default arguments
                 if (argument.Value != null)
                 {
-                    switch (argument.Value)
+                    var defaultType = VerifyConstantExpression(argument.Value, null, _globalIdentifiers, out var isConstant, out _);
+
+                    if (argument.HasGenerics)
                     {
-                        case ConstantAst constantAst:
-                            if (!TypeEquals(argument.Type, constantAst.Type))
-                            {
-                                AddError($"Default function argument expected type '{PrintTypeDefinition(argument.Type)}', but got '{PrintTypeDefinition(constantAst.Type)}'", argument.Value);
-                            }
-                            break;
-                        case NullAst nullAst:
-                            if (type != Type.Pointer)
-                            {
-                                AddError("Default function argument can only be null for pointers", argument.Value);
-                            }
-                            nullAst.TargetType = argument.Type;
-                            break;
-                        default:
-                            AddError("Default function argument should be a constant or null", argument.Value);
-                            break;
+                        AddError($"Argument '{argument.Name}' in function '{function.Name}' cannot have default value if the argument has a generic type", argument.Value);
+                    }
+                    else if (defaultType != null)
+                    {
+                        if (!isConstant)
+                        {
+                            AddError($"Expected default value of argument '{argument.Name}' in function '{function.Name}' to be a constant value", argument.Value);
+
+                        }
+                        else if (type != Type.Error && !TypeEquals(argument.Type, defaultType))
+                        {
+                            AddError($"Type of argument '{argument.Name}' in function '{function.Name}' is '{PrintTypeDefinition(argument.Type)}', but default value is type '{PrintTypeDefinition(defaultType)}'", argument.Value);
+                        }
+                        else if (argument.Type.PrimitiveType != null && argument.Value is ConstantAst constant)
+                        {
+                            VerifyConstant(constant, argument.Type);
+                        }
+                    }
+                    else if (isConstant && type != Type.Pointer && type != Type.Error)
+                    {
+                        AddError($"Type of argument '{argument.Name}' in function '{function.Name}' is '{PrintTypeDefinition(argument.Type)}', but default value is 'null'", argument.Value);
                     }
                 }
             }
 
             // 4. Load the function into the dictionary
-            function.TypeIndex = _programGraph.TypeCount++;
-            if (!_programGraph.Functions.TryGetValue(function.Name, out var functions))
+            if (function.Generics.Any())
             {
-                _programGraph.Functions[function.Name] = functions = new List<FunctionAst>();
-            }
-            if (functions.Any())
-            {
-                if (function.Extern)
+                if (!function.ReturnTypeHasGenerics && function.Arguments.All(arg => !arg.HasGenerics))
                 {
-                    AddError($"Multiple definitions of external function '{function.Name}'", function);
+                    AddError($"Function '{function.Name}' has generic(s), but the generic(s) are not used in the argument(s) or the return type", function);
                 }
-                else if (OverloadExistsForFunction(function, functions))
+
+                if (!_polymorphicFunctions.TryGetValue(function.Name, out var functions))
+                {
+                    _polymorphicFunctions[function.Name] = functions = new List<FunctionAst>();
+                }
+                if (functions.Any() && OverloadExistsForFunction(function, functions))
                 {
                     AddError($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.Type)))})", function);
                 }
+                functions.Add(function);
             }
-            functions.Add(function);
+            else
+            {
+                functionNames.Add(function.Name);
+                function.TypeIndex = _programGraph.TypeCount++;
+                if (!_programGraph.Functions.TryGetValue(function.Name, out var functions))
+                {
+                    _programGraph.Functions[function.Name] = functions = new List<FunctionAst>();
+                }
+                if (functions.Any())
+                {
+                    if (function.Extern)
+                    {
+                        AddError($"Multiple definitions of external function '{function.Name}'", function);
+                    }
+                    else if (OverloadExistsForFunction(function, functions))
+                    {
+                        AddError($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.Type)))})", function);
+                    }
+                }
+                functions.Add(function);
+            }
         }
 
         private bool OverloadExistsForFunction(FunctionAst currentFunction, List<FunctionAst> existingFunctions)
@@ -568,7 +629,7 @@ namespace Lang.Translation
             // 3. Resolve the compiler directives in the function
             if (function.HasDirectives)
             {
-                ResolveCompilerDirectives(function.Children);
+                ResolveCompilerDirectives(function.Children, function);
             }
 
             // 4. Loop through function body and verify all ASTs
@@ -588,7 +649,7 @@ namespace Lang.Translation
             function.Verified = true;
         }
 
-        private void ResolveCompilerDirectives(List<IAst> asts)
+        private void ResolveCompilerDirectives(List<IAst> asts, FunctionAst function)
         {
             for (int i = 0; i < asts.Count; i++)
             {
@@ -598,11 +659,11 @@ namespace Lang.Translation
                     case ScopeAst:
                     case WhileAst:
                     case EachAst:
-                        ResolveCompilerDirectives(ast.Children);
+                        ResolveCompilerDirectives(ast.Children, function);
                         break;
                     case ConditionalAst conditional:
-                        ResolveCompilerDirectives(conditional.Children);
-                        ResolveCompilerDirectives(conditional.Else);
+                        ResolveCompilerDirectives(conditional.Children, function);
+                        ResolveCompilerDirectives(conditional.Else, function);
                         break;
                     case CompilerDirectiveAst directive:
                         asts.RemoveAt(i);
@@ -630,7 +691,7 @@ namespace Lang.Translation
                                     _programRunner.Init(_programGraph);
                                     if (!_programRunner.ExecuteCondition(directive.Value))
                                     {
-                                        AddError("Assertion failed", directive.Value);
+                                        AddError($"Assertion failed in function '{function.Name}'", directive.Value);
                                     }
                                 }
                                 break;
@@ -1359,6 +1420,9 @@ namespace Lang.Translation
                         int.TryParse(constant.Value, out count);
                     }
                     return constant.Type;
+                case NullAst:
+                    isConstant = true;
+                    return null;
                 case StructFieldRefAst structField:
                     var structFieldType = VerifyStructFieldRef(structField, currentFunction, scopeIdentifiers);
                     isConstant = structFieldType?.PrimitiveType is EnumType;
@@ -1505,6 +1569,10 @@ namespace Lang.Translation
                         case UnaryOperator.Reference:
                             if (unary.Value is IdentifierAst || unary.Value is StructFieldRefAst || unary.Value is IndexAst || type == Type.Pointer)
                             {
+                                if (type == Type.Error)
+                                {
+                                    return null;
+                                }
                                 var pointerType = new TypeDefinition {Name = "*"};
                                 if (valueType.CArray)
                                 {
@@ -1645,11 +1713,6 @@ namespace Lang.Translation
 
         private TypeDefinition VerifyCall(CallAst call, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
-            if (!_programGraph.Functions.TryGetValue(call.Function, out var functions))
-            {
-                AddError($"Call to undefined function '{call.Function}'", call);
-            }
-
             var arguments = new TypeDefinition[call.Arguments.Count];
             var argumentsError = false;
 
@@ -1678,24 +1741,234 @@ namespace Lang.Translation
                 }
             }
 
+            if (call.Generics != null)
+            {
+                foreach (var generic in call.Generics)
+                {
+                    if (VerifyType(generic) == Type.Error)
+                    {
+                        AddError($"Undefined generic type '{PrintTypeDefinition(generic)}'", generic);
+                        argumentsError = true;
+                    }
+                }
+            }
+
             if (argumentsError)
             {
-                if (functions != null && functions.Count == 1)
+                _programGraph.Functions.TryGetValue(call.Function, out var functions);
+                _polymorphicFunctions.TryGetValue(call.Function, out var polymorphicFunctions);
+                if (functions == null)
+                {
+                    if (polymorphicFunctions == null)
+                    {
+                        AddError($"Call to undefined function '{call.Function}'", call);
+                        return null;
+                    }
+
+                    if (polymorphicFunctions.Count == 1)
+                    {
+                        var calledFunction = polymorphicFunctions[0];
+                        return calledFunction.ReturnTypeHasGenerics ? null : calledFunction.ReturnType;
+                    }
+                }
+                else if (polymorphicFunctions == null && functions.Count == 1)
                 {
                     return functions[0].ReturnType;
                 }
                 return null;
             }
 
-            if (functions != null)
+            var function = DetermineCallingFunction(call, arguments, specifiedArguments);
+
+            if (function == null)
             {
-                FunctionAst function = null;
+                AddError($"No overload of function '{call.Function}' found with given arguments", call);
+                return null;
+            }
+
+            if (!function.Verified && function != currentFunction)
+            {
+                VerifyFunction(function);
+            }
+
+            if (currentFunction != null && !currentFunction.CallsCompiler && (function.Compiler || function.CallsCompiler))
+            {
+                currentFunction.CallsCompiler = true;
+            }
+
+            call.Params = function.Params;
+            var argumentCount = function.Varargs || function.Params ? function.Arguments.Count - 1 : function.Arguments.Count;
+
+            // Verify call arguments match the types of the function arguments
+            for (var i = 0; i < argumentCount; i++)
+            {
+                var functionArg = function.Arguments[i];
+                if (call.SpecifiedArguments != null && call.SpecifiedArguments.TryGetValue(functionArg.Name, out var specifiedArgument))
+                {
+                    if (functionArg.Type.PrimitiveType != null && specifiedArgument is ConstantAst constant)
+                    {
+                        VerifyConstant(constant, functionArg.Type);
+                    }
+
+                    call.Arguments.Insert(i, specifiedArgument);
+                    continue;
+                }
+
+                var argumentAst = call.Arguments.ElementAtOrDefault(i);
+                if (argumentAst == null)
+                {
+                    call.Arguments.Insert(i, functionArg.Value);
+                }
+                else if (argumentAst is NullAst nullAst)
+                {
+                    nullAst.TargetType = functionArg.Type;
+                }
+                else
+                {
+                    var argument = arguments[i];
+                    if (argument != null)
+                    {
+                        if (functionArg.Type.Name == "Type")
+                        {
+                            var typeIndex = new ConstantAst
+                            {
+                                Type = new TypeDefinition {PrimitiveType = new IntegerType {Signed = true, Bytes = 4}}
+                            };
+                            if (argument.TypeIndex.HasValue)
+                            {
+                                typeIndex.Value = argument.TypeIndex.ToString();
+                            }
+                            else if (argument.Name == "Type")
+                            {
+                                continue;
+                            }
+                            else
+                            {
+                                var type = _programGraph.Types[argument.GenericName];
+                                typeIndex.Value = type.TypeIndex.ToString();
+                            }
+                            call.Arguments[i] = typeIndex;
+                            arguments[i] = typeIndex.Type;
+                        }
+                        else if (argument.PrimitiveType != null && call.Arguments[i] is ConstantAst constant)
+                        {
+                            VerifyConstant(constant, functionArg.Type);
+                        }
+                    }
+                }
+            }
+
+            // Verify varargs call arguments
+            if (function.Params)
+            {
+                var paramsType = function.Arguments[argumentCount].Type.Generics.FirstOrDefault();
+
+                if (paramsType != null)
+                {
+                    for (var i = argumentCount; i < arguments.Length; i++)
+                    {
+                        var argumentAst = call.Arguments[i];
+                        if (argumentAst is NullAst nullAst)
+                        {
+                            nullAst.TargetType = paramsType;
+                        }
+                        else
+                        {
+                            var argument = arguments[i];
+                            if (argument != null)
+                            {
+                                if (paramsType.Name == "Type")
+                                {
+                                    var typeIndex = new ConstantAst
+                                    {
+                                        Type = new TypeDefinition {PrimitiveType = new IntegerType {Signed = true, Bytes = 4}}
+                                    };
+                                    if (argument.TypeIndex.HasValue)
+                                    {
+                                        typeIndex.Value = argument.TypeIndex.ToString();
+                                    }
+                                    else if (argument.Name == "Type")
+                                    {
+                                        continue;
+                                    }
+
+                                    else
+                                    {
+                                        var type = _programGraph.Types[argument.GenericName];
+                                        typeIndex.Value = type.TypeIndex.ToString();
+                                    }
+                                    call.Arguments[i] = typeIndex;
+                                    arguments[i] = typeIndex.Type;
+                                }
+                                else if (argument.PrimitiveType != null && argumentAst is ConstantAst constant)
+                                {
+                                    VerifyConstant(constant, paramsType);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            else if (function.Varargs)
+            {
+                for (var i = 0; i < arguments.Length; i++)
+                {
+                    var argument = arguments[i];
+                    // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
+                    // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
+                    if (argument?.PrimitiveType is FloatType {Bytes: 4})
+                    {
+                        arguments[i] = argument = new TypeDefinition
+                        {
+                            Name = "float64", PrimitiveType = new FloatType {Bytes = 8}
+                        };
+                    }
+                }
+                var found = false;
+                for (var index = 0; index < function.VarargsCalls.Count; index++)
+                {
+                    var callTypes = function.VarargsCalls[index];
+                    if (callTypes.Count == arguments.Length)
+                    {
+                        var callMatches = true;
+                        for (var i = 0; i < callTypes.Count; i++)
+                        {
+                            if (!TypeEquals(callTypes[i], arguments[i], true))
+                            {
+                                callMatches = false;
+                                break;
+                            }
+                        }
+
+                        if (callMatches)
+                        {
+                            found = true;
+                            call.VarargsIndex = index;
+                            break;
+                        }
+                    }
+                }
+
+                if (!found)
+                {
+                    call.VarargsIndex = function.VarargsCalls.Count;
+                    function.VarargsCalls.Add(arguments.ToList());
+                }
+            }
+
+            return function.ReturnType;
+        }
+
+        private FunctionAst DetermineCallingFunction(CallAst call, TypeDefinition[] arguments, Dictionary<string, TypeDefinition> specifiedArguments)
+        {
+            if (_programGraph.Functions.TryGetValue(call.Function, out var functions))
+            {
                 for (var i = 0; i < functions.Count; i++)
                 {
-                    var functionAst = functions[i];
+                    var function = functions[i];
                     var match = true;
                     var callArgIndex = 0;
-                    var functionArgCount = functionAst.Varargs || functionAst.Params ? functionAst.Arguments.Count - 1 : functionAst.Arguments.Count;
+                    var functionArgCount = function.Varargs || function.Params ? function.Arguments.Count - 1 : function.Arguments.Count;
 
                     if (call.SpecifiedArguments != null)
                     {
@@ -1703,12 +1976,12 @@ namespace Lang.Translation
                         foreach (var (name, argument) in call.SpecifiedArguments)
                         {
                             var found = false;
-                            for (var argIndex = 0; argIndex < functionAst.Arguments.Count; argIndex++)
+                            for (var argIndex = 0; argIndex < function.Arguments.Count; argIndex++)
                             {
-                                var functionArg = functionAst.Arguments[argIndex];
+                                var functionArg = function.Arguments[argIndex];
                                 if (functionArg.Name == name)
                                 {
-                                    found = VerifyArgument(argument, specifiedArguments[name], functionArg.Type, functionAst.Extern);
+                                    found = VerifyArgument(argument, specifiedArguments[name], functionArg.Type, function.Extern);
                                     break;
                                 }
                             }
@@ -1726,7 +1999,7 @@ namespace Lang.Translation
 
                     for (var arg = 0; arg < functionArgCount; arg++)
                     {
-                        var functionArg = functionAst.Arguments[arg];
+                        var functionArg = function.Arguments[arg];
                         if (specifiedArguments.ContainsKey(functionArg.Name))
                         {
                             continue;
@@ -1743,7 +2016,7 @@ namespace Lang.Translation
                         }
                         else
                         {
-                            if (!VerifyArgument(argumentAst, arguments[callArgIndex], functionArg.Type, functionAst.Extern))
+                            if (!VerifyArgument(argumentAst, arguments[callArgIndex], functionArg.Type, function.Extern))
                             {
                                 match = false;
                                 break;
@@ -1752,9 +2025,9 @@ namespace Lang.Translation
                         }
                     }
 
-                    if (match && functionAst.Params)
+                    if (match && function.Params)
                     {
-                        var paramsType = functionAst.Arguments[^1].Type.Generics.FirstOrDefault();
+                        var paramsType = function.Arguments[^1].Type.Generics.FirstOrDefault();
 
                         if (paramsType != null)
                         {
@@ -1769,219 +2042,271 @@ namespace Lang.Translation
                         }
                     }
 
-                    if (match && (functionAst.Varargs || callArgIndex == call.Arguments.Count))
+                    if (match && (function.Varargs || callArgIndex == call.Arguments.Count))
                     {
-                        function = functionAst;
                         call.FunctionIndex = i;
-                        break;
+                        return function;
                     }
                 }
+            }
 
-                if (function == null)
+            if (_polymorphicFunctions.TryGetValue(call.Function, out var polymorphicFunctions))
+            {
+                for (var i = 0; i < polymorphicFunctions.Count; i++)
                 {
-                    AddError($"No overload of function '{call.Function}' found with given arguments", call);
-                    return null;
-                }
+                    var function = polymorphicFunctions[i];
 
-                if (!function.Verified && function != currentFunction)
-                {
-                    VerifyFunction(function);
-                }
-
-                if (currentFunction != null && !currentFunction.CallsCompiler && (function.Compiler || function.CallsCompiler))
-                {
-                    currentFunction.CallsCompiler = true;
-                }
-
-                call.Params = function.Params;
-                var argumentCount = function.Varargs || function.Params ? function.Arguments.Count - 1 : function.Arguments.Count;
-
-                // Verify call arguments match the types of the function arguments
-                for (var i = 0; i < argumentCount; i++)
-                {
-                    var functionArg = function.Arguments[i];
-                    if (call.SpecifiedArguments != null && call.SpecifiedArguments.TryGetValue(functionArg.Name, out var specifiedArgument))
+                    if (call.Generics != null && call.Generics.Count != function.Generics.Count)
                     {
-                        call.Arguments.Insert(i, specifiedArgument);
                         continue;
                     }
 
-                    var argumentAst = call.Arguments.ElementAtOrDefault(i);
-                    if (argumentAst == null)
-                    {
-                        call.Arguments.Insert(i, functionArg.Value);
-                    }
-                    else if (argumentAst is NullAst nullAst)
-                    {
-                        nullAst.TargetType = functionArg.Type;
-                    }
-                    else
-                    {
-                        var argument = arguments[i];
-                        if (argument != null)
-                        {
-                            if (functionArg.Type.Name == "Type")
-                            {
-                                var typeIndex = new ConstantAst
-                                {
-                                    Type = new TypeDefinition {PrimitiveType = new IntegerType {Signed = true, Bytes = 4}}
-                                };
-                                if (argument.TypeIndex.HasValue)
-                                {
-                                    typeIndex.Value = argument.TypeIndex.ToString();
-                                }
-                                else if (argument.Name == "Type")
-                                {
-                                    continue;
-                                }
-                                else
-                                {
-                                    var type = _programGraph.Types[argument.GenericName];
-                                    typeIndex.Value = type.TypeIndex.ToString();
-                                }
-                                call.Arguments[i] = typeIndex;
-                                arguments[i] = typeIndex.Type;
-                            }
-                            else if (argument.PrimitiveType != null && call.Arguments[i] is ConstantAst constant)
-                            {
-                                VerifyConstant(constant, functionArg.Type);
-                            }
-                        }
-                    }
-                }
+                    var match = true;
+                    var callArgIndex = 0;
+                    var functionArgCount = function.Varargs || function.Params ? function.Arguments.Count - 1 : function.Arguments.Count;
+                    var genericTypes = new TypeDefinition[function.Generics.Count];
 
-                // Verify varargs call arguments
-                if (function.Params)
-                {
-                    var paramsType = function.Arguments[argumentCount].Type.Generics.FirstOrDefault();
-
-                    if (paramsType != null)
+                    if (call.SpecifiedArguments != null)
                     {
-                        for (var i = argumentCount; i < arguments.Length; i++)
+                        var specifiedArgsMatch = true;
+                        foreach (var (name, argument) in call.SpecifiedArguments)
                         {
-                            var argumentAst = call.Arguments[i];
-                            if (argumentAst is NullAst nullAst)
+                            var found = false;
+                            for (var argIndex = 0; argIndex < function.Arguments.Count; argIndex++)
                             {
-                                nullAst.TargetType = paramsType;
-                            }
-                            else
-                            {
-                                var argument = arguments[i];
-                                if (argument != null)
+                                var functionArg = function.Arguments[argIndex];
+                                if (functionArg.Name == name)
                                 {
-                                    if (paramsType.Name == "Type")
+                                    if (functionArg.HasGenerics)
                                     {
-                                        var typeIndex = new ConstantAst
-                                        {
-                                            Type = new TypeDefinition {PrimitiveType = new IntegerType {Signed = true, Bytes = 4}}
-                                        };
-                                        if (argument.TypeIndex.HasValue)
-                                        {
-                                            typeIndex.Value = argument.TypeIndex.ToString();
-                                        }
-                                        else if (argument.Name == "Type")
-                                        {
-                                            continue;
-                                        }
-
-                                        else
-                                        {
-                                            var type = _programGraph.Types[argument.GenericName];
-                                            typeIndex.Value = type.TypeIndex.ToString();
-                                        }
-                                        call.Arguments[i] = typeIndex;
-                                        arguments[i] = typeIndex.Type;
+                                        found = VerifyPolymorphicArgument(argument, specifiedArguments[name], functionArg.Type, genericTypes);
                                     }
-                                    else if (argument.PrimitiveType != null && argumentAst is ConstantAst constant)
+                                    else
                                     {
-                                        VerifyConstant(constant, paramsType);
+                                        found = VerifyArgument(argument, specifiedArguments[name], functionArg.Type);
                                     }
-                                }
-                            }
-                        }
-                    }
-                }
-                else if (function.Varargs)
-                {
-                    for (var i = 0; i < arguments.Length; i++)
-                    {
-                        var argument = arguments[i];
-                        // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
-                        // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
-                        if (argument?.PrimitiveType is FloatType {Bytes: 4})
-                        {
-                            arguments[i] = argument = new TypeDefinition
-                            {
-                                Name = "float64", PrimitiveType = new FloatType {Bytes = 8}
-                            };
-                        }
-                    }
-                    var found = false;
-                    for (var index = 0; index < function.VarargsCalls.Count; index++)
-                    {
-                        var callTypes = function.VarargsCalls[index];
-                        if (callTypes.Count == arguments.Length)
-                        {
-                            var callMatches = true;
-                            for (var i = 0; i < callTypes.Count; i++)
-                            {
-                                if (!TypeEquals(callTypes[i], arguments[i], true))
-                                {
-                                    callMatches = false;
                                     break;
                                 }
                             }
-
-                            if (callMatches)
+                            if (!found)
                             {
-                                found = true;
-                                call.VarargsIndex = index;
+                                specifiedArgsMatch = false;
                                 break;
+                            }
+                        }
+                        if (!specifiedArgsMatch)
+                        {
+                            continue;
+                        }
+                    }
+
+                    for (var arg = 0; arg < functionArgCount; arg++)
+                    {
+                        var functionArg = function.Arguments[arg];
+                        if (specifiedArguments.ContainsKey(functionArg.Name))
+                        {
+                            continue;
+                        }
+
+                        var argumentAst = call.Arguments.ElementAtOrDefault(callArgIndex);
+                        if (argumentAst == null)
+                        {
+                            if (functionArg.Value == null)
+                            {
+                                match = false;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            if (functionArg.HasGenerics)
+                            {
+                                if (!VerifyPolymorphicArgument(argumentAst, arguments[callArgIndex], functionArg.Type, genericTypes))
+                                {
+                                    match = false;
+                                    break;
+                                }
+                            }
+                            else
+                            {
+                                if (!VerifyArgument(argumentAst, arguments[callArgIndex],functionArg.Type))
+                                {
+                                    match = false;
+                                    break;
+                                }
+                            }
+                            callArgIndex++;
+                        }
+                    }
+
+                    if (match && function.Params)
+                    {
+                        var paramsArgument = function.Arguments[^1];
+                        var paramsType = paramsArgument.Type.Generics.FirstOrDefault();
+
+                        if (paramsType != null)
+                        {
+                            if (paramsArgument.HasGenerics)
+                            {
+                                for (; callArgIndex < arguments.Length; callArgIndex++)
+                                {
+                                    if (!VerifyPolymorphicArgument(call.Arguments[callArgIndex], arguments[callArgIndex], paramsType, genericTypes))
+                                    {
+                                        match = false;
+                                        break;
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                for (; callArgIndex < arguments.Length; callArgIndex++)
+                                {
+                                    if (!VerifyArgument(call.Arguments[callArgIndex], arguments[callArgIndex], paramsType))
+                                    {
+                                        match = false;
+                                        break;
+                                    }
+                                }
                             }
                         }
                     }
 
-                    if (!found)
+                    if (call.Generics != null)
                     {
-                        call.VarargsIndex = function.VarargsCalls.Count;
-                        function.VarargsCalls.Add(arguments.ToList());
+                        if (genericTypes.Any(t => t != null))
+                        {
+                            var genericTypesMatch = true;
+                            for (var t = 0; t < genericTypes.Length; t++)
+                            {
+                                if (!TypeEquals(call.Generics[i], genericTypes[i], true))
+                                {
+                                    genericTypesMatch = false;
+                                    break;
+                                }
+                            }
+                            if (!genericTypesMatch)
+                            {
+                                continue;
+                            }
+                        }
+                        else
+                        {
+                            for (var t = 0; t < genericTypes.Length; t++)
+                            {
+                                genericTypes[i] = call.Generics[i];
+                            }
+                        }
+                    }
+
+                    if (match && (function.Varargs || callArgIndex == call.Arguments.Count))
+                    {
+                        var genericName = $"{function.Name}.{i}.{string.Join('.', genericTypes.Select(t => t.GenericName))}";
+                        var name = $"{function.Name}<{string.Join(", ", genericTypes.Select(PrintTypeDefinition))}>";
+                        call.Function = genericName;
+
+                        if (_programGraph.Functions.TryGetValue(genericName, out var implementations))
+                        {
+                            if (implementations.Count > 1)
+                            {
+                                AddError($"Internal compiler error, multiple implementations of polymorphic function '{name}'", call);
+                            }
+                            return implementations[0];
+                        }
+
+                        var polymorphedFunction = _polymorpher.CreatePolymorphedFunction(function, name, _programGraph.TypeCount++, genericTypes);
+                        _programGraph.Functions[genericName] = new List<FunctionAst>{polymorphedFunction};
+                        VerifyFunction(polymorphedFunction);
+
+                        return polymorphedFunction;
                     }
                 }
+            }
 
-                return function.ReturnType;
+            if (functions == null && polymorphicFunctions == null)
+            {
+                AddError($"Call to undefined function '{call.Function}'", call);
             }
             return null;
         }
 
-        private bool VerifyArgument(IAst argumentAst, TypeDefinition argument, TypeDefinition type, bool externCall = false)
+        private bool VerifyArgument(IAst argumentAst, TypeDefinition callType, TypeDefinition argumentType, bool externCall = false)
         {
             if (argumentAst is NullAst)
             {
-                if (type.Name != "*")
+                if (argumentType.Name != "*")
                 {
                     return false;
                 }
             }
-            else if (type.Name != "Type")
+            else if (argumentType.Name != "Type")
             {
-                if (externCall && type.Name == "string")
+                if (externCall && argumentType.Name == "string")
                 {
-                    if (argument.Name != "string" && argument.Name != "*")
+                    if (callType.Name != "string" && callType.Name != "*")
                     {
                         return false;
                     }
-                    else if (argument.Name == "*")
+                    else if (callType.Name == "*")
                     {
-                        var pointerType = argument.Generics.FirstOrDefault();
+                        var pointerType = callType.Generics.FirstOrDefault();
                         if (pointerType?.Name != "u8" || pointerType.Generics.Any())
                         {
                             return false;
                         }
                     }
                 }
-                else if (!TypeEquals(type, argument))
+                else if (!TypeEquals(argumentType, callType))
                 {
                     return false;
+                }
+            }
+            return true;
+        }
+
+        private bool VerifyPolymorphicArgument(IAst argumentAst, TypeDefinition callType, TypeDefinition argumentType, TypeDefinition[] genericTypes)
+        {
+            if (argumentAst is NullAst)
+            {
+                // Return false if the generic types have been determined,
+                // the type cannot be inferred from a null argument if the generics haven't been determined yet
+                if (argumentType.Name != "*" || genericTypes.Any(generic => generic == null))
+                {
+                    return false;
+                }
+            }
+            else if (!VerifyPolymorphicArgument(callType, argumentType, genericTypes))
+            {
+                return false;
+            }
+            return true;
+        }
+
+        private bool VerifyPolymorphicArgument(TypeDefinition callType, TypeDefinition argumentType, TypeDefinition[] genericTypes)
+        {
+            if (argumentType.IsGeneric)
+            {
+                var genericType = genericTypes[argumentType.GenericIndex];
+                if (genericType == null)
+                {
+                    genericTypes[argumentType.GenericIndex] = callType;
+                }
+                else if (!TypeEquals(genericType, callType))
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                if (callType.Name != argumentType.Name || callType.Generics.Count != argumentType.Generics.Count)
+                {
+                    return false;
+                }
+                for (var i = 0; i < callType.Generics.Count; i++)
+                {
+                    if (!VerifyPolymorphicArgument(callType.Generics[i], argumentType.Generics[i], genericTypes))
+                    {
+                        return false;
+                    }
                 }
             }
             return true;
@@ -2034,7 +2359,8 @@ namespace Lang.Translation
                     case Operator.LessThan:
                     case Operator.GreaterThanEqual:
                     case Operator.LessThanEqual:
-                        if (type == Type.Enum && nextType == Type.Enum)
+                        if ((type == Type.Enum && nextType == Type.Enum)
+                            || (type == Type.Type && nextType == Type.Type))
                         {
                             if ((op != Operator.Equality && op != Operator.NotEqual) || !TypeEquals(expression.Type, nextExpressionType))
                             {
@@ -2376,7 +2702,9 @@ namespace Lang.Translation
                             return Type.Error;
                         }
                         if (error) return Type.Error;
-                        CreatePolymorphedStruct(structDef, PrintTypeDefinition(typeDef), genericName, TypeKind.Struct, generics);
+                        var polyStruct = _polymorpher.CreatePolymorphedStruct(structDef, PrintTypeDefinition(typeDef), TypeKind.Struct, _programGraph.TypeCount++, generics);
+                        _programGraph.Types.Add(genericName, polyStruct);
+                        VerifyStruct(polyStruct);
                         return Type.Struct;
                     }
                     if (!_programGraph.Types.TryGetValue(typeDef.Name, out var type))
@@ -2401,6 +2729,11 @@ namespace Lang.Translation
         private bool VerifyList(TypeDefinition typeDef)
         {
             var listType = typeDef.Generics[0];
+            if (listType.IsGeneric)
+            {
+                return true;
+            }
+
             var genericType = VerifyType(listType);
             if (genericType == Type.Error)
             {
@@ -2418,69 +2751,10 @@ namespace Lang.Translation
                 return false;
             }
 
-            CreatePolymorphedStruct(structDef, $"List<{PrintTypeDefinition(listType)}>", genericName, TypeKind.List, listType);
+            var listStruct = _polymorpher.CreatePolymorphedStruct(structDef, $"List<{PrintTypeDefinition(listType)}>", TypeKind.List, _programGraph.TypeCount++, listType);
+            _programGraph.Types.Add(genericName, listStruct);
+            VerifyStruct(listStruct);
             return true;
-        }
-
-        private void CreatePolymorphedStruct(StructAst structAst, string name, string genericName, TypeKind typeKind, params TypeDefinition[] genericTypes)
-        {
-            var polyStruct = new StructAst {Name = name, TypeIndex = _programGraph.TypeCount++, TypeKind = typeKind, Verified = true};
-            foreach (var field in structAst.Fields)
-            {
-                if (field.HasGeneric)
-                {
-                    polyStruct.Fields.Add(new StructFieldAst
-                    {
-                        Type = CopyType(field.Type, genericTypes), Name = field.Name, DefaultValue = field.DefaultValue
-                    });
-                }
-                else
-                {
-                    polyStruct.Fields.Add(field);
-                }
-            }
-
-            CalculateStructSize(polyStruct);
-            _programGraph.Types.Add(genericName, polyStruct);
-        }
-
-        private TypeDefinition CopyType(TypeDefinition type, TypeDefinition[] genericTypes)
-        {
-            if (type.IsGeneric)
-            {
-                return genericTypes[type.GenericIndex];
-            }
-            var copyType = new TypeDefinition
-            {
-                Name = type.Name, IsGeneric = type.IsGeneric, PrimitiveType = type.PrimitiveType, Count = type.Count
-            };
-
-            foreach (var generic in type.Generics)
-            {
-                copyType.Generics.Add(CopyType(generic, genericTypes));
-            }
-            VerifyType(copyType);
-
-            return copyType;
-        }
-
-        private void CalculateStructSize(StructAst structAst)
-        {
-            foreach (var field in structAst.Fields)
-            {
-                // 1. Get the type from type dictionary
-                var type = field.Type.CArray ? _programGraph.Types[field.Type.Generics[0].GenericName] :_programGraph.Types[field.Type.GenericName];
-
-                // 2. If the type is a struct and the size hasn't been calculated, verify the struct and calculate the size
-                if (type is StructAst fieldStruct)
-                {
-                    if (!fieldStruct.Verified)
-                    {
-                        VerifyStruct(fieldStruct);
-                    }
-                }
-                structAst.Size += field.Type.CArray ? type.Size * field.Type.ConstCount.Value : type.Size;
-            }
         }
 
         private static string PrintTypeDefinition(TypeDefinition type)

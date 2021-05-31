@@ -28,6 +28,7 @@ namespace Lang.Runner
         private readonly Dictionary<string, ValueType> _globalVariables = new();
         private readonly Dictionary<string, Type> _types = new();
         private readonly Dictionary<string, IntPtr> _typeInfoPointers = new();
+        private readonly TypeDefinition _intTypeDefinition = new() {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
 
         private readonly Dictionary<string, string> _compilerFunctions = new() {
             { "add_dependency", "AddDependency" }
@@ -216,7 +217,7 @@ namespace Lang.Runner
                     for (var i = 0; i < functions.Count; i++)
                     {
                         var function = functions[i];
-                        if (!_typeInfoPointers.TryGetValue($"name.{i}", out var typeInfoPointer))
+                        if (!_typeInfoPointers.TryGetValue($"{name}.{i}", out var typeInfoPointer))
                         {
                             var typeInfo = Activator.CreateInstance(typeInfoType);
 
@@ -225,7 +226,7 @@ namespace Lang.Runner
                             var typeKindField = typeInfoType.GetField("type");
                             typeKindField.SetValue(typeInfo, function.TypeKind);
 
-                            _typeInfoPointers[$"name.{i}"] = typeInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoType));
+                            _typeInfoPointers[$"{name}.{i}"] = typeInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoType));
                             newTypeInfos.Add((function, typeInfo, typeInfoPointer));
                         }
 
@@ -834,7 +835,14 @@ namespace Lang.Runner
                     return GetStructFieldRef(structField, structVariable, variables);
                 }
                 case IdentifierAst identifier:
-                    return variables[identifier.Name];
+                {
+                    if (!variables.TryGetValue(identifier.Name, out var variable))
+                    {
+                        var type = _programGraph.Types[identifier.Name];
+                        return new ValueType {Type = _intTypeDefinition, Value = type.TypeIndex};
+                    }
+                    return variable;
+                }
                 case ChangeByOneAst changeByOne:
                     switch (changeByOne.Value)
                     {
@@ -1114,6 +1122,11 @@ namespace Lang.Runner
                 {
                     var (typeDef, elementType, pointer) = GetListPointer(indexAst, variables);
                     return new ValueType {Type = typeDef, Value = PointerToTargetType(pointer, typeDef, elementType)};
+                }
+                case TypeDefinition typeDef:
+                {
+                    var type = _programGraph.Types[typeDef.GenericName];
+                    return new ValueType {Type = _intTypeDefinition, Value = type.TypeIndex};
                 }
                 case CastAst cast:
                 {

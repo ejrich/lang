@@ -13,6 +13,7 @@ serviceCollection.AddTransient<ILexer, Lexer>();
 serviceCollection.AddTransient<IParser, Parser>();
 serviceCollection.AddTransient<IProjectInterpreter, ProjectInterpreter>();
 serviceCollection.AddTransient<IProgramGraphBuilder, ProgramGraphBuilder>();
+serviceCollection.AddTransient<IPolymorpher, Polymorpher>();
 serviceCollection.AddTransient<IProgramRunner, ProgramRunner>();
 // LLVM Backend
 serviceCollection.AddTransient<IWriter, LLVMWriter>();

@@ -45,6 +45,8 @@ namespace Lang.Parsing
         public bool HasDirectives { get; set; }
         public bool CallsCompiler { get; set; }
         public TypeDefinition ReturnType { get; set; }
+        public bool ReturnTypeHasGenerics { get; set; }
+        public List<string> Generics { get; } = new();
         public List<DeclarationAst> Arguments { get; } = new();
         public List<List<TypeDefinition>> VarargsCalls { get; set; }
         public List<IAst> Children { get; } = new();
@@ -205,6 +207,7 @@ namespace Lang.Parsing
         public bool Params { get; set; }
         public int FunctionIndex { get; set; }
         public int VarargsIndex { get; set; }
+        public List<TypeDefinition> Generics { get; set; }
         public Dictionary<string, IAst> SpecifiedArguments { get; set; }
         public List<IAst> Arguments { get; } = new();
         public List<IAst> Children => null;
@@ -219,6 +222,7 @@ namespace Lang.Parsing
         public TypeDefinition Type { get; set; }
         public IAst Value { get; set; }
         public bool Constant { get; set; }
+        public bool HasGenerics { get; set; }
         public List<AssignmentAst> Assignments { get; } = new();
         public List<IAst> Children => null;
     }
@@ -292,6 +296,7 @@ namespace Lang.Parsing
         public int Line { get; init; }
         public int Column { get; init; }
         public TypeDefinition TargetType { get; set; }
+        public bool HasGenerics { get; set; }
         public IAst Value { get; set; }
         public List<IAst> Children => null;
     }
