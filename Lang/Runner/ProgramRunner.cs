@@ -156,7 +156,6 @@ namespace Lang.Runner
                 }
             }
 
-
             if (functionTypeBuilder != null)
             {
                 var library = functionTypeBuilder.CreateType();
@@ -197,7 +196,6 @@ namespace Lang.Runner
                     if (!_typeInfoPointers.TryGetValue(name, out var typeInfoPointer))
                     {
                         var typeInfo = Activator.CreateInstance(typeInfoType);
-
 
                         var typeNameField = typeInfoType.GetField("name");
                         typeNameField.SetValue(typeInfo, GetString(type.Name));
