@@ -416,7 +416,7 @@ namespace Lang.Runner
         {
             var value = declaration.Value == null ?
                 GetUninitializedValue(declaration.Type, variables, declaration.Assignments) :
-                ExecuteExpression(declaration.Value, variables).Value;
+                CastValue(ExecuteExpression(declaration.Value, variables).Value, declaration.Type);
 
             variables[declaration.Name] = new ValueType {Type = declaration.Type, Value = value};
         }
@@ -1425,7 +1425,7 @@ namespace Lang.Runner
                 return PointerOperation(rhs.Value, lhs.Value, op);
             }
 
-            // 2. Handle compares, since the lhs and rhs should not be cast to the target type
+            // 2. Handle compares and shifts, since the lhs and rhs should not be cast to the target type
             switch (op)
             {
                 case Operator.And:
@@ -1440,6 +1440,14 @@ namespace Lang.Runner
                 case Operator.GreaterThan:
                 case Operator.LessThan:
                     return Compare(lhs, rhs, op);
+                case Operator.ShiftLeft:
+                    return Shift(lhs, rhs);
+                case Operator.ShiftRight:
+                    return Shift(lhs, rhs, true);
+                case Operator.RotateLeft:
+                    return Shift(lhs, rhs, rotate: true);
+                case Operator.RotateRight:
+                    return Shift(lhs, rhs, true, true);
             }
 
             // 3. Cast lhs and rhs to the target types
@@ -1710,6 +1718,105 @@ namespace Lang.Runner
 
             // @Future Operator overloading
             throw new NotImplementedException($"{op} not compatible with types '{lhs.Type.GenericName}' and '{rhs.Type.GenericName}'");
+        }
+
+        private static object Shift(ValueType lhs, ValueType rhs, bool right = false, bool rotate = false)
+        {
+            var rhsValue = Convert.ToInt32(CastValue(rhs.Value, new TypeDefinition {PrimitiveType = new IntegerType {Bytes = 4, Signed = true}}));
+
+            if (lhs.Type.PrimitiveType is IntegerType integerType)
+            {
+                switch (integerType.Bytes)
+                {
+                    case 1:
+                        if (integerType.Signed)
+                        {
+                            var lhsValue = Convert.ToSByte(lhs.Value);
+                            var result = right ? lhsValue >> rhsValue : lhsValue << rhsValue;
+                            if (rotate)
+                            {
+                                result |= right ? lhsValue << (8 - rhsValue) : lhsValue >> (8 - rhsValue);
+                            }
+                            return CastValue(result, lhs.Type);
+                        }
+                        else
+                        {
+                            var lhsValue = Convert.ToByte(lhs.Value);
+                            var result = right ? lhsValue >> rhsValue : lhsValue << rhsValue;
+                            if (rotate)
+                            {
+                                result |= right ? lhsValue << (8 - rhsValue) : lhsValue >> (8 - rhsValue);
+                            }
+                            return CastValue(result, lhs.Type);
+                        }
+                    case 2:
+                        if (integerType.Signed)
+                        {
+                            var lhsValue = Convert.ToInt16(lhs.Value);
+                            var result = right ? lhsValue >> rhsValue : lhsValue << rhsValue;
+                            if (rotate)
+                            {
+                                result |= right ? lhsValue << (16 - rhsValue) : lhsValue >> (16 - rhsValue);
+                            }
+                            return CastValue(result, lhs.Type);
+                        }
+                        else
+                        {
+                            var lhsVal = Convert.ToUInt16(lhs.Value);
+                            var result = right ? lhsVal >> rhsValue : lhsVal << rhsValue;
+                            if (rotate)
+                            {
+                                result |= right ? lhsVal << (16 - rhsValue) : lhsVal >> (16 - rhsValue);
+                            }
+                            return CastValue(result, lhs.Type);
+                        }
+                    case 4:
+                        if (integerType.Signed)
+                        {
+                            var lhsValue = Convert.ToInt32(lhs.Value);
+                            var result = right ? lhsValue >> rhsValue : lhsValue << rhsValue;
+                            if (rotate)
+                            {
+                                result |= right ? lhsValue << (32 - rhsValue) : lhsValue >> (32 - rhsValue);
+                            }
+                            return result;
+                        }
+                        else
+                        {
+                            var lhsValue = Convert.ToUInt32(lhs.Value);
+                            var result = right ? lhsValue >> rhsValue : lhsValue << rhsValue;
+                            if (rotate)
+                            {
+                                result |= right ? lhsValue << (32 - rhsValue) : lhsValue >> (32 - rhsValue);
+                            }
+                            return CastValue(result, lhs.Type);
+                        }
+                    case 8:
+                        if (integerType.Signed)
+                        {
+                            var lhsValue = Convert.ToInt64(lhs.Value);
+                            var result = right ? lhsValue >> rhsValue : lhsValue << rhsValue;
+                            if (rotate)
+                            {
+                                result |= right ? lhsValue << (64 - rhsValue) : lhsValue >> (64 - rhsValue);
+                            }
+                            return CastValue(result, lhs.Type);
+                        }
+                        else
+                        {
+                            var lhsValue = Convert.ToUInt64(lhs.Value);
+                            var result = right ? lhsValue >> rhsValue : lhsValue << rhsValue;
+                            if (rotate)
+                            {
+                                result |= right ? lhsValue << (64 - rhsValue) : lhsValue >> (64 - rhsValue);
+                            }
+                            return CastValue(result, lhs.Type);
+                        }
+                }
+            }
+
+            // @Cleanup this should not be hit
+            return lhs.Value;
         }
 
         private static object PerformOperation(TypeDefinition targetType, object lhsValue, object rhsValue, Operator op)

@@ -32,6 +32,8 @@ main() {
     type_information();
 
     type_casts();
+
+    shifts();
 }
 
 basic() {
@@ -41,7 +43,7 @@ basic() {
     baz := foo() + bar(3 + 1, "Hello", 1.2);
     b := 6 * (4 - 1);
     c := 2;
-    d := a + 1 == b + 2 && (1 + b) == 2 || b > 3 + 4 * c - 1;
+    d := a + 1 == b + 2 && 1 + b == 2 || b > 3 + 4 * c - 1;
     e := !d;
     f := test(3);
     g := test_each();
@@ -368,4 +370,21 @@ type_casts() {
     printf("a = %llu, b = %d, c = %f, d = %d\n", a, b, c, d);
 }
 
-// #run main();
+shifts() {
+    // Standard shifting
+    a := 34 << 3;
+    b := 12345 >> 5;
+    printf("a = %d, b = %d\n", a, b);
+
+    // Shifting negative numbers
+    c := -13 << 2;
+    d := -13 >> 2;
+    printf("c = %d, d = %d\n", c, d);
+
+    // Rotating
+    e: u32 = 123456789 <<< 7;
+    f := 34 >>> 32; // Full rotation
+    printf("e = %u, f = %d\n", e, f);
+}
+
+#run main();

@@ -1522,18 +1522,13 @@ namespace Lang.Backend.LLVM
                 return BuildPointerOperation(rhs.value, lhs.value, op);
             }
 
-            // 2. Handle simple operators like && and ||
+            // 2. Handle compares and shifts, since the lhs and rhs should not be cast to the target type
             switch (op)
             {
                 case Operator.And:
                     return LLVMApi.BuildAnd(_builder, lhs.value, rhs.value, "tmpand");
                 case Operator.Or:
                     return LLVMApi.BuildOr(_builder, lhs.value, rhs.value, "tmpor");
-            }
-
-            // 3. Handle compares, since the lhs and rhs should not be cast to the target type
-            switch (op)
-            {
                 case Operator.Equality:
                 case Operator.NotEqual:
                 case Operator.GreaterThanEqual:
@@ -1541,13 +1536,21 @@ namespace Lang.Backend.LLVM
                 case Operator.GreaterThan:
                 case Operator.LessThan:
                     return BuildCompare(lhs, rhs, op);
+                case Operator.ShiftLeft:
+                    return BuildShift(lhs, rhs);
+                case Operator.ShiftRight:
+                    return BuildShift(lhs, rhs, true);
+                case Operator.RotateLeft:
+                    return BuildRotate(lhs, rhs);
+                case Operator.RotateRight:
+                    return BuildRotate(lhs, rhs, true);
             }
 
-            // 4. Cast lhs and rhs to the target types
+            // 3. Cast lhs and rhs to the target types
             lhs.value = CastValue(lhs, targetType);
             rhs.value = CastValue(rhs, targetType);
 
-            // 5. Handle the rest of the simple operators
+            // 4. Handle the rest of the simple operators
             switch (op)
             {
                 case Operator.BitwiseAnd:
@@ -1558,7 +1561,7 @@ namespace Lang.Backend.LLVM
                     return LLVMApi.BuildXor(_builder, lhs.value, rhs.value, "tmpxor");
             }
 
-            // 6. Handle binary operations
+            // 5. Handle binary operations
             var signed = lhs.type.PrimitiveType.Signed || rhs.type.PrimitiveType.Signed;
             return BuildBinaryOperation(targetType, lhs.value, rhs.value, op, signed);
         }
@@ -1590,8 +1593,7 @@ namespace Lang.Backend.LLVM
             return LLVMApi.BuildGEP(_builder, lhs, new []{rhs}, "tmpptr");
         }
 
-        private LLVMValueRef BuildCompare((TypeDefinition type, LLVMValueRef value) lhs,
-            (TypeDefinition type, LLVMValueRef value) rhs, Operator op)
+        private LLVMValueRef BuildCompare((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, Operator op)
         {
             switch (lhs.type.PrimitiveType)
             {
@@ -1657,6 +1659,27 @@ namespace Lang.Backend.LLVM
 
             // @Future Operator overloading
             throw new NotImplementedException($"{op} not compatible with types '{lhs.value.TypeOf().TypeKind}' and '{rhs.value.TypeOf().TypeKind}'");
+        }
+
+        private LLVMValueRef BuildShift((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, bool right = false)
+        {
+            var result = right ? LLVMApi.BuildAShr(_builder, lhs.value, rhs.value, "tmpshr")
+                : LLVMApi.BuildShl(_builder, lhs.value, rhs.value, "tmpshl");
+
+            return result;
+        }
+
+        private LLVMValueRef BuildRotate((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, bool right = false)
+        {
+            var result = BuildShift(lhs, rhs, right);
+
+            var maskSize = LLVMApi.ConstInt(ConvertTypeDefinition(lhs.type), (uint)(lhs.type.PrimitiveType?.Bytes * 8 ?? 32), false);
+            var maskShift = LLVMApi.BuildSub(_builder, maskSize, rhs.value, "mask");
+
+            var mask = right ? LLVMApi.BuildShl(_builder, lhs.value, maskShift, "tmpshl")
+                : LLVMApi.BuildAShr(_builder, lhs.value, maskShift, "tmpshr");
+
+            return LLVMApi.IsUndef(result) ? mask : LLVMApi.BuildOr(_builder, result, mask, "tmpmask");
         }
 
         private LLVMValueRef BuildBinaryOperation(TypeDefinition type, LLVMValueRef lhs, LLVMValueRef rhs, Operator op, bool signed = true)

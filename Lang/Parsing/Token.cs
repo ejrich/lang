@@ -40,6 +40,10 @@ namespace Lang.Parsing
         Enum,
         Null,
         Cast,
+        ShiftLeft,
+        ShiftRight,
+        RotateLeft,
+        RotateRight,
         NumberRange, // Ignored by parser
         VarArgs, // Ignored by parser
         OpenParen = '(',

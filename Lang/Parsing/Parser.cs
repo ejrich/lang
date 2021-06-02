@@ -1676,7 +1676,7 @@ namespace Lang.Parsing
                     expression.Operators.RemoveRange(i, end - i);
 
                     if (i >= expression.Operators.Count) return;
-                    operatorPrecedence = GetOperatorPrecedence(expression.Operators[i]);
+                    operatorPrecedence = GetOperatorPrecedence(expression.Operators[--i]);
                 }
                 else
                 {
@@ -1687,10 +1687,6 @@ namespace Lang.Parsing
 
         private static ExpressionAst CreateSubExpression(ExpressionAst expression, int parentPrecedence, int i, out int end)
         {
-            // @Fix this case should make these subexpressions
-            // d := a + 1 == b + 2 && 1 + b == 2 || b > 3 + 4 * c - 1;
-            // d := a + 1 == (b + 2) && (1 + b == 2) || (b > (3 + (4 * c) - 1));
-            // This can be fixed in code by adding parens around (1 + b)
             var subExpression = new ExpressionAst
             {
                 FileIndex = expression.Children[i].FileIndex,
@@ -2408,6 +2404,14 @@ namespace Lang.Parsing
                     return Operator.GreaterThanEqual;
                 case TokenType.LessThanEqual:
                     return Operator.LessThanEqual;
+                case TokenType.ShiftLeft:
+                    return Operator.ShiftLeft;
+                case TokenType.ShiftRight:
+                    return Operator.ShiftRight;
+                case TokenType.RotateLeft:
+                    return Operator.RotateLeft;
+                case TokenType.RotateRight:
+                    return Operator.RotateRight;
                 // Handle single character operators
                 default:
                     var op = (Operator)token.Value[0];
