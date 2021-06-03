@@ -39,7 +39,8 @@ namespace Lang.Parsing
             {"struct", TokenType.Struct},
             {"enum", TokenType.Enum},
             {"null", TokenType.Null},
-            {"cast", TokenType.Cast}
+            {"cast", TokenType.Cast},
+            {"operator", TokenType.Operator}
         };
 
         public List<Token> LoadFileTokens(string filePath, int fileIndex, out List<ParseError> errors)

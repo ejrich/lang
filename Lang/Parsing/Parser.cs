@@ -118,6 +118,8 @@ namespace Lang.Parsing
                     return ParseEnum(enumerator, errors);
                 case TokenType.Pound:
                     return ParseTopLevelDirective(enumerator, errors);
+                case TokenType.Operator:
+                    return ParseOperatorOverload(enumerator, errors);
                 default:
                     errors.Add(new ParseError
                     {
@@ -1960,6 +1962,12 @@ namespace Lang.Parsing
             }
 
             return directive;
+        }
+
+        private static OperatorOverloadAst ParseOperatorOverload(TokenEnumerator enumerator, List<ParseError> errors)
+        {
+            // TODO Implement me
+            return null;
         }
 
         private static readonly HashSet<string> IntegerTypes = new()
