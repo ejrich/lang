@@ -486,7 +486,7 @@ namespace Lang.Parsing
             // 7. Find open brace to start parsing body
             if (enumerator.Current?.Type != TokenType.OpenBrace)
             {
-                // Add an error to the function AST and continue until open paren
+                // Add an error and continue until open paren
                 var token = enumerator.Current ?? enumerator.Last;
                 errors.Add(new ParseError
                 {
@@ -1966,8 +1966,175 @@ namespace Lang.Parsing
 
         private static OperatorOverloadAst ParseOperatorOverload(TokenEnumerator enumerator, List<ParseError> errors)
         {
-            // TODO Implement me
-            return null;
+            var overload = CreateAst<OperatorOverloadAst>(enumerator.Current);
+            if (!enumerator.MoveNext())
+            {
+                errors.Add(new ParseError {Error = "Expected an operator be specified to overload", Token = enumerator.Last});
+                return null;
+            }
+
+            // 1. Determine the operator
+            overload.Operator = ConvertOperator(enumerator.Current);
+            if (overload.Operator == Operator.None)
+            {
+                errors.Add(new ParseError {Error = $"Expected an operator to be be specified, but got '{enumerator.Current.Value}'", Token = enumerator.Current});
+            }
+            if (!enumerator.MoveNext())
+            {
+                errors.Add(new ParseError {Error = $"Expected to get the type to overload the operator", Token = enumerator.Last});
+                return null;
+            }
+
+            // 2. Determine the type
+            overload.Type = ParseType(enumerator, errors);
+            if (!enumerator.MoveNext())
+            {
+                errors.Add(new ParseError {Error = $"Expected to get the arguments for the operator overload", Token = enumerator.Last});
+                return null;
+            }
+
+            // 3. Find open paren to start parsing arguments
+            if (enumerator.Current?.Type != TokenType.OpenParen)
+            {
+                // Add an error to the function AST and continue until open paren
+                var token = enumerator.Current ?? enumerator.Last;
+                errors.Add(new ParseError
+                {
+                    Error = $"Unexpected token '{token.Value}' in function definition",
+                    Token = token
+                });
+                while (enumerator.Current != null && enumerator.Current.Type != TokenType.OpenParen)
+                    enumerator.MoveNext();
+            }
+
+            // 4. Get the arguments for the operator overload
+            var commaRequiredBeforeNextArgument = false;
+            DeclarationAst currentArgument = null;
+            while (enumerator.MoveNext())
+            {
+                var token = enumerator.Current;
+
+                if (token.Type == TokenType.CloseParen)
+                {
+                    if (commaRequiredBeforeNextArgument)
+                    {
+                        overload.Arguments.Add(currentArgument);
+                        currentArgument = null;
+                    }
+                    break;
+                }
+
+                switch (token.Type)
+                {
+                    case TokenType.Token:
+                    case TokenType.VarArgs:
+                        if (commaRequiredBeforeNextArgument)
+                        {
+                            errors.Add(new ParseError
+                            {
+                                Error = "Comma required after declaring an argument", Token = token
+                            });
+                        }
+                        else if (currentArgument == null)
+                        {
+                            currentArgument = CreateAst<DeclarationAst>(token);
+                            currentArgument.Type = ParseType(enumerator, errors, argument: true);
+                            // TODO Handle generics
+                            // for (var i = 0; i < overload.Generics.Count; i++)
+                            // {
+                            //     var generic = overload.Generics[i];
+                            //     if (SearchForGeneric(generic, i, currentArgument.Type))
+                            //     {
+                            //         currentArgument.HasGenerics = true;
+                            //     }
+                            // }
+                        }
+                        else
+                        {
+                            currentArgument.Name = token.Value;
+                            commaRequiredBeforeNextArgument = true;
+                        }
+                        break;
+                    case TokenType.Comma:
+                        if (commaRequiredBeforeNextArgument)
+                        {
+                            overload.Arguments.Add(currentArgument);
+                            currentArgument = null;
+                        }
+                        else
+                        {
+                            errors.Add(new ParseError {Error = "Unexpected comma in arguments", Token = token});
+                        }
+                        commaRequiredBeforeNextArgument = false;
+                        break;
+                    default:
+                        errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}' in arguments", Token = token});
+                        break;
+                }
+
+                if (enumerator.Current?.Type == TokenType.CloseParen)
+                {
+                    break;
+                }
+            }
+
+            if (currentArgument != null)
+            {
+                errors.Add(new ParseError
+                {
+                    Error = $"Incomplete argument in overload for type '{overload.Type.Name}'", Token = enumerator.Current
+                });
+            }
+
+            if (!commaRequiredBeforeNextArgument && overload.Arguments.Any())
+            {
+                errors.Add(new ParseError
+                {
+                    Error = "Unexpected comma in arguments", Token = enumerator.Current ?? enumerator.Last
+                });
+            }
+
+            // 5. Find open brace to start parsing body
+            enumerator.MoveNext();
+            if (enumerator.Current?.Type != TokenType.OpenBrace)
+            {
+                // Add an error and continue until open paren
+                var token = enumerator.Current ?? enumerator.Last;
+                errors.Add(new ParseError
+                {
+                    Error = $"Unexpected token '{token.Value}' in function definition",
+                    Token = token
+                });
+                while (enumerator.Current != null && enumerator.Current.Type != TokenType.OpenBrace)
+                    enumerator.MoveNext();
+            }
+
+            // 6. Parse body
+            var closed = false;
+            while (enumerator.MoveNext())
+            {
+                var token = enumerator.Current;
+
+                if (token.Type == TokenType.CloseBrace)
+                {
+                    closed = true;
+                    break;
+                }
+
+                var ast = ParseLine(enumerator, errors, null); // TODO Set the function to the overload
+                if (ast != null)
+                    overload.Children.Add(ast);
+            }
+
+            if (!closed)
+            {
+                errors.Add(new ParseError
+                {
+                    Error = $"Operator overload for type '{overload.Type.Name}' not closed by '}}'", Token = enumerator.Current ?? enumerator.Last
+                });
+            }
+
+            return overload;
         }
 
         private static readonly HashSet<string> IntegerTypes = new()
