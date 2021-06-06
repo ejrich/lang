@@ -16,7 +16,7 @@ namespace Lang.Backend.LLVM
         private LLVMModuleRef _module;
         private LLVMBuilderRef _builder;
         private LLVMPassManagerRef _passManager;
-        private FunctionAst _currentFunction;
+        private IFunction _currentFunction;
         private LLVMValueRef _stackPointer;
         private bool _stackPointerExists;
         private bool _stackSaved;
@@ -42,7 +42,7 @@ namespace Lang.Backend.LLVM
             // 3. Write Data section
             var globals = WriteData(programGraph);
 
-            // 4. Write Function definitions
+            // 4. Write Function and Operator overload definitions
             _functions = programGraph.Functions;
             foreach (var (name, functions) in programGraph.Functions)
             {
@@ -54,12 +54,12 @@ namespace Lang.Backend.LLVM
                     if (name == "main")
                     {
                         function.Name = "__main";
-                        WriteFunctionDefinition("__main", function.Arguments, function.ReturnType, function.Varargs);
+                        WriteFunctionDefinition(function.Name, function.Arguments, function.ReturnType);
                     }
                     else if (name == "__start")
                     {
                         function.Name = "main";
-                        WriteFunctionDefinition("main", function.Arguments, function.ReturnType, function.Varargs);
+                        WriteFunctionDefinition(function.Name, function.Arguments, function.ReturnType);
                     }
                     else
                     {
@@ -68,8 +68,16 @@ namespace Lang.Backend.LLVM
                     }
                 }
             }
+            foreach (var (type, overloads) in programGraph.OperatorOverloads)
+            {
+                foreach (var (op, overload) in overloads)
+                {
+                    var overloadName = GetOperatorOverloadName(type, op);
+                    WriteFunctionDefinition(overloadName, overload.Arguments, overload.ReturnType);
+                }
+            }
 
-            // 5. Write Function bodies
+            // 5. Write Function and Operator overload bodies
             foreach (var (name, functions) in programGraph.Functions)
             {
                 for (var i = 0; i < functions.Count; i++)
@@ -77,14 +85,23 @@ namespace Lang.Backend.LLVM
                     var functionAst = functions[i];
                     if (functionAst.Extern || functionAst.Compiler || functionAst.CallsCompiler) continue;
 
-                    _currentFunction = functionAst;
                     var functionName = name switch
                     {
                         "main" or "__start" => functionAst.Name,
                         _ => GetFunctionName(name, i, functions.Count)
                     };
                     var function = LLVMApi.GetNamedFunction(_module, functionName);
-                    WriteFunction(functionAst, globals, function);
+                    var argumentCount = functionAst.Varargs ? functionAst.Arguments.Count - 1 : functionAst.Arguments.Count;
+                    WriteFunction(functionAst, argumentCount, globals, function);
+                }
+            }
+            foreach (var (type, overloads) in programGraph.OperatorOverloads)
+            {
+                foreach (var (op, overload) in overloads)
+                {
+                    var overloadName = GetOperatorOverloadName(type, op);
+                    var function = LLVMApi.GetNamedFunction(_module, overloadName);
+                    WriteFunction(overload, 2, globals, function);
                 }
             }
 
@@ -360,14 +377,14 @@ namespace Lang.Backend.LLVM
             return function;
         }
 
-        private void WriteFunction(FunctionAst functionAst, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> globals, LLVMValueRef function)
+        private void WriteFunction(IFunction functionAst, int argumentCount, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> globals, LLVMValueRef function)
         {
+            _currentFunction = functionAst;
             // 1. Get function definition
             LLVMApi.PositionBuilderAtEnd(_builder, function.AppendBasicBlock("entry"));
             var localVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>(globals);
 
             // 2. Allocate arguments on the stack
-            var argumentCount = functionAst.Varargs ? functionAst.Arguments.Count - 1 : functionAst.Arguments.Count;
             for (var i = 0; i < argumentCount; i++)
             {
                 var arg = functionAst.Arguments[i];
@@ -1317,6 +1334,16 @@ namespace Lang.Backend.LLVM
             return functionCount == 1 ? name : $"{name}_{functionIndex}";
         }
 
+        private string GetOperatorOverloadName(TypeDefinition type, Operator op)
+        {
+            return GetOperatorOverloadName(type.GenericName, op);
+        }
+
+        private string GetOperatorOverloadName(string typeName, Operator op)
+        {
+            return $"operator.{op}.{typeName}";
+        }
+
         private readonly TypeDefinition _stackPointerType = new()
         {
             Name = "*", Generics = {new TypeDefinition {Name = "u8", PrimitiveType = new IntegerType {Bytes = 1}}}
@@ -1526,9 +1553,11 @@ namespace Lang.Backend.LLVM
             switch (op)
             {
                 case Operator.And:
-                    return LLVMApi.BuildAnd(_builder, lhs.value, rhs.value, "tmpand");
+                    return lhs.type.Name == "bool" ? LLVMApi.BuildAnd(_builder, lhs.value, rhs.value, "tmpand")
+                        : BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, Operator.And);
                 case Operator.Or:
-                    return LLVMApi.BuildOr(_builder, lhs.value, rhs.value, "tmpor");
+                    return lhs.type.Name == "bool" ? LLVMApi.BuildOr(_builder, lhs.value, rhs.value, "tmpor")
+                        : BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, Operator.Or);
                 case Operator.Equality:
                 case Operator.NotEqual:
                 case Operator.GreaterThanEqual:
@@ -1550,7 +1579,13 @@ namespace Lang.Backend.LLVM
             lhs.value = CastValue(lhs, targetType);
             rhs.value = CastValue(rhs, targetType);
 
-            // 4. Handle the rest of the simple operators
+            // 4. Handle overloaded operators
+            if (lhs.type.PrimitiveType == null)
+            {
+                return BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, op);
+            }
+
+            // 5. Handle the rest of the simple operators
             switch (op)
             {
                 case Operator.BitwiseAnd:
@@ -1561,7 +1596,7 @@ namespace Lang.Backend.LLVM
                     return LLVMApi.BuildXor(_builder, lhs.value, rhs.value, "tmpxor");
             }
 
-            // 5. Handle binary operations
+            // 6. Handle binary operations
             var signed = lhs.type.PrimitiveType.Signed || rhs.type.PrimitiveType.Signed;
             return BuildBinaryOperation(targetType, lhs.value, rhs.value, op, signed);
         }
@@ -1656,9 +1691,7 @@ namespace Lang.Backend.LLVM
                     return LLVMApi.BuildICmp(_builder, predicate, lhs.value, rhs.value, name);
                 }
             }
-
-            // @Future Operator overloading
-            throw new NotImplementedException($"{op} not compatible with types '{lhs.value.TypeOf().TypeKind}' and '{rhs.value.TypeOf().TypeKind}'");
+            return BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, op);
         }
 
         private LLVMValueRef BuildShift((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, bool right = false)
@@ -1666,6 +1699,7 @@ namespace Lang.Backend.LLVM
             var result = right ? LLVMApi.BuildAShr(_builder, lhs.value, rhs.value, "tmpshr")
                 : LLVMApi.BuildShl(_builder, lhs.value, rhs.value, "tmpshl");
 
+            // TODO Handle operator overloading
             return result;
         }
 
@@ -1679,6 +1713,7 @@ namespace Lang.Backend.LLVM
             var mask = right ? LLVMApi.BuildShl(_builder, lhs.value, maskShift, "tmpshl")
                 : LLVMApi.BuildAShr(_builder, lhs.value, maskShift, "tmpshr");
 
+            // TODO Handle operator overloading
             return LLVMApi.IsUndef(result) ? mask : LLVMApi.BuildOr(_builder, result, mask, "tmpmask");
         }
 
@@ -1690,10 +1725,20 @@ namespace Lang.Backend.LLVM
                     return BuildIntOperation(lhs, rhs, op, signed);
                 case FloatType:
                     return BuildRealOperation(lhs, rhs, op);
+                default:
+                    // @Cleanup this shouldn't be hit
+                    Console.WriteLine("Operator not compatible");
+                    Environment.Exit(ErrorCodes.BuildError);
+                    return new LLVMValueRef(); // Return never happens
             }
+        }
 
-            // @Future Operator overloading
-            throw new NotImplementedException($"{op} not compatible with types '{lhs.TypeOf().TypeKind}' and '{rhs.TypeOf().TypeKind}'");
+        private LLVMValueRef BuildOperatorOverloadCall(TypeDefinition type, LLVMValueRef lhs, LLVMValueRef rhs, Operator op)
+        {
+            var overloadName = GetOperatorOverloadName(type, op);
+            var overload = LLVMApi.GetNamedFunction(_module, overloadName);
+
+            return LLVMApi.BuildCall(_builder, overload, new []{lhs, rhs}, string.Empty);
         }
 
         private LLVMValueRef CastValue((TypeDefinition type, LLVMValueRef value) typeValue, TypeDefinition targetType,
