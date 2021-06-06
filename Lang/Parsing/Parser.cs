@@ -19,7 +19,6 @@ namespace Lang.Parsing
     public class Parser : IParser
     {
         private readonly ILexer _lexer;
-        private static FunctionAst _currentFunction;
 
         private class TokenEnumerator
         {
@@ -133,7 +132,6 @@ namespace Lang.Parsing
         {
             // 1. Determine return type and name of the function
             var function = CreateAst<FunctionAst>(enumerator.Current);
-            _currentFunction = function;
 
             // 1a. Check if the return type is void
             if (enumerator.Peek()?.Type == TokenType.OpenParen)
@@ -885,7 +883,7 @@ namespace Lang.Parsing
             return hasGeneric;
         }
 
-        private static IAst ParseLine(TokenEnumerator enumerator, List<ParseError> errors, FunctionAst currentFunction)
+        private static IAst ParseLine(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction)
         {
             var token = enumerator.Current;
 
@@ -931,7 +929,7 @@ namespace Lang.Parsing
             }
         }
 
-        private static ScopeAst ParseScope(TokenEnumerator enumerator, List<ParseError> errors, FunctionAst currentFunction)
+        private static ScopeAst ParseScope(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction)
         {
             var scopeAst = CreateAst<ScopeAst>(enumerator.Current);
 
@@ -960,7 +958,7 @@ namespace Lang.Parsing
             return scopeAst;
         }
 
-        private static ConditionalAst ParseConditional(TokenEnumerator enumerator, List<ParseError> errors, FunctionAst currentFunction, bool topLevel = false)
+        private static ConditionalAst ParseConditional(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction, bool topLevel = false)
         {
             var conditionalAst = CreateAst<ConditionalAst>(enumerator.Current);
 
@@ -1063,7 +1061,7 @@ namespace Lang.Parsing
             return conditionalAst;
         }
 
-        private static WhileAst ParseWhile(TokenEnumerator enumerator, List<ParseError> errors, FunctionAst currentFunction)
+        private static WhileAst ParseWhile(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction)
         {
             var whileAst = CreateAst<WhileAst>(enumerator.Current);
 
@@ -1103,7 +1101,7 @@ namespace Lang.Parsing
             return whileAst;
         }
 
-        private static EachAst ParseEach(TokenEnumerator enumerator, List<ParseError> errors, FunctionAst currentFunction)
+        private static EachAst ParseEach(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction)
         {
             var eachAst = CreateAst<EachAst>(enumerator.Current);
 
@@ -1209,7 +1207,7 @@ namespace Lang.Parsing
             return eachAst;
         }
 
-        private static DeclarationAst ParseDeclaration(TokenEnumerator enumerator, List<ParseError> errors, FunctionAst currentFunction = null)
+        private static DeclarationAst ParseDeclaration(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction = null)
         {
             var declaration = CreateAst<DeclarationAst>(enumerator.Current);
             declaration.Name = enumerator.Current.Value;
@@ -1288,7 +1286,7 @@ namespace Lang.Parsing
             return declaration;
         }
 
-        private static void ParseDeclarationValue(DeclarationAst declaration, TokenEnumerator enumerator, List<ParseError> errors, FunctionAst currentFunction)
+        private static void ParseDeclarationValue(DeclarationAst declaration, TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction)
         {
             // 1. Step over '=' sign
             if (!enumerator.MoveNext())
@@ -1300,7 +1298,7 @@ namespace Lang.Parsing
             // 2. Parse expression, constant, or object initialization as the value
             if (enumerator.Current.Type == TokenType.OpenBrace)
             {
-                while (enumerator.MoveNext())
+                while (enumerator.Current?.Type != TokenType.CloseBrace && enumerator.MoveNext())
                 {
                     if (enumerator.Current.Type == TokenType.CloseBrace)
                     {
@@ -1317,7 +1315,7 @@ namespace Lang.Parsing
             }
         }
 
-        private static AssignmentAst ParseAssignment(TokenEnumerator enumerator, List<ParseError> errors, FunctionAst currentFunction, ExpressionAst reference = null)
+        private static AssignmentAst ParseAssignment(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction, ExpressionAst reference = null)
         {
             // 1. Set the variable
             var assignment = CreateAst<AssignmentAst>(enumerator.Current);
@@ -1367,7 +1365,7 @@ namespace Lang.Parsing
                 {
                     assignment.Reference = reference.Children[0];
                 }
-                if (reference.Children.Count == reference.Operators.Count)
+                if (reference.Operators.Any() && reference.Children.Count == reference.Operators.Count)
                 {
                     assignment.Operator = reference.Operators.Last();
                     reference.Operators.RemoveAt(reference.Operators.Count - 1);
@@ -1387,7 +1385,7 @@ namespace Lang.Parsing
             return assignment;
         }
 
-        private static IAst ParseExpression(TokenEnumerator enumerator, List<ParseError> errors, FunctionAst currentFunction, ExpressionAst initial = null, params TokenType[] endToken)
+        private static IAst ParseExpression(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction, ExpressionAst initial = null, params TokenType[] endToken)
         {
             var operatorRequired = initial != null;
 
@@ -1486,7 +1484,7 @@ namespace Lang.Parsing
             return expression;
         }
 
-        private static IAst ParseStructFieldRef(TokenEnumerator enumerator, List<ParseError> errors, IAst initialAst, FunctionAst currentFunction)
+        private static IAst ParseStructFieldRef(TokenEnumerator enumerator, List<ParseError> errors, IAst initialAst, IFunction currentFunction)
         {
             // 1. Initialize and move over the dot operator
             var structFieldRef = new StructFieldRefAst {FileIndex = initialAst.FileIndex, Line = initialAst.Line, Column = initialAst.Column};
@@ -1516,7 +1514,7 @@ namespace Lang.Parsing
             return structFieldRef;
         }
 
-        private static IAst ParseNextExpressionUnit(TokenEnumerator enumerator, List<ParseError> errors, FunctionAst currentFunction, out bool operatorRequired)
+        private static IAst ParseNextExpressionUnit(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction, out bool operatorRequired)
         {
             var token = enumerator.Current;
             var nextToken = enumerator.Peek();
@@ -1766,7 +1764,7 @@ namespace Lang.Parsing
             }
         }
 
-        private static CallAst ParseCall(TokenEnumerator enumerator, List<ParseError> errors, FunctionAst currentFunction, bool requiresSemicolon = false)
+        private static CallAst ParseCall(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction, bool requiresSemicolon = false)
         {
             var callAst = CreateAst<CallAst>(enumerator.Current);
             callAst.Function = enumerator.Current.Value;
@@ -1805,7 +1803,7 @@ namespace Lang.Parsing
             return callAst;
         }
 
-        private static void ParseArguments(CallAst callAst, TokenEnumerator enumerator, List<ParseError> errors, FunctionAst currentFunction)
+        private static void ParseArguments(CallAst callAst, TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction)
         {
             while (enumerator.MoveNext())
             {
@@ -1852,7 +1850,7 @@ namespace Lang.Parsing
             }
         }
 
-        private static ReturnAst ParseReturn(TokenEnumerator enumerator, List<ParseError> errors, FunctionAst currentFunction)
+        private static ReturnAst ParseReturn(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction)
         {
             var returnAst = CreateAst<ReturnAst>(enumerator.Current);
 
@@ -1871,7 +1869,7 @@ namespace Lang.Parsing
             return returnAst;
         }
 
-        private static IndexAst ParseIndex(TokenEnumerator enumerator, List<ParseError> errors, FunctionAst currentFunction)
+        private static IndexAst ParseIndex(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction)
         {
             // 1. Initialize the index ast
             var index = CreateAst<IndexAst>(enumerator.Current);
@@ -1933,7 +1931,7 @@ namespace Lang.Parsing
             return directive;
         }
 
-        private static IAst ParseCompilerDirective(TokenEnumerator enumerator, List<ParseError> errors, FunctionAst currentFunction)
+        private static IAst ParseCompilerDirective(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction)
         {
             var directive = CreateAst<CompilerDirectiveAst>(enumerator.Current);
 
@@ -1949,7 +1947,7 @@ namespace Lang.Parsing
                 case "if":
                     directive.Type = DirectiveType.If;
                     directive.Value = ParseConditional(enumerator, errors, currentFunction);
-                    _currentFunction.HasDirectives = true;
+                    currentFunction.HasDirectives = true;
                     break;
                 case "assert":
                     directive.Type = DirectiveType.Assert;
@@ -1993,7 +1991,25 @@ namespace Lang.Parsing
                 return null;
             }
 
-            // 3. Find open paren to start parsing arguments
+            // 3. Set the return type based on the operator
+            switch (overload.Operator)
+            {
+                case Operator.And:
+                case Operator.Or:
+                case Operator.Equality:
+                case Operator.NotEqual:
+                case Operator.GreaterThanEqual:
+                case Operator.LessThanEqual:
+                case Operator.GreaterThan:
+                case Operator.LessThan:
+                    overload.ReturnType = new TypeDefinition {Name = "bool"};
+                    break;
+                default:
+                    overload.ReturnType = overload.Type;
+                    break;
+            }
+
+            // 4. Find open paren to start parsing arguments
             if (enumerator.Current?.Type != TokenType.OpenParen)
             {
                 // Add an error to the function AST and continue until open paren
@@ -2007,7 +2023,7 @@ namespace Lang.Parsing
                     enumerator.MoveNext();
             }
 
-            // 4. Get the arguments for the operator overload
+            // 5. Get the arguments for the operator overload
             var commaRequiredBeforeNextArgument = false;
             DeclarationAst currentArgument = null;
             while (enumerator.MoveNext())
@@ -2094,7 +2110,7 @@ namespace Lang.Parsing
                 });
             }
 
-            // 5. Find open brace to start parsing body
+            // 6. Find open brace to start parsing body
             enumerator.MoveNext();
             if (enumerator.Current?.Type != TokenType.OpenBrace)
             {
@@ -2109,7 +2125,7 @@ namespace Lang.Parsing
                     enumerator.MoveNext();
             }
 
-            // 6. Parse body
+            // 7. Parse body
             var closed = false;
             while (enumerator.MoveNext())
             {
@@ -2121,7 +2137,7 @@ namespace Lang.Parsing
                     break;
                 }
 
-                var ast = ParseLine(enumerator, errors, null); // TODO Set the function to the overload
+                var ast = ParseLine(enumerator, errors, overload);
                 if (ast != null)
                     overload.Children.Add(ast);
             }
@@ -2144,7 +2160,7 @@ namespace Lang.Parsing
 
         private static readonly HashSet<string> FloatTypes = new() {"float", "float64"};
 
-        private static TypeDefinition ParseType(TokenEnumerator enumerator, List<ParseError> errors, FunctionAst currentFunction = null, bool argument = false)
+        private static TypeDefinition ParseType(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction = null, bool argument = false)
         {
             var typeDefinition = CreateAst<TypeDefinition>(enumerator.Current);
             typeDefinition.Name = enumerator.Current.Value;
@@ -2501,7 +2517,7 @@ namespace Lang.Parsing
             }
         }
 
-        private static CastAst ParseCast(TokenEnumerator enumerator, List<ParseError> errors, FunctionAst currentFunction)
+        private static CastAst ParseCast(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction)
         {
             var castAst = CreateAst<CastAst>(enumerator.Current);
 

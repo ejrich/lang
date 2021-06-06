@@ -3,7 +3,11 @@ main() {
 }
 
 operator_overloading() {
+    a: Vector3 = { x = 1.0; y = 1.0; z = 1.0; }
+    b: Vector3 = { x = 2.0; y = 2.0; z = 2.0; }
 
+    c := a + b;
+    printf("x = %.2f, y = %.2f, z = %.2f\n", c.x, c.y, c.z);
 }
 
 struct Vector3 {
