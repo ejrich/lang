@@ -1428,13 +1428,14 @@ namespace Lang.Parsing
                         expression.Children.Add(constant);
                         continue;
                     }
-                    var op = ConvertOperator(token);
-                    if (op == Operator.Dot)
+                    if (token.Type == TokenType.Period)
                     {
                         var structFieldRef = ParseStructFieldRef(enumerator, errors, expression.Children[^1], currentFunction);
                         expression.Children[^1] = structFieldRef;
+                        continue;
                     }
-                    else if (op != Operator.None)
+                    var op = ConvertOperator(token);
+                    if (op != Operator.None)
                     {
                         expression.Operators.Add(op);
                         operatorRequired = false;
@@ -1496,7 +1497,7 @@ namespace Lang.Parsing
             {
                 if (operatorRequired)
                 {
-                    if (ConvertOperator(enumerator.Current) != Operator.Dot)
+                    if (enumerator.Current.Type != TokenType.Period)
                     {
                         enumerator.Move(-1);
                         break;
@@ -2002,6 +2003,7 @@ namespace Lang.Parsing
                 case Operator.LessThanEqual:
                 case Operator.GreaterThan:
                 case Operator.LessThan:
+                case Operator.Xor:
                     overload.ReturnType = new TypeDefinition {Name = "bool"};
                     break;
                 default:
