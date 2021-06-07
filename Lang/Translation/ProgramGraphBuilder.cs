@@ -396,18 +396,20 @@ namespace Lang.Translation
             {
                 foreach (var field in structAst.Fields)
                 {
-                    // 1. Get the type from type dictionary
-                    var type = field.Type.CArray ? _programGraph.Types[field.Type.Generics[0].GenericName] :_programGraph.Types[field.Type.GenericName];
-
-                    // 2. If the type is a struct and the size hasn't been calculated, verify the struct and calculate the size
-                    if (type is StructAst fieldStruct)
+                    // 2a. Get the type from type dictionary
+                    var fieldTypeName = field.Type.CArray ? field.Type.Generics[0].GenericName :field.Type.GenericName;
+                    if (_programGraph.Types.TryGetValue(fieldTypeName, out var type))
                     {
-                        if (!fieldStruct.Verified)
+                        // 2b. If the type is a struct and the size hasn't been calculated, verify the struct and calculate the size
+                        if (type is StructAst fieldStruct)
                         {
-                            VerifyStruct(fieldStruct);
+                            if (!fieldStruct.Verified)
+                            {
+                                VerifyStruct(fieldStruct);
+                            }
                         }
+                        structAst.Size += field.Type.CArray ? type.Size * field.Type.ConstCount.Value : type.Size;
                     }
-                    structAst.Size += field.Type.CArray ? type.Size * field.Type.ConstCount.Value : type.Size;
                 }
             }
             structAst.Verified = true;
@@ -2818,6 +2820,7 @@ namespace Lang.Translation
                         return Type.Error;
                     }
 
+                    // TODO If the type has generics, don't store yet
                     var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeIndex = _programGraph.TypeCount++, TypeKind = TypeKind.Pointer, Size = 8};
                     _programGraph.Types.Add(typeDef.GenericName, pointer);
                     return Type.Pointer;
@@ -2872,6 +2875,7 @@ namespace Lang.Translation
                             return Type.Error;
                         }
                         if (error) return Type.Error;
+                        // TODO If the type has generics, don't store yet
                         var polyStruct = _polymorpher.CreatePolymorphedStruct(structDef, PrintTypeDefinition(typeDef), TypeKind.Struct, _programGraph.TypeCount++, generics);
                         _programGraph.Types.Add(genericName, polyStruct);
                         VerifyStruct(polyStruct);
