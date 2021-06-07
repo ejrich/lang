@@ -1954,6 +1954,7 @@ namespace Lang.Parsing
                     directive.Type = DirectiveType.Assert;
                     enumerator.MoveNext();
                     directive.Value = ParseExpression(enumerator, errors, currentFunction);
+                    currentFunction.HasDirectives = true;
                     break;
                 default:
                     errors.Add(new ParseError {Error = $"Unsupported compiler directive '{token.Value}'", Token = token});
@@ -1984,8 +1985,60 @@ namespace Lang.Parsing
                 return null;
             }
 
-            // 2. Determine the type
+            // 2. Determine the type and get generics if necessary
             overload.Type = ParseType(enumerator, errors);
+            if (overload.Type.Generics.Any())
+            {
+                foreach (var generic in overload.Type.Generics)
+                {
+                    if (generic.Name == "*" || generic.Count != null || generic.CArray)
+                    {
+                        errors.Add(new ParseError
+                        {
+                            Error = "Expected operator overload generic to be specified as ian indentifier",
+                            Token = new Token
+                            {
+                                FileIndex = generic.FileIndex,
+                                Line = generic.Line,
+                                Column = generic.Column
+                            }
+                        });
+                    }
+                    else
+                    {
+                        if (generic.Generics.Any())
+                        {
+                            errors.Add(new ParseError
+                            {
+                                Error = $"Invalid generic in operator overload of type '{overload.Type.Name}'",
+                                Token = new Token
+                                {
+                                    FileIndex = generic.FileIndex,
+                                    Line = generic.Line,
+                                    Column = generic.Column
+                                }
+                            });
+                        }
+                        else if (overload.Generics.Contains(generic.Name))
+                        {
+                            errors.Add(new ParseError
+                            {
+                                Error = $"Duplicate generic '{generic.Name}' in operator overload of type '{overload.Type.Name}'",
+                                Token = new Token
+                                {
+                                    FileIndex = generic.FileIndex,
+                                    Line = generic.Line,
+                                    Column = generic.Column
+                                }
+                            });
+                        }
+                        else
+                        {
+                            overload.Generics.Add(generic.Name);
+                        }
+                    }
+                }
+            }
             if (!enumerator.MoveNext())
             {
                 errors.Add(new ParseError {Error = $"Expected to get the arguments for the operator overload", Token = enumerator.Last});
@@ -2008,6 +2061,11 @@ namespace Lang.Parsing
                     break;
                 default:
                     overload.ReturnType = overload.Type;
+                    overload.ReturnTypeHasGenerics = overload.Generics.Any();
+                    for (var i = 0; i < overload.Generics.Count; i++)
+                    {
+                        SearchForGeneric(overload.Generics[i], i, overload.ReturnType);
+                    }
                     break;
             }
 
@@ -2056,15 +2114,14 @@ namespace Lang.Parsing
                         {
                             currentArgument = CreateAst<DeclarationAst>(token);
                             currentArgument.Type = ParseType(enumerator, errors, argument: true);
-                            // TODO Handle generics
-                            // for (var i = 0; i < overload.Generics.Count; i++)
-                            // {
-                            //     var generic = overload.Generics[i];
-                            //     if (SearchForGeneric(generic, i, currentArgument.Type))
-                            //     {
-                            //         currentArgument.HasGenerics = true;
-                            //     }
-                            // }
+                            for (var i = 0; i < overload.Generics.Count; i++)
+                            {
+                                var generic = overload.Generics[i];
+                                if (SearchForGeneric(generic, i, currentArgument.Type))
+                                {
+                                    currentArgument.HasGenerics = true;
+                                }
+                            }
                         }
                         else
                         {

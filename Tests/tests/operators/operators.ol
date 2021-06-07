@@ -1,5 +1,7 @@
 main() {
     operator_overloading();
+
+    generic_overloads();
 }
 
 operator_overloading() {
@@ -109,5 +111,22 @@ operator ^ Vector3(Vector3 a, Vector3 b) {
     b_size := b.x + b.y + b.z;
     return a_size != 0 ^ b_size != 0;
 }
+
+generic_overloads() {
+
+
+}
+
+struct PolyStruct<T, U> {
+    T a;
+    U b;
+}
+
+operator + PolyStruct<T, U>(PolyStruct<T, U> a, PolyStruct<T, U> b) {
+    #assert type_of(T).type == TypeKind.Integer && type_of(U).type == TypeKind.Float;
+    c: PolyStruct<T, U>;
+    return c;
+}
+
 
 #run main();
