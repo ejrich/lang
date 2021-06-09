@@ -127,7 +127,7 @@ struct PolyStruct<T, U> {
 
 operator + PolyStruct<T, U>(PolyStruct<T, U> a, PolyStruct<T, U> b) {
     #assert type_of(T).type == TypeKind.Integer && type_of(U).type == TypeKind.Float;
-    c: PolyStruct<T, U>;
+    c: PolyStruct<T, U> = { a = a.a + b.a; b = a.b + b.b; }
     return c;
 }
 
