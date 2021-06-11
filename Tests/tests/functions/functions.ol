@@ -76,6 +76,10 @@ polymorphic_functions() {
     thing := create<Thing>();
     create<Thing>();
     printf("thing.a = %d, thing.b = %.2f\n", thing.a, thing.b);
+
+    a: PolyStruct<int> = { a = 2; }
+    foobar(a, 1, 2, 3);
+    foobar(a, 1.0, 2.0, 3.0);
 }
 
 T add_int<T>(T a, int b) {
@@ -93,10 +97,6 @@ baz<T, U>(List<T> list, U* b) {
     }
 }
 
-struct RCG<I> {I a;} // TODO Remove when done
-foobar<T, U>(List<T> list, U* b, RCG<T> c) {
-}
-
 struct Thing {
     int a = 9;
     float64 b = 3.2;
@@ -105,6 +105,26 @@ struct Thing {
 T create<T>() {
     thing: T;
     return thing;
+}
+
+struct PolyStruct<I> {
+    I a;
+}
+
+foobar<T, U>(PolyStruct<T> c, Params<U> args) {
+    #if T == U {
+        each arg in args {
+            printf("Compare without casting: c.a == arg = %d, arg = %d\n", c.a == arg, arg);
+        }
+    }
+    else {
+        each arg in args {
+            printf("Compare with casting: c.a == arg = %d, arg = %.2f\n", c.a == cast(T, arg), arg);
+        }
+    }
+}
+
+foobar<T, U>(PolyStruct<T> c, Params<List<U>> args) { // TODO Fix the parsing for this
 }
 
 #run main();
