@@ -187,9 +187,11 @@ index_overloading() {
     a.x[2] = 9.0;
     a.y[2] = 8.0;
     a.z[2] = 7.0;
+    a.x[3] = 5.0;
 
     vector := a[2];
     printf("Vector values: x = %.2f, y = %.2f, z = %.2f\n", vector.x, vector.y, vector.z);
+    printf("Vector value: x = %.2f\n", a[3].x);
 }
 
 struct SOAVector3 {
