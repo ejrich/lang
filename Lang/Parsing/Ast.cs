@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Lang.Translation;
 
 namespace Lang.Parsing
 {
@@ -287,6 +288,7 @@ namespace Lang.Parsing
         public int Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
+        public bool CallsOverload { get; set; }
         public IAst Index { get; set; }
         public List<IAst> Children => null;
     }
@@ -334,6 +336,7 @@ namespace Lang.Parsing
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
+        public Type? Type { get; set; }
         public string Name { get; set; }
         public bool IsGeneric { get; set; }
         public bool Constant { get; set; }
@@ -371,6 +374,7 @@ namespace Lang.Parsing
         ShiftRight, // >>
         RotateLeft, // <<<
         RotateRight, // >>>
+        Subscript, // []
         Add = '+',
         Subtract = '-',
         Multiply = '*',
