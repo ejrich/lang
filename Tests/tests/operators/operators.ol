@@ -201,13 +201,19 @@ index_overloading() {
     // j := &b[7]; // Does not compile, pointer unknown
     printf("Integer values: b[5] = %d, b[8] = %d\n", *b[5], *b[8]);
 
-    c: NestedStruct;
+    c: NestedStruct<Vector3>;
     initial_vector: Vector3 = { x = 1.0; y = 2.0; z = 3.0; }
     c.inner_list[2] = initial_vector;
     c.inner_list[2].y = 1.5;
     c.inner_list[2].x++;
     new_vec := c.inner_list[2];
     printf("Inner list vector values: x = %.2f, y = %.2f, z = %.2f\n", c.inner_list[2].x, new_vec.y, new_vec.z);
+
+    d: NestedStruct<float>;
+    d.inner_list[1] = 3.7;
+    d.inner_list[1]++;
+    d.inner_list[1] -= 2.0; // TODO Fix me
+    printf("Inner list float value: d.inner_list[1] = %.2f\n", *d.inner_list[1]);
 }
 
 struct SOAVector3 {
@@ -232,9 +238,9 @@ operator [] ListStruct<T>(ListStruct<T> a, int index) : T* {
     return &a.list[index];
 }
 
-struct NestedStruct {
+struct NestedStruct<T> {
     bool foo;
-    ListStruct<Vector3> inner_list;
+    ListStruct<T> inner_list;
 }
 
 #run main();

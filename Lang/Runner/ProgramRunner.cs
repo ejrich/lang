@@ -645,7 +645,6 @@ namespace Lang.Runner
                                     var indexValue = (int)ExecuteExpression(index.Index, variables).Value;
                                     var pointer = HandleOverloadedOperator(fieldType, Operator.Subscript, listValue, indexValue);
 
-                                    // TODO Test this
                                     fieldType = pointer.Type;
                                     if (i == structField.Children.Count - 1)
                                     {
@@ -973,14 +972,15 @@ namespace Lang.Runner
                                             var indexValue = (int)ExecuteExpression(index.Index, variables).Value;
                                             var pointer = HandleOverloadedOperator(fieldType, Operator.Subscript, listValue, indexValue);
 
-                                            // TODO Test this
                                             fieldType = pointer.Type;
                                             variable = pointer.Value;
                                             if (i == structField.Children.Count - 1)
                                             {
-                                                previousValue = variable;
+                                                fieldType = pointer.Type.Generics[0];
+                                                var rawPointer = GetPointer(pointer.Value);
+                                                previousValue = PointerToTargetType(rawPointer, fieldType);
                                                 newValue = PerformOperation(fieldType, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
-                                                Marshal.StructureToPtr(newValue, GetPointer(pointer.Value), false);
+                                                Marshal.StructureToPtr(newValue, rawPointer, false);
                                             }
                                         }
                                         else
@@ -1010,7 +1010,6 @@ namespace Lang.Runner
                                 var variable = variables[indexAst.Name];
                                 var pointer = HandleOverloadedOperator(variable.Type, Operator.Subscript, variable.Value, indexValue);
 
-                                // TODO Test this
                                 typeDef = pointer.Type.Generics[0];
                                 var rawPointer = GetPointer(pointer.Value);
                                 previousValue = PointerToTargetType(rawPointer, typeDef);
@@ -1323,8 +1322,6 @@ namespace Lang.Runner
                         {
                             var indexValue = (int)ExecuteExpression(index.Index, variables).Value;
                             var pointer = HandleOverloadedOperator(fieldType, Operator.Subscript, listValue, indexValue);
-
-                            // TODO Test this
                             fieldType = pointer.Type;
                             value = pointer.Value;
                         }
