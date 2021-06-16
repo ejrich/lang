@@ -39,7 +39,8 @@ namespace Lang.Parsing
             {"struct", TokenType.Struct},
             {"enum", TokenType.Enum},
             {"null", TokenType.Null},
-            {"cast", TokenType.Cast}
+            {"cast", TokenType.Cast},
+            {"operator", TokenType.Operator}
         };
 
         public List<Token> LoadFileTokens(string filePath, int fileIndex, out List<ParseError> errors)
@@ -223,7 +224,7 @@ namespace Lang.Parsing
                 }
             }
 
-            if (currentToken != null) yield return currentToken;
+            if (!lexerStatus.ReadingComment && currentToken != null) yield return currentToken;
         }
 
         private void CheckForReservedTokensAndErrors(Token token, List<ParseError> errors, char character = default)

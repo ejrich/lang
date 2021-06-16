@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Lang.Translation;
 
 namespace Lang.Parsing
 {
@@ -19,6 +20,17 @@ namespace Lang.Parsing
         uint Size { get; set; }
     }
 
+    public interface IFunction : IAst
+    {
+        bool Verified { get; set; }
+        bool HasDirectives { get; set; }
+        bool CallsCompiler { get; set; }
+        TypeDefinition ReturnType { get; set; }
+        bool ReturnTypeHasGenerics { get; set; }
+        List<string> Generics { get; }
+        List<DeclarationAst> Arguments { get; }
+    }
+
     public class ScopeAst : IAst
     {
         public int FileIndex { get; set; }
@@ -27,7 +39,7 @@ namespace Lang.Parsing
         public List<IAst> Children { get; } = new();
     }
 
-    public class FunctionAst : IAst, IType
+    public class FunctionAst : IFunction, IType
     {
         public int FileIndex { get; set; }
         public int Line { get; init; }
@@ -276,6 +288,8 @@ namespace Lang.Parsing
         public int Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
+        public bool CallsOverload { get; set; }
+        public TypeDefinition OverloadType { get; set; }
         public IAst Index { get; set; }
         public List<IAst> Children => null;
     }
@@ -301,11 +315,29 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
+    public class OperatorOverloadAst : IFunction
+    {
+        public int FileIndex { get; set; }
+        public int Line { get; init; }
+        public int Column { get; init; }
+        public Operator Operator { get; set; }
+        public TypeDefinition Type { get; set; }
+        public bool Verified { get; set; }
+        public bool HasDirectives { get; set; }
+        public bool CallsCompiler { get; set; }
+        public TypeDefinition ReturnType { get; set; }
+        public bool ReturnTypeHasGenerics { get; set; }
+        public List<string> Generics { get; } = new();
+        public List<DeclarationAst> Arguments { get; } = new();
+        public List<IAst> Children { get; } = new();
+    }
+
     public class TypeDefinition : IAst
     {
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
+        public Type? Type { get; set; }
         public string Name { get; set; }
         public bool IsGeneric { get; set; }
         public bool Constant { get; set; }
@@ -343,6 +375,7 @@ namespace Lang.Parsing
         ShiftRight, // >>
         RotateLeft, // <<<
         RotateRight, // >>>
+        Subscript, // []
         Add = '+',
         Subtract = '-',
         Multiply = '*',
@@ -352,8 +385,7 @@ namespace Lang.Parsing
         BitwiseOr = '|',
         BitwiseAnd = '&',
         Xor = '^',
-        Modulus = '%',
-        Dot = '.'
+        Modulus = '%'
     }
 
     public enum UnaryOperator

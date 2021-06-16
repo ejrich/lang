@@ -3,6 +3,8 @@ main() {
 
     ptr := pointers();
     printf("Pointer = %p, Value = %d\n", ptr, *ptr);
+    *ptr = 76;
+    printf("Pointer = %p, Value = %d\n", ptr, *ptr);
 
     str := string_test();
     printf("%s - Hello world %d, %d\n", str, 1, 2);
@@ -48,6 +50,9 @@ basic() {
     f := test(3);
     g := test_each();
     h := 3 > a;
+    i := b % 8;
+    j := a % 2;
+    printf("Modulus outputs: i = %d, j = %.2f\n", i, j);
     fac6 := factorial(6);
     printf("%d! = %d\n", 6, fac6);
     my_struct := create();

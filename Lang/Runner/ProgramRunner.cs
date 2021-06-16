@@ -490,6 +490,7 @@ namespace Lang.Runner
                         fieldInstance!.SetValue(instance, list);
                         break;
                     case "*":
+                    case "bool":
                         break;
                     default:
                     {
@@ -563,6 +564,17 @@ namespace Lang.Runner
             if (assignment.Operator != Operator.None)
             {
                 var lhs = ExecuteExpression(assignment.Reference, variables);
+                switch (assignment.Reference)
+                {
+                    case IndexAst index when index.CallsOverload:
+                    case StructFieldRefAst structField when structField.Children[^1] is IndexAst indexAst && indexAst.CallsOverload:
+                        if (lhs.Type.Name == "*")
+                        {
+                            lhs.Type = lhs.Type.Generics[0];
+                            lhs.Value = PointerToTargetType(GetPointer(lhs.Value), lhs.Type);
+                        }
+                        break;
+                }
                 expression.Value = RunExpression(lhs, expression, assignment.Operator, lhs.Type);
                 expression.Type = lhs.Type;
             }
@@ -634,16 +646,34 @@ namespace Lang.Runner
                             case IndexAst index:
                                 var list = variable!.GetType().GetField(index.Name);
                                 var listValue = list!.GetValue(variable);
-                                var (_, _, listPointer) = GetListPointer(index, variables, listValue, fieldType);
-                                fieldType = fieldType.Generics[0];
-                                if (i == structField.Children.Count - 1)
+                                if (index.CallsOverload)
                                 {
-                                    Marshal.StructureToPtr(expression.Value, listPointer, false);
+                                    var indexValue = (int)ExecuteExpression(index.Index, variables).Value;
+                                    var pointer = HandleOverloadedOperator(fieldType, Operator.Subscript, listValue, indexValue);
+
+                                    fieldType = pointer.Type;
+                                    if (i == structField.Children.Count - 1)
+                                    {
+                                        Marshal.StructureToPtr(expression.Value, GetPointer(pointer.Value), false);
+                                    }
+                                    else
+                                    {
+                                        variable = pointer.Value;
+                                    }
                                 }
                                 else
                                 {
-                                    var elementType = fieldType.Generics[0];
-                                    variable = PointerToTargetType(listPointer, elementType);
+                                    var (_, _, listPointer) = GetListPointer(index, variables, listValue, fieldType);
+                                    fieldType = fieldType.Generics[0];
+                                    if (i == structField.Children.Count - 1)
+                                    {
+                                        Marshal.StructureToPtr(expression.Value, listPointer, false);
+                                    }
+                                    else
+                                    {
+                                        var elementType = fieldType.Generics[0];
+                                        variable = PointerToTargetType(listPointer, elementType);
+                                    }
                                 }
                                 break;
                         }
@@ -651,22 +681,38 @@ namespace Lang.Runner
                     break;
                 }
                 case IndexAst indexAst:
-                    var (_, _, pointer) = GetListPointer(indexAst, variables);
-                    Marshal.StructureToPtr(expression.Value, pointer, false);
+                {
+                    if (indexAst.CallsOverload)
+                    {
+                        var indexValue = (int)ExecuteExpression(indexAst.Index, variables).Value;
+                        var variable = variables[indexAst.Name];
+                        var pointer = HandleOverloadedOperator(variable.Type, Operator.Subscript, variable.Value, indexValue).Value;
+                        Marshal.StructureToPtr(expression.Value, GetPointer(pointer), false);
+                    }
+                    else
+                    {
+                        var (_, _, pointer) = GetListPointer(indexAst, variables);
+                        Marshal.StructureToPtr(expression.Value, pointer, false);
+                    }
                     break;
+                }
+                case UnaryAst unary:
+                {
+                    var pointer = ExecuteExpression(unary.Value, variables).Value;
+                    Marshal.StructureToPtr(expression.Value, GetPointer(pointer), false);
+                    break;
+                }
             }
         }
 
-        private ValueType ExecuteScope(List<IAst> asts,
-            IDictionary<string, ValueType> variables, out bool returned)
+        private ValueType ExecuteScope(List<IAst> asts, IDictionary<string, ValueType> variables, out bool returned)
         {
             var scopeVariables = new Dictionary<string, ValueType>(variables);
 
             return ExecuteAsts(asts, scopeVariables, out returned);
         }
 
-        private ValueType ExecuteConditional(ConditionalAst conditional,
-            IDictionary<string, ValueType> variables, out bool returned)
+        private ValueType ExecuteConditional(ConditionalAst conditional, IDictionary<string, ValueType> variables, out bool returned)
         {
             if (ExecuteCondition(conditional.Condition, variables))
             {
@@ -682,8 +728,7 @@ namespace Lang.Runner
             return null;
         }
 
-        private ValueType ExecuteWhile(WhileAst whileAst,
-            IDictionary<string, ValueType> variables, out bool returned)
+        private ValueType ExecuteWhile(WhileAst whileAst, IDictionary<string, ValueType> variables, out bool returned)
         {
             while (ExecuteCondition(whileAst.Condition, variables))
             {
@@ -841,7 +886,7 @@ namespace Lang.Runner
                         var type = _programGraph.Types[identifier.Name];
                         return new ValueType {Type = _intTypeDefinition, Value = type.TypeIndex};
                     }
-                    return variable;
+                    return new ValueType {Type = variable.Type, Value = variable.Value};
                 }
                 case ChangeByOneAst changeByOne:
                     switch (changeByOne.Value)
@@ -934,14 +979,33 @@ namespace Lang.Runner
                                     case IndexAst index:
                                         var list = variable!.GetType().GetField(index.Name);
                                         var listValue = list!.GetValue(variable);
-                                        var (_, _, listPointer) = GetListPointer(index, variables, listValue, fieldType);
-                                        fieldType = fieldType.Generics[0];
-                                        variable = PointerToTargetType(listPointer, fieldType);
-                                        if (i == structField.Children.Count - 1)
+                                        if (index.CallsOverload)
                                         {
-                                            previousValue = variable;
-                                            newValue = PerformOperation(fieldType, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
-                                            Marshal.StructureToPtr(newValue, listPointer, false);
+                                            var indexValue = (int)ExecuteExpression(index.Index, variables).Value;
+                                            var pointer = HandleOverloadedOperator(fieldType, Operator.Subscript, listValue, indexValue);
+
+                                            fieldType = pointer.Type;
+                                            variable = pointer.Value;
+                                            if (i == structField.Children.Count - 1)
+                                            {
+                                                fieldType = pointer.Type.Generics[0];
+                                                var rawPointer = GetPointer(pointer.Value);
+                                                previousValue = PointerToTargetType(rawPointer, fieldType);
+                                                newValue = PerformOperation(fieldType, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
+                                                Marshal.StructureToPtr(newValue, rawPointer, false);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            var (_, _, listPointer) = GetListPointer(index, variables, listValue, fieldType);
+                                            fieldType = fieldType.Generics[0];
+                                            variable = PointerToTargetType(listPointer, fieldType);
+                                            if (i == structField.Children.Count - 1)
+                                            {
+                                                previousValue = variable;
+                                                newValue = PerformOperation(fieldType, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
+                                                Marshal.StructureToPtr(newValue, listPointer, false);
+                                            }
                                         }
                                         break;
                                 }
@@ -950,11 +1014,30 @@ namespace Lang.Runner
                         }
                         case IndexAst indexAst:
                         {
-                            var (typeDef, elementType, pointer) = GetListPointer(indexAst, variables);
+                            TypeDefinition typeDef;
+                            object previousValue, newValue;
+                            if (indexAst.CallsOverload)
+                            {
+                                var indexValue = (int)ExecuteExpression(indexAst.Index, variables).Value;
+                                var variable = variables[indexAst.Name];
+                                var pointer = HandleOverloadedOperator(variable.Type, Operator.Subscript, variable.Value, indexValue);
 
-                            var previousValue = Marshal.PtrToStructure(pointer, elementType);
-                            var newValue = PerformOperation(typeDef, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
-                            Marshal.StructureToPtr(newValue, pointer, false);
+                                typeDef = pointer.Type.Generics[0];
+                                var rawPointer = GetPointer(pointer.Value);
+                                previousValue = PointerToTargetType(rawPointer, typeDef);
+                                newValue = PerformOperation(typeDef, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
+                                Marshal.StructureToPtr(newValue, rawPointer, false);
+                            }
+                            else
+                            {
+
+                                var (type, elementType, pointer) = GetListPointer(indexAst, variables);
+                                typeDef = type;
+
+                                previousValue = Marshal.PtrToStructure(pointer, elementType);
+                                newValue = PerformOperation(typeDef, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
+                                Marshal.StructureToPtr(newValue, pointer, false);
+                            }
 
                             return new ValueType {Type = typeDef, Value = changeByOne.Prefix ? newValue : previousValue};
                         }
@@ -1120,6 +1203,12 @@ namespace Lang.Runner
                     return expressionValue;
                 case IndexAst indexAst:
                 {
+                    if (indexAst.CallsOverload)
+                    {
+                        var index = (int)ExecuteExpression(indexAst.Index, variables).Value;
+                        var variable = variables[indexAst.Name];
+                        return HandleOverloadedOperator(variable.Type, Operator.Subscript, variable.Value, index);
+                    }
                     var (typeDef, elementType, pointer) = GetListPointer(indexAst, variables);
                     return new ValueType {Type = typeDef, Value = PointerToTargetType(pointer, typeDef, elementType)};
                 }
@@ -1241,15 +1330,25 @@ namespace Lang.Runner
                     case IndexAst index:
                         var list = value!.GetType().GetField(index.Name);
                         var listValue = list!.GetValue(value);
-                        var (_, _, listPointer) = GetListPointer(index, variables, listValue, fieldType);
-                        fieldType = fieldType.Generics[0];
-                        if (getPointer && i == structField.Children.Count - 1)
+                        if (index.CallsOverload)
                         {
-                            value = listPointer;
+                            var indexValue = (int)ExecuteExpression(index.Index, variables).Value;
+                            var pointer = HandleOverloadedOperator(fieldType, Operator.Subscript, listValue, indexValue);
+                            fieldType = pointer.Type;
+                            value = pointer.Value;
                         }
                         else
                         {
-                            value = PointerToTargetType(listPointer, fieldType);
+                            var (_, _, listPointer) = GetListPointer(index, variables, listValue, fieldType);
+                            fieldType = fieldType.Generics[0];
+                            if (getPointer && i == structField.Children.Count - 1)
+                            {
+                                value = listPointer;
+                            }
+                            else
+                            {
+                                value = PointerToTargetType(listPointer, fieldType);
+                            }
                         }
                         break;
                 }
@@ -1359,6 +1458,11 @@ namespace Lang.Runner
                 return new ValueType {Type = function.ReturnType, Value = returnValue};
             }
 
+            return ExecuteFunction(function, arguments);
+        }
+
+        private ValueType ExecuteFunction(IFunction function, object[] arguments)
+        {
             var variables = new Dictionary<string, ValueType>(_globalVariables);
 
             for (var i = 0; i < function.Arguments.Count; i++)
@@ -1413,7 +1517,7 @@ namespace Lang.Runner
             _programGraph.Dependencies.Add(library);
         }
 
-        private static object RunExpression(ValueType lhs, ValueType rhs, Operator op, TypeDefinition targetType)
+        private object RunExpression(ValueType lhs, ValueType rhs, Operator op, TypeDefinition targetType)
         {
             // 1. Handle pointer math
             if (lhs.Type.Name == "*")
@@ -1430,9 +1534,16 @@ namespace Lang.Runner
             {
                 case Operator.And:
                 case Operator.Or:
-                    var lhsBool = (bool)lhs.Value;
-                    var rhsBool = (bool)rhs.Value;
-                    return op == Operator.And ? lhsBool && rhsBool : lhsBool || rhsBool;
+                    if (lhs.Type.Name == "bool")
+                    {
+                        var lhsBool = (bool)lhs.Value;
+                        var rhsBool = (bool)rhs.Value;
+                        return op == Operator.And ? lhsBool && rhsBool : lhsBool || rhsBool;
+                    }
+                    else
+                    {
+                        return HandleOverloadedOperator(lhs.Type, op, lhs.Value, rhs.Value).Value;
+                    }
                 case Operator.Equality:
                 case Operator.NotEqual:
                 case Operator.GreaterThanEqual:
@@ -1441,20 +1552,26 @@ namespace Lang.Runner
                 case Operator.LessThan:
                     return Compare(lhs, rhs, op);
                 case Operator.ShiftLeft:
-                    return Shift(lhs, rhs);
+                    return Shift(lhs, rhs, op);
                 case Operator.ShiftRight:
-                    return Shift(lhs, rhs, true);
+                    return Shift(lhs, rhs, op, true);
                 case Operator.RotateLeft:
-                    return Shift(lhs, rhs, rotate: true);
+                    return Shift(lhs, rhs, op, rotate: true);
                 case Operator.RotateRight:
-                    return Shift(lhs, rhs, true, true);
+                    return Shift(lhs, rhs, op, true, true);
             }
 
-            // 3. Cast lhs and rhs to the target types
+            // 3. Handle overloaded operators
+            if (lhs.Type.PrimitiveType == null && lhs.Type.Name != "bool")
+            {
+                return HandleOverloadedOperator(lhs.Type, op, lhs.Value, rhs.Value).Value;
+            }
+
+            // 4. Cast lhs and rhs to the target types
             var lhsValue = CastValue(lhs.Value, targetType);
             var rhsValue = CastValue(rhs.Value, targetType);
 
-            // 4. Handle the rest of the simple operators
+            // 5. Handle the rest of the simple operators
             switch (op)
             {
                 case Operator.BitwiseAnd:
@@ -1604,7 +1721,7 @@ namespace Lang.Runner
                     break;
             }
 
-            // 5. Handle binary operations
+            // 6. Handle binary operations
             return PerformOperation(targetType, lhsValue, rhsValue, op);
         }
 
@@ -1634,7 +1751,7 @@ namespace Lang.Runner
             return IntPtr.Add(lhsPointer, (int)rhs);
         }
 
-        private static object Compare(ValueType lhs, ValueType rhs, Operator op)
+        private object Compare(ValueType lhs, ValueType rhs, Operator op)
         {
             switch (lhs.Type.PrimitiveType)
             {
@@ -1714,18 +1831,19 @@ namespace Lang.Runner
                     var rhsValue = Convert.ToInt64(rhs.Value);
                     return IntegerOperations(lhsValue, rhsValue, op);
                 }
+                default:
+                    return HandleOverloadedOperator(lhs.Type, op, lhs.Value, rhs.Value).Value;
             }
 
-            // @Future Operator overloading
-            throw new NotImplementedException($"{op} not compatible with types '{lhs.Type.GenericName}' and '{rhs.Type.GenericName}'");
+            // @Cleanup this should not be hit
+            return null;
         }
 
-        private static object Shift(ValueType lhs, ValueType rhs, bool right = false, bool rotate = false)
+        private object Shift(ValueType lhs, ValueType rhs, Operator op, bool right = false, bool rotate = false)
         {
-            var rhsValue = Convert.ToInt32(CastValue(rhs.Value, new TypeDefinition {PrimitiveType = new IntegerType {Bytes = 4, Signed = true}}));
-
             if (lhs.Type.PrimitiveType is IntegerType integerType)
             {
+                var rhsValue = Convert.ToInt32(CastValue(rhs.Value, new TypeDefinition {PrimitiveType = new IntegerType {Bytes = 4, Signed = true}}));
                 switch (integerType.Bytes)
                 {
                     case 1:
@@ -1815,11 +1933,10 @@ namespace Lang.Runner
                 }
             }
 
-            // @Cleanup this should not be hit
-            return lhs.Value;
+            return HandleOverloadedOperator(lhs.Type, op, lhs.Value, rhs.Value).Value;
         }
 
-        private static object PerformOperation(TypeDefinition targetType, object lhsValue, object rhsValue, Operator op)
+        private object PerformOperation(TypeDefinition targetType, object lhsValue, object rhsValue, Operator op)
         {
             switch (targetType.PrimitiveType)
             {
@@ -1853,10 +1970,15 @@ namespace Lang.Runner
                         var result = DoubleOperations(lhsFloat, rhsFloat, op);
                         return CastValue(result, targetType);
                     }
+                default:
+                    return HandleOverloadedOperator(targetType, op, lhsValue, rhsValue).Value;
             }
+        }
 
-            // @Future Operator overloading
-            throw new NotImplementedException($"{op} not compatible with types '{lhsValue.GetType()}' and '{rhsValue.GetType()}'");
+        private ValueType HandleOverloadedOperator(TypeDefinition type, Operator op, object lhs, object rhs)
+        {
+            var operatorOverload = _programGraph.OperatorOverloads[type.GenericName][op];
+            return ExecuteFunction(operatorOverload, new []{lhs, rhs});
         }
 
         private static object CastValue(object value, TypeDefinition targetType)
