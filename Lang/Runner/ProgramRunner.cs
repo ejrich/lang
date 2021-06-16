@@ -381,7 +381,7 @@ namespace Lang.Runner
             {
                 case ReturnAst returnAst:
                     returned = true;
-                    return ExecuteReturn(returnAst, variables);
+                    return ExecuteExpression(returnAst.Value, variables);
                 case DeclarationAst declaration:
                     ExecuteDeclaration(declaration, variables);
                     break;
@@ -407,22 +407,28 @@ namespace Lang.Runner
             return returnValue;
         }
 
-        private ValueType ExecuteReturn(ReturnAst returnAst, IDictionary<string, ValueType> variables)
-        {
-            return ExecuteExpression(returnAst.Value, variables);
-        }
-
         private void ExecuteDeclaration(DeclarationAst declaration, IDictionary<string, ValueType> variables)
         {
             var value = declaration.Value == null ?
                 GetUninitializedValue(declaration.Type, variables, declaration.Assignments) :
                 CastValue(ExecuteExpression(declaration.Value, variables).Value, declaration.Type);
 
-            variables[declaration.Name] = new ValueType {Type = declaration.Type, Value = value};
+            var variable = new ValueType {Type = declaration.Type};
+            if (declaration.Type.Constant)
+            {
+                variable.Value = value;
+            }
+            else
+            {
+                var pointer = Marshal.AllocHGlobal(Marshal.SizeOf(GetTypeFromDefinition(declaration.Type)));
+                Marshal.StructureToPtr(value, pointer, false);
+                variable.Value = pointer;
+            }
+
+            variables[declaration.Name] = variable;
         }
 
-        private object GetUninitializedValue(TypeDefinition typeDef,
-            IDictionary<string, ValueType> variables, List<AssignmentAst> values)
+        private object GetUninitializedValue(TypeDefinition typeDef, IDictionary<string, ValueType> variables, List<AssignmentAst> values)
         {
             switch (typeDef.PrimitiveType)
             {
@@ -449,8 +455,7 @@ namespace Lang.Runner
             }
         }
 
-        private object InitializeStruct(Type type, StructAst structAst,
-            IDictionary<string, ValueType> variables, List<AssignmentAst> values = null)
+        private object InitializeStruct(Type type, StructAst structAst, IDictionary<string, ValueType> variables, List<AssignmentAst> values = null)
         {
             var assignments = values?.ToDictionary(_ => (_.Reference as IdentifierAst)!.Name);
             var instance = Activator.CreateInstance(type);
@@ -584,7 +589,7 @@ namespace Lang.Runner
                 case IdentifierAst identifier:
                 {
                     var variable = variables[identifier.Name];
-                    variable.Value = expression.Value;
+                    Marshal.StructureToPtr(expression.Value, GetPointer(variable.Value), false);
                     break;
                 }
                 case StructFieldRefAst structField:
@@ -685,6 +690,7 @@ namespace Lang.Runner
                     if (indexAst.CallsOverload)
                     {
                         var indexValue = (int)ExecuteExpression(indexAst.Index, variables).Value;
+                        // TODO Implement me
                         var variable = variables[indexAst.Name];
                         var pointer = HandleOverloadedOperator(variable.Type, Operator.Subscript, variable.Value, indexValue).Value;
                         Marshal.StructureToPtr(expression.Value, GetPointer(pointer), false);
@@ -886,13 +892,16 @@ namespace Lang.Runner
                         var type = _programGraph.Types[identifier.Name];
                         return new ValueType {Type = _intTypeDefinition, Value = type.TypeIndex};
                     }
-                    return new ValueType {Type = variable.Type, Value = variable.Value};
+
+                    var value = variable.Type.Constant ? variable.Value : Marshal.PtrToStructure(GetPointer(variable.Value), GetTypeFromDefinition(variable.Type));
+                    return new ValueType {Type = variable.Type, Value = value};
                 }
                 case ChangeByOneAst changeByOne:
                     switch (changeByOne.Value)
                     {
                         case IdentifierAst identifier:
                         {
+                            // TODO Implement me
                             var variable = variables[identifier.Name];
 
                             var previousValue = new ValueType {Type = variable.Type, Value = variable.Value};
@@ -1019,6 +1028,7 @@ namespace Lang.Runner
                             if (indexAst.CallsOverload)
                             {
                                 var indexValue = (int)ExecuteExpression(indexAst.Index, variables).Value;
+                                // TODO Implement me
                                 var variable = variables[indexAst.Name];
                                 var pointer = HandleOverloadedOperator(variable.Type, Operator.Subscript, variable.Value, indexValue);
 
@@ -1206,6 +1216,7 @@ namespace Lang.Runner
                     if (indexAst.CallsOverload)
                     {
                         var index = (int)ExecuteExpression(indexAst.Index, variables).Value;
+                        // TODO Implement me
                         var variable = variables[indexAst.Name];
                         return HandleOverloadedOperator(variable.Type, Operator.Subscript, variable.Value, index);
                     }
@@ -1364,6 +1375,7 @@ namespace Lang.Runner
             TypeDefinition elementTypeDef;
             if (listObject == null)
             {
+                // TODO Implement me
                 var variable = variables[indexAst.Name];
                 listObject = variable.Value;
                 listTypeDef ??= variable.Type;
@@ -1468,6 +1480,7 @@ namespace Lang.Runner
             for (var i = 0; i < function.Arguments.Count; i++)
             {
                 var arg = function.Arguments[i];
+                // TODO Implement me
                 variables[arg.Name] = new ValueType {Type = arg.Type, Value = arguments[i]};
             }
 
