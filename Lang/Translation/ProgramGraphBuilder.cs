@@ -237,7 +237,7 @@ namespace Lang.Translation
             var primitiveAst = new PrimitiveAst
             {
                 Name = name, TypeIndex = _programGraph.TypeCount++, TypeKind = typeKind,
-                     Size = primitive?.Bytes ?? size, Primitive = primitive
+                Size = primitive?.Bytes ?? size, Primitive = primitive
             };
             _globalIdentifiers.Add(name, primitiveAst);
             _programGraph.Types.Add(name, primitiveAst);
@@ -997,8 +997,7 @@ namespace Lang.Translation
                         {
                             if (!TypeEquals(field.Type, valueType))
                             {
-                                AddError($"Expected field value to be type '{PrintTypeDefinition(field.Type)}', " +
-                                        $"but got '{PrintTypeDefinition(valueType)}'", field.Type);
+                                AddError($"Expected field value to be type '{PrintTypeDefinition(field.Type)}', but got '{PrintTypeDefinition(valueType)}'", field.Type);
                             }
                             else if (field.Type.PrimitiveType != null && assignment.Value is ConstantAst constant)
                             {
@@ -1053,8 +1052,7 @@ namespace Lang.Translation
                     {
                         if (!TypeEquals(declaration.Type, valueType))
                         {
-                            AddError($"Expected declaration value to be type '{PrintTypeDefinition(declaration.Type)}', " +
-                                    $"but got '{PrintTypeDefinition(valueType)}'", declaration.Type);
+                            AddError($"Expected declaration value to be type '{PrintTypeDefinition(declaration.Type)}', but got '{PrintTypeDefinition(valueType)}'", declaration.Type);
                         }
                         else if (declaration.Type.PrimitiveType != null && declaration.Value is ConstantAst constant)
                         {
@@ -1195,11 +1193,10 @@ namespace Lang.Translation
                         case Operator.Or:
                             if (lhs != Type.Boolean || rhs != Type.Boolean)
                             {
-                                AddError($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types " +
-                                        $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                                AddError($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
                             }
                             break;
-                            // Invalid assignment operators
+                        // Invalid assignment operators
                         case Operator.Equality:
                         case Operator.GreaterThan:
                         case Operator.LessThan:
@@ -1207,20 +1204,19 @@ namespace Lang.Translation
                         case Operator.LessThanEqual:
                             AddError($"Invalid operator '{PrintOperator(assignment.Operator)}' in assignment", assignment);
                             break;
-                            // Requires same types and returns more precise type
+                        // Requires same types and returns more precise type
                         case Operator.Add:
                         case Operator.Subtract:
                         case Operator.Multiply:
                         case Operator.Divide:
                         case Operator.Modulus:
                             if (!(lhs == Type.Int && rhs == Type.Int) &&
-                                    !(lhs == Type.Float && (rhs == Type.Float || rhs == Type.Int)))
+                                !(lhs == Type.Float && (rhs == Type.Float || rhs == Type.Int)))
                             {
-                                AddError($"Operator {PrintOperator(assignment.Operator)} not applicable to types " +
-                                        $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                                AddError($"Operator {PrintOperator(assignment.Operator)} not applicable to types '{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
                             }
                             break;
-                            // Requires both integer or bool types and returns more same type
+                        // Requires both integer or bool types and returns more same type
                         case Operator.BitwiseAnd:
                         case Operator.BitwiseOr:
                         case Operator.Xor:
@@ -1231,15 +1227,14 @@ namespace Lang.Translation
                                         $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
                             }
                             break;
-                            // Requires both to be integers
+                        // Requires both to be integers
                         case Operator.ShiftLeft:
                         case Operator.ShiftRight:
                         case Operator.RotateLeft:
                         case Operator.RotateRight:
                             if (lhs != Type.Int || rhs != Type.Int)
                             {
-                                AddError($"Operator {PrintOperator(assignment.Operator)} not applicable to types " +
-                                        $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                                AddError($"Operator {PrintOperator(assignment.Operator)} not applicable to types '{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
                             }
                             break;
                     }
@@ -1581,7 +1576,7 @@ namespace Lang.Translation
                 var iterType = new DeclarationAst
                 {
                     Name = each.IterationVariable,
-                         Type = new TypeDefinition {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}}
+                    Type = new TypeDefinition {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}}
                 };
                 if (!eachIdentifiers.TryAdd(each.IterationVariable, iterType))
                 {
@@ -1811,42 +1806,42 @@ namespace Lang.Translation
                 case IndexAst index:
                     return VerifyIndexType(index, currentFunction, scopeIdentifiers);
                 case TypeDefinition typeDef:
+                {
+                    if (VerifyType(typeDef) == Type.Error)
                     {
-                        if (VerifyType(typeDef) == Type.Error)
-                        {
-                            return null;
-                        }
-                        if (!_programGraph.Types.TryGetValue(typeDef.GenericName, out var type))
-                        {
-                            return null;
-                        }
-                        return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
+                        return null;
                     }
+                    if (!_programGraph.Types.TryGetValue(typeDef.GenericName, out var type))
+                    {
+                        return null;
+                    }
+                    return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
+                }
                 case CastAst cast:
+                {
+                    var targetType = VerifyType(cast.TargetType);
+                    var valueType = VerifyExpression(cast.Value, currentFunction, scopeIdentifiers);
+                    switch (targetType)
                     {
-                        var targetType = VerifyType(cast.TargetType);
-                        var valueType = VerifyExpression(cast.Value, currentFunction, scopeIdentifiers);
-                        switch (targetType)
-                        {
-                            case Type.Int:
-                            case Type.Float:
-                                if (valueType != null && valueType.PrimitiveType == null)
-                                {
-                                    AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetType)}'", cast.Value);
-                                }
-                                break;
-                            case Type.Error:
-                                // Don't need to report additional errors
-                                return null;
-                            default:
-                                if (valueType != null)
-                                {
-                                    AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetType)}'", cast);
-                                }
-                                break;
-                        }
-                        return cast.TargetType;
+                        case Type.Int:
+                        case Type.Float:
+                            if (valueType != null && valueType.PrimitiveType == null)
+                            {
+                                AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetType)}'", cast.Value);
+                            }
+                            break;
+                        case Type.Error:
+                            // Don't need to report additional errors
+                            return null;
+                        default:
+                            if (valueType != null)
+                            {
+                                AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetType)}'", cast);
+                            }
+                            break;
                     }
+                    return cast.TargetType;
+                }
                 case null:
                     return null;
                 default:
@@ -1873,10 +1868,10 @@ namespace Lang.Translation
                     var success = integer.Bytes switch
                     {
                         1 => integer.Signed ? sbyte.TryParse(constant.Value, out _) : byte.TryParse(constant.Value, out _),
-                          2 => integer.Signed ? short.TryParse(constant.Value, out _) : ushort.TryParse(constant.Value, out _),
-                          4 => integer.Signed ? int.TryParse(constant.Value, out _) : uint.TryParse(constant.Value, out _),
-                          8 => integer.Signed ? long.TryParse(constant.Value, out _) : ulong.TryParse(constant.Value, out _),
-                          _ => integer.Signed ? int.TryParse(constant.Value, out _) : uint.TryParse(constant.Value, out _),
+                        2 => integer.Signed ? short.TryParse(constant.Value, out _) : ushort.TryParse(constant.Value, out _),
+                        4 => integer.Signed ? int.TryParse(constant.Value, out _) : uint.TryParse(constant.Value, out _),
+                        8 => integer.Signed ? long.TryParse(constant.Value, out _) : ulong.TryParse(constant.Value, out _),
+                        _ => integer.Signed ? int.TryParse(constant.Value, out _) : uint.TryParse(constant.Value, out _),
                     };
                     if (!success)
                     {
@@ -2582,7 +2577,7 @@ namespace Lang.Translation
                                 expression.Type = new TypeDefinition {Name = "bool"};
                             }
                             break;
-                            // Requires same types and returns bool
+                        // Requires same types and returns bool
                         case Operator.Equality:
                         case Operator.NotEqual:
                         case Operator.GreaterThan:
@@ -2590,7 +2585,7 @@ namespace Lang.Translation
                         case Operator.GreaterThanEqual:
                         case Operator.LessThanEqual:
                             if ((type == Type.Enum && nextType == Type.Enum)
-                                    || (type == Type.Type && nextType == Type.Type))
+                                || (type == Type.Type && nextType == Type.Type))
                             {
                                 if ((op != Operator.Equality && op != Operator.NotEqual) || !TypeEquals(expression.Type, nextExpressionType))
                                 {
