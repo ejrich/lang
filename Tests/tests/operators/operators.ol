@@ -28,6 +28,12 @@ operator_overloading() {
     a_int: Vector3I = { x = 1; y = 1; z = 1; }
     b_int: Vector3I = { x = 2; y = 2; z = 2; }
 
+    bitwise_or := a_int | b_int;
+    printf("Bitwise bitwise_or: x = %d, y = %d, z = %d\n", bitwise_or.x, bitwise_or.y, bitwise_or.z);
+
+    bitwise_and := a_int & b_int;
+    printf("Bitwise and: x = %d, y = %d, z = %d\n", bitwise_and.x, bitwise_and.y, bitwise_and.z);
+
     shift_right := a_int >> b_int;
     printf("Shift right: x = %d, y = %d, z = %d\n", shift_right.x, shift_right.y, shift_right.z);
 
@@ -89,6 +95,16 @@ operator / Vector3(Vector3 a, Vector3 b) {
 
 operator % Vector3(Vector3 a, Vector3 b) {
     c: Vector3 = { x = a.x % b.x; y = a.y % b.y; z = a.z % b.z; }
+    return c;
+}
+
+operator | Vector3I(Vector3I a, Vector3I b) {
+    c: Vector3I = { x = a.x | b.x; y = a.y | b.y; z = a.z | b.z; }
+    return c;
+}
+
+operator & Vector3I(Vector3I a, Vector3I b) {
+    c: Vector3I = { x = a.x & b.x; y = a.y & b.y; z = a.z & b.z; }
     return c;
 }
 
