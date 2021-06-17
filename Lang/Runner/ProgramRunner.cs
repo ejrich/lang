@@ -174,23 +174,24 @@ namespace Lang.Runner
 
             if (_typeCount != programGraph.TypeCount)
             {
-                var typeTable = _globalVariables["__type_table"];
+                var typeTableVariable = _globalVariables["__type_table"];
 
-                // Save the previous pointer
-                var typeInfoListType = _types[typeTable.Type.GenericName];
+                var typeInfoListType = _types["List.*.TypeInfo"];
+                var typeInfoType = _types["TypeInfo"];
+                var typeInfoPointerType = typeInfoType.MakePointerType();
+
+                // Allocate array
+                var typeTable = Activator.CreateInstance(typeInfoListType);
+                InitializeConstList(typeTable, typeInfoListType, typeInfoPointerType, programGraph.TypeCount);
+                Marshal.StructureToPtr(typeTable, GetPointer(typeTableVariable.Value), false);
+
+                // Get type table data pointer
                 var dataField = typeInfoListType.GetField("data");
-                var oldDataPointer = GetPointer(dataField.GetValue(typeTable.Value));
-
-                // Reallocate array
-                var typeInfoPointerType = GetTypeFromDefinition(typeTable.Type.Generics[0]);
-                var pointerSize = Marshal.SizeOf(typeInfoPointerType);
-                InitializeConstList(typeTable.Value, typeInfoListType, typeInfoPointerType, programGraph.TypeCount);
-                var typeDataPointer = GetPointer(dataField.GetValue(typeTable.Value));
-                Marshal.FreeHGlobal(oldDataPointer);
+                var typeDataPointer = GetPointer(dataField.GetValue(typeTable));
 
                 // Create TypeInfo pointers
+                const int pointerSize = 8;
                 var newTypeInfos = new List<(IType type, object typeInfo, IntPtr typeInfoPointer)>();
-                var typeInfoType = _types["TypeInfo"];
                 foreach (var (name, type) in programGraph.Types)
                 {
                     if (!_typeInfoPointers.TryGetValue(name, out var typeInfoPointer))
@@ -208,7 +209,7 @@ namespace Lang.Runner
                         newTypeInfos.Add((type, typeInfo, typeInfoPointer));
                     }
 
-                    var listPointer = IntPtr.Add(typeDataPointer, pointerSize * type.TypeIndex);
+                    var listPointer = IntPtr.Add(typeDataPointer, type.TypeIndex * pointerSize);
                     Marshal.StructureToPtr(typeInfoPointer, listPointer, false);
                 }
 
@@ -230,7 +231,7 @@ namespace Lang.Runner
                             newTypeInfos.Add((function, typeInfo, typeInfoPointer));
                         }
 
-                        var listPointer = IntPtr.Add(typeDataPointer, pointerSize * function.TypeIndex);
+                        var listPointer = IntPtr.Add(typeDataPointer, function.TypeIndex * pointerSize);
                         Marshal.StructureToPtr(typeInfoPointer, listPointer, false);
                     }
                 }
@@ -594,6 +595,7 @@ namespace Lang.Runner
                 }
                 case StructFieldRefAst structField:
                 {
+                    // TODO Implement me
                     var valueType = ExecuteExpression(structField.Children[0], variables);
                     var variable = valueType.Value;
                     var fieldType = valueType.Type;
@@ -687,23 +689,24 @@ namespace Lang.Runner
                 }
                 case IndexAst indexAst:
                 {
+                    // TODO Implement me
                     if (indexAst.CallsOverload)
                     {
                         var indexValue = (int)ExecuteExpression(indexAst.Index, variables).Value;
-                        // TODO Implement me
                         var variable = variables[indexAst.Name];
                         var pointer = HandleOverloadedOperator(variable.Type, Operator.Subscript, variable.Value, indexValue).Value;
                         Marshal.StructureToPtr(expression.Value, GetPointer(pointer), false);
                     }
                     else
                     {
-                        var (_, _, pointer) = GetListPointer(indexAst, variables);
+                        var (_, _, pointer) = GetListPointer(indexAst, variables, null);
                         Marshal.StructureToPtr(expression.Value, pointer, false);
                     }
                     break;
                 }
                 case UnaryAst unary:
                 {
+                    // TODO Implement me
                     var pointer = ExecuteExpression(unary.Value, variables).Value;
                     Marshal.StructureToPtr(expression.Value, GetPointer(pointer), false);
                     break;
@@ -901,16 +904,23 @@ namespace Lang.Runner
                     {
                         case IdentifierAst identifier:
                         {
-                            // TODO Implement me
                             var variable = variables[identifier.Name];
+                            var type = GetTypeFromDefinition(variable.Type);
+                            var pointer = GetPointer(variable.Value);
 
-                            var previousValue = new ValueType {Type = variable.Type, Value = variable.Value};
-                            variable.Value = PerformOperation(variable.Type, variable.Value, changeByOne.Positive ? 1 : -1, Operator.Add);
+                            var previousValue = variable.Type.Constant ? variable.Value : Marshal.PtrToStructure(pointer, type);
+                            var newValue = PerformOperation(variable.Type, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
 
-                            return changeByOne.Prefix ? variable : previousValue;
+                            if (!variable.Type.Constant)
+                            {
+                                Marshal.StructureToPtr(newValue, pointer, false);
+                            }
+
+                            return new ValueType {Type = variable.Type, Value = changeByOne.Prefix ? newValue : previousValue};
                         }
                         case StructFieldRefAst structField:
                         {
+                            // TODO Implement me
                             var valueType = ExecuteExpression(structField.Children[0], variables);
                             var variable = valueType.Value;
                             var fieldType = valueType.Type;
@@ -1041,7 +1051,7 @@ namespace Lang.Runner
                             else
                             {
 
-                                var (type, elementType, pointer) = GetListPointer(indexAst, variables);
+                                var (type, elementType, pointer) = GetListPointer(indexAst, variables, null);
                                 typeDef = type;
 
                                 previousValue = Marshal.PtrToStructure(pointer, elementType);
@@ -1062,7 +1072,7 @@ namespace Lang.Runner
                         switch (unary.Value)
                         {
                             case IndexAst index:
-                                (typeDef, _, pointer) = GetListPointer(index, variables);
+                                (typeDef, _, pointer) = GetListPointer(index, variables, null);
                                 break;
                             case StructFieldRefAst structField when structField.Children[^1] is IndexAst:
                                 var structVariable = ExecuteExpression(structField.Children[0], variables);
@@ -1220,7 +1230,7 @@ namespace Lang.Runner
                         var variable = variables[indexAst.Name];
                         return HandleOverloadedOperator(variable.Type, Operator.Subscript, variable.Value, index);
                     }
-                    var (typeDef, elementType, pointer) = GetListPointer(indexAst, variables);
+                    var (typeDef, elementType, pointer) = GetListPointer(indexAst, variables, null);
                     return new ValueType {Type = typeDef, Value = PointerToTargetType(pointer, typeDef, elementType)};
                 }
                 case TypeDefinition typeDef:
@@ -1368,16 +1378,21 @@ namespace Lang.Runner
             return new ValueType {Type = fieldType, Value = value};
         }
 
-        private (TypeDefinition typeDef, Type elementType, IntPtr pointer) GetListPointer(IndexAst indexAst, IDictionary<string, ValueType> variables, object listObject = null, TypeDefinition listTypeDef = null)
+        private (TypeDefinition typeDef, Type elementType, IntPtr pointer) GetListPointer(IndexAst indexAst, IDictionary<string, ValueType> variables, object pointer = null, TypeDefinition listTypeDef = null)
+        {
+            // TODO Remove me when done
+            return GetListPointer(indexAst, variables, pointer == null ? default : GetPointer(pointer), listTypeDef);
+        }
+
+        private (TypeDefinition typeDef, Type elementType, IntPtr pointer) GetListPointer(IndexAst indexAst, IDictionary<string, ValueType> variables, IntPtr pointer = default, TypeDefinition listTypeDef = null)
         {
             var index = (int)ExecuteExpression(indexAst.Index, variables).Value;
 
             TypeDefinition elementTypeDef;
-            if (listObject == null)
+            if (pointer == default)
             {
-                // TODO Implement me
                 var variable = variables[indexAst.Name];
-                listObject = variable.Value;
+                pointer = GetPointer(variable.Value);
                 listTypeDef ??= variable.Type;
                 elementTypeDef = variable.Type.Generics[0];
             }
@@ -1387,27 +1402,17 @@ namespace Lang.Runner
             }
             var elementType = GetTypeFromDefinition(elementTypeDef);
 
-            IntPtr dataPointer;
-            if (listTypeDef.CArray)
+            if (!listTypeDef.CArray)
             {
-                var pinnedArray = GCHandle.Alloc(listObject, GCHandleType.Pinned);
-                dataPointer = pinnedArray.AddrOfPinnedObject();
-            }
-            else
-            {
-                var dataField = listObject.GetType().GetField("data");
-                var data = dataField!.GetValue(listObject);
-                dataPointer = GetPointer(data!);
+                pointer = IntPtr.Add(pointer, 4);
             }
 
-            if (index == 0)
+            if (index != 0)
             {
-                return (elementTypeDef, elementType, dataPointer);
+                pointer = IntPtr.Add(pointer, Marshal.SizeOf(elementType) * index);
             }
 
-            var valuePointer = IntPtr.Add(dataPointer, Marshal.SizeOf(elementType) * index);
-
-            return (elementTypeDef, elementType, valuePointer);
+            return (elementTypeDef, elementType, pointer);
         }
 
         private static IntPtr GetPointer(object value)
@@ -1480,8 +1485,9 @@ namespace Lang.Runner
             for (var i = 0; i < function.Arguments.Count; i++)
             {
                 var arg = function.Arguments[i];
-                // TODO Implement me
-                variables[arg.Name] = new ValueType {Type = arg.Type, Value = arguments[i]};
+                var pointer = Marshal.AllocHGlobal(Marshal.SizeOf(GetTypeFromDefinition(arg.Type)));
+                Marshal.StructureToPtr(arguments[i], pointer, false);
+                variables[arg.Name] = new ValueType {Type = arg.Type, Value = pointer};
             }
 
             foreach (var ast in function.Children)
@@ -2126,6 +2132,8 @@ namespace Lang.Runner
             {
                 case "bool":
                     return typeof(bool);
+                case "Type":
+                    return typeof(int);
                 case "*":
                     var pointerType = GetTypeFromDefinition(typeDef.Generics[0], temporaryTypes);
                     if (pointerType == null)
@@ -2160,6 +2168,8 @@ namespace Lang.Runner
             {
                 case "bool":
                     return typeof(bool);
+                case "Type":
+                    return typeof(int);
                 case "string":
                     if (!cCall) break;
                     return typeof(char).MakePointerType();
