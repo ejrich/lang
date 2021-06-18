@@ -368,7 +368,6 @@ namespace Lang.Translation
                         if (!isConstant)
                         {
                             AddError($"Expected default value of '{structAst.Name}.{structField.Name}' to be a constant value", structField.DefaultValue);
-
                         }
                         else if (type != Type.Error && !TypeEquals(structField.Type, defaultType))
                         {
@@ -392,7 +391,7 @@ namespace Lang.Translation
                 }
             }
 
-            // 2. Calculate the size of the struct
+            // 2. Calculate the size of the struct and set field offsets
             if (!structAst.Generics.Any() && errorCount == _programGraph.Errors.Count)
             {
                 foreach (var field in structAst.Fields)
@@ -409,6 +408,7 @@ namespace Lang.Translation
                                 VerifyStruct(fieldStruct);
                             }
                         }
+                        field.Offset = (int)structAst.Size;
                         structAst.Size += field.Type.CArray ? type.Size * field.Type.ConstCount.Value : type.Size;
                     }
                 }
