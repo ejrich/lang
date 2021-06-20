@@ -39,6 +39,7 @@ enum TypeKind {
 
 struct TypeField {
     string name;
+    u32 offset;
     TypeInfo* type_info;
 }
 

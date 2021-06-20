@@ -368,7 +368,6 @@ namespace Lang.Translation
                         if (!isConstant)
                         {
                             AddError($"Expected default value of '{structAst.Name}.{structField.Name}' to be a constant value", structField.DefaultValue);
-
                         }
                         else if (type != Type.Error && !TypeEquals(structField.Type, defaultType))
                         {
@@ -392,7 +391,7 @@ namespace Lang.Translation
                 }
             }
 
-            // 2. Calculate the size of the struct
+            // 2. Calculate the size of the struct and set field offsets
             if (!structAst.Generics.Any() && errorCount == _programGraph.Errors.Count)
             {
                 foreach (var field in structAst.Fields)
@@ -409,6 +408,7 @@ namespace Lang.Translation
                                 VerifyStruct(fieldStruct);
                             }
                         }
+                        field.Offset = structAst.Size;
                         structAst.Size += field.Type.CArray ? type.Size * field.Type.ConstCount.Value : type.Size;
                     }
                 }
@@ -2122,15 +2122,26 @@ namespace Lang.Translation
                 for (var i = 0; i < arguments.Length; i++)
                 {
                     var argument = arguments[i];
-                    // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
-                    // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
-                    if (argument?.PrimitiveType is FloatType {Bytes: 4})
+                    switch (argument?.PrimitiveType)
                     {
-                        arguments[i] = argument = new TypeDefinition
-                        {
-                            Name = "float64", PrimitiveType = new FloatType {Bytes = 8}
-                        };
+                        // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
+                        // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
+                        case FloatType {Bytes: 4}:
+                            arguments[i] = argument = new TypeDefinition
+                            {
+                                Name = "float64", PrimitiveType = new FloatType {Bytes = 8}
+                            };
+                            break;
+                        // Enums should be called as integers
+                        case EnumType enumType:
+                            arguments[i] = argument = new TypeDefinition
+                            {
+                                Name = argument.Name,
+                                PrimitiveType = new IntegerType {Bytes = enumType.Bytes, Signed = enumType.Signed}
+                            };
+                            break;
                     }
+
                 }
                 var found = false;
                 for (var index = 0; index < function.VarargsCalls.Count; index++)
