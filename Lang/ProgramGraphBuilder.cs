@@ -2,11 +2,28 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Lang.Parsing;
-using Lang.Runner;
 
-namespace Lang.Translation
+namespace Lang
 {
+    public class ProgramGraph
+    {
+        public List<DeclarationAst> Variables { get; } = new();
+        public int TypeCount { get; set; }
+        public Dictionary<string, IType> Types { get; } = new();
+        public Dictionary<string, List<FunctionAst>> Functions { get; } = new();
+        public Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> OperatorOverloads { get; } = new();
+        public HashSet<string> Dependencies { get; set; }
+        public List<TranslationError> Errors { get; } = new();
+    }
+
+    public class TranslationError
+    {
+        public int FileIndex { get; init; }
+        public string Error { get; init; }
+        public int Line { get; init; }
+        public int Column { get; init; }
+    }
+
     public interface IProgramGraphBuilder
     {
         ProgramGraph CreateProgramGraph(ParseResult parseResult, ProjectFile project, BuildSettings buildSettings);
@@ -31,7 +48,6 @@ namespace Lang.Translation
 
         public ProgramGraph CreateProgramGraph(ParseResult parseResult, ProjectFile project, BuildSettings buildSettings)
         {
-            _programGraph.Name = project.Name;
             _programGraph.Dependencies = project.Dependencies;
 
             _buildSettings = buildSettings;
@@ -260,7 +276,7 @@ namespace Lang.Translation
             else
             {
                 var baseType = VerifyType(enumAst.BaseType);
-                if (baseType != Type.Int && baseType != Type.Error)
+                if (baseType != TypeKind.Integer && baseType != TypeKind.Error)
                 {
                     AddError($"Base type of enum must be an integer, but got '{PrintTypeDefinition(enumAst.BaseType)}'", enumAst.BaseType);
                     enumAst.BaseType.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
@@ -326,7 +342,7 @@ namespace Lang.Translation
                 // 1b. Check for errored or undefined field types
                 var type = VerifyType(structField.Type);
 
-                if (type == Type.Error)
+                if (type == TypeKind.Error)
                 {
                     AddError($"Type '{PrintTypeDefinition(structField.Type)}' of field {structAst.Name}.{structField.Name} is not defined", structField);
                 }
@@ -369,7 +385,7 @@ namespace Lang.Translation
                         {
                             AddError($"Expected default value of '{structAst.Name}.{structField.Name}' to be a constant value", structField.DefaultValue);
                         }
-                        else if (type != Type.Error && !TypeEquals(structField.Type, defaultType))
+                        else if (type != TypeKind.Error && !TypeEquals(structField.Type, defaultType))
                         {
                             AddError($"Type of field '{structAst.Name}.{structField.Name}' is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(defaultType)}'", structField.DefaultValue);
                         }
@@ -378,7 +394,7 @@ namespace Lang.Translation
                             VerifyConstant(constant, structField.Type);
                         }
                     }
-                    else if (isConstant && type != Type.Pointer && type != Type.Error)
+                    else if (isConstant && type != TypeKind.Pointer && type != TypeKind.Error)
                     {
                         AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is 'null'", structField.DefaultValue);
                     }
@@ -420,7 +436,7 @@ namespace Lang.Translation
         {
             // 1. Verify the return type of the function is valid
             var returnType = VerifyType(function.ReturnType);
-            if (returnType == Type.Error)
+            if (returnType == TypeKind.Error)
             {
                 AddError($"Return type '{function.ReturnType.Name}' of function '{function.Name}' is not defined", function.ReturnType);
             }
@@ -455,7 +471,7 @@ namespace Lang.Translation
             // 2. Verify main function return type and arguments
             if (main)
             {
-                if (returnType != Type.Void && returnType != Type.Int)
+                if (returnType != TypeKind.Void && returnType != TypeKind.Integer)
                 {
                     AddError("The main function should return type 'int' or 'void'", function);
                 }
@@ -487,7 +503,7 @@ namespace Lang.Translation
 
                 switch (type)
                 {
-                    case Type.VarArgs:
+                    case TypeKind.VarArgs:
                         if (function.Varargs || function.Params)
                         {
                             AddError($"Function '{function.Name}' cannot have multiple varargs", argument.Type);
@@ -495,14 +511,14 @@ namespace Lang.Translation
                         function.Varargs = true;
                         function.VarargsCalls = new List<List<TypeDefinition>>();
                         break;
-                    case Type.Params:
+                    case TypeKind.Params:
                         if (function.Varargs || function.Params)
                         {
                             AddError($"Function '{function.Name}' cannot have multiple varargs", argument.Type);
                         }
                         function.Params = true;
                         break;
-                    case Type.Error:
+                    case TypeKind.Error:
                         AddError($"Type '{PrintTypeDefinition(argument.Type)}' of argument '{argument.Name}' in function '{function.Name}' is not defined", argument.Type);
                         break;
                     default:
@@ -533,7 +549,7 @@ namespace Lang.Translation
                             AddError($"Expected default value of argument '{argument.Name}' in function '{function.Name}' to be a constant value", argument.Value);
 
                         }
-                        else if (type != Type.Error && !TypeEquals(argument.Type, defaultType))
+                        else if (type != TypeKind.Error && !TypeEquals(argument.Type, defaultType))
                         {
                             AddError($"Type of argument '{argument.Name}' in function '{function.Name}' is '{PrintTypeDefinition(argument.Type)}', but default value is type '{PrintTypeDefinition(defaultType)}'", argument.Value);
                         }
@@ -542,7 +558,7 @@ namespace Lang.Translation
                             VerifyConstant(constant, argument.Type);
                         }
                     }
-                    else if (isConstant && type != Type.Pointer && type != Type.Error)
+                    else if (isConstant && type != TypeKind.Pointer && type != TypeKind.Error)
                     {
                         AddError($"Type of argument '{argument.Name}' in function '{function.Name}' is '{PrintTypeDefinition(argument.Type)}', but default value is 'null'", argument.Value);
                     }
@@ -634,7 +650,7 @@ namespace Lang.Translation
             else
             {
                 var targetType = VerifyType(overload.Type);
-                if (targetType != Type.Error && targetType != Type.Struct)
+                if (targetType != TypeKind.Error && targetType != TypeKind.Struct)
                 {
                     AddError($"Cannot overload operator '{PrintOperator(overload.Operator)}' for type '{PrintTypeDefinition(overload.Type)}'", overload.Type);
                 }
@@ -742,7 +758,7 @@ namespace Lang.Translation
             }
 
             // 6. Verify the function returns on all paths
-            if (!returned && returnType != Type.Void)
+            if (!returned && returnType != TypeKind.Void)
             {
                 AddError($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnType)}' on all paths", function);
             }
@@ -901,7 +917,7 @@ namespace Lang.Translation
             var returnType = VerifyType(currentFunction.ReturnType);
 
             // 2. Handle void case since it's the easiest to interpret
-            if (returnType == Type.Void)
+            if (returnType == TypeKind.Void)
             {
                 if (returnAst.Value != null)
                 {
@@ -945,11 +961,11 @@ namespace Lang.Translation
                 else
                 {
                     var type = VerifyType(declaration.Type);
-                    if (type == Type.Error)
+                    if (type == TypeKind.Error)
                     {
                         AddError($"Undefined type in declaration '{PrintTypeDefinition(declaration.Type)}'", declaration.Type);
                     }
-                    else if (type != Type.Pointer)
+                    else if (type != TypeKind.Pointer)
                     {
                         AddError("Cannot assign null to non-pointer type", declaration.Value);
                     }
@@ -967,7 +983,7 @@ namespace Lang.Translation
                 else
                 {
                     var type = VerifyType(declaration.Type);
-                    if (type != Type.Struct)
+                    if (type != TypeKind.Struct)
                     {
                         AddError($"Can only use object initializer with struct type, got '{PrintTypeDefinition(declaration.Type)}'", declaration.Type);
                         return;
@@ -1038,11 +1054,11 @@ namespace Lang.Translation
                 else
                 {
                     var type = VerifyType(declaration.Type);
-                    if (type == Type.Error)
+                    if (type == TypeKind.Error)
                     {
                         AddError($"Undefined type in declaration '{PrintTypeDefinition(declaration.Type)}'", declaration.Type);
                     }
-                    else if (type == Type.Void)
+                    else if (type == TypeKind.Void)
                     {
                         AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.Type);
                     }
@@ -1191,7 +1207,7 @@ namespace Lang.Translation
                         // Both need to be bool and returns bool
                         case Operator.And:
                         case Operator.Or:
-                            if (lhs != Type.Boolean || rhs != Type.Boolean)
+                            if (lhs != TypeKind.Boolean || rhs != TypeKind.Boolean)
                             {
                                 AddError($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
                             }
@@ -1210,8 +1226,8 @@ namespace Lang.Translation
                         case Operator.Multiply:
                         case Operator.Divide:
                         case Operator.Modulus:
-                            if (!(lhs == Type.Int && rhs == Type.Int) &&
-                                !(lhs == Type.Float && (rhs == Type.Float || rhs == Type.Int)))
+                            if (!(lhs == TypeKind.Integer && rhs == TypeKind.Integer) &&
+                                !(lhs == TypeKind.Float && (rhs == TypeKind.Float || rhs == TypeKind.Integer)))
                             {
                                 AddError($"Operator {PrintOperator(assignment.Operator)} not applicable to types '{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
                             }
@@ -1220,8 +1236,8 @@ namespace Lang.Translation
                         case Operator.BitwiseAnd:
                         case Operator.BitwiseOr:
                         case Operator.Xor:
-                            if (!(lhs == Type.Boolean && rhs == Type.Boolean) &&
-                                    !(lhs == Type.Int && rhs == Type.Int))
+                            if (!(lhs == TypeKind.Boolean && rhs == TypeKind.Boolean) &&
+                                    !(lhs == TypeKind.Integer && rhs == TypeKind.Integer))
                             {
                                 AddError($"Operator {PrintOperator(assignment.Operator)} not applicable to types " +
                                         $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
@@ -1232,7 +1248,7 @@ namespace Lang.Translation
                         case Operator.ShiftRight:
                         case Operator.RotateLeft:
                         case Operator.RotateRight:
-                            if (lhs != Type.Int || rhs != Type.Int)
+                            if (lhs != TypeKind.Integer || rhs != TypeKind.Integer)
                             {
                                 AddError($"Operator {PrintOperator(assignment.Operator)} not applicable to types '{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
                             }
@@ -1264,7 +1280,7 @@ namespace Lang.Translation
                     var type = VerifyIndex(index, variableType, currentFunction, scopeIdentifiers, out var overloaded);
                     if (type != null && overloaded)
                     {
-                        if (type.Type != Type.Pointer)
+                        if (type.Type != TypeKind.Pointer)
                         {
                             AddError($"Overload [] for type '{PrintTypeDefinition(variableType)}' must be a pointer to be able to set the value", index);
                             return null;
@@ -1290,7 +1306,7 @@ namespace Lang.Translation
                             var variableType = GetVariable(index.Name, index, scopeIdentifiers);
                             if (variableType == null) return null;
                             refType = VerifyIndex(index, variableType, currentFunction, scopeIdentifiers, out var overloaded);
-                            if (refType != null && overloaded && refType.Type != Type.Pointer)
+                            if (refType != null && overloaded && refType.Type != TypeKind.Pointer)
                             {
                                 AddError($"Overload [] for type '{PrintTypeDefinition(variableType)}' must be a pointer to be able to set the value", index);
                                 return null;
@@ -1318,7 +1334,7 @@ namespace Lang.Translation
                                 refType = VerifyIndex(index, fieldType, currentFunction, scopeIdentifiers, out var overloaded);
                                 if (refType != null && overloaded)
                                 {
-                                    if (refType.Type == Type.Pointer)
+                                    if (refType.Type == TypeKind.Pointer)
                                     {
                                         if (i == structFieldRef.Children.Count - 1)
                                         {
@@ -1353,7 +1369,7 @@ namespace Lang.Translation
                         return null;
                     }
 
-                    if (reference.Type != Type.Pointer)
+                    if (reference.Type != TypeKind.Pointer)
                     {
                         AddError("Expected to get pointer to dereference", unary.Value);
                         return null;
@@ -1516,13 +1532,13 @@ namespace Lang.Translation
             var conditionalType = VerifyExpression(ast, currentFunction, scopeIdentifiers);
             switch (VerifyType(conditionalType))
             {
-                case Type.Int:
-                case Type.Float:
-                case Type.Boolean:
-                case Type.Pointer:
+                case TypeKind.Integer:
+                case TypeKind.Float:
+                case TypeKind.Boolean:
+                case TypeKind.Pointer:
                     // Valid types
                     return !_programGraph.Errors.Any();
-                case Type.Error:
+                case TypeKind.Error:
                     return false;
                 default:
                     AddError($"Expected condition to be bool, int, float, or pointer, but got '{PrintTypeDefinition(conditionalType)}'", ast);
@@ -1563,13 +1579,13 @@ namespace Lang.Translation
             {
                 var begin = VerifyExpression(each.RangeBegin, currentFunction, scopeIdentifiers);
                 var beginType = VerifyType(begin);
-                if (beginType != Type.Int && beginType != Type.Error)
+                if (beginType != TypeKind.Integer && beginType != TypeKind.Error)
                 {
                     AddError($"Expected range to begin with 'int', but got '{PrintTypeDefinition(begin)}'", each.RangeBegin);
                 }
                 var end = VerifyExpression(each.RangeEnd, currentFunction, scopeIdentifiers);
                 var endType = VerifyType(end);
-                if (endType != Type.Int && endType != Type.Error)
+                if (endType != TypeKind.Integer && endType != TypeKind.Error)
                 {
                     AddError($"Expected range to end with 'int', but got '{PrintTypeDefinition(end)}'", each.RangeEnd);
                 }
@@ -1717,7 +1733,7 @@ namespace Lang.Translation
                             if (expressionType != null)
                             {
                                 var type = VerifyType(expressionType);
-                                if (type != Type.Int && type != Type.Float)
+                                if (type != TypeKind.Integer && type != TypeKind.Float)
                                 {
                                     AddError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(expressionType)}'", changeByOne.Value);
                                     return null;
@@ -1741,7 +1757,7 @@ namespace Lang.Translation
                         }
 
                         var type = VerifyType(referenceType);
-                        if (type == Type.Error)
+                        if (type == TypeKind.Error)
                         {
                             return null;
                         }
@@ -1764,31 +1780,31 @@ namespace Lang.Translation
                         switch (unary.Operator)
                         {
                             case UnaryOperator.Not:
-                                if (type == Type.Boolean)
+                                if (type == TypeKind.Boolean)
                                 {
                                     return valueType;
                                 }
-                                else if (type != Type.Error)
+                                else if (type != TypeKind.Error)
                                 {
                                     AddError($"Expected type 'bool', but got type '{PrintTypeDefinition(valueType)}'", unary.Value);
                                 }
                                 return null;
                             case UnaryOperator.Negate:
-                                if (type == Type.Int || type == Type.Float)
+                                if (type == TypeKind.Integer || type == TypeKind.Float)
                                 {
                                     return valueType;
                                 }
-                                else if (type != Type.Error)
+                                else if (type != TypeKind.Error)
                                 {
                                     AddError($"Negation not compatible with type '{PrintTypeDefinition(valueType)}'", unary.Value);
                                 }
                                 return null;
                             case UnaryOperator.Dereference:
-                                if (type == Type.Pointer)
+                                if (type == TypeKind.Pointer)
                                 {
                                     return valueType.Generics[0];
                                 }
-                                else if (type != Type.Error)
+                                else if (type != TypeKind.Error)
                                 {
                                     AddError($"Cannot dereference type '{PrintTypeDefinition(valueType)}'", unary.Value);
                                 }
@@ -1807,7 +1823,7 @@ namespace Lang.Translation
                     return VerifyIndexType(index, currentFunction, scopeIdentifiers);
                 case TypeDefinition typeDef:
                 {
-                    if (VerifyType(typeDef) == Type.Error)
+                    if (VerifyType(typeDef) == TypeKind.Error)
                     {
                         return null;
                     }
@@ -1823,14 +1839,14 @@ namespace Lang.Translation
                     var valueType = VerifyExpression(cast.Value, currentFunction, scopeIdentifiers);
                     switch (targetType)
                     {
-                        case Type.Int:
-                        case Type.Float:
+                        case TypeKind.Integer:
+                        case TypeKind.Float:
                             if (valueType != null && valueType.PrimitiveType == null)
                             {
                                 AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetType)}'", cast.Value);
                             }
                             break;
-                        case Type.Error:
+                        case TypeKind.Error:
                             // Don't need to report additional errors
                             return null;
                         default:
@@ -1953,7 +1969,7 @@ namespace Lang.Translation
             {
                 foreach (var generic in call.Generics)
                 {
-                    if (VerifyType(generic) == Type.Error)
+                    if (VerifyType(generic) == TypeKind.Error)
                     {
                         AddError($"Undefined generic type '{PrintTypeDefinition(generic)}'", generic);
                         argumentsError = true;
@@ -2560,7 +2576,7 @@ namespace Lang.Translation
                 // 3. Verify the operator and expression types are compatible and convert the expression type if necessary
                 var type = VerifyType(expression.Type);
                 var nextType = VerifyType(nextExpressionType);
-                if (type == Type.Struct && nextType == Type.Struct)
+                if (type == TypeKind.Struct && nextType == TypeKind.Struct)
                 {
                     if (TypeEquals(expression.Type, nextExpressionType, true))
                     {
@@ -2582,7 +2598,7 @@ namespace Lang.Translation
                         // Both need to be bool and returns bool
                         case Operator.And:
                         case Operator.Or:
-                            if (type != Type.Boolean || nextType != Type.Boolean)
+                            if (type != TypeKind.Boolean || nextType != TypeKind.Boolean)
                             {
                                 AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
                                 expression.Type = new TypeDefinition {Name = "bool"};
@@ -2595,16 +2611,16 @@ namespace Lang.Translation
                         case Operator.LessThan:
                         case Operator.GreaterThanEqual:
                         case Operator.LessThanEqual:
-                            if ((type == Type.Enum && nextType == Type.Enum)
-                                || (type == Type.Type && nextType == Type.Type))
+                            if ((type == TypeKind.Enum && nextType == TypeKind.Enum)
+                                || (type == TypeKind.Type && nextType == TypeKind.Type))
                             {
                                 if ((op != Operator.Equality && op != Operator.NotEqual) || !TypeEquals(expression.Type, nextExpressionType))
                                 {
                                     AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
                                 }
                             }
-                            else if (!(type == Type.Int || type == Type.Float) &&
-                                !(nextType == Type.Int || nextType == Type.Float))
+                            else if (!(type == TypeKind.Integer || type == TypeKind.Float) &&
+                                !(nextType == TypeKind.Integer || nextType == TypeKind.Float))
                             {
                                 AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
                             }
@@ -2616,20 +2632,20 @@ namespace Lang.Translation
                         case Operator.Multiply:
                         case Operator.Divide:
                         case Operator.Modulus:
-                            if (((type == Type.Pointer && nextType == Type.Int) ||
-                                (type == Type.Int && nextType == Type.Pointer)) &&
+                            if (((type == TypeKind.Pointer && nextType == TypeKind.Integer) ||
+                                (type == TypeKind.Integer && nextType == TypeKind.Pointer)) &&
                                 (op == Operator.Add || op == Operator.Subtract))
                             {
-                                if (nextType == Type.Pointer)
+                                if (nextType == TypeKind.Pointer)
                                 {
                                     expression.Type = nextExpressionType;
                                 }
                             }
-                            else if ((type == Type.Int || type == Type.Float) &&
-                                (nextType == Type.Int || nextType == Type.Float))
+                            else if ((type == TypeKind.Integer || type == TypeKind.Float) &&
+                                (nextType == TypeKind.Integer || nextType == TypeKind.Float))
                             {
                                 // For integer operations, use the larger size and convert to signed if one type is signed
-                                if (type == Type.Int && nextType == Type.Int)
+                                if (type == TypeKind.Integer && nextType == TypeKind.Integer)
                                 {
                                     var currentIntegerType = expression.Type.PrimitiveType;
                                     var nextIntegerType = nextExpressionType.PrimitiveType;
@@ -2649,7 +2665,7 @@ namespace Lang.Translation
                                     };
                                 }
                                 // For floating point operations, convert to the larger size
-                                else if (type == Type.Float && nextType == Type.Float)
+                                else if (type == TypeKind.Float && nextType == TypeKind.Float)
                                 {
                                     if (expression.Type.PrimitiveType.Bytes < nextExpressionType.PrimitiveType.Bytes)
                                     {
@@ -2658,7 +2674,7 @@ namespace Lang.Translation
                                 }
                                 // For an int lhs and float rhs, convert to the floating point type
                                 // Note that float lhs and int rhs are covered since the floating point is already selected
-                                else if (nextType == Type.Float)
+                                else if (nextType == TypeKind.Float)
                                 {
                                     expression.Type = nextExpressionType;
                                 }
@@ -2672,7 +2688,7 @@ namespace Lang.Translation
                         case Operator.BitwiseAnd:
                         case Operator.BitwiseOr:
                         case Operator.Xor:
-                            if (type == Type.Int && nextType == Type.Int)
+                            if (type == TypeKind.Integer && nextType == TypeKind.Integer)
                             {
                                 var currentIntegerType = expression.Type.PrimitiveType;
                                 var nextIntegerType = nextExpressionType.PrimitiveType;
@@ -2691,14 +2707,14 @@ namespace Lang.Translation
                                     PrimitiveType = integerType
                                 };
                             }
-                            else if (!(type == Type.Boolean && nextType == Type.Boolean))
+                            else if (!(type == TypeKind.Boolean && nextType == TypeKind.Boolean))
                             {
                                 AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
-                                if (nextType == Type.Boolean || nextType == Type.Int)
+                                if (nextType == TypeKind.Boolean || nextType == TypeKind.Integer)
                                 {
                                     expression.Type = nextExpressionType;
                                 }
-                                else if (!(type == Type.Boolean || type == Type.Int))
+                                else if (!(type == TypeKind.Boolean || type == TypeKind.Integer))
                                 {
                                     // If the type can't be determined, default to int
                                     expression.Type = new TypeDefinition {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
@@ -2709,12 +2725,12 @@ namespace Lang.Translation
                         case Operator.ShiftRight:
                         case Operator.RotateLeft:
                         case Operator.RotateRight:
-                            if (type != Type.Int || nextType != Type.Int)
+                            if (type != TypeKind.Integer || nextType != TypeKind.Integer)
                             {
                                 AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
-                                if (type != Type.Int)
+                                if (type != TypeKind.Integer)
                                 {
-                                    if (nextType == Type.Int)
+                                    if (nextType == TypeKind.Integer)
                                     {
                                         expression.Type = nextExpressionType;
                                     }
@@ -2756,17 +2772,17 @@ namespace Lang.Translation
             TypeDefinition elementType = null;
             switch (type)
             {
-                case Type.Error:
+                case TypeKind.Error:
                     break;
-                case Type.Struct:
-                case Type.String:
+                case TypeKind.Struct:
+                case TypeKind.String:
                     index.CallsOverload = true;
                     index.OverloadType = typeDef;
                     overloaded = true;
                     elementType = VerifyOperatorOverloadType(typeDef, Operator.Subscript, currentFunction, index);
                     break;
-                case Type.List:
-                case Type.Params:
+                case TypeKind.List:
+                case TypeKind.Params:
                     elementType = typeDef.Generics.FirstOrDefault();
                     if (elementType == null)
                     {
@@ -2781,7 +2797,7 @@ namespace Lang.Translation
             // 2. Verify the count expression is an integer
             var indexValue = VerifyExpression(index.Index, currentFunction, scopeIdentifiers);
             var indexType = VerifyType(indexValue);
-            if (indexType != Type.Int && indexType != Type.Type)
+            if (indexType != TypeKind.Integer && indexType != TypeKind.Type)
             {
                 AddError($"Expected index to be type 'int', but got '{PrintTypeDefinition(indexValue)}'", index);
             }
@@ -2854,9 +2870,9 @@ namespace Lang.Translation
             return true;
         }
 
-        private Type VerifyType(TypeDefinition typeDef, int depth = 0, bool argument = false)
+        private TypeKind VerifyType(TypeDefinition typeDef, int depth = 0, bool argument = false)
         {
-            if (typeDef == null) return Type.Error;
+            if (typeDef == null) return TypeKind.Error;
             if (typeDef.Type != null) return typeDef.Type.Value;
 
             if (typeDef.IsGeneric)
@@ -2865,7 +2881,7 @@ namespace Lang.Translation
                 {
                     AddError("Generic type cannot have additional generic types", typeDef);
                 }
-                return Type.Generic;
+                return TypeKind.Generic;
             }
 
             if (typeDef.CArray && typeDef.Name != "List")
@@ -2876,7 +2892,7 @@ namespace Lang.Translation
             if (typeDef.Count != null && typeDef.Name != "List")
             {
                 AddError($"Type '{PrintTypeDefinition(typeDef)}' cannot have a count", typeDef);
-                return Type.Error;
+                return TypeKind.Error;
             }
 
             var hasGenerics = typeDef.Generics.Any();
@@ -2887,20 +2903,20 @@ namespace Lang.Translation
                     if (hasGenerics)
                     {
                         AddError($"Type '{typeDef.Name}' cannot have generics", typeDef);
-                        typeDef.Type = Type.Error;
-                        return Type.Error;
+                        typeDef.Type = TypeKind.Error;
+                        return TypeKind.Error;
                     }
-                    typeDef.Type = Type.Int;
-                    return Type.Int;
+                    typeDef.Type = TypeKind.Integer;
+                    return TypeKind.Integer;
                 case FloatType:
                     if (hasGenerics)
                     {
                         AddError($"Type '{typeDef.Name}' cannot have generics", typeDef);
-                        typeDef.Type = Type.Error;
-                        return Type.Error;
+                        typeDef.Type = TypeKind.Error;
+                        return TypeKind.Error;
                     }
-                    typeDef.Type = Type.Float;
-                    return Type.Float;
+                    typeDef.Type = TypeKind.Float;
+                    return TypeKind.Float;
             }
 
             switch (typeDef.Name)
@@ -2909,76 +2925,76 @@ namespace Lang.Translation
                     if (hasGenerics)
                     {
                         AddError("Type 'bool' cannot have generics", typeDef);
-                        typeDef.Type = Type.Error;
+                        typeDef.Type = TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = Type.Boolean;
+                        typeDef.Type = TypeKind.Boolean;
                     }
                     break;
                 case "string":
                     if (hasGenerics)
                     {
                         AddError("Type 'string' cannot have generics", typeDef);
-                        typeDef.Type = Type.Error;
+                        typeDef.Type = TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = Type.String;
+                        typeDef.Type = TypeKind.String;
                     }
                     break;
                 case "List":
                     if (typeDef.Generics.Count != 1)
                     {
                         AddError($"Type 'List' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
-                        typeDef.Type = Type.Error;
+                        typeDef.Type = TypeKind.Error;
                     }
                     else if (!VerifyList(typeDef, depth, argument, out var hasGenericTypes))
                     {
-                        typeDef.Type = Type.Error;
+                        typeDef.Type = TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = hasGenericTypes ? Type.Generic : Type.List;
+                        typeDef.Type = hasGenericTypes ? TypeKind.Generic : TypeKind.List;
                     }
                     break;
                 case "void":
                     if (hasGenerics)
                     {
                         AddError("Type 'void' cannot have generics", typeDef);
-                        typeDef.Type = Type.Error;
+                        typeDef.Type = TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = Type.Void;
+                        typeDef.Type = TypeKind.Void;
                     }
                     break;
                 case "*":
                     if (typeDef.Generics.Count != 1)
                     {
                         AddError($"pointer type should have reference to 1 type, but got {typeDef.Generics.Count}", typeDef);
-                        typeDef.Type = Type.Error;
+                        typeDef.Type = TypeKind.Error;
                     }
                     else if (_programGraph.Types.ContainsKey(typeDef.GenericName))
                     {
-                        typeDef.Type = Type.Pointer;
+                        typeDef.Type = TypeKind.Pointer;
                     }
                     else
                     {
                         var pointerType = VerifyType(typeDef.Generics[0], depth + 1);
-                        if (pointerType == Type.Error)
+                        if (pointerType == TypeKind.Error)
                         {
-                            typeDef.Type = Type.Error;
+                            typeDef.Type = TypeKind.Error;
                         }
-                        else if (pointerType == Type.Generic)
+                        else if (pointerType == TypeKind.Generic)
                         {
-                            typeDef.Type = Type.Generic;
+                            typeDef.Type = TypeKind.Generic;
                         }
                         else
                         {
                             var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeIndex = _programGraph.TypeCount++, TypeKind = TypeKind.Pointer, Size = 8};
                             _programGraph.Types.Add(typeDef.GenericName, pointer);
-                            typeDef.Type = Type.Pointer;
+                            typeDef.Type = TypeKind.Pointer;
                         }
                     }
                     break;
@@ -2986,44 +3002,44 @@ namespace Lang.Translation
                     if (hasGenerics)
                     {
                         AddError("Type 'varargs' cannot have generics", typeDef);
-                        typeDef.Type = Type.Error;
-                        return Type.Error;
+                        typeDef.Type = TypeKind.Error;
+                        return TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = Type.VarArgs;
+                        typeDef.Type = TypeKind.VarArgs;
                     }
                     break;
                 case "Params":
                     if (!argument)
                     {
                         AddError($"Params can only be used in function arguments", typeDef);
-                        typeDef.Type = Type.Error;
+                        typeDef.Type = TypeKind.Error;
                     }
                     else if (depth != 0)
                     {
                         AddError($"Params can only be declared as a top level type, such as 'Params<int>'", typeDef);
-                        typeDef.Type = Type.Error;
+                        typeDef.Type = TypeKind.Error;
                     }
                     else if (typeDef.Generics.Count != 1)
                     {
                         AddError($"Type 'Params' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
-                        typeDef.Type = Type.Error;
+                        typeDef.Type = TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = VerifyList(typeDef, depth, argument, out _) ? Type.Params : Type.Error;
+                        typeDef.Type = VerifyList(typeDef, depth, argument, out _) ? TypeKind.Params : TypeKind.Error;
                     }
                     break;
                 case "Type":
                     if (hasGenerics)
                     {
                         AddError("Type 'Type' cannot have generics", typeDef);
-                        typeDef.Type = Type.Error;
+                        typeDef.Type = TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = Type.Type;
+                        typeDef.Type = TypeKind.Type;
                     }
                     break;
                 default:
@@ -3032,7 +3048,7 @@ namespace Lang.Translation
                         var genericName = typeDef.GenericName;
                         if (_programGraph.Types.ContainsKey(genericName))
                         {
-                            typeDef.Type = Type.Struct;
+                            typeDef.Type = TypeKind.Struct;
                         }
                         else
                         {
@@ -3042,11 +3058,11 @@ namespace Lang.Translation
                             foreach (var generic in generics)
                             {
                                 var genericType = VerifyType(generic, depth + 1);
-                                if (genericType == Type.Error)
+                                if (genericType == TypeKind.Error)
                                 {
                                     error = true;
                                 }
-                                else if (genericType == Type.Generic)
+                                else if (genericType == TypeKind.Generic)
                                 {
                                     hasGenericTypes = true;
                                 }
@@ -3054,27 +3070,27 @@ namespace Lang.Translation
                             if (!_polymorphicStructs.TryGetValue(typeDef.Name, out var structDef))
                             {
                                 AddError($"No polymorphic structs of type '{typeDef.Name}'", typeDef);
-                                typeDef.Type = Type.Error;
+                                typeDef.Type = TypeKind.Error;
                             }
                             else if (structDef.Generics.Count != typeDef.Generics.Count)
                             {
                                 AddError($"Expected type '{typeDef.Name}' to have {structDef.Generics.Count} generic(s), but got {typeDef.Generics.Count}", typeDef);
-                                typeDef.Type = Type.Error;
+                                typeDef.Type = TypeKind.Error;
                             }
                             else if (error)
                             {
-                                typeDef.Type = Type.Error;
+                                typeDef.Type = TypeKind.Error;
                             }
                             else if (hasGenericTypes)
                             {
-                                typeDef.Type = Type.Generic;
+                                typeDef.Type = TypeKind.Generic;
                             }
                             else
                             {
                                 var polyStruct = _polymorpher.CreatePolymorphedStruct(structDef, PrintTypeDefinition(typeDef), TypeKind.Struct, _programGraph.TypeCount++, generics);
                                 _programGraph.Types.Add(genericName, polyStruct);
                                 VerifyStruct(polyStruct);
-                                typeDef.Type = Type.Struct;
+                                typeDef.Type = TypeKind.Struct;
                             }
                         }
                     }
@@ -3083,21 +3099,21 @@ namespace Lang.Translation
                         switch (type)
                         {
                             case StructAst:
-                                typeDef.Type = Type.Struct;
+                                typeDef.Type = TypeKind.Struct;
                                 break;
                             case EnumAst enumAst:
                                 var primitive = enumAst.BaseType.PrimitiveType;
                                 typeDef.PrimitiveType ??= new EnumType {Bytes = primitive.Bytes, Signed = primitive.Signed};
-                                typeDef.Type = Type.Enum;
+                                typeDef.Type = TypeKind.Enum;
                                 break;
                             default:
-                                typeDef.Type = Type.Error;
+                                typeDef.Type = TypeKind.Error;
                                 break;
                         }
                     }
                     else
                     {
-                        typeDef.Type = Type.Error;
+                        typeDef.Type = TypeKind.Error;
                     }
                     break;
             }
@@ -3109,11 +3125,11 @@ namespace Lang.Translation
             hasGenerics = false;
             var listType = typeDef.Generics[0];
             var genericType = VerifyType(listType, depth + 1, argument);
-            if (genericType == Type.Error)
+            if (genericType == TypeKind.Error)
             {
                 return false;
             }
-            else if (genericType == Type.Generic)
+            else if (genericType == TypeKind.Generic)
             {
                 hasGenerics = true;
                 return true;

@@ -1,10 +1,5 @@
 using Lang;
 using Lang.Backend;
-using Lang.Backend.LLVM;
-using Lang.Parsing;
-using Lang.Project;
-using Lang.Runner;
-using Lang.Translation;
 using Microsoft.Extensions.DependencyInjection;
 
 var serviceCollection = new ServiceCollection();
@@ -16,8 +11,6 @@ serviceCollection.AddTransient<IProgramGraphBuilder, ProgramGraphBuilder>();
 serviceCollection.AddTransient<IPolymorpher, Polymorpher>();
 serviceCollection.AddTransient<IProgramRunner, ProgramRunner>();
 // LLVM Backend
-serviceCollection.AddTransient<IWriter, LLVMWriter>();
-serviceCollection.AddTransient<ILinker, LLVMLinker>();
 serviceCollection.AddTransient<IBackend, LLVMBackend>();
 
 var container = serviceCollection.BuildServiceProvider();
