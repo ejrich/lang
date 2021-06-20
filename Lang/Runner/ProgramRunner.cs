@@ -1066,10 +1066,10 @@ namespace Lang.Runner
                         break;
                     case IndexAst index:
                         pointer = IntPtr.Add(pointer, offset);
-                        var indexValue = (int)ExecuteExpression(index.Index, variables).Value;
                         if (index.CallsOverload)
                         {
                             skipPointer = true;
+                            var indexValue = (int)ExecuteExpression(index.Index, variables).Value;
                             var lhs = PointerToTargetType(pointer, field.Type);
                             var result = HandleOverloadedOperator(type, Operator.Subscript, lhs, indexValue);
                             type = result.Type;
@@ -1093,19 +1093,9 @@ namespace Lang.Runner
                         }
                         else
                         {
-                            if (!type.CArray)
-                            {
-                                var listObject = PointerToTargetType(pointer, type);
-                                var dataField = listObject.GetType().GetField("data");
-                                var data = dataField!.GetValue(listObject);
-                                pointer = GetPointer(data!);
-                            }
-
-                            type = type.Generics[0];
-                            if (indexValue != 0)
-                            {
-                                pointer = IntPtr.Add(pointer, Marshal.SizeOf(GetTypeFromDefinition(type)) * indexValue);
-                            }
+                            var (typeDef, _, listPointer) = GetListPointer(index, variables, out _, pointer, type);
+                            type = typeDef;
+                            pointer = GetPointer(listPointer);
                         }
                         break;
                 }
