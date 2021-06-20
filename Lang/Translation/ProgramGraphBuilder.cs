@@ -2122,15 +2122,26 @@ namespace Lang.Translation
                 for (var i = 0; i < arguments.Length; i++)
                 {
                     var argument = arguments[i];
-                    // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
-                    // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
-                    if (argument?.PrimitiveType is FloatType {Bytes: 4})
+                    switch (argument?.PrimitiveType)
                     {
-                        arguments[i] = argument = new TypeDefinition
-                        {
-                            Name = "float64", PrimitiveType = new FloatType {Bytes = 8}
-                        };
+                        // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
+                        // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
+                        case FloatType {Bytes: 4}:
+                            arguments[i] = argument = new TypeDefinition
+                            {
+                                Name = "float64", PrimitiveType = new FloatType {Bytes = 8}
+                            };
+                            break;
+                        // Enums should be called as integers
+                        case EnumType enumType:
+                            arguments[i] = argument = new TypeDefinition
+                            {
+                                Name = argument.Name,
+                                PrimitiveType = new IntegerType {Bytes = enumType.Bytes, Signed = enumType.Signed}
+                            };
+                            break;
                     }
+
                 }
                 var found = false;
                 for (var index = 0; index < function.VarargsCalls.Count; index++)
