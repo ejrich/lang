@@ -472,7 +472,7 @@ namespace Lang.Backend
                     BuildCallAllocations(call);
                     break;
                 case DeclarationAst declaration:
-                    if (declaration.Constant) break;
+                    if (declaration.Constant && declaration.Type.TypeKind != TypeKind.String) break;
 
                     var type = ConvertTypeDefinition(declaration.Type);
                     var variable = LLVM.BuildAlloca(_builder, type, declaration.Name);
@@ -704,7 +704,7 @@ namespace Lang.Backend
             // 1. Declare variable on the stack
             var type = ConvertTypeDefinition(declaration.Type);
 
-            if (declaration.Constant)
+            if (declaration.Constant && declaration.Type.TypeKind != TypeKind.String)
             {
                 var (_, constant) = WriteExpression(declaration.Value, localVariables);
 
@@ -855,7 +855,7 @@ namespace Lang.Backend
                 // @Cleanup This branch should never be hit
                 _ => (null, new LLVMValueRef())
             };
-            if (loaded && type.Type == TypeKind.Pointer)
+            if (loaded && type.TypeKind == TypeKind.Pointer)
             {
                 type = type.Generics[0];
             }
@@ -1116,14 +1116,14 @@ namespace Lang.Backend
             return false;
         }
 
-        private (TypeDefinition type, LLVMValueRef value) WriteExpression(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
+        private (TypeDefinition type, LLVMValueRef value) WriteExpression(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, bool getStringPointer = false)
         {
             switch (ast)
             {
                 case ConstantAst constant:
                 {
                     var type = ConvertTypeDefinition(constant.Type);
-                    return (constant.Type, BuildConstant(type, constant));
+                    return (constant.Type, BuildConstant(type, constant, getStringPointer));
                 }
                 case NullAst nullAst:
                 {
@@ -1138,7 +1138,12 @@ namespace Lang.Backend
                         return (_intTypeDefinition, LLVM.ConstInt(LLVMTypeRef.Int32Type(), (uint)typeDef.TypeIndex, false));
                     }
                     var (type, value) = typeValue;
-                    if (!type.Constant)
+                    if (getStringPointer && type.TypeKind == TypeKind.String)
+                    {
+                        value = LLVM.BuildStructGEP(_builder, value, 1, "stringdata");
+                        value = LLVM.BuildLoad(_builder, value, identifier.Name);
+                    }
+                    else if (!type.Constant)
                     {
                         value = LLVM.BuildLoad(_builder, value, identifier.Name);
                     }
@@ -1156,6 +1161,10 @@ namespace Lang.Backend
                     var (type, field) = BuildStructField(structField, localVariables, out var loaded, out var constant);
                     if (!loaded && !constant)
                     {
+                        if (getStringPointer && type.TypeKind == TypeKind.String)
+                        {
+                            field = LLVM.BuildStructGEP(_builder, field, 1, "stringdata");
+                        }
                         field = LLVM.BuildLoad(_builder, field, "field");
                     }
                     return (type, field);
@@ -1203,13 +1212,13 @@ namespace Lang.Backend
                         callArguments[functionDef.Arguments.Count - 1] = paramsValue;
                         return (functionDef.ReturnType, LLVM.BuildCall(_builder, function, callArguments, string.Empty));
                     }
-                    // TODO If the function is extern, get the pointer
+                    // TODO If the function is extern, get the pointer of the string
                     else if (functionDef.Varargs)
                     {
                         var callArguments = new LLVMValueRef[call.Arguments.Count];
                         for (var i = 0; i < functionDef.Arguments.Count - 1; i++)
                         {
-                            var (_, value) = WriteExpression(call.Arguments[i], localVariables);
+                            var (_, value) = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
                             callArguments[i] = value;
                         }
 
@@ -1224,6 +1233,7 @@ namespace Lang.Backend
                             }
                             callArguments[i] = value;
                         }
+
                         return (functionDef.ReturnType, LLVM.BuildCall(_builder, function, callArguments, string.Empty));
                     }
                     else
@@ -1231,7 +1241,7 @@ namespace Lang.Backend
                         var callArguments = new LLVMValueRef[call.Arguments.Count];
                         for (var i = 0; i < call.Arguments.Count; i++)
                         {
-                            var (_, value) = WriteExpression(call.Arguments[i], localVariables);
+                            var (_, value) = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
                             callArguments[i] = value;
                         }
                         return (functionDef.ReturnType, LLVM.BuildCall(_builder, function, callArguments, string.Empty));
@@ -1250,7 +1260,7 @@ namespace Lang.Backend
                     };
 
                     var value = constant ? pointer : LLVM.BuildLoad(_builder, pointer, "tmpvalue");
-                    if (variableType.Type == TypeKind.Pointer)
+                    if (variableType.TypeKind == TypeKind.Pointer)
                     {
                         variableType = variableType.Generics[0];
                     }
@@ -1414,7 +1424,7 @@ namespace Lang.Backend
             LLVM.BuildCall(_builder, function, new []{stackPointer}, "");
         }
 
-        private LLVMValueRef BuildConstant(LLVMTypeRef type, ConstantAst constant)
+        private LLVMValueRef BuildConstant(LLVMTypeRef type, ConstantAst constant, bool getStringPointer = false)
         {
             switch (constant.Type.PrimitiveType)
             {
@@ -1433,19 +1443,26 @@ namespace Lang.Backend
                 case "bool":
                     return LLVM.ConstInt(type, constant.Value == "true" ? (ulong)1 : 0, false);
                 case "string":
-                    return BuildString(constant.Value);
+                    return BuildString(constant.Value, getStringPointer);
                 default:
                     return _zeroInt;
             }
         }
 
-        private LLVMValueRef BuildString(string value)
+        private LLVMValueRef BuildString(string value, bool getStringPointer = false)
         {
-            var length = LLVM.ConstInt(LLVMTypeRef.Int32Type(), (uint)value.Length, false);
             var stringValue = LLVM.ConstString(value, (uint)value.Length, false);
-            var stringPointer = LLVM.AddGlobal(_module, stringValue.TypeOf(), "str");
-            SetPrivateConstant(stringPointer);
-            LLVM.SetInitializer(stringPointer, stringValue);
+            var stringGlobal = LLVM.AddGlobal(_module, stringValue.TypeOf(), "str");
+            SetPrivateConstant(stringGlobal);
+            LLVM.SetInitializer(stringGlobal, stringValue);
+            var stringPointer = LLVM.ConstBitCast(stringGlobal, LLVMTypeRef.PointerType(LLVMTypeRef.Int8Type(), 0));
+
+            if (getStringPointer)
+            {
+                return stringPointer;
+            }
+
+            var length = LLVM.ConstInt(LLVMTypeRef.Int32Type(), (uint)value.Length, false);
             return LLVM.ConstStruct(new [] {length, stringPointer}, false);
         }
 
