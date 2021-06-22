@@ -1044,7 +1044,7 @@ namespace Lang
                 // 4a. Verify the assignment value matches the type definition if it has been defined
                 if (declaration.Type == null)
                 {
-                    if (valueType?.Name == "void")
+                    if (VerifyType(valueType) == TypeKind.Void)
                     {
                         AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.Value);
                         return;

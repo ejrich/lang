@@ -476,6 +476,7 @@ namespace Lang.Backend
                     BuildCallAllocations(call);
                     break;
                 case DeclarationAst declaration:
+                    // TODO Add back in constant strings
                     if (declaration.Constant && declaration.Type.TypeKind != TypeKind.String) break;
 
                     var type = ConvertTypeDefinition(declaration.Type);
@@ -708,6 +709,7 @@ namespace Lang.Backend
             // 1. Declare variable on the stack
             var type = ConvertTypeDefinition(declaration.Type);
 
+            // TODO Add back in constant strings
             if (declaration.Constant && declaration.Type.TypeKind != TypeKind.String)
             {
                 var (_, constant) = WriteExpression(declaration.Value, localVariables);
@@ -1077,8 +1079,7 @@ namespace Lang.Backend
             // 4. Check condition of each loop and break if condition is not met
             LLVM.PositionBuilderAtEnd(_builder, eachCondition);
             var indexValue = LLVM.BuildLoad(_builder, indexVariable, "curr");
-            var condition = LLVM.BuildICmp(_builder, each.Iteration == null ? LLVMIntPredicate.LLVMIntSLE : LLVMIntPredicate.LLVMIntSLT,
-                indexValue, compareTarget, "listcmp");
+            var condition = LLVM.BuildICmp(_builder, each.Iteration == null ? LLVMIntPredicate.LLVMIntSLE : LLVMIntPredicate.LLVMIntSLT, indexValue, compareTarget, "listcmp");
             if (each.Iteration != null)
             {
                 switch (iterationType!.Name)
