@@ -940,6 +940,11 @@ namespace Lang
             switch (type.PrimitiveType)
             {
                 case IntegerType integerType:
+                    if (type.Character)
+                    {
+                        return (byte)value[0];
+                    }
+
                     return integerType.Bytes switch
                     {
                         1 => integerType.Signed ? sbyte.Parse(value) : byte.Parse(value),
