@@ -79,6 +79,19 @@ namespace Lang
                             break;
                         }
                         var structField = structBuilder.DefineField(field.Name, fieldType, FieldAttributes.Public);
+                        if (field.Type.CArray)
+                        {
+                            var marshalAsType = typeof(MarshalAsAttribute);
+                            var sizeConstField = marshalAsType.GetField("SizeConst");
+                            var size = 0;
+                            if (field.Type.Count != null)
+                            {
+                                size = (int)field.Type.ConstCount.Value;
+                            }
+
+                            var caBuilder = new CustomAttributeBuilder(typeof(MarshalAsAttribute).GetConstructor(new []{typeof(UnmanagedType)}), new object[]{UnmanagedType.ByValArray}, new []{sizeConstField}, new object[]{size});
+                            structField.SetCustomAttribute(caBuilder);
+                        }
                     }
 
                     if (index >= count)
@@ -463,7 +476,7 @@ namespace Lang
                 else switch (field.Type.Name)
                 {
                     case "List":
-                        var list = InitializeList(field.Type, variables);
+                        var list = InitializeList(field.Type, variables, true);
                         fieldInstance!.SetValue(instance, list);
                         break;
                     case "*":
@@ -493,7 +506,7 @@ namespace Lang
             return instance;
         }
 
-        private object InitializeList(TypeDefinition type, IDictionary<string, ValueType> variables)
+        private object InitializeList(TypeDefinition type, IDictionary<string, ValueType> variables, bool structField = false)
         {
             var listType = _types[type.GenericName];
             var genericType = GetTypeFromDefinition(type.Generics[0]);
@@ -501,7 +514,8 @@ namespace Lang
             object list;
             if (type.CArray)
             {
-                list = Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * (int)type.ConstCount.Value);
+                list = structField ? Array.CreateInstance(genericType, type.ConstCount.Value) :
+                    Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * (int)type.ConstCount.Value);
             }
             else
             {
@@ -562,22 +576,22 @@ namespace Lang
                 case IdentifierAst identifier:
                 {
                     var variable = variables[identifier.Name];
-                    Marshal.StructureToPtr(expression.Value, GetPointer(variable.Value), false);
+                    Marshal.StructureToPtr(CastValue(expression.Value, variable.Type), GetPointer(variable.Value), false);
                     break;
                 }
                 case StructFieldRefAst structField:
                 {
-                    var pointer = GetStructFieldRef(structField, variables, out _, out var constant).Value;
+                    var pointer = GetStructFieldRef(structField, variables, out _, out var constant);
                     if (!constant)
                     {
-                        Marshal.StructureToPtr(expression.Value, GetPointer(pointer), false);
+                        Marshal.StructureToPtr(CastValue(expression.Value, pointer.Type), GetPointer(pointer.Value), false);
                     }
                     break;
                 }
                 case IndexAst indexAst:
                 {
-                    var (_, _, pointer) = GetListPointer(indexAst, variables, out _);
-                    Marshal.StructureToPtr(expression.Value, GetPointer(pointer), false);
+                    var (typeDef, _, pointer) = GetListPointer(indexAst, variables, out _);
+                    Marshal.StructureToPtr(CastValue(expression.Value, typeDef), GetPointer(pointer), false);
                     break;
                 }
                 case UnaryAst unary:
@@ -1851,6 +1865,11 @@ namespace Lang
                     return Convert.ToDouble(value);
             }
 
+            if (targetType.TypeKind == TypeKind.Pointer)
+            {
+                return GetPointer(value);
+            }
+
             // @Future Polymorphic type casting
             return value;
         }
@@ -1961,7 +1980,7 @@ namespace Lang
                     return pointerType.MakePointerType();
                 case "List" when typeDef.CArray:
                     var elementType = GetTypeFromDefinition(typeDef.Generics[0]);
-                    return elementType.MakePointerType();
+                    return elementType.MakeArrayType();
             }
 
             if (_types.TryGetValue(typeDef.GenericName, out var type))
