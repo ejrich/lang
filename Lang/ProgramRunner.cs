@@ -1085,36 +1085,31 @@ namespace Lang
                         break;
                     case IndexAst index:
                         pointer = IntPtr.Add(pointer, offset);
+                        var (typeDef, _, result) = GetListPointer(index, variables, out _, pointer, type);
+                        type = typeDef;
                         if (index.CallsOverload)
                         {
                             skipPointer = true;
-                            var indexValue = (int)ExecuteExpression(index.Index, variables).Value;
-                            var lhs = PointerToTargetType(pointer, field.Type);
-                            var result = HandleOverloadedOperator(type, Operator.Subscript, lhs, indexValue);
-                            type = result.Type;
-
                             if (i < structField.Pointers.Length)
                             {
                                 if (structField.Pointers[i])
                                 {
-                                    pointer = GetPointer(result.Value);
+                                    pointer = GetPointer(result);
                                 }
                                 else
                                 {
                                     pointer = Marshal.AllocHGlobal(Marshal.SizeOf(GetTypeFromDefinition(type)));
-                                    Marshal.StructureToPtr(result.Value, pointer, false);
+                                    Marshal.StructureToPtr(result, pointer, false);
                                 }
                             }
                             else
                             {
-                                value = result.Value;
+                                value = result;
                             }
                         }
                         else
                         {
-                            var (typeDef, _, listPointer) = GetListPointer(index, variables, out _, pointer, type);
-                            type = typeDef;
-                            pointer = GetPointer(listPointer);
+                            pointer = GetPointer(result);
                         }
                         break;
                 }
