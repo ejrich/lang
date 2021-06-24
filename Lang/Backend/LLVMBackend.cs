@@ -1621,6 +1621,8 @@ namespace Lang.Backend
             return (type, value);
         }
 
+        private StructAst _stringStruct;
+
         private (TypeDefinition type, LLVMValueRef value) GetListPointer(IndexAst index, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, out bool loaded)
         {
             // 1. Get the variable pointer
@@ -1641,7 +1643,16 @@ namespace Lang.Backend
             }
 
             // 4. Build the pointer with the first index of 0
-            var elementType = type.Generics[0];
+            TypeDefinition elementType;
+            if (type.TypeKind == TypeKind.String)
+            {
+                _stringStruct ??= (StructAst)_programGraph.Types["string"];
+                elementType = _stringStruct.Fields[1].Type.Generics[0];
+            }
+            else
+            {
+                elementType = type.Generics[0];
+            }
             LLVMValueRef listPointer;
             if (type.CArray)
             {
