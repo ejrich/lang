@@ -1174,14 +1174,17 @@ namespace Lang
 
         private void VerifyAssignment(AssignmentAst assignment, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
-            // 1. Verify the variable is already defined and that it is not a constant
+            // 1. Verify the variable is already defined, that it is not a constant, and the r-value
             var variableTypeDefinition = GetReference(assignment.Reference, currentFunction, scopeIdentifiers, out _);
+            var valueType = VerifyExpression(assignment.Value, currentFunction, scopeIdentifiers);
+
             if (variableTypeDefinition == null) return;
 
             if (variableTypeDefinition.Constant)
             {
                 var variable = assignment.Reference as IdentifierAst;
                 AddError($"Cannot reassign value of constant variable '{variable?.Name}'", assignment);
+                return;
             }
 
             // 2. Verify the assignment value
@@ -1198,7 +1201,6 @@ namespace Lang
                 nullAst.TargetType = variableTypeDefinition;
                 return;
             }
-            var valueType = VerifyExpression(assignment.Value, currentFunction, scopeIdentifiers);
 
             // 3. Verify the assignment value matches the variable type definition
             if (valueType != null)
@@ -1272,7 +1274,7 @@ namespace Lang
             }
         }
 
-        private TypeDefinition GetReference(IAst ast, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers, out bool hasPointer)
+        private TypeDefinition GetReference(IAst ast, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers, out bool hasPointer, bool fromUnaryReference = false)
         {
             hasPointer = true;
             switch (ast)
@@ -1283,6 +1285,10 @@ namespace Lang
                 {
                     var variableType = GetVariable(index.Name, index, scopeIdentifiers);
                     if (variableType == null) return null;
+                    if (variableType.Constant)
+                    {
+                        AddError($"Cannot reassign value of constant variable '{index.Name}'", index);
+                    }
                     var type = VerifyIndex(index, variableType, currentFunction, scopeIdentifiers, out var overloaded);
                     if (type != null && overloaded)
                     {
@@ -1368,6 +1374,11 @@ namespace Lang
                     return refType;
                 }
                 case UnaryAst unary when unary.Operator == UnaryOperator.Dereference:
+                    if (fromUnaryReference)
+                    {
+                        AddError("Operators '*' and '&' cancel each other out", unary);
+                        return null;
+                    }
                     var reference = GetReference(unary.Value, currentFunction, scopeIdentifiers, out var canDereference);
                     if (reference == null)
                     {
@@ -1759,7 +1770,7 @@ namespace Lang
                 {
                     if (unary.Operator == UnaryOperator.Reference)
                     {
-                        var referenceType = GetReference(unary.Value, currentFunction, scopeIdentifiers, out var hasPointer);
+                        var referenceType = GetReference(unary.Value, currentFunction, scopeIdentifiers, out var hasPointer, true);
                         if (!hasPointer)
                         {
                             AddError("Unable to get reference of unary value", unary.Value);
