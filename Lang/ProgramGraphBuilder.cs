@@ -650,9 +650,15 @@ namespace Lang
             else
             {
                 var targetType = VerifyType(overload.Type);
-                if (targetType != TypeKind.Error && targetType != TypeKind.Struct)
+                switch (targetType)
                 {
-                    AddError($"Cannot overload operator '{PrintOperator(overload.Operator)}' for type '{PrintTypeDefinition(overload.Type)}'", overload.Type);
+                    case TypeKind.Error:
+                    case TypeKind.Struct:
+                    case TypeKind.String when overload.Operator != Operator.Subscript:
+                        break;
+                    default:
+                        AddError($"Cannot overload operator '{PrintOperator(overload.Operator)}' for type '{PrintTypeDefinition(overload.Type)}'", overload.Type);
+                        break;
                 }
             }
 
@@ -983,7 +989,7 @@ namespace Lang
                 else
                 {
                     var type = VerifyType(declaration.Type);
-                    if (type != TypeKind.Struct)
+                    if (type != TypeKind.Struct && type != TypeKind.String)
                     {
                         AddError($"Can only use object initializer with struct type, got '{PrintTypeDefinition(declaration.Type)}'", declaration.Type);
                         return;
@@ -1044,7 +1050,7 @@ namespace Lang
                 // 4a. Verify the assignment value matches the type definition if it has been defined
                 if (declaration.Type == null)
                 {
-                    if (valueType?.Name == "void")
+                    if (VerifyType(valueType) == TypeKind.Void)
                     {
                         AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.Value);
                         return;
@@ -1119,7 +1125,9 @@ namespace Lang
             {
                 switch (declaration.Value)
                 {
-                    case ConstantAst:
+                    case ConstantAst constant:
+                        constant.Type.Constant = true;
+                        break;
                     case StructFieldRefAst structField when structField.IsEnum:
                         break;
                     default:
@@ -1168,14 +1176,17 @@ namespace Lang
 
         private void VerifyAssignment(AssignmentAst assignment, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
-            // 1. Verify the variable is already defined and that it is not a constant
+            // 1. Verify the variable is already defined, that it is not a constant, and the r-value
             var variableTypeDefinition = GetReference(assignment.Reference, currentFunction, scopeIdentifiers, out _);
+            var valueType = VerifyExpression(assignment.Value, currentFunction, scopeIdentifiers);
+
             if (variableTypeDefinition == null) return;
 
             if (variableTypeDefinition.Constant)
             {
                 var variable = assignment.Reference as IdentifierAst;
                 AddError($"Cannot reassign value of constant variable '{variable?.Name}'", assignment);
+                return;
             }
 
             // 2. Verify the assignment value
@@ -1192,7 +1203,6 @@ namespace Lang
                 nullAst.TargetType = variableTypeDefinition;
                 return;
             }
-            var valueType = VerifyExpression(assignment.Value, currentFunction, scopeIdentifiers);
 
             // 3. Verify the assignment value matches the variable type definition
             if (valueType != null)
@@ -1266,7 +1276,7 @@ namespace Lang
             }
         }
 
-        private TypeDefinition GetReference(IAst ast, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers, out bool hasPointer)
+        private TypeDefinition GetReference(IAst ast, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers, out bool hasPointer, bool fromUnaryReference = false)
         {
             hasPointer = true;
             switch (ast)
@@ -1277,10 +1287,14 @@ namespace Lang
                 {
                     var variableType = GetVariable(index.Name, index, scopeIdentifiers);
                     if (variableType == null) return null;
+                    if (variableType.Constant)
+                    {
+                        AddError($"Cannot reassign value of constant variable '{index.Name}'", index);
+                    }
                     var type = VerifyIndex(index, variableType, currentFunction, scopeIdentifiers, out var overloaded);
                     if (type != null && overloaded)
                     {
-                        if (type.Type != TypeKind.Pointer)
+                        if (type.TypeKind != TypeKind.Pointer)
                         {
                             AddError($"Overload [] for type '{PrintTypeDefinition(variableType)}' must be a pointer to be able to set the value", index);
                             return null;
@@ -1301,12 +1315,23 @@ namespace Lang
                     {
                         case IdentifierAst identifier:
                             refType = GetVariable(identifier.Name, identifier, scopeIdentifiers, true);
+                            if (refType == null) return null;
+                            if (refType.Constant)
+                            {
+                                AddError($"Cannot reassign value of constant variable '{identifier.Name}'", identifier);
+                                return null;
+                            }
                             break;
                         case IndexAst index:
                             var variableType = GetVariable(index.Name, index, scopeIdentifiers);
                             if (variableType == null) return null;
+                            if (variableType.Constant)
+                            {
+                                AddError($"Cannot reassign value of constant variable '{index.Name}'", index);
+                                return null;
+                            }
                             refType = VerifyIndex(index, variableType, currentFunction, scopeIdentifiers, out var overloaded);
-                            if (refType != null && overloaded && refType.Type != TypeKind.Pointer)
+                            if (refType != null && overloaded && refType.TypeKind != TypeKind.Pointer)
                             {
                                 AddError($"Overload [] for type '{PrintTypeDefinition(variableType)}' must be a pointer to be able to set the value", index);
                                 return null;
@@ -1334,7 +1359,7 @@ namespace Lang
                                 refType = VerifyIndex(index, fieldType, currentFunction, scopeIdentifiers, out var overloaded);
                                 if (refType != null && overloaded)
                                 {
-                                    if (refType.Type == TypeKind.Pointer)
+                                    if (refType.TypeKind == TypeKind.Pointer)
                                     {
                                         if (i == structFieldRef.Children.Count - 1)
                                         {
@@ -1362,14 +1387,23 @@ namespace Lang
                     return refType;
                 }
                 case UnaryAst unary when unary.Operator == UnaryOperator.Dereference:
+                    if (fromUnaryReference)
+                    {
+                        AddError("Operators '*' and '&' cancel each other out", unary);
+                        return null;
+                    }
                     var reference = GetReference(unary.Value, currentFunction, scopeIdentifiers, out var canDereference);
+                    if (reference == null)
+                    {
+                        return null;
+                    }
                     if (!canDereference)
                     {
                         AddError("Cannot dereference pointer to assign value", unary.Value);
                         return null;
                     }
 
-                    if (reference.Type != TypeKind.Pointer)
+                    if (reference.TypeKind != TypeKind.Pointer)
                     {
                         AddError("Expected to get pointer to dereference", unary.Value);
                         return null;
@@ -1694,33 +1728,31 @@ namespace Lang
                 case StructFieldRefAst structField:
                     return VerifyStructFieldRef(structField, currentFunction, scopeIdentifiers);
                 case IdentifierAst identifierAst:
+                    if (!scopeIdentifiers.TryGetValue(identifierAst.Name, out var identifier))
                     {
-                        if (!scopeIdentifiers.TryGetValue(identifierAst.Name, out var identifier))
+                        if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functions))
                         {
-                            if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functions))
+                            if (functions.Count > 1)
                             {
-                                if (functions.Count > 1)
-                                {
-                                    AddError($"Cannot determine type for function '{identifierAst.Name}' that has multiple overloads", identifierAst);
-                                    return null;
-                                }
-                                return new TypeDefinition {Name = "Type", TypeIndex = functions[0].TypeIndex};
-                            }
-                            AddError($"Identifier '{identifierAst.Name}' not defined", identifierAst);
-                        }
-                        switch (identifier)
-                        {
-                            case DeclarationAst declaration:
-                                return declaration.Type;
-                            case IType type:
-                                if (type is StructAst structAst && structAst.Generics.Any())
-                                {
-                                    AddError($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
-                                }
-                                return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
-                            default:
+                                AddError($"Cannot determine type for function '{identifierAst.Name}' that has multiple overloads", identifierAst);
                                 return null;
+                            }
+                            return new TypeDefinition {Name = "Type", TypeIndex = functions[0].TypeIndex};
                         }
+                        AddError($"Identifier '{identifierAst.Name}' not defined", identifierAst);
+                    }
+                    switch (identifier)
+                    {
+                        case DeclarationAst declaration:
+                            return declaration.Type;
+                        case IType type:
+                            if (type is StructAst structAst && structAst.Generics.Any())
+                            {
+                                AddError($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
+                            }
+                            return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
+                        default:
+                            return null;
                     }
                 case ChangeByOneAst changeByOne:
                     var op = changeByOne.Positive ? "increment" : "decrement";
@@ -1746,10 +1778,9 @@ namespace Lang
                             return null;
                     }
                 case UnaryAst unary:
-                {
                     if (unary.Operator == UnaryOperator.Reference)
                     {
-                        var referenceType = GetReference(unary.Value, currentFunction, scopeIdentifiers, out var hasPointer);
+                        var referenceType = GetReference(unary.Value, currentFunction, scopeIdentifiers, out var hasPointer, true);
                         if (!hasPointer)
                         {
                             AddError("Unable to get reference of unary value", unary.Value);
@@ -1814,7 +1845,6 @@ namespace Lang
                                 return null;
                         }
                     }
-                }
                 case CallAst call:
                     return VerifyCall(call, currentFunction, scopeIdentifiers);
                 case ExpressionAst expression:
@@ -1874,7 +1904,7 @@ namespace Lang
             var type = constant.Type;
             switch (type.PrimitiveType)
             {
-                case IntegerType integer:
+                case IntegerType integer when !type.Character:
                     if (!integer.Signed && constant.Value[0] == '-')
                     {
                         AddError($"Unsigned type '{PrintTypeDefinition(constant.Type)}' cannot be negative", constant);
@@ -2576,7 +2606,8 @@ namespace Lang
                 // 3. Verify the operator and expression types are compatible and convert the expression type if necessary
                 var type = VerifyType(expression.Type);
                 var nextType = VerifyType(nextExpressionType);
-                if (type == TypeKind.Struct && nextType == TypeKind.Struct)
+                if ((type == TypeKind.Struct && nextType == TypeKind.Struct) ||
+                    (type == TypeKind.String && nextType == TypeKind.String))
                 {
                     if (TypeEquals(expression.Type, nextExpressionType, true))
                     {
@@ -2764,6 +2795,8 @@ namespace Lang
             return VerifyIndex(index, declaration.Type, currentFunction, scopeIdentifiers, out _);
         }
 
+        private StructAst _stringStruct;
+
         private TypeDefinition VerifyIndex(IndexAst index, TypeDefinition typeDef, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers, out bool overloaded)
         {
             // 1. Verify the variable is a list or the operator overload exists
@@ -2775,7 +2808,6 @@ namespace Lang
                 case TypeKind.Error:
                     break;
                 case TypeKind.Struct:
-                case TypeKind.String:
                     index.CallsOverload = true;
                     index.OverloadType = typeDef;
                     overloaded = true;
@@ -2783,11 +2815,16 @@ namespace Lang
                     break;
                 case TypeKind.List:
                 case TypeKind.Params:
+                case TypeKind.Pointer:
                     elementType = typeDef.Generics.FirstOrDefault();
                     if (elementType == null)
                     {
                         AddError("Unable to determine element type of the List", index);
                     }
+                    break;
+                case TypeKind.String:
+                    _stringStruct ??= (StructAst)_programGraph.Types["string"];
+                    elementType = _stringStruct.Fields[1].Type.Generics[0];
                     break;
                 default:
                     AddError($"Cannot index type '{PrintTypeDefinition(typeDef)}'", index);
@@ -2873,7 +2910,7 @@ namespace Lang
         private TypeKind VerifyType(TypeDefinition typeDef, int depth = 0, bool argument = false)
         {
             if (typeDef == null) return TypeKind.Error;
-            if (typeDef.Type != null) return typeDef.Type.Value;
+            if (typeDef.TypeKind != null) return typeDef.TypeKind.Value;
 
             if (typeDef.IsGeneric)
             {
@@ -2903,19 +2940,19 @@ namespace Lang
                     if (hasGenerics)
                     {
                         AddError($"Type '{typeDef.Name}' cannot have generics", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                         return TypeKind.Error;
                     }
-                    typeDef.Type = TypeKind.Integer;
+                    typeDef.TypeKind = TypeKind.Integer;
                     return TypeKind.Integer;
                 case FloatType:
                     if (hasGenerics)
                     {
                         AddError($"Type '{typeDef.Name}' cannot have generics", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                         return TypeKind.Error;
                     }
-                    typeDef.Type = TypeKind.Float;
+                    typeDef.TypeKind = TypeKind.Float;
                     return TypeKind.Float;
             }
 
@@ -2925,76 +2962,76 @@ namespace Lang
                     if (hasGenerics)
                     {
                         AddError("Type 'bool' cannot have generics", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = TypeKind.Boolean;
+                        typeDef.TypeKind = TypeKind.Boolean;
                     }
                     break;
                 case "string":
                     if (hasGenerics)
                     {
                         AddError("Type 'string' cannot have generics", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = TypeKind.String;
+                        typeDef.TypeKind = TypeKind.String;
                     }
                     break;
                 case "List":
                     if (typeDef.Generics.Count != 1)
                     {
                         AddError($"Type 'List' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     else if (!VerifyList(typeDef, depth, argument, out var hasGenericTypes))
                     {
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = hasGenericTypes ? TypeKind.Generic : TypeKind.List;
+                        typeDef.TypeKind = hasGenericTypes ? TypeKind.Generic : TypeKind.List;
                     }
                     break;
                 case "void":
                     if (hasGenerics)
                     {
                         AddError("Type 'void' cannot have generics", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = TypeKind.Void;
+                        typeDef.TypeKind = TypeKind.Void;
                     }
                     break;
                 case "*":
                     if (typeDef.Generics.Count != 1)
                     {
                         AddError($"pointer type should have reference to 1 type, but got {typeDef.Generics.Count}", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     else if (_programGraph.Types.ContainsKey(typeDef.GenericName))
                     {
-                        typeDef.Type = TypeKind.Pointer;
+                        typeDef.TypeKind = TypeKind.Pointer;
                     }
                     else
                     {
                         var pointerType = VerifyType(typeDef.Generics[0], depth + 1);
                         if (pointerType == TypeKind.Error)
                         {
-                            typeDef.Type = TypeKind.Error;
+                            typeDef.TypeKind = TypeKind.Error;
                         }
                         else if (pointerType == TypeKind.Generic)
                         {
-                            typeDef.Type = TypeKind.Generic;
+                            typeDef.TypeKind = TypeKind.Generic;
                         }
                         else
                         {
                             var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeIndex = _programGraph.TypeCount++, TypeKind = TypeKind.Pointer, Size = 8};
                             _programGraph.Types.Add(typeDef.GenericName, pointer);
-                            typeDef.Type = TypeKind.Pointer;
+                            typeDef.TypeKind = TypeKind.Pointer;
                         }
                     }
                     break;
@@ -3002,44 +3039,44 @@ namespace Lang
                     if (hasGenerics)
                     {
                         AddError("Type 'varargs' cannot have generics", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                         return TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = TypeKind.VarArgs;
+                        typeDef.TypeKind = TypeKind.VarArgs;
                     }
                     break;
                 case "Params":
                     if (!argument)
                     {
                         AddError($"Params can only be used in function arguments", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     else if (depth != 0)
                     {
                         AddError($"Params can only be declared as a top level type, such as 'Params<int>'", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     else if (typeDef.Generics.Count != 1)
                     {
                         AddError($"Type 'Params' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = VerifyList(typeDef, depth, argument, out _) ? TypeKind.Params : TypeKind.Error;
+                        typeDef.TypeKind = VerifyList(typeDef, depth, argument, out _) ? TypeKind.Params : TypeKind.Error;
                     }
                     break;
                 case "Type":
                     if (hasGenerics)
                     {
                         AddError("Type 'Type' cannot have generics", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = TypeKind.Type;
+                        typeDef.TypeKind = TypeKind.Type;
                     }
                     break;
                 default:
@@ -3048,7 +3085,7 @@ namespace Lang
                         var genericName = typeDef.GenericName;
                         if (_programGraph.Types.ContainsKey(genericName))
                         {
-                            typeDef.Type = TypeKind.Struct;
+                            typeDef.TypeKind = TypeKind.Struct;
                         }
                         else
                         {
@@ -3070,27 +3107,27 @@ namespace Lang
                             if (!_polymorphicStructs.TryGetValue(typeDef.Name, out var structDef))
                             {
                                 AddError($"No polymorphic structs of type '{typeDef.Name}'", typeDef);
-                                typeDef.Type = TypeKind.Error;
+                                typeDef.TypeKind = TypeKind.Error;
                             }
                             else if (structDef.Generics.Count != typeDef.Generics.Count)
                             {
                                 AddError($"Expected type '{typeDef.Name}' to have {structDef.Generics.Count} generic(s), but got {typeDef.Generics.Count}", typeDef);
-                                typeDef.Type = TypeKind.Error;
+                                typeDef.TypeKind = TypeKind.Error;
                             }
                             else if (error)
                             {
-                                typeDef.Type = TypeKind.Error;
+                                typeDef.TypeKind = TypeKind.Error;
                             }
                             else if (hasGenericTypes)
                             {
-                                typeDef.Type = TypeKind.Generic;
+                                typeDef.TypeKind = TypeKind.Generic;
                             }
                             else
                             {
                                 var polyStruct = _polymorpher.CreatePolymorphedStruct(structDef, PrintTypeDefinition(typeDef), TypeKind.Struct, _programGraph.TypeCount++, generics);
                                 _programGraph.Types.Add(genericName, polyStruct);
                                 VerifyStruct(polyStruct);
-                                typeDef.Type = TypeKind.Struct;
+                                typeDef.TypeKind = TypeKind.Struct;
                             }
                         }
                     }
@@ -3099,25 +3136,25 @@ namespace Lang
                         switch (type)
                         {
                             case StructAst:
-                                typeDef.Type = TypeKind.Struct;
+                                typeDef.TypeKind = TypeKind.Struct;
                                 break;
                             case EnumAst enumAst:
                                 var primitive = enumAst.BaseType.PrimitiveType;
                                 typeDef.PrimitiveType ??= new EnumType {Bytes = primitive.Bytes, Signed = primitive.Signed};
-                                typeDef.Type = TypeKind.Enum;
+                                typeDef.TypeKind = TypeKind.Enum;
                                 break;
                             default:
-                                typeDef.Type = TypeKind.Error;
+                                typeDef.TypeKind = TypeKind.Error;
                                 break;
                         }
                     }
                     else
                     {
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     break;
             }
-            return typeDef.Type.Value;
+            return typeDef.TypeKind.Value;
         }
 
         private bool VerifyList(TypeDefinition typeDef, int depth, bool argument, out bool hasGenerics)

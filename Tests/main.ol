@@ -4,16 +4,18 @@ int main() {
     failed_test_count := 0;
     if dir {
         file := readdir(dir);
+        test_dir: string;
         while file {
             if file.d_type == FileType.DT_DIR && file.d_reclen == 32 {
-                test_dir: List<u8>[50];
-                sprintf(test_dir.data, "%s/%s", tests_dir, &file.d_name);
+                dir_name := get_file_name(file);
+                test_dir = format_string("%/%", tests_dir, dir_name);
 
-                if !run_test(test_dir.data) then failed_test_count++;
+                if !run_test(test_dir) then failed_test_count++;
             }
 
             file = readdir(dir);
         }
+        free(test_dir.data);
 
         closedir(dir);
     }
@@ -28,24 +30,62 @@ int main() {
     }
 }
 
-bool run_test(u8* test_dir) {
+string get_file_name(dirent* file) {
+    name: string = { data = file.d_name.data; }
+
+    each i in 0..file.d_name.length - 1 {
+        if file.d_name[i] != 0 then name.length++;
+        else then return name;
+    }
+    return name;
+}
+
+string format_string(string format, Params<string> args) {
+    if format.length == 0 then return "";
+
+    // @Cleanup This is not good, figure out a better way to do this
+    str: string = {data = malloc(100);}
+    arg_index := 0;
+    format_index := 0;
+
+    while format_index < format.length {
+        char := format[format_index];
+        if char == '%' {
+            arg := args[arg_index++];
+            each i in 0..arg.length - 1 {
+                str[str.length++] = arg[i];
+            }
+        }
+        else {
+            str[str.length++] = char;
+        }
+
+        format_index++;
+    }
+
+    str[str.length] = 0;
+
+    return str;
+}
+
+bool run_test(string test_dir) {
     executable := "./Lang/bin/Debug/net5.0/Lang"; #const
 
-    command: List<u8>[100];
-    sprintf(command.data, "%s %s", executable, test_dir);
-    printf("Compiling: %s", command.data);
-    exit_code := run_command(command.data);
+    command := format_string("% %", executable, test_dir);
+    printf("Compiling: %s", command);
+    exit_code := run_command(command);
+    free(command.data);
 
     if exit_code {
         printf(" -- Test Failed\n");
         return false;
     }
 
-    bin_dir: List<u8>[50];
-    sprintf(bin_dir.data, "%s/bin", test_dir);
+    bin_dir := format_string("%/bin", test_dir);
     dir := opendir(bin_dir.data);
     if dir == null {
         printf(" -- Test Failed: Unable to open directory '%s'\n", bin_dir.data);
+        free(bin_dir.data);
         return false;
     }
 
@@ -53,7 +93,8 @@ bool run_test(u8* test_dir) {
     found_executable := false;
     while !found_executable && file != null {
         if file.d_type == FileType.DT_REG {
-            sprintf(command.data, "./%s/%s", bin_dir.data, &file.d_name);
+            file_name := get_file_name(file);
+            command = format_string("./%/%", bin_dir, file_name);
             found_executable = true;
         }
 
@@ -64,11 +105,13 @@ bool run_test(u8* test_dir) {
 
     if !found_executable {
         printf(" -- Test Failed: Executable not found in directory '%s'\n", bin_dir.data);
+        free(bin_dir.data);
         return false;
     }
 
-    printf("\nRunning: %s", command.data);
-    exit_code = run_command(command.data);
+    printf("\nRunning: %s", command);
+    exit_code = run_command(command);
+    free(command.data);
 
     if exit_code {
         printf(" -- Test Failed\n");
@@ -78,15 +121,15 @@ bool run_test(u8* test_dir) {
     return true;
 }
 
-int run_command(u8* command) {
-    handle := popen(command, "r");
-    if handle == null {
+int run_command(string command) {
+    handle := popen(command, "r"); if handle == null {
         printf(" -- Test Failed: Unable to run '%s'\n", command);
         return -1;
     }
 
-    buffer: List<u8>[50];
-    while fgets(buffer.data, 50, handle) != null {}
+    buffer := malloc(1000);
+    while fgets(buffer, 1000, handle) != null {}
+    free(buffer);
 
     status := pclose(handle);
     return (status & 0xFF00) >> 8;

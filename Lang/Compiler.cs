@@ -32,13 +32,15 @@ namespace Lang
         private readonly IParser _parser;
         private readonly IProgramGraphBuilder _graphBuilder;
         private readonly IBackend _backend;
+        private readonly ILinker _linker;
 
-        public Compiler(IProjectInterpreter projectInterpreter, IParser parser, IProgramGraphBuilder graphBuilder, IBackend backend)
+        public Compiler(IProjectInterpreter projectInterpreter, IParser parser, IProgramGraphBuilder graphBuilder, IBackend backend, ILinker linker)
         {
             _projectInterpreter = projectInterpreter;
             _parser = parser;
             _graphBuilder = graphBuilder;
             _backend = backend;
+            _linker = linker;
         }
 
         public void Compile(string[] args)
@@ -66,12 +68,9 @@ namespace Lang
             stopwatch.Start();
             // 2. Load files in project
             var project = _projectInterpreter.LoadProject(buildSettings.ProjectPath);
-            var projectTime = stopwatch.Elapsed;
 
             // 3. Parse source files to tokens
-            stopwatch.Restart();
             var parseResult = _parser.Parse(project.SourceFiles);
-            var parseTime = stopwatch.Elapsed;
 
             if (parseResult.Errors.Any())
             {
@@ -90,9 +89,8 @@ namespace Lang
             }
 
             // 4. Build program graph
-            stopwatch.Restart();
             var programGraph = _graphBuilder.CreateProgramGraph(parseResult, project, buildSettings);
-            var graphTime = stopwatch.Elapsed;
+            var frontEndTime = stopwatch.Elapsed;
 
             if (programGraph.Errors.Any())
             {
@@ -104,17 +102,22 @@ namespace Lang
                 Environment.Exit(ErrorCodes.CompilationError);
             }
 
-            // 5. Build program and link binaries
+            // 5. Build program
             stopwatch.Restart();
-            _backend.Build(project, programGraph, buildSettings);
+            var objectFile = _backend.Build(project, programGraph, buildSettings);
             stopwatch.Stop();
             var buildTime = stopwatch.Elapsed;
 
-            // 6. Log statistics
-            Console.WriteLine($"Project time: {projectTime.TotalSeconds} seconds\n" +
-                              $"Lexing/Parsing time: {parseTime.TotalSeconds} seconds\n" +
-                              $"Project Graph time: {graphTime.TotalSeconds} seconds\n" +
-                              $"Building time: {buildTime.TotalSeconds} seconds");
+            // 6. Link binaries
+            stopwatch.Restart();
+            _linker.Link(objectFile, project, programGraph);
+            stopwatch.Stop();
+            var linkTime = stopwatch.Elapsed;
+
+            // 7. Log statistics
+            Console.WriteLine($"Front-end time: {frontEndTime.TotalSeconds} seconds\n" +
+                              $"LLVM build time: {buildTime.TotalSeconds} seconds\n" +
+                              $"Linking time: {linkTime.TotalSeconds} seconds");
         }
     }
 }

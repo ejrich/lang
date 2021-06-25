@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -11,48 +10,32 @@ namespace Lang.Backend
     public class LLVMBackend : IBackend
     {
         private const string ObjectDirectory = "obj";
-        private const string BinaryDirectory = "bin";
 
         private ProgramGraph _programGraph;
         private LLVMModuleRef _module;
         private LLVMBuilderRef _builder;
         private LLVMPassManagerRef _passManager;
-        private string _objectFile;
         private IFunction _currentFunction;
         private LLVMValueRef _stackPointer;
         private bool _stackPointerExists;
         private bool _stackSaved;
+        private LLVMTypeRef _stringType;
+        private LLVMTypeRef _u8PointerType;
 
         private readonly Queue<LLVMValueRef> _allocationQueue = new();
         private readonly LLVMValueRef _zeroInt = LLVM.ConstInt(LLVMTypeRef.Int32Type(), 0, false);
         private readonly TypeDefinition _intTypeDefinition = new() {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
 
-        public void Build(ProjectFile project, ProgramGraph programGraph, BuildSettings buildSettings)
+        public string Build(ProjectFile project, ProgramGraph programGraph, BuildSettings buildSettings)
         {
             _programGraph = programGraph;
-            // 1. Build the object file
-            BuildObjectFile(project, buildSettings);
-
-            // 2. Link and create the executable
-            Link(project, buildSettings);
-        }
-
-        public void BuildObjectFile(ProjectFile project, BuildSettings buildSettings)
-        {
             // 1. Initialize the LLVM module and builder
             InitLLVM(project.Name, buildSettings.Release);
 
-            // 2. Verify obj directory exists
-            var objectPath = Path.Combine(project.Path, ObjectDirectory);
-            if (!Directory.Exists(objectPath))
-                Directory.CreateDirectory(objectPath);
-
-            _objectFile = Path.Combine(objectPath, $"{project.Name}.o");
-
-            // 3. Write Data section
+            // 2. Write Data section
             var globals = WriteData();
 
-            // 4. Write Function and Operator overload definitions
+            // 3. Write Function and Operator overload definitions
             foreach (var (name, functions) in _programGraph.Functions)
             {
                 for (var i = 0; i < functions.Count; i++)
@@ -73,7 +56,7 @@ namespace Lang.Backend
                     else
                     {
                         var functionName = GetFunctionName(name, i, functions.Count);
-                        WriteFunctionDefinition(functionName, function.Arguments, function.ReturnType, function.Varargs);
+                        WriteFunctionDefinition(functionName, function.Arguments, function.ReturnType, function.Varargs, function.Extern);
                     }
                 }
             }
@@ -86,7 +69,7 @@ namespace Lang.Backend
                 }
             }
 
-            // 5. Write Function and Operator overload bodies
+            // 4. Write Function and Operator overload bodies
             foreach (var (name, functions) in _programGraph.Functions)
             {
                 for (var i = 0; i < functions.Count; i++)
@@ -114,8 +97,16 @@ namespace Lang.Backend
                 }
             }
 
+            // 5. Verify obj directory exists
+            var objectPath = Path.Combine(project.Path, ObjectDirectory);
+            if (!Directory.Exists(objectPath))
+                Directory.CreateDirectory(objectPath);
+
             // 6. Compile to object file
-            Compile(_objectFile, buildSettings.OutputAssembly);
+            var objectFile = Path.Combine(objectPath, $"{project.Name}.o");
+            Compile(objectFile, buildSettings.OutputAssembly);
+
+            return objectFile;
         }
 
         private void InitLLVM(string projectName, bool optimize)
@@ -155,12 +146,14 @@ namespace Lang.Backend
                     LLVM.StructSetBody(structs[name], fields, false);
                 }
             }
+            _stringType = LLVM.GetTypeByName(_module, "string");
+            _u8PointerType = LLVMTypeRef.PointerType(LLVMTypeRef.Int8Type(), 0);
 
             // 2. Declare variables
             var globals = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>();
             foreach (var globalVariable in _programGraph.Variables)
             {
-                if (globalVariable.Constant)
+                if (globalVariable.Constant && globalVariable.Type.TypeKind != TypeKind.String)
                 {
                     var (_, constant) = WriteExpression(globalVariable.Value, null);
                     globals.Add(globalVariable.Name, (globalVariable.Type, constant));
@@ -172,7 +165,7 @@ namespace Lang.Backend
                     LLVM.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
                     if (globalVariable.Value != null)
                     {
-                        LLVM.SetInitializer(global, BuildConstant(type, globalVariable.Value as ConstantAst));
+                        LLVM.SetInitializer(global, WriteExpression(globalVariable.Value, null).value);
                     }
                     else if (type.TypeKind != LLVMTypeKind.LLVMStructTypeKind && type.TypeKind != LLVMTypeKind.LLVMArrayTypeKind)
                     {
@@ -214,10 +207,7 @@ namespace Lang.Backend
             var argumentType = LLVM.GetTypeByName(_module, "ArgumentType");
             foreach (var (_, (type, typeInfo)) in typePointers)
             {
-                var typeName = LLVM.ConstString(type.Name, (uint)type.Name.Length, false);
-                var typeNameString = LLVM.AddGlobal(_module, typeName.TypeOf(), "str");
-                SetPrivateConstant(typeNameString);
-                LLVM.SetInitializer(typeNameString, typeName);
+                var typeNameString = BuildString(type.Name);
 
                 var typeKind = LLVM.ConstInt(LLVMTypeRef.Int32Type(), (uint)type.TypeKind, false);
                 var typeSize = LLVM.ConstInt(LLVMTypeRef.Int32Type(), type.Size, false);
@@ -231,10 +221,7 @@ namespace Lang.Backend
                     {
                         var field = structAst.Fields[i];
 
-                        var fieldName = LLVM.ConstString(field.Name, (uint)field.Name.Length, false);
-                        var fieldNameString = LLVM.AddGlobal(_module, typeName.TypeOf(), "str");
-                        SetPrivateConstant(fieldNameString);
-                        LLVM.SetInitializer(fieldNameString, fieldName);
+                        var fieldNameString = BuildString(field.Name);
                         var fieldOffset = LLVM.ConstInt(LLVMTypeRef.Int32Type(), field.Offset, false);
 
                         var typeField = LLVM.ConstStruct(new [] {fieldNameString, fieldOffset, typePointers[field.Type.GenericName].typeInfo}, false);
@@ -267,11 +254,7 @@ namespace Lang.Backend
                     {
                         var value = enumAst.Values[i];
 
-                        var enumValueName = LLVM.ConstString(value.Name, (uint)value.Name.Length, false);
-                        var enumValueNameString = LLVM.AddGlobal(_module, typeName.TypeOf(), "str");
-                        SetPrivateConstant(enumValueNameString);
-                        LLVM.SetInitializer(enumValueNameString, enumValueName);
-
+                        var enumValueNameString = BuildString(value.Name);
                         var enumValue = LLVM.ConstInt(LLVMTypeRef.Int32Type(), (uint)value.Value, false);
 
                         enumValueRefs[i] = LLVM.ConstStruct(new [] {enumValueNameString, enumValue}, false);
@@ -305,11 +288,7 @@ namespace Lang.Backend
                     {
                         var argument = function.Arguments[i];
 
-                        var argName = LLVM.ConstString(argument.Name, (uint)argument.Name.Length, false);
-                        var argNameString = LLVM.AddGlobal(_module, typeName.TypeOf(), "str");
-                        SetPrivateConstant(argNameString);
-                        LLVM.SetInitializer(argNameString, argName);
-
+                        var argNameString = BuildString(argument.Name);
                         var argumentTypeInfo = argument.Type.Name switch
                         {
                             "Type" => typePointers["s32"].typeInfo,
@@ -360,7 +339,7 @@ namespace Lang.Backend
             LLVM.SetUnnamedAddr(variable, true);
         }
 
-        private LLVMValueRef WriteFunctionDefinition(string name, List<DeclarationAst> arguments, TypeDefinition returnType, bool varargs = false)
+        private LLVMValueRef WriteFunctionDefinition(string name, List<DeclarationAst> arguments, TypeDefinition returnType, bool varargs = false, bool externFunction = false)
         {
             var argumentCount = varargs ? arguments.Count - 1 : arguments.Count;
             var argumentTypes = new LLVMTypeRef[argumentCount];
@@ -368,7 +347,7 @@ namespace Lang.Backend
             // 1. Determine argument types and varargs
             for (var i = 0; i < argumentCount; i++)
             {
-                argumentTypes[i] = ConvertTypeDefinition(arguments[i].Type);
+                argumentTypes[i] = ConvertTypeDefinition(arguments[i].Type, externFunction);
             }
 
             // 2. Declare function
@@ -486,7 +465,7 @@ namespace Lang.Backend
                     BuildCallAllocations(call);
                     break;
                 case DeclarationAst declaration:
-                    if (declaration.Constant) break;
+                    if (declaration.Constant && declaration.Type.TypeKind != TypeKind.String) break;
 
                     var type = ConvertTypeDefinition(declaration.Type);
                     var variable = LLVM.BuildAlloca(_builder, type, declaration.Name);
@@ -513,7 +492,7 @@ namespace Lang.Backend
                     }
                     else if (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind)
                     {
-                        BuildStructAllocations(declaration.Type.GenericName);
+                        BuildStructAllocations(declaration.Type.GenericName, declaration.Assignments);
                     }
                     break;
                 case AssignmentAst assignment:
@@ -641,12 +620,17 @@ namespace Lang.Backend
             }
         }
 
-        private void BuildStructAllocations(string name)
+        private void BuildStructAllocations(string name, List<AssignmentAst> values = null)
         {
+            var assignments = values?.ToDictionary(_ => (_.Reference as IdentifierAst)!.Name);
             var structDef = _programGraph.Types[name] as StructAst;
             foreach (var field in structDef!.Fields)
             {
-                if (field.Type.Name == "List")
+                if (assignments != null && assignments.TryGetValue(field.Name, out var assignment))
+                {
+                    BuildAllocations(assignment.Value);
+                }
+                else if (field.Type.Name == "List")
                 {
                     if (field.Type.CArray) continue;
                     var listType = field.Type.Generics[0];
@@ -656,12 +640,11 @@ namespace Lang.Backend
                     var arrayType = LLVMTypeRef.ArrayType(targetType, uint.Parse(count.Value));
                     var listData = LLVM.BuildAlloca(_builder, arrayType, "listdata");
                     _allocationQueue.Enqueue(listData);
-                    continue;
                 }
-
-                if (ConvertTypeDefinition(field.Type).TypeKind != LLVMTypeKind.LLVMStructTypeKind) continue;
-
-                BuildStructAllocations(field.Type.GenericName);
+                else if (ConvertTypeDefinition(field.Type).TypeKind == LLVMTypeKind.LLVMStructTypeKind)
+                {
+                    BuildStructAllocations(field.Type.GenericName);
+                }
             }
         }
 
@@ -720,9 +703,16 @@ namespace Lang.Backend
 
             if (declaration.Constant)
             {
-                var (_, constant) = WriteExpression(declaration.Value, localVariables);
+                var (_, value) = WriteExpression(declaration.Value, localVariables);
 
-                localVariables.Add(declaration.Name, (declaration.Type, constant));
+                if (declaration.Type.TypeKind == TypeKind.String)
+                {
+                    var stringVariable = _allocationQueue.Dequeue();
+                    LLVM.BuildStore(_builder, value, stringVariable);
+                    value = stringVariable;
+                }
+
+                localVariables.Add(declaration.Name, (declaration.Type, value));
                 return;
             }
 
@@ -772,8 +762,7 @@ namespace Lang.Backend
             }
         }
 
-        private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable,
-            IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, List<AssignmentAst> values = null)
+        private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, List<AssignmentAst> values = null)
         {
             var assignments = values?.ToDictionary(_ => (_.Reference as IdentifierAst)!.Name);
             var structDef = _programGraph.Types[typeDef.GenericName] as StructAst;
@@ -869,7 +858,7 @@ namespace Lang.Backend
                 // @Cleanup This branch should never be hit
                 _ => (null, new LLVMValueRef())
             };
-            if (loaded && type.Type == TypeKind.Pointer)
+            if (loaded && type.TypeKind == TypeKind.Pointer)
             {
                 type = type.Generics[0];
             }
@@ -1087,8 +1076,7 @@ namespace Lang.Backend
             // 4. Check condition of each loop and break if condition is not met
             LLVM.PositionBuilderAtEnd(_builder, eachCondition);
             var indexValue = LLVM.BuildLoad(_builder, indexVariable, "curr");
-            var condition = LLVM.BuildICmp(_builder, each.Iteration == null ? LLVMIntPredicate.LLVMIntSLE : LLVMIntPredicate.LLVMIntSLT,
-                indexValue, compareTarget, "listcmp");
+            var condition = LLVM.BuildICmp(_builder, each.Iteration == null ? LLVMIntPredicate.LLVMIntSLE : LLVMIntPredicate.LLVMIntSLT, indexValue, compareTarget, "listcmp");
             if (each.Iteration != null)
             {
                 switch (iterationType!.Name)
@@ -1130,14 +1118,14 @@ namespace Lang.Backend
             return false;
         }
 
-        private (TypeDefinition type, LLVMValueRef value) WriteExpression(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
+        private (TypeDefinition type, LLVMValueRef value) WriteExpression(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, bool getStringPointer = false)
         {
             switch (ast)
             {
                 case ConstantAst constant:
                 {
                     var type = ConvertTypeDefinition(constant.Type);
-                    return (constant.Type, BuildConstant(type, constant));
+                    return (constant.Type, BuildConstant(type, constant, getStringPointer));
                 }
                 case NullAst nullAst:
                 {
@@ -1152,7 +1140,15 @@ namespace Lang.Backend
                         return (_intTypeDefinition, LLVM.ConstInt(LLVMTypeRef.Int32Type(), (uint)typeDef.TypeIndex, false));
                     }
                     var (type, value) = typeValue;
-                    if (!type.Constant)
+                    if (type.TypeKind == TypeKind.String)
+                    {
+                        if (getStringPointer)
+                        {
+                            value = LLVM.BuildStructGEP(_builder, value, 1, "stringdata");
+                        }
+                        value = LLVM.BuildLoad(_builder, value, identifier.Name);
+                    }
+                    else if (!type.Constant)
                     {
                         value = LLVM.BuildLoad(_builder, value, identifier.Name);
                     }
@@ -1170,6 +1166,10 @@ namespace Lang.Backend
                     var (type, field) = BuildStructField(structField, localVariables, out var loaded, out var constant);
                     if (!loaded && !constant)
                     {
+                        if (getStringPointer && type.TypeKind == TypeKind.String)
+                        {
+                            field = LLVM.BuildStructGEP(_builder, field, 1, "stringdata");
+                        }
                         field = LLVM.BuildLoad(_builder, field, "field");
                     }
                     return (type, field);
@@ -1222,7 +1222,7 @@ namespace Lang.Backend
                         var callArguments = new LLVMValueRef[call.Arguments.Count];
                         for (var i = 0; i < functionDef.Arguments.Count - 1; i++)
                         {
-                            var (_, value) = WriteExpression(call.Arguments[i], localVariables);
+                            var (_, value) = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
                             callArguments[i] = value;
                         }
 
@@ -1230,13 +1230,14 @@ namespace Lang.Backend
                         // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
                         for (var i = functionDef.Arguments.Count - 1; i < call.Arguments.Count; i++)
                         {
-                            var (type, value) = WriteExpression(call.Arguments[i], localVariables);
+                            var (type, value) = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
                             if (type.Name == "float")
                             {
                                 value = LLVM.BuildFPExt(_builder, value, LLVMTypeRef.DoubleType(), "tmpdouble");
                             }
                             callArguments[i] = value;
                         }
+
                         return (functionDef.ReturnType, LLVM.BuildCall(_builder, function, callArguments, string.Empty));
                     }
                     else
@@ -1244,7 +1245,7 @@ namespace Lang.Backend
                         var callArguments = new LLVMValueRef[call.Arguments.Count];
                         for (var i = 0; i < call.Arguments.Count; i++)
                         {
-                            var (_, value) = WriteExpression(call.Arguments[i], localVariables);
+                            var (_, value) = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
                             callArguments[i] = value;
                         }
                         return (functionDef.ReturnType, LLVM.BuildCall(_builder, function, callArguments, string.Empty));
@@ -1257,13 +1258,12 @@ namespace Lang.Backend
                         IdentifierAst identifier => localVariables[identifier.Name],
                         StructFieldRefAst structField => BuildStructField(structField, localVariables, out _, out constant),
                         IndexAst index => GetListPointer(index, localVariables, out _),
-                        // TODO Test unary deref
                         // @Cleanup This branch should never be hit
                         _ => (null, new LLVMValueRef())
                     };
 
                     var value = constant ? pointer : LLVM.BuildLoad(_builder, pointer, "tmpvalue");
-                    if (variableType.Type == TypeKind.Pointer)
+                    if (variableType.TypeKind == TypeKind.Pointer)
                     {
                         variableType = variableType.Generics[0];
                     }
@@ -1298,7 +1298,6 @@ namespace Lang.Backend
                             IdentifierAst identifier => localVariables[identifier.Name],
                             StructFieldRefAst structField => BuildStructField(structField, localVariables, out _, out _),
                             IndexAst index => GetListPointer(index, localVariables, out _),
-                            // TODO Test unary deref?
                             // @Cleanup this branch should not be hit
                             _ => (null, new LLVMValueRef())
                         };
@@ -1369,7 +1368,7 @@ namespace Lang.Backend
 
         private string GetFunctionName(string name, int functionIndex, int functionCount)
         {
-            return functionCount == 1 ? name : $"{name}_{functionIndex}";
+            return functionCount == 1 ? name : $"{name}.{functionIndex}";
         }
 
         private string GetOperatorOverloadName(TypeDefinition type, Operator op)
@@ -1427,11 +1426,15 @@ namespace Lang.Backend
             LLVM.BuildCall(_builder, function, new []{stackPointer}, "");
         }
 
-        private LLVMValueRef BuildConstant(LLVMTypeRef type, ConstantAst constant)
+        private LLVMValueRef BuildConstant(LLVMTypeRef type, ConstantAst constant, bool getStringPointer = false)
         {
             switch (constant.Type.PrimitiveType)
             {
                 case IntegerType integerType:
+                    if (constant.Type.Character)
+                    {
+                        return LLVM.ConstInt(type, (byte)constant.Value[0], false);
+                    }
                     if (integerType.Bytes == 8 && !integerType.Signed)
                     {
                         return LLVM.ConstInt(type, ulong.Parse(constant.Value), false);
@@ -1446,10 +1449,30 @@ namespace Lang.Backend
                 case "bool":
                     return LLVM.ConstInt(type, constant.Value == "true" ? (ulong)1 : 0, false);
                 case "string":
-                    return LLVM.BuildGlobalStringPtr(_builder, constant.Value, "str");
+                    return BuildString(constant.Value, getStringPointer, constant.Type.Constant);
                 default:
                     return _zeroInt;
             }
+        }
+
+        private LLVMValueRef BuildString(string value, bool getStringPointer = false, bool constant = true)
+        {
+            var stringValue = LLVM.ConstString(value, (uint)value.Length, false);
+            var stringGlobal = LLVM.AddGlobal(_module, stringValue.TypeOf(), "str");
+            if (constant)
+            {
+                SetPrivateConstant(stringGlobal);
+            }
+            LLVM.SetInitializer(stringGlobal, stringValue);
+            var stringPointer = LLVM.ConstBitCast(stringGlobal, _u8PointerType);
+
+            if (getStringPointer)
+            {
+                return stringPointer;
+            }
+
+            var length = LLVM.ConstInt(LLVMTypeRef.Int32Type(), (uint)value.Length, false);
+            return LLVM.ConstNamedStruct(_stringType, new [] {length, stringPointer});
         }
 
         private (TypeDefinition type, LLVMValueRef value) BuildStructField(StructFieldRefAst structField, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, out bool loaded, out bool constant)
@@ -1545,47 +1568,22 @@ namespace Lang.Backend
                         value = LLVM.BuildStructGEP(_builder, value, (uint)structField.ValueIndices[i-1], identifier.Name);
                         break;
                     case IndexAst index:
-                        var (_, indexValue) = WriteExpression(index.Index, localVariables);
                         value = LLVM.BuildStructGEP(_builder, value, (uint)structField.ValueIndices[i-1], index.Name);
+                        (type, value) = GetListPointer(index, localVariables, out _, type, value);
 
                         if (index.CallsOverload)
                         {
-                            var overloadName = GetOperatorOverloadName(type, Operator.Subscript);
-                            var overload = LLVM.GetNamedFunction(_module, overloadName);
-                            var overloadDef = _programGraph.OperatorOverloads[type.GenericName][Operator.Subscript];
-
                             skipPointer = true;
-                            type = overloadDef.ReturnType;
-                            value = LLVM.BuildLoad(_builder, value, "value");
-                            var callValue = LLVM.BuildCall(_builder, overload, new []{value, indexValue}, string.Empty);
                             if (i < structField.Pointers.Length && !structField.Pointers[i])
                             {
-                                value = _allocationQueue.Dequeue();
-                                LLVM.BuildStore(_builder, callValue, value);
+                                var pointer = _allocationQueue.Dequeue();
+                                LLVM.BuildStore(_builder, value, pointer);
+                                value = pointer;
                             }
-                            else
-                            {
-                                value = callValue;
-                            }
-
-                            if (i == structField.Pointers.Length)
+                            else if (i == structField.Pointers.Length)
                             {
                                 loaded = true;
                             }
-                        }
-                        else
-                        {
-                            if (type.CArray)
-                            {
-                                value = LLVM.BuildGEP(_builder, value, new []{_zeroInt, indexValue}, "indexptr");
-                            }
-                            else
-                            {
-                                var listData = LLVM.BuildStructGEP(_builder, value, 1, "listdata");
-                                var dataPointer = LLVM.BuildLoad(_builder, listData, "dataptr");
-                                value = LLVM.BuildGEP(_builder, dataPointer, new [] {indexValue}, "indexptr");
-                            }
-                            type = type.Generics[0];
                         }
                         break;
                 }
@@ -1594,10 +1592,15 @@ namespace Lang.Backend
             return (type, value);
         }
 
-        private (TypeDefinition type, LLVMValueRef value) GetListPointer(IndexAst index, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, out bool loaded)
+        private StructAst _stringStruct;
+
+        private (TypeDefinition type, LLVMValueRef value) GetListPointer(IndexAst index, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, out bool loaded, TypeDefinition type = null, LLVMValueRef variable = default)
         {
             // 1. Get the variable pointer
-            var (type, variable) = localVariables[index.Name];
+            if (type == null)
+            {
+                (type, variable) = localVariables[index.Name];
+            }
 
             // 2. Determine the index
             var (_, indexValue) = WriteExpression(index.Index, localVariables);
@@ -1614,9 +1617,23 @@ namespace Lang.Backend
             }
 
             // 4. Build the pointer with the first index of 0
-            var elementType = type.Generics[0];
+            TypeDefinition elementType;
+            if (type.TypeKind == TypeKind.String)
+            {
+                _stringStruct ??= (StructAst)_programGraph.Types["string"];
+                elementType = _stringStruct.Fields[1].Type.Generics[0];
+            }
+            else
+            {
+                elementType = type.Generics[0];
+            }
             LLVMValueRef listPointer;
-            if (type.CArray)
+            if (type.TypeKind == TypeKind.Pointer)
+            {
+                var dataPointer = LLVM.BuildLoad(_builder, variable, "dataptr");
+                listPointer = LLVM.BuildGEP(_builder, dataPointer, new []{indexValue}, "indexptr");
+            }
+            else if (type.CArray)
             {
                 listPointer = LLVM.BuildGEP(_builder, variable, new []{_zeroInt, indexValue}, "dataptr");
             }
@@ -1630,8 +1647,7 @@ namespace Lang.Backend
             return (elementType, listPointer);
         }
 
-        private LLVMValueRef BuildExpression((TypeDefinition type, LLVMValueRef value) lhs,
-            (TypeDefinition type, LLVMValueRef value) rhs, Operator op, TypeDefinition targetType)
+        private LLVMValueRef BuildExpression((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, Operator op, TypeDefinition targetType)
         {
             // 1. Handle pointer math
             if (lhs.type.Name == "*")
@@ -1983,11 +1999,11 @@ namespace Lang.Backend
             };
         }
 
-        private LLVMTypeRef ConvertTypeDefinition(TypeDefinition type, bool pointer = false)
+        private LLVMTypeRef ConvertTypeDefinition(TypeDefinition type, bool externFunction = false, bool pointer = false)
         {
             if (type.Name == "*")
             {
-                return LLVMTypeRef.PointerType(ConvertTypeDefinition(type.Generics[0], true), 0);
+                return LLVMTypeRef.PointerType(ConvertTypeDefinition(type.Generics[0], externFunction, true), 0);
             }
 
             return type.PrimitiveType switch
@@ -2001,7 +2017,7 @@ namespace Lang.Backend
                     "void" => pointer ? LLVMTypeRef.Int8Type() : LLVMTypeRef.VoidType(),
                     "List" => GetListType(type),
                     "Params" => GetListType(type),
-                    "string" => LLVMTypeRef.PointerType(LLVMTypeRef.Int8Type(), 0),
+                    "string" => externFunction ? LLVMTypeRef.PointerType(LLVMTypeRef.Int8Type(), 0) : LLVM.GetTypeByName(_module, "string"),
                     "Type" => LLVMTypeRef.Int32Type(),
                     _ => GetStructType(type)
                 }
@@ -2041,132 +2057,6 @@ namespace Lang.Backend
             }
 
             return LLVM.GetTypeByName(_module, type.GenericName);
-        }
-
-        //
-        // Linker functions
-        //
-        public void Link(ProjectFile project, BuildSettings buildSettings)
-        {
-            // 1. Verify bin directory exists
-            var binaryPath = Path.Combine(project.Path, BinaryDirectory);
-            if (!Directory.Exists(binaryPath))
-                Directory.CreateDirectory(binaryPath);
-
-            // 2. Determine lib directories
-            var libDirectory = DetermineLibDirectory();
-            var linker = DetermineLinker(project.Linker, libDirectory);
-            var gccDirectory = DetermineGCCDirectory(libDirectory);
-            var defaultObjects = DefaultObjects(libDirectory);
-
-            // 3. Run the linker
-            var executableFile = Path.Combine(binaryPath, project.Name);
-            var dependencyList = string.Join(' ', _programGraph.Dependencies.Select(d => $"-l{d}"));
-            var buildProcess = new Process
-            {
-                StartInfo =
-                {
-                    FileName = "ld",
-                    Arguments = $"{linker} -o {executableFile} {_objectFile} {defaultObjects} " +
-                                $"-L{gccDirectory} --start-group {dependencyList} -lgcc -lgcc_eh -lc --end-group"
-                }
-            };
-            buildProcess.Start();
-            buildProcess.WaitForExit();
-            if (buildProcess.ExitCode != 0)
-            {
-                Console.WriteLine("Unable to link executable, please see output");
-                Environment.Exit(ErrorCodes.LinkError);
-            }
-        }
-
-        private static DirectoryInfo DetermineLibDirectory()
-        {
-            return new("/usr/lib");
-        }
-
-        private readonly string[] _crtObjects = {
-            "crt1.o", "crti.o", "crtn.o"
-        };
-
-        private string DefaultObjects(DirectoryInfo libDirectory)
-        {
-            var files = libDirectory.GetFiles();
-            if (_crtObjects.All(o => files.Any(f => f.Name == o)))
-            {
-                return string.Join(' ', _crtObjects.Select(o => Path.Combine(libDirectory.FullName, o)));
-            }
-
-            var platformDirectory = libDirectory.GetDirectories("x86_64*gnu").FirstOrDefault();
-            if (platformDirectory == null)
-            {
-                Console.WriteLine($"Cannot find x86_64 libs in directory '{libDirectory.FullName}'");
-                Environment.Exit(ErrorCodes.LinkError);
-            }
-            files = platformDirectory.GetFiles();
-            if (_crtObjects.All(o => files.Any(f => f.Name == o)))
-            {
-                return string.Join(' ', _crtObjects.Select(o => Path.Combine(platformDirectory.FullName, o)));
-            }
-
-            Console.WriteLine($"Unable to locate crt object files, valid locations are {libDirectory.FullName} or {platformDirectory.FullName}");
-            Environment.Exit(ErrorCodes.LinkError);
-            return null;
-        }
-
-        private static string DetermineLinker(Linker linkerType, DirectoryInfo libDirectory)
-        {
-            if (linkerType == Linker.Static)
-            {
-                return "-static";
-            }
-
-            const string linkerPattern = "ld-linux-x86-64.so*";
-            var linker = libDirectory.GetFiles(linkerPattern).FirstOrDefault();
-            if (linker == null)
-            {
-                var platformDirectory = libDirectory.GetDirectories("x86_64*gnu").FirstOrDefault();
-                if (platformDirectory == null)
-                {
-                    Console.WriteLine($"Cannot find x86_64 libs in directory '{platformDirectory.FullName}'");
-                    Environment.Exit(ErrorCodes.LinkError);
-                }
-
-                linker = platformDirectory.GetFiles(linkerPattern).FirstOrDefault();
-
-                if (linker == null)
-                {
-                    Console.WriteLine($"Cannot find linker in directory '{libDirectory.FullName}'");
-                    Environment.Exit(ErrorCodes.LinkError);
-                }
-            }
-
-            return $"-dynamic-linker {linker.FullName}";
-        }
-
-        private static string DetermineGCCDirectory(DirectoryInfo libDirectory)
-        {
-            var gccDirectory = libDirectory.GetDirectories("gcc").FirstOrDefault();
-            if (gccDirectory == null)
-            {
-                Console.WriteLine($"Cannot find gcc in directory '{libDirectory.FullName}'");
-                Environment.Exit(ErrorCodes.LinkError);
-            }
-
-            var platformDirectory = gccDirectory.GetDirectories("x86_64*gnu").FirstOrDefault();
-            if (platformDirectory == null)
-            {
-                Console.WriteLine($"Cannot find x86_64 libs in directory '{gccDirectory.FullName}'");
-                Environment.Exit(ErrorCodes.LinkError);
-            }
-
-            var versionDirectory = platformDirectory.GetDirectories().FirstOrDefault();
-            if (versionDirectory == null)
-            {
-                Console.WriteLine($"Cannot find any versions of gcc directory {platformDirectory.FullName}'");
-                Environment.Exit(ErrorCodes.LinkError);
-            }
-            return versionDirectory.FullName;
         }
     }
 }

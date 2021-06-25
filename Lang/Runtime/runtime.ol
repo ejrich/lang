@@ -6,10 +6,23 @@ struct List<T> {
     T* data;
 }
 
-// @Future Update strings to use this struct
 struct string {
     int length;
     u8* data;
+}
+
+operator == string(string a, string b) {
+    if (a.length != b.length) then return false;
+
+    each i in 0..a.length-1 {
+        if a[i] != b[i] then return false;
+    }
+
+    return true;
+}
+
+operator != string(string a, string b) {
+    return !(a == b);
 }
 
 
@@ -64,8 +77,9 @@ u32 size_of(Type type) {
 }
 
 
-// Basic IO functions
+// Basic functions
 printf(string format, ... args) #extern "libc"
+exit(int exit_code) #extern "libc"
 
 
 // Runtime functions
@@ -86,4 +100,19 @@ int __start(int argc, string* argv) {
     }
 
     return exit_code;
+}
+
+assert(bool assertion, int exit_code = 1) {
+    if assertion then return;
+
+    printf("Assertion failed\n");
+    exit(exit_code);
+}
+
+assert(bool assertion, string message, int exit_code = 1) {
+    if assertion then return;
+
+    if message.length == 0 then printf("Assertion failed\n");
+    else then printf("Assertion failed: %s\n", message);
+    exit(exit_code);
 }

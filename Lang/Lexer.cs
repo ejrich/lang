@@ -146,6 +146,28 @@ namespace Lang
                     continue;
                 }
 
+                // Interpret character literals
+                if (currentToken?.Type == TokenType.Apostrophe)
+                {
+                    currentToken.Type = TokenType.Character;
+                    currentToken.Value = $"{character}";
+                    continue;
+                }
+
+                if (currentToken?.Type == TokenType.Character)
+                {
+                    yield return currentToken;
+                    if (character != '\'')
+                    {
+                        errors.Add(new ParseError {Error = $"Expected a single digit character", Token = currentToken});
+                    }
+                    else
+                    {
+                        currentToken = null;
+                    }
+                    continue;
+                }
+
                 // Skip over whitespace and emit the current token if not null
                 if (char.IsWhiteSpace(character))
                 {
@@ -410,6 +432,7 @@ namespace Lang
         Number,
         Boolean,
         Literal,
+        Character,
         Return,
         If,
         Else,
@@ -455,6 +478,7 @@ namespace Lang
         Colon = ':',
         SemiColon = ';',
         Quote = '"',
+        Apostrophe = '\'',
         LessThan = '<',
         GreaterThan = '>',
         Comma = ',',
