@@ -22,15 +22,20 @@ namespace Lang.Backend
         private LLVMTypeRef _stringType;
         private LLVMTypeRef _u8PointerType;
 
+        private bool _emitDebug;
+        private LLVMDIBuilderRef _debugBuilder;
+        private LLVMMetadataRef _debugCompilationUnit;
+        private List<LLVMMetadataRef> _debugFiles;
+
         private readonly Queue<LLVMValueRef> _allocationQueue = new();
-        private readonly LLVMValueRef _zeroInt = LLVM.ConstInt(LLVMTypeRef.Int32Type(), 0, false);
+        private readonly LLVMValueRef _zeroInt = LLVM.ConstInt(LLVM.Int32Type(), 0, false);
         private readonly TypeDefinition _intTypeDefinition = new() {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
 
         public string Build(ProjectFile project, ProgramGraph programGraph, BuildSettings buildSettings)
         {
             _programGraph = programGraph;
             // 1. Initialize the LLVM module and builder
-            InitLLVM(project.Name, buildSettings.Release);
+            InitLLVM(project, buildSettings.Release);
 
             // 2. Write Data section
             var globals = WriteData();
@@ -109,9 +114,9 @@ namespace Lang.Backend
             return objectFile;
         }
 
-        private void InitLLVM(string projectName, bool optimize)
+        private void InitLLVM(ProjectFile project, bool optimize)
         {
-            _module = LLVM.ModuleCreateWithName(projectName);
+            _module = LLVM.ModuleCreateWithName(project.Name);
             _builder = LLVM.CreateBuilder();
             _passManager = LLVM.CreateFunctionPassManagerForModule(_module);
             if (optimize)
@@ -124,6 +129,14 @@ namespace Lang.Backend
                 LLVM.AddCFGSimplificationPass(_passManager);
 
                 LLVM.InitializeFunctionPassManager(_passManager);
+            }
+            else
+            {
+                _emitDebug = true;
+                _debugBuilder = LLVM.NewDIBuilder(_module);
+                _debugCompilationUnit = LLVM.DIBuilderCreateCompileUnit(_debugBuilder, 2, "", "obj", "ol", 0, string.Empty, 0);
+                _debugFiles = project.SourceFiles.Select(file =>
+                    LLVM.DIBuilderCreateFile(_debugBuilder, Path.GetFileName(file), Path.GetDirectoryName(file))).ToList();
             }
         }
 
@@ -147,7 +160,7 @@ namespace Lang.Backend
                 }
             }
             _stringType = LLVM.GetTypeByName(_module, "string");
-            _u8PointerType = LLVMTypeRef.PointerType(LLVMTypeRef.Int8Type(), 0);
+            _u8PointerType = LLVM.PointerType(LLVM.Int8Type(), 0);
 
             // 2. Declare variables
             var globals = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>();
@@ -209,8 +222,8 @@ namespace Lang.Backend
             {
                 var typeNameString = BuildString(type.Name);
 
-                var typeKind = LLVM.ConstInt(LLVMTypeRef.Int32Type(), (uint)type.TypeKind, false);
-                var typeSize = LLVM.ConstInt(LLVMTypeRef.Int32Type(), type.Size, false);
+                var typeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)type.TypeKind, false);
+                var typeSize = LLVM.ConstInt(LLVM.Int32Type(), type.Size, false);
 
                 LLVMValueRef fields;
                 if (type is StructAst structAst)
@@ -222,7 +235,7 @@ namespace Lang.Backend
                         var field = structAst.Fields[i];
 
                         var fieldNameString = BuildString(field.Name);
-                        var fieldOffset = LLVM.ConstInt(LLVMTypeRef.Int32Type(), field.Offset, false);
+                        var fieldOffset = LLVM.ConstInt(LLVM.Int32Type(), field.Offset, false);
 
                         var typeField = LLVM.ConstStruct(new [] {fieldNameString, fieldOffset, typePointers[field.Type.GenericName].typeInfo}, false);
 
@@ -236,13 +249,13 @@ namespace Lang.Backend
 
                     fields = LLVM.ConstStruct(new []
                     {
-                        LLVM.ConstInt(LLVMTypeRef.Int32Type(), (ulong)structAst.Fields.Count, false),
+                        LLVM.ConstInt(LLVM.Int32Type(), (ulong)structAst.Fields.Count, false),
                         typeFieldArrayGlobal
                     }, false);
                 }
                 else
                 {
-                    fields = LLVM.ConstStruct(new []{_zeroInt, LLVM.ConstNull(LLVMTypeRef.PointerType(typeFieldType, 0))}, false);
+                    fields = LLVM.ConstStruct(new []{_zeroInt, LLVM.ConstNull(LLVM.PointerType(typeFieldType, 0))}, false);
                 }
 
                 LLVMValueRef enumValues;
@@ -255,7 +268,7 @@ namespace Lang.Backend
                         var value = enumAst.Values[i];
 
                         var enumValueNameString = BuildString(value.Name);
-                        var enumValue = LLVM.ConstInt(LLVMTypeRef.Int32Type(), (uint)value.Value, false);
+                        var enumValue = LLVM.ConstInt(LLVM.Int32Type(), (uint)value.Value, false);
 
                         enumValueRefs[i] = LLVM.ConstStruct(new [] {enumValueNameString, enumValue}, false);
                     }
@@ -267,13 +280,13 @@ namespace Lang.Backend
 
                     enumValues = LLVM.ConstStruct(new []
                     {
-                        LLVM.ConstInt(LLVMTypeRef.Int32Type(), (ulong)enumAst.Values.Count, false),
+                        LLVM.ConstInt(LLVM.Int32Type(), (ulong)enumAst.Values.Count, false),
                         enumValuesArrayGlobal
                     }, false);
                 }
                 else
                 {
-                    enumValues = LLVM.ConstStruct(new [] {_zeroInt, LLVM.ConstNull(LLVMTypeRef.PointerType(enumValueType, 0))}, false);
+                    enumValues = LLVM.ConstStruct(new [] {_zeroInt, LLVM.ConstNull(LLVM.PointerType(enumValueType, 0))}, false);
                 }
 
                 LLVMValueRef returnType;
@@ -308,14 +321,14 @@ namespace Lang.Backend
 
                     arguments = LLVM.ConstStruct(new []
                     {
-                        LLVM.ConstInt(LLVMTypeRef.Int32Type(), (ulong)function.Arguments.Count, false),
+                        LLVM.ConstInt(LLVM.Int32Type(), (ulong)function.Arguments.Count, false),
                         argumentArrayGlobal
                     }, false);
                 }
                 else
                 {
-                    returnType = LLVM.ConstNull(LLVMTypeRef.PointerType(typeFieldType, 0));
-                    arguments = LLVM.ConstStruct(new []{_zeroInt, LLVM.ConstNull(LLVMTypeRef.PointerType(argumentType, 0))}, false);
+                    returnType = LLVM.ConstNull(LLVM.PointerType(typeFieldType, 0));
+                    arguments = LLVM.ConstStruct(new []{_zeroInt, LLVM.ConstNull(LLVM.PointerType(argumentType, 0))}, false);
                 }
 
                 LLVM.SetInitializer(typeInfo, LLVM.ConstStruct(new [] {typeNameString, typeKind, typeSize, fields, enumValues, returnType, arguments}, false));
@@ -326,7 +339,7 @@ namespace Lang.Backend
             SetPrivateConstant(typeArrayGlobal);
             LLVM.SetInitializer(typeArrayGlobal, typeArray);
 
-            var typeCount = LLVM.ConstInt(LLVMTypeRef.Int32Type(), (ulong)types.Length, false);
+            var typeCount = LLVM.ConstInt(LLVM.Int32Type(), (ulong)types.Length, false);
             LLVM.SetInitializer(typeTable, LLVM.ConstStruct(new [] {typeCount, typeArrayGlobal}, false));
 
             return globals;
@@ -432,6 +445,11 @@ namespace Lang.Backend
             LLVM.InitializeX86AsmParser();
             LLVM.InitializeX86AsmPrinter();
 
+            if (_emitDebug)
+            {
+                LLVM.DIBuilderFinalize(_debugBuilder);
+            }
+
             var target = LLVM.GetTargetFromName("x86-64");
             var targetTriple = Marshal.PtrToStringAnsi(LLVM.GetDefaultTargetTriple());
             LLVM.SetTarget(_module, targetTriple);
@@ -481,7 +499,7 @@ namespace Lang.Backend
                         {
                             var listType = declaration.Type.Generics[0];
                             var targetType = ConvertTypeDefinition(listType);
-                            var arrayType = LLVMTypeRef.ArrayType(targetType, declaration.Type.ConstCount.Value);
+                            var arrayType = LLVM.ArrayType(targetType, declaration.Type.ConstCount.Value);
                             var listData = LLVM.BuildAlloca(_builder, arrayType, "listdata");
                             _allocationQueue.Enqueue(listData);
                         }
@@ -540,7 +558,7 @@ namespace Lang.Backend
                 case WhileAst:
                     return BuildAllocations(ast.Children);
                 case EachAst each:
-                    var indexVariable = LLVM.BuildAlloca(_builder, LLVMTypeRef.Int32Type(), each.IterationVariable);
+                    var indexVariable = LLVM.BuildAlloca(_builder, LLVM.Int32Type(), each.IterationVariable);
                     _allocationQueue.Enqueue(indexVariable);
 
                     switch (each.Iteration)
@@ -609,7 +627,7 @@ namespace Lang.Backend
                 _allocationQueue.Enqueue(paramsVariable);
 
                 var targetType = ConvertTypeDefinition(paramsTypeDef);
-                var arrayType = LLVMTypeRef.ArrayType(targetType, (uint)(call.Arguments.Count - functionDef.Arguments.Count + 1));
+                var arrayType = LLVM.ArrayType(targetType, (uint)(call.Arguments.Count - functionDef.Arguments.Count + 1));
                 var listData = LLVM.BuildAlloca(_builder, arrayType, "listdata");
                 _allocationQueue.Enqueue(listData);
             }
@@ -637,7 +655,7 @@ namespace Lang.Backend
                     var targetType = ConvertTypeDefinition(listType);
 
                     var count = (ConstantAst)field.Type.Count;
-                    var arrayType = LLVMTypeRef.ArrayType(targetType, uint.Parse(count.Value));
+                    var arrayType = LLVM.ArrayType(targetType, uint.Parse(count.Value));
                     var listData = LLVM.BuildAlloca(_builder, arrayType, "listdata");
                     _allocationQueue.Enqueue(listData);
                 }
@@ -806,7 +824,7 @@ namespace Lang.Backend
                                 var enumName = structFieldRef.TypeNames[0];
                                 var enumDef = (EnumAst)_programGraph.Types[enumName];
                                 var value = enumDef.Values[structFieldRef.ValueIndices[0]].Value;
-                                var enumValue = LLVM.ConstInt(LLVMTypeRef.Int32Type(), (ulong)value, false);
+                                var enumValue = LLVM.ConstInt(LLVM.Int32Type(), (ulong)value, false);
                                 LLVM.BuildStore(_builder, enumValue, field);
                                 break;
                             case null:
@@ -821,14 +839,14 @@ namespace Lang.Backend
         private void InitializeConstList(LLVMValueRef list, uint length, TypeDefinition listType)
         {
             // 1. Set the count field
-            var countValue = LLVM.ConstInt(LLVMTypeRef.Int32Type(), (ulong)length, false);
+            var countValue = LLVM.ConstInt(LLVM.Int32Type(), (ulong)length, false);
             var countPointer = LLVM.BuildStructGEP(_builder, list, 0, "countptr");
             LLVM.BuildStore(_builder, countValue, countPointer);
 
             // 2. Initialize the list data array
             var targetType = ConvertTypeDefinition(listType);
             var listData = _allocationQueue.Dequeue();
-            var listDataPointer = LLVM.BuildBitCast(_builder, listData, LLVMTypeRef.PointerType(targetType, 0), "tmpdata");
+            var listDataPointer = LLVM.BuildBitCast(_builder, listData, LLVM.PointerType(targetType, 0), "tmpdata");
             var dataPointer = LLVM.BuildStructGEP(_builder, list, 1, "dataptr");
             LLVM.BuildStore(_builder, listDataPointer, dataPointer);
         }
@@ -1035,7 +1053,7 @@ namespace Lang.Backend
             // 2. Initialize the first variable in the loop and the compare target
             if (each.Iteration != null)
             {
-                LLVM.BuildStore(_builder, GetConstZero(LLVMTypeRef.Int32Type()), indexVariable);
+                LLVM.BuildStore(_builder, GetConstZero(LLVM.Int32Type()), indexVariable);
 
                 switch (iterationType!.Name)
                 {
@@ -1107,7 +1125,7 @@ namespace Lang.Backend
             }
 
             // 6. Increment and/or move the iteration variable
-            var nextValue = LLVM.BuildAdd(_builder, indexValue, LLVM.ConstInt(LLVMTypeRef.Int32Type(), 1, false), "inc");
+            var nextValue = LLVM.BuildAdd(_builder, indexValue, LLVM.ConstInt(LLVM.Int32Type(), 1, false), "inc");
             LLVM.BuildStore(_builder, nextValue, indexVariable);
 
             // 7. Write jump to the loop
@@ -1137,7 +1155,7 @@ namespace Lang.Backend
                     if (!localVariables.TryGetValue(identifier.Name, out var typeValue))
                     {
                         var typeDef = _programGraph.Types[identifier.Name];
-                        return (_intTypeDefinition, LLVM.ConstInt(LLVMTypeRef.Int32Type(), (uint)typeDef.TypeIndex, false));
+                        return (_intTypeDefinition, LLVM.ConstInt(LLVM.Int32Type(), (uint)typeDef.TypeIndex, false));
                     }
                     var (type, value) = typeValue;
                     if (type.TypeKind == TypeKind.String)
@@ -1208,7 +1226,7 @@ namespace Lang.Backend
                         uint paramsIndex = 0;
                         for (var i = functionDef.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
                         {
-                            var pointer = LLVM.BuildGEP(_builder, dataPointer, new [] {LLVM.ConstInt(LLVMTypeRef.Int32Type(), paramsIndex, false)}, "indexptr");
+                            var pointer = LLVM.BuildGEP(_builder, dataPointer, new [] {LLVM.ConstInt(LLVM.Int32Type(), paramsIndex, false)}, "indexptr");
                             var (_, value) = WriteExpression(call.Arguments[i], localVariables);
                             LLVM.BuildStore(_builder, value, pointer);
                         }
@@ -1233,7 +1251,7 @@ namespace Lang.Backend
                             var (type, value) = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
                             if (type.Name == "float")
                             {
-                                value = LLVM.BuildFPExt(_builder, value, LLVMTypeRef.DoubleType(), "tmpdouble");
+                                value = LLVM.BuildFPExt(_builder, value, LLVM.DoubleType(), "tmpdouble");
                             }
                             callArguments[i] = value;
                         }
@@ -1350,7 +1368,7 @@ namespace Lang.Backend
                 case TypeDefinition typeDef:
                 {
                     var type = _programGraph.Types[typeDef.GenericName];
-                    return (_intTypeDefinition, LLVM.ConstInt(LLVMTypeRef.Int32Type(), (uint)type.TypeIndex, false));
+                    return (_intTypeDefinition, LLVM.ConstInt(LLVM.Int32Type(), (uint)type.TypeIndex, false));
                 }
                 case CastAst cast:
                 {
@@ -1471,7 +1489,7 @@ namespace Lang.Backend
                 return stringPointer;
             }
 
-            var length = LLVM.ConstInt(LLVMTypeRef.Int32Type(), (uint)value.Length, false);
+            var length = LLVM.ConstInt(LLVM.Int32Type(), (uint)value.Length, false);
             return LLVM.ConstNamedStruct(_stringType, new [] {length, stringPointer});
         }
 
@@ -1784,11 +1802,11 @@ namespace Lang.Backend
                         {
                             if (lhsFloat.Bytes > rhsFloat.Bytes)
                             {
-                                rhs.value = LLVM.BuildFPCast(_builder, rhs.value, LLVMTypeRef.DoubleType(), "tmpfp");
+                                rhs.value = LLVM.BuildFPCast(_builder, rhs.value, LLVM.DoubleType(), "tmpfp");
                             }
                             else if (lhsFloat.Bytes < rhsFloat.Bytes)
                             {
-                                lhs.value = LLVM.BuildFPCast(_builder, lhs.value, LLVMTypeRef.DoubleType(), "tmpfp");
+                                lhs.value = LLVM.BuildFPCast(_builder, lhs.value, LLVM.DoubleType(), "tmpfp");
                             }
                             var (predicate, name) = ConvertRealOperator(op);
                             return LLVM.BuildFCmp(_builder, predicate, lhs.value, rhs.value, name);
@@ -2003,22 +2021,22 @@ namespace Lang.Backend
         {
             if (type.Name == "*")
             {
-                return LLVMTypeRef.PointerType(ConvertTypeDefinition(type.Generics[0], externFunction, true), 0);
+                return LLVM.PointerType(ConvertTypeDefinition(type.Generics[0], externFunction, true), 0);
             }
 
             return type.PrimitiveType switch
             {
                 IntegerType integerType => GetIntegerType(integerType),
-                FloatType floatType => floatType.Bytes == 8 ? LLVM.DoubleType() : LLVMTypeRef.FloatType(),
+                FloatType floatType => floatType.Bytes == 8 ? LLVM.DoubleType() : LLVM.FloatType(),
                 EnumType enumType => GetIntegerType(enumType),
                 _ => type.Name switch
                 {
-                    "bool" => LLVMTypeRef.Int1Type(),
-                    "void" => pointer ? LLVMTypeRef.Int8Type() : LLVMTypeRef.VoidType(),
+                    "bool" => LLVM.Int1Type(),
+                    "void" => pointer ? LLVM.Int8Type() : LLVM.VoidType(),
                     "List" => GetListType(type),
                     "Params" => GetListType(type),
-                    "string" => externFunction ? LLVMTypeRef.PointerType(LLVMTypeRef.Int8Type(), 0) : LLVM.GetTypeByName(_module, "string"),
-                    "Type" => LLVMTypeRef.Int32Type(),
+                    "string" => externFunction ? LLVM.PointerType(LLVM.Int8Type(), 0) : LLVM.GetTypeByName(_module, "string"),
+                    "Type" => LLVM.Int32Type(),
                     _ => GetStructType(type)
                 }
             };
@@ -2028,11 +2046,11 @@ namespace Lang.Backend
         {
             return primitive.Bytes switch
             {
-                1 => LLVMTypeRef.Int8Type(),
-                2 => LLVMTypeRef.Int16Type(),
-                4 => LLVMTypeRef.Int32Type(),
-                8 => LLVMTypeRef.Int64Type(),
-                _ => LLVMTypeRef.Int32Type()
+                1 => LLVM.Int8Type(),
+                2 => LLVM.Int16Type(),
+                4 => LLVM.Int32Type(),
+                8 => LLVM.Int64Type(),
+                _ => LLVM.Int32Type()
             };
         }
 
@@ -2053,7 +2071,7 @@ namespace Lang.Backend
         {
             if (_programGraph.Types.TryGetValue(type.Name, out var typeDef) && typeDef is EnumAst)
             {
-                return LLVMTypeRef.Int32Type();
+                return LLVM.Int32Type();
             }
 
             return LLVM.GetTypeByName(_module, type.GenericName);
