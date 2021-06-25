@@ -1125,7 +1125,9 @@ namespace Lang
             {
                 switch (declaration.Value)
                 {
-                    case ConstantAst:
+                    case ConstantAst constant:
+                        constant.Type.Constant = true;
+                        break;
                     case StructFieldRefAst structField when structField.IsEnum:
                         break;
                     default:
