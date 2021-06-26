@@ -4093,7 +4093,7 @@ namespace Lang.Backend
             OrcDisposeMangledSymbol(ptr);
         }
 
-        public static LLVMMetadataRef DIBuilderCreateCompileUnit(LLVMDIBuilderRef DIBuilder, uint Language, string File, string Directory, string Producer, bool Optimized, string Flags, uint RuntimeVersion, string SplitName, uint Kind, uint DWOId, bool SplitDebugInlining, bool DebugInfoForProfiling, string SysRoot, string SDK)
+        public static LLVMMetadataRef DIBuilderCreateCompileUnit(LLVMDIBuilderRef DIBuilder, uint Language, string File, string Directory, string Producer, bool Optimized, string Flags, uint RuntimeVersion, string SplitName = "", uint Kind = 0, uint DWOId = 0, bool SplitDebugInlining = false, bool DebugInfoForProfiling = false, string SysRoot = "", string SDK = "")
         {
             var compileUnitFile = DIBuilderCreateFile(DIBuilder, File, Directory);
             return DIBuilderCreateCompileUnit(DIBuilder, Language, compileUnitFile, Producer, (uint)Producer.Length, Optimized, Flags, (uint)Flags.Length, RuntimeVersion, SplitName, (uint)SplitName.Length, Kind, DWOId, SplitDebugInlining, DebugInfoForProfiling, SysRoot, (uint)SysRoot.Length, SDK, (uint)SDK.Length);
