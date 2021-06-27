@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using LLVMSharp.Interop;
 
 namespace Lang.Backend
@@ -458,13 +459,12 @@ namespace Lang.Backend
                 LLVM.DIBuilderFinalize(_debugBuilder);
             }
 
-            var target = LLVMTargetRef.GetTargetFromTriple("x86-64");
-            // TODO Figure this out
-            // var targetTriple = Marshal.PtrToStringAnsi(LLVM.GetDefaultTargetTriple());
-            // LLVM.SetTarget(_module, targetTriple);
+            var target = LLVMTargetRef.Targets.FirstOrDefault(t => t.Name == "x86-64");
+            var defaultTriple = LLVMTargetRef.DefaultTriple;
+            _module.Target = defaultTriple;
 
-            var targetMachine = target.CreateTargetMachine(LLVMTargetRef.DefaultTriple, "generic", "", LLVMCodeGenOptLevel.LLVMCodeGenLevelNone, LLVMRelocMode.LLVMRelocDefault, LLVMCodeModel.LLVMCodeModelDefault);
-            // _module.DataLayout = targetMachine.CreateTargetDataLayout(); // TODO Figure this out
+            var targetMachine = target.CreateTargetMachine(defaultTriple, "generic", "", LLVMCodeGenOptLevel.LLVMCodeGenLevelAggressive, LLVMRelocMode.LLVMRelocDefault, LLVMCodeModel.LLVMCodeModelDefault);
+            _module.DataLayout = Marshal.PtrToStringAnsi(targetMachine.CreateTargetDataLayout().Handle);
 
             if (outputIntermediate)
             {
