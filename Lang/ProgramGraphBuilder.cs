@@ -20,7 +20,7 @@ namespace Lang
     {
         public int FileIndex { get; init; }
         public string Error { get; init; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
     }
 
@@ -3018,7 +3018,8 @@ namespace Lang
                     }
                     else
                     {
-                        var pointerType = VerifyType(typeDef.Generics[0], depth + 1);
+                        var type = typeDef.Generics[0];
+                        var pointerType = VerifyType(type, depth + 1);
                         if (pointerType == TypeKind.Error)
                         {
                             typeDef.TypeKind = TypeKind.Error;
@@ -3029,7 +3030,7 @@ namespace Lang
                         }
                         else
                         {
-                            var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeIndex = _programGraph.TypeCount++, TypeKind = TypeKind.Pointer, Size = 8};
+                            var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeIndex = _programGraph.TypeCount++, TypeKind = TypeKind.Pointer, Size = 8, PointerType = type};
                             _programGraph.Types.Add(typeDef.GenericName, pointer);
                             typeDef.TypeKind = TypeKind.Pointer;
                         }
