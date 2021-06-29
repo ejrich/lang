@@ -415,8 +415,8 @@ namespace Lang.Backend
                 }
 
                 var file = _debugFiles[functionAst.FileIndex];
-                var functionType = _debugBuilder.CreateSubroutineType(file, debugArgumentTypes, LLVMDIFlags.LLVMDIFlagPrototyped);
-                _debugFunctions[name] = _debugBuilder.CreateFunction(file, debugName, name, file, functionAst.Line, functionType, 0, 0, functionAst.Line, 0, 0);
+                var functionType = _debugBuilder.CreateSubroutineType(file, debugArgumentTypes, LLVMDIFlags.LLVMDIFlagZero);
+                _debugFunctions[name] = _debugBuilder.CreateFunction(file, debugName, name, file, functionAst.Line, functionType, 0, 1, functionAst.Line, LLVMDIFlags.LLVMDIFlagPrototyped, 0);
             }
             else
             {
@@ -439,33 +439,11 @@ namespace Lang.Backend
             var localVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>(globals);
 
             // 2. Allocate arguments on the stack
-            LLVMMetadataRef block = null;
-            if (_emitDebug)
+            for (var i = 0; i < argumentCount; i++)
             {
-                block = _debugFunctions[functionName];
-                var file = _debugFiles[functionAst.FileIndex];
-                for (var i = 0; i < argumentCount; i++)
-                {
-                    var arg = functionAst.Arguments[i];
-                    var allocation = _builder.BuildAlloca(ConvertTypeDefinition(arg.Type), arg.Name);
-                    localVariables[arg.Name] = (arg.Type, allocation);
-
-                    using var argName = new MarshaledString(arg.Name);
-
-                    var debugType = GetDebugType(arg.Type);
-                    var debugVariable = LLVM.DIBuilderCreateParameterVariable(_debugBuilder, block, argName.Value, (UIntPtr)argName.Length, (uint)i+1, file, arg.Line, debugType, 0, LLVMDIFlags.LLVMDIFlagZero);
-                    var location = LLVM.DIBuilderCreateDebugLocation(_context, arg.Line, arg.Column, block, null);
-                    LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, allocation, debugType, null, location, entryBlock);
-                }
-            }
-            else
-            {
-                for (var i = 0; i < argumentCount; i++)
-                {
-                    var arg = functionAst.Arguments[i];
-                    var allocation = _builder.BuildAlloca(ConvertTypeDefinition(arg.Type), arg.Name);
-                    localVariables[arg.Name] = (arg.Type, allocation);
-                }
+                var arg = functionAst.Arguments[i];
+                var allocation = _builder.BuildAlloca(ConvertTypeDefinition(arg.Type), arg.Name);
+                localVariables[arg.Name] = (arg.Type, allocation);
             }
 
             // 3. Build allocations at the beginning of the function
@@ -478,12 +456,36 @@ namespace Lang.Backend
             }
 
             // 4. Store initial argument values
-            for (var i = 0; i < argumentCount; i++)
+            LLVMMetadataRef block = null;
+            if (_emitDebug)
             {
-                var arg = functionAst.Arguments[i];
-                var argument = LLVM.GetParam(function, (uint) i);
-                var variable = localVariables[arg.Name].value;
-                LLVM.BuildStore(_builder, argument, variable);
+                block = _debugFunctions[functionName];
+                var file = _debugFiles[functionAst.FileIndex];
+                for (var i = 0; i < argumentCount; i++)
+                {
+                    var arg = functionAst.Arguments[i];
+                    var argument = LLVM.GetParam(function, (uint) i);
+                    var variable = localVariables[arg.Name].value;
+                    LLVM.BuildStore(_builder, argument, variable);
+
+                    using var argName = new MarshaledString(arg.Name);
+
+                    var debugType = GetDebugType(arg.Type);
+                    var debugVariable = LLVM.DIBuilderCreateParameterVariable(_debugBuilder, block, argName.Value, (UIntPtr)argName.Length, (uint)i+1, file, arg.Line, debugType, 0, LLVMDIFlags.LLVMDIFlagZero);
+                    var location = LLVM.DIBuilderCreateDebugLocation(_context, arg.Line, arg.Column, block, null);
+
+                    LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, variable, debugVariable, LLVM.DIBuilderCreateExpression(_debugBuilder, null, (UIntPtr)0), location, entryBlock);
+                }
+            }
+            else
+            {
+                for (var i = 0; i < argumentCount; i++)
+                {
+                    var arg = functionAst.Arguments[i];
+                    var argument = LLVM.GetParam(function, (uint) i);
+                    var variable = localVariables[arg.Name].value;
+                    LLVM.BuildStore(_builder, argument, variable);
+                }
             }
 
             // 5. Loop through function body
@@ -509,23 +511,24 @@ namespace Lang.Backend
 
             // 7. Verify the function
             LLVM.RunFunctionPassManager(_passManager, function);
-            #if DEBUG
-            LLVM.VerifyFunction(function, LLVMVerifierFailureAction.LLVMPrintMessageAction);
-            #endif
         }
 
         private void Compile(string objectFile, bool outputIntermediate)
         {
+            if (_emitDebug)
+            {
+                LLVM.DIBuilderFinalize(_debugBuilder);
+            }
+
+            #if DEBUG
+            LLVM.VerifyModule(_module, LLVMVerifierFailureAction.LLVMPrintMessageAction, null);
+            #endif
+
             LLVM.InitializeX86TargetInfo();
             LLVM.InitializeX86Target();
             LLVM.InitializeX86TargetMC();
             LLVM.InitializeX86AsmParser();
             LLVM.InitializeX86AsmPrinter();
-
-            if (_emitDebug)
-            {
-                LLVM.DIBuilderFinalize(_debugBuilder);
-            }
 
             var target = LLVMTargetRef.Targets.FirstOrDefault(t => t.Name == "x86-64");
             var defaultTriple = LLVMTargetRef.DefaultTriple;
@@ -2188,6 +2191,7 @@ namespace Lang.Backend
 
                     fields[i] = LLVM.DIBuilderCreateMemberType(_debugBuilder, structDecl, fieldName.Value, (UIntPtr)fieldName.Length, file, structField.Line, structField.Size * 8, 0, structField.Offset * 8, LLVMDIFlags.LLVMDIFlagZero, GetDebugType(structField.Type));
                 }
+                LLVM.DisposeTemporaryMDNode(structDecl);
             }
 
             fixed (LLVMMetadataRef* fieldsPointer = fields)
