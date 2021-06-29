@@ -21,7 +21,7 @@ namespace Lang
         public int FileIndex { get; init; }
         public string Error { get; init; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
     }
 
     public interface IProgramGraphBuilder
