@@ -497,7 +497,7 @@ namespace Lang.Backend
             foreach (var ast in functionAst.Children)
             {
                 // 5a. Recursively write out lines
-                if (WriteFunctionLine(ast, localVariables, function))
+                if (WriteFunctionLine(ast, localVariables, function, block))
                 {
                     returned = true;
                     break;
@@ -751,43 +751,37 @@ namespace Lang.Backend
             }
         }
 
-        private bool WriteFunctionLine(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)//, LLVMMetadataRef block)
+        private bool WriteFunctionLine(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function, LLVMMetadataRef block)
         {
-            var returned = false;
+            if (_emitDebug)
+            {
+                LLVM.SetCurrentDebugLocation2(_builder, LLVM.DIBuilderCreateDebugLocation(_context, ast.Line, ast.Column, block, null));
+            }
+
             switch (ast)
             {
                 case ReturnAst returnAst:
                     WriteReturnStatement(returnAst, localVariables);
                     return true;
                 case DeclarationAst declaration:
-                    WriteDeclaration(declaration, localVariables);
+                    WriteDeclaration(declaration, localVariables, function, block);
                     break;
                 case AssignmentAst assignment:
                     WriteAssignment(assignment, localVariables);
                     break;
                 case ScopeAst scope:
-                    returned = WriteScope(scope.Children, localVariables, function);
-                    break;
+                    return WriteScope(scope, scope.Children, localVariables, function, block);
                 case ConditionalAst conditional:
-                    returned = WriteConditional(conditional, localVariables, function);
-                    break;
+                    return WriteConditional(conditional, localVariables, function, block);
                 case WhileAst whileAst:
-                    returned = WriteWhile(whileAst, localVariables, function);
-                    break;
+                    return WriteWhile(whileAst, localVariables, function, block);
                 case EachAst each:
-                    returned = WriteEach(each, localVariables, function);
-                    break;
+                    return WriteEach(each, localVariables, function, block);
                 default:
                     WriteExpression(ast, localVariables);
                     break;
             }
-
-            // if (_emitDebug)
-            // {
-            //     LLVM.CurrentDebugLocation;
-            // }
-
-            return returned;
+            return false;
         }
 
         private void WriteReturnStatement(ReturnAst returnAst, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
@@ -810,7 +804,7 @@ namespace Lang.Backend
             LLVM.BuildRet(_builder, returnValue);
         }
 
-        private void WriteDeclaration(DeclarationAst declaration, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
+        private void WriteDeclaration(DeclarationAst declaration, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function, LLVMMetadataRef block)
         {
             // 1. Declare variable on the stack
             var type = ConvertTypeDefinition(declaration.Type);
@@ -832,6 +826,18 @@ namespace Lang.Backend
 
             var variable = _allocationQueue.Dequeue();
             localVariables.Add(declaration.Name, (declaration.Type, variable));
+            if (_emitDebug)
+            {
+                using var name = new MarshaledString(declaration.Name);
+
+                var file = _debugFiles[declaration.FileIndex];
+                var debugType = GetDebugType(declaration.Type);
+                var debugVariable = LLVM.DIBuilderCreateAutoVariable(_debugBuilder, block, name.Value, (UIntPtr)name.Length, file, declaration.Line, debugType, 0, LLVMDIFlags.LLVMDIFlagZero, 0);
+                var location = LLVM.GetCurrentDebugLocation2(_builder);
+                var expression = LLVM.DIBuilderCreateExpression(_debugBuilder, null, (UIntPtr)0);
+                // TODO Pass the current basic block as a parameter and update in WriteFunctionLine
+                LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, variable, debugVariable, expression, location, function.EntryBasicBlock);
+            }
 
             // 2. Set value if it exists
             if (declaration.Value != null)
@@ -996,15 +1002,23 @@ namespace Lang.Backend
             }
         }
 
-        private bool WriteScope(List<IAst> scopeChildren, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)
+        private bool WriteScope(IAst sourceAst, List<IAst> scopeChildren, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function, LLVMMetadataRef block)
         {
+            if (!scopeChildren.Any()) return false;
+
             // 1. Create scope variables
             var scopeVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>(localVariables);
 
             // 2. Write function lines
+            if (_emitDebug)
+            {
+                var file = _debugFiles[sourceAst.FileIndex];
+                // TODO Update this to be the line and column of the beginning of the scope more accurately if necessary
+                block = LLVM.DIBuilderCreateLexicalBlock(_debugBuilder, block, file, sourceAst.Line, sourceAst.Column);
+            }
             foreach (var ast in scopeChildren)
             {
-                if (WriteFunctionLine(ast, scopeVariables, function))
+                if (WriteFunctionLine(ast, scopeVariables, function, block))
                 {
                     return true;
                 }
@@ -1012,7 +1026,7 @@ namespace Lang.Backend
             return false;
         }
 
-        private bool WriteConditional(ConditionalAst conditional, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)
+        private bool WriteConditional(ConditionalAst conditional, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function, LLVMMetadataRef block)
         {
             // 1. Write out the condition
             var condition = BuildConditionExpression(conditional.Condition, localVariables);
@@ -1025,7 +1039,7 @@ namespace Lang.Backend
 
             // 3. Write out if body
             LLVM.PositionBuilderAtEnd(_builder, thenBlock);
-            var ifReturned = WriteScope(conditional.Children, localVariables, function);
+            var ifReturned = WriteScope(conditional, conditional.Children, localVariables, function, block);
 
             if (!ifReturned)
             {
@@ -1047,7 +1061,7 @@ namespace Lang.Backend
             }
 
             // 4. Write out the else if necessary
-            var elseReturned = WriteScope(conditional.Else, localVariables, function);
+            var elseReturned = WriteScope(conditional, conditional.Else, localVariables, function, block);
 
             // 5. Return if both branches return
             if (ifReturned && elseReturned)
@@ -1069,7 +1083,7 @@ namespace Lang.Backend
             return false;
         }
 
-        private bool WriteWhile(WhileAst whileAst, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)
+        private bool WriteWhile(WhileAst whileAst, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function, LLVMMetadataRef block)
         {
             // 1. Break to the while loop
             var whileCondition = function.AppendBasicBlock("whilecondblock");
@@ -1086,7 +1100,7 @@ namespace Lang.Backend
             LLVM.PositionBuilderAtEnd(_builder, whileBody);
             foreach (var ast in whileAst.Children)
             {
-                var returned = WriteFunctionLine(ast, localVariables, function);
+                var returned = WriteFunctionLine(ast, localVariables, function, block);
                 if (returned)
                 {
                     LLVM.DeleteBasicBlock(afterWhile);
@@ -1114,7 +1128,7 @@ namespace Lang.Backend
             };
         }
 
-        private bool WriteEach(EachAst each, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)
+        private bool WriteEach(EachAst each, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function, LLVMMetadataRef block)
         {
             var eachVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>(localVariables);
 
@@ -1209,9 +1223,14 @@ namespace Lang.Backend
 
             // 5. Write out each loop body
             LLVM.PositionBuilderAtEnd(_builder, eachBody);
+            if (_emitDebug)
+            {
+                var file = _debugFiles[each.FileIndex];
+                block = LLVM.DIBuilderCreateLexicalBlock(_debugBuilder, block, file, each.Line, each.Column);
+            }
             foreach (var ast in each.Children)
             {
-                var returned = WriteFunctionLine(ast, eachVariables, function);
+                var returned = WriteFunctionLine(ast, eachVariables, function, block);
                 if (returned)
                 {
                     LLVM.DeleteBasicBlock(afterEach);

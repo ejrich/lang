@@ -9,6 +9,16 @@
         "stopAtEntry": false,
         "cwd": "${workspaceRoot}"
       }
+    },
+    "Launch - Debug": {
+      "adapter": "vscode-cpptools",
+      "configuration": {
+        "request": "launch",
+        "program": "${workspaceRoot}/Example/bin/Example",
+        "cwd": "${workspaceRoot}",
+        "externalConsole": true,
+        "MIMode": "gdb"
+      }
     }
   }
 }
