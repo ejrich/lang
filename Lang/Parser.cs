@@ -942,7 +942,7 @@ namespace Lang
             }
         }
 
-        private static ScopeAst ParseScope(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction)
+        private static ScopeAst ParseScope(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction, bool topLevel = false)
         {
             var scopeAst = CreateAst<ScopeAst>(enumerator.Current);
 
@@ -955,9 +955,7 @@ namespace Lang
                     break;
                 }
 
-                var ast = ParseLine(enumerator, errors, currentFunction);
-                if (ast != null)
-                    scopeAst.Children.Add(ast);
+                scopeAst.Children.Add(topLevel ? ParseTopLevelAst(enumerator, errors) : ParseLine(enumerator, errors, currentFunction));
             }
 
             if (!closed)
@@ -985,26 +983,15 @@ namespace Lang
                 case TokenType.Then:
                 {
                     // Parse single AST
+                    conditionalAst.IfBlock = CreateAst<ScopeAst>(enumerator.Current);
                     enumerator.MoveNext();
-                    var ast = topLevel ? ParseTopLevelAst(enumerator, errors) : ParseLine(enumerator, errors, currentFunction);
-                    if (ast != null)
-                        conditionalAst.Children.Add(ast);
+                    conditionalAst.IfBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator, errors) : ParseLine(enumerator, errors, currentFunction));
                     break;
                 }
                 case TokenType.OpenBrace:
                 {
                     // Parse until close brace
-                    while (enumerator.MoveNext())
-                    {
-                        if (enumerator.Current.Type == TokenType.CloseBrace)
-                        {
-                            break;
-                        }
-
-                        var ast = topLevel ? ParseTopLevelAst(enumerator, errors) : ParseLine(enumerator, errors, currentFunction);
-                        if (ast != null)
-                            conditionalAst.Children.Add(ast);
-                    }
+                    conditionalAst.IfBlock = ParseScope(enumerator, errors, currentFunction, topLevel);
                     break;
                 }
                 case null:
@@ -1032,32 +1019,22 @@ namespace Lang
                     case TokenType.Then:
                     {
                         // Parse single AST
+                        conditionalAst.ElseBlock = CreateAst<ScopeAst>(enumerator.Current);
                         enumerator.MoveNext();
-                        var ast = topLevel ? ParseTopLevelAst(enumerator, errors) : ParseLine(enumerator, errors, currentFunction);
-                        if (ast != null)
-                            conditionalAst.Else.Add(ast);
+                        conditionalAst.ElseBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator, errors) : ParseLine(enumerator, errors, currentFunction));
                         break;
                     }
                     case TokenType.OpenBrace:
                     {
                         // Parse until close brace
-                        while (enumerator.MoveNext())
-                        {
-                            if (enumerator.Current.Type == TokenType.CloseBrace)
-                            {
-                                break;
-                            }
-
-                            var ast = topLevel ? ParseTopLevelAst(enumerator, errors) : ParseLine(enumerator, errors, currentFunction);
-                            if (ast != null)
-                                conditionalAst.Else.Add(ast);
-                        }
+                        conditionalAst.ElseBlock = ParseScope(enumerator, errors, currentFunction, topLevel);
                         break;
                     }
                     case TokenType.If:
                         // Nest another conditional in else children
+                        conditionalAst.ElseBlock = CreateAst<ScopeAst>(enumerator.Current);
                         var conditional = ParseConditional(enumerator, errors, currentFunction);
-                        conditionalAst.Else.Add(conditional);
+                        conditionalAst.ElseBlock.Children.Add(conditional);
                         break;
                     case null:
                         errors.Add(new ParseError {Error = "Expected body of else branch", Token = enumerator.Last});
@@ -1088,16 +1065,15 @@ namespace Lang
                 case TokenType.Then:
                 {
                     // Parse single AST
+                    whileAst.Block = CreateAst<ScopeAst>(enumerator.Current);
                     enumerator.MoveNext();
-                    var ast = ParseLine(enumerator, errors, currentFunction);
-                    if (ast != null)
-                        whileAst.Children.Add(ast);
+                    whileAst.Block.Children.Add(ParseLine(enumerator, errors, currentFunction));
                     break;
                 }
                 case TokenType.OpenBrace:
                 {
                     // Parse until close brace
-                    whileAst.Children.Add(ParseScope(enumerator, errors, currentFunction));
+                    whileAst.Block = ParseScope(enumerator, errors, currentFunction);
                     break;
                 }
                 case null:
