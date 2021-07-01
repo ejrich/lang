@@ -1,6 +1,6 @@
 {
   "configurations": {
-    "launch - Example": {
+    "launch - Compile Example": {
       "adapter": "netcoredbg",
       "configuration": {
         "request": "launch",
@@ -8,6 +8,16 @@
         "args": ["-S", "${workspaceRoot}/Example/Example.olproj"],
         "stopAtEntry": false,
         "cwd": "${workspaceRoot}"
+      }
+    },
+    "Launch - Debug Example": {
+      "adapter": "vscode-cpptools",
+      "configuration": {
+        "request": "launch",
+        "program": "${workspaceRoot}/Example/bin/Example",
+        "cwd": "${workspaceRoot}",
+        "externalConsole": true,
+        "MIMode": "gdb"
       }
     }
   }

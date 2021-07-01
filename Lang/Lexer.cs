@@ -59,8 +59,7 @@ namespace Lang
             Token currentToken = null;
             var closingMultiLineComment = false;
             var literalEscapeToken = false;
-            var line = 1;
-            var column = 0;
+            uint line = 1, column = 1;
 
             while (reader.Peek() > 0)
             {
@@ -187,7 +186,7 @@ namespace Lang
                             };
                             currentToken.Type = TokenType.Range;
                             currentToken.Value = "..";
-                            currentToken.Column += number.Length;
+                            currentToken.Column += (uint)number.Length;
                         }
                         else
                         {
@@ -225,7 +224,7 @@ namespace Lang
                             };
                             currentToken.Type = TokenType.Range;
                             currentToken.Value = "..";
-                            currentToken.Column += number.Length;
+                            currentToken.Column += (uint)number.Length;
                         }
                         else
                         {
@@ -419,8 +418,8 @@ namespace Lang
         public string Value { get; set; }
         public TokenFlags Flags { get; set; }
         public int FileIndex { get; init; }
-        public int Line { get; init; }
-        public int Column { get; set; }
+        public uint Line { get; init; }
+        public uint Column { get; set; }
         public bool Error { get; set; }
     }
 
