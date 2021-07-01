@@ -60,8 +60,8 @@ namespace Lang.Backend
                     var functionName = name switch
                     {
                         "main" => "__main",
-                            "__start" => "main",
-                            _ => GetFunctionName(name, i, functions.Count)
+                        "__start" => "main",
+                        _ => GetFunctionName(name, i, functions.Count)
                     };
                     WriteFunctionDefinition(functionName, function, name, function.Varargs, function.Extern);
                 }
@@ -119,14 +119,14 @@ namespace Lang.Backend
             _passManager = _module.CreateFunctionPassManager();
             if (optimize)
             {
-                _passManager.AddBasicAliasAnalysisPass();
-                _passManager.AddPromoteMemoryToRegisterPass();
-                _passManager.AddInstructionCombiningPass();
-                _passManager.AddReassociatePass();
-                _passManager.AddGVNPass();
-                _passManager.AddCFGSimplificationPass();
+                LLVM.AddBasicAliasAnalysisPass(_passManager);
+                LLVM.AddPromoteMemoryToRegisterPass(_passManager);
+                LLVM.AddInstructionCombiningPass(_passManager);
+                LLVM.AddReassociatePass(_passManager);
+                LLVM.AddGVNPass(_passManager);
+                LLVM.AddCFGSimplificationPass(_passManager);
 
-                _passManager.InitializeFunctionPassManager();
+                LLVM.InitializeFunctionPassManager(_passManager);
             }
             else
             {
