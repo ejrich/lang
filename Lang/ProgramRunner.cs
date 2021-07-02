@@ -28,7 +28,7 @@ namespace Lang
         private readonly Dictionary<string, ValueType> _globalVariables = new();
         private readonly Dictionary<string, Type> _types = new();
         private readonly Dictionary<string, IntPtr> _typeInfoPointers = new();
-        private readonly TypeDefinition _intTypeDefinition = new() {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
+        private readonly TypeDefinition _s32Type = new() {Name = "s32", TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
 
         private readonly Dictionary<string, string> _compilerFunctions = new() {
             { "add_dependency", "AddDependency" }
@@ -706,15 +706,36 @@ namespace Lang
                     length = (int)lengthField!.GetValue(iterator.Value)!;
                 }
 
-                for (var i = 0; i < length; i++)
+                if (each.IndexVariable != null)
                 {
-                    iterationVariable.Value = IntPtr.Add(dataPointer, Marshal.SizeOf(type) * i);
-
-                    var value = ExecuteAsts(each.Children, eachVariables, out returned);
-
-                    if (returned)
+                    var indexVariablePointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(int)));
+                    var indexVariable = new ValueType {Type = _s32Type, Value = indexVariablePointer};
+                    eachVariables.Add(each.IndexVariable, indexVariable);
+                    for (var i = 0; i < length; i++)
                     {
-                        return value;
+                        Marshal.StructureToPtr(i, indexVariablePointer, false);
+                        iterationVariable.Value = IntPtr.Add(dataPointer, Marshal.SizeOf(type) * i);
+
+                        var value = ExecuteAsts(each.Children, eachVariables, out returned);
+
+                        if (returned)
+                        {
+                            return value;
+                        }
+                    }
+                }
+                else
+                {
+                    for (var i = 0; i < length; i++)
+                    {
+                        iterationVariable.Value = IntPtr.Add(dataPointer, Marshal.SizeOf(type) * i);
+
+                        var value = ExecuteAsts(each.Children, eachVariables, out returned);
+
+                        if (returned)
+                        {
+                            return value;
+                        }
                     }
                 }
             }
@@ -782,7 +803,7 @@ namespace Lang
                     if (!variables.TryGetValue(identifier.Name, out var variable))
                     {
                         var type = _programGraph.Types[identifier.Name];
-                        return new ValueType {Type = _intTypeDefinition, Value = type.TypeIndex};
+                        return new ValueType {Type = _s32Type, Value = type.TypeIndex};
                     }
 
                     var value = variable.Type.CArray ? variable.Value : PointerToTargetType(GetPointer(variable.Value), variable.Type);
@@ -926,7 +947,7 @@ namespace Lang
                 case TypeDefinition typeDef:
                 {
                     var type = _programGraph.Types[typeDef.GenericName];
-                    return new ValueType {Type = _intTypeDefinition, Value = type.TypeIndex};
+                    return new ValueType {Type = _s32Type, Value = type.TypeIndex};
                 }
                 case CastAst cast:
                 {

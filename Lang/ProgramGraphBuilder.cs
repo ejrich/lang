@@ -39,6 +39,7 @@ namespace Lang
         private readonly Dictionary<string, List<FunctionAst>> _polymorphicFunctions = new();
         private readonly Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads = new();
         private readonly Dictionary<string, IAst> _globalIdentifiers = new();
+        private readonly TypeDefinition _s32Type = new() {Name = "s32", TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
 
         public ProgramGraphBuilder(IPolymorpher polymorpher, IProgramRunner programRunner)
         {
@@ -271,7 +272,7 @@ namespace Lang
 
             if (enumAst.BaseType == null)
             {
-                enumAst.BaseType = new TypeDefinition {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
+                enumAst.BaseType = _s32Type;
             }
             else
             {
@@ -1425,7 +1426,7 @@ namespace Lang
             }
             if (allowEnums && identifier is EnumAst enumAst)
             {
-                return new TypeDefinition {Name = enumAst.Name};
+                return new TypeDefinition {Name = enumAst.Name, TypeKind = TypeKind.Enum};
             }
             if (identifier is not DeclarationAst declaration)
             {
@@ -1595,12 +1596,15 @@ namespace Lang
                 if (variableTypeDefinition == null) return false;
                 var iterator = new DeclarationAst {Name = each.IterationVariable, Type = variableTypeDefinition.Generics.FirstOrDefault()};
 
+                if (each.IndexVariable != null)
+                {
+                    var indexVariable = new DeclarationAst {Name = each.IndexVariable, Type = _s32Type};
+                    eachIdentifiers.TryAdd(each.IndexVariable, indexVariable);
+                }
+
                 switch (variableTypeDefinition.Name)
                 {
                     case "List":
-                        each.IteratorType = iterator.Type;
-                        eachIdentifiers.TryAdd(each.IterationVariable, iterator);
-                        break;
                     case "Params":
                         each.IteratorType = iterator.Type;
                         eachIdentifiers.TryAdd(each.IterationVariable, iterator);
@@ -1624,11 +1628,7 @@ namespace Lang
                 {
                     AddError($"Expected range to end with 'int', but got '{PrintTypeDefinition(end)}'", each.RangeEnd);
                 }
-                var iterType = new DeclarationAst
-                {
-                    Name = each.IterationVariable,
-                    Type = new TypeDefinition {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}}
-                };
+                var iterType = new DeclarationAst {Name = each.IterationVariable, Type = _s32Type};
                 if (!eachIdentifiers.TryAdd(each.IterationVariable, iterType))
                 {
                     AddError($"Iteration variable '{each.IterationVariable}' already exists in scope", each);
@@ -1688,7 +1688,7 @@ namespace Lang
                                 AddError($"Cannot determine type for function '{identifierAst.Name}' that has multiple overloads", identifierAst);
                                 return null;
                             }
-                            return new TypeDefinition {Name = "Type", TypeIndex = functions[0].TypeIndex};
+                            return new TypeDefinition {Name = "Type", TypeKind = TypeKind.Type, TypeIndex = functions[0].TypeIndex};
                         }
                         AddError($"Identifier '{identifierAst.Name}' not defined", identifierAst);
                     }
@@ -1709,7 +1709,7 @@ namespace Lang
                             {
                                 AddError($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
                             }
-                            return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
+                            return new TypeDefinition {Name = "Type", TypeKind = TypeKind.Type, TypeIndex = type.TypeIndex};
                         default:
                             return null;
                     }
@@ -1740,7 +1740,7 @@ namespace Lang
                                 AddError($"Cannot determine type for function '{identifierAst.Name}' that has multiple overloads", identifierAst);
                                 return null;
                             }
-                            return new TypeDefinition {Name = "Type", TypeIndex = functions[0].TypeIndex};
+                            return new TypeDefinition {Name = "Type", TypeKind = TypeKind.Type, TypeIndex = functions[0].TypeIndex};
                         }
                         AddError($"Identifier '{identifierAst.Name}' not defined", identifierAst);
                     }
@@ -1753,7 +1753,7 @@ namespace Lang
                             {
                                 AddError($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
                             }
-                            return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
+                            return new TypeDefinition {Name = "Type", TypeKind = TypeKind.Type, TypeIndex = type.TypeIndex};
                         default:
                             return null;
                     }
@@ -1796,7 +1796,7 @@ namespace Lang
                             return null;
                         }
 
-                        var pointerType = new TypeDefinition {Name = "*"};
+                        var pointerType = new TypeDefinition {Name = "*", TypeKind = TypeKind.Pointer};
                         if (referenceType.CArray)
                         {
                             pointerType.Generics.Add(referenceType.Generics[0]);
@@ -1864,7 +1864,7 @@ namespace Lang
                     {
                         return null;
                     }
-                    return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
+                    return new TypeDefinition {Name = "Type", TypeKind = TypeKind.Type, TypeIndex = type.TypeIndex};
                 }
                 case CastAst cast:
                 {
@@ -1965,7 +1965,7 @@ namespace Lang
             }
 
             var primitive = enumAst.BaseType.PrimitiveType;
-            return new TypeDefinition {Name = enumAst.Name, PrimitiveType = new EnumType {Bytes = primitive.Bytes, Signed = primitive.Signed}};
+            return new TypeDefinition {Name = enumAst.Name, TypeKind = TypeKind.Enum, PrimitiveType = new EnumType {Bytes = primitive.Bytes, Signed = primitive.Signed}};
         }
 
         private TypeDefinition VerifyCall(CallAst call, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
@@ -2089,7 +2089,7 @@ namespace Lang
                         {
                             var typeIndex = new ConstantAst
                             {
-                                Type = new TypeDefinition {PrimitiveType = new IntegerType {Signed = true, Bytes = 4}}
+                                Type = new TypeDefinition {TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Signed = true, Bytes = 4}}
                             };
                             if (argument.TypeIndex.HasValue)
                             {
@@ -2138,7 +2138,7 @@ namespace Lang
                                 {
                                     var typeIndex = new ConstantAst
                                     {
-                                        Type = new TypeDefinition {PrimitiveType = new IntegerType {Signed = true, Bytes = 4}}
+                                        Type = new TypeDefinition {TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Signed = true, Bytes = 4}}
                                     };
                                     if (argument.TypeIndex.HasValue)
                                     {
@@ -2178,14 +2178,14 @@ namespace Lang
                         case FloatType {Bytes: 4}:
                             arguments[i] = argument = new TypeDefinition
                             {
-                                Name = "float64", PrimitiveType = new FloatType {Bytes = 8}
+                                Name = "float64", TypeKind = TypeKind.Float, PrimitiveType = new FloatType {Bytes = 8}
                             };
                             break;
                         // Enums should be called as integers
                         case EnumType enumType:
                             arguments[i] = argument = new TypeDefinition
                             {
-                                Name = argument.Name,
+                                Name = argument.Name, TypeKind = TypeKind.Integer,
                                 PrimitiveType = new IntegerType {Bytes = enumType.Bytes, Signed = enumType.Signed}
                             };
                             break;
@@ -2601,7 +2601,7 @@ namespace Lang
                     }
 
                     nullAst.TargetType = expression.Type;
-                    expression.Type = new TypeDefinition {Name = "bool"};
+                    expression.Type = new TypeDefinition {Name = "bool", TypeKind = TypeKind.Boolean};
                     expression.ResultingTypes.Add(expression.Type);
                     continue;
                 }
@@ -2638,7 +2638,7 @@ namespace Lang
                             if (type != TypeKind.Boolean || nextType != TypeKind.Boolean)
                             {
                                 AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
-                                expression.Type = new TypeDefinition {Name = "bool"};
+                                expression.Type = new TypeDefinition {Name = "bool", TypeKind = TypeKind.Boolean};
                             }
                             break;
                         // Requires same types and returns bool
@@ -2661,7 +2661,7 @@ namespace Lang
                             {
                                 AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
                             }
-                            expression.Type = new TypeDefinition {Name = "bool"};
+                            expression.Type = new TypeDefinition {Name = "bool", TypeKind = TypeKind.Boolean};
                             break;
                         // Requires same types and returns more precise type
                         case Operator.Add:
@@ -2698,7 +2698,7 @@ namespace Lang
                                     expression.Type = new TypeDefinition
                                     {
                                         Name = $"{(integerType.Signed ? "s" : "u")}{integerType.Bytes * 8}",
-                                        PrimitiveType = integerType
+                                        TypeKind = TypeKind.Integer, PrimitiveType = integerType
                                     };
                                 }
                                 // For floating point operations, convert to the larger size
@@ -2741,7 +2741,7 @@ namespace Lang
                                 expression.Type = new TypeDefinition
                                 {
                                     Name = $"{(integerType.Signed ? "s" : "u")}{integerType.Bytes * 8}",
-                                    PrimitiveType = integerType
+                                    TypeKind = TypeKind.Integer, PrimitiveType = integerType
                                 };
                             }
                             else if (!(type == TypeKind.Boolean && nextType == TypeKind.Boolean))
@@ -2754,7 +2754,7 @@ namespace Lang
                                 else if (!(type == TypeKind.Boolean || type == TypeKind.Integer))
                                 {
                                     // If the type can't be determined, default to int
-                                    expression.Type = new TypeDefinition {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
+                                    expression.Type = _s32Type;
                                 }
                             }
                             break;
@@ -2774,7 +2774,7 @@ namespace Lang
                                     else
                                     {
                                         // If the type can't be determined, default to int
-                                        expression.Type = new TypeDefinition {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
+                                        expression.Type = _s32Type;
                                     }
                                 }
                             }
