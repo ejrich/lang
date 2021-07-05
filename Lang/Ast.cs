@@ -279,6 +279,7 @@ namespace Lang
         public uint Line { get; init; }
         public uint Column { get; init; }
         public string IterationVariable { get; set; }
+        public string IndexVariable { get; set; }
         public IAst Iteration { get; set; }
         public TypeDefinition IteratorType { get; set; }
         public IAst RangeBegin { get; set; }
