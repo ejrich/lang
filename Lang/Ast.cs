@@ -442,7 +442,7 @@ namespace Lang
         Float,
         String,
         Pointer,
-        List,
+        Array,
         Enum,
         Struct,
         Function,

@@ -7,7 +7,7 @@ main() {
 }
 
 function_overloads() {
-    sum_list: List<int>[7];
+    sum_list: Array<int>[7];
     sum_list[0] = 4;
     sum_list[1] = 41;
     sum_list[2] = 544;
@@ -17,11 +17,11 @@ function_overloads() {
     sum_list[6] = 23;
     // type_of(sum); // Does not compile due to multiple overloads of 'sum'
 
-    printf("Sum of List   = %d\n", sum(sum_list));
+    printf("Sum of Array  = %d\n", sum(sum_list));
     printf("Sum of Params = %d\n", sum(4, 41, 544, 244, 42, 14, 23));
 }
 
-int sum(List<int> args) {
+int sum(Array<int> args) {
     sum := 0;
     each i in args then sum += i;
     return sum;
@@ -67,8 +67,8 @@ polymorphic_functions() {
     printf("float_value = %.2f, should be 5.10\n", float_value);
     printf("int_value = %d, should be 45\n", int_value);
 
-    int_list: List<int>[8];
-    string_list: List<string>[8];
+    int_list: Array<int>[8];
+    string_list: Array<string>[8];
     baz(int_list, &float_value);
     baz(int_list, &int_value);
     baz(string_list, &int_value);
@@ -88,7 +88,7 @@ T add_int<T>(T a, int b) {
     return value;
 }
 
-baz<T, U>(List<T> list, U* b) {
+baz<T, U>(Array<T> list, U* b) {
     #assert U == float || U == s32;
     #if U == float then printf("b = %.2f\n", *b);
     else {
