@@ -2039,7 +2039,6 @@ namespace Lang
 
             if (function == null)
             {
-                AddError($"No overload of function '{call.Function}' found with given arguments", call);
                 return null;
             }
 
@@ -2496,6 +2495,10 @@ namespace Lang
             if (functions == null && polymorphicFunctions == null)
             {
                 AddError($"Call to undefined function '{call.Function}'", call);
+            }
+            else
+            {
+                AddError($"No overload of function '{call.Function}' found with given arguments", call);
             }
             return null;
         }

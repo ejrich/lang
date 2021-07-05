@@ -6,6 +6,18 @@ struct Array<T> {
     T* data;
 }
 
+array_insert<T>(Array<T>* array, T value) {
+    // TODO Implement me
+    // Get the size and determine if the array needs to be expanded
+    // If no expansion required, set the value at the index
+    // If expansion required, allocate new data and memcpy the original data
+    // Update the length
+}
+
+array_remove<T>(Array<T>* array, int index) {
+    // TODO Implement me
+}
+
 struct string {
     int length;
     u8* data;
