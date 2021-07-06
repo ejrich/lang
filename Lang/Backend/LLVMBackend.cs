@@ -1382,7 +1382,7 @@ namespace Lang.Backend
                         for (var i = 0; i < functionDef.Arguments.Count - 1; i++)
                         {
                             var value = WriteExpression(call.Arguments[i], localVariables);
-                            callArguments[i] = value.value;
+                            callArguments[i] = CastValue(value, functionDef.Arguments[i].Type);
                         }
 
                         // Rollup the rest of the arguments into an array
@@ -1410,8 +1410,8 @@ namespace Lang.Backend
                         var callArguments = new LLVMValueRef[call.Arguments.Count];
                         for (var i = 0; i < functionDef.Arguments.Count - 1; i++)
                         {
-                            var (_, value) = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
-                            callArguments[i] = value;
+                            var value = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
+                            callArguments[i] = CastValue(value, functionDef.Arguments[i].Type);
                         }
 
                         // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
@@ -1433,8 +1433,8 @@ namespace Lang.Backend
                         var callArguments = new LLVMValueRef[call.Arguments.Count];
                         for (var i = 0; i < call.Arguments.Count; i++)
                         {
-                            var (_, value) = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
-                            callArguments[i] = value;
+                            var value = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
+                            callArguments[i] = CastValue(value, functionDef.Arguments[i].Type);
                         }
                         return (functionDef.ReturnType, _builder.BuildCall(function, callArguments, string.Empty));
                     }
@@ -2043,8 +2043,7 @@ namespace Lang.Backend
             return _builder.BuildCall(overload, new []{lhs, rhs}, string.Empty);
         }
 
-        private LLVMValueRef CastValue((TypeDefinition type, LLVMValueRef value) typeValue, TypeDefinition targetType,
-            bool checkType = true)
+        private LLVMValueRef CastValue((TypeDefinition type, LLVMValueRef value) typeValue, TypeDefinition targetType, bool checkType = true)
         {
             var (type, value) = typeValue;
 
