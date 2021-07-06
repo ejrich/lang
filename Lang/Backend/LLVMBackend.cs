@@ -1018,6 +1018,10 @@ namespace Lang.Backend
             {
                 type = type.Generics[0];
             }
+            else if (assignment.Reference is UnaryAst)
+            {
+                type = type.Generics[0];
+            }
 
             // 2. Evaluate the expression value
             var expression = WriteExpression(assignment.Value, localVariables);
@@ -2073,6 +2077,12 @@ namespace Lang.Backend
                             return _builder.BuildFPCast(value, target, "tmpfp");
                     }
                     break;
+            }
+
+            if (targetType.TypeKind == TypeKind.Pointer)
+            {
+                var pointerType = ConvertTypeDefinition(targetType);
+                return _builder.BuildBitCast(value, pointerType, "ptr");
             }
 
             // @Future Polymorphic type casting
