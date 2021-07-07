@@ -30,8 +30,20 @@ array_insert<T>(Array<T>* array, T value) {
     array.length++;
 }
 
-array_remove<T>(Array<T>* array, int index) {
-    // TODO Implement me
+bool array_remove<T>(Array<T>* array, int index) {
+    length := array.length;
+    if index < 0 || index >= length {
+        return false;
+    }
+
+    if index <= length - 1 {
+        each i in index..length - 2 {
+            array.data[i] = array.data[i + 1];
+        }
+    }
+
+    array.length--;
+    return true;
 }
 
 struct string {

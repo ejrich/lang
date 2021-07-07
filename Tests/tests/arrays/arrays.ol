@@ -50,13 +50,16 @@ dynamic_arrays() {
     }
 
     print_array("Array<int>", a);
+    free(a.data);
 
     array_struct: DynamicArrayStruct;
     each i in 12..16 {
         array_insert(&array_struct.array, i);
     }
+    array_remove(&array_struct.array, 2);
 
     print_array("DynamicArrayStruct.array", array_struct.array);
+    free(array_struct.array.data);
 }
 
 struct DynamicArrayStruct {
