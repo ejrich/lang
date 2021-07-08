@@ -1063,6 +1063,7 @@ namespace Lang
                                 }
                             }
                         }
+                        declaration.Type.ConstCount = (uint)declaration.ArrayValues.Count;
                     }
                 }
             }
