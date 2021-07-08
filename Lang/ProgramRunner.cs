@@ -403,9 +403,19 @@ namespace Lang
 
         private void ExecuteDeclaration(DeclarationAst declaration, IDictionary<string, ValueType> variables)
         {
-            var value = declaration.Value == null ?
-                GetUninitializedValue(declaration.Type, variables, declaration.Assignments) :
-                CastValue(ExecuteExpression(declaration.Value, variables).Value, declaration.Type);
+            object value;
+            if (declaration.Value != null)
+            {
+                value = CastValue(ExecuteExpression(declaration.Value, variables).Value, declaration.Type);
+            }
+            else if (declaration.ArrayValues != null)
+            {
+                value = null; // TODO Implement me
+            }
+            else
+            {
+                value = GetUninitializedValue(declaration.Type, variables, declaration.Assignments);
+            }
 
             var variable = new ValueType {Type = declaration.Type};
             if (declaration.Type.CArray)

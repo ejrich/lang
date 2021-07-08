@@ -1034,7 +1034,37 @@ namespace Lang
             // 4. Verify array initializer
             else if (declaration.ArrayValues != null)
             {
-                // TODO Implement me
+                if (declaration.Type == null)
+                {
+                    AddError($"Declaration for variable '{declaration.Name}' with array initializer must have the type declared", declaration);
+                }
+                else
+                {
+                    var type = VerifyType(declaration.Type);
+                    if (type != TypeKind.Error && type != TypeKind.Array)
+                    {
+                        AddError($"Cannot use array initializer to declare non-array type '{PrintTypeDefinition(declaration.Type)}'", declaration.Type);
+                    }
+                    else
+                    {
+                        var elementType = declaration.Type.Generics[0];
+                        foreach (var value in declaration.ArrayValues)
+                        {
+                            var valueType = VerifyExpression(value, currentFunction, scopeIdentifiers);
+                            if (valueType != null)
+                            {
+                                if (!TypeEquals(elementType, valueType))
+                                {
+                                    AddError($"Expected array value to be type '{PrintTypeDefinition(elementType)}', but got '{PrintTypeDefinition(valueType)}'", value);
+                                }
+                                else if (elementType.PrimitiveType != null && value is ConstantAst constant)
+                                {
+                                    VerifyConstant(constant, elementType);
+                                }
+                            }
+                        }
+                    }
+                }
             }
             // 5. Verify declaration values
             else
@@ -1096,7 +1126,7 @@ namespace Lang
             {
                 if (declaration.Type.CArray && declaration.Type.Count == null)
                 {
-                    AddError($"C array of variable '{declaration.Name}' must be initialized to a constant integer", declaration.Type);
+                    AddError($"Length of C array variable '{declaration.Name}' must be initialized to a constant integer", declaration.Type);
                 }
                 else if (declaration.Type.Count != null)
                 {
@@ -1106,7 +1136,7 @@ namespace Lang
                     {
                         if (declaration.Type.CArray && !isConstant)
                         {
-                            AddError($"C array of variable '{declaration.Name}' must be initialized with a constant size", declaration.Type.Count);
+                            AddError($"Length of C array variable '{declaration.Name}' must be initialized with a constant size", declaration.Type.Count);
                         }
                         else if (countType.PrimitiveType is not IntegerType)
                         {
@@ -1116,7 +1146,7 @@ namespace Lang
                         {
                             if (count < 0)
                             {
-                                AddError($"Expected size of variable '{declaration.Name}' to be a positive integer", declaration.Type.Count);
+                                AddError($"Expected count of variable '{declaration.Name}' to be a positive integer", declaration.Type.Count);
                             }
                             else
                             {
