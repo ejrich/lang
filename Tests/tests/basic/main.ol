@@ -146,13 +146,13 @@ int primitives() {
     return d;
 }
 
-struct ListStruct {
+struct ArrayStruct {
     int something = 5;
-    List<float64>[6] list;
+    Array<float64>[6] list;
 }
 
-List<int> create_list(int count) {
-    list: List<int>[count];
+Array<int> create_list(int count) {
+    list: Array<int>[count];
     each i in 0..count-1 {
         list[i] = i * 5;
     }
@@ -165,7 +165,7 @@ List<int> create_list(int count) {
 }
 
 manipulate_list_struct() {
-    s: ListStruct;
+    s: ArrayStruct;
     s.list[0] = 8.9;
     ++s.list[0];
     printf("%.2f\n", s.list[0]);
@@ -188,7 +188,7 @@ int* pointers() {
         loop_node = loop_node.next;
     }
 
-    list: List<int>[8];
+    list: Array<int>[8];
     list_ptr := &list[4];
     a := 6;
     b := &a;
@@ -202,20 +202,13 @@ string string_test() {
 }
 
 sum_test() {
-    sum_list: List<int>[7];
-    sum_list[0] = 4;
-    sum_list[1] = 41;
-    sum_list[2] = 544;
-    sum_list[3] = 244;
-    sum_list[4] = 42;
-    sum_list[5] = 14;
-    sum_list[6] = 23;
+    sum_list: Array<int> = [4, 41, 544, 244, 42, 14, 23]
 
-    printf("Sum of List   = %d\n", sum(sum_list));
+    printf("Sum of Array   = %d\n", sum(sum_list));
     printf("Sum of Params = %d\n", sum2(4, 41, 544, 244, 42, 14, 23));
 }
 
-int sum(List<int> args) {
+int sum(Array<int> args) {
     sum := 0;
     each i in args then sum += i;
     return sum;
@@ -341,9 +334,9 @@ build() {
 type_information() {
     print_type_info(MyStruct);
     print_type_info(u8);
-    print_type_info(List<string>);
+    print_type_info(Array<string>);
     print_type_info(PolyStruct<int*, float>);
-    print_type_info(PolyStruct<List<int>, float>);
+    print_type_info(PolyStruct<Array<int>, float>);
     print_type_info(s32*);
     print_type_info(State);
 

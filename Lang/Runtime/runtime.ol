@@ -1,9 +1,49 @@
-// Runtime library with types and main function
+// ----------------- Runtime library with types and main function -----------------
 
 // Runtime structs
-struct List<T> {
+struct Array<T> {
     int length;
     T* data;
+}
+
+ARRAY_BLOCK_SIZE := 10; #const
+
+array_insert<T>(Array<T>* array, T value) {
+    // Reallocate the array if necessary
+    length := array.length;
+    if (length % ARRAY_BLOCK_SIZE == 0) {
+        // @Future add custom allocators
+        new_blocks := length / ARRAY_BLOCK_SIZE + 1;
+        element_size := size_of(T);
+
+        new_data := malloc(element_size * new_blocks * ARRAY_BLOCK_SIZE);
+
+        if (length > 0) {
+            memcpy(new_data, array.data, length * element_size);
+            free(array.data);
+        }
+
+        array.data = cast(T*, new_data);
+    }
+
+    array.data[length] = value;
+    array.length++;
+}
+
+bool array_remove<T>(Array<T>* array, int index) {
+    length := array.length;
+    if index < 0 || index >= length {
+        return false;
+    }
+
+    if index <= length - 1 {
+        each i in index..length - 2 {
+            array.data[i] = array.data[i + 1];
+        }
+    }
+
+    array.length--;
+    return true;
 }
 
 struct string {
@@ -38,10 +78,10 @@ struct TypeInfo {
     string name;
     TypeKind type;
     u32 size;
-    List<TypeField> fields;
-    List<EnumValue> enum_values;
+    Array<TypeField> fields;
+    Array<EnumValue> enum_values;
     TypeInfo* return_type;
-    List<ArgumentType> arguments;
+    Array<ArgumentType> arguments;
 }
 
 enum TypeKind {
@@ -51,7 +91,7 @@ enum TypeKind {
     Float;
     String;
     Pointer;
-    List;
+    Array;
     Enum;
     Struct;
     Function;
@@ -73,7 +113,7 @@ struct ArgumentType {
     TypeInfo* type_info;
 }
 
-__type_table: List<TypeInfo*>;
+__type_table: Array<TypeInfo*>;
 
 TypeInfo* type_of(Type type) {
     return __type_table[type];
@@ -87,12 +127,15 @@ u32 size_of(Type type) {
 // Basic functions
 printf(string format, ... args) #extern "libc"
 exit(int exit_code) #extern "libc"
+void* malloc(int size) #extern "libc"
+free(void* data) #extern "libc"
+void* memcpy(void* dest, void* src, int length) #extern "libc"
 
 
 // Runtime functions
 int __start(int argc, u8** argv) {
     exit_code := 0;
-    args: List<string>[argc-1];
+    args: Array<string>[argc-1];
 
     each i in 1..argc-1 then args[i-1] = convert_c_string(argv[i]);
 

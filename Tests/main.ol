@@ -1,6 +1,7 @@
 int main() {
     tests_dir := "Tests/tests"; #const
     dir := opendir(tests_dir);
+    command_buffer = malloc(1000);
     failed_test_count := 0;
     if dir {
         file := readdir(dir);
@@ -19,6 +20,7 @@ int main() {
 
         closedir(dir);
     }
+    free(command_buffer);
 
     if failed_test_count {
         printf("\n%d Test(s) Failed\n", failed_test_count);
@@ -44,7 +46,7 @@ string format_string(string format, Params<string> args) {
     if format.length == 0 then return "";
 
     // @Cleanup This is not good, figure out a better way to do this
-    str: string = {data = malloc(100);}
+    str: string = {data = cast(u8*, malloc(100));}
     arg_index := 0;
     format_index := 0;
 
@@ -121,15 +123,15 @@ bool run_test(string test_dir) {
     return true;
 }
 
+command_buffer: void*;
+
 int run_command(string command) {
     handle := popen(command, "r"); if handle == null {
         printf(" -- Test Failed: Unable to run '%s'\n", command);
         return -1;
     }
 
-    buffer := malloc(1000);
-    while fgets(buffer, 1000, handle) != null {}
-    free(buffer);
+    while fgets(cast(u8*, command_buffer), 1000, handle) != null {}
 
     status := pclose(handle);
     return (status & 0xFF00) >> 8;

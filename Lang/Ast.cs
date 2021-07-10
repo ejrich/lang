@@ -237,7 +237,8 @@ namespace Lang
         public IAst Value { get; set; }
         public bool Constant { get; set; }
         public bool HasGenerics { get; set; }
-        public List<AssignmentAst> Assignments { get; } = new();
+        public List<AssignmentAst> Assignments { get; set; }
+        public List<IAst> ArrayValues { get; set; }
         public List<IAst> Children => null;
     }
 
@@ -442,7 +443,7 @@ namespace Lang
         Float,
         String,
         Pointer,
-        List,
+        Array,
         Enum,
         Struct,
         Function,

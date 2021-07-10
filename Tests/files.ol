@@ -5,7 +5,7 @@ struct dirent {
     u64 d_off;
     u16 d_reclen;
     FileType d_type;
-    List<u8>[256] #c_array d_name;
+    Array<u8>[256] #c_array d_name;
 }
 
 enum FileType : u8 {
@@ -23,9 +23,6 @@ enum FileType : u8 {
 DIR* opendir(string dirname) #extern "libc"
 int closedir(DIR* dir) #extern "libc"
 dirent* readdir(DIR* dir) #extern "libc"
-
-u8* malloc(int size) #extern "libc"
-free(u8* data) #extern "libc"
 
 struct FILE {}
 
