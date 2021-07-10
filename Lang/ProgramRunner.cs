@@ -176,13 +176,13 @@ namespace Lang
                 // Get required types and allocate the array
                 var typeInfoArrayType = _types["Array.*.TypeInfo"];
                 var typeInfoType = _types["TypeInfo"];
-                var typeInfoPointerType = typeInfoType.MakePointerType();
+                var typeInfoSize = Marshal.SizeOf(typeInfoType);
 
+                const int pointerSize = 8;
                 var typeTable = Activator.CreateInstance(typeInfoArrayType);
-                _typeDataPointer = InitializeConstArray(typeTable, typeInfoArrayType, typeInfoPointerType, programGraph.TypeCount);
+                _typeDataPointer = InitializeConstArray(typeTable, typeInfoArrayType, pointerSize, programGraph.TypeCount);
 
                 // Create TypeInfo pointers
-                const int pointerSize = 8;
                 var newTypeInfos = new List<(IType type, object typeInfo, IntPtr typeInfoPointer)>();
                 foreach (var (name, type) in programGraph.Types)
                 {
@@ -197,7 +197,7 @@ namespace Lang
                         var typeSizeField = typeInfoType.GetField("size");
                         typeSizeField.SetValue(typeInfo, type.Size);
 
-                        _typeInfoPointers[name] = typeInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoType));
+                        _typeInfoPointers[name] = typeInfoPointer = Marshal.AllocHGlobal(typeInfoSize);
                         newTypeInfos.Add((type, typeInfo, typeInfoPointer));
                     }
 
@@ -219,7 +219,7 @@ namespace Lang
                             var typeKindField = typeInfoType.GetField("type");
                             typeKindField.SetValue(typeInfo, function.TypeKind);
 
-                            _typeInfoPointers[$"{name}.{i}"] = typeInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoType));
+                            _typeInfoPointers[$"{name}.{i}"] = typeInfoPointer = Marshal.AllocHGlobal(typeInfoSize);
                             newTypeInfos.Add((function, typeInfo, typeInfoPointer));
                         }
 
@@ -249,7 +249,7 @@ namespace Lang
                         {
                             case StructAst structAst:
                                 var typeFieldArray = Activator.CreateInstance(typeFieldArrayType);
-                                InitializeConstArray(typeFieldArray, typeFieldArrayType, typeFieldType, structAst.Fields.Count);
+                                InitializeConstArray(typeFieldArray, typeFieldArrayType, typeFieldSize, structAst.Fields.Count);
 
                                 var typeFieldsField = typeInfoType.GetField("fields");
                                 typeFieldsField.SetValue(typeInfo, typeFieldArray);
@@ -276,7 +276,7 @@ namespace Lang
                                 break;
                             case EnumAst enumAst:
                                 var enumValueArray = Activator.CreateInstance(enumValueArrayType);
-                                InitializeConstArray(enumValueArray, enumValueArrayType, enumValueType, enumAst.Values.Count);
+                                InitializeConstArray(enumValueArray, enumValueArrayType, enumValueSize, enumAst.Values.Count);
 
                                 var enumValuesField = typeInfoType.GetField("enum_values");
                                 enumValuesField.SetValue(typeInfo, enumValueArray);
@@ -304,7 +304,7 @@ namespace Lang
 
                                 var argumentArray = Activator.CreateInstance(argumentArrayType);
                                 var argumentCount = function.Varargs ? function.Arguments.Count - 1 : function.Arguments.Count;
-                                InitializeConstArray(argumentArray, argumentArrayType, argumentType, argumentCount);
+                                InitializeConstArray(argumentArray, argumentArrayType, argumentSize, argumentCount);
 
                                 var argumentsField = typeInfoType.GetField("arguments");
                                 argumentsField.SetValue(typeInfo, argumentArray);
@@ -549,7 +549,7 @@ namespace Lang
                 var array = Activator.CreateInstance(arrayType);
                 if (type.ConstCount != null)
                 {
-                    var arrayPointer = InitializeConstArray(array, arrayType, elementType, (int)type.ConstCount.Value);
+                    var arrayPointer = InitializeConstArray(array, arrayType, elementSize, (int)type.ConstCount.Value);
 
                     if (arrayValues != null)
                     {
@@ -559,19 +559,19 @@ namespace Lang
                 else if (type.Count != null)
                 {
                     var length = (int)ExecuteExpression(type.Count, variables).Value;
-                    InitializeConstArray(array, arrayType, elementType, length);
+                    InitializeConstArray(array, arrayType, elementSize, length);
                 }
 
                 return array;
             }
         }
 
-        private static IntPtr InitializeConstArray(object array, Type arrayType, Type genericType, int length)
+        private static IntPtr InitializeConstArray(object array, Type arrayType, int elementSize, int length)
         {
             var countField = arrayType.GetField("length");
             countField!.SetValue(array, length);
             var dataField = arrayType.GetField("data");
-            var arrayPointer = Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * length);
+            var arrayPointer = Marshal.AllocHGlobal(elementSize * length);
             dataField!.SetValue(array, arrayPointer);
             return arrayPointer;
         }
@@ -1217,7 +1217,7 @@ namespace Lang
                 var paramsType = GetTypeFromDefinition(elementType);
                 var arrayType = _types[$"Array.{elementType.GenericName}"];
                 var paramsArray = Activator.CreateInstance(arrayType);
-                InitializeConstArray(paramsArray, arrayType, paramsType, call.Arguments.Count - function.Arguments.Count + 1);
+                InitializeConstArray(paramsArray, arrayType, Marshal.SizeOf(paramsType), call.Arguments.Count - function.Arguments.Count + 1);
 
                 var dataField = arrayType.GetField("data");
                 var data = dataField!.GetValue(paramsArray);
