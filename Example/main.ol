@@ -220,14 +220,7 @@ string string_test() {
 }
 
 sum_test() {
-    sum_list: Array<int>[7];
-    sum_list[0] = 4;
-    sum_list[1] = 41;
-    sum_list[2] = 544;
-    sum_list[3] = 244;
-    sum_list[4] = 42;
-    sum_list[5] = 14;
-    sum_list[6] = 23;
+    sum_list: Array<int> = [4, 41, 544, 244, 42, 14, 23]
     // print_type_info(sum); // Does not compile
 
     printf("Sum of Array  = %d\n", sum(sum_list));
