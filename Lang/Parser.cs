@@ -662,7 +662,7 @@ namespace Lang
                 var generic = structAst.Generics[i];
                 foreach (var field in structAst.Fields)
                 {
-                    if (SearchForGeneric(generic, i, field.Type))
+                    if (field.Type != null && SearchForGeneric(generic, i, field.Type))
                     {
                         field.HasGenerics = true;
                     }
@@ -687,6 +687,15 @@ namespace Lang
                     Error = $"Unexpected token in struct field '{errorToken.Value}'",
                     Token = errorToken
                 });
+                // Parse to a ; or }
+                while (enumerator.MoveNext())
+                {
+                    var tokenType = enumerator.Current.Type;
+                    if (tokenType == TokenType.SemiColon || tokenType == TokenType.CloseBrace)
+                    {
+                        break;
+                    }
+                }
                 return structField;
             }
 
