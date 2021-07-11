@@ -758,30 +758,47 @@ namespace Lang.Backend
             }
         }
 
-        private void BuildStructAllocations(string name, List<AssignmentAst> values = null)
+        private void BuildStructAllocations(string name, Dictionary<string, AssignmentAst> assignments = null)
         {
-            var assignments = values?.ToDictionary(_ => (_.Reference as IdentifierAst)!.Name);
             var structDef = _programGraph.Types[name] as StructAst;
-            foreach (var field in structDef!.Fields)
+            if (assignments == null)
             {
-                if (assignments != null && assignments.TryGetValue(field.Name, out var assignment))
+                foreach (var field in structDef!.Fields)
                 {
-                    BuildAllocations(assignment.Value);
+                    BuildAllocations(field);
                 }
-                else if (field.Type.TypeKind == TypeKind.Array && !field.Type.CArray && field.Type.Count != null)
+            }
+            else
+            {
+                foreach (var field in structDef!.Fields)
                 {
-                    var elementType = field.Type.Generics[0];
-                    var targetType = ConvertTypeDefinition(elementType);
+                    if (assignments.TryGetValue(field.Name, out var assignment))
+                    {
+                        BuildAllocations(assignment.Value);
+                    }
+                    else
+                    {
+                        BuildAllocations(field);
+                    }
+                }
+            }
+        }
 
-                    var count = field.Type.ConstCount.Value;
-                    var arrayType = LLVM.ArrayType(targetType, count);
-                    var arrayData = _builder.BuildAlloca(arrayType, "arraydata");
-                    _allocationQueue.Enqueue(arrayData);
-                }
-                else if (field.Type.TypeKind == TypeKind.Struct)
-                {
-                    BuildStructAllocations(field.Type.GenericName);
-                }
+        private void BuildAllocations(StructFieldAst field)
+        {
+            if (field.Type.TypeKind == TypeKind.Array && !field.Type.CArray && field.Type.Count != null)
+            {
+                var elementType = field.Type.Generics[0];
+                var targetType = ConvertTypeDefinition(elementType);
+
+                var count = field.Type.ConstCount.Value;
+                var arrayType = LLVM.ArrayType(targetType, count);
+                var arrayData = _builder.BuildAlloca(arrayType, "arraydata");
+                _allocationQueue.Enqueue(arrayData);
+            }
+            else if (field.Type.TypeKind == TypeKind.Struct)
+            {
+                BuildStructAllocations(field.Type.GenericName);
             }
         }
 
@@ -945,7 +962,7 @@ namespace Lang.Backend
             }
         }
 
-        private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, List<AssignmentAst> assignments)
+        private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, Dictionary<string, AssignmentAst> assignments)
         {
             var structDef = _programGraph.Types[typeDef.GenericName] as StructAst;
             if (assignments == null)
@@ -961,14 +978,13 @@ namespace Lang.Backend
             }
             else
             {
-                var assignmentDictionary = assignments.ToDictionary(_ => (_.Reference as IdentifierAst).Name);
                 for (var i = 0; i < structDef!.Fields.Count; i++)
                 {
                     var field = structDef.Fields[i];
 
                     var fieldPointer = _builder.BuildStructGEP(variable, (uint)i, field.Name);
 
-                    if (assignmentDictionary.TryGetValue(field.Name, out var assignment))
+                    if (assignments.TryGetValue(field.Name, out var assignment))
                     {
                         var expression = WriteExpression(assignment.Value, localVariables);
                         var value = CastValue(expression, field.Type);

@@ -432,7 +432,7 @@ namespace Lang
             variables[declaration.Name] = variable;
         }
 
-        private object GetUninitializedValue(TypeDefinition typeDef, IDictionary<string, ValueType> variables, List<AssignmentAst> assignments)
+        private object GetUninitializedValue(TypeDefinition typeDef, IDictionary<string, ValueType> variables, Dictionary<string, AssignmentAst> assignments)
         {
             switch (typeDef.TypeKind)
             {
@@ -456,7 +456,7 @@ namespace Lang
             }
         }
 
-        private object InitializeStruct(Type type, StructAst structAst, IDictionary<string, ValueType> variables, List<AssignmentAst> assignments)
+        private object InitializeStruct(Type type, StructAst structAst, IDictionary<string, ValueType> variables, Dictionary<string, AssignmentAst> assignments)
         {
             var instance = Activator.CreateInstance(type);
 
@@ -471,12 +471,11 @@ namespace Lang
             }
             else
             {
-                var assignmentDictionary = assignments.ToDictionary(_ => (_.Reference as IdentifierAst)!.Name);
                 foreach (var field in structAst.Fields)
                 {
                     var fieldInstance = instance!.GetType().GetField(field.Name);
 
-                    if (assignmentDictionary.TryGetValue(field.Name, out var assignment))
+                    if (assignments.TryGetValue(field.Name, out var assignment))
                     {
                         var expression = ExecuteExpression(assignment.Value, variables);
                         var value = CastValue(expression.Value, field.Type);
