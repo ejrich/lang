@@ -61,15 +61,15 @@ operator_overloading() {
 }
 
 struct Vector3 {
-    float x;
-    float y;
-    float z;
+    x: float;
+    y: float;
+    z: float;
 }
 
 struct Vector3I {
-    int x;
-    int y;
-    int z;
+    x: int;
+    y: int;
+    z: int;
 }
 
 // Numeric operator overloads, these will return the overload type
@@ -188,8 +188,8 @@ generic_overloads() {
 }
 
 struct PolyStruct<T, U> {
-    T a;
-    U b;
+    a: T;
+    b: U;
 }
 
 operator + PolyStruct<T, U>(PolyStruct<T, U> a, PolyStruct<T, U> b) {
@@ -233,9 +233,9 @@ index_overloading() {
 }
 
 struct SOAVector3 {
-    Array<float>[5] x;
-    Array<float>[5] y;
-    Array<float>[5] z;
+    x: Array<float>[5];
+    y: Array<float>[5];
+    z: Array<float>[5];
 }
 
 operator [] SOAVector3(SOAVector3 a, int index) : Vector3 {
@@ -244,8 +244,8 @@ operator [] SOAVector3(SOAVector3 a, int index) : Vector3 {
 }
 
 struct ArrayStruct<T> {
-    int max = 10;
-    Array<T>[10] list;
+    max := 10;
+    list: Array<T>[10];
 }
 
 operator [] ArrayStruct<T>(ArrayStruct<T> a, int index) : T* {
@@ -255,8 +255,8 @@ operator [] ArrayStruct<T>(ArrayStruct<T> a, int index) : T* {
 }
 
 struct NestedStruct<T> {
-    bool foo;
-    ArrayStruct<T> inner_list;
+    foo: bool;
+    inner_list: ArrayStruct<T>;
 }
 
 #run main();

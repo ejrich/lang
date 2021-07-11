@@ -8,7 +8,6 @@ namespace Lang
         int FileIndex { get; set; }
         uint Line { get; init; }
         uint Column { get; init; }
-        List<IAst> Children { get; }
     }
 
     public interface IType
@@ -28,6 +27,17 @@ namespace Lang
         bool ReturnTypeHasGenerics { get; set; }
         List<string> Generics { get; }
         List<DeclarationAst> Arguments { get; }
+        List<IAst> Children { get; }
+    }
+
+    public interface IDeclaration : IAst
+    {
+        public string Name { get; set; }
+        public TypeDefinition Type { get; set; }
+        public bool HasGenerics { get; set; }
+        public IAst Value { get; set; }
+        public Dictionary<string, AssignmentAst> Assignments { get; set; }
+        public List<IAst> ArrayValues { get; set; }
     }
 
     public class ScopeAst : IAst
@@ -75,21 +85,21 @@ namespace Lang
         public bool Verified { get; set; }
         public List<string> Generics { get; } = new();
         public List<StructFieldAst> Fields { get; } = new();
-        public List<IAst> Children => null;
     }
 
-    public class StructFieldAst : IAst
+    public class StructFieldAst : IDeclaration
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
-        public bool HasGeneric { get; set; }
         public string Name { get; set; }
         public uint Offset { get; set; }
         public uint Size { get; set; }
         public TypeDefinition Type { get; set; }
-        public IAst DefaultValue { get; set; }
-        public List<IAst> Children => null;
+        public bool HasGenerics { get; set; }
+        public IAst Value { get; set; }
+        public Dictionary<string, AssignmentAst> Assignments { get; set; }
+        public List<IAst> ArrayValues { get; set; }
     }
 
     public class StructFieldRefAst : IAst
@@ -115,7 +125,6 @@ namespace Lang
         public TypeKind TypeKind { get; set; } = TypeKind.Enum;
         public TypeDefinition BaseType { get; set; }
         public List<EnumValueAst> Values { get; } = new();
-        public List<IAst> Children => null;
     }
 
     public class EnumValueAst : IAst
@@ -126,7 +135,6 @@ namespace Lang
         public string Name { get; set; }
         public int Value { get; set; }
         public bool Defined { get; set; }
-        public List<IAst> Children => null;
     }
 
     public class ReturnAst : IAst
@@ -135,7 +143,6 @@ namespace Lang
         public uint Line { get; init; }
         public uint Column { get; init; }
         public IAst Value { get; set; }
-        public List<IAst> Children => null;
     }
 
     public class PrimitiveAst : IAst, IType
@@ -149,7 +156,6 @@ namespace Lang
         public TypeKind TypeKind { get; set; }
         public IPrimitive Primitive { get; set; }
         public TypeDefinition PointerType { get; set; }
-        public List<IAst> Children => null;
     }
 
     public class ConstantAst : IAst
@@ -159,7 +165,6 @@ namespace Lang
         public uint Column { get; init; }
         public TypeDefinition Type { get; set; }
         public string Value { get; set; }
-        public List<IAst> Children => null;
     }
 
     public class NullAst : IAst
@@ -168,7 +173,6 @@ namespace Lang
         public uint Line { get; init; }
         public uint Column { get; init; }
         public TypeDefinition TargetType { get; set; }
-        public List<IAst> Children => null;
     }
 
     public class IdentifierAst : IAst
@@ -177,7 +181,6 @@ namespace Lang
         public uint Line { get; init; }
         public uint Column { get; init; }
         public string Name { get; set; }
-        public List<IAst> Children => null;
     }
 
     public class ExpressionAst : IAst
@@ -199,7 +202,6 @@ namespace Lang
         public bool Prefix { get; set; }
         public bool Positive { get; set; }
         public IAst Value { get; set; }
-        public List<IAst> Children => null;
     }
 
     public class UnaryAst : IAst
@@ -209,7 +211,6 @@ namespace Lang
         public uint Column { get; init; }
         public UnaryOperator Operator { get; set; }
         public IAst Value { get; set; }
-        public List<IAst> Children => null;
     }
 
     public class CallAst : IAst
@@ -224,22 +225,20 @@ namespace Lang
         public List<TypeDefinition> Generics { get; set; }
         public Dictionary<string, IAst> SpecifiedArguments { get; set; }
         public List<IAst> Arguments { get; } = new();
-        public List<IAst> Children => null;
     }
 
-    public class DeclarationAst : IAst
+    public class DeclarationAst : IDeclaration
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
         public string Name { get; set; }
         public TypeDefinition Type { get; set; }
-        public IAst Value { get; set; }
-        public bool Constant { get; set; }
         public bool HasGenerics { get; set; }
-        public List<AssignmentAst> Assignments { get; set; }
+        public bool Constant { get; set; }
+        public IAst Value { get; set; }
+        public Dictionary<string, AssignmentAst> Assignments { get; set; }
         public List<IAst> ArrayValues { get; set; }
-        public List<IAst> Children => null;
     }
 
     public class AssignmentAst : IAst
@@ -250,7 +249,6 @@ namespace Lang
         public IAst Reference { get; set; }
         public Operator Operator { get; set; }
         public IAst Value { get; set; }
-        public List<IAst> Children => null;
     }
 
     public class ConditionalAst : IAst
@@ -261,7 +259,6 @@ namespace Lang
         public IAst Condition { get; set; }
         public ScopeAst IfBlock { get; set; }
         public ScopeAst ElseBlock { get; set; }
-        public List<IAst> Children => null;
     }
 
     public class WhileAst : IAst
@@ -271,7 +268,6 @@ namespace Lang
         public uint Column { get; init; }
         public IAst Condition { get; set; }
         public ScopeAst Block { get; set; }
-        public List<IAst> Children => null;
     }
 
     public class EachAst : IAst
@@ -297,7 +293,6 @@ namespace Lang
         public bool CallsOverload { get; set; }
         public TypeDefinition OverloadType { get; set; }
         public IAst Index { get; set; }
-        public List<IAst> Children => null;
     }
 
     public class CompilerDirectiveAst : IAst
@@ -307,7 +302,6 @@ namespace Lang
         public uint Column { get; init; }
         public DirectiveType Type { get; set; }
         public IAst Value { get; set; }
-        public List<IAst> Children => null;
     }
 
     public class CastAst : IAst
@@ -318,7 +312,6 @@ namespace Lang
         public TypeDefinition TargetType { get; set; }
         public bool HasGenerics { get; set; }
         public IAst Value { get; set; }
-        public List<IAst> Children => null;
     }
 
     public class OperatorOverloadAst : IFunction
@@ -355,7 +348,6 @@ namespace Lang
         public List<TypeDefinition> Generics { get; } = new();
         public IAst Count { get; set; }
         public uint? ConstCount { get; set; }
-        public List<IAst> Children => null;
 
         private string _genericName;
         public string GenericName

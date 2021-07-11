@@ -18,12 +18,12 @@ int main(Array<string> args) {
     fac6 := factorial(6);
     printf("%d! = %d\n", 6, fac6);
     my_struct := create();
-    printf("my_struct: field = %d, something = %f, subvalue.something = %d\n", my_struct.field, my_struct.something, my_struct.subValue.something);
+    printf("my_struct: field = %d, something = %f, subvalue.something = %d, subvalue.foo = %d\n", my_struct.field, my_struct.something, my_struct.subValue.something, my_struct.subValue.foo);
     call_field := create().something;
     printf("call_field = %f\n", call_field);
 
     prim := primitives();
-    list := create_list(4);
+    array := create_array(4);
     ptr := pointers();
     printf("Pointer = %p, Value = %d\n", ptr, *ptr);
     str := string_test();
@@ -60,7 +60,7 @@ int main(Array<string> args) {
     // sleep(5);
 
     z := 1;
-    each i in create_list(5) {
+    each i in create_array(5) {
         printf("Value %d = %d\n", z++, i);
     }
 
@@ -129,13 +129,14 @@ int factorial(int n) {
 }
 
 struct MyStruct {
-    u8 field;
-    float something = 4.2;
-    OtherStruct subValue;
+    field: u8;
+    something := 4.2;
+    subValue: OtherStruct = { foo = 8; }
 }
 
 struct OtherStruct {
-    int something = 5;
+    something := 5;
+    foo: int;
 }
 
 MyStruct create() {
@@ -165,33 +166,36 @@ int primitives() {
 }
 
 struct ArrayStruct {
-    int something = 5;
-    Array<float64>[6] list;
+    something := 5;
+    array: Array<float64> = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
 }
 
-Array<int> create_list(int count) {
-    list: Array<int>[count];
+Array<int> create_array(int count) {
+    array: Array<int>[count];
     each i in 0..count-1 {
-        list[i] = i * 5;
+        array[i] = i * 5;
     }
-    a := list[count-2];
-    list[0]++;
-    ++list[0];
+    a := array[count-2];
+    array[0]++;
+    ++array[0];
 
-    manipulate_list_struct();
-    return list;
+    manipulate_array_struct();
+    return array;
 }
 
-manipulate_list_struct() {
+manipulate_array_struct() {
     s: ArrayStruct;
-    s.list[0] = 8.9;
-    ++s.list[0];
-    printf("%.2f\n", s.list[0]);
+    s.array[0] = 8.9;
+    ++s.array[0];
+    each i in s.array {
+        printf("%.2f, ", i);
+    }
+    printf("\n");
 }
 
 struct Node {
-    int value;
-    Node* next;
+    value: int;
+    next: Node*;
 }
 
 int* pointers() {
@@ -206,8 +210,8 @@ int* pointers() {
         loop_node = loop_node.next;
     }
 
-    list: Array<int>[8];
-    list_ptr := &list[4];
+    array: Array<int>[8];
+    array_ptr := &array[4];
     a := 6;
     b := &a;
     d := &a + 1; // Value will be garbage
@@ -220,10 +224,10 @@ string string_test() {
 }
 
 sum_test() {
-    sum_list: Array<int> = [4, 41, 544, 244, 42, 14, 23]
+    sum_array: Array<int> = [4, 41, 544, 244, 42, 14, 23]
     // print_type_info(sum); // Does not compile
 
-    printf("Sum of Array  = %d\n", sum(sum_list));
+    printf("Sum of Array  = %d\n", sum(sum_array));
     printf("Sum of Params = %d\n", sum(4, 41, 544, 244, 42, 14, 23));
 }
 
@@ -248,8 +252,8 @@ overflow_test() {
 }
 
 struct PolyStruct<T, U> {
-    T field1;
-    U field2;
+    field1: T;
+    field2: U;
 }
 
 poly_test() {
@@ -267,9 +271,9 @@ enum State {
 }
 
 struct StateStruct {
-    State state = State.Running;
-    int something;
-    bool flag = true;
+    state := State.Running;
+    something: int;
+    flag := true;
 }
 
 State current_state(int a) {

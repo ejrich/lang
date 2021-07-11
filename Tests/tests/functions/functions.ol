@@ -98,8 +98,8 @@ baz<T, U>(Array<T> list, U* b) {
 }
 
 struct Thing {
-    int a = 9;
-    float64 b = 3.2;
+    a := 9;
+    b: float64 = 3.2;
 }
 
 T create<T>() {
@@ -108,7 +108,7 @@ T create<T>() {
 }
 
 struct PolyStruct<I> {
-    I a;
+    a: I;
 }
 
 foobar<T, U>(PolyStruct<T> c, Params<U> args) {

@@ -83,11 +83,7 @@ namespace Lang
                         {
                             var marshalAsType = typeof(MarshalAsAttribute);
                             var sizeConstField = marshalAsType.GetField("SizeConst");
-                            var size = 0;
-                            if (field.Type.Count != null)
-                            {
-                                size = (int)field.Type.ConstCount.Value;
-                            }
+                            var size = (int)field.Type.ConstCount.Value;
 
                             var caBuilder = new CustomAttributeBuilder(typeof(MarshalAsAttribute).GetConstructor(new []{typeof(UnmanagedType)}), new object[]{UnmanagedType.ByValArray}, new []{sizeConstField}, new object[]{size});
                             structField.SetCustomAttribute(caBuilder);
@@ -410,7 +406,7 @@ namespace Lang
             }
             else if (declaration.ArrayValues != null)
             {
-                value = InitializeArray(declaration.Type, variables, arrayValues: declaration.ArrayValues);
+                value = InitializeArray(declaration.Type, variables, declaration.ArrayValues);
             }
             else
             {
@@ -432,7 +428,7 @@ namespace Lang
             variables[declaration.Name] = variable;
         }
 
-        private object GetUninitializedValue(TypeDefinition typeDef, IDictionary<string, ValueType> variables, List<AssignmentAst> values)
+        private object GetUninitializedValue(TypeDefinition typeDef, IDictionary<string, ValueType> variables, Dictionary<string, AssignmentAst> assignments)
         {
             switch (typeDef.TypeKind)
             {
@@ -449,59 +445,42 @@ namespace Lang
                     var type = _programGraph.Types[typeDef.GenericName];
                     if (type is StructAst structAst)
                     {
-                        return InitializeStruct(instanceType, structAst, variables, values);
+                        return InitializeStruct(instanceType, structAst, variables, assignments);
                     }
 
                     return Activator.CreateInstance(instanceType);
             }
         }
 
-        private object InitializeStruct(Type type, StructAst structAst, IDictionary<string, ValueType> variables, List<AssignmentAst> values = null)
+        private object InitializeStruct(Type type, StructAst structAst, IDictionary<string, ValueType> variables, Dictionary<string, AssignmentAst> assignments)
         {
-            var assignments = values?.ToDictionary(_ => (_.Reference as IdentifierAst)!.Name);
             var instance = Activator.CreateInstance(type);
-            foreach (var field in structAst.Fields)
+
+            if (assignments == null)
             {
-                var fieldInstance = instance!.GetType().GetField(field.Name);
+                foreach (var field in structAst.Fields)
+                {
+                    var fieldInstance = instance!.GetType().GetField(field.Name);
 
-                if (assignments != null && assignments.TryGetValue(field.Name, out var assignment))
+                    InitializeField(field, instance, fieldInstance, variables);
+                }
+            }
+            else
+            {
+                foreach (var field in structAst.Fields)
                 {
-                    var expression = ExecuteExpression(assignment.Value, variables);
-                    var value = CastValue(expression.Value, field.Type);
+                    var fieldInstance = instance!.GetType().GetField(field.Name);
 
-                    fieldInstance!.SetValue(instance, value);
-                }
-                else if (field.DefaultValue != null)
-                {
-                    var value = ExecuteExpression(field.DefaultValue, variables);
-                    fieldInstance!.SetValue(instance, value.Value);
-                }
-                else switch (field.Type.TypeKind)
-                {
-                    case TypeKind.Array:
-                        var array = InitializeArray(field.Type, variables, true);
-                        fieldInstance!.SetValue(instance, array);
-                        break;
-                    case TypeKind.Pointer:
-                    case TypeKind.Boolean:
-                        break;
-                    default:
+                    if (assignments.TryGetValue(field.Name, out var assignment))
                     {
-                        if (field.Type.PrimitiveType == null)
-                        {
-                            var fieldType = _types[field.Type.GenericName];
-                            var fieldTypeDef = _programGraph.Types[field.Type.GenericName];
-                            if (fieldTypeDef is StructAst fieldStructAst)
-                            {
-                                var value = InitializeStruct(fieldType, fieldStructAst, variables);
-                                fieldInstance!.SetValue(instance, value);
-                            }
-                            else
-                            {
-                                fieldInstance!.SetValue(instance, Activator.CreateInstance(fieldType));
-                            }
-                        }
-                        break;
+                        var expression = ExecuteExpression(assignment.Value, variables);
+                        var value = CastValue(expression.Value, field.Type);
+
+                        fieldInstance!.SetValue(instance, value);
+                    }
+                    else
+                    {
+                        InitializeField(field, instance, fieldInstance, variables);
                     }
                 }
             }
@@ -509,7 +488,44 @@ namespace Lang
             return instance;
         }
 
-        private object InitializeArray(TypeDefinition type, IDictionary<string, ValueType> variables, bool structField = false, List<IAst> arrayValues = null)
+        private void InitializeField(StructFieldAst field, object instance, FieldInfo fieldInstance, IDictionary<string, ValueType> variables)
+        {
+            if (field.Value != null)
+            {
+                var value = ExecuteExpression(field.Value, variables);
+                fieldInstance.SetValue(instance, value.Value);
+            }
+            else switch (field.Type.TypeKind)
+            {
+                case TypeKind.Array:
+                    var array = InitializeArray(field.Type, variables, field.ArrayValues, true);
+                    fieldInstance!.SetValue(instance, array);
+                    break;
+                case TypeKind.Pointer:
+                case TypeKind.Boolean:
+                    break;
+                default:
+                {
+                    if (field.Type.PrimitiveType == null)
+                    {
+                        var fieldType = _types[field.Type.GenericName];
+                        var fieldTypeDef = _programGraph.Types[field.Type.GenericName];
+                        if (fieldTypeDef is StructAst fieldStructAst)
+                        {
+                            var value = InitializeStruct(fieldType, fieldStructAst, variables, field.Assignments);
+                            fieldInstance.SetValue(instance, value);
+                        }
+                        else
+                        {
+                            fieldInstance.SetValue(instance, Activator.CreateInstance(fieldType));
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        private object InitializeArray(TypeDefinition type, IDictionary<string, ValueType> variables, List<IAst> arrayValues = null, bool structField = false)
         {
             var arrayType = _types[type.GenericName];
             var elementTypeDef = type.Generics[0];
@@ -739,7 +755,7 @@ namespace Lang
                 if (iterator.Type.CArray)
                 {
                     dataPointer = GetPointer(iterator.Value);
-                    length = (int)ExecuteExpression(iterator.Type.Count, variables).Value;
+                    length = (int)iterator.Type.ConstCount.Value;
                 }
                 else
                 {

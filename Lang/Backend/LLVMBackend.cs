@@ -662,8 +662,8 @@ namespace Lang.Backend
                         }
                     }
                     break;
-                case ScopeAst:
-                    return BuildAllocations(ast.Children);
+                case ScopeAst scope:
+                    return BuildAllocations(scope.Children);
                 case ConditionalAst conditional:
                     BuildAllocations(conditional.Condition);
                     var ifReturned = BuildAllocations(conditional.IfBlock.Children);
@@ -712,8 +712,8 @@ namespace Lang.Backend
                     }
 
                     return BuildAllocations(each.Children);
-                case ExpressionAst:
-                    BuildAllocations(ast.Children);
+                case ExpressionAst expression:
+                    BuildAllocations(expression.Children);
                     break;
                 case IndexAst index:
                     BuildAllocations(index.Index);
@@ -758,30 +758,47 @@ namespace Lang.Backend
             }
         }
 
-        private void BuildStructAllocations(string name, List<AssignmentAst> values = null)
+        private void BuildStructAllocations(string name, Dictionary<string, AssignmentAst> assignments = null)
         {
-            var assignments = values?.ToDictionary(_ => (_.Reference as IdentifierAst)!.Name);
             var structDef = _programGraph.Types[name] as StructAst;
-            foreach (var field in structDef!.Fields)
+            if (assignments == null)
             {
-                if (assignments != null && assignments.TryGetValue(field.Name, out var assignment))
+                foreach (var field in structDef!.Fields)
                 {
-                    BuildAllocations(assignment.Value);
+                    BuildFieldAllocations(field);
                 }
-                else if (field.Type.TypeKind == TypeKind.Array && !field.Type.CArray && field.Type.Count != null)
+            }
+            else
+            {
+                foreach (var field in structDef!.Fields)
                 {
-                    var elementType = field.Type.Generics[0];
-                    var targetType = ConvertTypeDefinition(elementType);
+                    if (assignments.TryGetValue(field.Name, out var assignment))
+                    {
+                        BuildAllocations(assignment.Value);
+                    }
+                    else
+                    {
+                        BuildFieldAllocations(field);
+                    }
+                }
+            }
+        }
 
-                    var count = field.Type.ConstCount.Value;
-                    var arrayType = LLVM.ArrayType(targetType, count);
-                    var arrayData = _builder.BuildAlloca(arrayType, "arraydata");
-                    _allocationQueue.Enqueue(arrayData);
-                }
-                else if (field.Type.TypeKind == TypeKind.Struct)
-                {
-                    BuildStructAllocations(field.Type.GenericName);
-                }
+        private void BuildFieldAllocations(StructFieldAst field)
+        {
+            if (field.Type.TypeKind == TypeKind.Array && !field.Type.CArray && field.Type.ConstCount != null)
+            {
+                var elementType = field.Type.Generics[0];
+                var targetType = ConvertTypeDefinition(elementType);
+
+                var count = field.Type.ConstCount.Value;
+                var arrayType = LLVM.ArrayType(targetType, count);
+                var arrayData = _builder.BuildAlloca(arrayType, "arraydata");
+                _allocationQueue.Enqueue(arrayData);
+            }
+            else if (field.Type.TypeKind == TypeKind.Struct)
+            {
+                BuildStructAllocations(field.Type.GenericName);
             }
         }
 
@@ -884,9 +901,8 @@ namespace Lang.Backend
                         {
                             InitializeArrayValues(variable, elementType, declaration.ArrayValues, localVariables);
                         }
-                        return;
                     }
-                    if (declaration.Type.ConstCount != null)
+                    else if (declaration.Type.ConstCount != null)
                     {
                         var arrayPointer = InitializeConstArray(variable, declaration.Type.ConstCount.Value, elementType);
 
@@ -945,61 +961,91 @@ namespace Lang.Backend
             }
         }
 
-        private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, List<AssignmentAst> values = null)
+        private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, Dictionary<string, AssignmentAst> assignments)
         {
-            var assignments = values?.ToDictionary(_ => (_.Reference as IdentifierAst)!.Name);
             var structDef = _programGraph.Types[typeDef.GenericName] as StructAst;
-            for (var i = 0; i < structDef!.Fields.Count; i++)
+            if (assignments == null)
             {
-                var structField = structDef.Fields[i];
-
-                var field = _builder.BuildStructGEP(variable, (uint)i, structField.Name);
-
-                if (assignments != null && assignments.TryGetValue(structField.Name, out var assignment))
+                for (var i = 0; i < structDef!.Fields.Count; i++)
                 {
-                    var expression = WriteExpression(assignment.Value, localVariables);
-                    var value = CastValue(expression, structField.Type);
+                    var field = structDef.Fields[i];
 
-                    LLVM.BuildStore(_builder, value, field);
+                    var fieldPointer = _builder.BuildStructGEP(variable, (uint)i, field.Name);
+
+                    InitializeField(field, fieldPointer, localVariables);
                 }
-                else
+            }
+            else
+            {
+                for (var i = 0; i < structDef!.Fields.Count; i++)
                 {
-                    switch (structField.Type.TypeKind)
+                    var field = structDef.Fields[i];
+
+                    var fieldPointer = _builder.BuildStructGEP(variable, (uint)i, field.Name);
+
+                    if (assignments.TryGetValue(field.Name, out var assignment))
                     {
-                        case TypeKind.Array:
-                            if (structField.Type.CArray) continue;
-                            if (structField.Type.ConstCount != null)
-                            {
-                                InitializeConstArray(field, structField.Type.ConstCount.Value, structField.Type.Generics[0]);
-                            }
-                            else
-                            {
-                                var countPointer = _builder.BuildStructGEP(field, 0, "countptr");
-                                LLVM.BuildStore(_builder, _zeroInt, countPointer);
-                            }
-                            break;
-                        case TypeKind.Pointer:
-                            var type = ConvertTypeDefinition(structField.Type);
-                            LLVM.BuildStore(_builder, LLVM.ConstNull(type), field);
-                            break;
-                        case TypeKind.Struct:
-                            InitializeStruct(structField.Type, field, localVariables);
-                            break;
-                        default:
-                            LLVMValueRef value;
-                            if (structField.DefaultValue != null)
-                            {
-                                (_, value) = WriteExpression(structField.DefaultValue, localVariables);
-                            }
-                            else
-                            {
-                                var fieldType = ConvertTypeDefinition(structField.Type);
-                                value = GetConstZero(fieldType);
-                            }
-                            LLVM.BuildStore(_builder, value, field);
-                            break;
+                        var expression = WriteExpression(assignment.Value, localVariables);
+                        var value = CastValue(expression, field.Type);
+
+                        LLVM.BuildStore(_builder, value, fieldPointer);
+                    }
+                    else
+                    {
+                        InitializeField(field, fieldPointer, localVariables);
                     }
                 }
+            }
+        }
+
+        private void InitializeField(StructFieldAst field, LLVMValueRef fieldPointer, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
+        {
+            switch (field.Type.TypeKind)
+            {
+                case TypeKind.Array:
+                    var elementType = field.Type.Generics[0];
+                    if (field.Type.CArray)
+                    {
+                        if (field.ArrayValues != null)
+                        {
+                            InitializeArrayValues(fieldPointer, elementType, field.ArrayValues, localVariables);
+                        }
+                    }
+                    else if (field.Type.ConstCount != null)
+                    {
+                        var arrayPointer = InitializeConstArray(fieldPointer, field.Type.ConstCount.Value, elementType);
+
+                        if (field.ArrayValues != null)
+                        {
+                            InitializeArrayValues(arrayPointer, elementType, field.ArrayValues, localVariables);
+                        }
+                    }
+                    else
+                    {
+                        var countPointer = _builder.BuildStructGEP(fieldPointer, 0, "countptr");
+                        LLVM.BuildStore(_builder, _zeroInt, countPointer);
+                    }
+                    break;
+                case TypeKind.Pointer:
+                    var type = ConvertTypeDefinition(field.Type);
+                    LLVM.BuildStore(_builder, LLVM.ConstNull(type), fieldPointer);
+                    break;
+                case TypeKind.Struct:
+                    InitializeStruct(field.Type, fieldPointer, localVariables, field.Assignments);
+                    break;
+                default:
+                    LLVMValueRef value;
+                    if (field.Value != null)
+                    {
+                        (_, value) = WriteExpression(field.Value, localVariables);
+                    }
+                    else
+                    {
+                        var fieldType = ConvertTypeDefinition(field.Type);
+                        value = GetConstZero(fieldType);
+                    }
+                    LLVM.BuildStore(_builder, value, fieldPointer);
+                    break;
             }
         }
 
@@ -1247,7 +1293,7 @@ namespace Lang.Backend
                 if (iterationType.CArray)
                 {
                     arrayData = iterationValue;
-                    compareTarget = WriteExpression(iterationType.Count, localVariables).value;
+                    compareTarget = LLVM.ConstInt(LLVM.Int32Type(), iterationType.ConstCount.Value, 0);
                 }
                 else
                 {

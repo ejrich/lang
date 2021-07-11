@@ -24,6 +24,10 @@ c_arrays() {
     }
 
     each x in array then printf("Array value: %d\n", x);
+
+    init_array: Array<int> #c_array = [1, 2, 3, 4, 5]
+
+    each x in init_array then printf("Initialized array value: %d\n", x);
 }
 
 c_array_structs() {
@@ -37,13 +41,16 @@ c_array_structs() {
     }
 
     each x in array_struct.array then printf("Struct array value: %d\n", x);
+
+    each x in array_struct.init_array then printf("Struct init_array value: %d\n", x);
 }
 
 struct_array_size := 5; #const
 
 struct ArrayStruct {
-    int something;
-    Array<int>[struct_array_size] #c_array array;
+    something: int;
+    array: Array<int>[struct_array_size] #c_array;
+    init_array: Array<int> #c_array = [1, 2, 3, 4, 5]
 }
 
 #run main();

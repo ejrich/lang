@@ -21,12 +21,14 @@ namespace Lang
 
             foreach (var field in baseStruct.Fields)
             {
-                if (field.HasGeneric)
+                if (field.HasGenerics)
                 {
                     var newField = CopyAst(field);
                     newField.Type = CopyType(field.Type, genericTypes);
                     newField.Name = field.Name;
-                    newField.DefaultValue = field.DefaultValue;
+                    newField.Value = field.Value;
+                    newField.Assignments = field.Assignments;
+                    newField.ArrayValues = field.ArrayValues;
                     polyStruct.Fields.Add(newField);
                 }
                 else
@@ -152,7 +154,11 @@ namespace Lang
 
             if (declaration.Assignments != null)
             {
-                copy.Assignments = declaration.Assignments.Select(assignment => CopyAssignment(assignment, genericTypes, generics)).ToList();
+                copy.Assignments = new();
+                foreach (var (name, assignment) in declaration.Assignments)
+                {
+                    copy.Assignments[name] = CopyAssignment(assignment, genericTypes, generics);
+                }
             }
             else if (declaration.ArrayValues != null)
             {
