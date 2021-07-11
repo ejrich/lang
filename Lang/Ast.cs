@@ -36,7 +36,6 @@ namespace Lang
         public TypeDefinition Type { get; set; }
         public bool HasGenerics { get; set; }
         public IAst Value { get; set; }
-        // public List<AssignmentAst> Assignments { get; set; }
         public Dictionary<string, AssignmentAst> Assignments { get; set; }
         public List<IAst> ArrayValues { get; set; }
     }

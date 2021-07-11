@@ -1293,7 +1293,7 @@ namespace Lang.Backend
                 if (iterationType.CArray)
                 {
                     arrayData = iterationValue;
-                    compareTarget = WriteExpression(iterationType.Count, localVariables).value;
+                    compareTarget = LLVM.ConstInt(LLVM.Int32Type(), iterationType.ConstCount.Value, 0);
                 }
                 else
                 {
