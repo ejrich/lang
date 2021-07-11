@@ -945,58 +945,58 @@ namespace Lang.Backend
             }
         }
 
-        private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, List<AssignmentAst> values = null)
+        private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, List<AssignmentAst> values)
         {
             var assignments = values?.ToDictionary(_ => (_.Reference as IdentifierAst)!.Name);
             var structDef = _programGraph.Types[typeDef.GenericName] as StructAst;
             for (var i = 0; i < structDef!.Fields.Count; i++)
             {
-                var structField = structDef.Fields[i];
+                var field = structDef.Fields[i];
 
-                var field = _builder.BuildStructGEP(variable, (uint)i, structField.Name);
+                var fieldPointer = _builder.BuildStructGEP(variable, (uint)i, field.Name);
 
-                if (assignments != null && assignments.TryGetValue(structField.Name, out var assignment))
+                if (assignments != null && assignments.TryGetValue(field.Name, out var assignment))
                 {
                     var expression = WriteExpression(assignment.Value, localVariables);
-                    var value = CastValue(expression, structField.Type);
+                    var value = CastValue(expression, field.Type);
 
-                    LLVM.BuildStore(_builder, value, field);
+                    LLVM.BuildStore(_builder, value, fieldPointer);
                 }
                 else
                 {
-                    switch (structField.Type.TypeKind)
+                    switch (field.Type.TypeKind)
                     {
                         case TypeKind.Array:
-                            if (structField.Type.CArray) continue;
-                            if (structField.Type.ConstCount != null)
+                            if (field.Type.CArray) continue;
+                            if (field.Type.ConstCount != null)
                             {
-                                InitializeConstArray(field, structField.Type.ConstCount.Value, structField.Type.Generics[0]);
+                                InitializeConstArray(fieldPointer, field.Type.ConstCount.Value, field.Type.Generics[0]);
                             }
                             else
                             {
-                                var countPointer = _builder.BuildStructGEP(field, 0, "countptr");
+                                var countPointer = _builder.BuildStructGEP(fieldPointer, 0, "countptr");
                                 LLVM.BuildStore(_builder, _zeroInt, countPointer);
                             }
                             break;
                         case TypeKind.Pointer:
-                            var type = ConvertTypeDefinition(structField.Type);
-                            LLVM.BuildStore(_builder, LLVM.ConstNull(type), field);
+                            var type = ConvertTypeDefinition(field.Type);
+                            LLVM.BuildStore(_builder, LLVM.ConstNull(type), fieldPointer);
                             break;
                         case TypeKind.Struct:
-                            InitializeStruct(structField.Type, field, localVariables);
+                            InitializeStruct(field.Type, fieldPointer, localVariables, field.Assignments);
                             break;
                         default:
                             LLVMValueRef value;
-                            if (structField.Value != null)
+                            if (field.Value != null)
                             {
-                                (_, value) = WriteExpression(structField.Value, localVariables);
+                                (_, value) = WriteExpression(field.Value, localVariables);
                             }
                             else
                             {
-                                var fieldType = ConvertTypeDefinition(structField.Type);
+                                var fieldType = ConvertTypeDefinition(field.Type);
                                 value = GetConstZero(fieldType);
                             }
-                            LLVM.BuildStore(_builder, value, field);
+                            LLVM.BuildStore(_builder, value, fieldPointer);
                             break;
                     }
                 }

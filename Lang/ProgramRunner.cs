@@ -432,7 +432,7 @@ namespace Lang
             variables[declaration.Name] = variable;
         }
 
-        private object GetUninitializedValue(TypeDefinition typeDef, IDictionary<string, ValueType> variables, List<AssignmentAst> values)
+        private object GetUninitializedValue(TypeDefinition typeDef, IDictionary<string, ValueType> variables, List<AssignmentAst> assignments)
         {
             switch (typeDef.TypeKind)
             {
@@ -449,14 +449,14 @@ namespace Lang
                     var type = _programGraph.Types[typeDef.GenericName];
                     if (type is StructAst structAst)
                     {
-                        return InitializeStruct(instanceType, structAst, variables, values);
+                        return InitializeStruct(instanceType, structAst, variables, assignments);
                     }
 
                     return Activator.CreateInstance(instanceType);
             }
         }
 
-        private object InitializeStruct(Type type, StructAst structAst, IDictionary<string, ValueType> variables, List<AssignmentAst> values = null)
+        private object InitializeStruct(Type type, StructAst structAst, IDictionary<string, ValueType> variables, List<AssignmentAst> values)
         {
             var assignments = values?.ToDictionary(_ => (_.Reference as IdentifierAst)!.Name);
             var instance = Activator.CreateInstance(type);
@@ -493,7 +493,7 @@ namespace Lang
                             var fieldTypeDef = _programGraph.Types[field.Type.GenericName];
                             if (fieldTypeDef is StructAst fieldStructAst)
                             {
-                                var value = InitializeStruct(fieldType, fieldStructAst, variables);
+                                var value = InitializeStruct(fieldType, fieldStructAst, variables, field.Assignments);
                                 fieldInstance!.SetValue(instance, value);
                             }
                             else
