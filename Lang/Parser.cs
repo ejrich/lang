@@ -508,29 +508,7 @@ namespace Lang
             }
 
             // 8. Parse function body
-            var closed = false;
-            while (enumerator.MoveNext())
-            {
-                var token = enumerator.Current;
-
-                if (token.Type == TokenType.CloseBrace)
-                {
-                    closed = true;
-                    break;
-                }
-
-                var ast = ParseLine(enumerator, errors, function);
-                if (ast != null)
-                    function.Children.Add(ast);
-            }
-
-            if (!closed)
-            {
-                errors.Add(new ParseError
-                {
-                    Error = "Function not closed by '}'", Token = enumerator.Current ?? enumerator.Last
-                });
-            }
+            function.Body = ParseScope(enumerator, errors, function);
 
             return function;
         }
@@ -1050,15 +1028,15 @@ namespace Lang
                 case TokenType.Then:
                 {
                     // Parse single AST
-                    whileAst.Block = CreateAst<ScopeAst>(enumerator.Current);
+                    whileAst.Body = CreateAst<ScopeAst>(enumerator.Current);
                     enumerator.MoveNext();
-                    whileAst.Block.Children.Add(ParseLine(enumerator, errors, currentFunction));
+                    whileAst.Body.Children.Add(ParseLine(enumerator, errors, currentFunction));
                     break;
                 }
                 case TokenType.OpenBrace:
                 {
                     // Parse until close brace
-                    whileAst.Block = ParseScope(enumerator, errors, currentFunction);
+                    whileAst.Body = ParseScope(enumerator, errors, currentFunction);
                     break;
                 }
                 case null:
@@ -1182,16 +1160,15 @@ namespace Lang
                 case TokenType.Then:
                 {
                     // Parse single AST
+                    eachAst.Body = CreateAst<ScopeAst>(enumerator.Current);
                     enumerator.MoveNext();
-                    var ast = ParseLine(enumerator, errors, currentFunction);
-                    if (ast != null)
-                        eachAst.Children.Add(ast);
+                    eachAst.Body.Children.Add(ParseLine(enumerator, errors, currentFunction));
                     break;
                 }
                 case TokenType.OpenBrace:
                 {
                     // Parse until close brace
-                    eachAst.Children.Add(ParseScope(enumerator, errors, currentFunction));
+                    eachAst.Body = ParseScope(enumerator, errors, currentFunction);
                     break;
                 }
                 default:
@@ -2254,29 +2231,7 @@ namespace Lang
             }
 
             // 7. Parse body
-            var closed = false;
-            while (enumerator.MoveNext())
-            {
-                var token = enumerator.Current;
-
-                if (token.Type == TokenType.CloseBrace)
-                {
-                    closed = true;
-                    break;
-                }
-
-                var ast = ParseLine(enumerator, errors, overload);
-                if (ast != null)
-                    overload.Children.Add(ast);
-            }
-
-            if (!closed)
-            {
-                errors.Add(new ParseError
-                {
-                    Error = $"Operator overload for type '{overload.Type.Name}' not closed by '}}'", Token = enumerator.Current ?? enumerator.Last
-                });
-            }
+            overload.Body = ParseScope(enumerator, errors, overload);
 
             return overload;
         }

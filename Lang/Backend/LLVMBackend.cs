@@ -484,7 +484,7 @@ namespace Lang.Backend
             }
 
             // 3. Build allocations at the beginning of the function
-            foreach (var ast in functionAst.Children)
+            foreach (var ast in functionAst.Body.Children)
             {
                 if (BuildAllocations(ast))
                 {
@@ -528,7 +528,7 @@ namespace Lang.Backend
 
             // 5. Loop through function body
             var returned = false;
-            foreach (var ast in functionAst.Children)
+            foreach (var ast in functionAst.Body.Children)
             {
                 // 5a. Recursively write out lines
                 if (WriteFunctionLine(ast, localVariables, function, block))
@@ -676,7 +676,7 @@ namespace Lang.Backend
                     break;
                 case WhileAst whileAst:
                     BuildAllocations(whileAst.Condition);
-                    return BuildAllocations(whileAst.Block.Children);
+                    return BuildAllocations(whileAst.Body.Children);
                 case EachAst each:
                     var indexVariable = _builder.BuildAlloca(LLVM.Int32Type(), each.IterationVariable);
                     _allocationQueue.Enqueue(indexVariable);
@@ -711,7 +711,7 @@ namespace Lang.Backend
                             break;
                     }
 
-                    return BuildAllocations(each.Children);
+                    return BuildAllocations(each.Body.Children);
                 case ExpressionAst expression:
                     BuildAllocations(expression.Children);
                     break;
@@ -1213,7 +1213,7 @@ namespace Lang.Backend
 
             // 3. Write out while body
             LLVM.PositionBuilderAtEnd(_builder, whileBody);
-            if (WriteScope(whileAst.Block, localVariables, function, block))
+            if (WriteScope(whileAst.Body, localVariables, function, block))
             {
                 LLVM.DeleteBasicBlock(afterWhile);
                 return true;
@@ -1346,7 +1346,7 @@ namespace Lang.Backend
 
             // 5. Write out each loop body
             LLVM.PositionBuilderAtEnd(_builder, eachBody);
-            foreach (var ast in each.Children)
+            foreach (var ast in each.Body.Children)
             {
                 if (WriteFunctionLine(ast, eachVariables, function, block))
                 {
