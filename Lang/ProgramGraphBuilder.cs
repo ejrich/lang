@@ -2228,13 +2228,13 @@ namespace Lang
 
             if (argumentsError)
             {
-                _programGraph.Functions.TryGetValue(call.Function, out var functions);
-                _polymorphicFunctions.TryGetValue(call.Function, out var polymorphicFunctions);
+                _programGraph.Functions.TryGetValue(call.FunctionName, out var functions);
+                _polymorphicFunctions.TryGetValue(call.FunctionName, out var polymorphicFunctions);
                 if (functions == null)
                 {
                     if (polymorphicFunctions == null)
                     {
-                        AddError($"Call to undefined function '{call.Function}'", call);
+                        AddError($"Call to undefined function '{call.FunctionName}'", call);
                         return null;
                     }
 
@@ -2268,7 +2268,7 @@ namespace Lang
                 currentFunction.CallsCompiler = true;
             }
 
-            call.Params = function.Params;
+            call.Function = function;
             var argumentCount = function.Varargs || function.Params ? function.Arguments.Count - 1 : function.Arguments.Count;
 
             // Verify call arguments match the types of the function arguments
@@ -2444,7 +2444,7 @@ namespace Lang
 
         private FunctionAst DetermineCallingFunction(CallAst call, TypeDefinition[] arguments, Dictionary<string, TypeDefinition> specifiedArguments)
         {
-            if (_programGraph.Functions.TryGetValue(call.Function, out var functions))
+            if (_programGraph.Functions.TryGetValue(call.FunctionName, out var functions))
             {
                 for (var i = 0; i < functions.Count; i++)
                 {
@@ -2533,7 +2533,7 @@ namespace Lang
                 }
             }
 
-            if (_polymorphicFunctions.TryGetValue(call.Function, out var polymorphicFunctions))
+            if (_polymorphicFunctions.TryGetValue(call.FunctionName, out var polymorphicFunctions))
             {
                 for (var i = 0; i < polymorphicFunctions.Count; i++)
                 {
@@ -2685,7 +2685,7 @@ namespace Lang
                     {
                         var genericName = $"{function.Name}.{i}.{string.Join('.', genericTypes.Select(t => t.GenericName))}";
                         var name = $"{function.Name}<{string.Join(", ", genericTypes.Select(PrintTypeDefinition))}>";
-                        call.Function = genericName;
+                        call.FunctionName = genericName;
 
                         if (_programGraph.Functions.TryGetValue(genericName, out var implementations))
                         {
@@ -2710,11 +2710,11 @@ namespace Lang
 
             if (functions == null && polymorphicFunctions == null)
             {
-                AddError($"Call to undefined function '{call.Function}'", call);
+                AddError($"Call to undefined function '{call.FunctionName}'", call);
             }
             else
             {
-                AddError($"No overload of function '{call.Function}' found with given arguments", call);
+                AddError($"No overload of function '{call.FunctionName}' found with given arguments", call);
             }
             return null;
         }

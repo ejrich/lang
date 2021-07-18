@@ -645,7 +645,7 @@ namespace Lang.Backend
                                 BuildCallAllocations(call);
                                 if (!structField.Pointers[i])
                                 {
-                                    var function = _programGraph.Functions[call.Function][call.FunctionIndex];
+                                    var function = _programGraph.Functions[call.FunctionName][call.FunctionIndex];
                                     var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(function.ReturnType), function.Name);
                                     _allocationQueue.Enqueue(iterationValue);
                                 }
@@ -689,7 +689,7 @@ namespace Lang.Backend
                         case CallAst call:
                         {
                             BuildCallAllocations(call);
-                            var function = _programGraph.Functions[call.Function][call.FunctionIndex];
+                            var function = _programGraph.Functions[call.FunctionName][call.FunctionIndex];
                             var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(function.ReturnType), function.Name);
                             _allocationQueue.Enqueue(iterationValue);
                             break;
@@ -702,7 +702,7 @@ namespace Lang.Backend
                                     BuildCallAllocations(call);
                                     if (!structField.Pointers[0])
                                     {
-                                        var function = _programGraph.Functions[call.Function][call.FunctionIndex];
+                                        var function = _programGraph.Functions[call.FunctionName][call.FunctionIndex];
                                         var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(function.ReturnType), function.Name);
                                         _allocationQueue.Enqueue(iterationValue);
                                     }
@@ -736,9 +736,9 @@ namespace Lang.Backend
 
         private void BuildCallAllocations(CallAst call)
         {
-            if (call.Params)
+            if (call.Function.Params)
             {
-                var functionDef = _programGraph.Functions[call.Function][call.FunctionIndex];
+                var functionDef = _programGraph.Functions[call.FunctionName][call.FunctionIndex];
 
                 var paramsTypeDef = functionDef.Arguments[^1].Type;
                 var paramsType = ConvertTypeDefinition(paramsTypeDef);
@@ -1436,15 +1436,15 @@ namespace Lang.Backend
                     return (type, field);
                 }
                 case CallAst call:
-                    var functions = _programGraph.Functions[call.Function];
+                    var functions = _programGraph.Functions[call.FunctionName];
                     LLVMValueRef function;
-                    if (call.Function == "main")
+                    if (call.FunctionName == "main")
                     {
                         function = _module.GetNamedFunction("__main");
                     }
                     else
                     {
-                        var functionName = GetFunctionName(call.Function, call.FunctionIndex, functions.Count);
+                        var functionName = GetFunctionName(call.FunctionName, call.FunctionIndex, functions.Count);
                         function = _module.GetNamedFunction(functionName);
                     }
                     var functionDef = functions[call.FunctionIndex];

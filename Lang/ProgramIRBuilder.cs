@@ -199,8 +199,6 @@ namespace Lang
                     if (!GetScopeIdentifier(scope, identifier.Name, out var identifierAst))
                     {
                         return null;
-                        // var typeDef = _programGraph.Types[identifier.Name];
-                        // return (_s32Type, LLVMValueRef.CreateConstInt(LLVM.Int32Type(), (uint)typeDef.TypeIndex, false));
                     }
                     if (identifierAst is DeclarationAst declaration)
                     {

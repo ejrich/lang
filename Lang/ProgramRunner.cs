@@ -1219,8 +1219,8 @@ namespace Lang
 
         private ValueType ExecuteCall(CallAst call, IDictionary<string, ValueType> variables)
         {
-            var function = _programGraph.Functions[call.Function][call.FunctionIndex];
-            if (call.Params)
+            var function = _programGraph.Functions[call.FunctionName][call.FunctionIndex];
+            if (call.Function.Params)
             {
                 var arguments = new object[function.Arguments.Count];
                 for (var i = 0; i < function.Arguments.Count - 1; i++)
@@ -1250,7 +1250,7 @@ namespace Lang
 
                 arguments[function.Arguments.Count - 1] = paramsArray;
 
-                return CallFunction(call.Function, function, arguments);
+                return CallFunction(call.FunctionName, function, arguments);
             }
             else if (function.Varargs)
             {
@@ -1280,7 +1280,7 @@ namespace Lang
                     }
                 }
 
-                return CallFunction(call.Function, function, arguments, types, call.VarargsIndex);
+                return CallFunction(call.FunctionName, function, arguments, types, call.VarargsIndex);
             }
             else
             {
@@ -1294,7 +1294,7 @@ namespace Lang
                     types[i] = GetTypeFromDefinition(valueType.Type, function.Extern);
                 }
 
-                return CallFunction(call.Function, function, arguments, types);
+                return CallFunction(call.FunctionName, function, arguments, types);
             }
         }
 
