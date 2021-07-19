@@ -76,6 +76,7 @@ namespace Lang
         Return,
         Load,
         Store,
+        GetPointer,
         Call,
         Cast,
         Not,

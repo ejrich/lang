@@ -449,6 +449,112 @@ namespace Lang
 
         private InstructionValue EmitGetStructPointer(FunctionIR function, StructFieldRefAst structField, ScopeAst scope, BasicBlock block)
         {
+            switch (structField.Children[0])
+            {
+                // case IdentifierAst identifier:
+                //     (type, value) = localVariables[identifier.Name];
+                //     break;
+                // case IndexAst index:
+                //     var (indexType, indexValue) = GetIndexPointer(index, localVariables, out _);
+                //     type = indexType;
+                //     if (index.CallsOverload && !structField.Pointers[0])
+                //     {
+                //         value = _allocationQueue.Dequeue();
+                //         LLVM.BuildStore(_builder, indexValue, value);
+                //     }
+                //     else
+                //     {
+                //         value = indexValue;
+                //     }
+                //     break;
+                // case CallAst call:
+                //     var (callType, callValue) = WriteExpression(call, localVariables);
+                //     type = callType;
+                //     if (structField.Pointers[0])
+                //     {
+                //         value = callValue;
+                //     }
+                //     else
+                //     {
+                //         value = _allocationQueue.Dequeue();
+                //         LLVM.BuildStore(_builder, callValue, value);
+                //     }
+                //     break;
+                default:
+                    // @Cleanup this branch shouldn't be hit
+                    // Console.WriteLine("Unexpected syntax tree in struct field ref");
+                    // Environment.Exit(ErrorCodes.BuildError);
+                    break;
+            }
+
+            var skipPointer = false;
+            for (var i = 1; i < structField.Children.Count; i++)
+            {
+                if (structField.Pointers[i-1])
+                {
+                    if (!skipPointer)
+                    {
+                        // value = _builder.BuildLoad(value, "pointerval");
+                    }
+                    // type = type.Generics[0];
+                }
+                skipPointer = false;
+
+                // if (type.CArray)
+                // {
+                //     switch (structField.Children[i])
+                //     {
+                //         case IdentifierAst identifier:
+                //             constant = true;
+                //             if (identifier.Name == "length")
+                //             {
+                //                 (type, value) = WriteExpression(type.Count, localVariables);
+                //             }
+                //             else
+                //             {
+                //                 type = new TypeDefinition {Name = "*", TypeKind = TypeKind.Pointer, Generics = {type.Generics[0]}};
+                //                 value = _builder.BuildGEP(value, new []{_zeroInt, _zeroInt}, "dataPtr");
+                //             }
+                //             break;
+                //         case IndexAst index:
+                //             var (_, indexValue) = WriteExpression(index.Index, localVariables);
+                //             value = _builder.BuildGEP(value, new []{_zeroInt, indexValue}, "indexptr");
+                //             type = type.Generics[0];
+                //             break;
+                //     }
+                //     continue;
+                // }
+
+                var structDefinition = (StructAst) structField.Types[i-1];
+                // type = structDefinition.Fields[structField.ValueIndices[i-1]].Type;
+
+                switch (structField.Children[i])
+                {
+                    case IdentifierAst identifier:
+                        // value = _builder.BuildStructGEP(value, (uint)structField.ValueIndices[i-1], identifier.Name);
+                        break;
+                    case IndexAst index:
+                        // value = _builder.BuildStructGEP(value, (uint)structField.ValueIndices[i-1], index.Name);
+                        // (type, value) = GetIndexPointer(index, localVariables, out _, type, value);
+
+                        if (index.CallsOverload)
+                        {
+                            skipPointer = true;
+                            if (i < structField.Pointers.Length && !structField.Pointers[i])
+                            {
+                                // var pointer = _allocationQueue.Dequeue();
+                                // LLVM.BuildStore(_builder, value, pointer);
+                                // value = pointer;
+                            }
+                            else if (i == structField.Pointers.Length)
+                            {
+                                // loaded = true;
+                            }
+                        }
+                        break;
+                }
+            }
+
             return null;
         }
 
