@@ -7,6 +7,8 @@ namespace Lang
     {
         public FunctionIR EntryPoint { get; set; }
         public Dictionary<string, FunctionIR> Functions { get; } = new();
+        public Dictionary<string, InstructionValue> Constants { get; } = new();
+        public List<GlobalVariable> GlobalVariables { get; } = new();
     }
 
     public class FunctionIR
@@ -15,6 +17,16 @@ namespace Lang
         public List<Allocation> Allocations { get; set; }
         public List<BasicBlock> BasicBlocks { get; set; }
         public Dictionary<string, InstructionValue> Constants { get; set; }
+    }
+
+    public class GlobalVariable
+    {
+        public string Name { get; set; }
+        public int Index { get; set; }
+        public uint Offset { get; set; }
+        public uint Size { get; set; }
+        public IType Type { get; set; }
+        // TODO Add initializers
     }
 
     public class Allocation
