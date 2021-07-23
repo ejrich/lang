@@ -23,7 +23,6 @@ namespace Lang
     {
         public string Name { get; set; }
         public int Index { get; set; }
-        public uint Offset { get; set; }
         public uint Size { get; set; }
         public IType Type { get; set; }
         // TODO Add initializers
@@ -50,6 +49,7 @@ namespace Lang
 
         // Used for Load, Store, GetPointer, and GetStructPointer
         public int? Index { get; set; }
+        public bool Global { get; set; }
         public bool GetFirstPointer { get; set; }
         public string CallFunction { get; set; }
 
