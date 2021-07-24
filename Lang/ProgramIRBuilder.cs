@@ -10,6 +10,7 @@ namespace Lang
         FunctionIR AddOperatorOverload(OperatorOverloadAst overload, Dictionary<string, IType> types);
         void EmitGlobalVariable(DeclarationAst declaration, IType type, ScopeAst scope);
         void EmitDeclaration(FunctionIR function, DeclarationAst declaration, IType type, ScopeAst scope);
+        void EmitAssignment(FunctionIR function, AssignmentAst assignment, ScopeAst scope);
         void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, ScopeAst scope, BasicBlock block = null);
         InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block = null);
     }
