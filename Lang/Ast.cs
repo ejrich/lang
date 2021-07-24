@@ -205,6 +205,7 @@ namespace Lang
         public bool Prefix { get; set; }
         public bool Positive { get; set; }
         public IAst Value { get; set; }
+        public TypeDefinition Type { get; set; }
     }
 
     public class UnaryAst : IAst
