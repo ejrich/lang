@@ -33,6 +33,8 @@ namespace Lang
         public int Index { get; set; }
         public uint Offset { get; set; }
         public uint Size { get; set; }
+        public bool Array { get; set; }
+        public int ArrayLength { get; set; }
         public IType Type { get; set; }
     }
 
