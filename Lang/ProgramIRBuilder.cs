@@ -151,6 +151,11 @@ namespace Lang
         private void AddAllocation(FunctionIR function, DeclarationAst declaration, IType type, int index)
         {
             declaration.AllocationIndex = index;
+            AddAllocation(function, type, index);
+        }
+
+        private void AddAllocation(FunctionIR function, IType type, int index)
+        {
             var allocation = new Allocation
             {
                 Index = index, Offset = function.StackSize,
@@ -469,9 +474,10 @@ namespace Lang
                     type = value.Type;
                     if (index.CallsOverload && !structField.Pointers[0])
                     {
-                        // TODO Add an allocation
-                        // value = _allocationQueue.Dequeue();
-                        // LLVM.BuildStore(_builder, indexValue, value);
+                        var allocationIndex = function.Allocations.Count;
+                        AddAllocation(function, structField.Types[0], allocationIndex);
+                        EmitStore(block, allocationIndex, value);
+                        value = EmitGetPointer(block, allocationIndex: allocationIndex);
                     }
                     break;
                 case CallAst call:
@@ -479,9 +485,10 @@ namespace Lang
                     type = value.Type;
                     if (!structField.Pointers[0])
                     {
-                        // TODO Add an allocation
-                        // value = _allocationQueue.Dequeue();
-                        // LLVM.BuildStore(_builder, callValue, value);
+                        var allocationIndex = function.Allocations.Count;
+                        AddAllocation(function, structField.Types[0], allocationIndex);
+                        EmitStore(block, allocationIndex, value);
+                        value = EmitGetPointer(block, allocationIndex: allocationIndex);
                     }
                     break;
                 default:
@@ -550,10 +557,10 @@ namespace Lang
                             skipPointer = true;
                             if (i < structField.Pointers.Length && !structField.Pointers[i])
                             {
-                                // TODO Implement me
-                                // var pointer = _allocationQueue.Dequeue();
-                                // LLVM.BuildStore(_builder, value, pointer);
-                                // value = pointer;
+                                var allocationIndex = function.Allocations.Count;
+                                AddAllocation(function, structField.Types[i], allocationIndex);
+                                EmitStore(block, allocationIndex, value);
+                                value = EmitGetPointer(block, allocationIndex: allocationIndex);
                             }
                             else if (i == structField.Pointers.Length)
                             {
