@@ -8,9 +8,6 @@ namespace Lang
     public class ProgramGraph
     {
         public List<DeclarationAst> Variables { get; } = new();
-        public int TypeCount { get; set; }
-        public Dictionary<string, IType> Types { get; } = new();
-        public Dictionary<string, List<FunctionAst>> Functions { get; } = new();
         public Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> OperatorOverloads { get; } = new();
         public HashSet<string> Dependencies { get; set; }
         public List<TranslationError> Errors { get; } = new();
@@ -85,12 +82,6 @@ namespace Lang
                             parseResult.SyntaxTrees.RemoveAt(i--);
                             break;
                         case StructAst structAst:
-                            if (_programGraph.Types.ContainsKey(structAst.Name))
-                            {
-                                AddError($"Multiple definitions of struct '{structAst.Name}'", structAst);
-                                break;
-                            }
-
                             if (structAst.Generics.Any())
                             {
                                 if (_polymorphicStructs.ContainsKey(structAst.Name))
@@ -101,10 +92,12 @@ namespace Lang
                             }
                             else
                             {
-                                structAst.TypeIndex = _programGraph.TypeCount++; // TODO Remove
                                 structAst.TypeKind = structAst.Name == "string" ? TypeKind.String : TypeKind.Struct;
-                                _programGraph.Types.Add(structAst.Name, structAst); // TODO Remove
-                                TypeTable.Add(structAst.Name, structAst);
+                                if (!TypeTable.Add(structAst.Name, structAst))
+                                {
+                                    AddError($"Multiple definitions of struct '{structAst.Name}'", structAst);
+                                    break;
+                                }
                             }
 
                             _globalScope.Identifiers[structAst.Name] = structAst;
@@ -226,7 +219,7 @@ namespace Lang
             // 6. Verify function bodies
             foreach (var name in functionNames)
             {
-                var functions = _programGraph.Functions[name];
+                var functions = TypeTable.Functions[name];
                 foreach (var function in functions)
                 {
                     if (function.Verified) continue;
@@ -256,25 +249,18 @@ namespace Lang
 
         private void AddPrimitive(string name, TypeKind typeKind, IPrimitive primitive = null, uint size = 0)
         {
-            var primitiveAst = new PrimitiveAst
-            {
-                Name = name, TypeIndex = _programGraph.TypeCount++, TypeKind = typeKind,
-                Size = primitive?.Bytes ?? size, Primitive = primitive
-            };
+            var primitiveAst = new PrimitiveAst {Name = name, TypeKind = typeKind, Size = primitive?.Bytes ?? size, Primitive = primitive};
             _globalScope.Identifiers.Add(name, primitiveAst);
-            _programGraph.Types.Add(name, primitiveAst); // TODO Remove
             TypeTable.Add(name, primitiveAst);
         }
 
         private void VerifyEnum(EnumAst enumAst)
         {
             // 1. Verify enum has not already been defined
-            if (!_programGraph.Types.TryAdd(enumAst.Name, enumAst)) // TODO Change to TypeTable
+            if (!TypeTable.Add(enumAst.Name, enumAst))
             {
                 AddError($"Multiple definitions of enum '{enumAst.Name}'", enumAst);
             }
-            enumAst.TypeIndex = _programGraph.TypeCount++;
-            TypeTable.Add(enumAst.Name, enumAst);
             _globalScope.Identifiers.Add(enumAst.Name, enumAst);
 
             if (enumAst.BaseType == null)
@@ -354,7 +340,7 @@ namespace Lang
 
                     // TODO Axe #c_array compiler directive and make it's own type
                     var fieldTypeName = structField.TypeDefinition.CArray ? structField.TypeDefinition.Generics[0].GenericName : structField.TypeDefinition.GenericName;
-                    _programGraph.Types.TryGetValue(fieldTypeName, out fieldType);
+                    TypeTable.Types.TryGetValue(fieldTypeName, out fieldType);
 
                     if (type == TypeKind.Error)
                     {
@@ -524,7 +510,7 @@ namespace Lang
                                 AddError($"Struct field '{structAst.Name}.{structField.Name}' cannot be assigned type 'void'", structField.Value);
                             }
                             structField.TypeDefinition = valueType;
-                            _programGraph.Types.TryGetValue(valueType?.GenericName, out fieldType);
+                            TypeTable.Types.TryGetValue(valueType?.GenericName, out fieldType);
                         }
                     }
                     else if (structField.Assignments != null)
@@ -719,7 +705,6 @@ namespace Lang
             else
             {
                 functionNames.Add(function.Name);
-                function.TypeIndex = _programGraph.TypeCount++;
                 var _functions = TypeTable.AddFunction(function.Name, function);
                 if (_functions.Count > 1)
                 {
@@ -732,25 +717,6 @@ namespace Lang
                         AddError($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
                     }
                 }
-
-                // TODO Remove this
-                if (!_programGraph.Functions.TryGetValue(function.Name, out var functions))
-                {
-                    _programGraph.Functions[function.Name] = functions = new List<FunctionAst>();
-                }
-                if (functions.Any())
-                {
-                    function.OverloadIndex = functions.Count;
-                    if (function.Extern)
-                    {
-                        AddError($"Multiple definitions of external function '{function.Name}'", function);
-                    }
-                    else if (OverloadExistsForFunction(function, functions))
-                    {
-                        AddError($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
-                    }
-                }
-                functions.Add(function);
             }
         }
 
@@ -1128,7 +1094,7 @@ namespace Lang
 
             if (functionIR != null && !_programGraph.Errors.Any())
             {
-                var returnType = _programGraph.Types[currentFunction.ReturnType.GenericName];
+                var returnType = TypeTable.GetType(currentFunction.ReturnType);
                 _irBuilder.EmitReturn(functionIR, returnAst, returnType, scope);
             }
         }
@@ -1186,7 +1152,7 @@ namespace Lang
                         return;
                     }
 
-                    var structDef = _programGraph.Types[declaration.TypeDefinition.GenericName] as StructAst;
+                    var structDef = TypeTable.Types[declaration.TypeDefinition.GenericName] as StructAst;
                     var fields = structDef!.Fields.ToDictionary(_ => _.Name);
                     foreach (var (name, assignment) in declaration.Assignments)
                     {
@@ -1336,7 +1302,7 @@ namespace Lang
 
             if (!_programGraph.Errors.Any())
             {
-                declaration.Type = _programGraph.Types[declaration.TypeDefinition.GenericName];
+                declaration.Type = TypeTable.GetType(declaration.TypeDefinition);
                 if (functionIR != null)
                 {
                     _irBuilder.EmitDeclaration(functionIR, declaration, scope);
@@ -1759,7 +1725,7 @@ namespace Lang
                 structField.Pointers[fieldIndex] = true;
             }
             var genericName = structType.GenericName;
-            if (!_programGraph.Types.TryGetValue(genericName, out var typeDefinition))
+            if (!TypeTable.Types.TryGetValue(genericName, out var typeDefinition))
             {
                 AddError($"Struct '{PrintTypeDefinition(structType)}' not defined", ast);
                 return null;
@@ -1933,7 +1899,7 @@ namespace Lang
                 case IdentifierAst identifierAst:
                     if (!GetScopeIdentifier(scope, identifierAst.Name, out var identifier))
                     {
-                        if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functions))
+                        if (TypeTable.Functions.TryGetValue(identifierAst.Name, out var functions))
                         {
                             if (functions.Count > 1)
                             {
@@ -1985,7 +1951,7 @@ namespace Lang
                 case IdentifierAst identifierAst:
                     if (!GetScopeIdentifier(scope, identifierAst.Name, out var identifier))
                     {
-                        if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functions))
+                        if (TypeTable.Functions.TryGetValue(identifierAst.Name, out var functions))
                         {
                             if (functions.Count > 1)
                             {
@@ -2113,7 +2079,7 @@ namespace Lang
                     {
                         return null;
                     }
-                    if (!_programGraph.Types.TryGetValue(typeDef.GenericName, out var type))
+                    if (!TypeTable.Types.TryGetValue(typeDef.GenericName, out var type))
                     {
                         return null;
                     }
@@ -2272,7 +2238,7 @@ namespace Lang
 
             if (argumentsError)
             {
-                _programGraph.Functions.TryGetValue(call.FunctionName, out var functions);
+                TypeTable.Functions.TryGetValue(call.FunctionName, out var functions);
                 _polymorphicFunctions.TryGetValue(call.FunctionName, out var polymorphicFunctions);
                 if (functions == null)
                 {
@@ -2360,7 +2326,7 @@ namespace Lang
                             }
                             else
                             {
-                                var type = _programGraph.Types[argument.GenericName];
+                                var type = TypeTable.Types[argument.GenericName];
                                 typeIndex.Value = type.TypeIndex.ToString();
                             }
                             call.Arguments[i] = typeIndex;
@@ -2410,7 +2376,7 @@ namespace Lang
 
                                     else
                                     {
-                                        var type = _programGraph.Types[argument.GenericName];
+                                        var type = TypeTable.Types[argument.GenericName];
                                         typeIndex.Value = type.TypeIndex.ToString();
                                     }
                                     call.Arguments[i] = typeIndex;
@@ -2488,7 +2454,7 @@ namespace Lang
 
         private FunctionAst DetermineCallingFunction(CallAst call, TypeDefinition[] arguments, Dictionary<string, TypeDefinition> specifiedArguments)
         {
-            if (_programGraph.Functions.TryGetValue(call.FunctionName, out var functions))
+            if (TypeTable.Functions.TryGetValue(call.FunctionName, out var functions))
             {
                 for (var i = 0; i < functions.Count; i++)
                 {
@@ -2731,7 +2697,7 @@ namespace Lang
                         var name = $"{function.Name}<{string.Join(", ", genericTypes.Select(PrintTypeDefinition))}>";
                         call.FunctionName = genericName;
 
-                        if (_programGraph.Functions.TryGetValue(genericName, out var implementations))
+                        if (TypeTable.Functions.TryGetValue(genericName, out var implementations))
                         {
                             if (implementations.Count > 1)
                             {
@@ -2740,7 +2706,7 @@ namespace Lang
                             return implementations[0];
                         }
 
-                        var polymorphedFunction = _polymorpher.CreatePolymorphedFunction(function, name, _programGraph.TypeCount++, genericTypes);
+                        var polymorphedFunction = _polymorpher.CreatePolymorphedFunction(function, name, genericTypes);
                         VerifyType(polymorphedFunction.ReturnType);
                         polymorphedFunction.Arguments.ForEach(arg => {
                             VerifyType(arg.TypeDefinition, argument: true);
@@ -2752,8 +2718,7 @@ namespace Lang
                             }
                         });
 
-                        _programGraph.Functions[genericName] = new List<FunctionAst>{polymorphedFunction};
-                        TypeTable.AddFunction(genericName, function);
+                        TypeTable.AddFunction(genericName, polymorphedFunction);
                         VerifyFunction(polymorphedFunction);
 
                         return polymorphedFunction;
@@ -3102,7 +3067,7 @@ namespace Lang
                     }
                     break;
                 case TypeKind.String:
-                    _stringStruct ??= (StructAst)_programGraph.Types["string"];
+                    _stringStruct ??= (StructAst)TypeTable.Types["string"];
                     elementType = _stringStruct.Fields[1].TypeDefinition.Generics[0];
                     break;
                 default:
@@ -3316,7 +3281,7 @@ namespace Lang
                         AddError($"pointer type should have reference to 1 type, but got {typeDef.Generics.Count}", typeDef);
                         typeDef.TypeKind = TypeKind.Error;
                     }
-                    else if (_programGraph.Types.ContainsKey(typeDef.GenericName))
+                    else if (TypeTable.Types.ContainsKey(typeDef.GenericName))
                     {
                         typeDef.TypeKind = TypeKind.Pointer;
                         VerifyType(typeDef.Generics[0], depth + 1);
@@ -3335,8 +3300,7 @@ namespace Lang
                         }
                         else
                         {
-                            var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeIndex = _programGraph.TypeCount++, TypeKind = TypeKind.Pointer, Size = 8, PointerType = type};
-                            _programGraph.Types.Add(typeDef.GenericName, pointer); // TODO Remove
+                            var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeKind = TypeKind.Pointer, Size = 8, PointerType = type};
                             TypeTable.Add(typeDef.GenericName, pointer);
                             typeDef.TypeKind = TypeKind.Pointer;
                         }
@@ -3390,7 +3354,7 @@ namespace Lang
                     if (hasGenerics)
                     {
                         var genericName = typeDef.GenericName;
-                        if (_programGraph.Types.ContainsKey(genericName))
+                        if (TypeTable.Types.ContainsKey(genericName))
                         {
                             typeDef.TypeKind = TypeKind.Struct;
                         }
@@ -3431,15 +3395,14 @@ namespace Lang
                             }
                             else
                             {
-                                var polyStruct = _polymorpher.CreatePolymorphedStruct(structDef, PrintTypeDefinition(typeDef), TypeKind.Struct, _programGraph.TypeCount++, generics);
-                                _programGraph.Types.Add(genericName, polyStruct); // TODO Remove
+                                var polyStruct = _polymorpher.CreatePolymorphedStruct(structDef, PrintTypeDefinition(typeDef), TypeKind.Struct, generics);
                                 TypeTable.Add(genericName, polyStruct);
                                 VerifyStruct(polyStruct);
                                 typeDef.TypeKind = TypeKind.Struct;
                             }
                         }
                     }
-                    else if (_programGraph.Types.TryGetValue(typeDef.Name, out var type))
+                    else if (TypeTable.Types.TryGetValue(typeDef.Name, out var type))
                     {
                         switch (type)
                         {
@@ -3481,7 +3444,7 @@ namespace Lang
             }
 
             var genericName = $"Array.{elementType.GenericName}";
-            if (_programGraph.Types.ContainsKey(genericName))
+            if (TypeTable.Types.ContainsKey(genericName))
             {
                 return true;
             }
@@ -3491,8 +3454,7 @@ namespace Lang
                 return false;
             }
 
-            var arrayStruct = _polymorpher.CreatePolymorphedStruct(structDef, $"Array<{PrintTypeDefinition(elementType)}>", TypeKind.Array, _programGraph.TypeCount++, elementType);
-            _programGraph.Types.Add(genericName, arrayStruct); // TODO Remove
+            var arrayStruct = _polymorpher.CreatePolymorphedStruct(structDef, $"Array<{PrintTypeDefinition(elementType)}>", TypeKind.Array, elementType);
             TypeTable.Add(genericName, arrayStruct);
             VerifyStruct(arrayStruct);
             return true;
