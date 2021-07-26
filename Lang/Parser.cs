@@ -357,11 +357,11 @@ namespace Lang
                         else if (currentArgument == null)
                         {
                             currentArgument = CreateAst<DeclarationAst>(token);
-                            currentArgument.Type = ParseType(enumerator, errors, argument: true);
+                            currentArgument.TypeDefinition = ParseType(enumerator, errors, argument: true);
                             for (var i = 0; i < function.Generics.Count; i++)
                             {
                                 var generic = function.Generics[i];
-                                if (SearchForGeneric(generic, i, currentArgument.Type))
+                                if (SearchForGeneric(generic, i, currentArgument.TypeDefinition))
                                 {
                                     currentArgument.HasGenerics = true;
                                 }
@@ -640,7 +640,7 @@ namespace Lang
                 var generic = structAst.Generics[i];
                 foreach (var field in structAst.Fields)
                 {
-                    if (field.Type != null && SearchForGeneric(generic, i, field.Type))
+                    if (field.TypeDefinition != null && SearchForGeneric(generic, i, field.TypeDefinition))
                     {
                         field.HasGenerics = true;
                     }
@@ -681,7 +681,7 @@ namespace Lang
             if (enumerator.Peek()?.Type == TokenType.Identifier)
             {
                 enumerator.MoveNext();
-                structField.Type = ParseType(enumerator, errors, null);
+                structField.TypeDefinition = ParseType(enumerator, errors, null);
             }
 
             // 3. Get the value or return
@@ -693,7 +693,7 @@ namespace Lang
                     ParseDeclarationValue(structField, enumerator, errors, null);
                     break;
                 case TokenType.SemiColon:
-                    if (structField.Type == null)
+                    if (structField.TypeDefinition == null)
                     {
                         errors.Add(new ParseError {Error = "Expected declaration to have value", Token = token});
                     }
@@ -1208,13 +1208,13 @@ namespace Lang
             if (enumerator.Peek()?.Type == TokenType.Identifier)
             {
                 enumerator.MoveNext();
-                declaration.Type = ParseType(enumerator, errors, currentFunction);
+                declaration.TypeDefinition = ParseType(enumerator, errors, currentFunction);
                 if (currentFunction != null)
                 {
                     for (var i = 0; i < currentFunction.Generics.Count; i++)
                     {
                         var generic = currentFunction.Generics[i];
-                        if (SearchForGeneric(generic, i, declaration.Type))
+                        if (SearchForGeneric(generic, i, declaration.TypeDefinition))
                         {
                             declaration.HasGenerics = true;
                         }
@@ -1231,7 +1231,7 @@ namespace Lang
                     ParseDeclarationValue(declaration, enumerator, errors, currentFunction);
                     break;
                 case TokenType.SemiColon:
-                    if (declaration.Type == null)
+                    if (declaration.TypeDefinition == null)
                     {
                         errors.Add(new ParseError {Error = "Expected token declaration to have value", Token = token});
                     }
@@ -2112,11 +2112,11 @@ namespace Lang
                         else if (currentArgument == null)
                         {
                             currentArgument = CreateAst<DeclarationAst>(token);
-                            currentArgument.Type = ParseType(enumerator, errors, argument: true);
+                            currentArgument.TypeDefinition = ParseType(enumerator, errors, argument: true);
                             for (var i = 0; i < overload.Generics.Count; i++)
                             {
                                 var generic = overload.Generics[i];
-                                if (SearchForGeneric(generic, i, currentArgument.Type))
+                                if (SearchForGeneric(generic, i, currentArgument.TypeDefinition))
                                 {
                                     currentArgument.HasGenerics = true;
                                 }

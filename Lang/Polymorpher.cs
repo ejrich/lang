@@ -24,7 +24,7 @@ namespace Lang
                 if (field.HasGenerics)
                 {
                     var newField = CopyAst(field);
-                    newField.Type = CopyType(field.Type, genericTypes);
+                    newField.TypeDefinition = CopyType(field.TypeDefinition, genericTypes);
                     newField.Name = field.Name;
                     newField.Value = field.Value;
                     newField.Assignments = field.Assignments;
@@ -149,7 +149,7 @@ namespace Lang
             var copy = CopyAst(declaration);
             copy.Name = declaration.Name;
             copy.Constant = declaration.Constant;
-            copy.Type = declaration.HasGenerics ? CopyType(declaration.Type, genericTypes) : declaration.Type;
+            copy.TypeDefinition = declaration.HasGenerics ? CopyType(declaration.TypeDefinition, genericTypes) : declaration.TypeDefinition;
             copy.Value = CopyExpression(declaration.Value, genericTypes, generics);
 
             if (declaration.Assignments != null)
