@@ -169,9 +169,10 @@ namespace Lang
                         }
                         break;
                     case TypeKind.CArray:
+                        var cArrayPointer = EmitGetPointer(block, allocationIndex: allocationIndex);
                         if (declaration.ArrayValues != null)
                         {
-                            // InitializeArrayValues(variable, declaration.TypeDefinition.Generics[0], declaration.ArrayValues, localVariables);
+                            InitializeArrayValues(function, block, cArrayPointer, declaration.ArrayValues, scope);
                         }
                         break;
                     // Initialize struct field default values
@@ -185,8 +186,8 @@ namespace Lang
                         break;
                     // Or initialize to 0
                     default:
-                        // var zero = GetConstZero(ConvertTypeDefinition(declaration.TypeDefinition));
-                        // LLVM.BuildStore(_builder, zero, variable);
+                        var zero = GetConstZero(declaration.Type);
+                        EmitStore(block, allocationIndex, zero);
                         break;
                 }
             }
@@ -247,6 +248,32 @@ namespace Lang
                 // TODO Cast value
                 EmitStore(block, pointer, value);
             }
+        }
+
+        private InstructionValue GetConstZero(IType type)
+        {
+            var value = new InstructionValue {ValueType = InstructionValueType.Constant, };// TODO Get this working Type = type};
+            switch (type.TypeKind)
+            {
+                case TypeKind.Boolean:
+                    value.ConstantValue = new InstructionConstant {Boolean = false};
+                    break;
+                case TypeKind.Integer:
+                    value.ConstantValue = new InstructionConstant {Integer = 0};
+                    break;
+                case TypeKind.Float:
+                    var floatType = (PrimitiveAst)type;
+                    if (floatType.Primitive.Bytes == 4)
+                    {
+                        value.ConstantValue = new InstructionConstant {Float = 0};
+                    }
+                    else
+                    {
+                        value.ConstantValue = new InstructionConstant {Double = 0};
+                    }
+                    break;
+            }
+            return value;
         }
 
         public void EmitAssignment(FunctionIR function, AssignmentAst assignment, ScopeAst scope)
