@@ -317,8 +317,7 @@ namespace Lang
         public uint Column { get; init; }
         public string Name { get; set; }
         public bool CallsOverload { get; set; }
-        public TypeDefinition OverloadType { get; set; }
-        public IType OverloadReturnType { get; set; }
+        public OperatorOverloadAst Overload { get; set; }
         public IAst Index { get; set; }
     }
 

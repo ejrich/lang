@@ -847,10 +847,10 @@ namespace Lang
 
             if (index.CallsOverload)
             {
-                var overloadName = "TODO Fix this";//GetOperatorOverloadName(type, Operator.Subscript);
+                var overloadName = GetOperatorOverloadName(index.Overload.Type, Operator.Subscript);
 
                 var value = EmitLoad(block, variable);
-                return EmitCall(block, overloadName, new []{value, indexValue}, index.OverloadReturnType);
+                return EmitCall(block, overloadName, new []{value, indexValue}, index.Overload.ReturnType);
             }
 
             IType elementType;
