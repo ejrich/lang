@@ -111,7 +111,7 @@ namespace Lang
             {
                 foreach (var function in functions.Where(_ => _.Extern))
                 {
-                    var returnType = GetTypeFromDefinition(function.ReturnType);
+                    var returnType = GetTypeFromDefinition(function.ReturnTypeDefinition);
 
                     if (!_functionIndices.TryGetValue(function.Name, out var functionIndex))
                         _functionIndices[function.Name] = functionIndex = new List<int>();
@@ -296,7 +296,7 @@ namespace Lang
                                 break;
                             case FunctionAst function:
                                 var returnTypeField = typeInfoType.GetField("return_type");
-                                returnTypeField.SetValue(typeInfo, _typeInfoPointers[function.ReturnType.GenericName]);
+                                returnTypeField.SetValue(typeInfo, _typeInfoPointers[function.ReturnTypeDefinition.GenericName]);
 
                                 var argumentArray = Activator.CreateInstance(argumentArrayType);
                                 var argumentCount = function.Varargs ? function.Arguments.Count - 1 : function.Arguments.Count;
@@ -850,7 +850,7 @@ namespace Lang
             switch (ast)
             {
                 case ConstantAst constant:
-                    return new ValueType {Type = constant.Type, Value = GetConstant(constant.Type, constant.Value)};
+                    return new ValueType {Type = constant.TypeDefinition, Value = GetConstant(constant.TypeDefinition, constant.Value)};
                 case NullAst nullAst:
                     return new ValueType {Type = nullAst.TargetType, Value = IntPtr.Zero};
                 case StructFieldRefAst structField:
@@ -1022,7 +1022,7 @@ namespace Lang
                 case CastAst cast:
                 {
                     var value = ExecuteExpression(cast.Value, variables);
-                    return new ValueType {Type = cast.TargetType, Value = CastValue(value.Value, cast.TargetType)};
+                    return new ValueType {Type = cast.TargetTypeDefinition, Value = CastValue(value.Value, cast.TargetTypeDefinition)};
                 }
             }
 
@@ -1064,7 +1064,7 @@ namespace Lang
         {
             var enumDef = (EnumAst)structField.Types[0];
             var enumValue = enumDef.Values[structField.ValueIndices[0]].Value;
-            return new ValueType {Type = enumDef.BaseType, Value = CastValue(enumValue, enumDef.BaseType)};
+            return new ValueType {Type = enumDef.BaseTypeDefinition, Value = CastValue(enumValue, enumDef.BaseTypeDefinition)};
         }
 
         private object GetString(string value)
@@ -1387,7 +1387,7 @@ namespace Lang
                     var (type, functionObject) = _functionLibraries[functionIndex];
                     var functionDecl = type.GetMethod(functionName, argumentTypes!);
                     var returnValue = functionDecl.Invoke(functionObject, args);
-                    return new ValueType {Type = function.ReturnType, Value = returnValue};
+                    return new ValueType {Type = function.ReturnTypeDefinition, Value = returnValue};
                 }
                 else
                 {
@@ -1395,7 +1395,7 @@ namespace Lang
                     var (type, functionObject) = _functionLibraries[functionIndex];
                     var functionDecl = type.GetMethod(functionName);
                     var returnValue = functionDecl.Invoke(functionObject, args);
-                    return new ValueType {Type = function.ReturnType, Value = returnValue};
+                    return new ValueType {Type = function.ReturnTypeDefinition, Value = returnValue};
                 }
             }
 
@@ -1410,7 +1410,7 @@ namespace Lang
 
                 var functionDecl = typeof(ProgramRunner).GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance);
                 var returnValue = functionDecl.Invoke(this, args);
-                return new ValueType {Type = function.ReturnType, Value = returnValue};
+                return new ValueType {Type = function.ReturnTypeDefinition, Value = returnValue};
             }
 
             return ExecuteFunction(function, arguments);

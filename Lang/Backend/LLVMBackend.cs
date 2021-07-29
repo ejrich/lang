@@ -373,7 +373,7 @@ namespace Lang.Backend
                 LLVMValueRef arguments;
                 if (type is FunctionAst function)
                 {
-                    returnType = typePointers[function.ReturnType.GenericName].typeInfo;
+                    returnType = typePointers[function.ReturnTypeDefinition.GenericName].typeInfo;
 
                     var argumentCount = function.Varargs ? function.Arguments.Count - 1 : function.Arguments.Count;
                     var argumentValues = new LLVMValueRef[argumentCount];
@@ -462,7 +462,7 @@ namespace Lang.Backend
             {
                 // Get the argument types and create debug symbols
                 var debugArgumentTypes = new LLVMMetadataRef[argumentCount + 1];
-                debugArgumentTypes[0] = GetDebugType(functionAst.ReturnType);
+                debugArgumentTypes[0] = GetDebugType(functionAst.ReturnTypeDefinition);
 
                 for (var i = 0; i < argumentCount; i++)
                 {
@@ -476,7 +476,7 @@ namespace Lang.Backend
                 var debugFunction = _debugFunctions[name] = _debugBuilder.CreateFunction(file, debugName, name, file, functionAst.Line, functionType, 0, 1, functionAst.Line, LLVMDIFlags.LLVMDIFlagPrototyped, 0);
 
                 // Declare the function
-                var function = _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(functionAst.ReturnType), argumentTypes, varargs));
+                var function = _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(functionAst.ReturnTypeDefinition), argumentTypes, varargs));
                 LLVM.SetSubprogram(function, debugFunction);
             }
             else
@@ -486,7 +486,7 @@ namespace Lang.Backend
                 {
                     argumentTypes[i] = ConvertTypeDefinition(functionAst.Arguments[i].TypeDefinition, externFunction);
                 }
-                _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(functionAst.ReturnType), argumentTypes, varargs));
+                _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(functionAst.ReturnTypeDefinition), argumentTypes, varargs));
             }
         }
 
@@ -566,7 +566,7 @@ namespace Lang.Backend
             }
 
             // 6. Write returns for void functions
-            if (!returned && functionAst.ReturnType.Name == "void")
+            if (!returned && functionAst.ReturnTypeDefinition.Name == "void")
             {
                 BuildStackRestore();
                 LLVM.BuildRetVoid(_builder);
@@ -673,7 +673,7 @@ namespace Lang.Backend
                                 if (!structField.Pointers[i])
                                 {
                                     var function = call.Function;
-                                    var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(function.ReturnType), function.Name);
+                                    var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(function.ReturnTypeDefinition), function.Name);
                                     _allocationQueue.Enqueue(iterationValue);
                                 }
                                 break;
@@ -682,7 +682,7 @@ namespace Lang.Backend
                                 if (index.CallsOverload && !structField.Pointers[i])
                                 {
                                     var overload = _programGraph.OperatorOverloads[index.OverloadType.GenericName][Operator.Subscript];
-                                    var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(overload.ReturnType), overload.ReturnType.GenericName);
+                                    var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(overload.ReturnTypeDefinition), overload.ReturnTypeDefinition.GenericName);
                                     _allocationQueue.Enqueue(iterationValue);
                                 }
                                 break;
@@ -717,7 +717,7 @@ namespace Lang.Backend
                         {
                             BuildCallAllocations(call);
                             var function = call.Function;
-                            var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(function.ReturnType), function.Name);
+                            var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(function.ReturnTypeDefinition), function.Name);
                             _allocationQueue.Enqueue(iterationValue);
                             break;
                         }
@@ -730,7 +730,7 @@ namespace Lang.Backend
                                     if (!structField.Pointers[0])
                                     {
                                         var function = call.Function;
-                                        var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(function.ReturnType), function.Name);
+                                        var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(function.ReturnTypeDefinition), function.Name);
                                         _allocationQueue.Enqueue(iterationValue);
                                     }
                                     break;
@@ -875,7 +875,7 @@ namespace Lang.Backend
             var returnExpression = WriteExpression(returnAst.Value, localVariables);
 
             // 3. Write expression as return value
-            var returnValue = CastValue(returnExpression, _currentFunction.ReturnType);
+            var returnValue = CastValue(returnExpression, _currentFunction.ReturnTypeDefinition);
 
             // 4. Restore the stack pointer if necessary and return
             BuildStackRestore();
@@ -1410,8 +1410,8 @@ namespace Lang.Backend
             {
                 case ConstantAst constant:
                 {
-                    var type = ConvertTypeDefinition(constant.Type);
-                    return (constant.Type, BuildConstant(type, constant, getStringPointer));
+                    var type = ConvertTypeDefinition(constant.TypeDefinition);
+                    return (constant.TypeDefinition, BuildConstant(type, constant, getStringPointer));
                 }
                 case NullAst nullAst:
                 {
@@ -1446,7 +1446,7 @@ namespace Lang.Backend
                     {
                         var enumDef = (EnumAst)structField.Types[0];
                         var value = enumDef.Values[structField.ValueIndices[0]].Value;
-                        return (enumDef.BaseType, LLVMValueRef.CreateConstInt(GetIntegerType(enumDef.BaseType.PrimitiveType), (ulong)value, false));
+                        return (enumDef.BaseTypeDefinition, LLVMValueRef.CreateConstInt(GetIntegerType(enumDef.BaseTypeDefinition.PrimitiveType), (ulong)value, false));
                     }
                     var (type, field) = BuildStructField(structField, localVariables, out var loaded, out var constant);
                     if (!loaded && !constant)
@@ -1500,7 +1500,7 @@ namespace Lang.Backend
 
                         var paramsValue = _builder.BuildLoad(paramsPointer, "params");
                         callArguments[functionDef.Arguments.Count - 1] = paramsValue;
-                        return (functionDef.ReturnType, _builder.BuildCall(function, callArguments, string.Empty));
+                        return (functionDef.ReturnTypeDefinition, _builder.BuildCall(function, callArguments, string.Empty));
                     }
                     else if (functionDef.Varargs)
                     {
@@ -1523,7 +1523,7 @@ namespace Lang.Backend
                             callArguments[i] = value;
                         }
 
-                        return (functionDef.ReturnType, _builder.BuildCall(function, callArguments, string.Empty));
+                        return (functionDef.ReturnTypeDefinition, _builder.BuildCall(function, callArguments, string.Empty));
                     }
                     else
                     {
@@ -1533,7 +1533,7 @@ namespace Lang.Backend
                             var value = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
                             callArguments[i] = CastValue(value, functionDef.Arguments[i].TypeDefinition);
                         }
-                        return (functionDef.ReturnType, _builder.BuildCall(function, callArguments, string.Empty));
+                        return (functionDef.ReturnTypeDefinition, _builder.BuildCall(function, callArguments, string.Empty));
                     }
                 case ChangeByOneAst changeByOne:
                 {
@@ -1641,7 +1641,7 @@ namespace Lang.Backend
                 case CastAst cast:
                 {
                     var value = WriteExpression(cast.Value, localVariables);
-                    return (cast.TargetType, CastValue(value, cast.TargetType));
+                    return (cast.TargetTypeDefinition, CastValue(value, cast.TargetTypeDefinition));
                 }
                 default:
                     // @Cleanup This branch should not be hit since we've already verified that these ASTs are handled,
@@ -1710,10 +1710,10 @@ namespace Lang.Backend
 
         private LLVMValueRef BuildConstant(LLVMTypeRef type, ConstantAst constant, bool getStringPointer = false)
         {
-            switch (constant.Type.PrimitiveType)
+            switch (constant.TypeDefinition.PrimitiveType)
             {
                 case IntegerType integerType:
-                    if (constant.Type.Character)
+                    if (constant.TypeDefinition.Character)
                     {
                         return LLVMValueRef.CreateConstInt(type, (byte)constant.Value[0], false);
                     }
@@ -1726,12 +1726,12 @@ namespace Lang.Backend
                     return LLVMValueRef.CreateConstRealOfStringAndSize(type, constant.Value, (uint)constant.Value.Length);
             }
 
-            switch (constant.Type.TypeKind)
+            switch (constant.TypeDefinition.TypeKind)
             {
                 case TypeKind.Boolean:
                     return LLVMValueRef.CreateConstInt(type, constant.Value == "true" ? (ulong)1 : 0, false);
                 case TypeKind.String:
-                    return BuildString(constant.Value, getStringPointer, constant.Type.Constant);
+                    return BuildString(constant.Value, getStringPointer, constant.TypeDefinition.Constant);
                 default:
                     return _zeroInt;
             }
@@ -1889,7 +1889,7 @@ namespace Lang.Backend
                 var overloadDef = _programGraph.OperatorOverloads[type.GenericName][Operator.Subscript];
 
                 loaded = true;
-                return (overloadDef.ReturnType, _builder.BuildCall(overload, new []{_builder.BuildLoad(variable, index.Name), indexValue}, string.Empty));
+                return (overloadDef.ReturnTypeDefinition, _builder.BuildCall(overload, new []{_builder.BuildLoad(variable, index.Name), indexValue}, string.Empty));
             }
 
             // 4. Build the pointer with the first index of 0
@@ -2381,7 +2381,7 @@ namespace Lang.Backend
 
             var file = _debugFiles[enumAst.FileIndex];
             var enumValues = new LLVMMetadataRef[enumAst.Values.Count];
-            var isUnsigned = enumAst.BaseType.PrimitiveType.Signed ? 0 : 1;
+            var isUnsigned = enumAst.BaseTypeDefinition.PrimitiveType.Signed ? 0 : 1;
 
             for (var i = 0; i < enumValues.Length; i++)
             {
@@ -2393,7 +2393,7 @@ namespace Lang.Backend
 
             fixed (LLVMMetadataRef* enumValuesPointer = enumValues)
             {
-                _debugTypes[enumAst.Name] = LLVM.DIBuilderCreateEnumerationType(_debugBuilder, null, enumName.Value, (UIntPtr)enumName.Length, file, enumAst.Line, (uint)enumAst.BaseType.PrimitiveType.Bytes * 8, 0, (LLVMOpaqueMetadata**)enumValuesPointer, (uint)enumValues.Length, GetDebugType(enumAst.BaseType));
+                _debugTypes[enumAst.Name] = LLVM.DIBuilderCreateEnumerationType(_debugBuilder, null, enumName.Value, (UIntPtr)enumName.Length, file, enumAst.Line, (uint)enumAst.BaseTypeDefinition.PrimitiveType.Bytes * 8, 0, (LLVMOpaqueMetadata**)enumValuesPointer, (uint)enumValues.Length, GetDebugType(enumAst.BaseTypeDefinition));
             }
         }
 
