@@ -67,7 +67,6 @@ namespace Lang
         public bool Varargs { get; set; }
         public bool Params { get; set; }
         public IType ParamsType { get; set; }
-        public IType ParamsElementType { get; set; }
         public bool Verified { get; set; }
         public bool HasDirectives { get; set; }
         public bool CallsCompiler { get; set; }
