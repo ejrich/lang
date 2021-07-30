@@ -619,7 +619,7 @@ namespace Lang
                             AddError($"Function '{function.Name}' cannot have multiple varargs", argument.TypeDefinition);
                         }
                         function.Params = true;
-                        function.ParamsType = TypeTable.GetType(argument.TypeDefinition.Generics[0]);
+                        function.ParamsElementType = TypeTable.GetType(argument.TypeDefinition.Generics[0]);
                         break;
                     case TypeKind.Error:
                         AddError($"Type '{PrintTypeDefinition(argument.TypeDefinition)}' of argument '{argument.Name}' in function '{function.Name}' is not defined", argument.TypeDefinition);
@@ -2340,12 +2340,14 @@ namespace Lang
                             {
                                 AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast.Value);
                             }
+                            cast.TargetType = TypeTable.GetType(cast.TargetTypeDefinition);
                             break;
                         case TypeKind.Pointer:
                             if (valueType != null && valueType.Name != "*")
                             {
                                 AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast.Value);
                             }
+                            cast.TargetType = TypeTable.GetType(cast.TargetTypeDefinition);
                             break;
                         case TypeKind.Error:
                             // Don't need to report additional errors
