@@ -14,6 +14,7 @@ namespace Lang
     public class FunctionIR
     {
         public uint StackSize { get; set; }
+        public bool SaveStack { get; set; }
         public List<Allocation> Allocations { get; set; }
         public List<BasicBlock> BasicBlocks { get; set; }
         public Dictionary<string, InstructionValue> Constants { get; set; }
@@ -63,7 +64,6 @@ namespace Lang
         public InstructionValueType ValueType { get; set; }
 
         public int ValueIndex { get; set; }
-        // public TypeDefinition TypeDefinition { get; set; } // TODO Remove
         public IType Type { get; set; }
 
         // For constant values
@@ -95,6 +95,7 @@ namespace Lang
         GetStructPointer,
         Call,
         Cast,
+        AllocateArray,
         Not,
         Negate,
         Add,
