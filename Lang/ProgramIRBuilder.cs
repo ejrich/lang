@@ -13,7 +13,7 @@ namespace Lang
         void EmitDeclaration(FunctionIR function, DeclarationAst declaration, ScopeAst scope);
         void EmitAssignment(FunctionIR function, AssignmentAst assignment, ScopeAst scope);
         void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, ScopeAst scope, BasicBlock block = null);
-        InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block = null);
+        InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block = null, bool useRawString = false);
     }
 
     public class ProgramIRBuilder : IProgramIRBuilder
@@ -21,6 +21,7 @@ namespace Lang
         private IType _u8Type;
         private IType _s32Type;
         private IType _float64Type;
+        private StructAst _stringStruct;
 
         public ProgramIR Program { get; } = new();
 
@@ -400,7 +401,7 @@ namespace Lang
             block.Instructions.Add(instruction);
         }
 
-        public InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block = null)
+        public InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block = null, bool useRawString = false)
         {
             if (block == null)
             {
@@ -408,8 +409,8 @@ namespace Lang
             }
             switch (ast)
             {
-                case ConstantAst constantAst:
-                    return GetConstant(constantAst);
+                case ConstantAst constant:
+                    return GetConstant(constant, useRawString);
                 case NullAst nullAst:
                     return new InstructionValue {ValueType = InstructionValueType.Null};
                 case IdentifierAst identifierAst:
@@ -418,9 +419,27 @@ namespace Lang
                     {
                         if (declaration.Constant)
                         {
-                            return global ? Program.Constants[declaration.Name] : function.Constants[declaration.Name];
+                            var constantValue = global ? Program.Constants[declaration.Name] : function.Constants[declaration.Name];
+                            if (useRawString && constantValue.Type?.TypeKind == TypeKind.String)
+                            {
+                                return new InstructionValue
+                                {
+                                    ValueType = InstructionValueType.Constant, Type = constantValue.Type,
+                                    ConstantString = constantValue.ConstantString, UseRawString = true
+                                };
+                            }
+                            return constantValue;
                         }
 
+                        if (useRawString && declaration.Type.TypeKind == TypeKind.String)
+                        {
+                            _stringStruct ??= (StructAst) declaration.Type;
+                            var dataField = _stringStruct.Fields[1];
+
+                            var stringPointer = EmitGetPointer(block, declaration.AllocationIndex, _stringStruct, global);
+                            var dataPointer = EmitGetStructPointer(block, stringPointer, _stringStruct, 1, dataField);
+                            return EmitLoad(block, dataField.Type, dataPointer);
+                        }
                         return EmitLoad(block, declaration.Type, allocationIndex: declaration.AllocationIndex, global: global);
                     }
                     else if (identifierAst is IType type)
@@ -439,19 +458,6 @@ namespace Lang
                             ConstantValue = new Constant {Integer = TypeTable.Functions[identifierAst.Name][0].TypeIndex}
                         };
                     }
-                    // TODO Implement getStringPointer
-                    // if (type.TypeKind == TypeKind.String)
-                    // {
-                    //     if (getStringPointer)
-                    //     {
-                    //         value = _builder.BuildStructGEP(value, 1, "stringdata");
-                    //     }
-                    //     value = _builder.BuildLoad(value, identifier.Name);
-                    // }
-                    // else if (!type.Constant)
-                    // {
-                    //     value = _builder.BuildLoad(value, identifier.Name);
-                    // }
                 case StructFieldRefAst structField:
                     if (structField.IsEnum)
                     {
@@ -471,11 +477,14 @@ namespace Lang
                     var structFieldPointer = EmitGetStructPointer(function, structField, scope, block, out var loaded);
                     if (!loaded)
                     {
-                        // TODO Implement getStringPointer
-                        // if (getStringPointer && type.TypeKind == TypeKind.String)
-                        // {
-                        //     field = _builder.BuildStructGEP(field, 1, "stringdata");
-                        // }
+                        if (useRawString && structFieldPointer.Type.TypeKind == TypeKind.String)
+                        {
+                            _stringStruct ??= (StructAst) TypeTable.Types["string"];
+                            var dataField = _stringStruct.Fields[1];
+
+                            var dataPointer = EmitGetStructPointer(block, structFieldPointer, _stringStruct, 1, dataField);
+                            return EmitLoad(block, dataField.Type, dataPointer);
+                        }
                         return EmitLoad(block, structFieldPointer.Type, structFieldPointer);
                     }
                     return structFieldPointer;
@@ -583,19 +592,6 @@ namespace Lang
                             ConstantValue = new Constant {Integer = TypeTable.Functions[identifierAst.Name][0].TypeIndex}
                         };
                     }
-                    // TODO Implement getStringPointer
-                    // if (type.TypeKind == TypeKind.String)
-                    // {
-                    //     if (getStringPointer)
-                    //     {
-                    //         value = _builder.BuildStructGEP(value, 1, "stringdata");
-                    //     }
-                    //     value = _builder.BuildLoad(value, identifier.Name);
-                    // }
-                    // else if (!type.Constant)
-                    // {
-                    //     value = _builder.BuildLoad(value, identifier.Name);
-                    // }
                 case StructFieldRefAst structField:
                     if (structField.IsEnum)
                     {
@@ -613,7 +609,7 @@ namespace Lang
             return null;
         }
 
-        private InstructionValue GetConstant(ConstantAst constant)
+        private InstructionValue GetConstant(ConstantAst constant, bool useRawString = false)
         {
             var value = new InstructionValue {ValueType = InstructionValueType.Constant, Type = constant.Type};
             switch (constant.TypeDefinition.TypeKind)
@@ -623,6 +619,7 @@ namespace Lang
                     break;
                 case TypeKind.String:
                     value.ConstantString = constant.Value;
+                    value.UseRawString = useRawString;
                     break;
                 case TypeKind.Integer:
                     if (constant.TypeDefinition.Character)
@@ -802,7 +799,7 @@ namespace Lang
                 var i = 0;
                 for (; i < call.Function.Arguments.Count - 1; i++)
                 {
-                    var argument = EmitIR(function, call.Arguments[i], scope, block);
+                    var argument = EmitIR(function, call.Arguments[i], scope, block, true);
                     arguments[i] = EmitCastValue(block, argument, call.Function.Arguments[i].Type);
                 }
 
@@ -810,7 +807,8 @@ namespace Lang
                 // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
                 for (; i < argumentCount; i++)
                 {
-                    var argument = EmitIR(function, call.Arguments[i], scope, block);
+                    var argument = EmitIR(function, call.Arguments[i], scope, block, true);
+                    // TODO Make this work
                     // if (argument.Type.TypeKind == TypeKind.Float && argument.Type.Size == 4)
                     // {
                     //     argument = EmitCastValue(block, argument, _float64Type);
@@ -822,7 +820,7 @@ namespace Lang
             {
                 for (var i = 0; i < argumentCount - 1; i++)
                 {
-                    var argument = EmitIR(function, call.Arguments[i], scope, block);
+                    var argument = EmitIR(function, call.Arguments[i], scope, block, call.Function.Extern);
                     arguments[i] = EmitCastValue(block, argument, call.Function.Arguments[i].Type);
                 }
             }
