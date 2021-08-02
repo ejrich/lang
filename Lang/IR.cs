@@ -25,8 +25,11 @@ namespace Lang
         public string Name { get; set; }
         public int Index { get; set; }
         public uint Size { get; set; }
+        public bool Array { get; set; }
+        public uint ArrayLength { get; set; }
         public IType Type { get; set; }
-        // TODO Add initializers
+        public InstructionValue InitialValue { get; set; }
+        public InstructionValue[] InitialArrayValues { get; set; }
     }
 
     public class Allocation
@@ -71,8 +74,8 @@ namespace Lang
         public string ConstantString { get; set; }
         public bool UseRawString { get; set; }
 
-        // For calls
-        public InstructionValue[] Arguments { get; set; }
+        // For calls and constant structs
+        public InstructionValue[] Values { get; set; }
     }
 
     [StructLayout(LayoutKind.Explicit)]
@@ -128,6 +131,7 @@ namespace Lang
         Constant,
         Null,
         Type,
-        CallArguments
+        CallArguments,
+        ConstantStruct
     }
 }

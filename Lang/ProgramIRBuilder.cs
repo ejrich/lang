@@ -101,26 +101,150 @@ namespace Lang
             {
                 var globalIndex = Program.GlobalVariables.Count;
                 declaration.AllocationIndex = globalIndex;
-                var globalVariable = new GlobalVariable
-                {
-                    Name = declaration.Name, Index = globalIndex,
-                    Size = declaration.Type.Size, Type = declaration.Type
-                };
-                Program.GlobalVariables.Add(globalVariable);
+                var globalVariable = new GlobalVariable {Name = declaration.Name, Index = globalIndex, Size = declaration.Type.Size};
 
-                // TODO Add initialization values
-                if (declaration.Value != null)
+                if (declaration.Type is ArrayType arrayType)
                 {
-                    // value = CastValue(ExecuteExpression(declaration.Value, variables).Value, declaration.Type);
-                }
-                else if (declaration.ArrayValues != null)
-                {
-                    // value = InitializeArray(declaration.Type, variables, declaration.ArrayValues);
+                    globalVariable.Array = true;
+                    globalVariable.ArrayLength = declaration.TypeDefinition.ConstCount.Value;
+                    globalVariable.Type = arrayType.ElementType;
                 }
                 else
                 {
-                    // value = GetUninitializedValue(declaration.Type, variables, declaration.Assignments);
+                    globalVariable.Type = declaration.Type;
                 }
+
+                Program.GlobalVariables.Add(globalVariable);
+
+                if (declaration.Value != null)
+                {
+                    globalVariable.InitialValue = EmitConstantIR(declaration.Value, scope);
+                    return;
+                }
+
+                switch (declaration.TypeDefinition.TypeKind)
+                {
+                    // Initialize arrays
+                    case TypeKind.Array:
+                        var arrayStruct = (StructAst)declaration.Type;
+                        if (declaration.TypeDefinition.ConstCount != null)
+                        {
+                            // var arrayPointer = InitializeConstArray(function, block, pointer, arrayStruct, declaration.TypeDefinition.ConstCount.Value);
+
+                            if (declaration.ArrayValues != null)
+                            {
+                                // InitializeArrayValues(function, block, arrayPointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
+                            }
+                        }
+                        else
+                        {
+                            var constArray = new InstructionValue
+                            {
+                                ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
+                                Values = new [] {GetDefaultConstant(_s32Type), new InstructionValue {ValueType = InstructionValueType.Null}}
+                            };
+                            globalVariable.InitialValue = constArray;
+                        }
+                        break;
+                    case TypeKind.CArray:
+                        if (declaration.ArrayValues != null)
+                        {
+                            // InitializeArrayValues(function, block, cArrayPointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
+                        }
+                        break;
+                    // Initialize struct field default values
+                    case TypeKind.Struct:
+                    case TypeKind.String:
+                        globalVariable.InitialValue = GetConstantStruct((StructAst)declaration.Type, scope, declaration.Assignments);
+                        break;
+                    // Initialize pointers to null
+                    case TypeKind.Pointer:
+                        globalVariable.InitialValue = new InstructionValue {ValueType = InstructionValueType.Null};
+                        break;
+                    // Or initialize to default
+                    default:
+                        globalVariable.InitialValue = GetDefaultConstant(declaration.Type);
+                        break;
+                }
+            }
+        }
+
+        private InstructionValue GetConstantStruct(StructAst structDef, ScopeAst scope, Dictionary<string, AssignmentAst> assignments)
+        {
+            var constantStruct = new InstructionValue {Type = structDef, Values = new InstructionValue[structDef.Fields.Count]};
+
+            if (assignments == null)
+            {
+                for (var i = 0; i < structDef.Fields.Count; i++)
+                {
+                    var field = structDef.Fields[i];
+                    constantStruct.Values[i] = GetFieldConstant(field, scope);
+                }
+            }
+            else
+            {
+                for (var i = 0; i < structDef.Fields.Count; i++)
+                {
+                    var field = structDef.Fields[i];
+
+                    if (assignments.TryGetValue(field.Name, out var assignment))
+                    {
+                        constantStruct.Values[i] = EmitConstantIR(assignment.Value, scope);
+                    }
+                    else
+                    {
+                        constantStruct.Values[i] = GetFieldConstant(field, scope);
+                    }
+                }
+            }
+
+            return constantStruct;
+        }
+
+        private InstructionValue GetFieldConstant(StructFieldAst field, ScopeAst scope)
+        {
+            switch (field.Type.TypeKind)
+            {
+                // Initialize arrays
+                case TypeKind.Array:
+                    var arrayStruct = (StructAst)field.Type;
+                    if (field.TypeDefinition.ConstCount != null)
+                    {
+                        // var arrayPointer = InitializeConstArray(function, block, pointer, arrayStruct, field.TypeDefinition.ConstCount.Value);
+
+                        if (field.ArrayValues != null)
+                        {
+                            // InitializeArrayValues(function, block, arrayPointer, field.ArrayElementType, field.ArrayValues, scope);
+                        }
+
+                        // TODO Implement me
+                        return null;
+                    }
+                    else
+                    {
+                        return new InstructionValue
+                        {
+                            ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
+                            Values = new [] {GetDefaultConstant(_s32Type), new InstructionValue {ValueType = InstructionValueType.Null}}
+                        };
+                    }
+                case TypeKind.CArray:
+                    if (field.ArrayValues != null)
+                    {
+                        // InitializeArrayValues(function, block, pointer, field.ArrayElementType, field.ArrayValues, scope);
+                    }
+                    // TODO Implement me
+                    return null;
+                // Initialize struct field default values
+                case TypeKind.Struct:
+                case TypeKind.String: // TODO String default values
+                    return GetConstantStruct((StructAst)field.Type, scope, field.Assignments);
+                // Initialize pointers to null
+                case TypeKind.Pointer:
+                    return new InstructionValue {ValueType = InstructionValueType.Null};
+                // Or initialize to default
+                default:
+                    return field.Value == null ? GetDefaultConstant(field.Type) : EmitConstantIR(field.Value, scope);
             }
         }
 
@@ -235,7 +359,7 @@ namespace Lang
         private InstructionValue InitializeConstArray(FunctionIR function, BasicBlock block, InstructionValue arrayPointer, StructAst arrayStruct, uint length, IType elementType = null)
         {
             var lengthPointer = EmitGetStructPointer(block, arrayPointer, arrayStruct, 0);
-            var lengthValue = new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new Constant {Integer = length}};
+            var lengthValue = GetConstantInteger(length);
             EmitStore(block, lengthPointer, lengthValue);
 
             if (elementType == null)
@@ -255,7 +379,7 @@ namespace Lang
         {
             for (var i = 0; i < arrayValues.Count; i++)
             {
-                var index = new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new Constant {Integer = i}};
+                var index = GetConstantInteger(i);
                 var pointer = EmitGetPointer(block, arrayPointer, index, elementType, getFirstPointer: true);
 
                 var value = EmitIR(function, arrayValues[i], scope, block);
@@ -444,19 +568,11 @@ namespace Lang
                     }
                     else if (identifierAst is IType type)
                     {
-                        return new InstructionValue
-                        {
-                            ValueType = InstructionValueType.Constant, Type = _s32Type,
-                            ConstantValue = new Constant {Integer = type.TypeIndex}
-                        };
+                        return GetConstantInteger(type.TypeIndex);
                     }
                     else
                     {
-                        return new InstructionValue
-                        {
-                            ValueType = InstructionValueType.Constant, Type = _s32Type,
-                            ConstantValue = new Constant {Integer = TypeTable.Functions[identifierAst.Name][0].TypeIndex}
-                        };
+                        return GetConstantInteger(TypeTable.Functions[identifierAst.Name][0].TypeIndex);
                     }
                 case StructFieldRefAst structField:
                     if (structField.IsEnum)
@@ -545,11 +661,7 @@ namespace Lang
                     // return expressionValue;
                     return new InstructionValue();
                 case TypeDefinition typeDef:
-                    return new InstructionValue
-                    {
-                        ValueType = InstructionValueType.Constant, Type = _s32Type,
-                        ConstantValue = new Constant {Integer = typeDef.TypeIndex.Value}
-                    };
+                    return GetConstantInteger(typeDef.TypeIndex.Value);
                 case CastAst cast:
                     var castValue = EmitIR(function, cast.Value, scope);
                     return EmitCastValue(block, castValue, cast.TargetType);
@@ -578,19 +690,11 @@ namespace Lang
                     }
                     else if (identifierAst is IType type)
                     {
-                        return new InstructionValue
-                        {
-                            ValueType = InstructionValueType.Constant, Type = _s32Type,
-                            ConstantValue = new Constant {Integer = (uint)type.TypeIndex}
-                        };
+                        return GetConstantInteger(type.TypeIndex);
                     }
                     else
                     {
-                        return new InstructionValue
-                        {
-                            ValueType = InstructionValueType.Constant, Type = _s32Type,
-                            ConstantValue = new Constant {Integer = TypeTable.Functions[identifierAst.Name][0].TypeIndex}
-                        };
+                        return GetConstantInteger(TypeTable.Functions[identifierAst.Name][0].TypeIndex);
                     }
                 case StructFieldRefAst structField:
                     if (structField.IsEnum)
@@ -784,7 +888,7 @@ namespace Lang
                 uint paramsIndex = 0;
                 for (var i = call.Function.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
                 {
-                    var index = new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new Constant {Integer = paramsIndex}};
+                    var index = GetConstantInteger(paramsIndex);
                     var pointer = EmitGetPointer(block, dataPointer, index, elementType, true);
 
                     var value = EmitIR(function, call.Arguments[i], scope, block);
@@ -898,6 +1002,16 @@ namespace Lang
             return new InstructionValue {ValueIndex = valueIndex, Type = type};
         }
 
+        private InstructionValue GetConstantInteger(int value)
+        {
+            return new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new Constant {Integer = value}};
+        }
+
+        private InstructionValue GetConstantInteger(uint value)
+        {
+            return new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new Constant {Integer = value}};
+        }
+
         private IAst GetScopeIdentifier(ScopeAst scope, string name, out bool global)
         {
             do {
@@ -967,7 +1081,7 @@ namespace Lang
             var callInstruction = new Instruction
             {
                 Type = InstructionType.Call, CallFunction = name,
-                Value1 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Arguments = arguments}
+                Value1 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Values = arguments}
             };
             return AddInstruction(block, callInstruction, returnType);
         }
