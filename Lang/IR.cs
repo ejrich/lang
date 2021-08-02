@@ -74,8 +74,9 @@ namespace Lang
         public string ConstantString { get; set; }
         public bool UseRawString { get; set; }
 
-        // For calls and constant structs
+        // For calls and constant structs/arrays
         public InstructionValue[] Values { get; set; }
+        public uint ArrayLength { get; set; }
     }
 
     [StructLayout(LayoutKind.Explicit)]
@@ -132,6 +133,7 @@ namespace Lang
         Null,
         Type,
         CallArguments,
-        ConstantStruct
+        ConstantStruct,
+        ConstantArray
     }
 }
