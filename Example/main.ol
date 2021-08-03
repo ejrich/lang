@@ -296,7 +296,7 @@ default_args(int val = 5) {
 }
 
 default_args_enum(State val = State.Running) {
-    printf("Enum value = %d\n", val);
+    printf("Enum value = %d, Running = %d\n", val, val == State.Running);
 }
 
 open_window() {
