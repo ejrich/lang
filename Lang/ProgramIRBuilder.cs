@@ -663,7 +663,14 @@ namespace Lang
                     for (var i = 1; i < expression.Children.Count; i++)
                     {
                         var rhs = EmitIR(function, expression.Children[i], scope, block);
-                        expressionValue = EmitExpression(block, expressionValue, rhs, expression.Operators[i - 1], expression.ResultingTypes[i - 1]);
+                        if (expression.OperatorOverloads.TryGetValue(i, out var overload))
+                        {
+                            expressionValue = EmitCall(block, GetOperatorOverloadName(overload.Type, overload.Operator), new []{expressionValue, rhs}, overload.ReturnType);
+                        }
+                        else
+                        {
+                            expressionValue = EmitExpression(block, expressionValue, rhs, expression.Operators[i - 1], expression.ResultingTypes[i - 1]);
+                        }
                     }
                     // return expressionValue;
                     return new InstructionValue();

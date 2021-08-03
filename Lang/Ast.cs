@@ -218,6 +218,7 @@ namespace Lang
         public List<Operator> Operators { get; } = new();
         public List<TypeDefinition> ResultingTypeDefinitions { get; } = new();
         public List<IType> ResultingTypes { get; } = new();
+        public Dictionary<int, OperatorOverloadAst> OperatorOverloads { get; } = new();
         public List<IAst> Children { get; } = new();
     }
 
