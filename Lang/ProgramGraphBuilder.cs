@@ -3080,8 +3080,8 @@ namespace Lang
         private TypeDefinition VerifyExpressionType(ExpressionAst expression, IFunction currentFunction, ScopeAst scope)
         {
             // 1. Get the type of the initial child
-            expression.Type = VerifyExpression(expression.Children[0], currentFunction, scope);
-            if (expression.Type == null) return null;
+            expression.TypeDefinition = VerifyExpression(expression.Children[0], currentFunction, scope);
+            if (expression.TypeDefinition == null) return null;
             for (var i = 1; i < expression.Children.Count; i++)
             {
                 // 2. Get the next operator and expression type
@@ -3089,13 +3089,15 @@ namespace Lang
                 var next = expression.Children[i];
                 if (next is NullAst nullAst)
                 {
-                    if (expression.Type.Name != "*" || (op != Operator.Equality && op != Operator.NotEqual))
+                    if (expression.TypeDefinition.Name != "*" || (op != Operator.Equality && op != Operator.NotEqual))
                     {
-                        AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and null", next);
+                        AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and null", next);
                     }
 
-                    nullAst.TargetType = expression.Type;
-                    expression.Type = new TypeDefinition {Name = "bool", TypeKind = TypeKind.Boolean};
+                    nullAst.TargetType = expression.TypeDefinition;
+                    expression.TypeDefinition = new TypeDefinition {Name = "bool", TypeKind = TypeKind.Boolean};
+                    expression.ResultingTypeDefinitions.Add(expression.TypeDefinition);
+                    expression.Type = TypeTable.Types["bool"];
                     expression.ResultingTypes.Add(expression.Type);
                     continue;
                 }
@@ -3104,22 +3106,22 @@ namespace Lang
                 if (nextExpressionType == null) return null;
 
                 // 3. Verify the operator and expression types are compatible and convert the expression type if necessary
-                var type = VerifyType(expression.Type);
+                var type = VerifyType(expression.TypeDefinition);
                 var nextType = VerifyType(nextExpressionType);
                 if ((type == TypeKind.Struct && nextType == TypeKind.Struct) ||
                     (type == TypeKind.String && nextType == TypeKind.String))
                 {
-                    if (TypeEquals(expression.Type, nextExpressionType, true))
+                    if (TypeEquals(expression.TypeDefinition, nextExpressionType, true))
                     {
-                        var resultType = VerifyOperatorOverloadType(expression.Type, op, currentFunction, expression.Children[i], out _);
+                        var resultType = VerifyOperatorOverloadType(expression.TypeDefinition, op, currentFunction, expression.Children[i], out _);
                         if (resultType != null)
                         {
-                            expression.Type = resultType;
+                            expression.TypeDefinition = resultType;
                         }
                     }
                     else
                     {
-                        AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                        AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
                     }
                 }
                 else
@@ -3131,8 +3133,8 @@ namespace Lang
                         case Operator.Or:
                             if (type != TypeKind.Boolean || nextType != TypeKind.Boolean)
                             {
-                                AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
-                                expression.Type = new TypeDefinition {Name = "bool", TypeKind = TypeKind.Boolean};
+                                AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                                expression.TypeDefinition = new TypeDefinition {Name = "bool", TypeKind = TypeKind.Boolean};
                             }
                             break;
                         // Requires same types and returns bool
@@ -3145,17 +3147,17 @@ namespace Lang
                             if ((type == TypeKind.Enum && nextType == TypeKind.Enum)
                                 || (type == TypeKind.Type && nextType == TypeKind.Type))
                             {
-                                if ((op != Operator.Equality && op != Operator.NotEqual) || !TypeEquals(expression.Type, nextExpressionType))
+                                if ((op != Operator.Equality && op != Operator.NotEqual) || !TypeEquals(expression.TypeDefinition, nextExpressionType))
                                 {
-                                    AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                                    AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
                                 }
                             }
                             else if (!(type == TypeKind.Integer || type == TypeKind.Float) &&
                                 !(nextType == TypeKind.Integer || nextType == TypeKind.Float))
                             {
-                                AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                                AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
                             }
-                            expression.Type = new TypeDefinition {Name = "bool", TypeKind = TypeKind.Boolean};
+                            expression.TypeDefinition = new TypeDefinition {Name = "bool", TypeKind = TypeKind.Boolean};
                             break;
                         // Requires same types and returns more precise type
                         case Operator.Add:
@@ -3169,7 +3171,7 @@ namespace Lang
                             {
                                 if (nextType == TypeKind.Pointer)
                                 {
-                                    expression.Type = nextExpressionType;
+                                    expression.TypeDefinition = nextExpressionType;
                                 }
                             }
                             else if ((type == TypeKind.Integer || type == TypeKind.Float) &&
@@ -3178,7 +3180,7 @@ namespace Lang
                                 // For integer operations, use the larger size and convert to signed if one type is signed
                                 if (type == TypeKind.Integer && nextType == TypeKind.Integer)
                                 {
-                                    var currentIntegerType = expression.Type.PrimitiveType;
+                                    var currentIntegerType = expression.TypeDefinition.PrimitiveType;
                                     var nextIntegerType = nextExpressionType.PrimitiveType;
                                     if (currentIntegerType.Bytes == nextIntegerType.Bytes &&
                                         currentIntegerType.Signed == nextIntegerType.Signed)
@@ -3189,7 +3191,7 @@ namespace Lang
                                         Bytes = currentIntegerType.Bytes > nextIntegerType.Bytes ? currentIntegerType.Bytes : nextIntegerType.Bytes,
                                         Signed = currentIntegerType.Signed || nextIntegerType.Signed
                                     };
-                                    expression.Type = new TypeDefinition
+                                    expression.TypeDefinition = new TypeDefinition
                                     {
                                         Name = $"{(integerType.Signed ? "s" : "u")}{integerType.Bytes * 8}",
                                         TypeKind = TypeKind.Integer, PrimitiveType = integerType
@@ -3198,21 +3200,21 @@ namespace Lang
                                 // For floating point operations, convert to the larger size
                                 else if (type == TypeKind.Float && nextType == TypeKind.Float)
                                 {
-                                    if (expression.Type.PrimitiveType.Bytes < nextExpressionType.PrimitiveType.Bytes)
+                                    if (expression.TypeDefinition.PrimitiveType.Bytes < nextExpressionType.PrimitiveType.Bytes)
                                     {
-                                        expression.Type = nextExpressionType;
+                                        expression.TypeDefinition = nextExpressionType;
                                     }
                                 }
                                 // For an int lhs and float rhs, convert to the floating point type
                                 // Note that float lhs and int rhs are covered since the floating point is already selected
                                 else if (nextType == TypeKind.Float)
                                 {
-                                    expression.Type = nextExpressionType;
+                                    expression.TypeDefinition = nextExpressionType;
                                 }
                             }
                             else
                             {
-                                AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                                AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
                             }
                             break;
                         // Requires both integer or bool types and returns more same type
@@ -3221,7 +3223,7 @@ namespace Lang
                         case Operator.Xor:
                             if (type == TypeKind.Integer && nextType == TypeKind.Integer)
                             {
-                                var currentIntegerType = expression.Type.PrimitiveType;
+                                var currentIntegerType = expression.TypeDefinition.PrimitiveType;
                                 var nextIntegerType = nextExpressionType.PrimitiveType;
                                 if (currentIntegerType.Bytes == nextIntegerType.Bytes &&
                                     currentIntegerType.Signed == nextIntegerType.Signed)
@@ -3232,7 +3234,7 @@ namespace Lang
                                     Bytes = currentIntegerType.Bytes > nextIntegerType.Bytes ? currentIntegerType.Bytes : nextIntegerType.Bytes,
                                     Signed = currentIntegerType.Signed || nextIntegerType.Signed
                                 };
-                                expression.Type = new TypeDefinition
+                                expression.TypeDefinition = new TypeDefinition
                                 {
                                     Name = $"{(integerType.Signed ? "s" : "u")}{integerType.Bytes * 8}",
                                     TypeKind = TypeKind.Integer, PrimitiveType = integerType
@@ -3240,15 +3242,15 @@ namespace Lang
                             }
                             else if (!(type == TypeKind.Boolean && nextType == TypeKind.Boolean))
                             {
-                                AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                                AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
                                 if (nextType == TypeKind.Boolean || nextType == TypeKind.Integer)
                                 {
-                                    expression.Type = nextExpressionType;
+                                    expression.TypeDefinition = nextExpressionType;
                                 }
                                 else if (!(type == TypeKind.Boolean || type == TypeKind.Integer))
                                 {
                                     // If the type can't be determined, default to int
-                                    expression.Type = _s32Type;
+                                    expression.TypeDefinition = _s32Type;
                                 }
                             }
                             break;
@@ -3258,26 +3260,28 @@ namespace Lang
                         case Operator.RotateRight:
                             if (type != TypeKind.Integer || nextType != TypeKind.Integer)
                             {
-                                AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                                AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
                                 if (type != TypeKind.Integer)
                                 {
                                     if (nextType == TypeKind.Integer)
                                     {
-                                        expression.Type = nextExpressionType;
+                                        expression.TypeDefinition = nextExpressionType;
                                     }
                                     else
                                     {
                                         // If the type can't be determined, default to int
-                                        expression.Type = _s32Type;
+                                        expression.TypeDefinition = _s32Type;
                                     }
                                 }
                             }
                             break;
                     }
                 }
+                expression.Type = TypeTable.GetType(expression.TypeDefinition);
                 expression.ResultingTypes.Add(expression.Type);
+                expression.ResultingTypeDefinitions.Add(expression.TypeDefinition);
             }
-            return expression.Type;
+            return expression.TypeDefinition;
         }
 
         private TypeDefinition VerifyIndexType(IndexAst index, IFunction currentFunction, ScopeAst scope)
