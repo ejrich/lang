@@ -36,6 +36,16 @@ namespace Lang
             var functionName = GetFunctionName(function);
 
             var functionIR = new FunctionIR();
+
+            if (functionName == "main")
+            {
+                Program.EntryPoint = functionIR;
+            }
+            else
+            {
+                Program.Functions[functionName] = functionIR;
+            }
+
             if (!function.Extern && !function.Compiler)
             {
                 functionIR.Allocations = new();
@@ -55,17 +65,9 @@ namespace Lang
                     };
                     entryBlock.Instructions.Add(storeInstruction);
                 }
-            }
 
-            if (functionName == "main")
-            {
-                Program.EntryPoint = functionIR;
+                EmitScope(functionIR, entryBlock, function.Body, function.ReturnType);
             }
-            else
-            {
-                Program.Functions[functionName] = functionIR;
-            }
-            // TODO Emit function body
         }
 
         public void AddOperatorOverload(OperatorOverloadAst overload)
@@ -84,7 +86,8 @@ namespace Lang
             }
 
             Program.Functions[functionName] = functionIR;
-            // TODO Emit function body
+
+            EmitScope(functionIR, entryBlock, overload.Body, overload.ReturnType);
         }
 
         public void EmitGlobalVariable(DeclarationAst declaration, ScopeAst scope)
@@ -257,22 +260,59 @@ namespace Lang
             };
         }
 
-        private void EmitDeclaration(FunctionIR function, DeclarationAst declaration, ScopeAst scope)
+        private void EmitScope(FunctionIR function, BasicBlock block, ScopeAst scope, IType returnType)
+        {
+            foreach (var ast in scope.Children)
+            {
+                switch (ast)
+                {
+                    case ReturnAst returnAst:
+                        EmitReturn(function, block, returnAst, returnType, scope);
+                        break;
+                    case DeclarationAst declaration:
+                        EmitDeclaration(function, block, declaration, scope);
+                        break;
+                    case AssignmentAst assignment:
+                        EmitAssignment(function, block, assignment, scope);
+                        break;
+                    case ScopeAst childScope:
+                        EmitScope(function, block, scope, returnType);
+                        break;
+                    case ConditionalAst conditional:
+                        EmitConditional(function, block, conditional, scope);
+                        break;
+                    case WhileAst whileAst:
+                        EmitWhile(function, whileAst, scope);
+                        break;
+                    case EachAst each:
+                        EmitEach(function, block, each, scope);
+                        break;
+                    case BreakAst:
+                    case ContinueAst:
+                        // TODO Use the break or continue basic block
+                        break;
+                    default:
+                        EmitIR(function, block, ast, scope);
+                        break;
+                }
+            }
+        }
+
+        private void EmitDeclaration(FunctionIR function, BasicBlock block, DeclarationAst declaration, ScopeAst scope)
         {
             if (declaration.Constant)
             {
                 function.Constants ??= new();
 
-                function.Constants[declaration.Name] = EmitIR(function, declaration.Value, scope);
+                function.Constants[declaration.Name] = EmitConstantIR(declaration.Value, scope, function);
             }
             else
             {
                 var allocationIndex = AddAllocation(function, declaration);
 
-                var block = function.BasicBlocks[^1];
                 if (declaration.Value != null)
                 {
-                    var value = EmitIR(function, declaration.Value, scope, block);
+                    var value = EmitIR(function, block, declaration.Value, scope);
                     EmitStore(block, allocationIndex, EmitCastValue(block, value, declaration.Type));
                     return;
                 }
@@ -295,7 +335,7 @@ namespace Lang
                         else if (declaration.TypeDefinition.Count != null)
                         {
                             function.SaveStack = true;
-                            var count = EmitIR(function, declaration.TypeDefinition.Count, scope, block);
+                            var count = EmitIR(function, block, declaration.TypeDefinition.Count, scope);
                             var countPointer = EmitGetStructPointer(block, pointer, arrayStruct, 0);
                             EmitStore(block, countPointer, count);
 
@@ -386,7 +426,7 @@ namespace Lang
                 var index = GetConstantInteger(i);
                 var pointer = EmitGetPointer(block, arrayPointer, index, elementType, getFirstPointer: true);
 
-                var value = EmitIR(function, arrayValues[i], scope, block);
+                var value = EmitIR(function, block, arrayValues[i], scope);
                 EmitStore(block, pointer, EmitCastValue(block, value, elementType));
             }
         }
@@ -414,7 +454,7 @@ namespace Lang
 
                     if (assignments.TryGetValue(field.Name, out var assignment))
                     {
-                        var value = EmitIR(function, assignment.Value, scope, block);
+                        var value = EmitIR(function, block, assignment.Value, scope);
 
                         EmitStore(block, fieldPointer, EmitCastValue(block, value, field.Type));
                     }
@@ -466,7 +506,7 @@ namespace Lang
                     break;
                 // Or initialize to default
                 default:
-                    var defaultValue = field.Value == null ? GetDefaultConstant(field.Type) : EmitIR(function, field.Value, scope, block);
+                    var defaultValue = field.Value == null ? GetDefaultConstant(field.Type) : EmitIR(function, block, field.Value, scope);
                     EmitStore(block, pointer, defaultValue);
                     break;
             }
@@ -498,12 +538,11 @@ namespace Lang
             return value;
         }
 
-        private void EmitAssignment(FunctionIR function, AssignmentAst assignment, ScopeAst scope)
+        private void EmitAssignment(FunctionIR function, BasicBlock block, AssignmentAst assignment, ScopeAst scope)
         {
-            var block = function.BasicBlocks[^1];
             var pointer = EmitGetReference(function, assignment.Reference, scope, block);
 
-            var value = EmitIR(function, assignment.Value, scope, block);
+            var value = EmitIR(function, block, assignment.Value, scope);
             if (assignment.Operator != Operator.None)
             {
                 var previousValue = EmitLoad(block, pointer.Type, pointer);
@@ -513,23 +552,18 @@ namespace Lang
             EmitStore(block, pointer, value);
         }
 
-        public void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, ScopeAst scope, BasicBlock block = null)
+        public void EmitReturn(FunctionIR function, BasicBlock block, ReturnAst returnAst, IType returnType, ScopeAst scope)
         {
-            if (block == null)
-            {
-                block = function.BasicBlocks[^1];
-            }
-
             var instruction = new Instruction {Type = InstructionType.Return};
             if (returnAst.Value != null)
             {
-                instruction.Value1 = EmitIR(function, returnAst.Value, scope, block);
+                instruction.Value1 = EmitIR(function, block, returnAst.Value, scope);
             }
 
             block.Instructions.Add(instruction);
         }
 
-        private BasicBlock EmitConditional(FunctionIR function, ConditionalAst conditional, ScopeAst scope, BasicBlock block)
+        private void EmitConditional(FunctionIR function, BasicBlock block, ConditionalAst conditional, ScopeAst scope)
         {
             // Run the condition expression in the current basic block and then jump to the following
             var condition = EmitConditionExpression(function, conditional.Condition, scope, block);
@@ -538,11 +572,9 @@ namespace Lang
             var thenBlock = AddBasicBlock(function);
             var elseBlock = conditional.ElseBlock == null ? null : AddBasicBlock(function);
             var afterBlock = AddBasicBlock(function);
-
-            return thenBlock;
         }
 
-        private BasicBlock EmitWhile(FunctionIR function, WhileAst whileAst, ScopeAst scope)
+        private void EmitWhile(FunctionIR function, WhileAst whileAst, ScopeAst scope)
         {
             // Create a block for the condition expression and then jump to the following
             var conditionBlock = AddBasicBlock(function);
@@ -550,13 +582,11 @@ namespace Lang
 
             // Return the while body block
             var whileBodyBlock = AddBasicBlock(function);
-
-            return whileBodyBlock;
         }
 
         private InstructionValue EmitConditionExpression(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block)
         {
-            var value = EmitIR(function, ast, scope, block);
+            var value = EmitIR(function, block, ast, scope);
 
             switch (value.Type.TypeKind)
             {
@@ -572,13 +602,11 @@ namespace Lang
             }
         }
 
-        private BasicBlock EmitEach(FunctionIR function, EachAst each, ScopeAst scope)
+        private void EmitEach(FunctionIR function, BasicBlock block, EachAst each, ScopeAst scope)
         {
             // TODO Implement me
             // Initialize the loop in the current basic block
             // Create a basic block for the condition
-            // Return the body block
-            return null;
         }
 
         private BasicBlock AddBasicBlock(FunctionIR function)
@@ -588,12 +616,8 @@ namespace Lang
             return block;
         }
 
-        private InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block = null, bool useRawString = false)
+        private InstructionValue EmitIR(FunctionIR function, BasicBlock block, IAst ast, ScopeAst scope, bool useRawString = false)
         {
-            if (block == null)
-            {
-                block = function.BasicBlocks[^1];
-            }
             switch (ast)
             {
                 case ConstantAst constant:
@@ -701,14 +725,14 @@ namespace Lang
                     switch (unary.Operator)
                     {
                         case UnaryOperator.Not:
-                            value = EmitIR(function, unary.Value, scope, block);
+                            value = EmitIR(function, block, unary.Value, scope);
                             return EmitInstruction(InstructionType.Not, block, value.Type, value);
                         case UnaryOperator.Negate:
-                            value = EmitIR(function, unary.Value, scope, block);
+                            value = EmitIR(function, block, unary.Value, scope);
                             var negate = value.Type.TypeKind == TypeKind.Integer ? InstructionType.IntegerNegate : InstructionType.FloatNegate;
                             return EmitInstruction(negate, block, value.Type, value);
                         case UnaryOperator.Dereference:
-                            value = EmitIR(function, unary.Value, scope, block);
+                            value = EmitIR(function, block, unary.Value, scope);
                             return EmitLoad(block, value.Type, value);
                         case UnaryOperator.Reference:
                             return EmitGetReference(function, unary.Value, scope, block);
@@ -719,11 +743,10 @@ namespace Lang
 
                     return index.CallsOverload ? indexPointer : EmitLoad(block, indexPointer.Type, indexPointer);
                 case ExpressionAst expression:
-                    var expressionValue = EmitIR(function, expression.Children[0], scope, block);
+                    var expressionValue = EmitIR(function, block, expression.Children[0], scope);
                     for (var i = 1; i < expression.Children.Count; i++)
                     {
-                        var foo = expression.Children[i];
-                        var rhs = EmitIR(function, foo, scope, block);
+                        var rhs = EmitIR(function, block, expression.Children[i], scope);
                         if (expression.OperatorOverloads.TryGetValue(i, out var overload))
                         {
                             expressionValue = EmitCall(block, GetOperatorOverloadName(overload.Type, overload.Operator), new []{expressionValue, rhs}, overload.ReturnType);
@@ -737,7 +760,7 @@ namespace Lang
                 case TypeDefinition typeDef:
                     return GetConstantInteger(typeDef.TypeIndex.Value);
                 case CastAst cast:
-                    var castValue = EmitIR(function, cast.Value, scope);
+                    var castValue = EmitIR(function, block, cast.Value, scope);
                     return EmitCastValue(block, castValue, cast.TargetType);
             }
             return null;
@@ -839,7 +862,7 @@ namespace Lang
                 case IndexAst index:
                     return EmitGetIndexPointer(function, index, scope, block);
                 case UnaryAst unary:
-                    return EmitIR(function, unary.Value, scope, block);
+                    return EmitIR(function, block, unary.Value, scope);
             }
             return null;
         }
@@ -900,7 +923,7 @@ namespace Lang
                 {
                     if (structField.Children[i] is IndexAst index)
                     {
-                        var indexValue = EmitIR(function, index.Index, scope, block);
+                        var indexValue = EmitIR(function, block, index.Index, scope);
                         var arrayType = (ArrayType) type;
                         var elementType = arrayType.ElementType;
                         value = EmitGetPointer(block, value, indexValue, elementType, true);
@@ -948,7 +971,7 @@ namespace Lang
             {
                 for (var i = 0; i < argumentCount - 1; i++)
                 {
-                    var argument = EmitIR(function, call.Arguments[i], scope, block);
+                    var argument = EmitIR(function, block, call.Arguments[i], scope);
                     arguments[i] = EmitCastValue(block, argument, call.Function.Arguments[i].Type);
                 }
 
@@ -965,7 +988,7 @@ namespace Lang
                     var index = GetConstantInteger(paramsIndex);
                     var pointer = EmitGetPointer(block, dataPointer, index, elementType, true);
 
-                    var value = EmitIR(function, call.Arguments[i], scope, block);
+                    var value = EmitIR(function, block, call.Arguments[i], scope);
                     EmitStore(block, pointer, EmitCastValue(block, value, elementType));
                 }
 
@@ -977,7 +1000,7 @@ namespace Lang
                 var i = 0;
                 for (; i < call.Function.Arguments.Count - 1; i++)
                 {
-                    var argument = EmitIR(function, call.Arguments[i], scope, block, true);
+                    var argument = EmitIR(function, block, call.Arguments[i], scope, true);
                     arguments[i] = EmitCastValue(block, argument, call.Function.Arguments[i].Type);
                 }
 
@@ -985,7 +1008,7 @@ namespace Lang
                 // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
                 for (; i < argumentCount; i++)
                 {
-                    var argument = EmitIR(function, call.Arguments[i], scope, block, true);
+                    var argument = EmitIR(function, block, call.Arguments[i], scope, true);
                     if (argument.Type?.TypeKind == TypeKind.Float && argument.Type.Size == 4)
                     {
                         argument = EmitCastValue(block, argument, _float64Type);
@@ -997,7 +1020,7 @@ namespace Lang
             {
                 for (var i = 0; i < argumentCount - 1; i++)
                 {
-                    var argument = EmitIR(function, call.Arguments[i], scope, block, call.Function.Extern);
+                    var argument = EmitIR(function, block, call.Arguments[i], scope, call.Function.Extern);
                     arguments[i] = EmitCastValue(block, argument, call.Function.Arguments[i].Type);
                 }
             }
@@ -1014,7 +1037,7 @@ namespace Lang
                 variable = EmitGetPointer(block, declaration.AllocationIndex, type, global);
             }
 
-            var indexValue = EmitIR(function, index.Index, scope, block);
+            var indexValue = EmitIR(function, block, index.Index, scope);
 
             if (index.CallsOverload)
             {
