@@ -1067,6 +1067,9 @@ namespace Lang
                     return VerifyWhile(whileAst, currentFunction, scope);
                 case EachAst each:
                     return VerifyEach(each, currentFunction, scope);
+                case BreakAst:
+                case ContinueAst:
+                    break;
                 default:
                     VerifyExpression(syntaxTree, currentFunction, scope);
                     break;
