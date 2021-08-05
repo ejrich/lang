@@ -40,7 +40,9 @@ namespace Lang
             {"enum", TokenType.Enum},
             {"null", TokenType.Null},
             {"cast", TokenType.Cast},
-            {"operator", TokenType.Operator}
+            {"operator", TokenType.Operator},
+            {"break", TokenType.Break},
+            {"continue", TokenType.Continue},
         };
 
         public List<Token> LoadFileTokens(string filePath, int fileIndex, out List<ParseError> errors)
@@ -427,7 +429,6 @@ namespace Lang
     {
         Identifier,
         Struct,
-        Comment, // Ignored by parser
         Number,
         Boolean,
         Literal,
@@ -456,33 +457,36 @@ namespace Lang
         RotateLeft,
         RotateRight,
         Operator,
+        Break,
+        Continue,
+        OpenParen = '(',    // 40
+        CloseParen = ')',   // 41
+        OpenBracket = '[',  // 91
+        CloseBracket = ']', // 93
+        OpenBrace = '{',    // 123
+        CloseBrace = '}',   // 125
+        Not = '!',          // 33
+        Ampersand = '&',    // 38
+        Pipe = '|',         // 124
+        Caret = '^',        // 94
+        Plus = '+',         // 43
+        Minus = '-',        // 45
+        Asterisk = '*',     // 42
+        ForwardSlash = '/', // 47
+        Percent = '%',      // 37
+        Equals = '=',       // 61
+        Colon = ':',        // 58
+        SemiColon = ';',    // 59
+        Quote = '"',        // 34
+        Apostrophe = '\'',  // 39
+        LessThan = '<',     // 60
+        GreaterThan = '>',  // 62
+        Comma = ',',        // 44
+        Period = '.',       // 46
+        Pound = '#',        // 35
+        Comment = 256, // Ignored by parser
         NumberRange, // Ignored by parser
         VarArgs, // Ignored by parser
-        OpenParen = '(',
-        CloseParen = ')',
-        OpenBracket = '[',
-        CloseBracket = ']',
-        OpenBrace = '{',
-        CloseBrace = '}',
-        Not = '!',
-        Ampersand = '&',
-        Pipe = '|',
-        Caret = '^',
-        Plus = '+',
-        Minus = '-',
-        Asterisk = '*',
-        ForwardSlash = '/',
-        Percent = '%',
-        Equals = '=',
-        Colon = ':',
-        SemiColon = ';',
-        Quote = '"',
-        Apostrophe = '\'',
-        LessThan = '<',
-        GreaterThan = '>',
-        Comma = ',',
-        Period = '.',
-        Pound = '#'
     }
 
     [Flags]
