@@ -572,8 +572,20 @@ namespace Lang
 
             var thenBlock = AddBasicBlock(function);
             thenBlock = EmitScope(function, thenBlock, conditional.IfBlock, returnType);
+            var elseBlock = AddBasicBlock(function);
 
-            var elseBlock = conditional.ElseBlock == null ? null : AddBasicBlock(function);
+            if (conditional.ElseBlock == null)
+            {
+                return elseBlock;
+            }
+
+            elseBlock = EmitScope(function, elseBlock, conditional.ElseBlock, returnType);
+
+            if (conditional.Returns)
+            {
+                return elseBlock;
+            }
+
             var afterBlock = AddBasicBlock(function);
 
             return afterBlock;
