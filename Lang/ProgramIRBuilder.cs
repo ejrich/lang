@@ -568,11 +568,13 @@ namespace Lang
         {
             // Run the condition expression in the current basic block and then jump to the following
             var condition = EmitConditionExpression(function, conditional.Condition, scope, block);
-            // TODO Add jumps
 
             var thenBlock = AddBasicBlock(function);
             thenBlock = EmitScope(function, thenBlock, conditional.IfBlock, returnType);
             var elseBlock = AddBasicBlock(function);
+
+            // Jump to the else block, otherwise fall through to the then block
+            EmitInstruction(InstructionType.ConditionalJump, block, null, condition, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = elseBlock.Index});
 
             if (conditional.ElseBlock == null)
             {
@@ -581,12 +583,18 @@ namespace Lang
 
             elseBlock = EmitScope(function, elseBlock, conditional.ElseBlock, returnType);
 
-            if (conditional.Returns)
+            if (conditional.IfReturns && conditional.ElseReturns)
             {
                 return elseBlock;
             }
 
             var afterBlock = AddBasicBlock(function);
+
+            // For when the the if block does not return, a jump to the after block is required
+            if (!conditional.IfReturns)
+            {
+                EmitInstruction(InstructionType.Jump, thenBlock, null, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = afterBlock.Index});
+            }
 
             return afterBlock;
         }
@@ -596,14 +604,13 @@ namespace Lang
             // Create a block for the condition expression and then jump to the following
             var conditionBlock = AddBasicBlock(function);
             var condition = EmitConditionExpression(function, whileAst.Condition, scope, conditionBlock);
-            // TODO Add conditional jump to after block
 
-            // Return the while body block
             var whileBodyBlock = AddBasicBlock(function);
             whileBodyBlock = EmitScope(function, whileBodyBlock, whileAst.Body, returnType);
-            // TODO Add jump to condition block
+            EmitInstruction(InstructionType.Jump, whileBodyBlock, null, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = conditionBlock.Index});
 
             var afterBlock = AddBasicBlock(function);
+            EmitInstruction(InstructionType.ConditionalJump, conditionBlock, null, condition, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = afterBlock.Index});
 
             return afterBlock;
         }
@@ -615,14 +622,14 @@ namespace Lang
             switch (value.Type.TypeKind)
             {
                 case TypeKind.Integer:
-                    return EmitInstruction(InstructionType.IntegerNotEquals, block, _boolType, value, GetDefaultConstant(value.Type));
+                    return EmitInstruction(InstructionType.IntegerEquals, block, _boolType, value, GetDefaultConstant(value.Type));
                 case TypeKind.Float:
-                    return EmitInstruction(InstructionType.FloatNotEquals, block, _boolType, value, GetDefaultConstant(value.Type));
+                    return EmitInstruction(InstructionType.FloatEquals, block, _boolType, value, GetDefaultConstant(value.Type));
                 case TypeKind.Pointer:
-                    return EmitInstruction(InstructionType.IsNotNull, block, _boolType, value);
+                    return EmitInstruction(InstructionType.IsNull, block, _boolType, value);
                 // Will be type bool
                 default:
-                    return value;
+                    return EmitInstruction(InstructionType.Not, block, _boolType, value);
             }
         }
 
