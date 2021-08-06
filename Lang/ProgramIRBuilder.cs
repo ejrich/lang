@@ -635,9 +635,24 @@ namespace Lang
 
         private BasicBlock EmitEach(FunctionIR function, BasicBlock block, EachAst each, ScopeAst scope, IType returnType)
         {
+            var indexVariable = AddAllocation(function, _s32Type);
+
+            if (each.Iteration != null)
+            {
+            }
+            else
+            {
+                // Begin the loop at the beginning of the range
+                var value = EmitIR(function, block, each.RangeBegin, scope);
+
+                EmitStore(block, indexVariable, value);
+                // TODO Store indexVariable to iteration variable declaration
+
+                // Get the end of the range
+                var  compareTarget = EmitIR(function, block, each.RangeEnd, scope);
+            }
             // TODO Implement me
-            // Initialize the loop in the current basic block
-            // Create a basic block for the condition
+
             return block;
         }
 
