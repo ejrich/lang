@@ -309,13 +309,28 @@ namespace Lang
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
-        public string IterationVariable { get; set; }
-        public string IndexVariable { get; set; }
+        public string IterationVariable { get; set; } // TODO Remove this and parse name to VariableAst
+        public VariableAst IterationVariableVariable { get; set; }
+        public string IndexVariable { get; set; } // TODO Remove this and parse name to VariableAst
+        public VariableAst IndexVariableVariable { get; set; }
         public IAst Iteration { get; set; }
         public TypeDefinition IteratorType { get; set; }
+        public uint CArrayLength { get; set; }
         public IAst RangeBegin { get; set; }
         public IAst RangeEnd { get; set; }
         public ScopeAst Body { get; set; }
+    }
+
+    public class VariableAst : IAst
+    {
+        public int FileIndex { get; set; }
+        public uint Line { get; init; }
+        public uint Column { get; init; }
+        public string Name { get; set; }
+        public TypeDefinition TypeDefinition { get; set; } // TODO Remove
+        public IType Type { get; set; }
+        public int? AllocationIndex { get; set; }
+        public InstructionValue Pointer { get; set; }
     }
 
     public class IndexAst : IAst

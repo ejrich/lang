@@ -135,7 +135,7 @@ namespace Lang
                             var constArray = new InstructionValue
                             {
                                 ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
-                                Values = new [] {GetDefaultConstant(_s32Type), new InstructionValue {ValueType = InstructionValueType.Null}}
+                                Values = new [] {GetConstantInteger(0), new InstructionValue {ValueType = InstructionValueType.Null}}
                             };
                             globalVariable.InitialValue = constArray;
                         }
@@ -211,7 +211,7 @@ namespace Lang
                         return new InstructionValue
                         {
                             ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
-                            Values = new [] {GetDefaultConstant(_s32Type), new InstructionValue {ValueType = InstructionValueType.Null}}
+                            Values = new [] {GetConstantInteger(0), new InstructionValue {ValueType = InstructionValueType.Null}}
                         };
                     }
                 case TypeKind.CArray:
@@ -348,7 +348,7 @@ namespace Lang
                         else
                         {
                             var lengthPointer = EmitGetStructPointer(block, pointer, arrayStruct, 0);
-                            var lengthValue = GetDefaultConstant(_s32Type);
+                            var lengthValue = GetConstantInteger(0);
                             EmitStore(block, lengthPointer, lengthValue);
                         }
                         break;
@@ -486,7 +486,7 @@ namespace Lang
                     else
                     {
                         var lengthPointer = EmitGetStructPointer(block, pointer, arrayStruct, 0);
-                        var lengthValue = GetDefaultConstant(_s32Type);
+                        var lengthValue = GetConstantInteger(0);
                         EmitStore(block, lengthPointer, lengthValue);
                     }
                     break;
@@ -636,9 +636,41 @@ namespace Lang
         private BasicBlock EmitEach(FunctionIR function, BasicBlock block, EachAst each, ScopeAst scope, IType returnType)
         {
             var indexVariable = AddAllocation(function, _s32Type);
+            InstructionValue compareTarget;
+            InstructionValue arrayData = null;
+            var cArrayIteration = false;
 
             if (each.Iteration != null)
             {
+                if (each.IndexVariable != null)
+                {
+                    each.IndexVariableVariable.AllocationIndex = indexVariable;
+                }
+                EmitStore(block, indexVariable, GetConstantInteger(0));
+
+                var iteration = EmitIR(function, block, each.Iteration, scope);
+
+                // Load the array data and set the compareTarget to the array count
+                if (iteration.Type.TypeKind == TypeKind.CArray)
+                {
+                    cArrayIteration = true;
+                    arrayData = iteration;
+                    compareTarget = GetConstantInteger(each.CArrayLength);
+                }
+                else
+                {
+                    var arrayDef = (StructAst)iteration.Type;
+                    var iterationVariable = AddAllocation(function, arrayDef);
+                    EmitStore(block, iterationVariable, iteration);
+                    var iterationVariablePointer = EmitGetPointer(block, iterationVariable, arrayDef);
+
+                    var lengthPointer = EmitGetStructPointer(block, iterationVariablePointer, arrayDef, 0);
+                    compareTarget = EmitLoad(block, _s32Type, lengthPointer);
+
+                    var dataField = arrayDef.Fields[1];
+                    var dataPointer = EmitGetStructPointer(block, iterationVariablePointer, arrayDef, 1, dataField);
+                    arrayData = EmitLoad(block, dataField.Type, dataPointer);
+                }
             }
             else
             {
@@ -646,14 +678,33 @@ namespace Lang
                 var value = EmitIR(function, block, each.RangeBegin, scope);
 
                 EmitStore(block, indexVariable, value);
-                // TODO Store indexVariable to iteration variable declaration
+                each.IterationVariableVariable.AllocationIndex = indexVariable;
 
                 // Get the end of the range
-                var  compareTarget = EmitIR(function, block, each.RangeEnd, scope);
+                compareTarget = EmitIR(function, block, each.RangeEnd, scope);
             }
-            // TODO Implement me
 
-            return block;
+            var conditionBlock = AddBasicBlock(function);
+            var indexValue = EmitLoad(conditionBlock, _s32Type, allocationIndex: indexVariable);
+            var condition = EmitInstruction(InstructionType.IntegerGreaterThanOrEqual, conditionBlock, _boolType, indexValue, compareTarget);
+            if (each.Iteration != null)
+            {
+                var iterationVariable = EmitGetPointer(conditionBlock, arrayData, indexValue, each.IterationVariableVariable.Type, cArrayIteration);
+                each.IterationVariableVariable.Pointer = iterationVariable;
+            }
+
+            var eachBodyBlock = AddBasicBlock(function);
+            EmitScope(function, eachBodyBlock, each.Body, returnType);
+
+            var eachIncrementBlock = AddBasicBlock(function);
+            var nextValue = EmitInstruction(InstructionType.IntegerAdd, eachIncrementBlock, _s32Type, indexValue, GetConstantInteger(1));
+            EmitStore(eachIncrementBlock, indexVariable, nextValue);
+            EmitInstruction(InstructionType.Jump, eachIncrementBlock, null, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = conditionBlock.Index});
+
+            var afterBlock = AddBasicBlock(function);
+            EmitInstruction(InstructionType.ConditionalJump, conditionBlock, null, condition, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = afterBlock.Index});
+
+            return afterBlock;
         }
 
         private BasicBlock AddBasicBlock(FunctionIR function)
@@ -700,6 +751,24 @@ namespace Lang
                         }
                         return EmitLoad(block, declaration.Type, allocationIndex: declaration.AllocationIndex, global: global);
                     }
+                    else if (identifier is VariableAst variable)
+                    {
+                        if (useRawString && variable.Type.TypeKind == TypeKind.String)
+                        {
+                            _stringStruct ??= (StructAst) variable.Type;
+                            var dataField = _stringStruct.Fields[1];
+
+                            var stringPointer = variable.AllocationIndex.HasValue ? EmitGetPointer(block, variable.AllocationIndex.Value, _stringStruct, global) : variable.Pointer;
+
+                            var dataPointer = EmitGetStructPointer(block, stringPointer, _stringStruct, 1, dataField);
+                            return EmitLoad(block, dataField.Type, dataPointer);
+                        }
+                        else if (variable.AllocationIndex.HasValue)
+                        {
+                            return EmitLoad(block, variable.Type, allocationIndex: variable.AllocationIndex, global: global);
+                        }
+                        return EmitLoad(block, variable.Type, variable.Pointer);
+                    }
                     else if (identifier is IType type)
                     {
                         return GetConstantInteger(type.TypeIndex);
@@ -724,7 +793,7 @@ namespace Lang
                     {
                         return GetConstantInteger(structField.ConstantValue);
                     }
-                    var structFieldPointer = EmitGetStructPointer(function, structField, scope, block, out var loaded);
+                    var structFieldPointer = EmitGetStructRefPointer(function, structField, scope, block, out var loaded);
                     if (!loaded)
                     {
                         if (useRawString && structFieldPointer.Type.TypeKind == TypeKind.String)
@@ -902,10 +971,24 @@ namespace Lang
             switch (ast)
             {
                 case IdentifierAst identifier:
-                    var declaration = (DeclarationAst) GetScopeIdentifier(scope, identifier.Name, out var global);
-                    return EmitGetPointer(block, declaration.AllocationIndex, declaration.Type, global);
+                    var ident = GetScopeIdentifier(scope, identifier.Name, out var global);
+                    switch (ident)
+                    {
+                        case DeclarationAst declaration:
+                            return EmitGetPointer(block, declaration.AllocationIndex, declaration.Type, global);
+                        case VariableAst variable:
+                            if (variable.AllocationIndex.HasValue)
+                            {
+                                return EmitGetPointer(block, variable.AllocationIndex.Value, variable.Type, global);
+                            }
+                            else
+                            {
+                                return variable.Pointer;
+                            }
+                    }
+                    break;
                 case StructFieldRefAst structField:
-                    return EmitGetStructPointer(function, structField, scope, block, out _);
+                    return EmitGetStructRefPointer(function, structField, scope, block, out _);
                 case IndexAst index:
                     return EmitGetIndexPointer(function, index, scope, block);
                 case UnaryAst unary:
@@ -914,7 +997,7 @@ namespace Lang
             return null;
         }
 
-        private InstructionValue EmitGetStructPointer(FunctionIR function, StructFieldRefAst structField, ScopeAst scope, BasicBlock block, out bool loaded)
+        private InstructionValue EmitGetStructRefPointer(FunctionIR function, StructFieldRefAst structField, ScopeAst scope, BasicBlock block, out bool loaded)
         {
             loaded = false;
             InstructionValue value = null;
@@ -922,8 +1005,16 @@ namespace Lang
             switch (structField.Children[0])
             {
                 case IdentifierAst identifier:
-                    var declaration = (DeclarationAst) GetScopeIdentifier(scope, identifier.Name, out var global);
-                    value = EmitGetPointer(block, declaration.AllocationIndex, declaration.Type, global);
+                    var ident = GetScopeIdentifier(scope, identifier.Name, out var global);
+                    switch (ident)
+                    {
+                        case DeclarationAst declaration:
+                            value = EmitGetPointer(block, declaration.AllocationIndex, declaration.Type, global);
+                            break;
+                        case VariableAst variable:
+                            value = variable.AllocationIndex.HasValue ? EmitGetPointer(block, variable.AllocationIndex.Value, variable.Type, global) : variable.Pointer;
+                            break;
+                    }
                     break;
                 case IndexAst index:
                     value = EmitGetIndexPointer(function, index, scope, block);
