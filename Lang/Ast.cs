@@ -72,6 +72,7 @@ namespace Lang
         public bool Verified { get; set; }
         public bool HasDirectives { get; set; }
         public bool CallsCompiler { get; set; }
+        public bool ReturnVoidAtEnd { get; set; }
         public IType ReturnType { get; set; }
         public TypeDefinition ReturnTypeDefinition { get; set; }
         public bool ReturnTypeHasGenerics { get; set; }
