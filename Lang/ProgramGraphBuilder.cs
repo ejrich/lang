@@ -2598,7 +2598,7 @@ namespace Lang
                         {
                             var typeIndex = new ConstantAst
                             {
-                                TypeDefinition = new TypeDefinition {TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Signed = true, Bytes = 4}}
+                                TypeDefinition = new TypeDefinition {TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Signed = true, Bytes = 4}}, Type = TypeTable.Types["s32"]
                             };
                             if (argument.TypeIndex.HasValue)
                             {
@@ -2647,7 +2647,7 @@ namespace Lang
                                 {
                                     var typeIndex = new ConstantAst
                                     {
-                                        TypeDefinition = new TypeDefinition {TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Signed = true, Bytes = 4}}
+                                        TypeDefinition = new TypeDefinition {TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Signed = true, Bytes = 4}}, Type = TypeTable.Types["s32"]
                                     };
                                     if (argument.TypeIndex.HasValue)
                                     {

@@ -58,12 +58,7 @@ namespace Lang
                     var argument = function.Arguments[i];
                     var allocationIndex = AddAllocation(functionIR, argument);
 
-                    var storeInstruction = new Instruction
-                    {
-                        Type = InstructionType.Store, Index = allocationIndex,
-                        Value1 = new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i}
-                    };
-                    entryBlock.Instructions.Add(storeInstruction);
+                    EmitStore(entryBlock, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i});
                 }
 
                 var finalBlock = EmitScope(functionIR, entryBlock, function.Body, function.ReturnType);
@@ -105,12 +100,83 @@ namespace Lang
             Console.WriteLine($"\nIR for function '{name}'");
             foreach (var block in function.BasicBlocks)
             {
-                Console.WriteLine($"\n--------------- Basic Block {block.Index + 1} ---------------\n");
+                Console.WriteLine($"\n--------------- Basic Block {block.Index} ---------------\n");
                 foreach (var instruction in block.Instructions)
                 {
-                    Console.WriteLine($"\t{instruction.Type}");
+                    var text = $"\t{instruction.Type} ";
+                    switch (instruction.Type)
+                    {
+                        case InstructionType.LoadAllocation:
+                        case InstructionType.GetAllocationPointer:
+                            text += $"{instruction.Index.Value} {(instruction.Global ? "global" : string.Empty)}";
+                            break;
+                        case InstructionType.StoreToAllocation:
+                        case InstructionType.GetStructPointer:
+                            text += $"{instruction.Index.Value} {PrintInstructionValue(instruction.Value1)}";
+                            break;
+                        case InstructionType.Call:
+                            text += $"{instruction.CallFunction} {PrintInstructionValue(instruction.Value1)}";
+                            break;
+                        case InstructionType.AllocateArray:
+                            break;
+                        case InstructionType.Jump:
+                        case InstructionType.Load:
+                        case InstructionType.Return:
+                        case InstructionType.IsNull:
+                        case InstructionType.IsNotNull:
+                        case InstructionType.Not:
+                        case InstructionType.IntegerNegate:
+                        case InstructionType.FloatNegate:
+                            text += PrintInstructionValue(instruction.Value1);
+                            break;
+                        default:
+                            text += $"{PrintInstructionValue(instruction.Value1)}, {PrintInstructionValue(instruction.Value2)}";
+                            break;
+                    }
+                    Console.WriteLine(text);
                 }
             }
+        }
+
+        private string PrintInstructionValue(InstructionValue value)
+        {
+            if (value == null) return string.Empty;
+
+            switch (value.ValueType)
+            {
+                case InstructionValueType.Value:
+                    return $"v{value.ValueIndex}";
+                case InstructionValueType.Block:
+                    return value.ValueIndex.ToString();
+                case InstructionValueType.Argument:
+                    return $"arg{value.ValueIndex}";
+                case InstructionValueType.Constant:
+                    switch (value.Type.TypeKind)
+                    {
+                        case TypeKind.Boolean:
+                            return value.ConstantValue.Boolean.ToString();
+                        case TypeKind.Integer:
+                        case TypeKind.Enum:
+                            return value.ConstantValue.Integer.ToString();
+                        case TypeKind.Float:
+                            if (value.Type.Size == 4)
+                            {
+                                return value.ConstantValue.Float.ToString();
+                            }
+                            return value.ConstantValue.Double.ToString();
+                        case TypeKind.String:
+                            return $"\"{value.ConstantString}\"";
+                    }
+                    break;
+                case InstructionValueType.Null:
+                    return "null";
+                case InstructionValueType.Type:
+                    return value.Type.Name;
+                case InstructionValueType.CallArguments:
+                    return string.Join(", ", value.Values.Select(PrintInstructionValue));
+            }
+
+            return string.Empty;
         }
 
         public void EmitGlobalVariable(DeclarationAst declaration, ScopeAst scope)
@@ -158,7 +224,7 @@ namespace Lang
                             var constArray = new InstructionValue
                             {
                                 ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
-                                Values = new [] {GetConstantInteger(0), new InstructionValue {ValueType = InstructionValueType.Null}}
+                                          Values = new [] {GetConstantInteger(0), new InstructionValue {ValueType = InstructionValueType.Null}}
                             };
                             globalVariable.InitialValue = constArray;
                         }
@@ -169,16 +235,16 @@ namespace Lang
                             globalVariable.InitialArrayValues = declaration.ArrayValues.Select(val => EmitConstantIR(val, scope)).ToArray();
                         }
                         break;
-                    // Initialize struct field default values
+                        // Initialize struct field default values
                     case TypeKind.Struct:
                     case TypeKind.String:
                         globalVariable.InitialValue = GetConstantStruct((StructAst)declaration.Type, scope, declaration.Assignments);
                         break;
-                    // Initialize pointers to null
+                        // Initialize pointers to null
                     case TypeKind.Pointer:
                         globalVariable.InitialValue = new InstructionValue {ValueType = InstructionValueType.Null};
                         break;
-                    // Or initialize to default
+                        // Or initialize to default
                     default:
                         globalVariable.InitialValue = GetDefaultConstant(declaration.Type);
                         break;
@@ -234,7 +300,7 @@ namespace Lang
                         return new InstructionValue
                         {
                             ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
-                            Values = new [] {GetConstantInteger(0), new InstructionValue {ValueType = InstructionValueType.Null}}
+                                      Values = new [] {GetConstantInteger(0), new InstructionValue {ValueType = InstructionValueType.Null}}
                         };
                     }
                 case TypeKind.CArray:
@@ -245,14 +311,14 @@ namespace Lang
                         constArray.Values = field.ArrayValues.Select(val => EmitConstantIR(val, scope)).ToArray();
                     }
                     return constArray;
-                // Initialize struct field default values
+                    // Initialize struct field default values
                 case TypeKind.Struct:
                 case TypeKind.String:
                     return GetConstantStruct((StructAst)field.Type, scope, field.Assignments);
-                // Initialize pointers to null
+                    // Initialize pointers to null
                 case TypeKind.Pointer:
                     return new InstructionValue {ValueType = InstructionValueType.Null};
-                // Or initialize to default
+                    // Or initialize to default
                 default:
                     return field.Value == null ? GetDefaultConstant(field.Type) : EmitConstantIR(field.Value, scope);
             }
@@ -267,7 +333,7 @@ namespace Lang
             var arrayVariable = new GlobalVariable
             {
                 Name = "____array", Index = arrayIndex, Size = elementType.Size,
-                Array = true, ArrayLength = length, Type = elementType
+                     Array = true, ArrayLength = length, Type = elementType
             };
             Program.GlobalVariables.Add(arrayVariable);
 
@@ -279,7 +345,7 @@ namespace Lang
             return new InstructionValue
             {
                 ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
-                Values = new [] {GetConstantInteger(length), new InstructionValue {ValueIndex = arrayIndex}}
+                          Values = new [] {GetConstantInteger(length), new InstructionValue {ValueIndex = arrayIndex}}
             };
         }
 
@@ -382,17 +448,17 @@ namespace Lang
                             InitializeArrayValues(function, block, cArrayPointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
                         }
                         break;
-                    // Initialize struct field default values
+                        // Initialize struct field default values
                     case TypeKind.Struct:
                     case TypeKind.String:
                         var structPointer = EmitGetPointer(block, allocationIndex, declaration.Type);
                         InitializeStruct(function, block, (StructAst)declaration.Type, structPointer, scope, declaration.Assignments);
                         break;
-                    // Initialize pointers to null
+                        // Initialize pointers to null
                     case TypeKind.Pointer:
                         EmitStore(block, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Null});
                         break;
-                    // Or initialize to default
+                        // Or initialize to default
                     default:
                         var zero = GetDefaultConstant(declaration.Type);
                         EmitStore(block, allocationIndex, zero);
@@ -422,7 +488,7 @@ namespace Lang
             var allocation = new Allocation
             {
                 Index = index, Offset = function.StackSize, Size = type.Size,
-                Array = array, ArrayLength = arrayLength, Type = type
+                      Array = array, ArrayLength = arrayLength, Type = type
             };
             function.StackSize += array ? arrayLength * type.Size : type.Size;
             function.Allocations.Add(allocation);
@@ -519,16 +585,16 @@ namespace Lang
                         InitializeArrayValues(function, block, pointer, field.ArrayElementType, field.ArrayValues, scope);
                     }
                     break;
-                // Initialize struct field default values
+                    // Initialize struct field default values
                 case TypeKind.Struct:
                 case TypeKind.String: // TODO String default values
                     InitializeStruct(function, block, (StructAst)field.Type, pointer, scope, field.Assignments);
                     break;
-                // Initialize pointers to null
+                    // Initialize pointers to null
                 case TypeKind.Pointer:
                     EmitStore(block, pointer, new InstructionValue {ValueType = InstructionValueType.Null});
                     break;
-                // Or initialize to default
+                    // Or initialize to default
                 default:
                     var defaultValue = field.Value == null ? GetDefaultConstant(field.Type) : EmitIR(function, block, field.Value, scope);
                     EmitStore(block, pointer, defaultValue);
@@ -650,7 +716,7 @@ namespace Lang
                     return EmitInstruction(InstructionType.FloatEquals, block, _boolType, value, GetDefaultConstant(value.Type));
                 case TypeKind.Pointer:
                     return EmitInstruction(InstructionType.IsNull, block, _boolType, value);
-                // Will be type bool
+                    // Will be type bool
                 default:
                     return EmitInstruction(InstructionType.Not, block, _boolType, value);
             }
@@ -708,7 +774,7 @@ namespace Lang
             }
 
             var conditionBlock = AddBasicBlock(function);
-            var indexValue = EmitLoad(conditionBlock, _s32Type, allocationIndex: indexVariable);
+            var indexValue = EmitLoad(conditionBlock, _s32Type, indexVariable);
             var condition = EmitInstruction(InstructionType.IntegerGreaterThanOrEqual, conditionBlock, _boolType, indexValue, compareTarget);
             if (each.Iteration != null)
             {
@@ -757,7 +823,7 @@ namespace Lang
                                 return new InstructionValue
                                 {
                                     ValueType = InstructionValueType.Constant, Type = constantValue.Type,
-                                    ConstantString = constantValue.ConstantString, UseRawString = true
+                                              ConstantString = constantValue.ConstantString, UseRawString = true
                                 };
                             }
                             return constantValue;
@@ -772,7 +838,7 @@ namespace Lang
                             var dataPointer = EmitGetStructPointer(block, stringPointer, _stringStruct, 1, dataField);
                             return EmitLoad(block, dataField.Type, dataPointer);
                         }
-                        return EmitLoad(block, declaration.Type, allocationIndex: declaration.AllocationIndex, global: global);
+                        return EmitLoad(block, declaration.Type, declaration.AllocationIndex, global);
                     }
                     else if (identifier is VariableAst variable)
                     {
@@ -788,7 +854,7 @@ namespace Lang
                         }
                         else if (variable.AllocationIndex.HasValue)
                         {
-                            return EmitLoad(block, variable.Type, allocationIndex: variable.AllocationIndex, global: global);
+                            return EmitLoad(block, variable.Type, variable.AllocationIndex.Value, global);
                         }
                         return EmitLoad(block, variable.Type, variable.Pointer);
                     }
@@ -809,7 +875,7 @@ namespace Lang
                         return new InstructionValue
                         {
                             ValueType = InstructionValueType.Constant, Type = enumDef,
-                            ConstantValue = new Constant {Integer = enumValue}
+                                      ConstantValue = new Constant {Integer = enumValue}
                         };
                     }
                     else if (structField.IsConstant)
@@ -1153,7 +1219,7 @@ namespace Lang
                     EmitStore(block, pointer, EmitCastValue(block, value, elementType));
                 }
 
-                var paramsValue = EmitLoad(block, paramsType, allocationIndex: paramsAllocationIndex);
+                var paramsValue = EmitLoad(block, paramsType, paramsAllocationIndex);
                 arguments[argumentCount - 1] = paramsValue;
             }
             else if (call.Function.Varargs)
@@ -1179,7 +1245,7 @@ namespace Lang
             }
             else
             {
-                for (var i = 0; i < argumentCount - 1; i++)
+                for (var i = 0; i < argumentCount; i++)
                 {
                     var argument = EmitIR(function, block, call.Arguments[i], scope, call.Function.Extern);
                     arguments[i] = EmitCastValue(block, argument, call.Function.Arguments[i].Type);
@@ -1302,12 +1368,12 @@ namespace Lang
                 instructionType = op switch
                 {
                     Operator.Add => InstructionType.IntegerAdd,
-                    Operator.Subtract => InstructionType.IntegerSubtract,
-                    Operator.Multiply => InstructionType.IntegerMultiply,
-                    Operator.Divide => integerType.Primitive.Signed ? InstructionType.IntegerDivide : InstructionType.UnsignedIntegerDivide,
-                    Operator.Modulus => integerType.Primitive.Signed ? InstructionType.IntegerDivide : InstructionType.UnsignedIntegerModulus,
-                    // @Cleanup this branch should never be hit
-                    _ => InstructionType.IntegerAdd
+                        Operator.Subtract => InstructionType.IntegerSubtract,
+                        Operator.Multiply => InstructionType.IntegerMultiply,
+                        Operator.Divide => integerType.Primitive.Signed ? InstructionType.IntegerDivide : InstructionType.UnsignedIntegerDivide,
+                        Operator.Modulus => integerType.Primitive.Signed ? InstructionType.IntegerDivide : InstructionType.UnsignedIntegerModulus,
+                        // @Cleanup this branch should never be hit
+                        _ => InstructionType.IntegerAdd
                 };
             }
             else
@@ -1315,12 +1381,12 @@ namespace Lang
                 instructionType = op switch
                 {
                     Operator.Add => InstructionType.FloatAdd,
-                    Operator.Subtract => InstructionType.FloatAdd,
-                    Operator.Multiply => InstructionType.FloatAdd,
-                    Operator.Divide => InstructionType.FloatAdd,
-                    Operator.Modulus => InstructionType.FloatModulus,
-                    // @Cleanup this branch should never be hit
-                    _ => InstructionType.FloatAdd
+                        Operator.Subtract => InstructionType.FloatAdd,
+                        Operator.Multiply => InstructionType.FloatAdd,
+                        Operator.Divide => InstructionType.FloatAdd,
+                        Operator.Modulus => InstructionType.FloatModulus,
+                        // @Cleanup this branch should never be hit
+                        _ => InstructionType.FloatAdd
                 };
             }
             return EmitInstruction(instructionType, block, type, lhs, rhs);
@@ -1408,13 +1474,13 @@ namespace Lang
             return op switch
             {
                 Operator.Equality => InstructionType.IntegerEquals,
-                Operator.NotEqual => InstructionType.IntegerNotEquals,
-                Operator.GreaterThan => signed ? InstructionType.IntegerGreaterThan : InstructionType.UnsignedIntegerGreaterThan,
-                Operator.GreaterThanEqual => signed ? InstructionType.IntegerGreaterThanOrEqual : InstructionType.UnsignedIntegerGreaterThanOrEqual,
-                Operator.LessThan => signed ? InstructionType.IntegerLessThan : InstructionType.UnsignedIntegerLessThan,
-                Operator.LessThanEqual => signed ? InstructionType.IntegerLessThanOrEqual : InstructionType.UnsignedIntegerLessThanOrEqual,
-                // @Cleanup This branch should never be hit
-                _ => InstructionType.IntegerEquals
+                    Operator.NotEqual => InstructionType.IntegerNotEquals,
+                    Operator.GreaterThan => signed ? InstructionType.IntegerGreaterThan : InstructionType.UnsignedIntegerGreaterThan,
+                    Operator.GreaterThanEqual => signed ? InstructionType.IntegerGreaterThanOrEqual : InstructionType.UnsignedIntegerGreaterThanOrEqual,
+                    Operator.LessThan => signed ? InstructionType.IntegerLessThan : InstructionType.UnsignedIntegerLessThan,
+                    Operator.LessThanEqual => signed ? InstructionType.IntegerLessThanOrEqual : InstructionType.UnsignedIntegerLessThanOrEqual,
+                    // @Cleanup This branch should never be hit
+                    _ => InstructionType.IntegerEquals
             };
         }
 
@@ -1423,13 +1489,13 @@ namespace Lang
             return op switch
             {
                 Operator.Equality => InstructionType.FloatEquals,
-                Operator.NotEqual => InstructionType.FloatNotEquals,
-                Operator.GreaterThan => InstructionType.FloatGreaterThan,
-                Operator.GreaterThanEqual => InstructionType.FloatGreaterThanOrEqual,
-                Operator.LessThan => InstructionType.FloatLessThan,
-                Operator.LessThanEqual => InstructionType.FloatLessThanOrEqual,
-                // @Cleanup This branch should never be hit
-                _ => InstructionType.FloatEquals
+                    Operator.NotEqual => InstructionType.FloatNotEquals,
+                    Operator.GreaterThan => InstructionType.FloatGreaterThan,
+                    Operator.GreaterThanEqual => InstructionType.FloatGreaterThanOrEqual,
+                    Operator.LessThan => InstructionType.FloatLessThan,
+                    Operator.LessThanEqual => InstructionType.FloatLessThanOrEqual,
+                    // @Cleanup This branch should never be hit
+                    _ => InstructionType.FloatEquals
             };
         }
 
@@ -1478,8 +1544,8 @@ namespace Lang
             return function.Name switch
             {
                 "main" => "__main",
-                "__start" => "main",
-                _ => function.OverloadIndex > 0 ? $"{function.Name}.{function.OverloadIndex}" : function.Name
+                    "__start" => "main",
+                    _ => function.OverloadIndex > 0 ? $"{function.Name}.{function.OverloadIndex}" : function.Name
             };
         }
 
@@ -1488,9 +1554,15 @@ namespace Lang
             return $"operator.{op}.{type.GenericName}";
         }
 
-        private InstructionValue EmitLoad(BasicBlock block, IType type, InstructionValue value = null, int? allocationIndex = null, bool global = false)
+        private InstructionValue EmitLoad(BasicBlock block, IType type, InstructionValue value)
         {
-            var loadInstruction = new Instruction {Type = InstructionType.Load, Index = allocationIndex, Global = global, Value1 = value};
+            var loadInstruction = new Instruction {Type = InstructionType.Load, Value1 = value};
+            return AddInstruction(block, loadInstruction, type);
+        }
+
+        private InstructionValue EmitLoad(BasicBlock block, IType type, int allocationIndex, bool global = false)
+        {
+            var loadInstruction = new Instruction {Type = InstructionType.LoadAllocation, Index = allocationIndex, Global = global};
             return AddInstruction(block, loadInstruction, type);
         }
 
@@ -1500,14 +1572,14 @@ namespace Lang
             var instruction = new Instruction
             {
                 Type = InstructionType.GetPointer, Value1 = pointer,
-                Value2 = index, GetFirstPointer = getFirstPointer
+                     Value2 = index, GetFirstPointer = getFirstPointer
             };
             return AddInstruction(block, instruction, type);
         }
 
         public InstructionValue EmitGetPointer(BasicBlock block, int allocationIndex, IType type, bool global = false)
         {
-            var instruction = new Instruction {Type = InstructionType.GetPointer, Index = allocationIndex, Global = global};
+            var instruction = new Instruction {Type = InstructionType.GetAllocationPointer, Index = allocationIndex, Global = global};
             return AddInstruction(block, instruction, type);
         }
 
@@ -1535,7 +1607,7 @@ namespace Lang
 
         private void EmitStore(BasicBlock block, int allocationIndex, InstructionValue value)
         {
-            var store = new Instruction {Type = InstructionType.Store, Index = allocationIndex, Value1 = value};
+            var store = new Instruction {Type = InstructionType.StoreToAllocation, Index = allocationIndex, Value1 = value};
             block.Instructions.Add(store);
         }
 
