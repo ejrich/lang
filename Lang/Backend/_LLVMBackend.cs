@@ -16,12 +16,14 @@ namespace Lang.Backend
         private LLVMContextRef _context;
         private LLVMBuilderRef _builder;
         private LLVMPassManagerRef _passManager;
-        private IFunction _currentFunction;
+
         private LLVMValueRef _stackPointer;
         private bool _stackPointerExists;
         private bool _stackSaved;
         private LLVMTypeRef _stringType;
         private LLVMTypeRef _u8PointerType;
+        private LLVMTypeRef[] _types;
+        private Queue<(LLVMValueRef, FunctionIR)> _functionsToWrite = new();
 
         private bool _emitDebug;
         private LLVMDIBuilderRef _debugBuilder;
@@ -30,9 +32,7 @@ namespace Lang.Backend
         private Dictionary<string, LLVMMetadataRef> _debugTypes;
         private Dictionary<string, LLVMMetadataRef> _debugFunctions;
 
-        private readonly Queue<LLVMValueRef> _allocationQueue = new();
         private readonly LLVMValueRef _zeroInt = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), 0, false);
-        private readonly TypeDefinition _s32Type = new() {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
 
         public string Build(ProjectFile project, ProgramGraph programGraph, BuildSettings buildSettings)
         {
@@ -50,7 +50,12 @@ namespace Lang.Backend
             var globals = WriteData();
 
             // 4. Write the program beginning at the entrypoint
-            // TODO Implement me
+            WriteFunctionDefinition("main", Program.EntryPoint);
+            while (_functionsToWrite.Any())
+            {
+                var (functionPointer, function) = _functionsToWrite.Dequeue();
+                WriteFunction(functionPointer, function);
+            }
 
             // 5. Compile to object file
             var objectFile = Path.Combine(objectPath, $"{project.Name}.o");
@@ -101,41 +106,81 @@ namespace Lang.Backend
 
         private IDictionary<string, (TypeDefinition type, LLVMValueRef value)> WriteData()
         {
-            // 1. Declare structs and enums
+            // 1. Declare types
+            _types = new LLVMTypeRef[TypeTable.Count];
             var structs = new Dictionary<string, LLVMTypeRef>();
-            if (_emitDebug)
+            // if (_emitDebug)
+            // {
+            //     foreach (var (name, type) in TypeTable.Types)
+            //     {
+            //         switch (type)
+            //         {
+            //             case StructAst structAst:
+            //                 structs[name] = _context.CreateNamedStruct(name);
+
+            //                 if (structAst.Fields.Any())
+            //                 {
+            //                     using var structName = new MarshaledString(structAst.Name);
+
+            //                     var file = _debugFiles[structAst.FileIndex];
+            //                     _debugTypes[name] = LLVM.DIBuilderCreateForwardDecl(_debugBuilder, (uint)DwarfTag.Structure_type, structName.Value, (UIntPtr)structName.Length, null, file, structAst.Line, 0, structAst.Size * 8, 0, null, (UIntPtr)0);
+            //                 }
+            //                 else
+            //                 {
+            //                     CreateDebugStructType(structAst, name);
+            //                 }
+            //                 break;
+            //             case EnumAst enumAst:
+            //                 CreateDebugEnumType(enumAst);
+            //                 break;
+            //             case PrimitiveAst primitive:
+            //                 CreateDebugBasicType(primitive, name);
+            //                 break;
+            //             case ArrayType arrayType:
+            //                 using (var typeName = new MarshaledString(type.Name))
+            //                 {
+            //                     var pointerType = _debugTypes[arrayType.ElementTypeDefinition.GenericName];
+            //                     _debugTypes[name] = LLVM.DIBuilderCreatePointerType(_debugBuilder, pointerType, 64, 0, 0, typeName.Value, (UIntPtr)typeName.Length);
+            //                 }
+            //                 break;
+            //         }
+            //     }
+            //     foreach (var (name, type) in TypeTable.Types)
+            //     {
+            //         if (type is StructAst structAst && structAst.Fields.Any())
+            //         {
+            //             var fields = structAst.Fields.Select(field => ConvertTypeDefinition(field.TypeDefinition)).ToArray();
+            //             structs[name].StructSetBody(fields, false);
+
+            //             CreateDebugStructType(structAst, name);
+            //         }
+            //     }
+            // }
+            // else
             {
                 foreach (var (name, type) in TypeTable.Types)
                 {
                     switch (type)
                     {
                         case StructAst structAst:
-                            structs[name] = _context.CreateNamedStruct(name);
-
-                            if (structAst.Fields.Any())
-                            {
-                                using var structName = new MarshaledString(structAst.Name);
-
-                                var file = _debugFiles[structAst.FileIndex];
-                                _debugTypes[name] = LLVM.DIBuilderCreateForwardDecl(_debugBuilder, (uint)DwarfTag.Structure_type, structName.Value, (UIntPtr)structName.Length, null, file, structAst.Line, 0, structAst.Size * 8, 0, null, (UIntPtr)0);
-                            }
-                            else
-                            {
-                                CreateDebugStructType(structAst, name);
-                            }
+                            structs[name] = _types[structAst.TypeIndex] = _context.CreateNamedStruct(name);
                             break;
                         case EnumAst enumAst:
-                            CreateDebugEnumType(enumAst);
+                            _types[enumAst.TypeIndex] = GetIntegerType(enumAst.BaseType.Size);
                             break;
                         case PrimitiveAst primitive:
-                            CreateDebugBasicType(primitive, name);
+                            _types[primitive.TypeIndex] = primitive.TypeKind switch
+                            {
+                                TypeKind.Void => LLVM.VoidType(),
+                                TypeKind.Boolean => LLVM.Int1Type(),
+                                TypeKind.Integer => GetIntegerType(primitive.Size),
+                                TypeKind.Float => primitive.Size == 4 ? LLVM.FloatType() : LLVM.DoubleType(),
+                                TypeKind.Pointer => GetPointerType(primitive.PointerType),
+                                _ => null
+                            };
                             break;
                         case ArrayType arrayType:
-                            using (var typeName = new MarshaledString(type.Name))
-                            {
-                                var pointerType = _debugTypes[arrayType.ElementTypeDefinition.GenericName];
-                                _debugTypes[name] = LLVM.DIBuilderCreatePointerType(_debugBuilder, pointerType, 64, 0, 0, typeName.Value, (UIntPtr)typeName.Length);
-                            }
+                            // TODO Should this be stored?
                             break;
                     }
                 }
@@ -143,75 +188,55 @@ namespace Lang.Backend
                 {
                     if (type is StructAst structAst && structAst.Fields.Any())
                     {
-                        var fields = structAst.Fields.Select(field => ConvertTypeDefinition(field.TypeDefinition)).ToArray();
-                        structs[name].StructSetBody(fields, false);
-
-                        CreateDebugStructType(structAst, name);
-                    }
-                }
-            }
-            else
-            {
-                foreach (var (name, type) in TypeTable.Types)
-                {
-                    if (type is StructAst structAst)
-                    {
-                        structs[name] = _context.CreateNamedStruct(name);
-                    }
-                }
-                foreach (var (name, type) in TypeTable.Types)
-                {
-                    if (type is StructAst structAst && structAst.Fields.Any())
-                    {
-                        var fields = structAst.Fields.Select(field => ConvertTypeDefinition(field.TypeDefinition)).ToArray();
+                        var fields = structAst.Fields.Select(field => _types[field.Type.TypeIndex]).ToArray();
                         structs[name].StructSetBody(fields, false);
                     }
                 }
             }
-            _stringType = _module.GetTypeByName("string");
+            _stringType = structs["string"];
             _u8PointerType = LLVM.PointerType(LLVM.Int8Type(), 0);
 
             // 2. Declare variables
             var globals = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>();
-            foreach (var globalVariable in _programGraph.Variables)
-            {
-                if (globalVariable.Constant && globalVariable.TypeDefinition.TypeKind != TypeKind.String)
-                {
-                    var (_, constant) = WriteExpression(globalVariable.Value, null);
-                    globals.Add(globalVariable.Name, (globalVariable.TypeDefinition, constant));
-                }
-                else
-                {
-                    var typeDef = globalVariable.TypeDefinition;
-                    var type = ConvertTypeDefinition(typeDef);
-                    var global = _module.AddGlobal(type, globalVariable.Name);
-                    LLVM.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
-                    if (globalVariable.Value != null)
-                    {
-                        LLVM.SetInitializer(global, WriteExpression(globalVariable.Value, null).value);
-                    }
-                    else if (typeDef.TypeKind == TypeKind.Integer || typeDef.TypeKind == TypeKind.Float)
-                    {
-                        LLVM.SetInitializer(global, GetConstZero(type));
-                    }
-                    else if (typeDef.TypeKind == TypeKind.Pointer)
-                    {
-                        LLVM.SetInitializer(global, LLVM.ConstNull(type));
-                    }
+            // foreach (var globalVariable in _programGraph.Variables)
+            // {
+            //     if (globalVariable.Constant && globalVariable.TypeDefinition.TypeKind != TypeKind.String)
+            //     {
+            //         var (_, constant) = WriteExpression(globalVariable.Value, null);
+            //         globals.Add(globalVariable.Name, (globalVariable.TypeDefinition, constant));
+            //     }
+            //     else
+            //     {
+            //         var typeDef = globalVariable.TypeDefinition;
+            //         var type = ConvertTypeDefinition(typeDef);
+            //         var global = _module.AddGlobal(type, globalVariable.Name);
+            //         LLVM.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
+            //         if (globalVariable.Value != null)
+            //         {
+            //             LLVM.SetInitializer(global, WriteExpression(globalVariable.Value, null).value);
+            //         }
+            //         else if (typeDef.TypeKind == TypeKind.Integer || typeDef.TypeKind == TypeKind.Float)
+            //         {
+            //             LLVM.SetInitializer(global, GetConstZero(type));
+            //         }
+            //         else if (typeDef.TypeKind == TypeKind.Pointer)
+            //         {
+            //             LLVM.SetInitializer(global, LLVM.ConstNull(type));
+            //         }
 
-                    if (_emitDebug)
-                    {
-                        using var name = new MarshaledString(globalVariable.Name);
+            //         if (_emitDebug)
+            //         {
+            //             using var name = new MarshaledString(globalVariable.Name);
 
-                        var file = _debugFiles[globalVariable.FileIndex];
-                        var debugType = GetDebugType(globalVariable.TypeDefinition);
-                        var globalDebug = LLVM.DIBuilderCreateGlobalVariableExpression(_debugBuilder, _debugCompilationUnit, name.Value, (UIntPtr)name.Length, null, (UIntPtr)0, file, globalVariable.Line, debugType, 0, null, null, 0);
-                        LLVM.GlobalSetMetadata(global, 0, globalDebug);
-                    }
+            //             var file = _debugFiles[globalVariable.FileIndex];
+            //             var debugType = GetDebugType(globalVariable.TypeDefinition);
+            //             var globalDebug = LLVM.DIBuilderCreateGlobalVariableExpression(_debugBuilder, _debugCompilationUnit, name.Value, (UIntPtr)name.Length, null, (UIntPtr)0, file, globalVariable.Line, debugType, 0, null, null, 0);
+            //             LLVM.GlobalSetMetadata(global, 0, globalDebug);
+            //         }
 
-                    globals.Add(globalVariable.Name, (globalVariable.TypeDefinition, global));
-                }
-            }
+            //         globals.Add(globalVariable.Name, (globalVariable.TypeDefinition, global));
+            //     }
+            // }
 
             // 3. Write type table
             var typeTable = globals["__type_table"].value;
@@ -240,12 +265,12 @@ namespace Lang.Backend
                 }
             }
 
-            var typeFieldType = _module.GetTypeByName("TypeField");
-            var typeFieldArrayType = _module.GetTypeByName("Array.TypeField");
-            var enumValueType = _module.GetTypeByName("EnumValue");
-            var enumValueArrayType = _module.GetTypeByName("Array.EnumValue");
-            var argumentType = _module.GetTypeByName("ArgumentType");
-            var argumentArrayType = _module.GetTypeByName("Array.ArgumentType");
+            var typeFieldType = structs["TypeField"];
+            var typeFieldArrayType = structs["Array.TypeField"];
+            var enumValueType = structs["EnumValue"];
+            var enumValueArrayType = structs["Array.EnumValue"];
+            var argumentType = structs["ArgumentType"];
+            var argumentArrayType = structs["Array.ArgumentType"];
             foreach (var (_, (type, typeInfo)) in typePointers)
             {
                 var typeNameString = BuildString(type.Name);
@@ -276,10 +301,10 @@ namespace Lang.Backend
                     LLVM.SetInitializer(typeFieldArrayGlobal, typeFieldArray);
 
                     fields = LLVMValueRef.CreateConstNamedStruct(typeFieldArrayType, new LLVMValueRef[]
-                    {
-                        LLVM.ConstInt(LLVM.Int32Type(), (ulong)structAst.Fields.Count, 0),
-                        typeFieldArrayGlobal
-                    });
+                            {
+                            LLVM.ConstInt(LLVM.Int32Type(), (ulong)structAst.Fields.Count, 0),
+                            typeFieldArrayGlobal
+                            });
                 }
                 else
                 {
@@ -307,10 +332,10 @@ namespace Lang.Backend
                     LLVM.SetInitializer(enumValuesArrayGlobal, enumValuesArray);
 
                     enumValues = LLVMValueRef.CreateConstNamedStruct(enumValueArrayType, new LLVMValueRef[]
-                    {
-                        LLVM.ConstInt(LLVM.Int32Type(), (ulong)enumAst.Values.Count, 0),
-                        enumValuesArrayGlobal
-                    });
+                            {
+                            LLVM.ConstInt(LLVM.Int32Type(), (ulong)enumAst.Values.Count, 0),
+                            enumValuesArrayGlobal
+                            });
                 }
                 else
                 {
@@ -333,8 +358,8 @@ namespace Lang.Backend
                         var argumentTypeInfo = argument.TypeDefinition.Name switch
                         {
                             "Type" => typePointers["s32"].typeInfo,
-                            "Params" => typePointers[$"Array.{argument.TypeDefinition.Generics[0].GenericName}"].typeInfo,
-                            _ => typePointers[argument.TypeDefinition.GenericName].typeInfo
+                                "Params" => typePointers[$"Array.{argument.TypeDefinition.Generics[0].GenericName}"].typeInfo,
+                                _ => typePointers[argument.TypeDefinition.GenericName].typeInfo
                         };
 
                         var argumentValue = LLVMValueRef.CreateConstNamedStruct(argumentType, new LLVMValueRef[] {argNameString, argumentTypeInfo});
@@ -348,10 +373,10 @@ namespace Lang.Backend
                     LLVM.SetInitializer(argumentArrayGlobal, argumentArray);
 
                     arguments = LLVMValueRef.CreateConstNamedStruct(argumentArrayType, new LLVMValueRef[]
-                    {
-                        LLVM.ConstInt(LLVM.Int32Type(), (ulong)function.Arguments.Count, 0),
-                        argumentArrayGlobal
-                    });
+                            {
+                            LLVM.ConstInt(LLVM.Int32Type(), (ulong)function.Arguments.Count, 0),
+                            argumentArrayGlobal
+                            });
                 }
                 else
                 {
@@ -394,6 +419,28 @@ namespace Lang.Backend
             return globals;
         }
 
+        private LLVMTypeRef GetIntegerType(uint size)
+        {
+            return size switch
+            {
+                1 => LLVM.Int8Type(),
+                2 => LLVM.Int16Type(),
+                4 => LLVM.Int32Type(),
+                8 => LLVM.Int64Type(),
+                _ => LLVM.Int32Type()
+            };
+        }
+
+        private LLVMTypeRef GetPointerType(IType pointerType)
+        {
+            if (pointerType.TypeKind == TypeKind.Void)
+            {
+                return LLVM.PointerType(LLVM.Int8Type(), 0);
+            }
+
+            return LLVM.PointerType(_types[pointerType.TypeIndex], 0);
+        }
+
         private void SetPrivateConstant(LLVMValueRef variable)
         {
             LLVM.SetLinkage(variable, LLVMLinkage.LLVMPrivateLinkage);
@@ -401,130 +448,293 @@ namespace Lang.Backend
             LLVM.SetUnnamedAddr(variable, 1);
         }
 
-        private void WriteFunctionDefinition(string name, IFunction functionAst, string debugName, bool varargs = false, bool externFunction = false)
+        private LLVMValueRef WriteFunctionDefinition(string name, FunctionIR function)
         {
-            var argumentCount = varargs ? functionAst.Arguments.Count - 1 : functionAst.Arguments.Count;
-            var argumentTypes = new LLVMTypeRef[argumentCount];
-
-            if (_emitDebug && !externFunction)
+            var argumentTypes = new LLVMTypeRef[function.Arguments.Length];
+            for (var i = 0; i < function.Arguments.Length; i++)
             {
-                // Get the argument types and create debug symbols
-                var debugArgumentTypes = new LLVMMetadataRef[argumentCount + 1];
-                debugArgumentTypes[0] = GetDebugType(functionAst.ReturnTypeDefinition);
-
-                for (var i = 0; i < argumentCount; i++)
-                {
-                    var argumentType = functionAst.Arguments[i].TypeDefinition;
-                    argumentTypes[i] = ConvertTypeDefinition(argumentType);
-                    debugArgumentTypes[i + 1] = GetDebugType(argumentType);
-                }
-
-                var file = _debugFiles[functionAst.FileIndex];
-                var functionType = _debugBuilder.CreateSubroutineType(file, debugArgumentTypes, LLVMDIFlags.LLVMDIFlagZero);
-                var debugFunction = _debugFunctions[name] = _debugBuilder.CreateFunction(file, debugName, name, file, functionAst.Line, functionType, 0, 1, functionAst.Line, LLVMDIFlags.LLVMDIFlagPrototyped, 0);
-
-                // Declare the function
-                var function = _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(functionAst.ReturnTypeDefinition), argumentTypes, varargs));
-                LLVM.SetSubprogram(function, debugFunction);
+                argumentTypes[i] = _types[function.Arguments[i].TypeIndex];
             }
-            else
+            var functionPointer = _module.AddFunction(name, LLVMTypeRef.CreateFunction(_types[function.ReturnType.TypeIndex], argumentTypes, function.Varargs));
+
+            _functionsToWrite.Enqueue((functionPointer, function));
+
+            return functionPointer;
+        }
+
+        private LLVMValueRef GetOrCreateFunctionDefinition(string name)
+        {
+            var functionPointer = _module.GetNamedFunction(name);
+            if (functionPointer.Handle == IntPtr.Zero)
             {
-                // Get the argument types and declare the function
-                for (var i = 0; i < argumentCount; i++)
+                functionPointer = WriteFunctionDefinition(name, Program.Functions[name]);
+            }
+
+            return functionPointer;
+        }
+
+        private void WriteFunction(LLVMValueRef functionPointer, FunctionIR function)
+        {
+            // Declare the basic blocks
+            var basicBlocks = new LLVMBasicBlockRef[function.BasicBlocks.Count];
+            foreach (var block in function.BasicBlocks)
+            {
+                basicBlocks[block.Index] = functionPointer.AppendBasicBlock(block.Index.ToString());
+            }
+            LLVM.PositionBuilderAtEnd(_builder, basicBlocks[0]);
+
+            // Allocate the function stack
+            var allocations = new LLVMValueRef[function.Allocations.Count];
+            foreach (var allocation in function.Allocations)
+            {
+                if (allocation.Array)
                 {
-                    argumentTypes[i] = ConvertTypeDefinition(functionAst.Arguments[i].TypeDefinition, externFunction);
+                    allocations[allocation.Index] = _builder.BuildAlloca(LLVM.ArrayType(_types[allocation.Type.TypeIndex], allocation.ArrayLength));
                 }
-                _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(functionAst.ReturnTypeDefinition), argumentTypes, varargs));
+                else
+                {
+                    allocations[allocation.Index] = _builder.BuildAlloca(_types[allocation.Type.TypeIndex]);
+                }
+            }
+
+            if (function.SaveStack)
+            {
+                BuildStackSave();
+            }
+
+            // Write the instructions
+            var blockIndex = 0;
+            var i = 0;
+            var values = new LLVMValueRef[function.Instructions.Count];
+            while (blockIndex < function.BasicBlocks.Count)
+            {
+                LLVM.PositionBuilderAtEnd(_builder, basicBlocks[blockIndex]); // Redundant for the first pass, not a big deal
+                var instructionToStopAt = blockIndex < function.BasicBlocks.Count - 1 ? function.BasicBlocks[blockIndex + 1].Location : function.Instructions.Count;
+                while (i < instructionToStopAt)
+                {
+                    var instruction = function.Instructions[i++];
+
+                    switch (instruction.Type)
+                    {
+                        case InstructionType.Jump:
+                        case InstructionType.ConditionalJump:
+                        case InstructionType.Return:
+                        case InstructionType.Load:
+                        case InstructionType.LoadAllocation:
+                        case InstructionType.Store:
+                        case InstructionType.StoreToAllocation:
+                        case InstructionType.GetPointer:
+                        case InstructionType.GetAllocationPointer:
+                        case InstructionType.GetStructPointer:
+                        case InstructionType.Call:
+                        case InstructionType.Cast:
+                        case InstructionType.AllocateArray:
+                        case InstructionType.IsNull:
+                        case InstructionType.IsNotNull:
+                        case InstructionType.Not:
+                        case InstructionType.IntegerNegate:
+                        case InstructionType.FloatNegate:
+                        case InstructionType.And:
+                        case InstructionType.Or:
+                        case InstructionType.BitwiseAnd:
+                        case InstructionType.BitwiseOr:
+                        case InstructionType.Xor:
+                        case InstructionType.PointerEquals:
+                        case InstructionType.IntegerEquals:
+                        case InstructionType.FloatEquals:
+                        case InstructionType.PointerNotEquals:
+                        case InstructionType.IntegerNotEquals:
+                        case InstructionType.FloatNotEquals:
+                        case InstructionType.IntegerGreaterThan:
+                        case InstructionType.UnsignedIntegerGreaterThan:
+                        case InstructionType.FloatGreaterThan:
+                        case InstructionType.IntegerGreaterThanOrEqual:
+                        case InstructionType.UnsignedIntegerGreaterThanOrEqual:
+                        case InstructionType.FloatGreaterThanOrEqual:
+                        case InstructionType.IntegerLessThan:
+                        case InstructionType.UnsignedIntegerLessThan:
+                        case InstructionType.FloatLessThan:
+                        case InstructionType.IntegerLessThanOrEqual:
+                        case InstructionType.UnsignedIntegerLessThanOrEqual:
+                        case InstructionType.FloatLessThanOrEqual:
+                        case InstructionType.PointerAdd:
+                        case InstructionType.IntegerAdd:
+                        case InstructionType.FloatAdd:
+                        case InstructionType.PointerSubtract:
+                        case InstructionType.IntegerSubtract:
+                        case InstructionType.FloatSubtract:
+                        case InstructionType.IntegerMultiply:
+                        case InstructionType.FloatMultiply:
+                        case InstructionType.IntegerDivide:
+                        case InstructionType.UnsignedIntegerDivide:
+                        case InstructionType.FloatDivide:
+                        case InstructionType.IntegerModulus:
+                        case InstructionType.UnsignedIntegerModulus:
+                        case InstructionType.FloatModulus:
+                        case InstructionType.ShiftRight:
+                        case InstructionType.ShiftLeft:
+                        case InstructionType.RotateRight:
+                        case InstructionType.RotateLeft:
+                            break;
+                    }
+                }
+                blockIndex++;
             }
         }
 
-        private void WriteFunction(IFunction functionAst, int argumentCount, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> globals, LLVMValueRef function, string functionName)
+        private void BuildStackSave()
         {
-            _currentFunction = functionAst;
-            // 1. Get function definition
-            var entryBlock = function.AppendBasicBlock("entry");
-            LLVM.PositionBuilderAtEnd(_builder, entryBlock);
-            var localVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>(globals);
+            const string stackSaveIntrinsic = "llvm.stacksave";
+            _stackPointer = _builder.BuildAlloca(_u8PointerType, "stackPtr");
 
-            // 2. Allocate arguments on the stack
-            if (_emitDebug)
+            var function = _module.GetNamedFunction(stackSaveIntrinsic);
+            if (function.Handle == IntPtr.Zero)
             {
-                _builder.CurrentDebugLocation = null;
-            }
-            for (var i = 0; i < argumentCount; i++)
-            {
-                var arg = functionAst.Arguments[i];
-                var allocation = _builder.BuildAlloca(ConvertTypeDefinition(arg.TypeDefinition), arg.Name);
-                localVariables[arg.Name] = (arg.TypeDefinition, allocation);
+                function = _module.AddFunction(stackSaveIntrinsic, LLVMTypeRef.CreateFunction(_u8PointerType, Array.Empty<LLVMTypeRef>()));
             }
 
-            // 3. Build allocations at the beginning of the function
-            foreach (var ast in functionAst.Body.Children)
-            {
-                if (BuildAllocations(ast))
-                {
-                    break;
-                }
-            }
-
-            // 4. Store initial argument values
-            LLVMMetadataRef block = null;
-            if (_emitDebug)
-            {
-                block = _debugFunctions[functionName];
-                var file = _debugFiles[functionAst.FileIndex];
-                for (var i = 0; i < argumentCount; i++)
-                {
-                    var arg = functionAst.Arguments[i];
-                    var argument = LLVM.GetParam(function, (uint) i);
-                    var variable = localVariables[arg.Name].value;
-                    LLVM.BuildStore(_builder, argument, variable);
-
-                    using var argName = new MarshaledString(arg.Name);
-
-                    var debugType = GetDebugType(arg.TypeDefinition);
-                    var debugVariable = LLVM.DIBuilderCreateParameterVariable(_debugBuilder, block, argName.Value, (UIntPtr)argName.Length, (uint)i+1, file, arg.Line, debugType, 0, LLVMDIFlags.LLVMDIFlagZero);
-                    var expression = LLVM.DIBuilderCreateExpression(_debugBuilder, null, (UIntPtr)0);
-                    var location = LLVM.DIBuilderCreateDebugLocation(_context, arg.Line, arg.Column, block, null);
-
-                    LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, variable, debugVariable, expression, location, entryBlock);
-                }
-            }
-            else
-            {
-                for (var i = 0; i < argumentCount; i++)
-                {
-                    var arg = functionAst.Arguments[i];
-                    var argument = LLVM.GetParam(function, (uint) i);
-                    var variable = localVariables[arg.Name].value;
-                    LLVM.BuildStore(_builder, argument, variable);
-                }
-            }
-
-            // 5. Loop through function body
-            var returned = false;
-            foreach (var ast in functionAst.Body.Children)
-            {
-                // 5a. Recursively write out lines
-                if (WriteFunctionLine(ast, localVariables, function, block))
-                {
-                    returned = true;
-                    break;
-                }
-            }
-
-            // 6. Write returns for void functions
-            if (!returned && functionAst.ReturnTypeDefinition.Name == "void")
-            {
-                BuildStackRestore();
-                LLVM.BuildRetVoid(_builder);
-            }
-            _stackPointerExists = false;
-            _stackSaved = false;
-
-            // 7. Verify the function
-            LLVM.RunFunctionPassManager(_passManager, function);
+            var stackPointer = _builder.BuildCall(function, Array.Empty<LLVMValueRef>(), "stackPointer");
+            LLVM.BuildStore(_builder, stackPointer, _stackPointer);
         }
+
+        private void BuildStackRestore()
+        {
+            const string stackRestoreIntrinsic = "llvm.stackrestore";
+
+            var function = _module.GetNamedFunction(stackRestoreIntrinsic);
+            if (function.Handle == IntPtr.Zero)
+            {
+                function = _module.AddFunction(stackRestoreIntrinsic, LLVMTypeRef.CreateFunction(LLVM.VoidType(), new [] {_u8PointerType}));
+            }
+
+            var stackPointer = _builder.BuildLoad(_stackPointer, "stackPointer");
+            _builder.BuildCall(function, new []{stackPointer}, string.Empty);
+        }
+
+        // private void WriteFunctionDefinition(string name, IFunction functionAst, string debugName, bool varargs = false, bool externFunction = false)
+        // {
+        //     var argumentCount = varargs ? functionAst.Arguments.Count - 1 : functionAst.Arguments.Count;
+        //     var argumentTypes = new LLVMTypeRef[argumentCount];
+
+        //     if (_emitDebug && !externFunction)
+        //     {
+        //         // Get the argument types and create debug symbols
+        //         var debugArgumentTypes = new LLVMMetadataRef[argumentCount + 1];
+        //         debugArgumentTypes[0] = GetDebugType(functionAst.ReturnTypeDefinition);
+
+        //         for (var i = 0; i < argumentCount; i++)
+        //         {
+        //             var argumentType = functionAst.Arguments[i].TypeDefinition;
+        //             argumentTypes[i] = ConvertTypeDefinition(argumentType);
+        //             debugArgumentTypes[i + 1] = GetDebugType(argumentType);
+        //         }
+
+        //         var file = _debugFiles[functionAst.FileIndex];
+        //         var functionType = _debugBuilder.CreateSubroutineType(file, debugArgumentTypes, LLVMDIFlags.LLVMDIFlagZero);
+        //         var debugFunction = _debugFunctions[name] = _debugBuilder.CreateFunction(file, debugName, name, file, functionAst.Line, functionType, 0, 1, functionAst.Line, LLVMDIFlags.LLVMDIFlagPrototyped, 0);
+
+        //         // Declare the function
+        //         var function = _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(functionAst.ReturnTypeDefinition), argumentTypes, varargs));
+        //         LLVM.SetSubprogram(function, debugFunction);
+        //     }
+        //     else
+        //     {
+        //         // Get the argument types and declare the function
+        //         for (var i = 0; i < argumentCount; i++)
+        //         {
+        //             argumentTypes[i] = ConvertTypeDefinition(functionAst.Arguments[i].TypeDefinition, externFunction);
+        //         }
+        //         _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(functionAst.ReturnTypeDefinition), argumentTypes, varargs));
+        //     }
+        // }
+
+        // private void WriteFunction(IFunction functionAst, int argumentCount, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> globals, LLVMValueRef function, string functionName)
+        // {
+        //     _currentFunction = functionAst;
+        //     // 1. Get function definition
+        //     var entryBlock = function.AppendBasicBlock("entry");
+        //     LLVM.PositionBuilderAtEnd(_builder, entryBlock);
+        //     var localVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>(globals);
+
+        //     // 2. Allocate arguments on the stack
+        //     if (_emitDebug)
+        //     {
+        //         _builder.CurrentDebugLocation = null;
+        //     }
+        //     for (var i = 0; i < argumentCount; i++)
+        //     {
+        //         var arg = functionAst.Arguments[i];
+        //         var allocation = _builder.BuildAlloca(ConvertTypeDefinition(arg.TypeDefinition), arg.Name);
+        //         localVariables[arg.Name] = (arg.TypeDefinition, allocation);
+        //     }
+
+        //     // 3. Build allocations at the beginning of the function
+        //     foreach (var ast in functionAst.Body.Children)
+        //     {
+        //         if (BuildAllocations(ast))
+        //         {
+        //             break;
+        //         }
+        //     }
+
+        //     // 4. Store initial argument values
+        //     LLVMMetadataRef block = null;
+        //     if (_emitDebug)
+        //     {
+        //         block = _debugFunctions[functionName];
+        //         var file = _debugFiles[functionAst.FileIndex];
+        //         for (var i = 0; i < argumentCount; i++)
+        //         {
+        //             var arg = functionAst.Arguments[i];
+        //             var argument = LLVM.GetParam(function, (uint) i);
+        //             var variable = localVariables[arg.Name].value;
+        //             LLVM.BuildStore(_builder, argument, variable);
+
+        //             using var argName = new MarshaledString(arg.Name);
+
+        //             var debugType = GetDebugType(arg.TypeDefinition);
+        //             var debugVariable = LLVM.DIBuilderCreateParameterVariable(_debugBuilder, block, argName.Value, (UIntPtr)argName.Length, (uint)i+1, file, arg.Line, debugType, 0, LLVMDIFlags.LLVMDIFlagZero);
+        //             var expression = LLVM.DIBuilderCreateExpression(_debugBuilder, null, (UIntPtr)0);
+        //             var location = LLVM.DIBuilderCreateDebugLocation(_context, arg.Line, arg.Column, block, null);
+
+        //             LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, variable, debugVariable, expression, location, entryBlock);
+        //         }
+        //     }
+        //     else
+        //     {
+        //         for (var i = 0; i < argumentCount; i++)
+        //         {
+        //             var arg = functionAst.Arguments[i];
+        //             var argument = LLVM.GetParam(function, (uint) i);
+        //             var variable = localVariables[arg.Name].value;
+        //             LLVM.BuildStore(_builder, argument, variable);
+        //         }
+        //     }
+
+        //     // 5. Loop through function body
+        //     var returned = false;
+        //     foreach (var ast in functionAst.Body.Children)
+        //     {
+        //         // 5a. Recursively write out lines
+        //         if (WriteFunctionLine(ast, localVariables, function, block))
+        //         {
+        //             returned = true;
+        //             break;
+        //         }
+        //     }
+
+        //     // 6. Write returns for void functions
+        //     if (!returned && functionAst.ReturnTypeDefinition.Name == "void")
+        //     {
+        //         BuildStackRestore();
+        //         LLVM.BuildRetVoid(_builder);
+        //     }
+        //     _stackPointerExists = false;
+        //     _stackSaved = false;
+
+        //     // 7. Verify the function
+        //     LLVM.RunFunctionPassManager(_passManager, function);
+        // }
 
         private void Compile(string objectFile, bool outputIntermediate)
         {
@@ -533,9 +743,9 @@ namespace Lang.Backend
                 LLVM.DIBuilderFinalize(_debugBuilder);
             }
 
-            #if DEBUG
+#if DEBUG
             LLVM.VerifyModule(_module, LLVMVerifierFailureAction.LLVMPrintMessageAction, null);
-            #endif
+#endif
 
             LLVM.InitializeX86TargetInfo();
             LLVM.InitializeX86Target();
@@ -566,1127 +776,1087 @@ namespace Lang.Backend
             }
         }
 
-        private bool BuildAllocations(IAst ast)
-        {
-            switch (ast)
-            {
-                case ReturnAst returnAst:
-                    BuildAllocations(returnAst.Value);
-                    return true;
-                case CallAst call:
-                    BuildCallAllocations(call);
-                    break;
-                case DeclarationAst declaration:
-                    if (declaration.Constant && declaration.TypeDefinition.TypeKind != TypeKind.String) break;
-
-                    var type = ConvertTypeDefinition(declaration.TypeDefinition);
-                    var variable = _builder.BuildAlloca(type, declaration.Name);
-                    _allocationQueue.Enqueue(variable);
-
-                    if (declaration.Value != null)
-                    {
-                        BuildAllocations(declaration.Value);
-                    }
-                    else if (declaration.TypeDefinition.TypeKind == TypeKind.Array && declaration.TypeDefinition.TypeKind != TypeKind.CArray)
-                    {
-                        if (declaration.TypeDefinition.ConstCount != null)
-                        {
-                            var elementType = declaration.TypeDefinition.Generics[0];
-                            var targetType = ConvertTypeDefinition(elementType);
-                            var arrayType = LLVM.ArrayType(targetType, declaration.TypeDefinition.ConstCount.Value);
-                            var arrayData = _builder.BuildAlloca(arrayType, "arraydata");
-                            _allocationQueue.Enqueue(arrayData);
-                        }
-                        else if (declaration.TypeDefinition.Count != null)
-                        {
-                            BuildStackPointer();
-                        }
-                    }
-                    else if (declaration.TypeDefinition.TypeKind == TypeKind.Struct)
-                    {
-                        BuildStructAllocations(declaration.TypeDefinition.GenericName, declaration.Assignments);
-                    }
-                    break;
-                case AssignmentAst assignment:
-                    BuildAllocations(assignment.Value);
-                    break;
-                case StructFieldRefAst structField:
-                    for (var i = 0; i < structField.Children.Count - 1; i++)
-                    {
-                        switch (structField.Children[i])
-                        {
-                            // To get the field of a call, the value needs to be stored on the stack to use GetElementPtr
-                            case CallAst call:
-                                BuildCallAllocations(call);
-                                if (!structField.Pointers[i])
-                                {
-                                    var function = call.Function;
-                                    var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(function.ReturnTypeDefinition), function.Name);
-                                    _allocationQueue.Enqueue(iterationValue);
-                                }
-                                break;
-                            case IndexAst index:
-                                BuildAllocations(index.Index);
-                                if (index.CallsOverload && !structField.Pointers[i])
-                                {
-                                    var overloadType = index.Overload.ReturnTypeDefinition;
-                                    var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(overloadType), overloadType.GenericName);
-                                    _allocationQueue.Enqueue(iterationValue);
-                                }
-                                break;
-                        }
-                    }
-                    break;
-                case ScopeAst scope:
-                    return BuildAllocations(scope.Children);
-                case ConditionalAst conditional:
-                    BuildAllocations(conditional.Condition);
-                    var ifReturned = BuildAllocations(conditional.IfBlock.Children);
-
-                    if (conditional.ElseBlock != null)
-                    {
-                        var elseReturned = BuildAllocations(conditional.ElseBlock.Children);
-                        return ifReturned && elseReturned;
-                    }
-                    break;
-                case WhileAst whileAst:
-                    BuildAllocations(whileAst.Condition);
-                    return BuildAllocations(whileAst.Body.Children);
-                case EachAst each:
-                    var indexVariable = _builder.BuildAlloca(LLVM.Int32Type(), each.IterationVariable);
-                    _allocationQueue.Enqueue(indexVariable);
-
-                    switch (each.Iteration)
-                    {
-                        // To get the field of a call, the value needs to be stored on the stack to use GetElementPtr
-                        // @PotentialBug I can't really think of other cases that would fall under here, but this may
-                        // become an issue if there are some new ways to create arrays
-                        case CallAst call:
-                        {
-                            BuildCallAllocations(call);
-                            var function = call.Function;
-                            var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(function.ReturnTypeDefinition), function.Name);
-                            _allocationQueue.Enqueue(iterationValue);
-                            break;
-                        }
-                        case StructFieldRefAst structField:
-                            switch (structField.Children[0])
-                            {
-                                // To get the field of a call, the value needs to be stored on the stack to use GetElementPtr
-                                case CallAst call:
-                                    BuildCallAllocations(call);
-                                    if (!structField.Pointers[0])
-                                    {
-                                        var function = call.Function;
-                                        var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(function.ReturnTypeDefinition), function.Name);
-                                        _allocationQueue.Enqueue(iterationValue);
-                                    }
-                                    break;
-                            }
-                            break;
-                    }
-
-                    return BuildAllocations(each.Body.Children);
-                case ExpressionAst expression:
-                    BuildAllocations(expression.Children);
-                    break;
-                case IndexAst index:
-                    BuildAllocations(index.Index);
-                    break;
-            }
-            return false;
-        }
-
-        private bool BuildAllocations(List<IAst> children)
-        {
-            foreach (var ast in children)
-            {
-                if (BuildAllocations(ast))
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private void BuildCallAllocations(CallAst call)
-        {
-            if (call.Function.Params)
-            {
-                var functionDef = call.Function;
-
-                var paramsTypeDef = functionDef.Arguments[^1].TypeDefinition;
-                var paramsType = ConvertTypeDefinition(paramsTypeDef);
-
-                var paramsVariable = _builder.BuildAlloca(paramsType, "params");
-                _allocationQueue.Enqueue(paramsVariable);
-
-                var targetType = ConvertTypeDefinition(paramsTypeDef);
-                var arrayType = LLVM.ArrayType(targetType, (uint)(call.Arguments.Count - functionDef.Arguments.Count + 1));
-                var arrayData = _builder.BuildAlloca(arrayType, "arraydata");
-                _allocationQueue.Enqueue(arrayData);
-            }
-
-            foreach (var argument in call.Arguments)
-            {
-                BuildAllocations(argument);
-            }
-        }
-
-        private void BuildStructAllocations(string name, Dictionary<string, AssignmentAst> assignments = null)
-        {
-            var structDef = TypeTable.Types[name] as StructAst;
-            if (assignments == null)
-            {
-                foreach (var field in structDef!.Fields)
-                {
-                    BuildFieldAllocations(field);
-                }
-            }
-            else
-            {
-                foreach (var field in structDef!.Fields)
-                {
-                    if (assignments.TryGetValue(field.Name, out var assignment))
-                    {
-                        BuildAllocations(assignment.Value);
-                    }
-                    else
-                    {
-                        BuildFieldAllocations(field);
-                    }
-                }
-            }
-        }
-
-        private void BuildFieldAllocations(StructFieldAst field)
-        {
-            if (field.TypeDefinition.TypeKind == TypeKind.Array && field.TypeDefinition.TypeKind != TypeKind.CArray && field.TypeDefinition.ConstCount != null)
-            {
-                var elementType = field.TypeDefinition.Generics[0];
-                var targetType = ConvertTypeDefinition(elementType);
-
-                var count = field.TypeDefinition.ConstCount.Value;
-                var arrayType = LLVM.ArrayType(targetType, count);
-                var arrayData = _builder.BuildAlloca(arrayType, "arraydata");
-                _allocationQueue.Enqueue(arrayData);
-            }
-            else if (field.TypeDefinition.TypeKind == TypeKind.Struct)
-            {
-                BuildStructAllocations(field.TypeDefinition.GenericName);
-            }
-        }
-
-        private bool WriteFunctionLine(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function, LLVMMetadataRef block)
-        {
-            if (_emitDebug)
-            {
-                LLVM.SetCurrentDebugLocation2(_builder, LLVM.DIBuilderCreateDebugLocation(_context, ast.Line, ast.Column, block, null));
-            }
-
-            switch (ast)
-            {
-                case ReturnAst returnAst:
-                    WriteReturnStatement(returnAst, localVariables);
-                    return true;
-                case DeclarationAst declaration:
-                    WriteDeclaration(declaration, localVariables, block);
-                    break;
-                case AssignmentAst assignment:
-                    WriteAssignment(assignment, localVariables);
-                    break;
-                case ScopeAst scope:
-                    return WriteScope(scope, localVariables, function, block);
-                case ConditionalAst conditional:
-                    return WriteConditional(conditional, localVariables, function, block);
-                case WhileAst whileAst:
-                    return WriteWhile(whileAst, localVariables, function, block);
-                case EachAst each:
-                    return WriteEach(each, localVariables, function, block);
-                case BreakAst:
-                case ContinueAst:
-                    break;
-                default:
-                    WriteExpression(ast, localVariables);
-                    break;
-            }
-            return false;
-        }
-
-        private void WriteReturnStatement(ReturnAst returnAst, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
-        {
-            // 1. Return void if the value is null
-            if (returnAst.Value == null)
-            {
-                LLVM.BuildRetVoid(_builder);
-                return;
-            }
-
-            // 2. Get the return value
-            var returnExpression = WriteExpression(returnAst.Value, localVariables);
-
-            // 3. Write expression as return value
-            var returnValue = CastValue(returnExpression, _currentFunction.ReturnTypeDefinition);
-
-            // 4. Restore the stack pointer if necessary and return
-            BuildStackRestore();
-            LLVM.BuildRet(_builder, returnValue);
-        }
-
-        private void WriteDeclaration(DeclarationAst declaration, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMMetadataRef block)
-        {
-            // 1. Declare variable on the stack
-            if (declaration.Constant)
-            {
-                var (_, value) = WriteExpression(declaration.Value, localVariables);
-
-                if (declaration.TypeDefinition.TypeKind == TypeKind.String)
-                {
-                    var stringVariable = _allocationQueue.Dequeue();
-                    LLVM.BuildStore(_builder, value, stringVariable);
-                    value = stringVariable;
-                }
-
-                localVariables.Add(declaration.Name, (declaration.TypeDefinition, value));
-                return;
-            }
-
-            var variable = _allocationQueue.Dequeue();
-            localVariables.Add(declaration.Name, (declaration.TypeDefinition, variable));
-            if (_emitDebug)
-            {
-                DeclareDebugVariable(declaration.Name, declaration.TypeDefinition, declaration, variable, block);
-            }
-
-            // 2. Set value if it exists
-            if (declaration.Value != null)
-            {
-                var expression = WriteExpression(declaration.Value, localVariables);
-                var value = CastValue(expression, declaration.TypeDefinition);
-
-                LLVM.BuildStore(_builder, value, variable);
-                return;
-            }
-
-            switch (declaration.TypeDefinition.TypeKind)
-            {
-                // Initialize arrays
-                case TypeKind.Array:
-                    var elementType = declaration.TypeDefinition.Generics[0];
-                    if (declaration.TypeDefinition.ConstCount != null)
-                    {
-                        var arrayPointer = InitializeConstArray(variable, declaration.TypeDefinition.ConstCount.Value, elementType);
-
-                        if (declaration.ArrayValues != null)
-                        {
-                            InitializeArrayValues(arrayPointer, elementType, declaration.ArrayValues, localVariables);
-                        }
-                    }
-                    else if (declaration.TypeDefinition.Count != null)
-                    {
-                        BuildStackSave();
-                        var (_, count) = WriteExpression(declaration.TypeDefinition.Count, localVariables);
-
-                        var countPointer = _builder.BuildStructGEP(variable, 0, "countptr");
-                        LLVM.BuildStore(_builder, count, countPointer);
-
-                        var targetType = ConvertTypeDefinition(elementType);
-                        var arrayData = _builder.BuildArrayAlloca(targetType, count, "arraydata");
-                        var dataPointer = _builder.BuildStructGEP(variable, 1, "dataptr");
-                        LLVM.BuildStore(_builder, arrayData, dataPointer);
-                    }
-                    else
-                    {
-                        var countPointer = _builder.BuildStructGEP(variable, 0, "countptr");
-                        LLVM.BuildStore(_builder, _zeroInt, countPointer);
-                    }
-                    break;
-                case TypeKind.CArray:
-                    if (declaration.ArrayValues != null)
-                    {
-                        InitializeArrayValues(variable, declaration.TypeDefinition.Generics[0], declaration.ArrayValues, localVariables);
-                    }
-                    break;
-                // Initialize struct field default values
-                case TypeKind.Struct:
-                case TypeKind.String:
-                    InitializeStruct(declaration.TypeDefinition, variable, localVariables, declaration.Assignments);
-                    break;
-                // Initialize pointers to null
-                case TypeKind.Pointer:
-                    var nullValue = LLVM.ConstNull(ConvertTypeDefinition(declaration.TypeDefinition));
-                    LLVM.BuildStore(_builder, nullValue, variable);
-                    break;
-                // Or initialize to 0
-                default:
-                    var zero = GetConstZero(ConvertTypeDefinition(declaration.TypeDefinition));
-                    LLVM.BuildStore(_builder, zero, variable);
-                    break;
-            }
-        }
-
-        private void InitializeArrayValues(LLVMValueRef arrayPointer, TypeDefinition elementType, List<IAst> arrayValues, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
-        {
-            for (var i = 0; i < arrayValues.Count; i++)
-            {
-                var value = WriteExpression(arrayValues[i], localVariables);
-
-                var index = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), (uint)i, false);
-                var pointer = _builder.BuildGEP(arrayPointer, new []{_zeroInt, index}, "dataptr");
-
-                LLVM.BuildStore(_builder, CastValue(value, elementType), pointer);
-            }
-        }
-
-        private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, Dictionary<string, AssignmentAst> assignments)
-        {
-            var structDef = TypeTable.Types[typeDef.GenericName] as StructAst;
-            if (assignments == null)
-            {
-                for (var i = 0; i < structDef!.Fields.Count; i++)
-                {
-                    var field = structDef.Fields[i];
-
-                    var fieldPointer = _builder.BuildStructGEP(variable, (uint)i, field.Name);
-
-                    InitializeField(field, fieldPointer, localVariables);
-                }
-            }
-            else
-            {
-                for (var i = 0; i < structDef!.Fields.Count; i++)
-                {
-                    var field = structDef.Fields[i];
-
-                    var fieldPointer = _builder.BuildStructGEP(variable, (uint)i, field.Name);
-
-                    if (assignments.TryGetValue(field.Name, out var assignment))
-                    {
-                        var expression = WriteExpression(assignment.Value, localVariables);
-                        var value = CastValue(expression, field.TypeDefinition);
-
-                        LLVM.BuildStore(_builder, value, fieldPointer);
-                    }
-                    else
-                    {
-                        InitializeField(field, fieldPointer, localVariables);
-                    }
-                }
-            }
-        }
-
-        private void InitializeField(StructFieldAst field, LLVMValueRef fieldPointer, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
-        {
-            switch (field.TypeDefinition.TypeKind)
-            {
-                case TypeKind.Array:
-                    var elementType = field.TypeDefinition.Generics[0];
-                    if (field.TypeDefinition.ConstCount != null)
-                    {
-                        var arrayPointer = InitializeConstArray(fieldPointer, field.TypeDefinition.ConstCount.Value, elementType);
-
-                        if (field.ArrayValues != null)
-                        {
-                            InitializeArrayValues(arrayPointer, elementType, field.ArrayValues, localVariables);
-                        }
-                    }
-                    else
-                    {
-                        var countPointer = _builder.BuildStructGEP(fieldPointer, 0, "countptr");
-                        LLVM.BuildStore(_builder, _zeroInt, countPointer);
-                    }
-                    break;
-                case TypeKind.CArray:
-                    if (field.ArrayValues != null)
-                    {
-                        InitializeArrayValues(fieldPointer, field.TypeDefinition.Generics[0], field.ArrayValues, localVariables);
-                    }
-                    break;
-                case TypeKind.Pointer:
-                    var type = ConvertTypeDefinition(field.TypeDefinition);
-                    LLVM.BuildStore(_builder, LLVM.ConstNull(type), fieldPointer);
-                    break;
-                case TypeKind.Struct:
-                    InitializeStruct(field.TypeDefinition, fieldPointer, localVariables, field.Assignments);
-                    break;
-                default:
-                    LLVMValueRef value;
-                    if (field.Value != null)
-                    {
-                        (_, value) = WriteExpression(field.Value, localVariables);
-                    }
-                    else
-                    {
-                        var fieldType = ConvertTypeDefinition(field.TypeDefinition);
-                        value = GetConstZero(fieldType);
-                    }
-                    LLVM.BuildStore(_builder, value, fieldPointer);
-                    break;
-            }
-        }
-
-        private LLVMValueRef InitializeConstArray(LLVMValueRef array, uint length, TypeDefinition arrayType)
-        {
-            // 1. Set the count field
-            var countValue = LLVM.ConstInt(LLVM.Int32Type(), (ulong)length, 0);
-            var countPointer = _builder.BuildStructGEP(array, 0, "countptr");
-            LLVM.BuildStore(_builder, countValue, countPointer);
-
-            // 2. Initialize the array data
-            var targetType = ConvertTypeDefinition(arrayType);
-            var arrayData = _allocationQueue.Dequeue();
-            var arrayDataPointer = _builder.BuildBitCast(arrayData, LLVM.PointerType(targetType, 0), "tmpdata");
-            var dataPointer = _builder.BuildStructGEP(array, 1, "dataptr");
-            LLVM.BuildStore(_builder, arrayDataPointer, dataPointer);
-
-            return arrayData;
-        }
-
-        private static LLVMValueRef GetConstZero(LLVMTypeRef type)
-        {
-            return LLVM.GetTypeKind(type) switch
-            {
-                LLVMTypeKind.LLVMIntegerTypeKind => LLVM.ConstInt(type, 0, 0),
-                LLVMTypeKind.LLVMFloatTypeKind => LLVM.ConstReal(type, 0),
-                LLVMTypeKind.LLVMDoubleTypeKind => LLVM.ConstReal(type, 0),
-                _ => LLVM.ConstInt(type, 0, 0)
-            };
-        }
-
-        private void WriteAssignment(AssignmentAst assignment, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
-        {
-            // 1. Get the variable on the stack
-            var loaded = false;
-            var constant = false;
-            var (type, variable) = assignment.Reference switch
-            {
-                IdentifierAst identifier => localVariables[identifier.Name],
-                StructFieldRefAst structField => BuildStructField(structField, localVariables, out loaded, out constant),
-                IndexAst index => GetIndexPointer(index, localVariables, out loaded),
-                UnaryAst unary => WriteExpression(unary.Value, localVariables),
-                // @Cleanup This branch should never be hit
-                _ => (null, new LLVMValueRef())
-            };
-            if (loaded && type.TypeKind == TypeKind.Pointer)
-            {
-                type = type.Generics[0];
-            }
-            else if (assignment.Reference is UnaryAst)
-            {
-                type = type.Generics[0];
-            }
-
-            // 2. Evaluate the expression value
-            var expression = WriteExpression(assignment.Value, localVariables);
-            if (assignment.Operator != Operator.None && !constant)
-            {
-                // 2a. Build expression with variable value as the LHS
-                var value = _builder.BuildLoad(variable, "tmpvalue");
-                expression.value = BuildExpression((type, value), expression, assignment.Operator, type);
-                expression.type = type; // The type should now be the type of the variable
-            }
-
-            // 3. Reallocate the value of the variable
-            var assignmentValue = CastValue(expression, type);
-            if (!constant) // Values are either readonly or constants, so don't store
-            {
-                LLVM.BuildStore(_builder, assignmentValue, variable);
-            }
-        }
-
-        private bool WriteScope(ScopeAst scope, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function, LLVMMetadataRef block)
-        {
-            if (!scope.Children.Any()) return false;
-
-            // 1. Create scope variables
-            var scopeVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>(localVariables);
-
-            // 2. Write function lines
-            if (_emitDebug)
-            {
-                var file = _debugFiles[scope.FileIndex];
-                block = LLVM.DIBuilderCreateLexicalBlock(_debugBuilder, block, file, scope.Line, scope.Column);
-            }
-            foreach (var ast in scope.Children)
-            {
-                if (WriteFunctionLine(ast, scopeVariables, function, block))
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private bool WriteConditional(ConditionalAst conditional, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function, LLVMMetadataRef block)
-        {
-            // 1. Write out the condition
-            var condition = BuildConditionExpression(conditional.Condition, localVariables);
-
-            // 2. Write out the condition jump and blocks
-            var thenBlock = function.AppendBasicBlock("then");
-            var elseBlock = function.AppendBasicBlock("else");
-            var endBlock = new LLVMBasicBlockRef();
-            LLVM.BuildCondBr(_builder, condition, thenBlock, elseBlock);
-
-            // 3. Write out if body
-            LLVM.PositionBuilderAtEnd(_builder, thenBlock);
-            var ifReturned = WriteScope(conditional.IfBlock, localVariables, function, block);
-
-            if (!ifReturned)
-            {
-                if (conditional.ElseBlock == null)
-                {
-                    LLVM.BuildBr(_builder, elseBlock);
-                    LLVM.PositionBuilderAtEnd(_builder, elseBlock);
-                    return false;
-                }
-                endBlock = function.AppendBasicBlock("ifcont");
-                LLVM.BuildBr(_builder, endBlock);
-            }
-
-            LLVM.PositionBuilderAtEnd(_builder, elseBlock);
-
-            if (conditional.ElseBlock == null)
-            {
-                return false;
-            }
-
-            // 4. Write out the else if necessary
-            var elseReturned = WriteScope(conditional.ElseBlock, localVariables, function, block);
-
-            // 5. Return if both branches return
-            if (ifReturned && elseReturned)
-            {
-                return true;
-            }
-
-            // 6. Jump to end block if necessary and position builder at end block
-            if (ifReturned)
-            {
-                endBlock = function.AppendBasicBlock("ifcont");
-            }
-            if (!elseReturned)
-            {
-                LLVM.BuildBr(_builder, endBlock);
-            }
-
-            LLVM.PositionBuilderAtEnd(_builder, endBlock);
-            return false;
-        }
-
-        private bool WriteWhile(WhileAst whileAst, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function, LLVMMetadataRef block)
-        {
-            // 1. Break to the while loop
-            var whileCondition = function.AppendBasicBlock("whilecondblock");
-            LLVM.BuildBr(_builder, whileCondition);
-
-            // 2. Check condition of while loop and break if condition is not met
-            LLVM.PositionBuilderAtEnd(_builder, whileCondition);
-            var condition = BuildConditionExpression(whileAst.Condition, localVariables);
-            var whileBody = function.AppendBasicBlock("whilebody");
-            var afterWhile = function.AppendBasicBlock("afterwhile");
-            LLVM.BuildCondBr(_builder, condition, whileBody, afterWhile);
-
-            // 3. Write out while body
-            LLVM.PositionBuilderAtEnd(_builder, whileBody);
-            if (WriteScope(whileAst.Body, localVariables, function, block))
-            {
-                LLVM.DeleteBasicBlock(afterWhile);
-                return true;
-            }
-
-            // 4. Jump back to the loop
-            LLVM.BuildBr(_builder, whileCondition);
-
-            // 5. Position builder to after block
-            LLVM.PositionBuilderAtEnd(_builder, afterWhile);
-            return false;
-        }
-
-        private LLVMValueRef BuildConditionExpression(IAst expression, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
-        {
-            var (type, conditionExpression) = WriteExpression(expression, localVariables);
-            return type.PrimitiveType switch
-            {
-                IntegerType => _builder.BuildICmp(LLVMIntPredicate.LLVMIntNE, conditionExpression, LLVM.ConstInt(LLVM.TypeOf(conditionExpression), 0, 0), "ifcond"),
-                FloatType => _builder.BuildFCmp(LLVMRealPredicate.LLVMRealONE, conditionExpression, LLVM.ConstReal(LLVM.TypeOf(conditionExpression), 0), "ifcond"),
-                _ when type.Name == "*" => _builder.BuildIsNotNull(conditionExpression, "whilecond"),
-                _ => conditionExpression
-            };
-        }
-
-        private bool WriteEach(EachAst each, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function, LLVMMetadataRef block)
-        {
-            var eachVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>(localVariables);
-            if (_emitDebug)
-            {
-                var file = _debugFiles[each.FileIndex];
-                block = LLVM.DIBuilderCreateLexicalBlock(_debugBuilder, block, file, each.Line, each.Column);
-                LLVM.SetCurrentDebugLocation2(_builder, LLVM.DIBuilderCreateDebugLocation(_context, each.Line, each.Column, block, null));
-            }
-
-            // 1. Initialize each values
-            var indexVariable = _allocationQueue.Dequeue();
-            TypeDefinition iterationType = null;
-            var iterationValue = new LLVMValueRef();
-            switch (each.Iteration)
-            {
-                case IdentifierAst identifier:
-                    (iterationType, iterationValue) = localVariables[identifier.Name];
-                    break;
-                case StructFieldRefAst structField:
-                    (iterationType, iterationValue) = BuildStructField(structField, localVariables, out _, out _);
-                    break;
-                case IndexAst index:
-                    (iterationType, iterationValue) = GetIndexPointer(index, localVariables, out _);
-                    break;
-                case null:
-                    break;
-                default:
-                    var (type, value) = WriteExpression(each.Iteration, localVariables);
-                    iterationType = type;
-                    iterationValue = _allocationQueue.Dequeue();
-                    LLVM.BuildStore(_builder, value, iterationValue);
-                    break;
-            }
-
-            // 2. Initialize the first variable in the loop and the compare target
-            var arrayData = new LLVMValueRef();
-            var compareTarget = new LLVMValueRef();
-            if (each.Iteration != null)
-            {
-                if (each.IndexVariable != null)
-                {
-                    eachVariables.Add(each.IndexVariable, (_s32Type, indexVariable));
-                    if (_emitDebug)
-                    {
-                        DeclareDebugVariable(each.IndexVariable, _s32Type, each, indexVariable, block);
-                    }
-                }
-                LLVM.BuildStore(_builder, _zeroInt, indexVariable);
-
-                // Load the array data and set the compareTarget to the array count
-                if (iterationType.TypeKind == TypeKind.CArray)
-                {
-                    arrayData = iterationValue;
-                    compareTarget = LLVM.ConstInt(LLVM.Int32Type(), iterationType.ConstCount.Value, 0);
-                }
-                else
-                {
-                    var dataPointer = _builder.BuildStructGEP(iterationValue, 1, "dataptr");
-                    arrayData = _builder.BuildLoad(dataPointer, "data");
-
-                    var lengthPointer = _builder.BuildStructGEP(iterationValue, 0, "lengthptr");
-                    compareTarget = _builder.BuildLoad(lengthPointer, "length");
-                }
-            }
-            else
-            {
-                // Begin the loop at the beginning of the range
-                var (type, value) = WriteExpression(each.RangeBegin, localVariables);
-                if (_emitDebug)
-                {
-                    DeclareDebugVariable(each.IterationVariable, type, each, indexVariable, block);
-                }
-
-                LLVM.BuildStore(_builder, value, indexVariable);
-                eachVariables.Add(each.IterationVariable, (type, indexVariable));
-
-                // Get the end of the range
-                (_, compareTarget) = WriteExpression(each.RangeEnd, localVariables);
-            }
-
-            // 3. Break to the each condition loop
-            var eachCondition = function.AppendBasicBlock("eachcond");
-            LLVM.BuildBr(_builder, eachCondition);
-
-            // 4. Check condition of each loop and break if condition is not met
-            LLVM.PositionBuilderAtEnd(_builder, eachCondition);
-            var indexValue = _builder.BuildLoad(indexVariable, "curr");
-            var condition = _builder.BuildICmp(each.Iteration == null ? LLVMIntPredicate.LLVMIntSLE : LLVMIntPredicate.LLVMIntSLT, indexValue, compareTarget, "arraycmp");
-            if (each.Iteration != null)
-            {
-                var pointerIndices = iterationType.TypeKind == TypeKind.CArray ? new []{_zeroInt, indexValue} : new []{indexValue};
-                var iterationVariable = _builder.BuildGEP(arrayData, pointerIndices, each.IterationVariable);
-                eachVariables.TryAdd(each.IterationVariable, (each.IteratorType, iterationVariable));
-
-                if (_emitDebug)
-                {
-                    DeclareDebugVariable(each.IterationVariable, each.IteratorType, each, iterationVariable, block);
-                }
-            }
-
-            var eachBody = function.AppendBasicBlock("eachbody");
-            var afterEach = function.AppendBasicBlock("aftereach");
-            LLVM.BuildCondBr(_builder, condition, eachBody, afterEach);
-
-            // 5. Write out each loop body
-            LLVM.PositionBuilderAtEnd(_builder, eachBody);
-            foreach (var ast in each.Body.Children)
-            {
-                if (WriteFunctionLine(ast, eachVariables, function, block))
-                {
-                    LLVM.DeleteBasicBlock(afterEach);
-                    return true;
-                }
-            }
-
-            // 6. Increment and/or move the iteration variable
-            var nextValue = _builder.BuildAdd(indexValue, LLVM.ConstInt(LLVM.Int32Type(), 1, 0), "inc");
-            LLVM.BuildStore(_builder, nextValue, indexVariable);
-
-            // 7. Write jump to the loop
-            LLVM.BuildBr(_builder, eachCondition);
-
-            // 8. Position builder to after block
-            LLVM.PositionBuilderAtEnd(_builder, afterEach);
-            return false;
-        }
-
-        private void DeclareDebugVariable(string variableName, TypeDefinition type, IAst ast, LLVMValueRef variable, LLVMMetadataRef block)
-        {
-            using var name = new MarshaledString(variableName);
-
-            var file = _debugFiles[ast.FileIndex];
-            var debugVariable = LLVM.DIBuilderCreateAutoVariable(_debugBuilder, block, name.Value, (UIntPtr)name.Length, file, ast.Line, GetDebugType(type), 0, LLVMDIFlags.LLVMDIFlagZero, 0);
-            var expression = LLVM.DIBuilderCreateExpression(_debugBuilder, null, (UIntPtr)0);
-            var location = LLVM.GetCurrentDebugLocation2(_builder);
-
-            LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, variable, debugVariable, expression, location, _builder.InsertBlock);
-        }
-
-        private (TypeDefinition type, LLVMValueRef value) WriteExpression(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, bool getStringPointer = false)
-        {
-            switch (ast)
-            {
-                case ConstantAst constant:
-                {
-                    var type = ConvertTypeDefinition(constant.TypeDefinition);
-                    return (constant.TypeDefinition, BuildConstant(type, constant, getStringPointer));
-                }
-                case NullAst nullAst:
-                {
-                    var type = ConvertTypeDefinition(nullAst.TargetType);
-                    return (nullAst.TargetType, LLVMValueRef.CreateConstNull(type));
-                }
-                case IdentifierAst identifier:
-                {
-                    if (!localVariables.TryGetValue(identifier.Name, out var typeValue))
-                    {
-                        var typeDef = TypeTable.Types[identifier.Name];
-                        return (_s32Type, LLVMValueRef.CreateConstInt(LLVM.Int32Type(), (uint)typeDef.TypeIndex, false));
-                    }
-                    var (type, value) = typeValue;
-                    if (type.TypeKind == TypeKind.String)
-                    {
-                        if (getStringPointer)
-                        {
-                            value = _builder.BuildStructGEP(value, 1, "stringdata");
-                        }
-                        value = _builder.BuildLoad(value, identifier.Name);
-                    }
-                    else if (!type.Constant)
-                    {
-                        value = _builder.BuildLoad(value, identifier.Name);
-                    }
-                    return (type, value);
-                }
-                case StructFieldRefAst structField:
-                {
-                    if (structField.IsEnum)
-                    {
-                        var enumDef = (EnumAst)structField.Types[0];
-                        var value = enumDef.Values[structField.ValueIndices[0]].Value;
-                        return (enumDef.BaseTypeDefinition, LLVMValueRef.CreateConstInt(GetIntegerType(enumDef.BaseTypeDefinition.PrimitiveType), (ulong)value, false));
-                    }
-                    var (type, field) = BuildStructField(structField, localVariables, out var loaded, out var constant);
-                    if (!loaded && !constant)
-                    {
-                        if (getStringPointer && type.TypeKind == TypeKind.String)
-                        {
-                            field = _builder.BuildStructGEP(field, 1, "stringdata");
-                        }
-                        field = _builder.BuildLoad(field, "field");
-                    }
-                    return (type, field);
-                }
-                case CallAst call:
-                    var functions = TypeTable.Functions[call.FunctionName];
-                    LLVMValueRef function;
-                    if (call.FunctionName == "main")
-                    {
-                        function = _module.GetNamedFunction("__main");
-                    }
-                    else
-                    {
-                        var functionName = GetFunctionName(call.FunctionName, call.FunctionIndex, functions.Count);
-                        function = _module.GetNamedFunction(functionName);
-                    }
-                    var functionDef = functions[call.FunctionIndex];
-
-                    if (functionDef.Params)
-                    {
-                        var callArguments = new LLVMValueRef[functionDef.Arguments.Count];
-                        for (var i = 0; i < functionDef.Arguments.Count - 1; i++)
-                        {
-                            var value = WriteExpression(call.Arguments[i], localVariables);
-                            callArguments[i] = CastValue(value, functionDef.Arguments[i].TypeDefinition);
-                        }
-
-                        // Rollup the rest of the arguments into an array
-                        var paramsType = functionDef.Arguments[^1].TypeDefinition.Generics[0];
-                        var paramsPointer = _allocationQueue.Dequeue();
-                        InitializeConstArray(paramsPointer, (uint)(call.Arguments.Count - functionDef.Arguments.Count + 1), paramsType);
-
-                        var arrayData = _builder.BuildStructGEP(paramsPointer, 1, "arraydata");
-                        var dataPointer = _builder.BuildLoad(arrayData, "dataptr");
-
-                        uint paramsIndex = 0;
-                        for (var i = functionDef.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
-                        {
-                            var pointer = _builder.BuildGEP(dataPointer, new [] {LLVMValueRef.CreateConstInt(LLVM.Int32Type(), paramsIndex, false)}, "indexptr");
-                            var (_, value) = WriteExpression(call.Arguments[i], localVariables);
-                            LLVM.BuildStore(_builder, value, pointer);
-                        }
-
-                        var paramsValue = _builder.BuildLoad(paramsPointer, "params");
-                        callArguments[functionDef.Arguments.Count - 1] = paramsValue;
-                        return (functionDef.ReturnTypeDefinition, _builder.BuildCall(function, callArguments, string.Empty));
-                    }
-                    else if (functionDef.Varargs)
-                    {
-                        var callArguments = new LLVMValueRef[call.Arguments.Count];
-                        for (var i = 0; i < functionDef.Arguments.Count - 1; i++)
-                        {
-                            var value = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
-                            callArguments[i] = CastValue(value, functionDef.Arguments[i].TypeDefinition);
-                        }
-
-                        // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
-                        // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
-                        for (var i = functionDef.Arguments.Count - 1; i < call.Arguments.Count; i++)
-                        {
-                            var (type, value) = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
-                            if (type.Name == "float")
-                            {
-                                value = _builder.BuildFPExt(value, LLVM.DoubleType(), "tmpdouble");
-                            }
-                            callArguments[i] = value;
-                        }
-
-                        return (functionDef.ReturnTypeDefinition, _builder.BuildCall(function, callArguments, string.Empty));
-                    }
-                    else
-                    {
-                        var callArguments = new LLVMValueRef[call.Arguments.Count];
-                        for (var i = 0; i < call.Arguments.Count; i++)
-                        {
-                            var value = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
-                            callArguments[i] = CastValue(value, functionDef.Arguments[i].TypeDefinition);
-                        }
-                        return (functionDef.ReturnTypeDefinition, _builder.BuildCall(function, callArguments, string.Empty));
-                    }
-                case ChangeByOneAst changeByOne:
-                {
-                    var constant = false;
-                    var (variableType, pointer) = changeByOne.Value switch
-                    {
-                        IdentifierAst identifier => localVariables[identifier.Name],
-                        StructFieldRefAst structField => BuildStructField(structField, localVariables, out _, out constant),
-                        IndexAst index => GetIndexPointer(index, localVariables, out _),
-                        // @Cleanup This branch should never be hit
-                        _ => (null, new LLVMValueRef())
-                    };
-
-                    var value = constant ? pointer : _builder.BuildLoad(pointer, "tmpvalue");
-                    if (variableType.TypeKind == TypeKind.Pointer)
-                    {
-                        variableType = variableType.Generics[0];
-                    }
-                    var type = ConvertTypeDefinition(variableType);
-
-                    LLVMValueRef newValue;
-                    if (variableType.PrimitiveType is IntegerType)
-                    {
-                        newValue = changeByOne.Positive
-                            ? _builder.BuildAdd(value, LLVMValueRef.CreateConstInt(type, 1, false), "inc")
-                            : _builder.BuildSub(value, LLVMValueRef.CreateConstInt(type, 1, false), "dec");
-                    }
-                    else
-                    {
-                        newValue = changeByOne.Positive
-                            ? _builder.BuildFAdd(value, LLVM.ConstReal(type, 1), "incf")
-                            : _builder.BuildFSub(value, LLVM.ConstReal(type, 1), "decf");
-                    }
-
-                    if (!constant) // Values are either readonly or constants, so don't store
-                    {
-                        LLVM.BuildStore(_builder, newValue, pointer);
-                    }
-                    return changeByOne.Prefix ? (variableType, newValue) : (variableType, value);
-                }
-                case UnaryAst unary:
-                {
-                    if (unary.Operator == UnaryOperator.Reference)
-                    {
-                        var (valueType, pointer) = unary.Value switch
-                        {
-                            IdentifierAst identifier => localVariables[identifier.Name],
-                            StructFieldRefAst structField => BuildStructField(structField, localVariables, out _, out _),
-                            IndexAst index => GetIndexPointer(index, localVariables, out _),
-                            // @Cleanup this branch should not be hit
-                            _ => (null, new LLVMValueRef())
-                        };
-                        var pointerType = new TypeDefinition {Name = "*", TypeKind = TypeKind.Pointer};
-                        if (valueType.TypeKind == TypeKind.CArray)
-                        {
-                            pointerType.Generics.Add(valueType.Generics[0]);
-                            pointer = _builder.BuildBitCast(pointer, ConvertTypeDefinition(pointerType), "tmpdata");
-                        }
-                        else
-                        {
-                            pointerType.Generics.Add(valueType);
-                        }
-                        return (pointerType, pointer);
-                    }
-
-                    var (type, value) = WriteExpression(unary.Value, localVariables);
-                    return unary.Operator switch
-                    {
-                        UnaryOperator.Not => (type, _builder.BuildNot(value, "not")),
-                        UnaryOperator.Negate => type.PrimitiveType switch
-                        {
-                            IntegerType => (type, _builder.BuildNeg(value, "neg")),
-                            FloatType => (type, _builder.BuildFNeg(value, "fneg")),
-                            // @Cleanup This branch should not be hit
-                            _ => (null, new LLVMValueRef())
-                        },
-                        UnaryOperator.Dereference => (type.Generics[0], _builder.BuildLoad(value, "tmpderef")),
-                        // @Cleanup This branch should not be hit
-                        _ => (null, new LLVMValueRef())
-                    };
-                }
-                case IndexAst index:
-                {
-                    var (elementType, elementValue) = GetIndexPointer(index, localVariables, out var loaded);
-                    if (!loaded)
-                    {
-                        elementValue = _builder .BuildLoad(elementValue, "tmpindex");
-                    }
-                    return (elementType, elementValue);
-                }
-                case ExpressionAst expression:
-                    var expressionValue = WriteExpression(expression.Children[0], localVariables);
-                    for (var i = 1; i < expression.Children.Count; i++)
-                    {
-                        var rhs = WriteExpression(expression.Children[i], localVariables);
-                        expressionValue.value = BuildExpression(expressionValue, rhs, expression.Operators[i - 1], expression.ResultingTypeDefinitions[i - 1]);
-                        expressionValue.type = expression.ResultingTypeDefinitions[i - 1];
-                    }
-                    return expressionValue;
-                case TypeDefinition typeDef:
-                {
-                    var type = TypeTable.Types[typeDef.GenericName];
-                    return (_s32Type, LLVMValueRef.CreateConstInt(LLVM.Int32Type(), (uint)type.TypeIndex, false));
-                }
-                case CastAst cast:
-                {
-                    var value = WriteExpression(cast.Value, localVariables);
-                    return (cast.TargetTypeDefinition, CastValue(value, cast.TargetTypeDefinition));
-                }
-                default:
-                    // @Cleanup This branch should not be hit since we've already verified that these ASTs are handled,
-                    // but notify the user and exit just in case
-                    Console.WriteLine($"Unexpected syntax tree");
-                    Environment.Exit(ErrorCodes.BuildError);
-                    return (null, new LLVMValueRef()); // Return never happens
-            }
-        }
+        // private bool BuildAllocations(IAst ast)
+        // {
+        //     switch (ast)
+        //     {
+        //         case ReturnAst returnAst:
+        //             BuildAllocations(returnAst.Value);
+        //             return true;
+        //         case CallAst call:
+        //             BuildCallAllocations(call);
+        //             break;
+        //         case DeclarationAst declaration:
+        //             if (declaration.Constant && declaration.TypeDefinition.TypeKind != TypeKind.String) break;
+
+        //             var type = ConvertTypeDefinition(declaration.TypeDefinition);
+        //             var variable = _builder.BuildAlloca(type, declaration.Name);
+        //             _allocationQueue.Enqueue(variable);
+
+        //             if (declaration.Value != null)
+        //             {
+        //                 BuildAllocations(declaration.Value);
+        //             }
+        //             else if (declaration.TypeDefinition.TypeKind == TypeKind.Array && declaration.TypeDefinition.TypeKind != TypeKind.CArray)
+        //             {
+        //                 if (declaration.TypeDefinition.ConstCount != null)
+        //                 {
+        //                     var elementType = declaration.TypeDefinition.Generics[0];
+        //                     var targetType = ConvertTypeDefinition(elementType);
+        //                     var arrayType = LLVM.ArrayType(targetType, declaration.TypeDefinition.ConstCount.Value);
+        //                     var arrayData = _builder.BuildAlloca(arrayType, "arraydata");
+        //                     _allocationQueue.Enqueue(arrayData);
+        //                 }
+        //                 else if (declaration.TypeDefinition.Count != null)
+        //                 {
+        //                     BuildStackPointer();
+        //                 }
+        //             }
+        //             else if (declaration.TypeDefinition.TypeKind == TypeKind.Struct)
+        //             {
+        //                 BuildStructAllocations(declaration.TypeDefinition.GenericName, declaration.Assignments);
+        //             }
+        //             break;
+        //         case AssignmentAst assignment:
+        //             BuildAllocations(assignment.Value);
+        //             break;
+        //         case StructFieldRefAst structField:
+        //             for (var i = 0; i < structField.Children.Count - 1; i++)
+        //             {
+        //                 switch (structField.Children[i])
+        //                 {
+        //                     // To get the field of a call, the value needs to be stored on the stack to use GetElementPtr
+        //                     case CallAst call:
+        //                         BuildCallAllocations(call);
+        //                         if (!structField.Pointers[i])
+        //                         {
+        //                             var function = call.Function;
+        //                             var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(function.ReturnTypeDefinition), function.Name);
+        //                             _allocationQueue.Enqueue(iterationValue);
+        //                         }
+        //                         break;
+        //                     case IndexAst index:
+        //                         BuildAllocations(index.Index);
+        //                         if (index.CallsOverload && !structField.Pointers[i])
+        //                         {
+        //                             var overloadType = index.Overload.ReturnTypeDefinition;
+        //                             var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(overloadType), overloadType.GenericName);
+        //                             _allocationQueue.Enqueue(iterationValue);
+        //                         }
+        //                         break;
+        //                 }
+        //             }
+        //             break;
+        //         case ScopeAst scope:
+        //             return BuildAllocations(scope.Children);
+        //         case ConditionalAst conditional:
+        //             BuildAllocations(conditional.Condition);
+        //             var ifReturned = BuildAllocations(conditional.IfBlock.Children);
+
+        //             if (conditional.ElseBlock != null)
+        //             {
+        //                 var elseReturned = BuildAllocations(conditional.ElseBlock.Children);
+        //                 return ifReturned && elseReturned;
+        //             }
+        //             break;
+        //         case WhileAst whileAst:
+        //             BuildAllocations(whileAst.Condition);
+        //             return BuildAllocations(whileAst.Body.Children);
+        //         case EachAst each:
+        //             var indexVariable = _builder.BuildAlloca(LLVM.Int32Type(), each.IterationVariable);
+        //             _allocationQueue.Enqueue(indexVariable);
+
+        //             switch (each.Iteration)
+        //             {
+        //                 // To get the field of a call, the value needs to be stored on the stack to use GetElementPtr
+        //                 // @PotentialBug I can't really think of other cases that would fall under here, but this may
+        //                 // become an issue if there are some new ways to create arrays
+        //                 case CallAst call:
+        //                 {
+        //                     BuildCallAllocations(call);
+        //                     var function = call.Function;
+        //                     var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(function.ReturnTypeDefinition), function.Name);
+        //                     _allocationQueue.Enqueue(iterationValue);
+        //                     break;
+        //                 }
+        //                 case StructFieldRefAst structField:
+        //                     switch (structField.Children[0])
+        //                     {
+        //                         // To get the field of a call, the value needs to be stored on the stack to use GetElementPtr
+        //                         case CallAst call:
+        //                             BuildCallAllocations(call);
+        //                             if (!structField.Pointers[0])
+        //                             {
+        //                                 var function = call.Function;
+        //                                 var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(function.ReturnTypeDefinition), function.Name);
+        //                                 _allocationQueue.Enqueue(iterationValue);
+        //                             }
+        //                             break;
+        //                     }
+        //                     break;
+        //             }
+
+        //             return BuildAllocations(each.Body.Children);
+        //         case ExpressionAst expression:
+        //             BuildAllocations(expression.Children);
+        //             break;
+        //         case IndexAst index:
+        //             BuildAllocations(index.Index);
+        //             break;
+        //     }
+        //     return false;
+        // }
+
+        // private bool BuildAllocations(List<IAst> children)
+        // {
+        //     foreach (var ast in children)
+        //     {
+        //         if (BuildAllocations(ast))
+        //         {
+        //             return true;
+        //         }
+        //     }
+        //     return false;
+        // }
+
+        // private void BuildCallAllocations(CallAst call)
+        // {
+        //     if (call.Function.Params)
+        //     {
+        //         var functionDef = call.Function;
+
+        //         var paramsTypeDef = functionDef.Arguments[^1].TypeDefinition;
+        //         var paramsType = ConvertTypeDefinition(paramsTypeDef);
+
+        //         var paramsVariable = _builder.BuildAlloca(paramsType, "params");
+        //         _allocationQueue.Enqueue(paramsVariable);
+
+        //         var targetType = ConvertTypeDefinition(paramsTypeDef);
+        //         var arrayType = LLVM.ArrayType(targetType, (uint)(call.Arguments.Count - functionDef.Arguments.Count + 1));
+        //         var arrayData = _builder.BuildAlloca(arrayType, "arraydata");
+        //         _allocationQueue.Enqueue(arrayData);
+        //     }
+
+        //     foreach (var argument in call.Arguments)
+        //     {
+        //         BuildAllocations(argument);
+        //     }
+        // }
+
+        // private void BuildStructAllocations(string name, Dictionary<string, AssignmentAst> assignments = null)
+        // {
+        //     var structDef = TypeTable.Types[name] as StructAst;
+        //     if (assignments == null)
+        //     {
+        //         foreach (var field in structDef!.Fields)
+        //         {
+        //             BuildFieldAllocations(field);
+        //         }
+        //     }
+        //     else
+        //     {
+        //         foreach (var field in structDef!.Fields)
+        //         {
+        //             if (assignments.TryGetValue(field.Name, out var assignment))
+        //             {
+        //                 BuildAllocations(assignment.Value);
+        //             }
+        //             else
+        //             {
+        //                 BuildFieldAllocations(field);
+        //             }
+        //         }
+        //     }
+        // }
+
+        // private void BuildFieldAllocations(StructFieldAst field)
+        // {
+        //     if (field.TypeDefinition.TypeKind == TypeKind.Array && field.TypeDefinition.TypeKind != TypeKind.CArray && field.TypeDefinition.ConstCount != null)
+        //     {
+        //         var elementType = field.TypeDefinition.Generics[0];
+        //         var targetType = ConvertTypeDefinition(elementType);
+
+        //         var count = field.TypeDefinition.ConstCount.Value;
+        //         var arrayType = LLVM.ArrayType(targetType, count);
+        //         var arrayData = _builder.BuildAlloca(arrayType, "arraydata");
+        //         _allocationQueue.Enqueue(arrayData);
+        //     }
+        //     else if (field.TypeDefinition.TypeKind == TypeKind.Struct)
+        //     {
+        //         BuildStructAllocations(field.TypeDefinition.GenericName);
+        //     }
+        // }
+
+        // private bool WriteFunctionLine(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function, LLVMMetadataRef block)
+        // {
+        //     if (_emitDebug)
+        //     {
+        //         LLVM.SetCurrentDebugLocation2(_builder, LLVM.DIBuilderCreateDebugLocation(_context, ast.Line, ast.Column, block, null));
+        //     }
+
+        //     switch (ast)
+        //     {
+        //         case ReturnAst returnAst:
+        //             WriteReturnStatement(returnAst, localVariables);
+        //             return true;
+        //         case DeclarationAst declaration:
+        //             WriteDeclaration(declaration, localVariables, block);
+        //             break;
+        //         case AssignmentAst assignment:
+        //             WriteAssignment(assignment, localVariables);
+        //             break;
+        //         case ScopeAst scope:
+        //             return WriteScope(scope, localVariables, function, block);
+        //         case ConditionalAst conditional:
+        //             return WriteConditional(conditional, localVariables, function, block);
+        //         case WhileAst whileAst:
+        //             return WriteWhile(whileAst, localVariables, function, block);
+        //         case EachAst each:
+        //             return WriteEach(each, localVariables, function, block);
+        //         case BreakAst:
+        //         case ContinueAst:
+        //             break;
+        //         default:
+        //             WriteExpression(ast, localVariables);
+        //             break;
+        //     }
+        //     return false;
+        // }
+
+        // private void WriteReturnStatement(ReturnAst returnAst, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
+        // {
+        //     // 1. Return void if the value is null
+        //     if (returnAst.Value == null)
+        //     {
+        //         LLVM.BuildRetVoid(_builder);
+        //         return;
+        //     }
+
+        //     // 2. Get the return value
+        //     var returnExpression = WriteExpression(returnAst.Value, localVariables);
+
+        //     // 3. Write expression as return value
+        //     var returnValue = CastValue(returnExpression, _currentFunction.ReturnTypeDefinition);
+
+        //     // 4. Restore the stack pointer if necessary and return
+        //     BuildStackRestore();
+        //     LLVM.BuildRet(_builder, returnValue);
+        // }
+
+        // private void WriteDeclaration(DeclarationAst declaration, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMMetadataRef block)
+        // {
+        //     // 1. Declare variable on the stack
+        //     if (declaration.Constant)
+        //     {
+        //         var (_, value) = WriteExpression(declaration.Value, localVariables);
+
+        //         if (declaration.TypeDefinition.TypeKind == TypeKind.String)
+        //         {
+        //             var stringVariable = _allocationQueue.Dequeue();
+        //             LLVM.BuildStore(_builder, value, stringVariable);
+        //             value = stringVariable;
+        //         }
+
+        //         localVariables.Add(declaration.Name, (declaration.TypeDefinition, value));
+        //         return;
+        //     }
+
+        //     var variable = _allocationQueue.Dequeue();
+        //     localVariables.Add(declaration.Name, (declaration.TypeDefinition, variable));
+        //     if (_emitDebug)
+        //     {
+        //         DeclareDebugVariable(declaration.Name, declaration.TypeDefinition, declaration, variable, block);
+        //     }
+
+        //     // 2. Set value if it exists
+        //     if (declaration.Value != null)
+        //     {
+        //         var expression = WriteExpression(declaration.Value, localVariables);
+        //         var value = CastValue(expression, declaration.TypeDefinition);
+
+        //         LLVM.BuildStore(_builder, value, variable);
+        //         return;
+        //     }
+
+        //     switch (declaration.TypeDefinition.TypeKind)
+        //     {
+        //         // Initialize arrays
+        //         case TypeKind.Array:
+        //             var elementType = declaration.TypeDefinition.Generics[0];
+        //             if (declaration.TypeDefinition.ConstCount != null)
+        //             {
+        //                 var arrayPointer = InitializeConstArray(variable, declaration.TypeDefinition.ConstCount.Value, elementType);
+
+        //                 if (declaration.ArrayValues != null)
+        //                 {
+        //                     InitializeArrayValues(arrayPointer, elementType, declaration.ArrayValues, localVariables);
+        //                 }
+        //             }
+        //             else if (declaration.TypeDefinition.Count != null)
+        //             {
+        //                 BuildStackSave();
+        //                 var (_, count) = WriteExpression(declaration.TypeDefinition.Count, localVariables);
+
+        //                 var countPointer = _builder.BuildStructGEP(variable, 0, "countptr");
+        //                 LLVM.BuildStore(_builder, count, countPointer);
+
+        //                 var targetType = ConvertTypeDefinition(elementType);
+        //                 var arrayData = _builder.BuildArrayAlloca(targetType, count, "arraydata");
+        //                 var dataPointer = _builder.BuildStructGEP(variable, 1, "dataptr");
+        //                 LLVM.BuildStore(_builder, arrayData, dataPointer);
+        //             }
+        //             else
+        //             {
+        //                 var countPointer = _builder.BuildStructGEP(variable, 0, "countptr");
+        //                 LLVM.BuildStore(_builder, _zeroInt, countPointer);
+        //             }
+        //             break;
+        //         case TypeKind.CArray:
+        //             if (declaration.ArrayValues != null)
+        //             {
+        //                 InitializeArrayValues(variable, declaration.TypeDefinition.Generics[0], declaration.ArrayValues, localVariables);
+        //             }
+        //             break;
+        //         // Initialize struct field default values
+        //         case TypeKind.Struct:
+        //         case TypeKind.String:
+        //             InitializeStruct(declaration.TypeDefinition, variable, localVariables, declaration.Assignments);
+        //             break;
+        //         // Initialize pointers to null
+        //         case TypeKind.Pointer:
+        //             var nullValue = LLVM.ConstNull(ConvertTypeDefinition(declaration.TypeDefinition));
+        //             LLVM.BuildStore(_builder, nullValue, variable);
+        //             break;
+        //         // Or initialize to 0
+        //         default:
+        //             var zero = GetConstZero(ConvertTypeDefinition(declaration.TypeDefinition));
+        //             LLVM.BuildStore(_builder, zero, variable);
+        //             break;
+        //     }
+        // }
+
+        // private void InitializeArrayValues(LLVMValueRef arrayPointer, TypeDefinition elementType, List<IAst> arrayValues, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
+        // {
+        //     for (var i = 0; i < arrayValues.Count; i++)
+        //     {
+        //         var value = WriteExpression(arrayValues[i], localVariables);
+
+        //         var index = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), (uint)i, false);
+        //         var pointer = _builder.BuildGEP(arrayPointer, new []{_zeroInt, index}, "dataptr");
+
+        //         LLVM.BuildStore(_builder, CastValue(value, elementType), pointer);
+        //     }
+        // }
+
+        // private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, Dictionary<string, AssignmentAst> assignments)
+        // {
+        //     var structDef = TypeTable.Types[typeDef.GenericName] as StructAst;
+        //     if (assignments == null)
+        //     {
+        //         for (var i = 0; i < structDef!.Fields.Count; i++)
+        //         {
+        //             var field = structDef.Fields[i];
+
+        //             var fieldPointer = _builder.BuildStructGEP(variable, (uint)i, field.Name);
+
+        //             InitializeField(field, fieldPointer, localVariables);
+        //         }
+        //     }
+        //     else
+        //     {
+        //         for (var i = 0; i < structDef!.Fields.Count; i++)
+        //         {
+        //             var field = structDef.Fields[i];
+
+        //             var fieldPointer = _builder.BuildStructGEP(variable, (uint)i, field.Name);
+
+        //             if (assignments.TryGetValue(field.Name, out var assignment))
+        //             {
+        //                 var expression = WriteExpression(assignment.Value, localVariables);
+        //                 var value = CastValue(expression, field.TypeDefinition);
+
+        //                 LLVM.BuildStore(_builder, value, fieldPointer);
+        //             }
+        //             else
+        //             {
+        //                 InitializeField(field, fieldPointer, localVariables);
+        //             }
+        //         }
+        //     }
+        // }
+
+        // private void InitializeField(StructFieldAst field, LLVMValueRef fieldPointer, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
+        // {
+        //     switch (field.TypeDefinition.TypeKind)
+        //     {
+        //         case TypeKind.Array:
+        //             var elementType = field.TypeDefinition.Generics[0];
+        //             if (field.TypeDefinition.ConstCount != null)
+        //             {
+        //                 var arrayPointer = InitializeConstArray(fieldPointer, field.TypeDefinition.ConstCount.Value, elementType);
+
+        //                 if (field.ArrayValues != null)
+        //                 {
+        //                     InitializeArrayValues(arrayPointer, elementType, field.ArrayValues, localVariables);
+        //                 }
+        //             }
+        //             else
+        //             {
+        //                 var countPointer = _builder.BuildStructGEP(fieldPointer, 0, "countptr");
+        //                 LLVM.BuildStore(_builder, _zeroInt, countPointer);
+        //             }
+        //             break;
+        //         case TypeKind.CArray:
+        //             if (field.ArrayValues != null)
+        //             {
+        //                 InitializeArrayValues(fieldPointer, field.TypeDefinition.Generics[0], field.ArrayValues, localVariables);
+        //             }
+        //             break;
+        //         case TypeKind.Pointer:
+        //             var type = ConvertTypeDefinition(field.TypeDefinition);
+        //             LLVM.BuildStore(_builder, LLVM.ConstNull(type), fieldPointer);
+        //             break;
+        //         case TypeKind.Struct:
+        //             InitializeStruct(field.TypeDefinition, fieldPointer, localVariables, field.Assignments);
+        //             break;
+        //         default:
+        //             LLVMValueRef value;
+        //             if (field.Value != null)
+        //             {
+        //                 (_, value) = WriteExpression(field.Value, localVariables);
+        //             }
+        //             else
+        //             {
+        //                 var fieldType = ConvertTypeDefinition(field.TypeDefinition);
+        //                 value = GetConstZero(fieldType);
+        //             }
+        //             LLVM.BuildStore(_builder, value, fieldPointer);
+        //             break;
+        //     }
+        // }
+
+        // private LLVMValueRef InitializeConstArray(LLVMValueRef array, uint length, TypeDefinition arrayType)
+        // {
+        //     // 1. Set the count field
+        //     var countValue = LLVM.ConstInt(LLVM.Int32Type(), (ulong)length, 0);
+        //     var countPointer = _builder.BuildStructGEP(array, 0, "countptr");
+        //     LLVM.BuildStore(_builder, countValue, countPointer);
+
+        //     // 2. Initialize the array data
+        //     var targetType = ConvertTypeDefinition(arrayType);
+        //     var arrayData = _allocationQueue.Dequeue();
+        //     var arrayDataPointer = _builder.BuildBitCast(arrayData, LLVM.PointerType(targetType, 0), "tmpdata");
+        //     var dataPointer = _builder.BuildStructGEP(array, 1, "dataptr");
+        //     LLVM.BuildStore(_builder, arrayDataPointer, dataPointer);
+
+        //     return arrayData;
+        // }
+
+        // private static LLVMValueRef GetConstZero(LLVMTypeRef type)
+        // {
+        //     return LLVM.GetTypeKind(type) switch
+        //     {
+        //         LLVMTypeKind.LLVMIntegerTypeKind => LLVM.ConstInt(type, 0, 0),
+        //         LLVMTypeKind.LLVMFloatTypeKind => LLVM.ConstReal(type, 0),
+        //         LLVMTypeKind.LLVMDoubleTypeKind => LLVM.ConstReal(type, 0),
+        //         _ => LLVM.ConstInt(type, 0, 0)
+        //     };
+        // }
+
+        // private void WriteAssignment(AssignmentAst assignment, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
+        // {
+        //     // 1. Get the variable on the stack
+        //     var loaded = false;
+        //     var constant = false;
+        //     var (type, variable) = assignment.Reference switch
+        //     {
+        //         IdentifierAst identifier => localVariables[identifier.Name],
+        //         StructFieldRefAst structField => BuildStructField(structField, localVariables, out loaded, out constant),
+        //         IndexAst index => GetIndexPointer(index, localVariables, out loaded),
+        //         UnaryAst unary => WriteExpression(unary.Value, localVariables),
+        //         // @Cleanup This branch should never be hit
+        //         _ => (null, new LLVMValueRef())
+        //     };
+        //     if (loaded && type.TypeKind == TypeKind.Pointer)
+        //     {
+        //         type = type.Generics[0];
+        //     }
+        //     else if (assignment.Reference is UnaryAst)
+        //     {
+        //         type = type.Generics[0];
+        //     }
+
+        //     // 2. Evaluate the expression value
+        //     var expression = WriteExpression(assignment.Value, localVariables);
+        //     if (assignment.Operator != Operator.None && !constant)
+        //     {
+        //         // 2a. Build expression with variable value as the LHS
+        //         var value = _builder.BuildLoad(variable, "tmpvalue");
+        //         expression.value = BuildExpression((type, value), expression, assignment.Operator, type);
+        //         expression.type = type; // The type should now be the type of the variable
+        //     }
+
+        //     // 3. Reallocate the value of the variable
+        //     var assignmentValue = CastValue(expression, type);
+        //     if (!constant) // Values are either readonly or constants, so don't store
+        //     {
+        //         LLVM.BuildStore(_builder, assignmentValue, variable);
+        //     }
+        // }
+
+        // private bool WriteScope(ScopeAst scope, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function, LLVMMetadataRef block)
+        // {
+        //     if (!scope.Children.Any()) return false;
+
+        //     // 1. Create scope variables
+        //     var scopeVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>(localVariables);
+
+        //     // 2. Write function lines
+        //     if (_emitDebug)
+        //     {
+        //         var file = _debugFiles[scope.FileIndex];
+        //         block = LLVM.DIBuilderCreateLexicalBlock(_debugBuilder, block, file, scope.Line, scope.Column);
+        //     }
+        //     foreach (var ast in scope.Children)
+        //     {
+        //         if (WriteFunctionLine(ast, scopeVariables, function, block))
+        //         {
+        //             return true;
+        //         }
+        //     }
+        //     return false;
+        // }
+
+        // private bool WriteConditional(ConditionalAst conditional, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function, LLVMMetadataRef block)
+        // {
+        //     // 1. Write out the condition
+        //     var condition = BuildConditionExpression(conditional.Condition, localVariables);
+
+        //     // 2. Write out the condition jump and blocks
+        //     var thenBlock = function.AppendBasicBlock("then");
+        //     var elseBlock = function.AppendBasicBlock("else");
+        //     var endBlock = new LLVMBasicBlockRef();
+        //     LLVM.BuildCondBr(_builder, condition, thenBlock, elseBlock);
+
+        //     // 3. Write out if body
+        //     LLVM.PositionBuilderAtEnd(_builder, thenBlock);
+        //     var ifReturned = WriteScope(conditional.IfBlock, localVariables, function, block);
+
+        //     if (!ifReturned)
+        //     {
+        //         if (conditional.ElseBlock == null)
+        //         {
+        //             LLVM.BuildBr(_builder, elseBlock);
+        //             LLVM.PositionBuilderAtEnd(_builder, elseBlock);
+        //             return false;
+        //         }
+        //         endBlock = function.AppendBasicBlock("ifcont");
+        //         LLVM.BuildBr(_builder, endBlock);
+        //     }
+
+        //     LLVM.PositionBuilderAtEnd(_builder, elseBlock);
+
+        //     if (conditional.ElseBlock == null)
+        //     {
+        //         return false;
+        //     }
+
+        //     // 4. Write out the else if necessary
+        //     var elseReturned = WriteScope(conditional.ElseBlock, localVariables, function, block);
+
+        //     // 5. Return if both branches return
+        //     if (ifReturned && elseReturned)
+        //     {
+        //         return true;
+        //     }
+
+        //     // 6. Jump to end block if necessary and position builder at end block
+        //     if (ifReturned)
+        //     {
+        //         endBlock = function.AppendBasicBlock("ifcont");
+        //     }
+        //     if (!elseReturned)
+        //     {
+        //         LLVM.BuildBr(_builder, endBlock);
+        //     }
+
+        //     LLVM.PositionBuilderAtEnd(_builder, endBlock);
+        //     return false;
+        // }
+
+        // private bool WriteWhile(WhileAst whileAst, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function, LLVMMetadataRef block)
+        // {
+        //     // 1. Break to the while loop
+        //     var whileCondition = function.AppendBasicBlock("whilecondblock");
+        //     LLVM.BuildBr(_builder, whileCondition);
+
+        //     // 2. Check condition of while loop and break if condition is not met
+        //     LLVM.PositionBuilderAtEnd(_builder, whileCondition);
+        //     var condition = BuildConditionExpression(whileAst.Condition, localVariables);
+        //     var whileBody = function.AppendBasicBlock("whilebody");
+        //     var afterWhile = function.AppendBasicBlock("afterwhile");
+        //     LLVM.BuildCondBr(_builder, condition, whileBody, afterWhile);
+
+        //     // 3. Write out while body
+        //     LLVM.PositionBuilderAtEnd(_builder, whileBody);
+        //     if (WriteScope(whileAst.Body, localVariables, function, block))
+        //     {
+        //         LLVM.DeleteBasicBlock(afterWhile);
+        //         return true;
+        //     }
+
+        //     // 4. Jump back to the loop
+        //     LLVM.BuildBr(_builder, whileCondition);
+
+        //     // 5. Position builder to after block
+        //     LLVM.PositionBuilderAtEnd(_builder, afterWhile);
+        //     return false;
+        // }
+
+        // private LLVMValueRef BuildConditionExpression(IAst expression, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
+        // {
+        //     var (type, conditionExpression) = WriteExpression(expression, localVariables);
+        //     return type.PrimitiveType switch
+        //     {
+        //         IntegerType => _builder.BuildICmp(LLVMIntPredicate.LLVMIntNE, conditionExpression, LLVM.ConstInt(LLVM.TypeOf(conditionExpression), 0, 0), "ifcond"),
+        //         FloatType => _builder.BuildFCmp(LLVMRealPredicate.LLVMRealONE, conditionExpression, LLVM.ConstReal(LLVM.TypeOf(conditionExpression), 0), "ifcond"),
+        //         _ when type.Name == "*" => _builder.BuildIsNotNull(conditionExpression, "whilecond"),
+        //         _ => conditionExpression
+        //     };
+        // }
+
+        // private bool WriteEach(EachAst each, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function, LLVMMetadataRef block)
+        // {
+        //     var eachVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>(localVariables);
+        //     if (_emitDebug)
+        //     {
+        //         var file = _debugFiles[each.FileIndex];
+        //         block = LLVM.DIBuilderCreateLexicalBlock(_debugBuilder, block, file, each.Line, each.Column);
+        //         LLVM.SetCurrentDebugLocation2(_builder, LLVM.DIBuilderCreateDebugLocation(_context, each.Line, each.Column, block, null));
+        //     }
+
+        //     // 1. Initialize each values
+        //     var indexVariable = _allocationQueue.Dequeue();
+        //     TypeDefinition iterationType = null;
+        //     var iterationValue = new LLVMValueRef();
+        //     switch (each.Iteration)
+        //     {
+        //         case IdentifierAst identifier:
+        //             (iterationType, iterationValue) = localVariables[identifier.Name];
+        //             break;
+        //         case StructFieldRefAst structField:
+        //             (iterationType, iterationValue) = BuildStructField(structField, localVariables, out _, out _);
+        //             break;
+        //         case IndexAst index:
+        //             (iterationType, iterationValue) = GetIndexPointer(index, localVariables, out _);
+        //             break;
+        //         case null:
+        //             break;
+        //         default:
+        //             var (type, value) = WriteExpression(each.Iteration, localVariables);
+        //             iterationType = type;
+        //             iterationValue = _allocationQueue.Dequeue();
+        //             LLVM.BuildStore(_builder, value, iterationValue);
+        //             break;
+        //     }
+
+        //     // 2. Initialize the first variable in the loop and the compare target
+        //     var arrayData = new LLVMValueRef();
+        //     var compareTarget = new LLVMValueRef();
+        //     if (each.Iteration != null)
+        //     {
+        //         if (each.IndexVariable != null)
+        //         {
+        //             eachVariables.Add(each.IndexVariable, (_s32Type, indexVariable));
+        //             if (_emitDebug)
+        //             {
+        //                 DeclareDebugVariable(each.IndexVariable, _s32Type, each, indexVariable, block);
+        //             }
+        //         }
+        //         LLVM.BuildStore(_builder, _zeroInt, indexVariable);
+
+        //         // Load the array data and set the compareTarget to the array count
+        //         if (iterationType.TypeKind == TypeKind.CArray)
+        //         {
+        //             arrayData = iterationValue;
+        //             compareTarget = LLVM.ConstInt(LLVM.Int32Type(), iterationType.ConstCount.Value, 0);
+        //         }
+        //         else
+        //         {
+        //             var dataPointer = _builder.BuildStructGEP(iterationValue, 1, "dataptr");
+        //             arrayData = _builder.BuildLoad(dataPointer, "data");
+
+        //             var lengthPointer = _builder.BuildStructGEP(iterationValue, 0, "lengthptr");
+        //             compareTarget = _builder.BuildLoad(lengthPointer, "length");
+        //         }
+        //     }
+        //     else
+        //     {
+        //         // Begin the loop at the beginning of the range
+        //         var (type, value) = WriteExpression(each.RangeBegin, localVariables);
+        //         if (_emitDebug)
+        //         {
+        //             DeclareDebugVariable(each.IterationVariable, type, each, indexVariable, block);
+        //         }
+
+        //         LLVM.BuildStore(_builder, value, indexVariable);
+        //         eachVariables.Add(each.IterationVariable, (type, indexVariable));
+
+        //         // Get the end of the range
+        //         (_, compareTarget) = WriteExpression(each.RangeEnd, localVariables);
+        //     }
+
+        //     // 3. Break to the each condition loop
+        //     var eachCondition = function.AppendBasicBlock("eachcond");
+        //     LLVM.BuildBr(_builder, eachCondition);
+
+        //     // 4. Check condition of each loop and break if condition is not met
+        //     LLVM.PositionBuilderAtEnd(_builder, eachCondition);
+        //     var indexValue = _builder.BuildLoad(indexVariable, "curr");
+        //     var condition = _builder.BuildICmp(each.Iteration == null ? LLVMIntPredicate.LLVMIntSLE : LLVMIntPredicate.LLVMIntSLT, indexValue, compareTarget, "arraycmp");
+        //     if (each.Iteration != null)
+        //     {
+        //         var pointerIndices = iterationType.TypeKind == TypeKind.CArray ? new []{_zeroInt, indexValue} : new []{indexValue};
+        //         var iterationVariable = _builder.BuildGEP(arrayData, pointerIndices, each.IterationVariable);
+        //         eachVariables.TryAdd(each.IterationVariable, (each.IteratorType, iterationVariable));
+
+        //         if (_emitDebug)
+        //         {
+        //             DeclareDebugVariable(each.IterationVariable, each.IteratorType, each, iterationVariable, block);
+        //         }
+        //     }
+
+        //     var eachBody = function.AppendBasicBlock("eachbody");
+        //     var afterEach = function.AppendBasicBlock("aftereach");
+        //     LLVM.BuildCondBr(_builder, condition, eachBody, afterEach);
+
+        //     // 5. Write out each loop body
+        //     LLVM.PositionBuilderAtEnd(_builder, eachBody);
+        //     foreach (var ast in each.Body.Children)
+        //     {
+        //         if (WriteFunctionLine(ast, eachVariables, function, block))
+        //         {
+        //             LLVM.DeleteBasicBlock(afterEach);
+        //             return true;
+        //         }
+        //     }
+
+        //     // 6. Increment and/or move the iteration variable
+        //     var nextValue = _builder.BuildAdd(indexValue, LLVM.ConstInt(LLVM.Int32Type(), 1, 0), "inc");
+        //     LLVM.BuildStore(_builder, nextValue, indexVariable);
+
+        //     // 7. Write jump to the loop
+        //     LLVM.BuildBr(_builder, eachCondition);
+
+        //     // 8. Position builder to after block
+        //     LLVM.PositionBuilderAtEnd(_builder, afterEach);
+        //     return false;
+        // }
+
+        // private void DeclareDebugVariable(string variableName, TypeDefinition type, IAst ast, LLVMValueRef variable, LLVMMetadataRef block)
+        // {
+        //     using var name = new MarshaledString(variableName);
+
+        //     var file = _debugFiles[ast.FileIndex];
+        //     var debugVariable = LLVM.DIBuilderCreateAutoVariable(_debugBuilder, block, name.Value, (UIntPtr)name.Length, file, ast.Line, GetDebugType(type), 0, LLVMDIFlags.LLVMDIFlagZero, 0);
+        //     var expression = LLVM.DIBuilderCreateExpression(_debugBuilder, null, (UIntPtr)0);
+        //     var location = LLVM.GetCurrentDebugLocation2(_builder);
+
+        //     LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, variable, debugVariable, expression, location, _builder.InsertBlock);
+        // }
+
+        // private (TypeDefinition type, LLVMValueRef value) WriteExpression(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, bool getStringPointer = false)
+        // {
+        //     switch (ast)
+        //     {
+        //         case ConstantAst constant:
+        //         {
+        //             var type = ConvertTypeDefinition(constant.TypeDefinition);
+        //             return (constant.TypeDefinition, BuildConstant(type, constant, getStringPointer));
+        //         }
+        //         case NullAst nullAst:
+        //         {
+        //             var type = ConvertTypeDefinition(nullAst.TargetType);
+        //             return (nullAst.TargetType, LLVMValueRef.CreateConstNull(type));
+        //         }
+        //         case IdentifierAst identifier:
+        //         {
+        //             if (!localVariables.TryGetValue(identifier.Name, out var typeValue))
+        //             {
+        //                 var typeDef = TypeTable.Types[identifier.Name];
+        //                 return (_s32Type, LLVMValueRef.CreateConstInt(LLVM.Int32Type(), (uint)typeDef.TypeIndex, false));
+        //             }
+        //             var (type, value) = typeValue;
+        //             if (type.TypeKind == TypeKind.String)
+        //             {
+        //                 if (getStringPointer)
+        //                 {
+        //                     value = _builder.BuildStructGEP(value, 1, "stringdata");
+        //                 }
+        //                 value = _builder.BuildLoad(value, identifier.Name);
+        //             }
+        //             else if (!type.Constant)
+        //             {
+        //                 value = _builder.BuildLoad(value, identifier.Name);
+        //             }
+        //             return (type, value);
+        //         }
+        //         case StructFieldRefAst structField:
+        //         {
+        //             if (structField.IsEnum)
+        //             {
+        //                 var enumDef = (EnumAst)structField.Types[0];
+        //                 var value = enumDef.Values[structField.ValueIndices[0]].Value;
+        //                 return (enumDef.BaseTypeDefinition, LLVMValueRef.CreateConstInt(GetIntegerType(enumDef.BaseTypeDefinition.PrimitiveType), (ulong)value, false));
+        //             }
+        //             var (type, field) = BuildStructField(structField, localVariables, out var loaded, out var constant);
+        //             if (!loaded && !constant)
+        //             {
+        //                 if (getStringPointer && type.TypeKind == TypeKind.String)
+        //                 {
+        //                     field = _builder.BuildStructGEP(field, 1, "stringdata");
+        //                 }
+        //                 field = _builder.BuildLoad(field, "field");
+        //             }
+        //             return (type, field);
+        //         }
+        //         case CallAst call:
+        //             var functions = TypeTable.Functions[call.FunctionName];
+        //             LLVMValueRef function;
+        //             if (call.FunctionName == "main")
+        //             {
+        //                 function = _module.GetNamedFunction("__main");
+        //             }
+        //             else
+        //             {
+        //                 var functionName = GetFunctionName(call.FunctionName, call.FunctionIndex, functions.Count);
+        //                 function = _module.GetNamedFunction(functionName);
+        //             }
+        //             var functionDef = functions[call.FunctionIndex];
+
+        //             if (functionDef.Params)
+        //             {
+        //                 var callArguments = new LLVMValueRef[functionDef.Arguments.Count];
+        //                 for (var i = 0; i < functionDef.Arguments.Count - 1; i++)
+        //                 {
+        //                     var value = WriteExpression(call.Arguments[i], localVariables);
+        //                     callArguments[i] = CastValue(value, functionDef.Arguments[i].TypeDefinition);
+        //                 }
+
+        //                 // Rollup the rest of the arguments into an array
+        //                 var paramsType = functionDef.Arguments[^1].TypeDefinition.Generics[0];
+        //                 var paramsPointer = _allocationQueue.Dequeue();
+        //                 InitializeConstArray(paramsPointer, (uint)(call.Arguments.Count - functionDef.Arguments.Count + 1), paramsType);
+
+        //                 var arrayData = _builder.BuildStructGEP(paramsPointer, 1, "arraydata");
+        //                 var dataPointer = _builder.BuildLoad(arrayData, "dataptr");
+
+        //                 uint paramsIndex = 0;
+        //                 for (var i = functionDef.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
+        //                 {
+        //                     var pointer = _builder.BuildGEP(dataPointer, new [] {LLVMValueRef.CreateConstInt(LLVM.Int32Type(), paramsIndex, false)}, "indexptr");
+        //                     var (_, value) = WriteExpression(call.Arguments[i], localVariables);
+        //                     LLVM.BuildStore(_builder, value, pointer);
+        //                 }
+
+        //                 var paramsValue = _builder.BuildLoad(paramsPointer, "params");
+        //                 callArguments[functionDef.Arguments.Count - 1] = paramsValue;
+        //                 return (functionDef.ReturnTypeDefinition, _builder.BuildCall(function, callArguments, string.Empty));
+        //             }
+        //             else if (functionDef.Varargs)
+        //             {
+        //                 var callArguments = new LLVMValueRef[call.Arguments.Count];
+        //                 for (var i = 0; i < functionDef.Arguments.Count - 1; i++)
+        //                 {
+        //                     var value = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
+        //                     callArguments[i] = CastValue(value, functionDef.Arguments[i].TypeDefinition);
+        //                 }
+
+        //                 // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
+        //                 // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
+        //                 for (var i = functionDef.Arguments.Count - 1; i < call.Arguments.Count; i++)
+        //                 {
+        //                     var (type, value) = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
+        //                     if (type.Name == "float")
+        //                     {
+        //                         value = _builder.BuildFPExt(value, LLVM.DoubleType(), "tmpdouble");
+        //                     }
+        //                     callArguments[i] = value;
+        //                 }
+
+        //                 return (functionDef.ReturnTypeDefinition, _builder.BuildCall(function, callArguments, string.Empty));
+        //             }
+        //             else
+        //             {
+        //                 var callArguments = new LLVMValueRef[call.Arguments.Count];
+        //                 for (var i = 0; i < call.Arguments.Count; i++)
+        //                 {
+        //                     var value = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
+        //                     callArguments[i] = CastValue(value, functionDef.Arguments[i].TypeDefinition);
+        //                 }
+        //                 return (functionDef.ReturnTypeDefinition, _builder.BuildCall(function, callArguments, string.Empty));
+        //             }
+        //         case ChangeByOneAst changeByOne:
+        //         {
+        //             var constant = false;
+        //             var (variableType, pointer) = changeByOne.Value switch
+        //             {
+        //                 IdentifierAst identifier => localVariables[identifier.Name],
+        //                 StructFieldRefAst structField => BuildStructField(structField, localVariables, out _, out constant),
+        //                 IndexAst index => GetIndexPointer(index, localVariables, out _),
+        //                 // @Cleanup This branch should never be hit
+        //                 _ => (null, new LLVMValueRef())
+        //             };
+
+        //             var value = constant ? pointer : _builder.BuildLoad(pointer, "tmpvalue");
+        //             if (variableType.TypeKind == TypeKind.Pointer)
+        //             {
+        //                 variableType = variableType.Generics[0];
+        //             }
+        //             var type = ConvertTypeDefinition(variableType);
+
+        //             LLVMValueRef newValue;
+        //             if (variableType.PrimitiveType is IntegerType)
+        //             {
+        //                 newValue = changeByOne.Positive
+        //                     ? _builder.BuildAdd(value, LLVMValueRef.CreateConstInt(type, 1, false), "inc")
+        //                     : _builder.BuildSub(value, LLVMValueRef.CreateConstInt(type, 1, false), "dec");
+        //             }
+        //             else
+        //             {
+        //                 newValue = changeByOne.Positive
+        //                     ? _builder.BuildFAdd(value, LLVM.ConstReal(type, 1), "incf")
+        //                     : _builder.BuildFSub(value, LLVM.ConstReal(type, 1), "decf");
+        //             }
+
+        //             if (!constant) // Values are either readonly or constants, so don't store
+        //             {
+        //                 LLVM.BuildStore(_builder, newValue, pointer);
+        //             }
+        //             return changeByOne.Prefix ? (variableType, newValue) : (variableType, value);
+        //         }
+        //         case UnaryAst unary:
+        //         {
+        //             if (unary.Operator == UnaryOperator.Reference)
+        //             {
+        //                 var (valueType, pointer) = unary.Value switch
+        //                 {
+        //                     IdentifierAst identifier => localVariables[identifier.Name],
+        //                     StructFieldRefAst structField => BuildStructField(structField, localVariables, out _, out _),
+        //                     IndexAst index => GetIndexPointer(index, localVariables, out _),
+        //                     // @Cleanup this branch should not be hit
+        //                     _ => (null, new LLVMValueRef())
+        //                 };
+        //                 var pointerType = new TypeDefinition {Name = "*", TypeKind = TypeKind.Pointer};
+        //                 if (valueType.TypeKind == TypeKind.CArray)
+        //                 {
+        //                     pointerType.Generics.Add(valueType.Generics[0]);
+        //                     pointer = _builder.BuildBitCast(pointer, ConvertTypeDefinition(pointerType), "tmpdata");
+        //                 }
+        //                 else
+        //                 {
+        //                     pointerType.Generics.Add(valueType);
+        //                 }
+        //                 return (pointerType, pointer);
+        //             }
+
+        //             var (type, value) = WriteExpression(unary.Value, localVariables);
+        //             return unary.Operator switch
+        //             {
+        //                 UnaryOperator.Not => (type, _builder.BuildNot(value, "not")),
+        //                 UnaryOperator.Negate => type.PrimitiveType switch
+        //                 {
+        //                     IntegerType => (type, _builder.BuildNeg(value, "neg")),
+        //                     FloatType => (type, _builder.BuildFNeg(value, "fneg")),
+        //                     // @Cleanup This branch should not be hit
+        //                     _ => (null, new LLVMValueRef())
+        //                 },
+        //                 UnaryOperator.Dereference => (type.Generics[0], _builder.BuildLoad(value, "tmpderef")),
+        //                 // @Cleanup This branch should not be hit
+        //                 _ => (null, new LLVMValueRef())
+        //             };
+        //         }
+        //         case IndexAst index:
+        //         {
+        //             var (elementType, elementValue) = GetIndexPointer(index, localVariables, out var loaded);
+        //             if (!loaded)
+        //             {
+        //                 elementValue = _builder .BuildLoad(elementValue, "tmpindex");
+        //             }
+        //             return (elementType, elementValue);
+        //         }
+        //         case ExpressionAst expression:
+        //             var expressionValue = WriteExpression(expression.Children[0], localVariables);
+        //             for (var i = 1; i < expression.Children.Count; i++)
+        //             {
+        //                 var rhs = WriteExpression(expression.Children[i], localVariables);
+        //                 expressionValue.value = BuildExpression(expressionValue, rhs, expression.Operators[i - 1], expression.ResultingTypeDefinitions[i - 1]);
+        //                 expressionValue.type = expression.ResultingTypeDefinitions[i - 1];
+        //             }
+        //             return expressionValue;
+        //         case TypeDefinition typeDef:
+        //         {
+        //             var type = TypeTable.Types[typeDef.GenericName];
+        //             return (_s32Type, LLVMValueRef.CreateConstInt(LLVM.Int32Type(), (uint)type.TypeIndex, false));
+        //         }
+        //         case CastAst cast:
+        //         {
+        //             var value = WriteExpression(cast.Value, localVariables);
+        //             return (cast.TargetTypeDefinition, CastValue(value, cast.TargetTypeDefinition));
+        //         }
+        //         default:
+        //             // @Cleanup This branch should not be hit since we've already verified that these ASTs are handled,
+        //             // but notify the user and exit just in case
+        //             Console.WriteLine($"Unexpected syntax tree");
+        //             Environment.Exit(ErrorCodes.BuildError);
+        //             return (null, new LLVMValueRef()); // Return never happens
+        //     }
+        // }
 
         private string GetFunctionName(string name, int functionIndex, int functionCount)
         {
             return functionCount == 1 ? name : $"{name}.{functionIndex}";
         }
 
-        private string GetOperatorOverloadName(TypeDefinition type, Operator op)
-        {
-            return GetOperatorOverloadName(type.GenericName, op);
-        }
+        // private string GetOperatorOverloadName(TypeDefinition type, Operator op)
+        // {
+        //     return GetOperatorOverloadName(type.GenericName, op);
+        // }
 
-        private string GetOperatorOverloadName(string typeName, Operator op)
-        {
-            return $"operator.{op}.{typeName}";
-        }
+        // private string GetOperatorOverloadName(string typeName, Operator op)
+        // {
+        //     return $"operator.{op}.{typeName}";
+        // }
 
-        private readonly LLVMTypeRef _stackPointerType = LLVM.PointerType(LLVM.Int8Type(), 0);
 
-        private void BuildStackPointer()
-        {
-            if (_stackPointerExists) return;
+        // private LLVMValueRef BuildConstant(LLVMTypeRef type, ConstantAst constant, bool getStringPointer = false)
+        // {
+        //     switch (constant.TypeDefinition.PrimitiveType)
+        //     {
+        //         case IntegerType integerType:
+        //             if (constant.TypeDefinition.Character)
+        //             {
+        //                 return LLVMValueRef.CreateConstInt(type, (byte)constant.Value[0], false);
+        //             }
+        //             if (integerType.Bytes == 8 && !integerType.Signed)
+        //             {
+        //                 return LLVMValueRef.CreateConstInt(type, ulong.Parse(constant.Value), false);
+        //             }
+        //             return LLVMValueRef.CreateConstInt(type, (ulong)long.Parse(constant.Value), false);
+        //         case FloatType:
+        //             return LLVMValueRef.CreateConstRealOfStringAndSize(type, constant.Value, (uint)constant.Value.Length);
+        //     }
 
-            _stackPointer = _builder.BuildAlloca(_stackPointerType, "stackPtr");
-            _stackPointerExists = true;
-        }
-
-        private void BuildStackSave()
-        {
-            if (_stackSaved) return;
-            const string stackSaveIntrinsic = "llvm.stacksave";
-
-            var function = _module.GetNamedFunction(stackSaveIntrinsic);
-            if (function.Handle == IntPtr.Zero)
-            {
-                function = _module.AddFunction(stackSaveIntrinsic, LLVMTypeRef.CreateFunction(_stackPointerType, Array.Empty<LLVMTypeRef>()));
-            }
-
-            var stackPointer = _builder.BuildCall(function, Array.Empty<LLVMValueRef>(), "stackPointer");
-            LLVM.BuildStore(_builder, stackPointer, _stackPointer);
-            _stackSaved = true;
-        }
-
-        private void BuildStackRestore()
-        {
-            if (!_stackSaved) return;
-            const string stackRestoreIntrinsic = "llvm.stackrestore";
-
-            var function = _module.GetNamedFunction(stackRestoreIntrinsic);
-            if (function.Handle == IntPtr.Zero)
-            {
-                function = _module.AddFunction(stackRestoreIntrinsic, LLVMTypeRef.CreateFunction(LLVM.VoidType(), new [] {_stackPointerType}));
-            }
-
-            var stackPointer = _builder.BuildLoad(_stackPointer, "stackPointer");
-            _builder.BuildCall(function, new []{stackPointer}, string.Empty);
-        }
-
-        private LLVMValueRef BuildConstant(LLVMTypeRef type, ConstantAst constant, bool getStringPointer = false)
-        {
-            switch (constant.TypeDefinition.PrimitiveType)
-            {
-                case IntegerType integerType:
-                    if (constant.TypeDefinition.Character)
-                    {
-                        return LLVMValueRef.CreateConstInt(type, (byte)constant.Value[0], false);
-                    }
-                    if (integerType.Bytes == 8 && !integerType.Signed)
-                    {
-                        return LLVMValueRef.CreateConstInt(type, ulong.Parse(constant.Value), false);
-                    }
-                    return LLVMValueRef.CreateConstInt(type, (ulong)long.Parse(constant.Value), false);
-                case FloatType:
-                    return LLVMValueRef.CreateConstRealOfStringAndSize(type, constant.Value, (uint)constant.Value.Length);
-            }
-
-            switch (constant.TypeDefinition.TypeKind)
-            {
-                case TypeKind.Boolean:
-                    return LLVMValueRef.CreateConstInt(type, constant.Value == "true" ? (ulong)1 : 0, false);
-                case TypeKind.String:
-                    return BuildString(constant.Value, getStringPointer, constant.TypeDefinition.Constant);
-                default:
-                    return _zeroInt;
-            }
-        }
+        //     switch (constant.TypeDefinition.TypeKind)
+        //     {
+        //         case TypeKind.Boolean:
+        //             return LLVMValueRef.CreateConstInt(type, constant.Value == "true" ? (ulong)1 : 0, false);
+        //         case TypeKind.String:
+        //             return BuildString(constant.Value, getStringPointer, constant.TypeDefinition.Constant);
+        //         default:
+        //             return _zeroInt;
+        //     }
+        // }
 
         private LLVMValueRef BuildString(string value, bool getStringPointer = false, bool constant = true)
         {
@@ -1708,588 +1878,575 @@ namespace Lang.Backend
             return LLVMValueRef.CreateConstNamedStruct(_stringType, new [] {length, stringPointer});
         }
 
-        private (TypeDefinition type, LLVMValueRef value) BuildStructField(StructFieldRefAst structField, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, out bool loaded, out bool constant)
-        {
-            loaded = false;
-            constant = false;
-            TypeDefinition type = null;
-            LLVMValueRef value = new LLVMValueRef();
+        // private (TypeDefinition type, LLVMValueRef value) BuildStructField(StructFieldRefAst structField, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, out bool loaded, out bool constant)
+        // {
+        //     loaded = false;
+        //     constant = false;
+        //     TypeDefinition type = null;
+        //     LLVMValueRef value = new LLVMValueRef();
 
-            switch (structField.Children[0])
-            {
-                case IdentifierAst identifier:
-                    (type, value) = localVariables[identifier.Name];
-                    break;
-                case IndexAst index:
-                    var (indexType, indexValue) = GetIndexPointer(index, localVariables, out _);
-                    type = indexType;
-                    if (index.CallsOverload && !structField.Pointers[0])
-                    {
-                        value = _allocationQueue.Dequeue();
-                        LLVM.BuildStore(_builder, indexValue, value);
-                    }
-                    else
-                    {
-                        value = indexValue;
-                    }
-                    break;
-                case CallAst call:
-                    var (callType, callValue) = WriteExpression(call, localVariables);
-                    type = callType;
-                    if (structField.Pointers[0])
-                    {
-                        value = callValue;
-                    }
-                    else
-                    {
-                        value = _allocationQueue.Dequeue();
-                        LLVM.BuildStore(_builder, callValue, value);
-                    }
-                    break;
-                default:
-                    // @Cleanup this branch shouldn't be hit
-                    Console.WriteLine("Unexpected syntax tree in struct field ref");
-                    Environment.Exit(ErrorCodes.BuildError);
-                    break;
-            }
+        //     switch (structField.Children[0])
+        //     {
+        //         case IdentifierAst identifier:
+        //             (type, value) = localVariables[identifier.Name];
+        //             break;
+        //         case IndexAst index:
+        //             var (indexType, indexValue) = GetIndexPointer(index, localVariables, out _);
+        //             type = indexType;
+        //             if (index.CallsOverload && !structField.Pointers[0])
+        //             {
+        //                 value = _allocationQueue.Dequeue();
+        //                 LLVM.BuildStore(_builder, indexValue, value);
+        //             }
+        //             else
+        //             {
+        //                 value = indexValue;
+        //             }
+        //             break;
+        //         case CallAst call:
+        //             var (callType, callValue) = WriteExpression(call, localVariables);
+        //             type = callType;
+        //             if (structField.Pointers[0])
+        //             {
+        //                 value = callValue;
+        //             }
+        //             else
+        //             {
+        //                 value = _allocationQueue.Dequeue();
+        //                 LLVM.BuildStore(_builder, callValue, value);
+        //             }
+        //             break;
+        //         default:
+        //             // @Cleanup this branch shouldn't be hit
+        //             Console.WriteLine("Unexpected syntax tree in struct field ref");
+        //             Environment.Exit(ErrorCodes.BuildError);
+        //             break;
+        //     }
 
-            var skipPointer = false;
-            for (var i = 1; i < structField.Children.Count; i++)
-            {
-                if (structField.Pointers[i-1])
-                {
-                    if (!skipPointer)
-                    {
-                        value = _builder.BuildLoad(value, "pointerval");
-                    }
-                    type = type.Generics[0];
-                }
-                skipPointer = false;
+        //     var skipPointer = false;
+        //     for (var i = 1; i < structField.Children.Count; i++)
+        //     {
+        //         if (structField.Pointers[i-1])
+        //         {
+        //             if (!skipPointer)
+        //             {
+        //                 value = _builder.BuildLoad(value, "pointerval");
+        //             }
+        //             type = type.Generics[0];
+        //         }
+        //         skipPointer = false;
 
-                if (type.TypeKind == TypeKind.CArray)
-                {
-                    switch (structField.Children[i])
-                    {
-                        case IdentifierAst identifier:
-                            constant = true;
-                            if (identifier.Name == "length")
-                            {
-                                (type, value) = WriteExpression(type.Count, localVariables);
-                            }
-                            break;
-                        case IndexAst index:
-                            var (_, indexValue) = WriteExpression(index.Index, localVariables);
-                            value = _builder.BuildGEP(value, new []{_zeroInt, indexValue}, "indexptr");
-                            type = type.Generics[0];
-                            break;
-                    }
-                    continue;
-                }
+        //         if (type.TypeKind == TypeKind.CArray)
+        //         {
+        //             switch (structField.Children[i])
+        //             {
+        //                 case IdentifierAst identifier:
+        //                     constant = true;
+        //                     if (identifier.Name == "length")
+        //                     {
+        //                         (type, value) = WriteExpression(type.Count, localVariables);
+        //                     }
+        //                     break;
+        //                 case IndexAst index:
+        //                     var (_, indexValue) = WriteExpression(index.Index, localVariables);
+        //                     value = _builder.BuildGEP(value, new []{_zeroInt, indexValue}, "indexptr");
+        //                     type = type.Generics[0];
+        //                     break;
+        //             }
+        //             continue;
+        //         }
 
-                var structDefinition = (StructAst) structField.Types[i-1];
-                type = structDefinition.Fields[structField.ValueIndices[i-1]].TypeDefinition;
+        //         var structDefinition = (StructAst) structField.Types[i-1];
+        //         type = structDefinition.Fields[structField.ValueIndices[i-1]].TypeDefinition;
 
-                switch (structField.Children[i])
-                {
-                    case IdentifierAst identifier:
-                        value = _builder.BuildStructGEP(value, (uint)structField.ValueIndices[i-1], identifier.Name);
-                        break;
-                    case IndexAst index:
-                        value = _builder.BuildStructGEP(value, (uint)structField.ValueIndices[i-1], index.Name);
-                        (type, value) = GetIndexPointer(index, localVariables, out _, type, value);
+        //         switch (structField.Children[i])
+        //         {
+        //             case IdentifierAst identifier:
+        //                 value = _builder.BuildStructGEP(value, (uint)structField.ValueIndices[i-1], identifier.Name);
+        //                 break;
+        //             case IndexAst index:
+        //                 value = _builder.BuildStructGEP(value, (uint)structField.ValueIndices[i-1], index.Name);
+        //                 (type, value) = GetIndexPointer(index, localVariables, out _, type, value);
 
-                        if (index.CallsOverload)
-                        {
-                            skipPointer = true;
-                            if (i < structField.Pointers.Length && !structField.Pointers[i])
-                            {
-                                var pointer = _allocationQueue.Dequeue();
-                                LLVM.BuildStore(_builder, value, pointer);
-                                value = pointer;
-                            }
-                            else if (i == structField.Pointers.Length)
-                            {
-                                loaded = true;
-                            }
-                        }
-                        break;
-                }
-            }
+        //                 if (index.CallsOverload)
+        //                 {
+        //                     skipPointer = true;
+        //                     if (i < structField.Pointers.Length && !structField.Pointers[i])
+        //                     {
+        //                         var pointer = _allocationQueue.Dequeue();
+        //                         LLVM.BuildStore(_builder, value, pointer);
+        //                         value = pointer;
+        //                     }
+        //                     else if (i == structField.Pointers.Length)
+        //                     {
+        //                         loaded = true;
+        //                     }
+        //                 }
+        //                 break;
+        //         }
+        //     }
 
-            return (type, value);
-        }
+        //     return (type, value);
+        // }
 
-        private StructAst _stringStruct;
+        // private StructAst _stringStruct;
 
-        private (TypeDefinition type, LLVMValueRef value) GetIndexPointer(IndexAst index, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, out bool loaded, TypeDefinition type = null, LLVMValueRef variable = default)
-        {
-            // 1. Get the variable pointer
-            if (type == null)
-            {
-                (type, variable) = localVariables[index.Name];
-            }
+        // private (TypeDefinition type, LLVMValueRef value) GetIndexPointer(IndexAst index, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, out bool loaded, TypeDefinition type = null, LLVMValueRef variable = default)
+        // {
+        //     // 1. Get the variable pointer
+        //     if (type == null)
+        //     {
+        //         (type, variable) = localVariables[index.Name];
+        //     }
 
-            // 2. Determine the index
-            var (_, indexValue) = WriteExpression(index.Index, localVariables);
+        //     // 2. Determine the index
+        //     var (_, indexValue) = WriteExpression(index.Index, localVariables);
 
-            // 3. Call the overload if needed
-            if (index.CallsOverload)
-            {
-                var overloadName = GetOperatorOverloadName(type, Operator.Subscript);
-                var overload = _module.GetNamedFunction(overloadName);
-                var overloadDef = _programGraph.OperatorOverloads[type.GenericName][Operator.Subscript];
+        //     // 3. Call the overload if needed
+        //     if (index.CallsOverload)
+        //     {
+        //         var overloadName = GetOperatorOverloadName(type, Operator.Subscript);
+        //         var overload = _module.GetNamedFunction(overloadName);
+        //         var overloadDef = _programGraph.OperatorOverloads[type.GenericName][Operator.Subscript];
 
-                loaded = true;
-                return (overloadDef.ReturnTypeDefinition, _builder.BuildCall(overload, new []{_builder.BuildLoad(variable, index.Name), indexValue}, string.Empty));
-            }
+        //         loaded = true;
+        //         return (overloadDef.ReturnTypeDefinition, _builder.BuildCall(overload, new []{_builder.BuildLoad(variable, index.Name), indexValue}, string.Empty));
+        //     }
 
-            // 4. Build the pointer with the first index of 0
-            TypeDefinition elementType;
-            if (type.TypeKind == TypeKind.String)
-            {
-                _stringStruct ??= (StructAst)TypeTable.Types["string"];
-                elementType = _stringStruct.Fields[1].TypeDefinition.Generics[0];
-            }
-            else
-            {
-                elementType = type.Generics[0];
-            }
-            LLVMValueRef indexPointer;
-            if (type.TypeKind == TypeKind.Pointer)
-            {
-                var dataPointer = _builder.BuildLoad(variable, "dataptr");
-                indexPointer = _builder.BuildGEP(dataPointer, new []{indexValue}, "indexptr");
-            }
-            else if (type.TypeKind == TypeKind.CArray)
-            {
-                indexPointer = _builder.BuildGEP(variable, new []{_zeroInt, indexValue}, "dataptr");
-            }
-            else
-            {
-                var arrayData = _builder.BuildStructGEP(variable, 1, "arraydata");
-                var dataPointer = _builder.BuildLoad(arrayData, "dataptr");
-                indexPointer = _builder.BuildGEP(dataPointer, new [] {indexValue}, "indexptr");
-            }
-            loaded = false;
-            return (elementType, indexPointer);
-        }
+        //     // 4. Build the pointer with the first index of 0
+        //     TypeDefinition elementType;
+        //     if (type.TypeKind == TypeKind.String)
+        //     {
+        //         _stringStruct ??= (StructAst)TypeTable.Types["string"];
+        //         elementType = _stringStruct.Fields[1].TypeDefinition.Generics[0];
+        //     }
+        //     else
+        //     {
+        //         elementType = type.Generics[0];
+        //     }
+        //     LLVMValueRef indexPointer;
+        //     if (type.TypeKind == TypeKind.Pointer)
+        //     {
+        //         var dataPointer = _builder.BuildLoad(variable, "dataptr");
+        //         indexPointer = _builder.BuildGEP(dataPointer, new []{indexValue}, "indexptr");
+        //     }
+        //     else if (type.TypeKind == TypeKind.CArray)
+        //     {
+        //         indexPointer = _builder.BuildGEP(variable, new []{_zeroInt, indexValue}, "dataptr");
+        //     }
+        //     else
+        //     {
+        //         var arrayData = _builder.BuildStructGEP(variable, 1, "arraydata");
+        //         var dataPointer = _builder.BuildLoad(arrayData, "dataptr");
+        //         indexPointer = _builder.BuildGEP(dataPointer, new [] {indexValue}, "indexptr");
+        //     }
+        //     loaded = false;
+        //     return (elementType, indexPointer);
+        // }
 
-        private LLVMValueRef BuildExpression((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, Operator op, TypeDefinition targetType)
-        {
-            // 1. Handle pointer math
-            if (lhs.type.Name == "*")
-            {
-                return BuildPointerOperation(lhs.value, rhs.value, op);
-            }
-            if (rhs.type.Name == "*")
-            {
-                return BuildPointerOperation(rhs.value, lhs.value, op);
-            }
+        // private LLVMValueRef BuildExpression((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, Operator op, TypeDefinition targetType)
+        // {
+        //     // 1. Handle pointer math
+        //     if (lhs.type.Name == "*")
+        //     {
+        //         return BuildPointerOperation(lhs.value, rhs.value, op);
+        //     }
+        //     if (rhs.type.Name == "*")
+        //     {
+        //         return BuildPointerOperation(rhs.value, lhs.value, op);
+        //     }
 
-            // 2. Handle compares and shifts, since the lhs and rhs should not be cast to the target type
-            switch (op)
-            {
-                case Operator.And:
-                    return lhs.type.Name == "bool" ? _builder.BuildAnd(lhs.value, rhs.value, "tmpand")
-                        : BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, Operator.And);
-                case Operator.Or:
-                    return lhs.type.Name == "bool" ? _builder.BuildOr(lhs.value, rhs.value, "tmpor")
-                        : BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, Operator.Or);
-                case Operator.Equality:
-                case Operator.NotEqual:
-                case Operator.GreaterThanEqual:
-                case Operator.LessThanEqual:
-                case Operator.GreaterThan:
-                case Operator.LessThan:
-                    return BuildCompare(lhs, rhs, op);
-                case Operator.ShiftLeft:
-                    return BuildShift(lhs, rhs);
-                case Operator.ShiftRight:
-                    return BuildShift(lhs, rhs, true);
-                case Operator.RotateLeft:
-                    return BuildRotate(lhs, rhs);
-                case Operator.RotateRight:
-                    return BuildRotate(lhs, rhs, true);
-            }
+        //     // 2. Handle compares and shifts, since the lhs and rhs should not be cast to the target type
+        //     switch (op)
+        //     {
+        //         case Operator.And:
+        //             return lhs.type.Name == "bool" ? _builder.BuildAnd(lhs.value, rhs.value, "tmpand")
+        //                 : BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, Operator.And);
+        //         case Operator.Or:
+        //             return lhs.type.Name == "bool" ? _builder.BuildOr(lhs.value, rhs.value, "tmpor")
+        //                 : BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, Operator.Or);
+        //         case Operator.Equality:
+        //         case Operator.NotEqual:
+        //         case Operator.GreaterThanEqual:
+        //         case Operator.LessThanEqual:
+        //         case Operator.GreaterThan:
+        //         case Operator.LessThan:
+        //             return BuildCompare(lhs, rhs, op);
+        //         case Operator.ShiftLeft:
+        //             return BuildShift(lhs, rhs);
+        //         case Operator.ShiftRight:
+        //             return BuildShift(lhs, rhs, true);
+        //         case Operator.RotateLeft:
+        //             return BuildRotate(lhs, rhs);
+        //         case Operator.RotateRight:
+        //             return BuildRotate(lhs, rhs, true);
+        //     }
 
-            // 3. Handle overloaded operators
-            if (lhs.type.PrimitiveType == null && lhs.type.Name != "bool")
-            {
-                return BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, op);
-            }
+        //     // 3. Handle overloaded operators
+        //     if (lhs.type.PrimitiveType == null && lhs.type.Name != "bool")
+        //     {
+        //         return BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, op);
+        //     }
 
-            // 4. Cast lhs and rhs to the target types
-            lhs.value = CastValue(lhs, targetType);
-            rhs.value = CastValue(rhs, targetType);
+        //     // 4. Cast lhs and rhs to the target types
+        //     lhs.value = CastValue(lhs, targetType);
+        //     rhs.value = CastValue(rhs, targetType);
 
-            // 5. Handle the rest of the simple operators
-            switch (op)
-            {
-                case Operator.BitwiseAnd:
-                    return _builder.BuildAnd(lhs.value, rhs.value, "tmpband");
-                case Operator.BitwiseOr:
-                    return _builder.BuildOr(lhs.value, rhs.value, "tmpbor");
-                case Operator.Xor:
-                    return _builder.BuildXor(lhs.value, rhs.value, "tmpxor");
-            }
+        //     // 5. Handle the rest of the simple operators
+        //     switch (op)
+        //     {
+        //         case Operator.BitwiseAnd:
+        //             return _builder.BuildAnd(lhs.value, rhs.value, "tmpband");
+        //         case Operator.BitwiseOr:
+        //             return _builder.BuildOr(lhs.value, rhs.value, "tmpbor");
+        //         case Operator.Xor:
+        //             return _builder.BuildXor(lhs.value, rhs.value, "tmpxor");
+        //     }
 
-            // 6. Handle binary operations
-            var signed = lhs.type.PrimitiveType.Signed || rhs.type.PrimitiveType.Signed;
-            return BuildBinaryOperation(targetType, lhs.value, rhs.value, op, signed);
-        }
+        //     // 6. Handle binary operations
+        //     var signed = lhs.type.PrimitiveType.Signed || rhs.type.PrimitiveType.Signed;
+        //     return BuildBinaryOperation(targetType, lhs.value, rhs.value, op, signed);
+        // }
 
-        private LLVMValueRef BuildPointerOperation(LLVMValueRef lhs, LLVMValueRef rhs, Operator op)
-        {
-            if (op == Operator.Equality)
-            {
-                if (rhs.IsNull)
-                {
-                    return _builder.BuildIsNull(lhs, "isnull");
-                }
-                var diff = _builder.BuildPtrDiff(lhs, rhs, "ptrdiff");
-                return _builder.BuildICmp(LLVMIntPredicate.LLVMIntEQ, diff, LLVMValueRef.CreateConstInt(LLVM.TypeOf(diff), 0, false), "ptreq");
-            }
-            if (op == Operator.NotEqual)
-            {
-                if (rhs.IsNull)
-                {
-                    return _builder.BuildIsNotNull(lhs, "notnull");
-                }
-                var diff = _builder.BuildPtrDiff(lhs, rhs, "ptrdiff");
-                return _builder.BuildICmp(LLVMIntPredicate.LLVMIntNE, diff, LLVMValueRef.CreateConstInt(LLVM.TypeOf(diff), 0, false), "ptreq");
-            }
-            if (op == Operator.Subtract)
-            {
-                rhs = _builder.BuildNeg(rhs, "tmpneg");
-            }
-            return _builder.BuildGEP(lhs, new []{rhs}, "tmpptr");
-        }
+        // private LLVMValueRef BuildPointerOperation(LLVMValueRef lhs, LLVMValueRef rhs, Operator op)
+        // {
+        //     if (op == Operator.Equality)
+        //     {
+        //         if (rhs.IsNull)
+        //         {
+        //             return _builder.BuildIsNull(lhs, "isnull");
+        //         }
+        //         var diff = _builder.BuildPtrDiff(lhs, rhs, "ptrdiff");
+        //         return _builder.BuildICmp(LLVMIntPredicate.LLVMIntEQ, diff, LLVMValueRef.CreateConstInt(LLVM.TypeOf(diff), 0, false), "ptreq");
+        //     }
+        //     if (op == Operator.NotEqual)
+        //     {
+        //         if (rhs.IsNull)
+        //         {
+        //             return _builder.BuildIsNotNull(lhs, "notnull");
+        //         }
+        //         var diff = _builder.BuildPtrDiff(lhs, rhs, "ptrdiff");
+        //         return _builder.BuildICmp(LLVMIntPredicate.LLVMIntNE, diff, LLVMValueRef.CreateConstInt(LLVM.TypeOf(diff), 0, false), "ptreq");
+        //     }
+        //     if (op == Operator.Subtract)
+        //     {
+        //         rhs = _builder.BuildNeg(rhs, "tmpneg");
+        //     }
+        //     return _builder.BuildGEP(lhs, new []{rhs}, "tmpptr");
+        // }
 
-        private LLVMValueRef BuildCompare((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, Operator op)
-        {
-            switch (lhs.type.PrimitiveType)
-            {
-                case IntegerType lhsInt:
-                    switch (rhs.type.PrimitiveType)
-                    {
-                        case IntegerType rhsInt:
-                        {
-                            var signed = lhsInt.Signed || rhsInt.Signed;
-                            if (lhsInt.Bytes > rhsInt.Bytes)
-                            {
-                                var type = ConvertTypeDefinition(lhs.type);
-                                rhs.value = signed ? _builder.BuildSExt(rhs.value, type, "tmpint") :
-                                    _builder.BuildZExt(rhs.value, type, "tmpint");
-                            }
-                            else if (lhsInt.Bytes < rhsInt.Bytes)
-                            {
-                                var type = ConvertTypeDefinition(rhs.type);
-                                lhs.value = signed ? _builder.BuildSExt(lhs.value, type, "tmpint") :
-                                    _builder.BuildZExt(lhs.value, type, "tmpint");
-                            }
-                            var (predicate, name) = ConvertIntOperator(op, signed);
-                            return _builder.BuildICmp(predicate, lhs.value, rhs.value, name);
-                        }
-                        case FloatType:
-                        {
-                            var lhsValue = CastValue(lhs, rhs.type, false);
-                            var (predicate, name) = ConvertRealOperator(op);
-                            return _builder.BuildFCmp(predicate, lhsValue, rhs.value, name);
-                        }
-                    }
-                    break;
-                case FloatType lhsFloat:
-                    switch (rhs.type.PrimitiveType)
-                    {
-                        case IntegerType:
-                        {
-                            var rhsValue = CastValue(rhs, lhs.type, false);
-                            var (predicate, name) = ConvertRealOperator(op);
-                            return _builder.BuildFCmp(predicate, lhs.value, rhsValue, name);
-                        }
-                        case FloatType rhsFloat:
-                        {
-                            if (lhsFloat.Bytes > rhsFloat.Bytes)
-                            {
-                                rhs.value = _builder.BuildFPCast(rhs.value, LLVM.DoubleType(), "tmpfp");
-                            }
-                            else if (lhsFloat.Bytes < rhsFloat.Bytes)
-                            {
-                                lhs.value = _builder.BuildFPCast(lhs.value, LLVM.DoubleType(), "tmpfp");
-                            }
-                            var (predicate, name) = ConvertRealOperator(op);
-                            return _builder.BuildFCmp(predicate, lhs.value, rhs.value, name);
-                        }
-                    }
-                    break;
-                case EnumType:
-                {
-                    var (predicate, name) = ConvertIntOperator(op);
-                    return _builder.BuildICmp(predicate, lhs.value, rhs.value, name);
-                }
-            }
-            return BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, op);
-        }
+        // private LLVMValueRef BuildCompare((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, Operator op)
+        // {
+        //     switch (lhs.type.PrimitiveType)
+        //     {
+        //         case IntegerType lhsInt:
+        //             switch (rhs.type.PrimitiveType)
+        //             {
+        //                 case IntegerType rhsInt:
+        //                 {
+        //                     var signed = lhsInt.Signed || rhsInt.Signed;
+        //                     if (lhsInt.Bytes > rhsInt.Bytes)
+        //                     {
+        //                         var type = ConvertTypeDefinition(lhs.type);
+        //                         rhs.value = signed ? _builder.BuildSExt(rhs.value, type, "tmpint") :
+        //                             _builder.BuildZExt(rhs.value, type, "tmpint");
+        //                     }
+        //                     else if (lhsInt.Bytes < rhsInt.Bytes)
+        //                     {
+        //                         var type = ConvertTypeDefinition(rhs.type);
+        //                         lhs.value = signed ? _builder.BuildSExt(lhs.value, type, "tmpint") :
+        //                             _builder.BuildZExt(lhs.value, type, "tmpint");
+        //                     }
+        //                     var (predicate, name) = ConvertIntOperator(op, signed);
+        //                     return _builder.BuildICmp(predicate, lhs.value, rhs.value, name);
+        //                 }
+        //                 case FloatType:
+        //                 {
+        //                     var lhsValue = CastValue(lhs, rhs.type, false);
+        //                     var (predicate, name) = ConvertRealOperator(op);
+        //                     return _builder.BuildFCmp(predicate, lhsValue, rhs.value, name);
+        //                 }
+        //             }
+        //             break;
+        //         case FloatType lhsFloat:
+        //             switch (rhs.type.PrimitiveType)
+        //             {
+        //                 case IntegerType:
+        //                 {
+        //                     var rhsValue = CastValue(rhs, lhs.type, false);
+        //                     var (predicate, name) = ConvertRealOperator(op);
+        //                     return _builder.BuildFCmp(predicate, lhs.value, rhsValue, name);
+        //                 }
+        //                 case FloatType rhsFloat:
+        //                 {
+        //                     if (lhsFloat.Bytes > rhsFloat.Bytes)
+        //                     {
+        //                         rhs.value = _builder.BuildFPCast(rhs.value, LLVM.DoubleType(), "tmpfp");
+        //                     }
+        //                     else if (lhsFloat.Bytes < rhsFloat.Bytes)
+        //                     {
+        //                         lhs.value = _builder.BuildFPCast(lhs.value, LLVM.DoubleType(), "tmpfp");
+        //                     }
+        //                     var (predicate, name) = ConvertRealOperator(op);
+        //                     return _builder.BuildFCmp(predicate, lhs.value, rhs.value, name);
+        //                 }
+        //             }
+        //             break;
+        //         case EnumType:
+        //         {
+        //             var (predicate, name) = ConvertIntOperator(op);
+        //             return _builder.BuildICmp(predicate, lhs.value, rhs.value, name);
+        //         }
+        //     }
+        //     return BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, op);
+        // }
 
-        private LLVMValueRef BuildShift((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, bool right = false)
-        {
-            if (lhs.type.PrimitiveType is IntegerType)
-            {
-                var result = right ? _builder.BuildAShr(lhs.value, rhs.value, "tmpshr")
-                    : _builder.BuildShl(lhs.value, rhs.value, "tmpshl");
+        // private LLVMValueRef BuildShift((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, bool right = false)
+        // {
+        //     if (lhs.type.PrimitiveType is IntegerType)
+        //     {
+        //         var result = right ? _builder.BuildAShr(lhs.value, rhs.value, "tmpshr")
+        //             : _builder.BuildShl(lhs.value, rhs.value, "tmpshl");
 
-                return result;
-            }
+        //         return result;
+        //     }
 
-            return BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, right ? Operator.ShiftRight : Operator.ShiftLeft);
-        }
+        //     return BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, right ? Operator.ShiftRight : Operator.ShiftLeft);
+        // }
 
-        private LLVMValueRef BuildRotate((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, bool right = false)
-        {
-            if (lhs.type.PrimitiveType is IntegerType)
-            {
-                var result = BuildShift(lhs, rhs, right);
+        // private LLVMValueRef BuildRotate((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, bool right = false)
+        // {
+        //     if (lhs.type.PrimitiveType is IntegerType)
+        //     {
+        //         var result = BuildShift(lhs, rhs, right);
 
-                var maskSize = LLVMValueRef.CreateConstInt(ConvertTypeDefinition(lhs.type), (uint)(lhs.type.PrimitiveType?.Bytes * 8 ?? 32), false);
-                var maskShift = _builder.BuildSub(maskSize, rhs.value, "mask");
+        //         var maskSize = LLVMValueRef.CreateConstInt(ConvertTypeDefinition(lhs.type), (uint)(lhs.type.PrimitiveType?.Bytes * 8 ?? 32), false);
+        //         var maskShift = _builder.BuildSub(maskSize, rhs.value, "mask");
 
-                var mask = right ? _builder.BuildShl(lhs.value, maskShift, "tmpshl")
-                    : _builder.BuildAShr(lhs.value, maskShift, "tmpshr");
+        //         var mask = right ? _builder.BuildShl(lhs.value, maskShift, "tmpshl")
+        //             : _builder.BuildAShr(lhs.value, maskShift, "tmpshr");
 
-                return result.IsUndef ? mask : _builder.BuildOr(result, mask, "tmpmask");
-            }
+        //         return result.IsUndef ? mask : _builder.BuildOr(result, mask, "tmpmask");
+        //     }
 
-            return BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, right ? Operator.RotateRight : Operator.RotateLeft);
-        }
+        //     return BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, right ? Operator.RotateRight : Operator.RotateLeft);
+        // }
 
-        private LLVMValueRef BuildBinaryOperation(TypeDefinition type, LLVMValueRef lhs, LLVMValueRef rhs, Operator op, bool signed = true)
-        {
-            switch (type.PrimitiveType)
-            {
-                case IntegerType:
-                    return BuildIntOperation(lhs, rhs, op, signed);
-                case FloatType:
-                    return BuildRealOperation(lhs, rhs, op);
-                default:
-                    // @Cleanup this shouldn't be hit
-                    Console.WriteLine("Operator not compatible");
-                    Environment.Exit(ErrorCodes.BuildError);
-                    return new LLVMValueRef(); // Return never happens
-            }
-        }
+        // private LLVMValueRef BuildBinaryOperation(TypeDefinition type, LLVMValueRef lhs, LLVMValueRef rhs, Operator op, bool signed = true)
+        // {
+        //     switch (type.PrimitiveType)
+        //     {
+        //         case IntegerType:
+        //             return BuildIntOperation(lhs, rhs, op, signed);
+        //         case FloatType:
+        //             return BuildRealOperation(lhs, rhs, op);
+        //         default:
+        //             // @Cleanup this shouldn't be hit
+        //             Console.WriteLine("Operator not compatible");
+        //             Environment.Exit(ErrorCodes.BuildError);
+        //             return new LLVMValueRef(); // Return never happens
+        //     }
+        // }
 
-        private LLVMValueRef BuildOperatorOverloadCall(TypeDefinition type, LLVMValueRef lhs, LLVMValueRef rhs, Operator op)
-        {
-            var overloadName = GetOperatorOverloadName(type, op);
-            var overload = _module.GetNamedFunction(overloadName);
+        // private LLVMValueRef BuildOperatorOverloadCall(TypeDefinition type, LLVMValueRef lhs, LLVMValueRef rhs, Operator op)
+        // {
+        //     var overloadName = GetOperatorOverloadName(type, op);
+        //     var overload = _module.GetNamedFunction(overloadName);
 
-            return _builder.BuildCall(overload, new []{lhs, rhs}, string.Empty);
-        }
+        //     return _builder.BuildCall(overload, new []{lhs, rhs}, string.Empty);
+        // }
 
-        private LLVMValueRef CastValue((TypeDefinition type, LLVMValueRef value) typeValue, TypeDefinition targetType, bool checkType = true)
-        {
-            var (type, value) = typeValue;
+        // private LLVMValueRef CastValue((TypeDefinition type, LLVMValueRef value) typeValue, TypeDefinition targetType, bool checkType = true)
+        // {
+        //     var (type, value) = typeValue;
 
-            if (checkType && TypeEquals(type, targetType)) return value;
+        //     if (checkType && TypeEquals(type, targetType)) return value;
 
-            var target = ConvertTypeDefinition(targetType);
-            switch (type.PrimitiveType)
-            {
-                case IntegerType intType:
-                    switch (targetType.PrimitiveType)
-                    {
-                        case IntegerType intTarget:
-                            if (intTarget.Bytes >= intType.Bytes)
-                            {
-                                return intTarget.Signed ? _builder.BuildSExtOrBitCast(value, target, "tmpint") :
-                                    _builder.BuildZExtOrBitCast(value, target, "tmpint");
-                            }
-                            else
-                            {
-                                return _builder.BuildTrunc(value, target, "tmpint");
-                            }
-                        case FloatType:
-                            return intType.Signed ? _builder.BuildSIToFP(value, target, "tmpfp") :
-                                _builder.BuildUIToFP(value, target, "tmpfp");
-                    }
-                    break;
-                case FloatType:
-                    switch (targetType.PrimitiveType)
-                    {
-                        case IntegerType intTarget:
-                            return intTarget.Signed ? _builder.BuildFPToSI(value, target, "tmpfp") :
-                                _builder.BuildFPToUI(value, target, "tmpfp");
-                        case FloatType:
-                            return _builder.BuildFPCast(value, target, "tmpfp");
-                    }
-                    break;
-            }
+        //     var target = ConvertTypeDefinition(targetType);
+        //     switch (type.PrimitiveType)
+        //     {
+        //         case IntegerType intType:
+        //             switch (targetType.PrimitiveType)
+        //             {
+        //                 case IntegerType intTarget:
+        //                     if (intTarget.Bytes >= intType.Bytes)
+        //                     {
+        //                         return intTarget.Signed ? _builder.BuildSExtOrBitCast(value, target, "tmpint") :
+        //                             _builder.BuildZExtOrBitCast(value, target, "tmpint");
+        //                     }
+        //                     else
+        //                     {
+        //                         return _builder.BuildTrunc(value, target, "tmpint");
+        //                     }
+        //                 case FloatType:
+        //                     return intType.Signed ? _builder.BuildSIToFP(value, target, "tmpfp") :
+        //                         _builder.BuildUIToFP(value, target, "tmpfp");
+        //             }
+        //             break;
+        //         case FloatType:
+        //             switch (targetType.PrimitiveType)
+        //             {
+        //                 case IntegerType intTarget:
+        //                     return intTarget.Signed ? _builder.BuildFPToSI(value, target, "tmpfp") :
+        //                         _builder.BuildFPToUI(value, target, "tmpfp");
+        //                 case FloatType:
+        //                     return _builder.BuildFPCast(value, target, "tmpfp");
+        //             }
+        //             break;
+        //     }
 
-            if (targetType.TypeKind == TypeKind.Pointer)
-            {
-                var pointerType = ConvertTypeDefinition(targetType);
-                return _builder.BuildBitCast(value, pointerType, "ptr");
-            }
+        //     if (targetType.TypeKind == TypeKind.Pointer)
+        //     {
+        //         var pointerType = ConvertTypeDefinition(targetType);
+        //         return _builder.BuildBitCast(value, pointerType, "ptr");
+        //     }
 
-            // @Future Polymorphic type casting
-            return value;
-        }
+        //     // @Future Polymorphic type casting
+        //     return value;
+        // }
 
-        private static bool TypeEquals(TypeDefinition a, TypeDefinition b)
-        {
-            // Check by primitive type
-            switch (a.PrimitiveType)
-            {
-                case IntegerType aInt:
-                    if (b.PrimitiveType is IntegerType bInt)
-                    {
-                        return aInt.Bytes == bInt.Bytes && aInt.Signed == bInt.Signed;
-                    }
-                    return false;
-                case FloatType aFloat:
-                    if (b.PrimitiveType is FloatType bFloat)
-                    {
-                        return aFloat.Bytes == bFloat.Bytes && aFloat.Signed == bFloat.Signed;
-                    }
-                    return false;
-                default:
-                    if (b.PrimitiveType != null) return false;
-                    break;
-            }
+        // private static bool TypeEquals(TypeDefinition a, TypeDefinition b)
+        // {
+        //     // Check by primitive type
+        //     switch (a.PrimitiveType)
+        //     {
+        //         case IntegerType aInt:
+        //             if (b.PrimitiveType is IntegerType bInt)
+        //             {
+        //                 return aInt.Bytes == bInt.Bytes && aInt.Signed == bInt.Signed;
+        //             }
+        //             return false;
+        //         case FloatType aFloat:
+        //             if (b.PrimitiveType is FloatType bFloat)
+        //             {
+        //                 return aFloat.Bytes == bFloat.Bytes && aFloat.Signed == bFloat.Signed;
+        //             }
+        //             return false;
+        //         default:
+        //             if (b.PrimitiveType != null) return false;
+        //             break;
+        //     }
 
-            // Check by name
-            if (a.Name != b.Name) return false;
-            if (a.Generics.Count != b.Generics.Count) return false;
-            for (var i = 0; i < a.Generics.Count; i++)
-            {
-                var ai = a.Generics[i];
-                var bi = b.Generics[i];
-                if (!TypeEquals(ai, bi)) return false;
-            }
-            return true;
-        }
+        //     // Check by name
+        //     if (a.Name != b.Name) return false;
+        //     if (a.Generics.Count != b.Generics.Count) return false;
+        //     for (var i = 0; i < a.Generics.Count; i++)
+        //     {
+        //         var ai = a.Generics[i];
+        //         var bi = b.Generics[i];
+        //         if (!TypeEquals(ai, bi)) return false;
+        //     }
+        //     return true;
+        // }
 
-        private static (LLVMIntPredicate predicate, string name) ConvertIntOperator(Operator op, bool signed = true)
-        {
-            return op switch
-            {
-                Operator.Equality => (LLVMIntPredicate.LLVMIntEQ, "tmpeq"),
-                Operator.NotEqual => (LLVMIntPredicate.LLVMIntNE, "tmpne"),
-                Operator.GreaterThan => (signed ? LLVMIntPredicate.LLVMIntSGT : LLVMIntPredicate.LLVMIntUGT, "tmpgt"),
-                Operator.GreaterThanEqual => (signed ? LLVMIntPredicate.LLVMIntSGE : LLVMIntPredicate.LLVMIntUGE, "tmpgte"),
-                Operator.LessThan => (signed ? LLVMIntPredicate.LLVMIntSLT : LLVMIntPredicate.LLVMIntULT, "tmplt"),
-                Operator.LessThanEqual => (signed ? LLVMIntPredicate.LLVMIntSLE : LLVMIntPredicate.LLVMIntULE, "tmplte"),
-                // @Cleanup This branch should never be hit
-                _ => (LLVMIntPredicate.LLVMIntEQ, "tmpeq")
-            };
-        }
+        // private static (LLVMIntPredicate predicate, string name) ConvertIntOperator(Operator op, bool signed = true)
+        // {
+        //     return op switch
+        //     {
+        //         Operator.Equality => (LLVMIntPredicate.LLVMIntEQ, "tmpeq"),
+        //         Operator.NotEqual => (LLVMIntPredicate.LLVMIntNE, "tmpne"),
+        //         Operator.GreaterThan => (signed ? LLVMIntPredicate.LLVMIntSGT : LLVMIntPredicate.LLVMIntUGT, "tmpgt"),
+        //         Operator.GreaterThanEqual => (signed ? LLVMIntPredicate.LLVMIntSGE : LLVMIntPredicate.LLVMIntUGE, "tmpgte"),
+        //         Operator.LessThan => (signed ? LLVMIntPredicate.LLVMIntSLT : LLVMIntPredicate.LLVMIntULT, "tmplt"),
+        //         Operator.LessThanEqual => (signed ? LLVMIntPredicate.LLVMIntSLE : LLVMIntPredicate.LLVMIntULE, "tmplte"),
+        //         // @Cleanup This branch should never be hit
+        //         _ => (LLVMIntPredicate.LLVMIntEQ, "tmpeq")
+        //     };
+        // }
 
-        private static (LLVMRealPredicate predicate, string name) ConvertRealOperator(Operator op)
-        {
-            return op switch
-            {
-                Operator.Equality => (LLVMRealPredicate.LLVMRealOEQ, "tmpeq"),
-                Operator.NotEqual => (LLVMRealPredicate.LLVMRealONE, "tmpne"),
-                Operator.GreaterThan => (LLVMRealPredicate.LLVMRealOGT, "tmpgt"),
-                Operator.GreaterThanEqual => (LLVMRealPredicate.LLVMRealOGE, "tmpgte"),
-                Operator.LessThan => (LLVMRealPredicate.LLVMRealOLT, "tmplt"),
-                Operator.LessThanEqual => (LLVMRealPredicate.LLVMRealOLE, "tmplte"),
-               // @Cleanup This branch should never be hit
-                _ => (LLVMRealPredicate.LLVMRealOEQ, "tmpeq")
-            };
-        }
+        // private static (LLVMRealPredicate predicate, string name) ConvertRealOperator(Operator op)
+        // {
+        //     return op switch
+        //     {
+        //         Operator.Equality => (LLVMRealPredicate.LLVMRealOEQ, "tmpeq"),
+        //         Operator.NotEqual => (LLVMRealPredicate.LLVMRealONE, "tmpne"),
+        //         Operator.GreaterThan => (LLVMRealPredicate.LLVMRealOGT, "tmpgt"),
+        //         Operator.GreaterThanEqual => (LLVMRealPredicate.LLVMRealOGE, "tmpgte"),
+        //         Operator.LessThan => (LLVMRealPredicate.LLVMRealOLT, "tmplt"),
+        //         Operator.LessThanEqual => (LLVMRealPredicate.LLVMRealOLE, "tmplte"),
+        //        // @Cleanup This branch should never be hit
+        //         _ => (LLVMRealPredicate.LLVMRealOEQ, "tmpeq")
+        //     };
+        // }
 
-        private LLVMValueRef BuildIntOperation(LLVMValueRef lhs, LLVMValueRef rhs, Operator op, bool signed = true)
-        {
-            return op switch
-            {
-                Operator.Add => _builder.BuildAdd(lhs, rhs, "tmpadd"),
-                Operator.Subtract => _builder.BuildSub(lhs, rhs, "tmpsub"),
-                Operator.Multiply => _builder.BuildMul(lhs, rhs, "tmpmul"),
-                Operator.Divide => signed ? _builder.BuildSDiv(lhs, rhs, "tmpdiv") :
-                    _builder.BuildUDiv(lhs, rhs, "tmpdiv"),
-                Operator.Modulus => signed ? _builder.BuildSRem(lhs, rhs, "tmpmod") :
-                    _builder.BuildURem(lhs, rhs, "tmpmod"),
-                // @Cleanup This branch should never be hit
-                _ => new LLVMValueRef()
-            };
-        }
+        // private LLVMValueRef BuildIntOperation(LLVMValueRef lhs, LLVMValueRef rhs, Operator op, bool signed = true)
+        // {
+        //     return op switch
+        //     {
+        //         Operator.Add => _builder.BuildAdd(lhs, rhs, "tmpadd"),
+        //         Operator.Subtract => _builder.BuildSub(lhs, rhs, "tmpsub"),
+        //         Operator.Multiply => _builder.BuildMul(lhs, rhs, "tmpmul"),
+        //         Operator.Divide => signed ? _builder.BuildSDiv(lhs, rhs, "tmpdiv") :
+        //             _builder.BuildUDiv(lhs, rhs, "tmpdiv"),
+        //         Operator.Modulus => signed ? _builder.BuildSRem(lhs, rhs, "tmpmod") :
+        //             _builder.BuildURem(lhs, rhs, "tmpmod"),
+        //         // @Cleanup This branch should never be hit
+        //         _ => new LLVMValueRef()
+        //     };
+        // }
 
-        private LLVMValueRef BuildRealOperation(LLVMValueRef lhs, LLVMValueRef rhs, Operator op)
-        {
-            switch (op)
-            {
-                case Operator.Add: return _builder.BuildFAdd(lhs, rhs, "tmpadd");
-                case Operator.Subtract: return _builder.BuildFSub(lhs, rhs, "tmpsub");
-                case Operator.Multiply: return _builder.BuildFMul(lhs, rhs, "tmpmul");
-                case Operator.Divide: return _builder.BuildFDiv(lhs, rhs, "tmpdiv");
-                case Operator.Modulus:
-                    _programGraph.Dependencies.Add("m");
-                    return _builder.BuildFRem(lhs, rhs, "tmpmod");
-                // @Cleanup This branch should never be hit
-                default: return new LLVMValueRef();
-            };
-        }
+        // private LLVMValueRef BuildRealOperation(LLVMValueRef lhs, LLVMValueRef rhs, Operator op)
+        // {
+        //     switch (op)
+        //     {
+        //         case Operator.Add: return _builder.BuildFAdd(lhs, rhs, "tmpadd");
+        //         case Operator.Subtract: return _builder.BuildFSub(lhs, rhs, "tmpsub");
+        //         case Operator.Multiply: return _builder.BuildFMul(lhs, rhs, "tmpmul");
+        //         case Operator.Divide: return _builder.BuildFDiv(lhs, rhs, "tmpdiv");
+        //         case Operator.Modulus:
+        //             _programGraph.Dependencies.Add("m");
+        //             return _builder.BuildFRem(lhs, rhs, "tmpmod");
+        //         // @Cleanup This branch should never be hit
+        //         default: return new LLVMValueRef();
+        //     };
+        // }
 
-        private LLVMTypeRef ConvertTypeDefinition(TypeDefinition type, bool externFunction = false, bool pointer = false)
-        {
-            if (type.TypeKind == TypeKind.Pointer)
-            {
-                return LLVM.PointerType(ConvertTypeDefinition(type.Generics[0], externFunction, true), 0);
-            }
+        // private LLVMTypeRef ConvertTypeDefinition(TypeDefinition type, bool externFunction = false, bool pointer = false)
+        // {
+        //     if (type.TypeKind == TypeKind.Pointer)
+        //     {
+        //         return LLVM.PointerType(ConvertTypeDefinition(type.Generics[0], externFunction, true), 0);
+        //     }
 
-            return type.PrimitiveType switch
-            {
-                IntegerType integerType => GetIntegerType(integerType),
-                FloatType floatType => floatType.Bytes == 8 ? LLVM.DoubleType() : LLVM.FloatType(),
-                EnumType enumType => GetIntegerType(enumType),
-                _ => type.TypeKind switch
-                {
-                    TypeKind.Boolean => LLVM.Int1Type(),
-                    TypeKind.Void => pointer ? LLVM.Int8Type() : LLVM.VoidType(),
-                    TypeKind.Array or TypeKind.CArray or TypeKind.Params => GetArrayType(type),
-                    TypeKind.String => externFunction ? LLVM.PointerType(LLVM.Int8Type(), 0) : _module.GetTypeByName("string"),
-                    TypeKind.Type => LLVM.Int32Type(),
-                    _ => GetStructType(type)
-                }
-            };
-        }
+        //     return type.PrimitiveType switch
+        //     {
+        //         IntegerType integerType => GetIntegerType(integerType.Bytes),
+        //         FloatType floatType => floatType.Bytes == 8 ? LLVM.DoubleType() : LLVM.FloatType(),
+        //         EnumType enumType => GetIntegerType(enumType.Bytes),
+        //         _ => type.TypeKind switch
+        //         {
+        //             TypeKind.Boolean => LLVM.Int1Type(),
+        //             TypeKind.Void => pointer ? LLVM.Int8Type() : LLVM.VoidType(),
+        //             TypeKind.Array or TypeKind.CArray or TypeKind.Params => GetArrayType(type),
+        //             TypeKind.String => externFunction ? LLVM.PointerType(LLVM.Int8Type(), 0) : _module.GetTypeByName("string"),
+        //             TypeKind.Type => LLVM.Int32Type(),
+        //             _ => GetStructType(type)
+        //         }
+        //     };
+        // }
 
-        private LLVMTypeRef GetIntegerType(IPrimitive primitive)
-        {
-            return primitive.Bytes switch
-            {
-                1 => LLVM.Int8Type(),
-                2 => LLVM.Int16Type(),
-                4 => LLVM.Int32Type(),
-                8 => LLVM.Int64Type(),
-                _ => LLVM.Int32Type()
-            };
-        }
+        // private LLVMTypeRef GetArrayType(TypeDefinition type)
+        // {
+        //     var elementTypeDef = type.Generics[0];
 
-        private LLVMTypeRef GetArrayType(TypeDefinition type)
-        {
-            var elementTypeDef = type.Generics[0];
+        //     if (type.TypeKind == TypeKind.CArray)
+        //     {
+        //         var elementType = ConvertTypeDefinition(elementTypeDef);
+        //         return LLVM.ArrayType(elementType, type.ConstCount.Value);
+        //     }
 
-            if (type.TypeKind == TypeKind.CArray)
-            {
-                var elementType = ConvertTypeDefinition(elementTypeDef);
-                return LLVM.ArrayType(elementType, type.ConstCount.Value);
-            }
+        //     return _module.GetTypeByName($"Array.{elementTypeDef.GenericName}");
+        // }
 
-            return _module.GetTypeByName($"Array.{elementTypeDef.GenericName}");
-        }
+        // private LLVMTypeRef GetStructType(TypeDefinition type)
+        // {
+        //     if (TypeTable.Types.TryGetValue(type.Name, out var typeDef) && typeDef is EnumAst)
+        //     {
+        //         return LLVM.Int32Type();
+        //     }
 
-        private LLVMTypeRef GetStructType(TypeDefinition type)
-        {
-            if (TypeTable.Types.TryGetValue(type.Name, out var typeDef) && typeDef is EnumAst)
-            {
-                return LLVM.Int32Type();
-            }
-
-            return _module.GetTypeByName(type.GenericName);
-        }
-
+        //     return _module.GetTypeByName(type.GenericName);
+        // }
 
         private LLVMMetadataRef GetDebugType(TypeDefinition type)
         {
