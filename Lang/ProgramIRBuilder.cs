@@ -669,14 +669,18 @@ namespace Lang
 
         public void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, ScopeAst scope)
         {
-            var instruction = new Instruction {Type = InstructionType.Return};
-            if (returnAst.Value != null)
-            {
-                instruction.Value1 = EmitIR(function, returnAst.Value, scope);
-            }
-
-            function.Instructions.Add(instruction);
             scope.Returns = true;
+
+            if (returnAst.Value == null)
+            {
+                var instruction = new Instruction {Type = InstructionType.ReturnVoid};
+                function.Instructions.Add(instruction);
+            }
+            else
+            {
+                var instruction = new Instruction {Type = InstructionType.Return, Value1 = EmitIR(function, returnAst.Value, scope)};
+                function.Instructions.Add(instruction);
+            }
         }
 
         private BasicBlock EmitConditional(FunctionIR function, BasicBlock block, ConditionalAst conditional, ScopeAst scope, IType returnType, out bool returns)

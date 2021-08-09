@@ -18,8 +18,6 @@ namespace Lang.Backend
         private LLVMPassManagerRef _passManager;
 
         private LLVMValueRef _stackPointer;
-        private bool _stackPointerExists;
-        private bool _stackSaved;
         private LLVMTypeRef _stringType;
         private LLVMTypeRef _u8PointerType;
         private LLVMTypeRef[] _types;
@@ -510,6 +508,7 @@ namespace Lang.Backend
             {
                 LLVM.PositionBuilderAtEnd(_builder, basicBlocks[blockIndex]); // Redundant for the first pass, not a big deal
                 var instructionToStopAt = blockIndex < function.BasicBlocks.Count - 1 ? function.BasicBlocks[blockIndex + 1].Location : function.Instructions.Count;
+                var breakToNextBlock = true;
                 while (i < instructionToStopAt)
                 {
                     var instruction = function.Instructions[i++];
@@ -517,8 +516,28 @@ namespace Lang.Backend
                     switch (instruction.Type)
                     {
                         case InstructionType.Jump:
+                            _builder.BuildBr(basicBlocks[instruction.Index.Value]);
+                            breakToNextBlock = false;
+                            break;
                         case InstructionType.ConditionalJump:
+                            breakToNextBlock = false;
+                            break;
                         case InstructionType.Return:
+                            if (function.SaveStack)
+                            {
+                                BuildStackRestore();
+                            }
+                            _builder.BuildRet(GetValue(instruction.Value1, values, functionPointer));
+                            breakToNextBlock = false;
+                            break;
+                        case InstructionType.ReturnVoid:
+                            if (function.SaveStack)
+                            {
+                                BuildStackRestore();
+                            }
+                            _builder.BuildRetVoid();
+                            breakToNextBlock = false;
+                            break;
                         case InstructionType.Load:
                         case InstructionType.LoadAllocation:
                         case InstructionType.Store:
@@ -579,7 +598,17 @@ namespace Lang.Backend
                     }
                 }
                 blockIndex++;
+
+                if (breakToNextBlock)
+                {
+                    _builder.BuildBr(basicBlocks[blockIndex]);
+                }
             }
+        }
+
+        private LLVMValueRef GetValue(InstructionValue value, LLVMValueRef[] values, LLVMValueRef functionPointer)
+        {
+            return null;
         }
 
         private void BuildStackSave()
