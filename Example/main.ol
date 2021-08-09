@@ -1,4 +1,4 @@
-int main(Array<string> args) #print_ir {
+int main(Array<string> args) { //#print_ir {
     // Return positive exit code
     /*
         Multi line comment
