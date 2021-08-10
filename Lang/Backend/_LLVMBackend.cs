@@ -503,7 +503,7 @@ namespace Lang.Backend
             // Write the instructions
             var blockIndex = 0;
             var i = 0;
-            var values = new LLVMValueRef[function.Instructions.Count];
+            var values = new LLVMValueRef[function.ValueCount];
             while (blockIndex < function.BasicBlocks.Count)
             {
                 LLVM.PositionBuilderAtEnd(_builder, basicBlocks[blockIndex]); // Redundant for the first pass, not a big deal
@@ -527,7 +527,7 @@ namespace Lang.Backend
                             {
                                 BuildStackRestore();
                             }
-                            _builder.BuildRet(GetValue(instruction.Value1, values, functionPointer));
+                            _builder.BuildRet(GetValue(instruction.Value1, values, allocations, functionPointer));
                             breakToNextBlock = false;
                             break;
                         case InstructionType.ReturnVoid:
@@ -603,7 +603,7 @@ namespace Lang.Backend
             }
         }
 
-        private LLVMValueRef GetValue(InstructionValue value, LLVMValueRef[] values, LLVMValueRef functionPointer)
+        private LLVMValueRef GetValue(InstructionValue value, LLVMValueRef[] values, LLVMValueRef[] allocations, LLVMValueRef functionPointer)
         {
             return null;
         }
