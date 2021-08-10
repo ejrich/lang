@@ -539,11 +539,8 @@ namespace Lang.Backend
                             breakToNextBlock = false;
                             break;
                         case InstructionType.Load:
-                        case InstructionType.LoadAllocation:
                         case InstructionType.Store:
-                        case InstructionType.StoreToAllocation:
                         case InstructionType.GetPointer:
-                        case InstructionType.GetAllocationPointer:
                         case InstructionType.GetStructPointer:
                         case InstructionType.Call:
                         case InstructionType.Cast:
