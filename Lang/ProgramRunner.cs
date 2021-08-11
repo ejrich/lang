@@ -855,7 +855,7 @@ namespace Lang
                 case ConstantAst constant:
                     return new ValueType {Type = constant.TypeDefinition, Value = GetConstant(constant.TypeDefinition, constant.Value)};
                 case NullAst nullAst:
-                    return new ValueType {Type = nullAst.TargetType, Value = IntPtr.Zero};
+                    return new ValueType {Type = nullAst.TargetTypeDefinition, Value = IntPtr.Zero};
                 case StructFieldRefAst structField:
                 {
                     if (structField.IsEnum)
