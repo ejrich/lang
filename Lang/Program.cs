@@ -13,8 +13,8 @@ serviceCollection.AddTransient<IProgramRunner, ProgramRunner>();
 serviceCollection.AddTransient<IProgramIRBuilder, ProgramIRBuilder>();
 serviceCollection.AddTransient<ILinker, Linker>();
 // LLVM Backend
-serviceCollection.AddTransient<IBackend, LLVMBackend>();
-// serviceCollection.AddTransient<IBackend, _LLVMBackend>();
+// serviceCollection.AddTransient<IBackend, LLVMBackend>();
+serviceCollection.AddTransient<IBackend, _LLVMBackend>();
 
 var container = serviceCollection.BuildServiceProvider();
 
