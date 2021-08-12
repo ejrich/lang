@@ -34,7 +34,7 @@ namespace Lang.Backend
         private readonly LLVMValueRef _zeroInt = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), 0, false);
         private readonly TypeDefinition _s32Type = new() {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
 
-        public string Build(ProjectFile project, ProgramGraph programGraph, BuildSettings buildSettings)
+        public string Build(ProjectFile project, ProgramGraph programGraph)
         {
             _programGraph = programGraph;
 
@@ -44,7 +44,7 @@ namespace Lang.Backend
                 Directory.CreateDirectory(objectPath);
 
             // 2. Initialize the LLVM module and builder
-            InitLLVM(project, buildSettings.Release, objectPath);
+            InitLLVM(project, BuildSettings.Release, objectPath);
 
             // 3. Write Data section
             var globals = WriteData();
