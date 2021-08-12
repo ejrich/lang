@@ -84,7 +84,9 @@ int main(Array<string> args) { //#print_ir {
     return 0;
 }
 
-// global_c := global_b; TODO Make this work
+// TODO Make these work
+// global_c := global_b;
+// global_struct: MyStruct;
 global_a := 7;
 global_b: int = 456; #const
 
