@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Lang.Backend
 {
     public interface IBackend
@@ -5,8 +7,8 @@ namespace Lang.Backend
         /// <summary>
         /// Builds the program executable
         /// </summary>
-        /// <param name="projectPath">The path to the project</param>
         /// <param name="programGraph">Graph of the program</param>
-        string Build(ProjectFile project, ProgramGraph programGraph);
+        /// <param name="sourceFiles">The source files for debugging</param>
+        string Build(ProgramGraph programGraph, List<string> sourceFiles);
     }
 }
