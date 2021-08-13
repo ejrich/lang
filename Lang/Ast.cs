@@ -23,6 +23,7 @@ namespace Lang
         bool Verified { get; set; }
         bool HasDirectives { get; set; }
         bool CallsCompiler { get; set; }
+        bool Varargs { get; set; }
         IType ReturnType { get; set; }
         TypeDefinition ReturnTypeDefinition { get; set; }
         bool ReturnTypeHasGenerics { get; set; }
@@ -391,6 +392,7 @@ namespace Lang
         public bool Verified { get; set; }
         public bool HasDirectives { get; set; }
         public bool CallsCompiler { get; set; }
+        public bool Varargs { get; set; }
         public IType ReturnType { get; set; }
         public TypeDefinition ReturnTypeDefinition { get; set; }
         public bool ReturnTypeHasGenerics { get; set; }
