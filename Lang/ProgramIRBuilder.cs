@@ -445,7 +445,7 @@ namespace Lang
 
                 if (!BuildSettings.Release)
                 {
-                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, Index = allocationIndex, String = declaration.Name, Source = declaration, Value1 = new InstructionValue {ValueType = InstructionValueType.Allocation, ValueIndex = allocationIndex, Type = declaration.Type}});
+                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = declaration.Name, Source = declaration, Value1 = new InstructionValue {ValueType = InstructionValueType.Allocation, ValueIndex = allocationIndex, Type = declaration.Type}});
                 }
 
                 if (declaration.Value != null)
@@ -807,6 +807,10 @@ namespace Lang
                 if (each.IndexVariable != null)
                 {
                     each.IndexVariableVariable.AllocationIndex = indexVariable;
+                    if (!BuildSettings.Release)
+                    {
+                        function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = each.IndexVariable, Source = each.IndexVariableVariable, Value1 = new InstructionValue {ValueType = InstructionValueType.Allocation, ValueIndex = indexVariable, Type = _s32Type}});
+                    }
                 }
                 EmitStore(function, indexVariable, GetConstantInteger(0));
 
@@ -840,6 +844,10 @@ namespace Lang
 
                 EmitStore(function, indexVariable, value);
                 each.IterationVariableVariable.AllocationIndex = indexVariable;
+                if (!BuildSettings.Release)
+                {
+                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = each.IterationVariable, Source = each.IterationVariableVariable, Value1 = new InstructionValue {ValueType = InstructionValueType.Allocation, ValueIndex = indexVariable, Type = _s32Type}});
+                }
 
                 // Get the end of the range
                 compareTarget = EmitIR(function, each.RangeEnd, scope);
@@ -852,6 +860,11 @@ namespace Lang
             {
                 var iterationVariable = EmitGetPointer(function, arrayData, indexValue, each.IterationVariableVariable.Type, cArrayIteration);
                 each.IterationVariableVariable.Pointer = iterationVariable;
+
+                if (!BuildSettings.Release)
+                {
+                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = each.IterationVariable, Source = each.IterationVariableVariable, Value1 = iterationVariable});
+                }
             }
             var conditionJump = new Instruction {Type = InstructionType.ConditionalJump, Value1 = condition};
             function.Instructions.Add(conditionJump);
