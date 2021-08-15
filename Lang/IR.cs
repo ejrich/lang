@@ -166,6 +166,8 @@ namespace Lang
         RotateRight,
         RotateLeft,
         DebugSetLocation,
+        DebugPushLexicalBlock,
+        DebugPopLexicalBlock,
         DebugDeclareParameter,
         DebugDeclareVariable
     }
