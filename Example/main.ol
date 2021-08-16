@@ -88,7 +88,7 @@ int main(Array<string> args) { //#print_ir {
 
 // TODO Make these work
 // global_c := global_b;
-// global_struct: MyStruct;
+global_struct: MyStruct;
 global_poly_struct: PolyStruct<int, float64>;
 global_array: Array<int> = [1, 2, 3, 5]
 global_a := 7;
