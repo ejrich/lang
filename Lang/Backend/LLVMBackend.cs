@@ -279,30 +279,18 @@ namespace Lang.Backend
                 LLVMValueRef global;
                 if (globalVariable.Array)
                 {
-                    global = _module.AddGlobal(LLVM.ArrayType(_types[globalVariable.Type.TypeIndex], globalVariable.ArrayLength), globalVariable.Name);
-
-                    if (globalVariable.InitialArrayValues != null)
-                    {
-                        // TODO Get the initial values
-                    }
+                    var elementType = _types[globalVariable.Type.TypeIndex];
+                    global = _module.AddGlobal(LLVM.ArrayType(elementType, globalVariable.ArrayLength), globalVariable.Name);
                 }
                 else
                 {
-                    var type = _types[globalVariable.Type.TypeIndex];
-                    global = _module.AddGlobal(type, globalVariable.Name);
+                    global = _module.AddGlobal(_types[globalVariable.Type.TypeIndex], globalVariable.Name);
+                }
 
-                    switch (globalVariable.InitialValue.ValueType)
-                    {
-                        case InstructionValueType.Constant:
-                            LLVM.SetInitializer(global, GetConstant(globalVariable.InitialValue));
-                            break;
-                        case InstructionValueType.Null:
-                            LLVM.SetInitializer(global, LLVM.ConstNull(type));
-                            break;
-                        case InstructionValueType.ConstantStruct:
-                            // TODO Implement me
-                            break;
-                    }
+                if (globalVariable.InitialValue != null)
+                {
+                    var initialValue = GetConstantValue(globalVariable.InitialValue);
+                    LLVM.SetInitializer(global, initialValue);
                 }
 
                 if (_emitDebug && globalVariable.FileIndex.HasValue)
@@ -1102,10 +1090,34 @@ namespace Lang.Backend
                         return LLVM.ConstNull(_u8PointerType);
                     }
                     return LLVM.ConstNull(_types[value.Type.TypeIndex]);
+            }
+            return null;
+        }
+
+        private LLVMValueRef GetConstantValue(InstructionValue value)
+        {
+            switch (value.ValueType)
+            {
+                case InstructionValueType.Value:
+                    return _globals[value.ValueIndex];
+                case InstructionValueType.Constant:
+                    return GetConstant(value);
+                case InstructionValueType.Null:
+                    return LLVM.ConstNull(_types[value.Type.TypeIndex]);
                 case InstructionValueType.ConstantStruct:
-                case InstructionValueType.ConstantArray:
-                    // TODO Implement me
-                    break;
+                    var fieldValues = new LLVMValueRef[value.Values.Length];
+                    for (var i = 0; i < fieldValues.Length; i++)
+                    {
+                        fieldValues[i] = GetConstantValue(value.Values[i]);
+                    }
+                    return LLVMValueRef.CreateConstNamedStruct(_types[value.Type.TypeIndex], fieldValues);
+                case InstructionValueType.ConstantArray when value.Values != null:
+                    var values = new LLVMValueRef[value.ArrayLength];
+                    for (var i = 0; i < value.ArrayLength; i++)
+                    {
+                        values[i] = GetConstantValue(value.Values[i]);
+                    }
+                    return LLVMValueRef.CreateConstArray(_types[value.Type.TypeIndex], values);
             }
             return null;
         }

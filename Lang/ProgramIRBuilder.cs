@@ -213,9 +213,7 @@ namespace Lang
             }
             else
             {
-                var globalIndex = Program.GlobalVariables.Count;
-                declaration.AllocationIndex = globalIndex;
-                var globalVariable = new GlobalVariable {Name = declaration.Name, Index = globalIndex, FileIndex = declaration.FileIndex, Line = declaration.Line};
+                var globalVariable = new GlobalVariable {Name = declaration.Name, FileIndex = declaration.FileIndex, Line = declaration.Line};
 
                 if (declaration.Type is ArrayType arrayType)
                 {
@@ -230,53 +228,59 @@ namespace Lang
                     globalVariable.Size = declaration.Type.Size;
                 }
 
-                Program.GlobalVariables.Add(globalVariable);
-
                 if (declaration.Value != null)
                 {
                     globalVariable.InitialValue = EmitConstantIR(declaration.Value, scope);
-                    return;
+                }
+                else
+                {
+                    switch (declaration.Type.TypeKind)
+                    {
+                        // Initialize arrays
+                        case TypeKind.Array:
+                            var arrayStruct = (StructAst)declaration.Type;
+                            if (declaration.TypeDefinition.ConstCount != null)
+                            {
+                                globalVariable.InitialValue = InitializeGlobalArray(arrayStruct, declaration, scope);
+                            }
+                            else
+                            {
+                                var constArray = new InstructionValue
+                                {
+                                    ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
+                                    Values = new [] {GetConstantInteger(0), new InstructionValue {ValueType = InstructionValueType.Null, Type = arrayStruct.Fields[1].Type}}
+                                };
+                                globalVariable.InitialValue = constArray;
+                            }
+                            break;
+                        case TypeKind.CArray:
+                            if (declaration.ArrayValues != null)
+                            {
+                                globalVariable.InitialValue = new InstructionValue
+                                {
+                                    ValueType = InstructionValueType.ConstantArray, Type = declaration.ArrayElementType,
+                                    Values = declaration.ArrayValues.Select(val => EmitConstantIR(val, scope)).ToArray(), ArrayLength = globalVariable.ArrayLength
+                                };
+                            }
+                            break;
+                        // Initialize struct field default values
+                        case TypeKind.Struct:
+                        case TypeKind.String:
+                            globalVariable.InitialValue = GetConstantStruct((StructAst)declaration.Type, scope, declaration.Assignments);
+                            break;
+                        // Initialize pointers to null
+                        case TypeKind.Pointer:
+                            globalVariable.InitialValue = new InstructionValue {ValueType = InstructionValueType.Null, Type = globalVariable.Type};
+                            break;
+                        // Or initialize to default
+                        default:
+                            globalVariable.InitialValue = GetDefaultConstant(declaration.Type);
+                            break;
+                    }
                 }
 
-                switch (declaration.Type.TypeKind)
-                {
-                    // Initialize arrays
-                    case TypeKind.Array:
-                        var arrayStruct = (StructAst)declaration.Type;
-                        if (declaration.TypeDefinition.ConstCount != null)
-                        {
-                            globalVariable.InitialValue = InitializeGlobalArray(arrayStruct, declaration, scope);
-                        }
-                        else
-                        {
-                            var constArray = new InstructionValue
-                            {
-                                ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
-                                Values = new [] {GetConstantInteger(0), new InstructionValue {ValueType = InstructionValueType.Null, Type = arrayStruct.Fields[1].Type}}
-                            };
-                            globalVariable.InitialValue = constArray;
-                        }
-                        break;
-                    case TypeKind.CArray:
-                        if (declaration.ArrayValues != null)
-                        {
-                            globalVariable.InitialArrayValues = declaration.ArrayValues.Select(val => EmitConstantIR(val, scope)).ToArray();
-                        }
-                        break;
-                    // Initialize struct field default values
-                    case TypeKind.Struct:
-                    case TypeKind.String:
-                        globalVariable.InitialValue = GetConstantStruct((StructAst)declaration.Type, scope, declaration.Assignments);
-                        break;
-                    // Initialize pointers to null
-                    case TypeKind.Pointer:
-                        globalVariable.InitialValue = new InstructionValue {ValueType = InstructionValueType.Null, Type = globalVariable.Type};
-                        break;
-                    // Or initialize to default
-                    default:
-                        globalVariable.InitialValue = GetDefaultConstant(declaration.Type);
-                        break;
-                }
+                globalVariable.Index = declaration.AllocationIndex = Program.GlobalVariables.Count;
+                Program.GlobalVariables.Add(globalVariable);
             }
         }
 
@@ -367,7 +371,11 @@ namespace Lang
 
             if (declaration.ArrayValues != null)
             {
-                arrayVariable.InitialArrayValues = declaration.ArrayValues.Select(val => EmitConstantIR(val, scope)).ToArray();
+                arrayVariable.InitialValue = new InstructionValue
+                {
+                    ValueType = InstructionValueType.ConstantArray, Type = declaration.ArrayElementType,
+                    Values = declaration.ArrayValues.Select(val => EmitConstantIR(val, scope)).ToArray(), ArrayLength = length
+                };
             }
 
             return new InstructionValue

@@ -36,7 +36,6 @@ namespace Lang
         public uint ArrayLength { get; set; }
         public IType Type { get; set; }
         public InstructionValue InitialValue { get; set; }
-        public InstructionValue[] InitialArrayValues { get; set; }
     }
 
     public class Allocation
