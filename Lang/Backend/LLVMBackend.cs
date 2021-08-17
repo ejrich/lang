@@ -32,7 +32,7 @@ namespace Lang.Backend
 
         private readonly LLVMValueRef _zeroInt = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), 0, false);
 
-        public string Build(ProgramGraph programGraph, List<string> sourceFiles)
+        public string Build(List<string> sourceFiles)
         {
             // 1. Verify obj directory exists
             var objectPath = Path.Combine(BuildSettings.Path, ObjectDirectory);
