@@ -536,14 +536,14 @@ namespace Lang.Backend
                     {
                         case InstructionType.Jump:
                         {
-                            _builder.BuildBr(basicBlocks[instruction.Index]);
+                            _builder.BuildBr(basicBlocks[instruction.Value1.JumpBlock.Index]);
                             breakToNextBlock = false;
                             break;
                         }
                         case InstructionType.ConditionalJump:
                         {
                             var condition = GetValue(instruction.Value1, values, allocations, functionPointer);
-                            _builder.BuildCondBr(condition, basicBlocks[instruction.Index], basicBlocks[blockIndex + 1]);
+                            _builder.BuildCondBr(condition, basicBlocks[instruction.Value2.JumpBlock.Index], basicBlocks[blockIndex + 1]);
                             breakToNextBlock = false;
                             break;
                         }

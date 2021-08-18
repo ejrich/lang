@@ -85,6 +85,9 @@ namespace Lang
         // For calls and constant structs/arrays
         public InstructionValue[] Values { get; set; }
         public uint ArrayLength { get; set; }
+
+        // For Jumps
+        public BasicBlock JumpBlock { get; set; }
     }
 
     [StructLayout(LayoutKind.Explicit)]
@@ -179,6 +182,7 @@ namespace Lang
         Constant,
         Null,
         Type,
+        BasicBlock,
         CallArguments,
         ConstantStruct,
         ConstantArray
