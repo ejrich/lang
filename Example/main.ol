@@ -383,7 +383,10 @@ break_and_continue() {
 
     each i in 1..10 {
         if (i > 5) then break;
-        if (i > 3) then continue;
+        if (i > 3) {
+            printf("Special Value = %d\n", i);
+            continue;
+        }
         printf("Value = %d\n", i);
     }
 }
