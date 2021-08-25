@@ -21,7 +21,7 @@ namespace Lang
         [FieldOffset(0)] public IntPtr Pointer;
     }
 
-    public class _ProgramRunner //: IProgramRunner
+    public unsafe class _ProgramRunner //: IProgramRunner
     {
         private readonly Dictionary<string, string> _compilerFunctions = new() {
             { "add_dependency", "AddDependency" }
@@ -39,7 +39,7 @@ namespace Lang
         {
             try
             {
-                var returnRegister = ExecuteFunction(function, new IntPtr[0]);
+                var returnRegister = ExecuteFunction(function, new Register[0]);
             }
             catch (Exception e)
             {
@@ -54,7 +54,7 @@ namespace Lang
         {
             try
             {
-                var returnRegister = ExecuteFunction(function, new IntPtr[0]);
+                var returnRegister = ExecuteFunction(function, new Register[0]);
                 return returnRegister.Bool;
             }
             catch (Exception e)
@@ -72,7 +72,7 @@ namespace Lang
             BuildSettings.Dependencies.Add(library);
         }
 
-        private Register ExecuteFunction(FunctionIR function, IntPtr[] arguments)
+        private Register ExecuteFunction(FunctionIR function, Register[] arguments)
         {
             var instructionPointer = 0;
             var stackPointer = Marshal.AllocHGlobal((int)function.StackSize);
@@ -117,15 +117,69 @@ namespace Lang
                     {
                         // TODO Implement me
                         var pointer = GetValue(instruction.Value1, registers, stackPointer);
+                        Register value;
                         switch (instruction.Value2.ValueType)
                         {
                             case InstructionValueType.Value:
+                                value = registers[instruction.Value2.ValueIndex];
+                                break;
                             case InstructionValueType.Argument:
+                                value = arguments[instruction.Value2.ValueIndex];
+                                break;
                             case InstructionValueType.Constant:
+                                value = GetConstant(instruction.Value2);
+                                break;
+                            default:
+                                value = new Register();
                                 break;
                         }
-                        // var value = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // _builder.BuildStore(value, pointer);
+
+                        switch (instruction.Value2.Type.TypeKind)
+                        {
+                            case TypeKind.Boolean:
+                                Marshal.StructureToPtr(value.Bool, pointer.Pointer, false);
+                                break;
+                            case TypeKind.Integer:
+                            case TypeKind.Enum:
+                                switch (instruction.Value2.Type.Size)
+                                {
+                                    case 1:
+                                        Marshal.StructureToPtr(value.Byte, pointer.Pointer, false);
+                                        break;
+                                    case 2:
+                                        Marshal.StructureToPtr(value.UShort, pointer.Pointer, false);
+                                        break;
+                                    case 4:
+                                        Marshal.StructureToPtr(value.UInteger, pointer.Pointer, false);
+                                        break;
+                                    case 8:
+                                        Marshal.StructureToPtr(value.ULong, pointer.Pointer, false);
+                                        break;
+                                }
+                                break;
+                            case TypeKind.Float:
+                                if (instruction.Value2.Type.Size == 4)
+                                {
+                                    Marshal.StructureToPtr(value.Float, pointer.Pointer, false);
+                                }
+                                else
+                                {
+                                    Marshal.StructureToPtr(value.Double, pointer.Pointer, false);
+                                }
+                                break;
+                            case TypeKind.Pointer:
+                                Marshal.StructureToPtr(value.Pointer, pointer.Pointer, false);
+                                break;
+                            case TypeKind.String:
+                            case TypeKind.Array:
+                            case TypeKind.Struct:
+                                var copyBytes = instruction.Value2.Type.Size;
+                                Buffer.MemoryCopy(value.Pointer.ToPointer(), pointer.Pointer.ToPointer(), copyBytes, copyBytes);
+                                break;
+                            case TypeKind.CArray:
+                                // TODO How should this work?
+                                break;
+                        }
                         break;
                     }
                     case InstructionType.GetPointer:
