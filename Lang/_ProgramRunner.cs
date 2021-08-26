@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 namespace Lang
@@ -242,7 +243,6 @@ namespace Lang
                     }
                     case InstructionType.Call:
                     {
-                        // TODO Implement me
                         var callingFunction = Program.Functions[instruction.String];
                         var callArguments = new Register[instruction.Value1.Values.Length];
                         for (var i = 0; i < instruction.Value1.Values.Length; i++)
@@ -252,36 +252,38 @@ namespace Lang
 
                         if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Extern))
                         {
-                        //     var args = arguments.Select(GetCArg).ToArray();
-                        //     if (function.Varargs)
-                        //     {
-                        //         var functionIndex = _functionIndices[functionName][callIndex];
-                        //         var (type, functionObject) = _functionLibraries[functionIndex];
-                        //         var functionDecl = type.GetMethod(functionName, argumentTypes!);
-                        //         var returnValue = functionDecl.Invoke(functionObject, args);
-                        //         return new ValueType {Type = function.ReturnTypeDefinition, Value = returnValue};
-                        //     }
-                        //     else
-                        //     {
-                        //         var functionIndex = _functionIndices[functionName][callIndex];
-                        //         var (type, functionObject) = _functionLibraries[functionIndex];
-                        //         var functionDecl = type.GetMethod(functionName);
-                        //         var returnValue = functionDecl.Invoke(functionObject, args);
-                        //         return new ValueType {Type = function.ReturnTypeDefinition, Value = returnValue};
-                        //     }
+                            // TODO Implement me
+                            // var args = arguments.Select(GetCArg).ToArray();
+                            // if (function.Varargs)
+                            // {
+                            //     var functionIndex = _functionIndices[functionName][callIndex];
+                            //     var (type, functionObject) = _functionLibraries[functionIndex];
+                            //     var functionDecl = type.GetMethod(functionName, argumentTypes!);
+                            //     var returnValue = functionDecl.Invoke(functionObject, args);
+                            //     return new ValueType {Type = function.ReturnTypeDefinition, Value = returnValue};
+                            // }
+                            // else
+                            // {
+                            //     var functionIndex = _functionIndices[functionName][callIndex];
+                            //     var (type, functionObject) = _functionLibraries[functionIndex];
+                            //     var functionDecl = type.GetMethod(functionName);
+                            //     var returnValue = functionDecl.Invoke(functionObject, args);
+                            //     return new ValueType {Type = function.ReturnTypeDefinition, Value = returnValue};
+                            // }
                         }
                         else if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Compiler))
                         {
-                        //     if (!_compilerFunctions.TryGetValue(function.Name, out var name))
-                        //     {
-                        //         ErrorReporter.Report($"Undefined compiler function '{function.Name}'", function);
-                        //         return null;
-                        //     }
-                        //     var args = arguments.Select(GetManagedArg).ToArray();
-
-                        //     var functionDecl = typeof(ProgramRunner).GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance);
-                        //     var returnValue = functionDecl.Invoke(this, args);
-                        //     return new ValueType {Type = function.ReturnTypeDefinition, Value = returnValue};
+                            if (!_compilerFunctions.TryGetValue(callingFunction.Source.Name, out var name))
+                            {
+                                ErrorReporter.Report($"Undefined compiler function '{callingFunction.Source.Name}'", callingFunction.Source);
+                            }
+                            else
+                            {
+                                var functionDecl = typeof(ProgramRunner).GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance);
+                                // TODO Implement me
+                                // var returnValue = functionDecl.Invoke(this, args);
+                                // registers[instruction.ValueIndex] = returnValue;
+                            }
                         }
                         else
                         {
