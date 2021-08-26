@@ -109,14 +109,14 @@ namespace Lang
             TypeBuilder functionTypeBuilder = null;
             foreach (var functions in TypeTable.Functions.Values)
             {
-                foreach (var function in functions.Where(_ => _.Extern))
+                foreach (var function in functions.Where(_ => _.Flags.HasFlag(FunctionFlags.Extern)))
                 {
                     var returnType = GetTypeFromDefinition(function.ReturnTypeDefinition);
 
                     if (!_functionIndices.TryGetValue(function.Name, out var functionIndex))
                         _functionIndices[function.Name] = functionIndex = new List<int>();
 
-                    if (function.Varargs)
+                    if (function.Flags.HasFlag(FunctionFlags.Varargs))
                     {
                         for (var i = functionIndex.Count; i < function.VarargsCalls.Count; i++)
                         {
@@ -299,7 +299,7 @@ namespace Lang
                                 returnTypeField.SetValue(typeInfo, _typeInfoPointers[function.ReturnTypeDefinition.GenericName]);
 
                                 var argumentArray = Activator.CreateInstance(argumentArrayType);
-                                var argumentCount = function.Varargs ? function.Arguments.Count - 1 : function.Arguments.Count;
+                                var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
                                 InitializeConstArray(argumentArray, argumentArrayType, argumentSize, argumentCount);
 
                                 var argumentsField = typeInfoType.GetField("arguments");
@@ -1223,7 +1223,7 @@ namespace Lang
         private ValueType ExecuteCall(CallAst call, IDictionary<string, ValueType> variables)
         {
             var function = call.Function;
-            if (call.Function.Params)
+            if (call.Function.Flags.HasFlag(FunctionFlags.Params))
             {
                 var arguments = new object[function.Arguments.Count];
                 for (var i = 0; i < function.Arguments.Count - 1; i++)
@@ -1255,7 +1255,7 @@ namespace Lang
 
                 return CallFunction(call.FunctionName, function, arguments);
             }
-            else if (function.Varargs)
+            else if (function.Flags.HasFlag(FunctionFlags.Varargs))
             {
                 var arguments = new object[call.Arguments.Count];
                 var types = new Type[call.Arguments.Count];
@@ -1294,7 +1294,7 @@ namespace Lang
                     var argument = call.Arguments[i];
                     var valueType = ExecuteExpression(argument, variables);
                     arguments[i] = valueType.Value;
-                    types[i] = GetTypeFromDefinition(valueType.Type, function.Extern);
+                    types[i] = GetTypeFromDefinition(valueType.Type, function.Flags.HasFlag(FunctionFlags.Extern));
                 }
 
                 return CallFunction(call.FunctionName, function, arguments, types);
@@ -1381,10 +1381,10 @@ namespace Lang
 
         private ValueType CallFunction(string functionName, FunctionAst function, object[] arguments, Type[] argumentTypes = null, int callIndex = 0)
         {
-            if (function.Extern)
+            if (function.Flags.HasFlag(FunctionFlags.Extern))
             {
                 var args = arguments.Select(GetCArg).ToArray();
-                if (function.Varargs)
+                if (function.Flags.HasFlag(FunctionFlags.Varargs))
                 {
                     var functionIndex = _functionIndices[functionName][callIndex];
                     var (type, functionObject) = _functionLibraries[functionIndex];
@@ -1402,7 +1402,7 @@ namespace Lang
                 }
             }
 
-            if (function.Compiler)
+            if (function.Flags.HasFlag(FunctionFlags.Compiler))
             {
                 if (!_compilerFunctions.TryGetValue(function.Name, out var name))
                 {
