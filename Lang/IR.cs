@@ -9,6 +9,7 @@ namespace Lang
         public static FunctionIR EntryPoint { get; set; }
         public static Dictionary<string, FunctionIR> Functions { get; } = new();
         public static Dictionary<string, InstructionValue> Constants { get; } = new();
+        public static uint GlobalVariablesSize { get; set; }
         public static List<GlobalVariable> GlobalVariables { get; } = new();
     }
 

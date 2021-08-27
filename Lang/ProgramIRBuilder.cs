@@ -353,6 +353,7 @@ namespace Lang
 
                 globalVariable.Index = declaration.AllocationIndex = Program.GlobalVariables.Count;
                 Program.GlobalVariables.Add(globalVariable);
+                Program.GlobalVariablesSize += globalVariable.Size;
             }
         }
 
