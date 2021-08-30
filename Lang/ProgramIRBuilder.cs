@@ -60,7 +60,7 @@ namespace Lang
                         var argument = function.Arguments[i];
                         var allocationIndex = AddAllocation(functionIR, argument);
 
-                        EmitStore(functionIR, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i});
+                        EmitStore(functionIR, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i, Type = argument.Type});
                     }
                 }
                 else
@@ -217,6 +217,8 @@ namespace Lang
                             text += $"{instruction.String} {PrintInstructionValue(instruction.Value1)} => v{instruction.ValueIndex}";
                             break;
                         case InstructionType.Load:
+                            text += $"{PrintInstructionValue(instruction.Value1)} {instruction.Value1.Type.Name} => v{instruction.ValueIndex}";
+                            break;
                         case InstructionType.IsNull:
                         case InstructionType.IsNotNull:
                         case InstructionType.Not:
@@ -580,7 +582,7 @@ namespace Lang
                             EmitStore(function, countPointer, count);
 
                             var elementType = new InstructionValue {ValueType = InstructionValueType.Type, Type = declaration.ArrayElementType};
-                            var arrayData = EmitInstruction(InstructionType.AllocateArray, function, null, count, elementType);
+                            var arrayData = EmitInstruction(InstructionType.AllocateArray, function, arrayStruct.Fields[1].Type, count, elementType);
                             var dataPointer = EmitGetStructPointer(function, allocationIndex, arrayStruct, 1);
                             EmitStore(function, dataPointer, arrayData);
                         }
@@ -1864,7 +1866,7 @@ namespace Lang
 
         private void EmitStore(FunctionIR function, int allocationIndex, InstructionValue value)
         {
-            var allocation = AllocationValue(allocationIndex, null);
+            var allocation = AllocationValue(allocationIndex, value.Type);
             EmitStore(function, allocation, value);
         }
 

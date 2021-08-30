@@ -1,0 +1,81 @@
+Arg 0: "Hello world" -- length = 11
+6! = 720
+my_struct: field = 1, something = 4.200000, subvalue.something = 13, subvalue.foo = 8
+call_field = 4.200000
+9.90, 2.00, 3.00, 4.00, 5.00, 6.00,
+Value 1 = 9
+Value 2 = 8
+Pointer = 0x56489e8a9f60, Value = 6
+something - Hello world 1, 2, 18
+Sum of Array  = 912
+Sum of Params = 912
+Initial array values 4, 0x56489e89b010
+Initial PolyStruct values 0, 0.00
+Initial MyStruct values 0, 4.20, {5, 8}
+'global_a' = 7
+'global_b' = 456
+87, 3.141590
+State is 6
+Current state - 6
+The state is Running
+Pointer value is 7
+Pointer is null
+Value = 8
+Value = 5
+Enum value = 1, Running = 0
+Enum value = 6, Running = 1
+9.90, 2.00, 3.00, 4.00, 5.00, 6.00,
+Value 1 = 2
+Value 2 = 5
+Value 3 = 10
+Value 4 = 15
+Value 5 = 20
+Constant value = 7
+Running Debug code
+Opening X11 window
+Type Name = MyStruct, Type Kind = 8, Type Size = 13, Field Count = 3
+Field name = field, Field offset = 0, Field type name = u8
+Field name = something, Field offset = 1, Field type name = float
+Field name = subValue, Field offset = 5, Field type name = OtherStruct
+Type Name = u8, Type Kind = 2, Type Size = 1, Field Count = 0
+Type Name = Array<string>, Type Kind = 6, Type Size = 12, Field Count = 2
+Field name = length, Field offset = 0, Field type name = s32
+Field name = data, Field offset = 4, Field type name = string*
+Type Name = PolyStruct<s32*, float>, Type Kind = 8, Type Size = 12, Field Count = 2
+Field name = field1, Field offset = 0, Field type name = s32*
+Field name = field2, Field offset = 8, Field type name = float
+Type Name = PolyStruct<Array<s32>, float>, Type Kind = 8, Type Size = 16, Field Count = 2
+Field name = field1, Field offset = 0, Field type name = Array<s32>
+Field name = field2, Field offset = 12, Field type name = float
+Type Name = s32*, Type Kind = 5, Type Size = 8, Field Count = 0
+Type Name = State, Type Kind = 7, Type Size = 4, Field Count = 0
+Enum value name = Stopped, Value = 0
+Enum value name = Stopping, Value = 1
+Enum value name = Starting, Value = 5
+Enum value name = Running, Value = 6
+Type Name = OtherStruct, Type Kind = 8, Type Size = 8, Field Count = 2
+Field name = something, Field offset = 0, Field type name = s32
+Field name = foo, Field offset = 4, Field type name = s32
+Type Name = bar, Type Kind = 9, Type Size = 0, Field Count = 0
+Return type = s32
+Argument name = a, Argument type name = s32, Argument type kind = 2
+Argument name = b, Argument type name = string, Argument type kind = 4
+Argument name = c, Argument type name = float, Argument type kind = 3
+a = 18446744073709486080, b = -65536, c = 18446744073709486080.000000, d = 6
+Value = 1
+Value = 2
+Value = 3
+Special Value = 4
+Value = 4
+Special Value = 5
+Value = 5
+Special Value = 6
+Value = 6
+Special Value = 7
+Value = 7
+Special Value = 8
+Value = 8
+Special Value = 9
+Value = 9
+Special Value = 10
+Value = 10

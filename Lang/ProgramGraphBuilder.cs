@@ -21,6 +21,7 @@ namespace Lang
         private readonly IPolymorpher _polymorpher;
         private readonly IProgramRunner _programRunner;
         private readonly IProgramIRBuilder _irBuilder;
+        private readonly _IProgramRunner _runner;
 
         private readonly ProgramGraph _programGraph = new();
         private readonly Dictionary<string, StructAst> _polymorphicStructs = new();
@@ -29,11 +30,12 @@ namespace Lang
         private readonly ScopeAst _globalScope = new();
         private readonly TypeDefinition _s32Type = new() {Name = "s32", TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
 
-        public ProgramGraphBuilder(IPolymorpher polymorpher, IProgramRunner programRunner, IProgramIRBuilder irBuilder)
+        public ProgramGraphBuilder(IPolymorpher polymorpher, IProgramRunner programRunner, IProgramIRBuilder irBuilder, _IProgramRunner runner)
         {
             _polymorpher = polymorpher;
             _programRunner = programRunner;
             _irBuilder = irBuilder;
+            _runner = runner;
         }
 
         public void CreateProgramGraph(List<IAst> asts)
@@ -172,8 +174,10 @@ namespace Lang
                                     if (VerifyCondition(conditional.Condition, null, _globalScope))
                                     {
                                         var condition = _irBuilder.CreateRunnableCondition(conditional.Condition, _globalScope);
-                                        _programRunner.Init(_programGraph);
-                                        if (_programRunner.ExecuteCondition(conditional!.Condition))
+                                        // _programRunner.Init(_programGraph);
+                                        _runner.Init();
+                                        // if (_programRunner.ExecuteCondition(conditional!.Condition))
+                                        if (_runner.ExecuteCondition(condition, conditional.Condition))
                                         {
                                             additionalAsts.AddRange(conditional.IfBlock.Children);
                                         }
@@ -188,8 +192,10 @@ namespace Lang
                                     if (VerifyCondition(directive.Value, null, _globalScope))
                                     {
                                         var condition = _irBuilder.CreateRunnableCondition(directive.Value, _globalScope);
-                                        _programRunner.Init(_programGraph);
-                                        if (!_programRunner.ExecuteCondition(directive.Value))
+                                        // _programRunner.Init(_programGraph);
+                                        _runner.Init();
+                                        // if (!_programRunner.ExecuteCondition(directive.Value))
+                                        if (!_runner.ExecuteCondition(condition, directive.Value))
                                         {
                                             ErrorReporter.Report("Assertion failed", directive.Value);
                                         }
@@ -1008,8 +1014,10 @@ namespace Lang
                                 if (VerifyCondition(conditional.Condition, null, _globalScope))
                                 {
                                     var condition = _irBuilder.CreateRunnableCondition(conditional.Condition, _globalScope);
-                                    _programRunner.Init(_programGraph);
-                                    if (_programRunner.ExecuteCondition(conditional!.Condition))
+                                    // _programRunner.Init(_programGraph);
+                                    _runner.Init();
+                                    // if (_programRunner.ExecuteCondition(conditional!.Condition))
+                                    if (_runner.ExecuteCondition(condition, conditional.Condition))
                                     {
                                         asts.InsertRange(i, conditional.IfBlock.Children);
                                     }
@@ -1023,8 +1031,10 @@ namespace Lang
                                 if (VerifyCondition(directive.Value, null, _globalScope))
                                 {
                                     var condition = _irBuilder.CreateRunnableCondition(directive.Value, _globalScope);
-                                    _programRunner.Init(_programGraph);
-                                    if (!_programRunner.ExecuteCondition(directive.Value))
+                                    // _programRunner.Init(_programGraph);
+                                    _runner.Init();
+                                    // if (!_programRunner.ExecuteCondition(directive.Value))
+                                    if (!_runner.ExecuteCondition(condition, directive.Value))
                                     {
                                         if (function is FunctionAst functionAst)
                                         {
@@ -2157,8 +2167,11 @@ namespace Lang
                     if (!ErrorReporter.Errors.Any())
                     {
                         var function = _irBuilder.CreateRunnableFunction(directive.Value, _globalScope);
-                        _programRunner.Init(_programGraph);
-                        _programRunner.RunProgram(directive.Value);
+
+                        // _programRunner.Init(_programGraph);
+                        // _programRunner.RunProgram(directive.Value);
+                        _runner.Init();
+                        _runner.RunProgram(function, directive.Value);
                     }
                     break;
                 default:
@@ -2726,22 +2739,25 @@ namespace Lang
                     var callTypes = function.VarargsCalls[index];
                     if (callTypes.Count == arguments.Length)
                     {
-                        var callMatches = true;
-                        for (var i = 0; i < callTypes.Count; i++)
-                        {
-                            if (!TypeEquals(callTypes[i], arguments[i], true))
-                            {
-                                callMatches = false;
-                                break;
-                            }
-                        }
+                        found = true;
+                        call.VarargsIndex = index;
+                        break;
+                        // var callMatches = true;
+                        // for (var i = 0; i < callTypes.Count; i++)
+                        // {
+                        //     if (!TypeEquals(callTypes[i], arguments[i], true))
+                        //     {
+                        //         callMatches = false;
+                        //         break;
+                        //     }
+                        // }
 
-                        if (callMatches)
-                        {
-                            found = true;
-                            call.VarargsIndex = index;
-                            break;
-                        }
+                        // if (callMatches)
+                        // {
+                        //     found = true;
+                        //     call.VarargsIndex = index;
+                        //     break;
+                        // }
                     }
                 }
 
