@@ -571,6 +571,7 @@ namespace Lang.Backend
                             break;
                         }
                         case InstructionType.Load:
+                        case InstructionType.LoadPointer:
                         {
                             var value = GetValue(instruction.Value1, values, allocations, functionPointer);
                             values[instruction.ValueIndex] = _builder.BuildLoad(value);
