@@ -59,7 +59,6 @@ namespace Lang
             // - When function IR is built and the function is extern, create the function ref
             // - When a global variable is added, store them in the global space
 
-
             // Initialize the runner
             if (_moduleBuilder == null)
             {
@@ -137,16 +136,16 @@ namespace Lang
                     {
                         _typeTablePointer = pointer;
                     }
-
-                    if (variable.InitialValue != null)
+                    else if (variable.InitialValue != null)
                     {
-                         // InitializeGlobalVariable(pointer, variable.InitialValue);
+                         InitializeGlobalVariable(pointer, variable.InitialValue);
                     }
 
                     _globals[i] = pointer;
                     pointer += (int)variable.Size;
                 }
             }
+
 
             if (_typeCount != TypeTable.Count)
             {
@@ -163,8 +162,8 @@ namespace Lang
                     _typeInfoPointers = newTypeInfoPointers;
                 }
 
-                Marshal.StructureToPtr(_typeCount, _typeTablePointer, false);
                 // TODO Implement me
+                // Marshal.StructureToPtr(_typeCount, _typeTablePointer, false);
                 // // Get required types and allocate the array
                 // var typeInfoArrayType = _types["Array.*.TypeInfo"];
                 // var typeInfoType = _types["TypeInfo"];
@@ -366,15 +365,15 @@ namespace Lang
                     for (var i = 0; i < value.Values.Length; i++)
                     {
                         var field = structDef.Fields[i];
-                        pointer += (int)field.Offset;
-                        InitializeGlobalVariable(pointer, value.Values[i]);
+                        var fieldPointer = pointer + (int)field.Offset;
+                        InitializeGlobalVariable(fieldPointer, value.Values[i]);
                     }
                     break;
                 case InstructionValueType.ConstantArray when value.Values != null:
                     for (var i = 0; i < value.ArrayLength; i++)
                     {
-                        pointer += i * (int)value.Type.Size;
-                        InitializeGlobalVariable(pointer, value.Values[i]);
+                        var arrayPointer = pointer + i * (int)value.Type.Size;
+                        InitializeGlobalVariable(arrayPointer, value.Values[i]);
                     }
                     break;
             }
