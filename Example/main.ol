@@ -321,7 +321,6 @@ u32 sleep(u32 seconds) #extern "libc"
 
 #run {
     args: Array<string> = ["Hello world"]
-    printf("Hello world\n");
     main(args);
 
     build();
