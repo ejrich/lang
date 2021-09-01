@@ -19,7 +19,6 @@ namespace Lang
     public class ProgramGraphBuilder : IProgramGraphBuilder
     {
         private readonly IPolymorpher _polymorpher;
-        private readonly IProgramRunner _programRunner;
         private readonly IProgramIRBuilder _irBuilder;
         private readonly _IProgramRunner _runner;
 
@@ -30,10 +29,9 @@ namespace Lang
         private readonly ScopeAst _globalScope = new();
         private readonly TypeDefinition _s32Type = new() {Name = "s32", TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
 
-        public ProgramGraphBuilder(IPolymorpher polymorpher, IProgramRunner programRunner, IProgramIRBuilder irBuilder, _IProgramRunner runner)
+        public ProgramGraphBuilder(IPolymorpher polymorpher, IProgramIRBuilder irBuilder, _IProgramRunner runner)
         {
             _polymorpher = polymorpher;
-            _programRunner = programRunner;
             _irBuilder = irBuilder;
             _runner = runner;
         }
@@ -174,9 +172,8 @@ namespace Lang
                                     if (VerifyCondition(conditional.Condition, null, _globalScope))
                                     {
                                         var condition = _irBuilder.CreateRunnableCondition(conditional.Condition, _globalScope);
-                                        // _programRunner.Init(_programGraph);
                                         _runner.Init();
-                                        // if (_programRunner.ExecuteCondition(conditional!.Condition))
+
                                         if (_runner.ExecuteCondition(condition, conditional.Condition))
                                         {
                                             additionalAsts.AddRange(conditional.IfBlock.Children);
@@ -192,9 +189,8 @@ namespace Lang
                                     if (VerifyCondition(directive.Value, null, _globalScope))
                                     {
                                         var condition = _irBuilder.CreateRunnableCondition(directive.Value, _globalScope);
-                                        // _programRunner.Init(_programGraph);
                                         _runner.Init();
-                                        // if (!_programRunner.ExecuteCondition(directive.Value))
+
                                         if (!_runner.ExecuteCondition(condition, directive.Value))
                                         {
                                             ErrorReporter.Report("Assertion failed", directive.Value);
@@ -628,7 +624,7 @@ namespace Lang
                             ErrorReporter.Report($"Function '{function.Name}' cannot have multiple varargs", argument.TypeDefinition);
                         }
                         function.Flags |= FunctionFlags.Varargs;
-                        function.VarargsCalls = new List<List<TypeDefinition>>();
+                        function.VarargsCalls = new List<int>();
                         break;
                     case TypeKind.Params:
                         if (function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params))
@@ -1014,9 +1010,8 @@ namespace Lang
                                 if (VerifyCondition(conditional.Condition, null, _globalScope))
                                 {
                                     var condition = _irBuilder.CreateRunnableCondition(conditional.Condition, _globalScope);
-                                    // _programRunner.Init(_programGraph);
                                     _runner.Init();
-                                    // if (_programRunner.ExecuteCondition(conditional!.Condition))
+
                                     if (_runner.ExecuteCondition(condition, conditional.Condition))
                                     {
                                         asts.InsertRange(i, conditional.IfBlock.Children);
@@ -1031,9 +1026,8 @@ namespace Lang
                                 if (VerifyCondition(directive.Value, null, _globalScope))
                                 {
                                     var condition = _irBuilder.CreateRunnableCondition(directive.Value, _globalScope);
-                                    // _programRunner.Init(_programGraph);
                                     _runner.Init();
-                                    // if (!_programRunner.ExecuteCondition(directive.Value))
+
                                     if (!_runner.ExecuteCondition(condition, directive.Value))
                                     {
                                         if (function is FunctionAst functionAst)
@@ -2162,14 +2156,11 @@ namespace Lang
             switch (directive.Type)
             {
                 case DirectiveType.Run:
-                    // TODO Figure out where to put this IR
                     VerifyAst(directive.Value, null, _globalScope, false);
                     if (!ErrorReporter.Errors.Any())
                     {
                         var function = _irBuilder.CreateRunnableFunction(directive.Value, _globalScope);
 
-                        // _programRunner.Init(_programGraph);
-                        // _programRunner.RunProgram(directive.Value);
                         _runner.Init();
                         _runner.RunProgram(function, directive.Value);
                     }
@@ -2731,40 +2722,23 @@ namespace Lang
                             };
                             break;
                     }
-
                 }
                 var found = false;
                 for (var index = 0; index < function.VarargsCalls.Count; index++)
                 {
-                    var callTypes = function.VarargsCalls[index];
-                    if (callTypes.Count == arguments.Length)
+                    var varargsLength = function.VarargsCalls[index];
+                    if (varargsLength == arguments.Length)
                     {
                         found = true;
                         call.VarargsIndex = index;
                         break;
-                        // var callMatches = true;
-                        // for (var i = 0; i < callTypes.Count; i++)
-                        // {
-                        //     if (!TypeEquals(callTypes[i], arguments[i], true))
-                        //     {
-                        //         callMatches = false;
-                        //         break;
-                        //     }
-                        // }
-
-                        // if (callMatches)
-                        // {
-                        //     found = true;
-                        //     call.VarargsIndex = index;
-                        //     break;
-                        // }
                     }
                 }
 
                 if (!found)
                 {
                     call.VarargsIndex = function.VarargsCalls.Count;
-                    function.VarargsCalls.Add(arguments.ToList());
+                    function.VarargsCalls.Add(arguments.Length);
                 }
             }
 
