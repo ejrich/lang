@@ -48,7 +48,6 @@ namespace Lang
 
         private int _typeCount;
         private IntPtr _typeTablePointer;
-        private IntPtr[] _typeInfoPointers;
 
         private uint _globalVariablesSize;
         private IntPtr[] _globals;
@@ -138,26 +137,17 @@ namespace Lang
             {
                 _typeCount = TypeTable.Count;
 
-                if (_typeInfoPointers == null)
-                {
-                    _typeInfoPointers = new IntPtr[TypeTable.Count];
-                }
-                else
-                {
-                    var newTypeInfoPointers = new IntPtr[TypeTable.Count];
-                    _typeInfoPointers.CopyTo(newTypeInfoPointers, 0);
-                    _typeInfoPointers = newTypeInfoPointers;
-                }
-
-                // TODO Implement me
-                // Marshal.StructureToPtr(_typeCount, _typeTablePointer, false);
-
                 // Set the data pointer
-                // fixed (IntPtr* pointer = &_typeInfoPointers[0])
-                // {
-                //     var dataPointer = _typeTablePointer + 4;
-                //     Buffer.MemoryCopy(pointer, dataPointer.ToPointer(), 8, 8);
-                // }
+                var typeInfosArray = TypeTable.TypeInfos.ToArray();
+                var arraySize = _typeCount * sizeof(IntPtr);
+                var typeTableArrayPointer = Allocator.Allocate(arraySize);
+                fixed (IntPtr* pointer = &typeInfosArray[0])
+                {
+                    Buffer.MemoryCopy(pointer, typeTableArrayPointer.ToPointer(), arraySize, arraySize);
+                }
+
+                var typeTableArray = new TypeTable.Array {Length = TypeTable.Count, Data = typeTableArrayPointer};
+                Marshal.StructureToPtr(typeTableArray, _typeTablePointer, false);
             }
         }
 
