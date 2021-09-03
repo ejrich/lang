@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 
 namespace Lang
 {
-    public static class TypeTable
+    public unsafe static class TypeTable
     {
         public static int Count { get; set; }
         public static Dictionary<string, IType> Types { get; } = new();
@@ -15,7 +15,9 @@ namespace Lang
             if (Types.TryAdd(name, type))
             {
                 type.TypeIndex = Count++;
-                CreateTypeInfo(type);
+                // Set a temporary value of null before the type data is fully determined
+                TypeInfos.Add(IntPtr.Zero);
+                // CreateTypeInfo(type);
                 return true;
             }
             return false;
@@ -30,7 +32,36 @@ namespace Lang
             function.TypeIndex = Count++;
             function.OverloadIndex = functions.Count;
             functions.Add(function);
-            CreateTypeInfo(function);
+
+            // Add function to type infos
+            var typeInfo = new TypeInfo {Name = Allocator.MakeString(function.Name), Type = TypeKind.Function};
+            typeInfo.ReturnType = TypeInfos[function.ReturnType.TypeIndex];
+
+            var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
+            if (argumentCount > 0)
+            {
+                typeInfo.Arguments.Length = argumentCount;
+                var arguments = new ArgumentType[argumentCount];
+
+                for (var i = 0; i < argumentCount; i++)
+                {
+                    var argument = function.Arguments[i];
+                    var argumentType = new ArgumentType {Name = Allocator.MakeString(argument.Name), TypeInfo = TypeInfos[argument.Type.TypeIndex]};
+                    arguments[i] = argumentType;
+                }
+
+                var argumentTypesArraySize = argumentCount * ArgumentTypeSize;
+                var argumentTypesPointer = Allocator.Allocate(argumentTypesArraySize);
+                fixed (ArgumentType* pointer = &arguments[0])
+                {
+                    Buffer.MemoryCopy(pointer, argumentTypesPointer.ToPointer(), argumentTypesArraySize, argumentTypesArraySize);
+                }
+                typeInfo.Arguments.Data = argumentTypesPointer;
+            }
+
+            var typeInfoPointer = Allocator.Allocate(TypeInfoSize);
+            TypeInfos.Add(typeInfoPointer);
+            Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
 
             return functions;
         }
@@ -72,103 +103,85 @@ namespace Lang
             [FieldOffset(4)] public IntPtr Data;
         }
 
-        private static void CreateTypeInfo(IType type)
+        private const int TypeFieldSize = 24;
+        [StructLayout(LayoutKind.Explicit, Size=TypeFieldSize)]
+        public struct TypeField
         {
-            // Create TypeInfo pointer
-            var typeInfoPointer = Allocator.Allocate(TypeInfoSize);
-            TypeInfos.Add(typeInfoPointer);
+            [FieldOffset(0)] public String Name;
+            [FieldOffset(12)] public uint Offset;
+            [FieldOffset(16)] public IntPtr TypeInfo;
+        }
+
+        private const int EnumValueSize = 16;
+        [StructLayout(LayoutKind.Explicit, Size=EnumValueSize)]
+        public struct EnumValue
+        {
+            [FieldOffset(0)] public String Name;
+            [FieldOffset(12)] public int Value;
+        }
+
+        private const int ArgumentTypeSize = 20;
+        [StructLayout(LayoutKind.Explicit, Size=ArgumentTypeSize)]
+        public struct ArgumentType
+        {
+            [FieldOffset(0)] public String Name;
+            [FieldOffset(12)] public IntPtr TypeInfo;
+        }
+
+        public static void CreateTypeInfo(IType type)
+        {
             var typeInfo = new TypeInfo {Name = Allocator.MakeString(type.Name), Type = type.TypeKind, Size = type.Size};
 
             switch (type)
             {
-                case StructAst structAst:
-                    // var typeFieldArray = Activator.CreateInstance(typeFieldArrayType);
-                    // InitializeConstArray(typeFieldArray, typeFieldArrayType, typeFieldSize, structAst.Fields.Count);
+                case StructAst structAst when structAst.Fields.Count > 0:
+                    typeInfo.Fields.Length = structAst.Fields.Count;
+                    var typeFields = new TypeField[typeInfo.Fields.Length];
 
-                    // var typeFieldsField = typeInfoType.GetField("fields");
-                    // typeFieldsField.SetValue(typeInfo, typeFieldArray);
-
-                    // var typeFieldArrayDataField = typeFieldArrayType.GetField("data");
-                    // var typeFieldsDataPointer = GetPointer(typeFieldArrayDataField.GetValue(typeFieldArray));
-
-                    for (var i = 0; i < structAst.Fields.Count; i++)
+                    for (var i = 0; i < typeInfo.Fields.Length; i++)
                     {
                         var field = structAst.Fields[i];
-                        // var typeField = Activator.CreateInstance(typeFieldType);
-
-                        // var typeFieldName = typeFieldType.GetField("name");
-                        // typeFieldName.SetValue(typeField, GetString(field.Name));
-                        // var typeFieldOffset = typeFieldType.GetField("offset");
-                        // typeFieldOffset.SetValue(typeField, field.Offset);
-                        // var typeFieldInfo = typeFieldType.GetField("type_info");
-                        // var typePointer = _typeInfoPointers[field.TypeDefinition.GenericName];
-                        // typeFieldInfo.SetValue(typeField, typePointer);
-
-                        // var arrayPointer = IntPtr.Add(typeFieldsDataPointer, typeFieldSize * i);
-                        // Marshal.StructureToPtr(typeField, arrayPointer, false);
+                        var typeField = new TypeField {Name = Allocator.MakeString(field.Name), Offset = field.Offset, TypeInfo = TypeInfos[field.Type.TypeIndex]};
+                        typeFields[i] = typeField;
                     }
+
+                    var typeFieldsArraySize = typeInfo.Fields.Length * TypeFieldSize;
+                    var typeFieldsPointer = Allocator.Allocate(typeFieldsArraySize);
+                    fixed (TypeField* pointer = &typeFields[0])
+                    {
+                        Buffer.MemoryCopy(pointer, typeFieldsPointer.ToPointer(), typeFieldsArraySize, typeFieldsArraySize);
+                    }
+                    typeInfo.Fields.Data = typeFieldsPointer;
                     break;
                 case EnumAst enumAst:
-                    // var enumValueArray = Activator.CreateInstance(enumValueArrayType);
-                    // InitializeConstArray(enumValueArray, enumValueArrayType, enumValueSize, enumAst.Values.Count);
+                    typeInfo.EnumValues.Length = enumAst.Values.Count;
+                    var enumValues = new EnumValue[typeInfo.EnumValues.Length];
 
-                    // var enumValuesField = typeInfoType.GetField("enum_values");
-                    // enumValuesField.SetValue(typeInfo, enumValueArray);
-
-                    // var enumValuesArrayDataField = enumValueArrayType.GetField("data");
-                    // var enumValuesDataPointer = GetPointer(enumValuesArrayDataField.GetValue(enumValueArray));
-
-                    for (var i = 0; i < enumAst.Values.Count; i++)
+                    for (var i = 0; i < typeInfo.EnumValues.Length; i++)
                     {
                         var value = enumAst.Values[i];
-                        // var enumValue = Activator.CreateInstance(enumValueType);
-
-                        // var enumValueName = enumValueType.GetField("name");
-                        // enumValueName.SetValue(enumValue, GetString(value.Name));
-                        // var enumValueValue = enumValueType.GetField("value");
-                        // enumValueValue.SetValue(enumValue, value.Value);
-
-                        // var arrayPointer = IntPtr.Add(enumValuesDataPointer, enumValueSize * i);
-                        // Marshal.StructureToPtr(enumValue, arrayPointer, false);
+                        var enumValue = new EnumValue {Name = Allocator.MakeString(value.Name), Value = value.Value};
+                        enumValues[i] = enumValue;
                     }
-                    break;
-                case FunctionAst function:
-                    // var returnTypeField = typeInfoType.GetField("return_type");
-                    // returnTypeField.SetValue(typeInfo, _typeInfoPointers[function.ReturnTypeDefinition.GenericName]);
 
-                    // var argumentArray = Activator.CreateInstance(argumentArrayType);
-                    var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
-                    // InitializeConstArray(argumentArray, argumentArrayType, argumentSize, argumentCount);
-
-                    // var argumentsField = typeInfoType.GetField("arguments");
-                    // argumentsField.SetValue(typeInfo, argumentArray);
-
-                    // var argumentArrayDataField = argumentArrayType.GetField("data");
-                    // var argumentArrayDataPointer = GetPointer(argumentArrayDataField.GetValue(argumentArray));
-
-                    for (var i = 0; i < argumentCount; i++)
+                    var enumValuesArraySize = typeInfo.EnumValues.Length * EnumValueSize;
+                    var enumValuesPointer = Allocator.Allocate(enumValuesArraySize);
+                    fixed (EnumValue* pointer = &enumValues[0])
                     {
-                        var argument = function.Arguments[i];
-                        // var argumentValue = Activator.CreateInstance(argumentType);
-
-                        // var argumentName = argumentType.GetField("name");
-                        // argumentName.SetValue(argumentValue, GetString(argument.Name));
-                        // var argumentTypeField = argumentType.GetField("type_info");
-
-                        // var argumentTypeInfoPointer = argument.TypeDefinition.TypeKind switch
-                        // {
-                        //     TypeKind.Type => _typeInfoPointers["s32"],
-                        //     TypeKind.Params => _typeInfoPointers[$"Array.{argument.TypeDefinition.Generics[0].GenericName}"],
-                        //     _ => _typeInfoPointers[argument.TypeDefinition.GenericName]
-                        // };
-                        // argumentTypeField.SetValue(argumentValue, argumentTypeInfoPointer);
-
-                        // var arrayPointer = IntPtr.Add(argumentArrayDataPointer, argumentSize * i);
-                        // Marshal.StructureToPtr(argumentValue, arrayPointer, false);
+                        Buffer.MemoryCopy(pointer, enumValuesPointer.ToPointer(), enumValuesArraySize, enumValuesArraySize);
                     }
+                    typeInfo.EnumValues.Data = enumValuesPointer;
+                    break;
+                case PrimitiveAst primitive when primitive.TypeKind == TypeKind.Pointer:
+                    typeInfo.PointerType = TypeInfos[primitive.PointerType.TypeIndex];
+                    break;
+                case ArrayType arrayType:
+                    typeInfo.ElementType = TypeInfos[arrayType.ElementType.TypeIndex];
                     break;
             }
 
+            var typeInfoPointer = Allocator.Allocate(TypeInfoSize);
+            TypeInfos[type.TypeIndex] = typeInfoPointer;
             Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
         }
     }
