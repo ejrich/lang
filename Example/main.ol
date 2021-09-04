@@ -72,13 +72,14 @@ int main(Array<string> args) { //#print_ir {
 
     print_type_info(MyStruct);
     print_type_info(u8);
-    // print_type_info(Array<string>);
-    // print_type_info(PolyStruct<int*, float>);
+    print_type_info(Array<string>);
+    print_type_info(PolyStruct<int*, float>);
     print_type_info(PolyStruct<Array<int>, float>);
-    // print_type_info(s32*);
+    print_type_info(s32*);
     print_type_info(State);
     print_type_info(my_struct.subValue);
-    // print_type_info(bar);
+    print_type_info(string);
+    print_type_info(bar);
 
     type_casts();
 
