@@ -795,13 +795,19 @@ namespace Lang
 
         private void EmitAssignment(FunctionIR function, AssignmentAst assignment, ScopeAst scope)
         {
-            var pointer = EmitGetReference(function, assignment.Reference, scope);
+            var pointer = EmitGetReference(function, assignment.Reference, scope, out var loaded);
 
             var value = EmitIR(function, assignment.Value, scope);
             if (assignment.Operator != Operator.None)
             {
-                var previousValue = EmitLoad(function, pointer.Type, pointer);
-                value = EmitExpression(function, previousValue, value, assignment.Operator, pointer.Type);
+                var type = pointer.Type;
+                if (loaded && pointer.Type.TypeKind == TypeKind.Pointer)
+                {
+                    var pointerType = (PrimitiveAst)type;
+                    type = pointerType.PointerType;
+                }
+                var previousValue = EmitLoad(function, type, pointer);
+                value = EmitExpression(function, previousValue, value, assignment.Operator, type);
             }
 
             EmitStore(function, pointer, value);
@@ -1123,7 +1129,7 @@ namespace Lang
                 case CallAst call:
                     return EmitCall(function, call, scope);
                 case ChangeByOneAst changeByOne:
-                    var pointer = EmitGetReference(function, changeByOne.Value, scope);
+                    var pointer = EmitGetReference(function, changeByOne.Value, scope, out _);
                     var previousValue = EmitLoad(function, pointer.Type, pointer);
 
                     var constOne = new InstructionValue {ValueType = InstructionValueType.Constant, Type = changeByOne.Type};
@@ -1157,7 +1163,7 @@ namespace Lang
                             value = EmitIR(function, unary.Value, scope);
                             return EmitLoad(function, unary.Type, value);
                         case UnaryOperator.Reference:
-                            value = EmitGetReference(function, unary.Value, scope);
+                            value = EmitGetReference(function, unary.Value, scope, out _);
                             if (value.Type.TypeKind == TypeKind.CArray)
                             {
                                 return EmitInstruction(InstructionType.PointerCast, function, unary.Type, value, new InstructionValue {ValueType = InstructionValueType.Type, Type = unary.Type});
@@ -1270,8 +1276,9 @@ namespace Lang
             return value;
         }
 
-        private InstructionValue EmitGetReference(FunctionIR function, IAst ast, ScopeAst scope)
+        private InstructionValue EmitGetReference(FunctionIR function, IAst ast, ScopeAst scope, out bool loaded)
         {
+            loaded = false;
             switch (ast)
             {
                 case IdentifierAst identifier:
@@ -1292,8 +1299,9 @@ namespace Lang
                     }
                     break;
                 case StructFieldRefAst structField:
-                    return EmitGetStructRefPointer(function, structField, scope, out _);
+                    return EmitGetStructRefPointer(function, structField, scope, out loaded);
                 case IndexAst index:
+                    loaded = index.CallsOverload;
                     return EmitGetIndexPointer(function, index, scope);
                 case UnaryAst unary:
                     return EmitIR(function, unary.Value, scope);

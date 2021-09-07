@@ -1828,37 +1828,63 @@ namespace Lang
                 return null;
             }
 
-            // 2. Determine the type and get generics if necessary
-            overload.Type = ParseType(enumerator);
-            if (overload.Type.Generics.Any())
+            // 2. Determine generics if necessary
+            if (enumerator.Current?.Type == TokenType.LessThan)
             {
-                foreach (var generic in overload.Type.Generics)
+                var commaRequiredBeforeNextType = false;
+                var generics = new HashSet<string>();
+                while (enumerator.MoveNext())
                 {
-                    if (generic.Name == "*" || generic.Count != null)
+                    var token = enumerator.Current;
+
+                    if (token.Type == TokenType.GreaterThan)
                     {
-                        ErrorReporter.Report("Expected operator overload generic to be specified as ian indentifier", generic.FileIndex, generic.Line, generic.Column);
+                        if (!commaRequiredBeforeNextType)
+                        {
+                            ErrorReporter.Report($"Expected comma in generics", token);
+                        }
+
+                        break;
+                    }
+
+                    if (!commaRequiredBeforeNextType)
+                    {
+                        switch (token.Type)
+                        {
+                            case TokenType.Identifier:
+                                if (!generics.Add(token.Value))
+                                {
+                                    ErrorReporter.Report($"Duplicate generic '{token.Value}'", token);
+                                }
+                                commaRequiredBeforeNextType = true;
+                                break;
+                            default:
+                                ErrorReporter.Report($"Unexpected token '{token.Value}' in generics", token);
+                                commaRequiredBeforeNextType = true;
+                                break;
+                        }
                     }
                     else
                     {
-                        if (generic.Generics.Any())
+                        switch (token.Type)
                         {
-                            ErrorReporter.Report($"Invalid generic in operator overload of type '{overload.Type.Name}'", generic.FileIndex, generic.Line, generic.Column);
-                        }
-                        else if (overload.Generics.Contains(generic.Name))
-                        {
-                            ErrorReporter.Report($"Duplicate generic '{generic.Name}' in operator overload of type '{overload.Type.Name}'", generic.FileIndex, generic.Line, generic.Column);
-                        }
-                        else
-                        {
-                            overload.Generics.Add(generic.Name);
+                            case TokenType.Comma:
+                                commaRequiredBeforeNextType = false;
+                                break;
+                            default:
+                                ErrorReporter.Report($"Unexpected token '{token.Value}' when defining generics", token);
+                                commaRequiredBeforeNextType = false;
+                                break;
                         }
                     }
                 }
-            }
-            if (!enumerator.MoveNext())
-            {
-                ErrorReporter.Report($"Expected to get the arguments for the operator overload", enumerator.Last);
-                return null;
+
+                if (!generics.Any())
+                {
+                    ErrorReporter.Report("Expected operator overload to contain generics", enumerator.Current ?? enumerator.Last);
+                }
+                enumerator.MoveNext();
+                overload.Generics.AddRange(generics);
             }
 
             // 3. Find open paren to start parsing arguments
@@ -1866,7 +1892,7 @@ namespace Lang
             {
                 // Add an error to the function AST and continue until open paren
                 var token = enumerator.Current ?? enumerator.Last;
-                ErrorReporter.Report($"Unexpected token '{token.Value}' in function definition", token);
+                ErrorReporter.Report($"Unexpected token '{token.Value}' in operator overload definition", token);
                 while (enumerator.Current != null && enumerator.Current.Type != TokenType.OpenParen)
                     enumerator.MoveNext();
             }
@@ -1906,6 +1932,10 @@ namespace Lang
                                 {
                                     currentArgument.HasGenerics = true;
                                 }
+                            }
+                            if (overload.Arguments.Count == 0)
+                            {
+                                overload.Type = currentArgument.TypeDefinition;
                             }
                         }
                         else
