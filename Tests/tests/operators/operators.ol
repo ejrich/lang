@@ -198,7 +198,7 @@ operator + <T, U>(PolyStruct<T, U> a, PolyStruct<T, U> b) {
     return c;
 }
 
-index_overloading() {//#print_ir {
+index_overloading() {
     a: SOAVector3;
     a.x[2] = 9.0;
     a.y[2] = 8.0;

@@ -1129,8 +1129,14 @@ namespace Lang
                 case CallAst call:
                     return EmitCall(function, call, scope);
                 case ChangeByOneAst changeByOne:
-                    var pointer = EmitGetReference(function, changeByOne.Value, scope, out _);
-                    var previousValue = EmitLoad(function, pointer.Type, pointer);
+                    var pointer = EmitGetReference(function, changeByOne.Value, scope, out loaded);
+                    var pointerType = pointer.Type;
+                    if (loaded && pointer.Type.TypeKind == TypeKind.Pointer)
+                    {
+                        var pointerTypeDef = (PrimitiveAst)pointerType;
+                        pointerType = pointerTypeDef.PointerType;
+                    }
+                    var previousValue = EmitLoad(function, pointerType, pointer);
 
                     var constOne = new InstructionValue {ValueType = InstructionValueType.Constant, Type = changeByOne.Type};
                     InstructionType instructionType;
