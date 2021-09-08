@@ -85,7 +85,7 @@ namespace Lang
         public TypeDefinition ReturnTypeDefinition { get; set; }
         public List<string> Generics { get; } = new();
         public List<DeclarationAst> Arguments { get; } = new();
-        public List<TypeDefinition[]> VarargsCalls { get; set; }
+        public List<IType[]> VarargsCallTypes { get; set; }
         public ScopeAst Body { get; set; }
     }
 
@@ -145,7 +145,7 @@ namespace Lang
         public uint Size { get; set; } = 4;
         public TypeKind TypeKind { get; set; } = TypeKind.Enum;
         public TypeDefinition BaseTypeDefinition { get; set; }
-        public IType BaseType { get; set; }
+        public PrimitiveAst BaseType { get; set; }
         public List<EnumValueAst> Values { get; } = new();
     }
 
@@ -174,10 +174,11 @@ namespace Lang
         public uint Column { get; init; }
         public string Name { get; set; }
         public int TypeIndex { get; set; }
-        public uint Size { get; set; }
         public TypeKind TypeKind { get; set; }
-        public IPrimitive Primitive { get; set; }
-        public TypeDefinition PointerTypeDefinition { get; set; }
+        public uint Size { get; set; }
+        public bool Signed { get; set; }
+        // public IPrimitive Primitive { get; set; }
+        // public TypeDefinition PointerTypeDefinition { get; set; }
         public IType PointerType { get; set; }
     }
 
