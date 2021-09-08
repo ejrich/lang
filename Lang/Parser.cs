@@ -939,7 +939,8 @@ namespace Lang
             enumerator.MoveNext();
             if (enumerator.Current?.Type == TokenType.Identifier)
             {
-                eachAst.IterationVariable = enumerator.Current.Value;
+                eachAst.IterationVariable = CreateAst<VariableAst>(enumerator.Current);
+                eachAst.IterationVariable.Name = enumerator.Current.Value;
             }
             else
             {
@@ -952,7 +953,8 @@ namespace Lang
                 enumerator.MoveNext();
                 if (enumerator.Current?.Type == TokenType.Identifier)
                 {
-                    eachAst.IndexVariable = enumerator.Current.Value;
+                    eachAst.IndexVariable = CreateAst<VariableAst>(enumerator.Current);
+                    eachAst.IndexVariable.Name = enumerator.Current.Value;
                     enumerator.MoveNext();
                 }
                 else
