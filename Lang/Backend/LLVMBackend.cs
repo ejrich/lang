@@ -116,9 +116,6 @@ namespace Lang.Backend
                         case PrimitiveAst primitive:
                             _types[primitive.TypeIndex] = GetPrimitiveType(primitive);
                             break;
-                        case ArrayType arrayType:
-                            // TODO Should this be stored?
-                            break;
                     }
                 }
             }
