@@ -1688,8 +1688,7 @@ namespace Lang
                     break;
                 case TypeKind.Enum:
                     var enumAst = (EnumAst)lhs.Type;
-                    var baseType = (PrimitiveAst)enumAst.BaseType;
-                    return EmitInstruction(GetIntCompareInstructionType(op, baseType.Signed), function, type, lhs, rhs);
+                    return EmitInstruction(GetIntCompareInstructionType(op, enumAst.BaseType.Signed), function, type, lhs, rhs);
             }
 
             Console.WriteLine("Unexpected type in compare");
@@ -1749,7 +1748,7 @@ namespace Lang
                             break;
                         case TypeKind.Enum:
                             var enumType = (EnumAst)value.Type;
-                            sourceIntegerType = (PrimitiveAst)enumType.BaseType;
+                            sourceIntegerType = enumType.BaseType;
                             castInstruction.Type = GetIntegerCastType(sourceIntegerType, targetIntegerType);
                             break;
                         case TypeKind.Float:

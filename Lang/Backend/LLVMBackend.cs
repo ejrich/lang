@@ -1264,7 +1264,7 @@ namespace Lang.Backend
 
             var file = _debugFiles[enumAst.FileIndex];
             var enumValues = new LLVMMetadataRef[enumAst.Values.Count];
-            var isUnsigned = enumAst.BaseTypeDefinition.PrimitiveType.Signed ? 0 : 1;
+            var isUnsigned = enumAst.BaseType.Signed ? 0 : 1;
 
             for (var i = 0; i < enumValues.Length; i++)
             {

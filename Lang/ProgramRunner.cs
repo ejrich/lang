@@ -1360,7 +1360,7 @@ namespace Lang
                     return GetIntegerValue(value.ConstantValue, sourceIntegerType);
                 case TypeKind.Enum:
                     var enumType = (EnumAst)value.Type;
-                    sourceIntegerType = (PrimitiveAst)enumType.BaseType;
+                    sourceIntegerType = enumType.BaseType;
                     return GetIntegerValue(value.ConstantValue, sourceIntegerType);
                 case TypeKind.Float:
                     if (value.Type.Size == 4)
