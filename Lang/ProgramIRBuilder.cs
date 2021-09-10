@@ -1252,33 +1252,42 @@ namespace Lang
         private InstructionValue GetConstant(ConstantAst constant, bool useRawString = false)
         {
             var value = new InstructionValue {ValueType = InstructionValueType.Constant, Type = constant.Type};
-            switch (constant.Type.TypeKind)
+            if (constant.Type.TypeKind == TypeKind.String)
             {
-                case TypeKind.Boolean:
-                    value.ConstantValue = new Constant {Boolean = constant.Value == "true"};
-                    break;
-                case TypeKind.String:
-                    value.ConstantString = constant.Value;
-                    value.UseRawString = useRawString;
-                    break;
-                case TypeKind.Integer:
-                    if (constant.TypeDefinition.Character)
-                    {
-                        value.ConstantValue = new Constant {UnsignedInteger = (byte)constant.Value[0]};
-                    }
-                    else if (constant.TypeDefinition.PrimitiveType.Signed)
-                    {
-                        value.ConstantValue = new Constant {Integer = long.Parse(constant.Value)};
-                    }
-                    else
-                    {
-                        value.ConstantValue = new Constant {UnsignedInteger = ulong.Parse(constant.Value)};
-                    }
-                    break;
-                case TypeKind.Float:
-                    value.ConstantValue = new Constant {Double = double.Parse(constant.Value)};
-                    break;
+                value.ConstantString = constant.String;
+                value.UseRawString = useRawString;
             }
+            else
+            {
+                value.ConstantValue = constant.Value;
+            }
+            // switch (constant.Type.TypeKind)
+            // {
+            //     case TypeKind.Boolean:
+            //         value.ConstantValue = constant.Value;
+            //         break;
+            //     case TypeKind.String:
+            //         value.ConstantString = constant.Value;
+            //         value.UseRawString = useRawString;
+            //         break;
+            //     case TypeKind.Integer:
+            //         if (constant.TypeDefinition.Character)
+            //         {
+            //             value.ConstantValue = new Constant {UnsignedInteger = (byte)constant.Value[0]};
+            //         }
+            //         else if (constant.TypeDefinition.PrimitiveType.Signed)
+            //         {
+            //             value.ConstantValue = new Constant {Integer = long.Parse(constant.Value)};
+            //         }
+            //         else
+            //         {
+            //             value.ConstantValue = new Constant {UnsignedInteger = ulong.Parse(constant.Value)};
+            //         }
+            //         break;
+            //     case TypeKind.Float:
+            //         value.ConstantValue = new Constant {Double = double.Parse(constant.Value)};
+            //         break;
+            // }
             return value;
         }
 
