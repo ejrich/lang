@@ -97,7 +97,6 @@ namespace Lang
         public uint Line { get; init; }
         public uint Column { get; init; }
         public string Name { get; set; }
-        // TODO Implement both
         public string BackendName { get; set; }
         public string BaseName { get; set; }
         public int TypeIndex { get; set; }

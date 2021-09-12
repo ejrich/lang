@@ -584,39 +584,46 @@ namespace Lang
         private void VerifyFunctionDefinition(FunctionAst function, HashSet<string> functionNames, bool main)
         {
             // 1. Verify the return type of the function is valid
-            function.ReturnType = VerifyType(function.ReturnTypeDefinition, out var isGeneric, out var isVarargs, out var isParams);
-            if (isVarargs || isParams)
+            if (function.ReturnTypeDefinition == null)
             {
-                ErrorReporter.Report($"Return type of function '{function.Name}' cannot be varargs or Params", function.ReturnTypeDefinition);
+                function.ReturnType = _voidType;
             }
-            else if (function.ReturnType == null && !isGeneric)
+            else
             {
-                ErrorReporter.Report($"Return type '{PrintTypeDefinition(function.ReturnTypeDefinition)}' of function '{function.Name}' is not defined", function.ReturnTypeDefinition);
-            }
-            else if (function.ReturnType.TypeKind == TypeKind.CArray && function.ReturnTypeDefinition.Count == null)
-            {
-                ErrorReporter.Report($"C array for function '{function.Name}' must have a constant size", function.ReturnTypeDefinition);
-            }
-            else if (function.ReturnTypeDefinition.Count != null)
-            {
-                var countType = VerifyConstantExpression(function.ReturnTypeDefinition.Count, null, _globalScope, out var isConstant, out var count);
-
-                if (countType != null)
+                function.ReturnType = VerifyType(function.ReturnTypeDefinition, out var isGeneric, out var isVarargs, out var isParams);
+                if (isVarargs || isParams)
                 {
-                    if (isConstant)
+                    ErrorReporter.Report($"Return type of function '{function.Name}' cannot be varargs or Params", function.ReturnTypeDefinition);
+                }
+                else if (function.ReturnType == null && !isGeneric)
+                {
+                    ErrorReporter.Report($"Return type '{PrintTypeDefinition(function.ReturnTypeDefinition)}' of function '{function.Name}' is not defined", function.ReturnTypeDefinition);
+                }
+                else if (function.ReturnType.TypeKind == TypeKind.CArray && function.ReturnTypeDefinition.Count == null)
+                {
+                    ErrorReporter.Report($"C array for function '{function.Name}' must have a constant size", function.ReturnTypeDefinition);
+                }
+                else if (function.ReturnTypeDefinition.Count != null)
+                {
+                    var countType = VerifyConstantExpression(function.ReturnTypeDefinition.Count, null, _globalScope, out var isConstant, out var count);
+
+                    if (countType != null)
                     {
-                        if (count < 0)
+                        if (isConstant)
                         {
-                            ErrorReporter.Report($"Expected size of return type of function '{function.Name}' to be a positive integer", function.ReturnTypeDefinition.Count);
+                            if (count < 0)
+                            {
+                                ErrorReporter.Report($"Expected size of return type of function '{function.Name}' to be a positive integer", function.ReturnTypeDefinition.Count);
+                            }
+                            else
+                            {
+                                function.ReturnTypeDefinition.ConstCount = (uint)count;
+                            }
                         }
                         else
                         {
-                            function.ReturnTypeDefinition.ConstCount = (uint)count;
+                            ErrorReporter.Report($"Return type of function '{function.Name}' should have constant size", function.ReturnTypeDefinition.Count);
                         }
-                    }
-                    else
-                    {
-                        ErrorReporter.Report($"Return type of function '{function.Name}' should have constant size", function.ReturnTypeDefinition.Count);
                     }
                 }
             }
@@ -632,7 +639,7 @@ namespace Lang
                 }
 
                 // 3b. Check for errored or undefined field types
-                argument.Type = VerifyType(argument.TypeDefinition, out isGeneric, out isVarargs, out isParams, allowParams: true);
+                argument.Type = VerifyType(argument.TypeDefinition, out var isGeneric, out var isVarargs, out var isParams, allowParams: true);
 
                 if (isVarargs)
                 {
