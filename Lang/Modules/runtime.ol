@@ -94,10 +94,11 @@ enum TypeKind {
     String;
     Pointer;
     Array;
+    CArray;
     Enum;
     Struct;
+    Type;
     Function;
-    CArray;
 }
 
 struct TypeField {

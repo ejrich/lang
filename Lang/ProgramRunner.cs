@@ -92,6 +92,7 @@ namespace Lang
                     return typeof(bool);
                 case TypeKind.Integer:
                 case TypeKind.Enum:
+                case TypeKind.Type:
                     switch (type.Size)
                     {
                         case 1:
