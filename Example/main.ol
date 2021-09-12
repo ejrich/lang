@@ -209,7 +209,7 @@ struct Node {
     next: Node*;
 }
 
-int* pointers() {//#print_ir {
+int* pointers() {
     node: Node = { value = 9; }
     next: Node = { value = 8; }
     node.next = &next;
