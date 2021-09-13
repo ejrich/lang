@@ -157,7 +157,8 @@ namespace Lang.Backend
                             var field = structAst.Fields[i];
                             if (field.Type.TypeKind == TypeKind.CArray)
                             {
-                                fields[i] = LLVM.ArrayType(_types[field.ArrayElementType.TypeIndex], field.TypeDefinition.ConstCount.Value);
+                                var arrayType = (ArrayType)field.Type;
+                                fields[i] = LLVM.ArrayType(_types[field.ArrayElementType.TypeIndex], arrayType.Length);
                             }
                             else
                             {
@@ -672,6 +673,14 @@ namespace Lang.Backend
                             var value = GetValue(instruction.Value1, values, allocations, functionPointer);
                             var targetType = _types[instruction.Value2.Type.TypeIndex];
                             values[instruction.ValueIndex] = _builder.BuildBitCast(value, targetType);
+                            break;
+                        }
+                        case InstructionType.CArrayPointerCast:
+                        {
+                            var value = GetValue(instruction.Value1, values, allocations, functionPointer);
+                            var elementType = _types[instruction.Value2.Type.TypeIndex];
+                            var pointerType = LLVM.PointerType(elementType, 0);
+                            values[instruction.ValueIndex] = _builder.BuildBitCast(value, pointerType);
                             break;
                         }
                         case InstructionType.AllocateArray:

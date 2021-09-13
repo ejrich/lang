@@ -333,7 +333,6 @@ namespace Lang
         public VariableAst IndexVariable { get; set; }
         public IAst Iteration { get; set; }
         // public TypeDefinition IteratorType { get; set; }
-        public uint CArrayLength { get; set; }
         public IAst RangeBegin { get; set; }
         public IAst RangeEnd { get; set; }
         public ScopeAst Body { get; set; }
