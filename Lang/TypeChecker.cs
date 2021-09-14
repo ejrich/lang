@@ -3864,7 +3864,7 @@ namespace Lang
                             for (var i = 0; i < generics.Length; i++)
                             {
                                 var genericType = genericTypes[i] = VerifyType(generics[i], scope, out var hasGeneric, out _, out _, depth + 1, allowParams);
-                                if (genericType == null)
+                                if (genericType == null && !hasGeneric)
                                 {
                                     error = true;
                                 }
