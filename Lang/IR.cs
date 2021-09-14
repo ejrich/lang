@@ -128,7 +128,7 @@ namespace Lang
         FloatToIntegerCast,
         FloatToUnsignedIntegerCast,
         PointerCast,
-        CArrayPointerCast,
+        ArrayCastToPointer,
         AllocateArray,
         IsNull,
         IsNotNull,

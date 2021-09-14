@@ -6,9 +6,7 @@ namespace Lang
     public interface IPolymorpher
     {
         StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, string backendName, TypeKind typeKind, IType[] genericTypes, params TypeDefinition[] genericTypeDefinitions);
-        // FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, TypeDefinition[] genericTypes);
         FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, IType[] genericTypes);
-        // OperatorOverloadAst CreatePolymorphedOperatorOverload(OperatorOverloadAst baseOverload, TypeDefinition[] genericTypes);
         OperatorOverloadAst CreatePolymorphedOperatorOverload(OperatorOverloadAst baseOverload, IType[] genericTypes);
     }
 
@@ -44,14 +42,12 @@ namespace Lang
             return polyStruct;
         }
 
-        // public FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, TypeDefinition[] genericTypes)
         public FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, IType[] genericTypes)
         {
             var genericTypeDefs = GetGenericTypeDefinitions(genericTypes);
             var function = CopyAst(baseFunction);
             function.Name = name;
             function.Flags = baseFunction.Flags;
-            // function.ReturnTypeDefinition = baseFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? CopyType(baseFunction.ReturnTypeDefinition, genericTypeDefs) : baseFunction.ReturnTypeDefinition;
 
             if (baseFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics))
             {
@@ -84,7 +80,6 @@ namespace Lang
             return function;
         }
 
-        // public OperatorOverloadAst CreatePolymorphedOperatorOverload(OperatorOverloadAst baseOverload, TypeDefinition[] genericTypes)
         public OperatorOverloadAst CreatePolymorphedOperatorOverload(OperatorOverloadAst baseOverload, IType[] genericTypes)
         {
             var genericTypeDefs = GetGenericTypeDefinitions(genericTypes);
@@ -104,7 +99,7 @@ namespace Lang
             return overload;
         }
 
-        // This probably isn't the best idea, but ok for now
+        // @Cleanup This probably isn't the best idea, but ok for now
         private TypeDefinition[] GetGenericTypeDefinitions(IType[] genericTypes)
         {
             var genericTypeDefinitions = new TypeDefinition[genericTypes.Length];

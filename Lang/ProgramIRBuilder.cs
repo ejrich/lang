@@ -1850,7 +1850,7 @@ namespace Lang
             if (type.TypeKind == TypeKind.CArray)
             {
                 var arrayType = (ArrayType)type;
-                var castInstruction = new Instruction {Type = InstructionType.CArrayPointerCast, Value1 = value, Value2 = new InstructionValue {ValueType = InstructionValueType.Type, Type = arrayType.ElementType}};
+                var castInstruction = new Instruction {Type = InstructionType.ArrayCastToPointer, Value1 = value, Value2 = new InstructionValue {ValueType = InstructionValueType.Type, Type = arrayType.ElementType}};
                 return AddInstruction(function, castInstruction, type);
             }
             var loadInstruction = new Instruction {Type = InstructionType.Load, Value1 = value};
