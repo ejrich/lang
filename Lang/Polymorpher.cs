@@ -145,10 +145,17 @@ namespace Lang
                 case TypeKind.Array:
                 case TypeKind.Struct:
                     var structDef = (StructAst)type;
-                    typeDef.Name = structDef.BaseName;
-                    foreach (var genericType in structDef.GenericTypes)
+                    if (structDef.GenericTypes != null)
                     {
-                        typeDef.Generics.Add(GetTypeDefinition(genericType));
+                        typeDef.Name = structDef.BaseName;
+                        foreach (var genericType in structDef.GenericTypes)
+                        {
+                            typeDef.Generics.Add(GetTypeDefinition(genericType));
+                        }
+                    }
+                    else
+                    {
+                        typeDef.Name = structDef.Name;
                     }
                     break;
             }
