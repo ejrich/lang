@@ -6,7 +6,7 @@ main() {
     c_array_structs();
 }
 
-c_arrays() #print_ir {
+c_arrays() {
     // Examples include this from the tests project
     // each i in file.d_name then printf("%c", i);
     // each i in 0..255 then printf("%c", file.d_name[i]);
