@@ -219,7 +219,38 @@ namespace Lang
                 }
             } while (verifyAdditional);
 
-            // 6. Verify operator overload bodies
+            // 6. Execute any other compiler directives
+            foreach (var ast in asts)
+            {
+                switch (ast)
+                {
+                    case CompilerDirectiveAst directive:
+                        switch (directive.Type)
+                        {
+                            case DirectiveType.Run:
+                                VerifyAst(directive.Value, null, _globalScope, false);
+                                if (!ErrorReporter.Errors.Any())
+                                {
+                                    var function = _irBuilder.CreateRunnableFunction(directive.Value, _globalScope);
+
+                                    _runner.Init();
+                                    _runner.RunProgram(function, directive.Value);
+                                }
+                                break;
+                            default:
+                                ErrorReporter.Report($"Compiler directive '{directive.Type}' not supported", directive);
+                                break;
+                        }
+                        break;
+                }
+            }
+
+            if (!mainDefined)
+            {
+                ErrorReporter.Report("'main' function of the program is not defined");
+            }
+
+            // 7. Verify operator overload bodies
             foreach (var overloads in _operatorOverloads.Values)
             {
                 foreach (var overload in overloads.Values)
@@ -229,7 +260,7 @@ namespace Lang
                 }
             }
 
-            // 7. Verify function bodies
+            // 8. Verify function bodies
             foreach (var name in functionNames)
             {
                 var functions = TypeTable.Functions[name];
@@ -238,23 +269,6 @@ namespace Lang
                     if (function.Flags.HasFlag(FunctionFlags.Verified)) continue;
                     VerifyFunction(function);
                 }
-            }
-
-            // 8. Execute any other compiler directives
-            foreach (var ast in asts)
-            {
-                switch (ast)
-                {
-                    case CompilerDirectiveAst compilerDirective:
-                        VerifyTopLevelDirective(compilerDirective);
-                        break;
-                }
-            }
-
-            if (!mainDefined)
-            {
-                // @Cleanup allow errors to be reported without having a file/line/column
-                ErrorReporter.Report("'main' function of the program is not defined");
             }
         }
 
@@ -675,16 +689,14 @@ namespace Lang
             // 3. Verify main function return type and arguments
             if (main)
             {
-                if (function.ReturnType?.TypeKind != TypeKind.Void && function.ReturnType?.TypeKind != TypeKind.Integer)
+                if (function.ReturnType?.TypeKind != TypeKind.Void)
                 {
-                    ErrorReporter.Report("The main function should return type 'int' or 'void'", function);
+                    ErrorReporter.Report("The main function should return type 'void'", function);
                 }
 
-                // TODO Make main only be type 'void main()'
-                var argument = function.Arguments.FirstOrDefault();
-                if (argument != null && !(function.Arguments.Count == 1 && argument.Type?.TypeKind == TypeKind.Array))// && argument.TypeDefinition.Generics.FirstOrDefault()?.TypeKind == TypeKind.String))
+                if (function.Arguments.Count != 0)
                 {
-                    ErrorReporter.Report("The main function should either have 0 arguments or 'Array<string>' argument", function);
+                    ErrorReporter.Report("The main function should have 0 arguments", function);
                 }
 
                 if (function.Generics.Any())
@@ -1495,7 +1507,7 @@ namespace Lang
                     else
                     {
                         declaration.TypeDefinition.ConstCount = (uint)declaration.ArrayValues.Count;
-                        var elementType = declaration.ArrayElementType = TypeTable.GetType(declaration.TypeDefinition.Generics[0]);
+                        var elementType = declaration.ArrayElementType;
                         foreach (var value in declaration.ArrayValues)
                         {
                             var valueType = VerifyExpression(value, currentFunction, scope);
@@ -2067,26 +2079,6 @@ namespace Lang
 
             // 2. Verify the scope of the each block
             VerifyScope(each.Body, currentFunction, scope, true);
-        }
-
-        private void VerifyTopLevelDirective(CompilerDirectiveAst directive)
-        {
-            switch (directive.Type)
-            {
-                case DirectiveType.Run:
-                    VerifyAst(directive.Value, null, _globalScope, false);
-                    if (!ErrorReporter.Errors.Any())
-                    {
-                        var function = _irBuilder.CreateRunnableFunction(directive.Value, _globalScope);
-
-                        _runner.Init();
-                        _runner.RunProgram(function, directive.Value);
-                    }
-                    break;
-                default:
-                    ErrorReporter.Report($"Compiler directive '{directive.Type}' not supported", directive);
-                    break;
-            }
         }
 
         private IType VerifyConstantExpression(IAst ast, IFunction currentFunction, ScopeAst scope, out bool isConstant, out uint arrayLength)
