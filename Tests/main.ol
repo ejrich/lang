@@ -24,7 +24,7 @@ main() {
 
     if failed_test_count {
         printf("\n%d Test(s) Failed\n", failed_test_count);
-        exit(-1);
+        exit_code = -1;
     }
     else {
         printf("\nAll Tests Passed\n");
@@ -74,10 +74,10 @@ bool run_test(string test_dir) {
 
     command := format_string("% %", executable, test_dir);
     printf("Compiling: %s", command);
-    exit_code := run_command(command);
+    compiler_exit_code := run_command(command);
     free(command.data);
 
-    if exit_code {
+    if compiler_exit_code {
         printf(" -- Test Failed\n");
         return false;
     }
@@ -111,10 +111,10 @@ bool run_test(string test_dir) {
     }
 
     printf("\nRunning: %s", command);
-    exit_code = run_command(command);
+    run_exit_code := run_command(command);
     free(command.data);
 
-    if exit_code {
+    if run_exit_code {
         printf(" -- Test Failed\n");
         return false;
     }

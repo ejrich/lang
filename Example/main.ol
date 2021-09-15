@@ -3,7 +3,7 @@ main() { //#print_ir {
     /*
         Multi line comment
     */
-    // each arg, i in args then printf("Arg %d: \"%s\" -- length = %d\n", i, arg, arg.length);
+    each arg, i in command_line_arguments then printf("Arg %d: \"%s\" -- length = %d\n", i, arg, arg.length);
     hello := "This is an \"escaped\" string literal\nWith a new line!";
     a := 4.2;
     a++;
