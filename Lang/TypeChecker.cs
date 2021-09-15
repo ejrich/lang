@@ -726,14 +726,14 @@ namespace Lang
             else
             {
                 functionNames.Add(function.Name);
-                var _functions = TypeTable.AddFunction(function.Name, function);
-                if (_functions.Count > 1)
+                var functions = TypeTable.AddFunction(function.Name, function);
+                if (functions.Count > 1)
                 {
                     if (function.Flags.HasFlag(FunctionFlags.Extern))
                     {
                         ErrorReporter.Report($"Multiple definitions of extern function '{function.Name}'", function);
                     }
-                    else if (OverloadExistsForFunction(function, _functions, false))
+                    else if (OverloadExistsForFunction(function, functions, false))
                     {
                         ErrorReporter.Report($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
                     }
@@ -3506,7 +3506,6 @@ namespace Lang
                                 if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
                                 {
                                     ErrorReporter.Report($"Expected size of C array to be a constant, positive integer", type);
-                                    return null;
                                 }
                             }
 
