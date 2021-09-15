@@ -181,7 +181,7 @@ struct ArrayStruct {
 
 Array<int> create_array(int count) {
     array: Array<int>[count];
-    each i in 0..count {
+    each i in 0..count-1 {
         array[i] = i * 5;
     }
     a := array[count-2];

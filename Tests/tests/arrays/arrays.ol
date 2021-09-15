@@ -45,7 +45,7 @@ variable_size_arrays() {
 
 dynamic_arrays() {
     a: Array<int>;
-    each i in 0..11 {
+    each i in 0..10 {
         array_insert(&a, i * 8);
     }
 
