@@ -319,7 +319,7 @@ SDL_CreateWindow(string title, int x, int y, int w, int h, u32 flags) #extern "S
 u32 sleep(u32 seconds) #extern "libc"
 
 #run {
-    args: Array<string> = ["Hello world"]
+    array_insert(&command_line_arguments, "Hello world");
     main();
 
     build();
