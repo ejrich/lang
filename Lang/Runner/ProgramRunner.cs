@@ -15,8 +15,9 @@ namespace Lang.Runner
 
     public class ProgramRunner : IProgramRunner
     {
-        private Type library;
-        private object functionObject;
+        private Type _library;
+        private object _functionObject;
+        private Dictionary<string, (TypeDefinition type, object value)> _globalVariables = new();
 
         public void RunProgram(ProgramGraph programGraph)
         {
@@ -47,17 +48,20 @@ namespace Lang.Runner
 
             CreateFunction(typeBuilder, "printf", "libc", null, typeof(string), typeof(int));
 
-            library = typeBuilder.CreateType();
-            functionObject = library!.GetConstructor(Type.EmptyTypes)!.Invoke(new object[]{});
+            _library = typeBuilder.CreateType();
+            _functionObject = _library!.GetConstructor(Type.EmptyTypes)!.Invoke(new object[]{});
 
-            // TODO Initialize using global variables
-            var variables = new Dictionary<string, (TypeDefinition type, object value)>();
+            foreach (var variable in programGraph.Data.Variables)
+            {
+                ExecuteDeclaration(variable, programGraph, _globalVariables);
+            }
+
             foreach (var directive in programGraph.Directives)
             {
                 switch (directive.Type)
                 {
                     case DirectiveType.Run:
-                        ExecuteAst(directive.Value, programGraph, variables);
+                        ExecuteAst(directive.Value, programGraph, _globalVariables, out _);
                         break;
                     case DirectiveType.If:
                         // TODO Evaluate the condition
@@ -66,13 +70,15 @@ namespace Lang.Runner
             }
         }
 
-        private bool ExecuteAst(IAst ast, ProgramGraph programGraph, IDictionary<string, (TypeDefinition type, object value)> variables)
+        private (TypeDefinition type, object value) ExecuteAst(IAst ast, ProgramGraph programGraph, IDictionary<string, (TypeDefinition type, object value)> variables, out bool returned)
         {
+            returned = false;
+            (TypeDefinition type, object value) returnValue = (null, null);
             switch (ast)
             {
                 case ReturnAst returnAst:
-                    ExecuteReturn(returnAst, programGraph, variables);
-                    return true;
+                    returned = true;
+                    return ExecuteReturn(returnAst, programGraph, variables);
                 case DeclarationAst declaration:
                     ExecuteDeclaration(declaration, programGraph, variables);
                     break;
@@ -80,28 +86,45 @@ namespace Lang.Runner
                     ExecuteAssignment(assignment, programGraph, variables);
                     break;
                 case ScopeAst scope:
-                    return ExecuteScope(scope.Children, programGraph, variables);
-                case ConditionalAst conditional:
-                    return ExecuteConditional(conditional, programGraph, variables);
-                case WhileAst whileAst:
-                    return ExecuteWhile(whileAst, programGraph, variables);
-                case EachAst each:
-                    return ExecuteEach(each, programGraph, variables);
-                default:
-                    ExecuteExpression(ast, programGraph, variables);
+                    returnValue = ExecuteScope(scope.Children, programGraph, variables, out returned);
                     break;
+                case ConditionalAst conditional:
+                    returnValue = ExecuteConditional(conditional, programGraph, variables, out returned);
+                    break;
+                case WhileAst whileAst:
+                    returnValue = ExecuteWhile(whileAst, programGraph, variables, out returned);
+                    break;
+                case EachAst each:
+                    returnValue = ExecuteEach(each, programGraph, variables, out returned);
+                    break;
+                default:
+                    return ExecuteExpression(ast, programGraph, variables);
             }
-            return false;
+
+            return returnValue;
         }
 
-        private void ExecuteReturn(ReturnAst returnAst, ProgramGraph programGraph, IDictionary<string, (TypeDefinition type, object value)> variables)
+        private (TypeDefinition type, object value) ExecuteReturn(ReturnAst returnAst, ProgramGraph programGraph, IDictionary<string, (TypeDefinition type, object value)> variables)
         {
-            throw new NotImplementedException();
+            return ExecuteExpression(returnAst.Value, programGraph, variables);
         }
 
         private void ExecuteDeclaration(DeclarationAst declaration, ProgramGraph programGraph, IDictionary<string, (TypeDefinition type, object value)> variables)
         {
-            throw new NotImplementedException();
+            var value = declaration.Value == null ? GetUninitializedValue(declaration.Type) :
+                ExecuteExpression(declaration.Value, programGraph, null).value;
+
+            _globalVariables[declaration.Name] = (declaration.Type, value);
+        }
+
+        private static object GetUninitializedValue(TypeDefinition typeDef)
+        {
+            return typeDef.PrimitiveType switch
+            {
+                IntegerType => 0,
+                FloatType floatType => floatType.Bytes == 4 ? 0f : 0.0,
+                _ => 0 // TODO Handle more types
+            };
         }
 
         private void ExecuteAssignment(AssignmentAst assignment, ProgramGraph programGraph, IDictionary<string, (TypeDefinition type, object value)> variables)
@@ -109,24 +132,58 @@ namespace Lang.Runner
             throw new NotImplementedException();
         }
 
-        private bool ExecuteScope(List<IAst> scopeChildren, ProgramGraph programGraph, IDictionary<string, (TypeDefinition type, object value)> variables)
+        private (TypeDefinition type, object value) ExecuteScope(List<IAst> asts, ProgramGraph programGraph,
+            IDictionary<string, (TypeDefinition type, object value)> variables, out bool returned)
+        {
+            var scopeVariables = new Dictionary<string, (TypeDefinition type, object value)>(variables);
+
+            return ExecuteAsts(asts, programGraph, scopeVariables, out returned);
+        }
+
+        private (TypeDefinition type, object value) ExecuteConditional(ConditionalAst conditional, ProgramGraph programGraph,
+            IDictionary<string, (TypeDefinition type, object value)> variables, out bool returned)
+        {
+            if (ExecuteCondition(conditional.Condition, programGraph, variables))
+            {
+                return ExecuteScope(conditional.Children, programGraph, variables, out returned);
+            }
+
+            return ExecuteScope(conditional.Else, programGraph, variables, out returned);
+        }
+
+        private (TypeDefinition type, object value) ExecuteWhile(WhileAst whileAst, ProgramGraph programGraph,
+            IDictionary<string, (TypeDefinition type, object value)> variables, out bool returned)
         {
             throw new NotImplementedException();
         }
 
-        private bool ExecuteConditional(ConditionalAst conditional, ProgramGraph programGraph, IDictionary<string, (TypeDefinition type, object value)> variables)
+        private bool ExecuteCondition(IAst conditionExpression, ProgramGraph programGraph, 
+            IDictionary<string, (TypeDefinition type, object value)> variables)
         {
             throw new NotImplementedException();
         }
 
-        private bool ExecuteWhile(WhileAst whileAst, ProgramGraph programGraph, IDictionary<string, (TypeDefinition type, object value)> variables)
+        private (TypeDefinition type, object value) ExecuteEach(EachAst each, ProgramGraph programGraph,
+            IDictionary<string, (TypeDefinition type, object value)> variables, out bool returned)
         {
             throw new NotImplementedException();
         }
 
-        private bool ExecuteEach(EachAst each, ProgramGraph programGraph, IDictionary<string, (TypeDefinition type, object value)> variables)
+        private (TypeDefinition type, object value) ExecuteAsts(List<IAst> asts, ProgramGraph programGraph,
+            IDictionary<string, (TypeDefinition type, object value)> variables, out bool returned)
         {
-            throw new NotImplementedException();
+            foreach (var ast in asts)
+            {
+                var value = ExecuteAst(ast, programGraph, variables, out returned);
+
+                if (returned)
+                {
+                    return value;
+                }
+            }
+
+            returned = false;
+            return (null, null);
         }
 
         private (TypeDefinition type, object value) ExecuteExpression(IAst ast, ProgramGraph programGraph, IDictionary<string, (TypeDefinition type, object value)> variables)
@@ -143,7 +200,7 @@ namespace Lang.Runner
                     };
                     return (type, value);
                 case NullAst:
-                    // return null;
+                    return (null, null);
                 case StructFieldRefAst structField:
                     // if (!localVariables.TryGetValue(structField.Name, out var structType))
                     // {
@@ -159,9 +216,9 @@ namespace Lang.Runner
                     //     return null;
                     // }
                     // return VerifyStructFieldRef(structField, structType, errors);
+                    break;
                 case VariableAst variable:
-                    // if (localVariables.TryGetValue(variable.Name, out var typeDefinition))
-                    // return typeDefinition;
+                    return variables[variable.Name];
                 case ChangeByOneAst changeByOne:
                     // switch (changeByOne.Variable)
                     // {
@@ -233,20 +290,42 @@ namespace Lang.Runner
                             // TODO Create overloads for varargs functions
                         }
 
-                        var functionDecl = library.GetMethod(call.Function);
-                        var returnValue = functionDecl!.Invoke(functionObject, arguments);
+                        var functionDecl = _library.GetMethod(call.Function);
+                        var returnValue = functionDecl!.Invoke(_functionObject, arguments);
                         return (function.ReturnType, returnValue);
                     }
                     else
                     {
-                        // TODO Make calls to other user-defined functions
+                        return CallFunction(function, programGraph, arguments);
                     }
-                    break;
                 case ExpressionAst expression:
                     // return VerifyExpressionType(expression, localVariables, errors);
                 case IndexAst index:
                     // return VerifyIndexType(index, localVariables, errors, out _);
                     break;
+            }
+
+            return (null, null);
+        }
+
+        private (TypeDefinition type, object value) CallFunction(FunctionAst function, ProgramGraph programGraph, object[] arguments)
+        {
+            var variables = new Dictionary<string, (TypeDefinition type, object value)>(_globalVariables);
+
+            for (var i = 0; i < function.Arguments.Count; i++)
+            {
+                var arg = function.Arguments[i];
+                variables[arg.Name] = (arg.Type, arguments[i]);
+            }
+
+            foreach (var ast in function.Children)
+            {
+                var value = ExecuteAst(ast, programGraph, variables, out var returned);
+
+                if (returned)
+                {
+                    return value;
+                }
             }
 
             return (null, null);
