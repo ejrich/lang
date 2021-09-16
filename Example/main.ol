@@ -92,6 +92,6 @@ int primitives() {
     //h = 12 + 23;
     i: float64 = -1.23456;
     j := g + i;
-    k := e | g;
+    k := e > e;
     return d;
 }

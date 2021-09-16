@@ -680,13 +680,15 @@ namespace Lang.Backend.LLVM
                             var signed = lhsInt.Signed || rhsInt.Signed;
                             if (lhsInt.Bytes > rhsInt.Bytes)
                             {
-                                // TODO Figure out how to zest cast
-                                rhs.value = LLVMApi.BuildIntCast(_builder, rhs.value, ConvertTypeDefinition(lhs.type), "tmpint");
+                                var type = ConvertTypeDefinition(lhs.type);
+                                rhs.value = signed ? LLVMApi.BuildSExt(_builder, rhs.value, type, "tmpint") :
+                                    LLVMApi.BuildZExt(_builder, rhs.value, type, "tmpint");
                             }
                             else if (lhsInt.Bytes < rhsInt.Bytes)
                             {
-                                // TODO Figure out how to zest cast
-                                lhs.value = LLVMApi.BuildIntCast(_builder, lhs.value, ConvertTypeDefinition(rhs.type), "tmpint");
+                                var type = ConvertTypeDefinition(rhs.type);
+                                lhs.value = signed ? LLVMApi.BuildSExt(_builder, lhs.value, type, "tmpint") :
+                                    LLVMApi.BuildZExt(_builder, lhs.value, type, "tmpint");
                             }
                             var (predicate, name) = ConvertIntOperator(op, signed);
                             return LLVMApi.BuildICmp(_builder, predicate, lhs.value, rhs.value, name);
@@ -755,9 +757,16 @@ namespace Lang.Backend.LLVM
                 case IntegerType intType:
                     switch (targetType.PrimitiveType)
                     {
-                        case IntegerType:
-                            // TODO Figure out how to zest cast
-                            return LLVMApi.BuildIntCast(_builder, value, target, "tmpint");
+                        case IntegerType intTarget:
+                            if (intTarget.Bytes >= intType.Bytes)
+                            {
+                                return intTarget.Signed ? LLVMApi.BuildSExtOrBitCast(_builder, value, target, "tmpint") :
+                                    LLVMApi.BuildZExtOrBitCast(_builder, value, target, "tmpint");
+                            }
+                            else
+                            {
+                                return LLVMApi.BuildTrunc(_builder, value, target, "tmpint");
+                            }
                         case FloatType:
                             return intType.Signed ? LLVMApi.BuildSIToFP(_builder, value, target, "tmpfp") :
                                 LLVMApi.BuildUIToFP(_builder, value, target, "tmpfp");
