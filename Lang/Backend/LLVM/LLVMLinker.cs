@@ -95,7 +95,7 @@ namespace Lang.Backend.LLVM
                     Environment.Exit(ErrorCodes.LinkError);
                 }
 
-                linker = libDirectory.GetFiles(linkerPattern).FirstOrDefault();
+                linker = platformDirectory.GetFiles(linkerPattern).FirstOrDefault();
 
                 if (linker == null)
                 {
