@@ -2015,7 +2015,7 @@ namespace Lang
 
             if (functionIR != null && !_programGraph.Errors.Any())
             {
-                var block = _irBuilder.EmitConditional(functionIR, conditional, scope);
+                var block = _irBuilder.EmitConditional(functionIR, conditional, scope, functionIR.BasicBlocks[^1]);
             }
 
             // 2. Verify the conditional scope

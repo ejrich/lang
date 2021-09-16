@@ -14,7 +14,7 @@ namespace Lang
         void EmitDeclaration(FunctionIR function, DeclarationAst declaration, ScopeAst scope);
         void EmitAssignment(FunctionIR function, AssignmentAst assignment, ScopeAst scope);
         void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, ScopeAst scope, BasicBlock block = null);
-        BasicBlock EmitConditional(FunctionIR function, ConditionalAst conditional, ScopeAst scope);
+        BasicBlock EmitConditional(FunctionIR function, ConditionalAst conditional, ScopeAst scope, BasicBlock block);
         BasicBlock EmitWhile(FunctionIR function, WhileAst whileAst, ScopeAst scope);
         BasicBlock EmitEach(FunctionIR function, EachAst each, ScopeAst scope);
         InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block = null, bool useRawString = false);
@@ -22,6 +22,7 @@ namespace Lang
 
     public class ProgramIRBuilder : IProgramIRBuilder
     {
+        private IType _boolType;
         private IType _u8Type;
         private IType _s32Type;
         private IType _float64Type;
@@ -31,6 +32,7 @@ namespace Lang
 
         public void Init()
         {
+            _boolType = TypeTable.Types["bool"];
             _u8Type = TypeTable.Types["u8"];
             _s32Type = TypeTable.Types["s32"];
             _float64Type = TypeTable.Types["float64"];
@@ -46,8 +48,7 @@ namespace Lang
                 functionIR.Allocations = new();
                 functionIR.BasicBlocks = new();
 
-                var entryBlock = new BasicBlock();
-                functionIR.BasicBlocks.Add(entryBlock);
+                var entryBlock = AddBasicBlock(functionIR);
 
                 for (var i = 0; i < function.Arguments.Count; i++)
                 {
@@ -537,19 +538,47 @@ namespace Lang
             block.Instructions.Add(instruction);
         }
 
-        public BasicBlock EmitConditional(FunctionIR function, ConditionalAst conditional, ScopeAst scope)
+        public BasicBlock EmitConditional(FunctionIR function, ConditionalAst conditional, ScopeAst scope, BasicBlock block)
         {
-            // TODO Implement me
             // Run the condition expression in the current basic block and then jump to the following
-            return null;
+            var condition = EmitConditionExpression(function, conditional.Condition, scope, block);
+            // TODO Add jumps
+
+            var thenBlock = AddBasicBlock(function);
+            var elseBlock = conditional.ElseBlock == null ? null : AddBasicBlock(function);
+            var afterBlock = AddBasicBlock(function);
+
+            return thenBlock;
         }
 
         public BasicBlock EmitWhile(FunctionIR function, WhileAst whileAst, ScopeAst scope)
         {
-            // TODO Implement me
             // Create a block for the condition expression and then jump to the following
+            var conditionBlock = AddBasicBlock(function);
+            var condition = EmitConditionExpression(function, whileAst.Condition, scope, conditionBlock);
+
             // Return the while body block
-            return null;
+            var whileBodyBlock = AddBasicBlock(function);
+
+            return whileBodyBlock;
+        }
+
+        private InstructionValue EmitConditionExpression(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block)
+        {
+            var value = EmitIR(function, ast, scope, block);
+
+            switch (value.Type.TypeKind)
+            {
+                case TypeKind.Integer:
+                    return EmitInstruction(InstructionType.IntegerNotEquals, block, _boolType, value, GetDefaultConstant(value.Type));
+                case TypeKind.Float:
+                    return EmitInstruction(InstructionType.FloatNotEquals, block, _boolType, value, GetDefaultConstant(value.Type));
+                case TypeKind.Pointer:
+                    return EmitInstruction(InstructionType.IsNotNull, block, _boolType, value);
+                // Will be type bool
+                default:
+                    return value;
+            }
         }
 
         public BasicBlock EmitEach(FunctionIR function, EachAst each, ScopeAst scope)
@@ -559,6 +588,13 @@ namespace Lang
             // Create a basic block for the condition
             // Return the body block
             return null;
+        }
+
+        private BasicBlock AddBasicBlock(FunctionIR function)
+        {
+            var block = new BasicBlock {Index = function.BasicBlocks.Count};
+            function.BasicBlocks.Add(block);
+            return block;
         }
 
         public InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block = null, bool useRawString = false)
@@ -602,7 +638,7 @@ namespace Lang
                         }
                         return EmitLoad(block, declaration.Type, allocationIndex: declaration.AllocationIndex, global: global);
                     }
-                    else if (identifierAst is IType type)
+                    else if (identifier is IType type)
                     {
                         return GetConstantInteger(type.TypeIndex);
                     }
