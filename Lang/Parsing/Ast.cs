@@ -55,6 +55,13 @@ namespace Lang.Parsing
         public List<IAst> Children { get; } = new();
     }
 
+    public class ChangeByOneAst : IAst
+    {
+        public bool Prefix { get; init; }
+        public Operator Operator { get; init; }
+        public List<IAst> Children { get; } = new();
+    }
+
     public class CallAst : IAst
     {
         public string Function { get; set; }
@@ -107,6 +114,8 @@ namespace Lang.Parsing
         And, // &&
         Or, // ||
         Equality, // ==
+        Increment, // ++
+        Decrement, // --
         Add = '+',
         Subtract = '-',
         Multiply = '*',
@@ -227,6 +236,10 @@ namespace Lang.Parsing
                     return Operator.Or;
                 case TokenType.Equality:
                     return Operator.Equality;
+                case TokenType.Increment:
+                    return Operator.Increment;
+                case TokenType.Decrement:
+                    return Operator.Decrement;
                 // Handle single character operators
                 default:
                     var op = (Operator)token.Value[0];

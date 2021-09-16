@@ -12,6 +12,9 @@ int Main(List<string> args) {
 
 int foo() {
     var a = 0;
+    a++;
+    ++a;
+    var b = --a + 1;
     while a < 10 {
         a = a + 1;
     }
@@ -26,13 +29,13 @@ int bar(int a, string b, float c) {
     return a + 3;
 }
 
-int baz() {
+/*int baz() {
     var a = 1;
     each i in 1..10 {
         a = a + i;
     }
     return a;
-}
+}*/
 
 int fib(int n) {
     if n == 1 then return 1;
