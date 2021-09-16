@@ -1216,7 +1216,7 @@ namespace Lang.Parsing
                             {
                                 errors.Add(new ParseError
                                 {
-                                    Error = "Expected to end line with ';'", Token = enumerator.Current ?? enumerator.Last
+                                    Error = "Expected ';'", Token = enumerator.Current ?? enumerator.Last
                                 });
                             }
                         }
