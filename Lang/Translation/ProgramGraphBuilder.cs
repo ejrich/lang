@@ -403,7 +403,7 @@ namespace Lang.Translation
                 }
                 else if (!TypeEquals(variableTypeDefinition, valueType))
                 {
-                    errors.Add(CreateError($"Expected assignment value to be type '{PrintTypeDefinition(variableTypeDefinition)}'", assignment.Value));
+                    errors.Add(CreateError($"Expected assignment value to be type '{PrintTypeDefinition(variableTypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", assignment.Value));
                 }
                 else if (variableTypeDefinition.PrimitiveType != null && assignment.Value is ConstantAst constant)
                 {
@@ -596,15 +596,21 @@ namespace Lang.Translation
                             {
                                 // TODO Figure out how to reference existing pointer types
                             }
-                            var pointerType = new TypeDefinition
+
+                            if (unary.Value is VariableAst || unary.Value is StructFieldRefAst)
                             {
-                                Pointer = true,
-                                Name = valueType.Name,
-                                PrimitiveType = valueType.PrimitiveType,
-                                Count = valueType.Count
-                            };
-                            pointerType.Generics.AddRange(valueType.Generics);
-                            return pointerType;
+                                var pointerType = new TypeDefinition
+                                {
+                                    Pointer = true,
+                                    Name = valueType.Name,
+                                    PrimitiveType = valueType.PrimitiveType,
+                                    Count = valueType.Count
+                                };
+                                pointerType.Generics.AddRange(valueType.Generics);
+                                return pointerType;
+                            }
+                            errors.Add(CreateError("Cannot only reference variables, structs, or struct fields", unary.Value));
+                            return null;
                         default:
                             errors.Add(CreateError($"Unexpected unary operator '{unary.Operator}'", unary.Value));
                             return null;
@@ -720,6 +726,7 @@ namespace Lang.Translation
                 // 3. Verify the operator and expression types are compatible and convert the expression type if necessary
                 var type = VerifyType(expression.Type, errors);
                 var nextType = VerifyType(nextExpressionType, errors);
+                // TODO Handle pointer math
                 switch (op)
                 {
                     // Both need to be bool and returns bool
@@ -1045,6 +1052,8 @@ namespace Lang.Translation
             {
                 sb.Append($"<{string.Join(", ", type.Generics.Select(PrintTypeDefinition))}>");
             }
+
+            if (type.Pointer) sb.Append('*');
             return sb.ToString();
         }
 
