@@ -183,6 +183,7 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public string IterationVariable { get; set; }
         public IAst Iteration { get; set; }
+        public TypeDefinition IteratorType { get; set; }
         public IAst RangeBegin { get; set; }
         public IAst RangeEnd { get; set; }
         public List<IAst> Children { get; } = new();

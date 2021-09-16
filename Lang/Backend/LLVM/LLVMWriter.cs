@@ -259,11 +259,12 @@ namespace Lang.Backend.LLVM
                     }
                     break;
                 case EachAst each:
-                    var iterationVariable = LLVMApi.BuildAlloca(_builder, LLVMTypeRef.Int32Type(), each.IterationVariable);
-                    _allocationQueue.Enqueue(iterationVariable);
+                    var indexVariable = LLVMApi.BuildAlloca(_builder, LLVMTypeRef.Int32Type(), each.IterationVariable);
+                    _allocationQueue.Enqueue(indexVariable);
                     if (each.Iteration != null)
                     {
-                        BuildStackPointer();
+                        var iterationVariable = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(each.IteratorType), each.IterationVariable);
+                        _allocationQueue.Enqueue(iterationVariable);
                     }
 
                     foreach (var childAst in each.Children)
@@ -600,97 +601,70 @@ namespace Lang.Backend.LLVM
         {
             var eachVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>(localVariables);
 
-            LLVMValueRef variable;
+            // 1. Initialize each values
+            var indexVariable = _allocationQueue.Dequeue();
             var iterationVariable = new LLVMValueRef();
+            var listData = new LLVMValueRef();
+            var compareTarget = new LLVMValueRef();
+            var (iterationType, iterationValue) = each.Iteration switch
+            {
+                VariableAst var => localVariables[var.Name],
+                StructFieldRefAst structField => BuildStructField(structField, localVariables[structField.Name].value),
+                IndexAst index => GetListPointer(index, localVariables),
+                _ => (null, new LLVMValueRef())
+            };
+
+            // 2. Initialize the first variable in the loop and the compare target
             if (each.Iteration != null)
             {
-                var (type, value) = each.Iteration switch
-                {
-                    VariableAst var => localVariables[var.Name],
-                    StructFieldRefAst structField => BuildStructField(structField,  localVariables[structField.Name].value),
-                    IndexAst index => GetListPointer(index, localVariables),
-                    // @Cleanup This branch should never be hit
-                    _ => (null, new LLVMValueRef())
-                };
+                LLVMApi.BuildStore(_builder, GetConstZero(LLVMTypeRef.Int32Type()), indexVariable);
 
-                iterationVariable = _allocationQueue.Dequeue();
-                LLVMApi.BuildStore(_builder, GetConstZero(LLVMTypeRef.Int32Type()), iterationVariable);
-
-                switch (type.Name)
+                switch (iterationType.Name)
                 {
                     case "List":
                     case "Params": // TODO Add 'Any' type case
-                        BuildStackSave();
-                        var iterType = type.Generics[0];
-                        variable = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(iterType), each.IterationVariable);
+                        iterationVariable = _allocationQueue.Dequeue();
 
                         // Get the first element of the List
-                        var dataPointer = LLVMApi.BuildStructGEP(_builder, value, 1, "dataptr");
-                        var data = LLVMApi.BuildLoad(_builder, dataPointer, "data");
-                        var first = LLVMApi.BuildLoad(_builder, data, "first");
+                        var dataPointer = LLVMApi.BuildStructGEP(_builder, iterationValue, 1, "dataptr");
+                        listData = LLVMApi.BuildLoad(_builder, dataPointer, "data");
+                        var first = LLVMApi.BuildLoad(_builder, listData, "first");
 
-                        LLVMApi.BuildStore(_builder, first, variable);
-                        eachVariables.TryAdd(each.IterationVariable, (iterType, variable));
-                        break;
-                    // @Cleanup This branch should never be hit
-                    default:
-                        variable = new LLVMValueRef();
+                        LLVMApi.BuildStore(_builder, first, iterationVariable);
+                        eachVariables.TryAdd(each.IterationVariable, (each.IteratorType, iterationVariable));
+
+                        // Set the compareTarget to the list count
+                        var lengthPointer= LLVMApi.BuildStructGEP(_builder, iterationValue, 0, "lengthptr");
+                        compareTarget = LLVMApi.BuildLoad(_builder, lengthPointer, "length");
                         break;
                 }
             }
             else
             {
-                variable = _allocationQueue.Dequeue();
+                // Begin the loop at the beginning of the range
                 var (type, value) = WriteExpression(each.RangeBegin, localVariables);
-                LLVMApi.BuildStore(_builder, value, variable);
-                eachVariables.Add(each.IterationVariable, (type, variable));
+                LLVMApi.BuildStore(_builder, value, indexVariable);
+                eachVariables.Add(each.IterationVariable, (type, indexVariable));
+
+                // Get the end of the range
+                (_, compareTarget) = WriteExpression(each.RangeEnd, localVariables);
             }
 
-            // 1. Break to the each condition loop
+            // 3. Break to the each condition loop
             var eachCondition = LLVMApi.AppendBasicBlock(function, "eachcond");
             LLVMApi.BuildBr(_builder, eachCondition);
 
-            // 2. Check condition of each loop and break if condition is not met
+            // 4. Check condition of each loop and break if condition is not met
             LLVMApi.PositionBuilderAtEnd(_builder, eachCondition);
-            LLVMValueRef condition;
-            if (each.Iteration != null)
-            {
-                var (type, value) = each.Iteration switch
-                {
-                    VariableAst var => localVariables[var.Name],
-                    StructFieldRefAst structField => BuildStructField(structField,  localVariables[structField.Name].value),
-                    IndexAst index => GetListPointer(index, localVariables),
-                    // @Cleanup This branch should never be hit
-                    _ => (null, new LLVMValueRef())
-                };
-                
-                switch (type.Name)
-                {
-                    case "List":
-                    case "Params":
-                        var countPointer = LLVMApi.BuildStructGEP(_builder, value, 0, "count");
-                        var count = LLVMApi.BuildLoad(_builder, countPointer, "data");
-                        var iterationValue = LLVMApi.BuildLoad(_builder, iterationVariable, "curr");
+            var indexValue = LLVMApi.BuildLoad(_builder, indexVariable, "curr");
+            var condition = LLVMApi.BuildICmp(_builder, each.Iteration == null ? LLVMIntPredicate.LLVMIntSLE : LLVMIntPredicate.LLVMIntSLT,
+                indexValue, compareTarget, "listcmp");
 
-                        condition = LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntSLT, iterationValue, count, "listcmp");
-                        break;
-                    // @Cleanup This branch should never be hit
-                    default:
-                        condition = new LLVMValueRef();
-                        break;
-                }
-            }
-            else
-            {
-                var value = LLVMApi.BuildLoad(_builder, variable, "curr");
-                var (_, rangeEnd) = WriteExpression(each.RangeEnd, localVariables);
-                condition = LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntSLE, value, rangeEnd, "rangecond");
-            }
             var eachBody = LLVMApi.AppendBasicBlock(function, "eachbody");
             var afterEach = LLVMApi.AppendBasicBlock(function, "aftereach");
             LLVMApi.BuildCondBr(_builder, condition, eachBody, afterEach);
 
-            // 3. Write out each loop body
+            // 5. Write out each loop body
             LLVMApi.PositionBuilderAtEnd(_builder, eachBody);
             foreach (var ast in each.Children)
             {
@@ -702,46 +676,26 @@ namespace Lang.Backend.LLVM
                 }
             }
 
-            // 4. Increment or move the iteration variable
+            // 6. Increment and/or move the iteration variable
+            var nextValue = LLVMApi.BuildAdd(_builder, indexValue, LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 1, false), "inc");
+            LLVMApi.BuildStore(_builder, nextValue, indexVariable);
             if (each.Iteration != null)
             {
-                var (type, value) = each.Iteration switch
-                {
-                    VariableAst var => localVariables[var.Name],
-                    StructFieldRefAst structField => BuildStructField(structField,  localVariables[structField.Name].value),
-                    IndexAst index => GetListPointer(index, localVariables),
-                    // @Cleanup This branch should never be hit
-                    _ => (null, new LLVMValueRef())
-                };
-
-                var iterationValue = LLVMApi.BuildLoad(_builder, iterationVariable, "curr");
-                var nextValue = LLVMApi.BuildAdd(_builder, iterationValue, LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 1, false), "inc");
-                LLVMApi.BuildStore(_builder, nextValue, iterationVariable);
-
-                switch (type.Name)
+                switch (iterationType.Name)
                 {
                     case "List":
                     case "Params":
-                        var dataPointer = LLVMApi.BuildStructGEP(_builder, value, 1, "dataptr");
-                        var data = LLVMApi.BuildLoad(_builder, dataPointer, "data");
-                        var nextPointer = LLVMApi.BuildGEP(_builder, data, new []{nextValue}, "nextptr");
+                        var nextPointer = LLVMApi.BuildGEP(_builder, listData, new []{nextValue}, "nextptr");
                         var nextVariable = LLVMApi.BuildLoad(_builder, nextPointer, "nextvar");
-
-                        LLVMApi.BuildStore(_builder, nextVariable, variable);
+                        LLVMApi.BuildStore(_builder, nextVariable, iterationVariable);
                         break;
                 }
             }
-            else
-            {
-                var value = LLVMApi.BuildLoad(_builder, variable, "iter");
-                var nextValue = LLVMApi.BuildAdd(_builder, value, LLVMApi.ConstInt(LLVMApi.Int32Type(), 1, false), "tmpadd");
-                LLVMApi.BuildStore(_builder, nextValue, variable);
-            }
 
-            // 5. Write jump to the loop
+            // 7. Write jump to the loop
             LLVMApi.BuildBr(_builder, eachCondition);
 
-            // 6. Position builder to after block
+            // 8. Position builder to after block
             LLVMApi.PositionBuilderAtEnd(_builder, afterEach);
             return false;
         }

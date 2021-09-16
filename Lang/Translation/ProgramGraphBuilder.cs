@@ -547,20 +547,24 @@ namespace Lang.Translation
             {
                 var variableTypeDefinition = GetVariable(each.Iteration, localVariables, errors);
                 if (variableTypeDefinition == null) return false;
+                var iteratorType = variableTypeDefinition.Generics.FirstOrDefault();
 
                 switch (variableTypeDefinition.Name)
                 {
                     case "List":
-                        eachVariables.TryAdd(each.IterationVariable, variableTypeDefinition.Generics[0]);
+                        each.IteratorType = iteratorType;
+                        eachVariables.TryAdd(each.IterationVariable, iteratorType);
                         break;
                     case "Params":
                         if (variableTypeDefinition.Generics.Any())
                         {
-                            eachVariables.TryAdd(each.IterationVariable, variableTypeDefinition.Generics[0]);
+                            each.IteratorType = iteratorType;
+                            eachVariables.TryAdd(each.IterationVariable, iteratorType);
                         }
                         else
                         {
                             var anyType = new TypeDefinition {Name = "Any"};
+                            each.IteratorType = anyType;
                             eachVariables.TryAdd(each.IterationVariable, anyType);
                         }
                         break;
