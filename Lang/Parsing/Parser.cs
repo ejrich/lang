@@ -1268,11 +1268,13 @@ namespace Lang.Parsing
                     if (int.TryParse(token.Value, out _))
                     {
                         typeDefinition.Name = "int";
+                        typeDefinition.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
                         return typeDefinition;
                     }
                     else if (float.TryParse(token.Value, out _))
                     {
                         typeDefinition.Name = "float";
+                        typeDefinition.PrimitiveType = new FloatType {Bytes = 4};
                         return typeDefinition;
                     }
                     else
