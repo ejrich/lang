@@ -2058,13 +2058,6 @@ namespace Lang
             return overload;
         }
 
-        // private static readonly HashSet<string> IntegerTypes = new()
-        // {
-        //     "int", "u64", "s64", "u32", "s32", "u16", "s16", "u8", "s8"
-        // };
-
-        // private static readonly HashSet<string> FloatTypes = new() {"float", "float64"};
-
         private static TypeDefinition ParseType(TokenEnumerator enumerator, IFunction currentFunction = null, bool argument = false, int depth = 0)
         {
             var typeDefinition = CreateAst<TypeDefinition>(enumerator.Current);
@@ -2283,8 +2276,6 @@ namespace Lang
                 case TokenType.Character:
                     constant.TypeName = "u8";
                     constant.Value = new Constant {UnsignedInteger = (byte)token.Value[0]};
-                    // typeDefinition.Character = true;
-                    // typeDefinition.PrimitiveType = new IntegerType {Bytes = 1};
                     return constant;
                 case TokenType.Number:
                     if (token.Flags == TokenFlags.None)
@@ -2293,7 +2284,6 @@ namespace Lang
                         {
                             constant.TypeName = "s32";
                             constant.Value = new Constant {Integer = s32};
-                            // typeDefinition.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
                             return constant;
                         }
 
@@ -2301,7 +2291,6 @@ namespace Lang
                         {
                             constant.TypeName = "s64";
                             constant.Value = new Constant {Integer = s64};
-                            // typeDefinition.PrimitiveType = new IntegerType {Bytes = 8, Signed = true};
                             return constant;
                         }
 
@@ -2309,7 +2298,6 @@ namespace Lang
                         {
                             constant.TypeName = "u64";
                             constant.Value = new Constant {UnsignedInteger = u64};
-                            // typeDefinition.PrimitiveType = new IntegerType {Bytes = 8, Signed = false};
                             return constant;
                         }
 
@@ -2323,7 +2311,6 @@ namespace Lang
                         {
                             constant.TypeName = "float";
                             constant.Value = new Constant {Double = (double)f32};
-                            // typeDefinition.PrimitiveType = new FloatType {Bytes = 4};
                             return constant;
                         }
 
@@ -2331,7 +2318,6 @@ namespace Lang
                         {
                             constant.TypeName = "float64";
                             constant.Value = new Constant {Double = f64};
-                            // typeDefinition.PrimitiveType = new FloatType {Bytes = 8};
                             return constant;
                         }
 
@@ -2354,7 +2340,6 @@ namespace Lang
                             {
                                 constant.TypeName = "u32";
                                 constant.Value = new Constant {UnsignedInteger = u32};
-                                // typeDefinition.PrimitiveType = new IntegerType {Bytes = 4};
                                 return constant;
                             }
                         }
@@ -2364,7 +2349,6 @@ namespace Lang
                             {
                                 constant.TypeName = "u64";
                                 constant.Value = new Constant {UnsignedInteger = u64};
-                                // typeDefinition.PrimitiveType = new IntegerType {Bytes = 8};
                                 return constant;
                             }
                         }

@@ -184,8 +184,6 @@ namespace Lang
         public TypeKind TypeKind { get; set; }
         public uint Size { get; set; }
         public bool Signed { get; set; }
-        // public IPrimitive Primitive { get; set; }
-        // public TypeDefinition PointerTypeDefinition { get; set; }
         public IType PointerType { get; set; }
     }
 
@@ -196,8 +194,7 @@ namespace Lang
         public int TypeIndex { get; set; }
         public TypeKind TypeKind { get; set; } = TypeKind.CArray;
         public uint Size { get; set; }
-        public uint Length { get; set; } // TODO Set this
-        // public TypeDefinition ElementTypeDefinition { get; set; }
+        public uint Length { get; set; }
         public IType ElementType { get; set; }
     }
 
@@ -206,7 +203,6 @@ namespace Lang
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
-        // public TypeDefinition TypeDefinition { get; set; }
         public string TypeName { get; set; }
         public IType Type { get; set; }
         public Constant Value { get; set; }
@@ -218,7 +214,6 @@ namespace Lang
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
-        // public TypeDefinition TargetTypeDefinition { get; set; }
         public IType TargetType { get; set; }
     }
 
@@ -235,10 +230,8 @@ namespace Lang
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
-        // public TypeDefinition TypeDefinition { get; set; }
         public IType Type { get; set; }
         public List<Operator> Operators { get; } = new();
-        // public List<TypeDefinition> ResultingTypeDefinitions { get; } = new();
         public List<IType> ResultingTypes { get; } = new();
         public Dictionary<int, OperatorOverloadAst> OperatorOverloads { get; } = new();
         public List<IAst> Children { get; } = new();
@@ -332,7 +325,6 @@ namespace Lang
         public VariableAst IterationVariable { get; set; }
         public VariableAst IndexVariable { get; set; }
         public IAst Iteration { get; set; }
-        // public TypeDefinition IteratorType { get; set; }
         public IAst RangeBegin { get; set; }
         public IAst RangeEnd { get; set; }
         public ScopeAst Body { get; set; }
@@ -344,7 +336,6 @@ namespace Lang
         public uint Line { get; init; }
         public uint Column { get; init; }
         public string Name { get; set; }
-        // public TypeDefinition TypeDefinition { get; set; }
         public IType Type { get; set; }
         public int? AllocationIndex { get; set; }
         public InstructionValue Pointer { get; set; }
@@ -416,14 +407,10 @@ namespace Lang
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
-        // public TypeKind? TypeKind { get; set; }
         public string Name { get; set; }
         public bool IsGeneric { get; set; }
-        // public bool Constant { get; set; }
-        // public bool Character { get; set; }
         public int GenericIndex { get; set; }
         public int TypeIndex { get; set; }
-        // public IPrimitive PrimitiveType { get; set; }
         public List<TypeDefinition> Generics { get; } = new();
         public IAst Count { get; set; }
         public uint? ConstCount { get; set; }
@@ -439,30 +426,6 @@ namespace Lang
             }
         }
     }
-
-    // public interface IPrimitive
-    // {
-    //     byte Bytes { get; }
-    //     bool Signed { get; }
-    // }
-
-    // public class IntegerType : IPrimitive
-    // {
-    //     public byte Bytes { get; init; }
-    //     public bool Signed { get; init; }
-    // }
-
-    // public class FloatType : IPrimitive
-    // {
-    //     public byte Bytes { get; set; }
-    //     public bool Signed => true;
-    // }
-
-    // public class EnumType : IPrimitive
-    // {
-    //     public byte Bytes { get; init; }
-    //     public bool Signed { get; init; }
-    // }
 
     public enum Operator
     {
@@ -520,11 +483,5 @@ namespace Lang
         Struct,
         Type,
         Function
-        // Below not used in the backend
-        // VarArgs,
-        // Params,
-        // Type,
-        // Generic,
-        // Error
     }
 }

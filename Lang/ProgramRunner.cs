@@ -866,7 +866,7 @@ namespace Lang
                         break;
                     }
                     case InstructionType.PointerCast:
-                    case InstructionType.CArrayPointerCast:
+                    case InstructionType.ArrayCastToPointer:
                     {
                         // These instructions are for LLVM, so this is a no-op
                         registers[instruction.ValueIndex] = GetValue(instruction.Value1, registers, stackPointer, function, arguments);

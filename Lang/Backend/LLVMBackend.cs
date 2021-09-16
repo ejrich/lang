@@ -675,7 +675,7 @@ namespace Lang.Backend
                             values[instruction.ValueIndex] = _builder.BuildBitCast(value, targetType);
                             break;
                         }
-                        case InstructionType.CArrayPointerCast:
+                        case InstructionType.ArrayCastToPointer:
                         {
                             var value = GetValue(instruction.Value1, values, allocations, functionPointer);
                             var elementType = _types[instruction.Value2.Type.TypeIndex];
