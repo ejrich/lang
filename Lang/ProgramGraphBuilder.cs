@@ -557,7 +557,7 @@ namespace Lang
                     }
                     structField.Type = fieldType;
                     structField.Offset = structAst.Size;
-                    structField.Size = structField.TypeDefinition.TypeKind == TypeKind.CArray ? fieldType.Size * structField.TypeDefinition.ConstCount.Value : fieldType.Size;
+                    structField.Size = fieldType.TypeKind == TypeKind.CArray ? fieldType.Size * structField.TypeDefinition.ConstCount.Value : fieldType.Size;
                     structAst.Size += fieldType.Size;
                 }
             }
