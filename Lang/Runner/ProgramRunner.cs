@@ -79,19 +79,6 @@ namespace Lang.Runner
                             break;
                         }
                         var structField = structBuilder.DefineField(field.Name, fieldType, FieldAttributes.Public);
-                        if (field.Type.CArray)
-                        {
-                            var marshalAsType = typeof(MarshalAsAttribute);
-                            var sizeConstField = marshalAsType.GetField("SizeConst");
-                            var size = 0;
-                            if (field.Type.Count != null)
-                            {
-                                size = (int)field.Type.ConstCount.Value;
-                            }
-
-                            var caBuilder = new CustomAttributeBuilder(typeof(MarshalAsAttribute).GetConstructor(new []{typeof(UnmanagedType)}), new object[]{UnmanagedType.ByValArray}, new []{sizeConstField}, new object[]{size});
-                            structField.SetCustomAttribute(caBuilder);
-                        }
                     }
 
                     if (index >= count)
@@ -407,7 +394,7 @@ namespace Lang.Runner
                 CastValue(ExecuteExpression(declaration.Value, variables).Value, declaration.Type);
 
             var variable = new ValueType {Type = declaration.Type};
-            if (declaration.Type.Constant)
+            if (declaration.Type.Constant || declaration.Type.CArray)
             {
                 variable.Value = value;
             }
@@ -509,7 +496,7 @@ namespace Lang.Runner
             object list;
             if (type.CArray)
             {
-                list = Array.CreateInstance(genericType, type.ConstCount.Value);
+                list = Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * (int)type.ConstCount.Value);
             }
             else
             {
@@ -681,8 +668,7 @@ namespace Lang.Runner
                 int length;
                 if (iterator.Type.CArray)
                 {
-                    var pinnedArray = GCHandle.Alloc(iterator.Value, GCHandleType.Pinned);
-                    dataPointer = pinnedArray.AddrOfPinnedObject();
+                    dataPointer = GetPointer(iterator.Value);
                     length = (int)ExecuteExpression(iterator.Type.Count, variables).Value;
                 }
                 else
@@ -774,7 +760,7 @@ namespace Lang.Runner
                         return new ValueType {Type = _intTypeDefinition, Value = type.TypeIndex};
                     }
 
-                    var value = variable.Type.Constant ? variable.Value : PointerToTargetType(GetPointer(variable.Value), variable.Type);
+                    var value = variable.Type.Constant || variable.Type.CArray ? variable.Value : PointerToTargetType(GetPointer(variable.Value), variable.Type);
                     return new ValueType {Type = variable.Type, Value = value};
                 }
                 case ChangeByOneAst changeByOne:
@@ -1125,7 +1111,7 @@ namespace Lang.Runner
             if (value == null)
             {
                 loaded = false;
-                value = load ? PointerToTargetType(pointer, type) : pointer;
+                value = load && !type.CArray ? PointerToTargetType(pointer, type) : pointer;
             }
             else
             {
@@ -1977,7 +1963,7 @@ namespace Lang.Runner
                     return pointerType.MakePointerType();
                 case "List" when typeDef.CArray:
                     var elementType = GetTypeFromDefinition(typeDef.Generics[0]);
-                    return elementType.MakeArrayType();
+                    return elementType.MakePointerType();
             }
 
             if (_types.TryGetValue(typeDef.GenericName, out var type))
@@ -2019,7 +2005,7 @@ namespace Lang.Runner
                     return _types.TryGetValue($"List.{typeDef.Generics[0].GenericName}", out var listType) ? listType : null;
                 case "List" when typeDef.CArray:
                     var elementType = GetTypeFromDefinition(typeDef.Generics[0]);
-                    return elementType.MakeArrayType();
+                    return elementType.MakePointerType();
             }
 
             return _types.TryGetValue(typeDef.GenericName, out var type) ? type : null;
