@@ -307,6 +307,7 @@ namespace Lang.Parsing
         public int Line { get; init; }
         public int Column { get; init; }
         public Operator Operator { get; set; }
+        public TypeDefinition Type { get; set; }
         public bool Verified { get; set; }
         public bool HasDirectives { get; set; }
         public TypeDefinition ReturnType { get; set; }
