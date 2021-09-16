@@ -482,6 +482,19 @@ namespace Lang
                             case InstructionValueType.Value:
                                 value = registers[instruction.Value2.ValueIndex];
                                 break;
+                            case InstructionValueType.Allocation:
+                                if (instruction.Value2.Global)
+                                {
+                                    var globalPointer = _globals[instruction.Value2.ValueIndex];
+                                    value = new Register {Pointer = globalPointer};
+                                }
+                                else
+                                {
+                                    var allocation = function.Allocations[instruction.Value2.ValueIndex];
+                                    var allocationPointer = stackPointer + (int)allocation.Offset;
+                                    value = new Register {Pointer = allocationPointer};
+                                }
+                                break;
                             case InstructionValueType.Argument:
                                 value = arguments[instruction.Value2.ValueIndex];
                                 break;
