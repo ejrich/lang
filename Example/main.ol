@@ -1,9 +1,9 @@
-int main(List<string> args) {
+int main() {//List<string> args) {
     // Return positive exit code
     /*
         Multi line comment
     */
-    each arg in args then printf("Arg: %s\n", arg);
+    //each arg in args then printf("Arg: %s\n", arg);
     hello := "This is an \"escaped\" string literal\nWith a new line!";
     a := 4.2;
     a++;
@@ -164,7 +164,7 @@ List<int> create_list(int count) {
 manipulate_list_struct() {
     s: ListStruct;
     s.list[0] = 8.9;
-    //printf("%.2f\n", s.list[0]);
+    printf("%.2f\n", s.list[0]);
 }
 
 struct Node {
@@ -180,8 +180,7 @@ int* pointers() {
     loop_node := &node;
     i := 1;
     while loop_node {
-        //printf("Value %d = %d\n", i++, loop_node.value);
-        printf("Value = %d\n", loop_node.value);
+        printf("Value %d = %d\n", i++, loop_node.value);
         loop_node = loop_node.next;
     }
 
@@ -280,7 +279,10 @@ SDL_CreateWindow(string title, int x, int y, int w, int h, u32 flags) #extern "S
 u32 sleep(u32 seconds) #extern "libc"
 
 #run {
-    default_args(87);
+    //args: List<string>[0];
+    //__main(args);
+    __main();
+    /*default_args(87);
     set_global(11);
     node: Node;
     node.value = 7;
@@ -304,7 +306,7 @@ u32 sleep(u32 seconds) #extern "libc"
     printf("%d\n", list[3]);
 
     sum_test();
-    printf("Pointer Result = %d\n", *pointers());
+    printf("Pointer Result = %d\n", *pointers());*/
 }
 
 /*
