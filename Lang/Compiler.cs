@@ -19,20 +19,21 @@ namespace Lang
         private readonly IProjectInterpreter _projectInterpreter;
         private readonly IParser _parser;
         private readonly IProgramGraphBuilder _graphBuilder;
+        private readonly IProgramRunner _programRunner;
         private readonly IBackend _backend;
 
         public Compiler(IProjectInterpreter projectInterpreter, IParser parser, IProgramGraphBuilder graphBuilder,
-            IBackend backend)
+            IProgramRunner programRunner, IBackend backend)
         {
             _projectInterpreter = projectInterpreter;
             _parser = parser;
             _graphBuilder = graphBuilder;
+            _programRunner = programRunner;
             _backend = backend;
         }
 
         public void Compile(string[] args)
         {
-            //new ProgramRunner().RunProgram();
             // 1. Load cli args into build settings
             var buildSettings = new BuildSettings();
             foreach (var arg in args)
@@ -94,16 +95,23 @@ namespace Lang
                 Environment.Exit(ErrorCodes.CompilationError);
             }
 
-            // 5. Build program and link binaries
+            // 5. Run any compile-time programs
+            stopwatch.Restart();
+            _programRunner.RunProgram(programGraph);
+            stopwatch.Stop();
+            var runTime = stopwatch.Elapsed;
+
+            // 6. Build program and link binaries
             stopwatch.Restart();
             _backend.Build(programGraph, project, buildSettings);
             stopwatch.Stop();
             var buildTime = stopwatch.Elapsed;
 
-            // 6. Log statistics
+            // 7. Log statistics
             Console.WriteLine($"Project time: {projectTime.TotalSeconds} seconds\n" + 
                               $"Lexing/Parsing time: {parseTime.TotalSeconds} seconds\n" +
                               $"Project Graph time: {graphTime.TotalSeconds} seconds\n" +
+                              $"Program run time: {runTime.TotalSeconds} seconds\n" +
                               $"Building time: {buildTime.TotalSeconds} seconds");
         }
     }

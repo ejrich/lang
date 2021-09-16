@@ -72,32 +72,45 @@ namespace Lang.Translation
             }
 
             // 3. Verify function bodies
-            foreach (var function in parseResult.SyntaxTrees.Where(ast => ast is FunctionAst).Cast<FunctionAst>())
+            var mainDefined = false;
+            foreach (var ast in parseResult.SyntaxTrees)
             {
-                _currentFunction = function;
-                // The __start function does not need to be verified
-                if (function.Name == "__start")
+                switch (ast)
                 {
-                    graph.Start = function;
-                    VerifyFunction(function, false, globalVariables, errors);
-                    continue;
-                }
+                    case FunctionAst function:
+                        _currentFunction = function;
+                        // The __start function does not need to be verified
+                        if (function.Name == "__start")
+                        {
+                            graph.Start = function;
+                            VerifyFunction(function, false, globalVariables, errors);
+                            continue;
+                        }
 
-                // Verify the function body
-                var main = function.Name.Equals("main", StringComparison.OrdinalIgnoreCase);
-                VerifyFunction(function, main, globalVariables, errors);
-                if (main)
-                {
-                    if (graph.Main != null)
-                    {
-                        errors.Add(CreateError("Only one main function can be defined", function));
-                    }
-                    graph.Main = function;
+                        // Verify the function body
+                        var main = function.Name == "main";
+                        VerifyFunction(function, main, globalVariables, errors);
+                        if (main)
+                        {
+                            if (mainDefined)
+                            {
+                                errors.Add(CreateError("Only one main function can be defined", function));
+                            }
+                            mainDefined = true;
+                        }
+                        graph.Functions.Add(function);
+                        break;
+                    case CompilerDirectiveAst compilerDirective:
+                        VerifyTopLevelDirective(compilerDirective, globalVariables, errors);
+                        graph.Directives.Add(compilerDirective);
+                        break;
                 }
-                else
-                {
-                    graph.Functions.Add(function);
-                }
+            }
+
+            if (!mainDefined)
+            {
+                // @Cleanup allow errors to be reported without having a file/line/column
+                errors.Add(CreateError("'main' function of the program is not defined", _currentFunction));
             }
 
             graph.Data.Types = _types.Values.ToList();
@@ -767,6 +780,23 @@ namespace Lang.Translation
             return VerifyAsts(each.Children, eachVariables, errors);
         }
 
+        private void VerifyTopLevelDirective(CompilerDirectiveAst directive, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        {
+            switch (directive.Directive)
+            {
+                case Directive.Run:
+                    VerifyAst(directive.Value, localVariables, errors);
+                    break;
+                case Directive.If:
+                    var conditional = directive.Value as ConditionalAst;
+                    VerifyAst(conditional!.Condition, localVariables, errors);
+                    break;
+                default:
+                    errors.Add(CreateError("Compiler directive not supported", directive.Value));
+                    break;
+            }
+        }
+
         private bool VerifyCompilerDirective(CompilerDirectiveAst directive, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             switch (directive.Value)
@@ -791,7 +821,7 @@ namespace Lang.Translation
 
         private bool EvaluateCompileTimeExpression(IAst ast, List<TranslationError> errors)
         {
-            return false;
+            return true;
         }
 
         private TypeDefinition VerifyExpression(IAst ast, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
