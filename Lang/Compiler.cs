@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Linq;
+using Lang.Backend;
 using Lang.Parsing;
 using Lang.Project;
 
@@ -13,13 +14,20 @@ namespace Lang
 
     public class Compiler : ICompiler
     {
-        private readonly IParser _parser;
         private readonly IProjectInterpreter _projectInterpreter;
+        private readonly IParser _parser;
+        private readonly IWriter _writer;
+        private readonly IBuilder _builder;
+        private readonly ILinker _linker;
 
-        public Compiler(IParser parser, IProjectInterpreter projectInterpreter)
+        public Compiler(IProjectInterpreter projectInterpreter, IParser parser, IWriter writer, IBuilder builder,
+            ILinker linker)
         {
-            _parser = parser;
             _projectInterpreter = projectInterpreter;
+            _parser = parser;
+            _writer = writer;
+            _builder = builder;
+            _linker = linker;
         }
 
         public void Compile(string[] args)
@@ -48,15 +56,29 @@ namespace Lang
                 Environment.Exit(ErrorCodes.ParsingError);
             }
 
-            // 3. Build dependency graph
-            // 4. Generate assembly code
-            // 5. Assemble and link binaries
-            // 6. Clean up unused binaries
+            // 3. Build program graph
+            stopwatch.Restart();
+            var programGraph = new ProgramGraph(); // TODO Insert graph builder here
+            var graphTime = stopwatch.Elapsed;
 
-            // 7. Log statistics
+            // 4. Generate translated code
+            stopwatch.Restart();
+            var translatedFile = _writer.WriteTranslatedFile(programGraph);
+            var translationTime = stopwatch.Elapsed;
+
+            // 5. Assemble and link binaries
+            stopwatch.Restart();
+            var objectFile = _builder.BuildTranslatedFile(translatedFile);
+            _linker.Link(objectFile, project.Name);
+            var buildTime = stopwatch.Elapsed;
+
+            // 6. Log statistics
             stopwatch.Stop();
             Console.WriteLine($"Project time: {projectTime.TotalSeconds} seconds");
             Console.WriteLine($"Lexing/Parsing time: {parseTime.TotalSeconds} seconds");
+            Console.WriteLine($"Project Graph time: {graphTime.TotalSeconds} seconds");
+            Console.WriteLine($"Writing time: {translationTime.TotalSeconds} seconds");
+            Console.WriteLine($"Building time: {buildTime.TotalSeconds} seconds");
         }
     }
 }
