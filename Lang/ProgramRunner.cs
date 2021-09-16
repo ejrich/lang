@@ -363,7 +363,8 @@ namespace Lang
                         switch (instruction.Value1.Type.TypeKind)
                         {
                             case TypeKind.Boolean:
-                                register.Bool = Marshal.PtrToStructure<bool>(pointer.Pointer);
+                                var rawValue = Marshal.PtrToStructure<byte>(pointer.Pointer);
+                                register.Bool = Convert.ToBoolean(rawValue);
                                 break;
                             case TypeKind.Integer:
                             case TypeKind.Enum:
@@ -422,7 +423,7 @@ namespace Lang
                         switch (instruction.Value2.Type.TypeKind)
                         {
                             case TypeKind.Boolean:
-                                Marshal.StructureToPtr(value.Bool, pointer.Pointer, false);
+                                Marshal.StructureToPtr(value.Byte, pointer.Pointer, false);
                                 break;
                             case TypeKind.Integer:
                             case TypeKind.Enum:

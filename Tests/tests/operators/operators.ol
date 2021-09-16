@@ -47,16 +47,25 @@ operator_overloading() {
     printf("Rotate left: x = %d, y = %d, z = %d\n", rotate_left.x, rotate_left.y, rotate_left.z);
 
     and := a && b;
+    assert(and, "and");
     or := a || b;
+    assert(or, "or");
     xor := a ^ b;
+    assert(!xor, "xor");
     equals := a == b;
+    assert(!equals, "==");
     not_equals := a != b;
+    assert(not_equals, "!=");
     printf("And: %d, Or: %d, Xor: %d, Equals: %d, Not Equals: %d\n", and, or, xor, equals, not_equals);
 
     gte := a >= b;
+    assert(!gte, ">=");
     lte := a <= b;
+    assert(lte, "<=");
     gt := a > b;
+    assert(!gt, ">");
     lt := a < b;
+    assert(lt, "<");
     printf("Greater than or equal: %d, Less than or equal: %d, Greater than: %d, Less than: %d\n", gte, lte, gt, lt);
 }
 
