@@ -1737,7 +1737,7 @@ namespace Lang.Runner
                             {
                                 result |= right ? lhsValue << (8 - rhsValue) : lhsValue >> (8 - rhsValue);
                             }
-                            return result;
+                            return CastValue(result, lhs.Type);
                         }
                         else
                         {
@@ -1747,7 +1747,7 @@ namespace Lang.Runner
                             {
                                 result |= right ? lhsValue << (8 - rhsValue) : lhsValue >> (8 - rhsValue);
                             }
-                            return result;
+                            return CastValue(result, lhs.Type);
                         }
                     case 2:
                         if (integerType.Signed)
@@ -1758,7 +1758,7 @@ namespace Lang.Runner
                             {
                                 result |= right ? lhsValue << (16 - rhsValue) : lhsValue >> (16 - rhsValue);
                             }
-                            return result;
+                            return CastValue(result, lhs.Type);
                         }
                         else
                         {
@@ -1768,7 +1768,7 @@ namespace Lang.Runner
                             {
                                 result |= right ? lhsVal << (16 - rhsValue) : lhsVal >> (16 - rhsValue);
                             }
-                            return result;
+                            return CastValue(result, lhs.Type);
                         }
                     case 4:
                         if (integerType.Signed)
@@ -1789,7 +1789,7 @@ namespace Lang.Runner
                             {
                                 result |= right ? lhsValue << (32 - rhsValue) : lhsValue >> (32 - rhsValue);
                             }
-                            return result;
+                            return CastValue(result, lhs.Type);
                         }
                     case 8:
                         if (integerType.Signed)
@@ -1800,7 +1800,7 @@ namespace Lang.Runner
                             {
                                 result |= right ? lhsValue << (64 - rhsValue) : lhsValue >> (64 - rhsValue);
                             }
-                            return result;
+                            return CastValue(result, lhs.Type);
                         }
                         else
                         {
@@ -1810,7 +1810,7 @@ namespace Lang.Runner
                             {
                                 result |= right ? lhsValue << (64 - rhsValue) : lhsValue >> (64 - rhsValue);
                             }
-                            return result;
+                            return CastValue(result, lhs.Type);
                         }
                 }
             }

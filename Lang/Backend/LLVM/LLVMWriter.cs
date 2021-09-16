@@ -1541,9 +1541,9 @@ namespace Lang.Backend.LLVM
                 case Operator.ShiftRight:
                     return BuildShift(lhs, rhs, true);
                 case Operator.RotateLeft:
-                    return BuildShift(lhs, rhs, rotate: true);
+                    return BuildRotate(lhs, rhs);
                 case Operator.RotateRight:
-                    return BuildShift(lhs, rhs, true, true);
+                    return BuildRotate(lhs, rhs, true);
             }
 
             // 3. Cast lhs and rhs to the target types
@@ -1661,16 +1661,25 @@ namespace Lang.Backend.LLVM
             throw new NotImplementedException($"{op} not compatible with types '{lhs.value.TypeOf().TypeKind}' and '{rhs.value.TypeOf().TypeKind}'");
         }
 
-        private LLVMValueRef BuildShift((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, bool right = false, bool rotate = false)
+        private LLVMValueRef BuildShift((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, bool right = false)
         {
             var result = right ? LLVMApi.BuildAShr(_builder, lhs.value, rhs.value, "tmpshr")
                 : LLVMApi.BuildShl(_builder, lhs.value, rhs.value, "tmpshl");
 
-            if (rotate)
-            {
-                // TODO Implement me
-            }
             return result;
+        }
+
+        private LLVMValueRef BuildRotate((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, bool right = false)
+        {
+            var result = BuildShift(lhs, rhs, right);
+
+            var maskSize = LLVMApi.ConstInt(ConvertTypeDefinition(lhs.type), (uint)(lhs.type.PrimitiveType?.Bytes * 8 ?? 32), false);
+            var maskShift = LLVMApi.BuildSub(_builder, maskSize, rhs.value, "mask");
+
+            var mask = right ? LLVMApi.BuildShl(_builder, lhs.value, maskShift, "tmpshl")
+                : LLVMApi.BuildAShr(_builder, lhs.value, maskShift, "tmpshr");
+
+            return LLVMApi.IsUndef(result) ? mask : LLVMApi.BuildOr(_builder, result, mask, "tmpmask");
         }
 
         private LLVMValueRef BuildBinaryOperation(TypeDefinition type, LLVMValueRef lhs, LLVMValueRef rhs, Operator op, bool signed = true)
