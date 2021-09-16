@@ -3,6 +3,7 @@ using Lang.Backend;
 using Lang.Backend.C;
 using Lang.Parsing;
 using Lang.Project;
+using Lang.Translation;
 using Microsoft.Extensions.DependencyInjection;
 
 var serviceCollection = new ServiceCollection();
@@ -13,6 +14,7 @@ serviceCollection.AddTransient<IProjectInterpreter, ProjectInterpreter>();
 serviceCollection.AddTransient<IWriter, CWriter>();
 serviceCollection.AddTransient<IBuilder, CBuilder>();
 serviceCollection.AddTransient<ILinker, CLinker>();
+serviceCollection.AddTransient<IProgramGraphBuilder, ProgramGraphBuilder>();
 
 var container = serviceCollection.BuildServiceProvider();
 
