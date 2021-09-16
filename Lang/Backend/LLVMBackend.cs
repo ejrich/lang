@@ -239,6 +239,10 @@ namespace Lang.Backend
                     {
                         LLVM.SetInitializer(global, GetConstZero(type));
                     }
+                    else if (typeDef.TypeKind == TypeKind.Pointer)
+                    {
+                        LLVM.SetInitializer(global, LLVM.ConstNull(type));
+                    }
 
                     if (_emitDebug)
                     {
