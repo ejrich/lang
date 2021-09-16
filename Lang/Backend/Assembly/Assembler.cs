@@ -2,7 +2,7 @@
 {
     public class Assembler : IBuilder
     {
-        public string BuildTranslatedFile(string filePath)
+        public string BuildFile(string filePath)
         {
             throw new System.NotImplementedException();
         }

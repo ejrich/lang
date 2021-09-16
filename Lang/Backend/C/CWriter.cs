@@ -1,7 +1,6 @@
 ﻿using System.IO;
 using System.Text;
 using Lang.Parsing;
-using LLVMSharp.Interop;
 
 namespace Lang.Backend.C
 {
@@ -9,16 +8,7 @@ namespace Lang.Backend.C
     {
         private const string ObjectDirectory = "obj";
 
-        private readonly LLVMModuleRef _module;
-        private readonly LLVMBuilderRef _builder;
-
-        public CWriter()
-        {
-            _module = LLVMModuleRef.CreateWithName("ol");
-            _builder = LLVMBuilderRef.Create(_module.Context);
-        }
-
-        public string WriteTranslatedFile(ProgramGraph programGraph, string projectName, string projectPath)
+        public string WriteFile(ProgramGraph programGraph, string projectName, string projectPath)
         {
             // 1. Verify obj directory exists
             var objectPath = Path.Combine(projectPath, ObjectDirectory);
