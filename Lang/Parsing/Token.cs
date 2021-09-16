@@ -44,6 +44,7 @@ namespace Lang.Parsing
         ShiftRight,
         RotateLeft,
         RotateRight,
+        Operator,
         NumberRange, // Ignored by parser
         VarArgs, // Ignored by parser
         OpenParen = '(',

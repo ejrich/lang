@@ -301,6 +301,21 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
+    public class OperatorOverloadAst : IAst
+    {
+        public int FileIndex { get; set; }
+        public int Line { get; init; }
+        public int Column { get; init; }
+        public Operator Operator { get; set; }
+        public bool Verified { get; set; }
+        public bool HasDirectives { get; set; }
+        public TypeDefinition ReturnType { get; set; }
+        public bool ReturnTypeHasGenerics { get; set; }
+        public List<string> Generics { get; } = new();
+        public List<DeclarationAst> Arguments { get; } = new();
+        public List<IAst> Children { get; } = new();
+    }
+
     public class TypeDefinition : IAst
     {
         public int FileIndex { get; set; }
