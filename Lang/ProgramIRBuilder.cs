@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Lang
 {
@@ -129,12 +130,7 @@ namespace Lang
                         var arrayStruct = (StructAst)declaration.Type;
                         if (declaration.TypeDefinition.ConstCount != null)
                         {
-                            // var arrayPointer = InitializeConstArray(function, block, pointer, arrayStruct, declaration.TypeDefinition.ConstCount.Value);
-
-                            if (declaration.ArrayValues != null)
-                            {
-                                // InitializeArrayValues(function, block, arrayPointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
-                            }
+                            globalVariable.InitialValue = InitializeGlobalArray(arrayStruct, declaration, scope);
                         }
                         else
                         {
@@ -149,7 +145,7 @@ namespace Lang
                     case TypeKind.CArray:
                         if (declaration.ArrayValues != null)
                         {
-                            // InitializeArrayValues(function, block, cArrayPointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
+                            globalVariable.InitialArrayValues = declaration.ArrayValues.Select(val => EmitConstantIR(val, scope)).ToArray();
                         }
                         break;
                     // Initialize struct field default values
@@ -210,15 +206,7 @@ namespace Lang
                     var arrayStruct = (StructAst)field.Type;
                     if (field.TypeDefinition.ConstCount != null)
                     {
-                        // var arrayPointer = InitializeConstArray(function, block, pointer, arrayStruct, field.TypeDefinition.ConstCount.Value);
-
-                        if (field.ArrayValues != null)
-                        {
-                            // InitializeArrayValues(function, block, arrayPointer, field.ArrayElementType, field.ArrayValues, scope);
-                        }
-
-                        // TODO Implement me
-                        return null;
+                        return InitializeGlobalArray(arrayStruct, field, scope);
                     }
                     else
                     {
@@ -229,12 +217,13 @@ namespace Lang
                         };
                     }
                 case TypeKind.CArray:
+                    var length = field.TypeDefinition.ConstCount.Value;
+                    var constArray = new InstructionValue {ValueType = InstructionValueType.ConstantArray, Type = field.ArrayElementType, ArrayLength = length};
                     if (field.ArrayValues != null)
                     {
-                        // InitializeArrayValues(function, block, pointer, field.ArrayElementType, field.ArrayValues, scope);
+                        constArray.Values = field.ArrayValues.Select(val => EmitConstantIR(val, scope)).ToArray();
                     }
-                    // TODO Implement me
-                    return null;
+                    return constArray;
                 // Initialize struct field default values
                 case TypeKind.Struct:
                 case TypeKind.String: // TODO String default values
@@ -246,6 +235,31 @@ namespace Lang
                 default:
                     return field.Value == null ? GetDefaultConstant(field.Type) : EmitConstantIR(field.Value, scope);
             }
+        }
+
+        private InstructionValue InitializeGlobalArray(StructAst arrayStruct, IDeclaration declaration, ScopeAst scope)
+        {
+            var length = declaration.TypeDefinition.ConstCount.Value;
+            var elementType = declaration.ArrayElementType;
+
+            var arrayIndex = Program.GlobalVariables.Count;
+            var arrayVariable = new GlobalVariable
+            {
+                Name = "____array", Index = arrayIndex, Size = elementType.Size,
+                Array = true, ArrayLength = length, Type = elementType
+            };
+            Program.GlobalVariables.Add(arrayVariable);
+
+            if (declaration.ArrayValues != null)
+            {
+                arrayVariable.InitialArrayValues = declaration.ArrayValues.Select(val => EmitConstantIR(val, scope)).ToArray();
+            }
+
+            return new InstructionValue
+            {
+                ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
+                Values = new [] {GetConstantInteger(length), new InstructionValue {ValueIndex = arrayIndex}}
+            };
         }
 
         public void EmitDeclaration(FunctionIR function, DeclarationAst declaration, ScopeAst scope)
@@ -276,7 +290,7 @@ namespace Lang
                         var arrayStruct = (StructAst)declaration.Type;
                         if (declaration.TypeDefinition.ConstCount != null)
                         {
-                            var arrayPointer = InitializeConstArray(function, block, pointer, arrayStruct, declaration.TypeDefinition.ConstCount.Value);
+                            var arrayPointer = InitializeConstArray(function, block, pointer, arrayStruct, declaration.TypeDefinition.ConstCount.Value, declaration.ArrayElementType);
 
                             if (declaration.ArrayValues != null)
                             {
@@ -356,17 +370,12 @@ namespace Lang
             return index;
         }
 
-        private InstructionValue InitializeConstArray(FunctionIR function, BasicBlock block, InstructionValue arrayPointer, StructAst arrayStruct, uint length, IType elementType = null)
+        private InstructionValue InitializeConstArray(FunctionIR function, BasicBlock block, InstructionValue arrayPointer, StructAst arrayStruct, uint length, IType elementType)
         {
             var lengthPointer = EmitGetStructPointer(block, arrayPointer, arrayStruct, 0);
             var lengthValue = GetConstantInteger(length);
             EmitStore(block, lengthPointer, lengthValue);
 
-            if (elementType == null)
-            {
-                var pointerType = (PrimitiveAst)arrayStruct.Fields[1].Type;
-                elementType = pointerType.PointerType;
-            }
             var dataIndex = AddAllocation(function, elementType, true, length);
             var arrayDataPointer = EmitGetPointer(block, dataIndex, elementType);
             var dataPointer = EmitGetStructPointer(block, arrayPointer, arrayStruct, 1);
@@ -431,7 +440,7 @@ namespace Lang
                     var arrayStruct = (StructAst)field.Type;
                     if (field.TypeDefinition.ConstCount != null)
                     {
-                        var arrayPointer = InitializeConstArray(function, block, pointer, arrayStruct, field.TypeDefinition.ConstCount.Value);
+                        var arrayPointer = InitializeConstArray(function, block, pointer, arrayStruct, field.TypeDefinition.ConstCount.Value, field.ArrayElementType);
 
                         if (field.ArrayValues != null)
                         {
