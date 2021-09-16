@@ -20,6 +20,8 @@
         If,
         Else,
         Then,
+        While,
+        Each,
         And,
         Or,
         Equality,

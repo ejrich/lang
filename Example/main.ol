@@ -11,11 +11,11 @@ int Main(List<string> args) {
 }
 
 int foo() {
-    {
-        var a = 0;
-        a = a + 8;
+    var a = 0;
+    while a < 10 {
+        a = a + 1;
     }
-    return 8;
+    return a;
 }
 
 int bar(int a, string b, float c) {
