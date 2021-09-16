@@ -6,9 +6,9 @@ namespace Lang
     public class ProgramGraph
     {
         public Data Data { get; } = new();
-        public List<FunctionAst> Functions { get; } = new();
+        public Dictionary<string, FunctionAst> Functions { get; } = new();
         public FunctionAst Start { get; set; }
-        public List<IAst> Directives { get; } = new();
+        public List<CompilerDirectiveAst> Directives { get; } = new();
     }
 
     public class Data
