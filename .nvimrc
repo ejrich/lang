@@ -13,6 +13,5 @@ map <leader><F8> :Dispatch dotnet build --no-restore<CR>
 map <leader><F5> :Dispatch ./Lang/bin/Debug/net5.0/Lang Example/Example.olproj<CR>
 map <leader><F10> :Dispatch ./Example/bin/Example<CR>
 
-nnoremap <leader>ff <cmd>lua require('telescope.builtin').find_files({ find_command = {'rg', '--files', '--hidden', '-g', '!.git/**'} })<cr>
-
-setlocal commentstring=//\ %s
+au BufEnter *.cs :setlocal commentstring=//\ %s
+au BufEnter *.ol :setlocal commentstring=//\ %s
