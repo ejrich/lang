@@ -83,11 +83,7 @@ namespace Lang
                         {
                             var marshalAsType = typeof(MarshalAsAttribute);
                             var sizeConstField = marshalAsType.GetField("SizeConst");
-                            var size = 0;
-                            if (field.Type.Count != null)
-                            {
-                                size = (int)field.Type.ConstCount.Value;
-                            }
+                            var size = (int)field.Type.ConstCount.Value;
 
                             var caBuilder = new CustomAttributeBuilder(typeof(MarshalAsAttribute).GetConstructor(new []{typeof(UnmanagedType)}), new object[]{UnmanagedType.ByValArray}, new []{sizeConstField}, new object[]{size});
                             structField.SetCustomAttribute(caBuilder);
@@ -759,7 +755,7 @@ namespace Lang
                 if (iterator.Type.CArray)
                 {
                     dataPointer = GetPointer(iterator.Value);
-                    length = (int)ExecuteExpression(iterator.Type.Count, variables).Value;
+                    length = (int)iterator.Type.ConstCount.Value;
                 }
                 else
                 {
