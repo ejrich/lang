@@ -1453,13 +1453,13 @@ namespace Lang.Runner
                 case Operator.LessThan:
                     return Compare(lhs, rhs, op);
                 case Operator.ShiftLeft:
-                    return Shift(lhs, rhs);
+                    return Shift(lhs, rhs, op);
                 case Operator.ShiftRight:
-                    return Shift(lhs, rhs, true);
+                    return Shift(lhs, rhs, op, true);
                 case Operator.RotateLeft:
-                    return Shift(lhs, rhs, rotate: true);
+                    return Shift(lhs, rhs, op, rotate: true);
                 case Operator.RotateRight:
-                    return Shift(lhs, rhs, true, true);
+                    return Shift(lhs, rhs, op, true, true);
             }
 
             // 3. Handle overloaded operators
@@ -1740,12 +1740,11 @@ namespace Lang.Runner
             return null;
         }
 
-        private static object Shift(ValueType lhs, ValueType rhs, bool right = false, bool rotate = false)
+        private object Shift(ValueType lhs, ValueType rhs, Operator op, bool right = false, bool rotate = false)
         {
-            var rhsValue = Convert.ToInt32(CastValue(rhs.Value, new TypeDefinition {PrimitiveType = new IntegerType {Bytes = 4, Signed = true}}));
-
             if (lhs.Type.PrimitiveType is IntegerType integerType)
             {
+                var rhsValue = Convert.ToInt32(CastValue(rhs.Value, new TypeDefinition {PrimitiveType = new IntegerType {Bytes = 4, Signed = true}}));
                 switch (integerType.Bytes)
                 {
                     case 1:
@@ -1835,8 +1834,7 @@ namespace Lang.Runner
                 }
             }
 
-            // TODO Handle operator overloading
-            return lhs.Value;
+            return HandleOverloadedOperator(lhs.Type, op, lhs.Value, rhs.Value);
         }
 
         private object PerformOperation(TypeDefinition targetType, object lhsValue, object rhsValue, Operator op)

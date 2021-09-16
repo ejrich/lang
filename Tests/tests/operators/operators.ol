@@ -23,6 +23,21 @@ operator_overloading() {
     mod := a % b;
     printf("Modulus: x = %.2f, y = %.2f, z = %.2f\n", mod.x, mod.y, mod.z);
 
+    a_int: Vector3I = { x = 1; y = 1; z = 1; }
+    b_int: Vector3I = { x = 2; y = 2; z = 2; }
+
+    shift_right := a_int >> b_int;
+    printf("Shift right: x = %d, y = %d, z = %d\n", shift_right.x, shift_right.y, shift_right.z);
+
+    shift_left := a_int << b_int;
+    printf("Shift left: x = %d, y = %d, z = %d\n", shift_left.x, shift_left.y, shift_left.z);
+
+    rotate_right := a_int >>> b_int;
+    printf("Rotate right: x = %d, y = %d, z = %d\n", rotate_right.x, rotate_right.y, rotate_right.z);
+
+    rotate_left := a_int <<< b_int;
+    printf("Rotate left: x = %d, y = %d, z = %d\n", rotate_left.x, rotate_left.y, rotate_left.z);
+
     and := a && b;
     or := a || b;
     xor := a ^ b;
@@ -41,6 +56,12 @@ struct Vector3 {
     float x;
     float y;
     float z;
+}
+
+struct Vector3I {
+    int x;
+    int y;
+    int z;
 }
 
 // Numeric operator overloads, these will return the overload type
@@ -66,6 +87,26 @@ operator / Vector3(Vector3 a, Vector3 b) {
 
 operator % Vector3(Vector3 a, Vector3 b) {
     c: Vector3 = { x = a.x % b.x; y = a.y % b.y; z = a.z % b.z; }
+    return c;
+}
+
+operator >> Vector3I(Vector3I a, Vector3I b) {
+    c: Vector3I = { x = a.x >> b.x; y = a.y >> b.y; z = a.z >> b.z; }
+    return c;
+}
+
+operator << Vector3I(Vector3I a, Vector3I b) {
+    c: Vector3I = { x = a.x << b.x; y = a.y << b.y; z = a.z << b.z; }
+    return c;
+}
+
+operator >>> Vector3I(Vector3I a, Vector3I b) {
+    c: Vector3I = { x = a.x >>> b.x; y = a.y >>> b.y; z = a.z >>> b.z; }
+    return c;
+}
+
+operator <<< Vector3I(Vector3I a, Vector3I b) {
+    c: Vector3I = { x = a.x <<< b.x; y = a.y <<< b.y; z = a.z <<< b.z; }
     return c;
 }
 

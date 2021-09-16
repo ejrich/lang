@@ -1694,25 +1694,33 @@ namespace Lang.Backend.LLVM
 
         private LLVMValueRef BuildShift((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, bool right = false)
         {
-            var result = right ? LLVMApi.BuildAShr(_builder, lhs.value, rhs.value, "tmpshr")
-                : LLVMApi.BuildShl(_builder, lhs.value, rhs.value, "tmpshl");
+            if (lhs.type.PrimitiveType is IntegerType)
+            {
+                var result = right ? LLVMApi.BuildAShr(_builder, lhs.value, rhs.value, "tmpshr")
+                    : LLVMApi.BuildShl(_builder, lhs.value, rhs.value, "tmpshl");
 
-            // TODO Handle operator overloading
-            return result;
+                return result;
+            }
+
+            return BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, right ? Operator.ShiftRight : Operator.ShiftLeft);
         }
 
         private LLVMValueRef BuildRotate((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, bool right = false)
         {
-            var result = BuildShift(lhs, rhs, right);
+            if (lhs.type.PrimitiveType is IntegerType)
+            {
+                var result = BuildShift(lhs, rhs, right);
 
-            var maskSize = LLVMApi.ConstInt(ConvertTypeDefinition(lhs.type), (uint)(lhs.type.PrimitiveType?.Bytes * 8 ?? 32), false);
-            var maskShift = LLVMApi.BuildSub(_builder, maskSize, rhs.value, "mask");
+                var maskSize = LLVMApi.ConstInt(ConvertTypeDefinition(lhs.type), (uint)(lhs.type.PrimitiveType?.Bytes * 8 ?? 32), false);
+                var maskShift = LLVMApi.BuildSub(_builder, maskSize, rhs.value, "mask");
 
-            var mask = right ? LLVMApi.BuildShl(_builder, lhs.value, maskShift, "tmpshl")
-                : LLVMApi.BuildAShr(_builder, lhs.value, maskShift, "tmpshr");
+                var mask = right ? LLVMApi.BuildShl(_builder, lhs.value, maskShift, "tmpshl")
+                    : LLVMApi.BuildAShr(_builder, lhs.value, maskShift, "tmpshr");
 
-            // TODO Handle operator overloading
-            return LLVMApi.IsUndef(result) ? mask : LLVMApi.BuildOr(_builder, result, mask, "tmpmask");
+                return LLVMApi.IsUndef(result) ? mask : LLVMApi.BuildOr(_builder, result, mask, "tmpmask");
+            }
+
+            return BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, right ? Operator.RotateRight : Operator.RotateLeft);
         }
 
         private LLVMValueRef BuildBinaryOperation(TypeDefinition type, LLVMValueRef lhs, LLVMValueRef rhs, Operator op, bool signed = true)
