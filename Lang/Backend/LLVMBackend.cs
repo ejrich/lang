@@ -645,7 +645,7 @@ namespace Lang.Backend
                                 BuildCallAllocations(call);
                                 if (!structField.Pointers[i])
                                 {
-                                    var function = _programGraph.Functions[call.FunctionName][call.FunctionIndex];
+                                    var function = call.Function;
                                     var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(function.ReturnType), function.Name);
                                     _allocationQueue.Enqueue(iterationValue);
                                 }
@@ -689,7 +689,7 @@ namespace Lang.Backend
                         case CallAst call:
                         {
                             BuildCallAllocations(call);
-                            var function = _programGraph.Functions[call.FunctionName][call.FunctionIndex];
+                            var function = call.Function;
                             var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(function.ReturnType), function.Name);
                             _allocationQueue.Enqueue(iterationValue);
                             break;
@@ -702,7 +702,7 @@ namespace Lang.Backend
                                     BuildCallAllocations(call);
                                     if (!structField.Pointers[0])
                                     {
-                                        var function = _programGraph.Functions[call.FunctionName][call.FunctionIndex];
+                                        var function = call.Function;
                                         var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(function.ReturnType), function.Name);
                                         _allocationQueue.Enqueue(iterationValue);
                                     }
@@ -738,7 +738,7 @@ namespace Lang.Backend
         {
             if (call.Function.Params)
             {
-                var functionDef = _programGraph.Functions[call.FunctionName][call.FunctionIndex];
+                var functionDef = call.Function;
 
                 var paramsTypeDef = functionDef.Arguments[^1].Type;
                 var paramsType = ConvertTypeDefinition(paramsTypeDef);

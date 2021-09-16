@@ -1219,7 +1219,7 @@ namespace Lang
 
         private ValueType ExecuteCall(CallAst call, IDictionary<string, ValueType> variables)
         {
-            var function = _programGraph.Functions[call.FunctionName][call.FunctionIndex];
+            var function = call.Function;
             if (call.Function.Params)
             {
                 var arguments = new object[function.Arguments.Count];
