@@ -1444,6 +1444,19 @@ namespace Lang.Translation
                         }
                         else if (function.Varargs)
                         {
+                            for (var i = 0; i < arguments.Count; i++)
+                            {
+                                var argument = arguments[i];
+                                // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
+                                // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
+                                if (argument?.PrimitiveType is FloatType {Bytes: 4})
+                                {
+                                    arguments[i] = argument = new TypeDefinition
+                                    {
+                                        Name = "float64", PrimitiveType = new FloatType {Bytes = 8}
+                                    };
+                                }
+                            }
                             var found = false;
                             for (var index = 0; index < function.VarargsCalls.Count; index++)
                             {
@@ -1453,17 +1466,7 @@ namespace Lang.Translation
                                     var callMatches = true;
                                     for (var i = 0; i < callTypes.Count; i++)
                                     {
-                                        var argument = arguments[i];
-                                        // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
-                                        // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
-                                        if (argument?.PrimitiveType is FloatType {Bytes: 4})
-                                        {
-                                            arguments[i] = argument = new TypeDefinition
-                                            {
-                                                Name = "float64", PrimitiveType = new FloatType {Bytes = 8}
-                                            };
-                                        }
-                                        if (!TypeEquals(callTypes[i], argument, true))
+                                        if (!TypeEquals(callTypes[i], arguments[i], true))
                                         {
                                             callMatches = false;
                                             break;
