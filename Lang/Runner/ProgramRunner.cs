@@ -179,8 +179,11 @@ namespace Lang.Runner
                     var typeKindField = typeInfoType.GetField("type");
                     typeKindField.SetValue(typeInfo, type.TypeKind);
 
-                    var pointer = IntPtr.Add(typeDataPointer, size * type.TypeIndex);
-                    Marshal.StructureToPtr(typeInfo, pointer, false);
+                    var typeInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoType));
+                    Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
+
+                    var listPointer = IntPtr.Add(typeDataPointer, size * type.TypeIndex);
+                    Marshal.StructureToPtr(typeInfoPointer, listPointer, false);
                 }
 
                 _typeCount = programGraph.Types.Count;
