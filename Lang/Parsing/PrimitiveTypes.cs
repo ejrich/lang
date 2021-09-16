@@ -1,4 +1,4 @@
-﻿namespace Lang.Parsing
+namespace Lang.Parsing
 {
     public interface IPrimitive
     {

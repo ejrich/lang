@@ -1,4 +1,4 @@
-﻿namespace Lang.Backend.C
+namespace Lang.Backend.C
 {
     public class CBackend : IBackend
     {
