@@ -48,7 +48,7 @@ namespace Lang.Backend.LLVM
                 for (var i = 0; i < functions.Count; i++)
                 {
                     var function = functions[i];
-                    if (function.Compiler || function.CallsCompiler || function.Generics.Any()) continue;
+                    if (function.Compiler || function.CallsCompiler) continue;
 
                     if (name == "main")
                     {
@@ -74,7 +74,7 @@ namespace Lang.Backend.LLVM
                 for (var i = 0; i < functions.Count; i++)
                 {
                     var functionAst = functions[i];
-                    if (functionAst.Extern || functionAst.Compiler || functionAst.CallsCompiler || functionAst.Generics.Any()) continue;
+                    if (functionAst.Extern || functionAst.Compiler || functionAst.CallsCompiler) continue;
 
                     _currentFunction = functionAst;
                     var functionName = GetFunctionName(functionAst.Name, i, functions.Count);
@@ -178,8 +178,6 @@ namespace Lang.Backend.LLVM
                 for (var i = 0; i < functions.Count; i++)
                 {
                     var function = functions[i];
-                    if (function.Generics.Any()) continue;
-
                     var typeInfo = LLVMApi.AddGlobal(_module, typeInfoType, "____type_info");
                     SetPrivateConstant(typeInfo);
                     types[function.TypeIndex] = typeInfo;

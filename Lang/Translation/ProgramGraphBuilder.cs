@@ -18,6 +18,7 @@ namespace Lang.Translation
         private readonly ProgramGraph _programGraph = new();
         private BuildSettings _buildSettings;
         private readonly Dictionary<string, StructAst> _polymorphicStructs = new();
+        private readonly Dictionary<string, List<FunctionAst>> _polymorphicFunctions = new();
         private readonly Dictionary<string, IAst> _globalIdentifiers = new();
 
         public ProgramGraphBuilder(IProgramRunner programRunner)
@@ -505,26 +506,38 @@ namespace Lang.Translation
             }
 
             // 4. Load the function into the dictionary
-            if (!function.Generics.Any())
+            if (function.Generics.Any())
             {
-                function.TypeIndex = _programGraph.TypeCount++;
-            }
-            if (!_programGraph.Functions.TryGetValue(function.Name, out var functions))
-            {
-                _programGraph.Functions[function.Name] = functions = new List<FunctionAst>();
-            }
-            if (functions.Any())
-            {
-                if (function.Extern)
+                if (!_polymorphicFunctions.TryGetValue(function.Name, out var functions))
                 {
-                    AddError($"Multiple definitions of external function '{function.Name}'", function);
+                    _polymorphicFunctions[function.Name] = functions = new List<FunctionAst>();
                 }
-                else if (OverloadExistsForFunction(function, functions))
+                if (functions.Any() && OverloadExistsForFunction(function, functions))
                 {
                     AddError($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.Type)))})", function);
                 }
+                functions.Add(function);
             }
-            functions.Add(function);
+            else
+            {
+                function.TypeIndex = _programGraph.TypeCount++;
+                if (!_programGraph.Functions.TryGetValue(function.Name, out var functions))
+                {
+                    _programGraph.Functions[function.Name] = functions = new List<FunctionAst>();
+                }
+                if (functions.Any())
+                {
+                    if (function.Extern)
+                    {
+                        AddError($"Multiple definitions of external function '{function.Name}'", function);
+                    }
+                    else if (OverloadExistsForFunction(function, functions))
+                    {
+                        AddError($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.Type)))})", function);
+                    }
+                }
+                functions.Add(function);
+            }
         }
 
         private bool OverloadExistsForFunction(FunctionAst currentFunction, List<FunctionAst> existingFunctions)
@@ -581,7 +594,7 @@ namespace Lang.Translation
             }
 
             // 3. Resolve the compiler directives in the function
-            if (function.HasDirectives && !function.Generics.Any())
+            if (function.HasDirectives)
             {
                 ResolveCompilerDirectives(function.Children);
             }
