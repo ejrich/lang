@@ -504,7 +504,6 @@ namespace Lang.Translation
                 var nextType = VerifyType(nextExpressionType, errors);
                 switch (op)
                 {
-                    // TODO Implement branches
                     // Both need to be bool and returns bool
                     case Operator.And:
                     case Operator.Or:
