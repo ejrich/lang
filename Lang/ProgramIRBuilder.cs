@@ -286,7 +286,7 @@ namespace Lang
 
         private InstructionValue GetConstantStruct(StructAst structDef, ScopeAst scope, Dictionary<string, AssignmentAst> assignments)
         {
-            var constantStruct = new InstructionValue {Type = structDef, Values = new InstructionValue[structDef.Fields.Count]};
+            var constantStruct = new InstructionValue {ValueType = InstructionValueType.ConstantStruct, Type = structDef, Values = new InstructionValue[structDef.Fields.Count]};
 
             if (assignments == null)
             {

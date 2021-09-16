@@ -31,6 +31,8 @@ int main(Array<string> args) { //#print_ir {
     sum_test();
     // overflow_test();
 
+    printf("Initial array values %d, %p\n", global_array.length, global_array.data);
+    printf("Initial PolyStruct values %d, %.2f\n", global_poly_struct.field1, global_poly_struct.field2);
     set_global(8);
     printf("'global_a' = %d\n", global_a);
     printf("'global_b' = %d\n", global_b);
@@ -87,6 +89,8 @@ int main(Array<string> args) { //#print_ir {
 // TODO Make these work
 // global_c := global_b;
 // global_struct: MyStruct;
+global_poly_struct: PolyStruct<int, float64>;
+global_array: Array<int> = [1, 2, 3, 5]
 global_a := 7;
 global_b: int = 456; #const
 
