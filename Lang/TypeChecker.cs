@@ -408,9 +408,9 @@ namespace Lang
                                 {
                                     ErrorReporter.Report("Default values in structs must be constant", structField.Value);
                                 }
-                                else if (structField.TypeDefinition.PrimitiveType != null && structField.Value is ConstantAst constant)
+                                else
                                 {
-                                    VerifyConstant(constant, structField.Type);
+                                    VerifyConstantIfNecessary(structField.Value, structField.Type);
                                 }
                             }
                         }
@@ -453,9 +453,9 @@ namespace Lang
                                     {
                                         ErrorReporter.Report("Default values in structs should be constant", assignment.Value);
                                     }
-                                    else if (field.TypeDefinition.PrimitiveType != null && assignment.Value is ConstantAst constant)
+                                    else
                                     {
-                                        VerifyConstant(constant, field.Type);
+                                        VerifyConstantIfNecessary(assignment.Value, field.Type);
                                     }
                                 }
                             }
@@ -484,9 +484,9 @@ namespace Lang
                                     {
                                         ErrorReporter.Report("Default values in structs array initializers should be constant", value);
                                     }
-                                    else if (elementType != null && value is ConstantAst constant)
+                                    else
                                     {
-                                        VerifyConstant(constant, elementType);
+                                        VerifyConstantIfNecessary(value, elementType);
                                     }
                                 }
                             }
@@ -699,9 +699,9 @@ namespace Lang
                         {
                             ErrorReporter.Report($"Type of argument '{argument.Name}' in function '{function.Name}' is '{argument.Type.Name}', but default value is type '{defaultType.Name}'", argument.Value);
                         }
-                        else if (argument.TypeDefinition.PrimitiveType != null && argument.Value is ConstantAst constant)
+                        else
                         {
-                            VerifyConstant(constant, argument.Type);
+                            VerifyConstantIfNecessary(argument.Value, argument.Type);
                         }
                     }
                     // TODO Not sure what this covers, make sure to test
@@ -1264,9 +1264,9 @@ namespace Lang
                             {
                                 ErrorReporter.Report($"Global variables can only be initialized with constant values", assignment.Value);
                             }
-                            else if (field.TypeDefinition.PrimitiveType != null && assignment.Value is ConstantAst constant)
+                            else
                             {
-                                VerifyConstant(constant, field.Type);
+                                VerifyConstantIfNecessary(assignment.Value, field.Type);
                             }
                         }
                     }
@@ -1302,9 +1302,9 @@ namespace Lang
                                 {
                                     ErrorReporter.Report($"Global variables can only be initialized with constant values", value);
                                 }
-                                else if (elementType != null && value is ConstantAst constant)
+                                else
                                 {
-                                    VerifyConstant(constant, elementType);
+                                    VerifyConstantIfNecessary(value, elementType);
                                 }
                             }
                         }
@@ -1410,9 +1410,9 @@ namespace Lang
                     {
                         ErrorReporter.Report($"Expected declaration value to be type '{declaration.Name}', but got '{valueType.Name}'", declaration.Value);
                     }
-                    else if (declaration.TypeDefinition.PrimitiveType != null && declaration.Value is ConstantAst constant)
+                    else
                     {
-                        VerifyConstant(constant, declaration.Type);
+                        VerifyConstantIfNecessary(declaration.Value, declaration.Type);
                     }
                 }
             }
@@ -1490,9 +1490,9 @@ namespace Lang
                         {
                             ErrorReporter.Report($"Expected declaration value to be type '{declaration.Type}', but got '{valueType.Name}'", declaration.TypeDefinition);
                         }
-                        else if (declaration.Type != null && declaration.Value is ConstantAst constant)
+                        else
                         {
-                            VerifyConstant(constant, declaration.Type);
+                            VerifyConstantIfNecessary(declaration.Value, declaration.Type);
                         }
                     }
                 }
@@ -1533,9 +1533,9 @@ namespace Lang
                             {
                                 ErrorReporter.Report($"Expected field value to be type '{PrintTypeDefinition(field.TypeDefinition)}', but got '{valueType.Name}'", assignment.Value);
                             }
-                            else if (field.TypeDefinition.PrimitiveType != null && assignment.Value is ConstantAst constant)
+                            else
                             {
-                                VerifyConstant(constant, field.Type);
+                                VerifyConstantIfNecessary(assignment.Value, field.Type);
                             }
                         }
                     }
@@ -1567,9 +1567,9 @@ namespace Lang
                                 {
                                     ErrorReporter.Report($"Expected array value to be type '{elementType.Name}', but got '{valueType.Name}'", value);
                                 }
-                                else if (elementType != null && value is ConstantAst constant)
+                                else
                                 {
-                                    VerifyConstant(constant, elementType);
+                                    VerifyConstantIfNecessary(value, elementType);
                                 }
                             }
                         }
@@ -1748,9 +1748,9 @@ namespace Lang
                 {
                     ErrorReporter.Report($"Expected assignment value to be type '{variableType.Name}', but got '{valueType.Name}'", assignment.Value);
                 }
-                else if (assignment.Value is ConstantAst constant)
+                else
                 {
-                    VerifyConstant(constant, variableType);
+                    VerifyConstantIfNecessary(assignment.Value, variableType);
                 }
             }
         }
@@ -2485,125 +2485,99 @@ namespace Lang
             }
         }
 
-        private void VerifyConstant(ConstantAst constant, IType type)
+        private void VerifyConstantIfNecessary(IAst ast, IType targetType)
         {
-            // constant.TypeDefinition.Name = typeDef.Name;
-            // constant.TypeDefinition.PrimitiveType = typeDef.PrimitiveType;
-            // constant.Type = TypeTable.GetType(typeDef);
-
-            if (constant.Type == type) return;
-
-            // var type = constant.TypeDefinition;
-            switch (type.TypeKind)
+            if (ast is ConstantAst constant && (constant.Type.TypeKind == TypeKind.Integer || constant.Type.TypeKind == TypeKind.Float))
             {
-                case TypeKind.Integer:
-                    if (constant.Type.TypeKind == TypeKind.Integer)
-                    {
-                        var currentInt = (PrimitiveAst)constant.Type;
-                        var newInt = (PrimitiveAst)type;
+                if (constant.Type == targetType) return;
 
-                        if (!newInt.Signed)
+                switch (targetType.TypeKind)
+                {
+                    case TypeKind.Integer:
+                        if (constant.Type.TypeKind == TypeKind.Integer)
                         {
-                            if (currentInt.Signed && constant.Value.Integer < 0)
+                            var currentInt = (PrimitiveAst)constant.Type;
+                            var newInt = (PrimitiveAst)targetType;
+
+                            if (!newInt.Signed)
                             {
-                                ErrorReporter.Report($"Unsigned type '{type.Name}' cannot be negative", constant);
+                                if (currentInt.Signed && constant.Value.Integer < 0)
+                                {
+                                    ErrorReporter.Report($"Unsigned type '{targetType.Name}' cannot be negative", constant);
+                                }
+                                else
+                                {
+                                    var largestAllowedValue = Math.Pow(2, 8 * newInt.Size) - 1;
+                                    if (constant.Value.UnsignedInteger > largestAllowedValue)
+                                    {
+                                        ErrorReporter.Report($"Value '{constant.Value.UnsignedInteger}' out of range for type '{targetType.Name}'", constant);
+                                    }
+                                }
                             }
                             else
                             {
-                                var largestAllowedValue = Math.Pow(2, 8 * newInt.Size) - 1;
-                                if (constant.Value.UnsignedInteger > largestAllowedValue)
+                                var largestAllowedValue = Math.Pow(2, 8 * newInt.Size - 1) - 1;
+                                if (currentInt.Signed)
                                 {
-                                    ErrorReporter.Report($"Value '{constant.Value.UnsignedInteger}' out of range for type '{type.Name}'", constant);
+                                    var lowestAllowedValue = -Math.Pow(2, 8 * newInt.Size - 1);
+                                    if (constant.Value.Integer < lowestAllowedValue || constant.Value.Integer > largestAllowedValue)
+                                    {
+                                        ErrorReporter.Report($"Value '{constant.Value.Integer}' out of range for type '{targetType.Name}'", constant);
+                                    }
+                                }
+                                else
+                                {
+                                    if (constant.Value.UnsignedInteger > largestAllowedValue)
+                                    {
+                                        ErrorReporter.Report($"Value '{constant.Value.Integer}' out of range for type '{targetType.Name}'", constant);
+                                    }
                                 }
                             }
                         }
+                        // Convert float to int, shelved for now
+                        /*else if (constant.Type.TypeKind == TypeKind.Float)
+                        {
+                            if (type.Size < constant.Type.Size && (constant.Value.Double > float.MaxValue || constant.Value.Double < float.MinValue))
+                            {
+                                ErrorReporter.Report($"Value '{constant.Value.Double}' out of range for type '{type.Name}'", constant);
+                            }
+                        }*/
                         else
                         {
-                            var largestAllowedValue = Math.Pow(2, 8 * newInt.Size - 1) - 1;
+                            ErrorReporter.Report($"Type '{constant.Type.Name}' cannot be converted to '{targetType.Name}'", constant);
+                        }
+                        break;
+                    case TypeKind.Float:
+                        // Convert int to float
+                        if (constant.Type.TypeKind == TypeKind.Integer)
+                        {
+                            var currentInt = (PrimitiveAst)constant.Type;
                             if (currentInt.Signed)
                             {
-                                var lowestAllowedValue = -Math.Pow(2, 8 * newInt.Size - 1);
-                                if (constant.Value.Integer < lowestAllowedValue || constant.Value.Integer > largestAllowedValue)
-                                {
-                                    ErrorReporter.Report($"Value '{constant.Value.Integer}' out of range for type '{type.Name}'", constant);
-                                }
+                                constant.Value = new Constant {Double = (double)constant.Value.Integer};
                             }
                             else
                             {
-                                if (constant.Value.UnsignedInteger > largestAllowedValue)
-                                {
-                                    ErrorReporter.Report($"Value '{constant.Value.Integer}' out of range for type '{type.Name}'", constant);
-                                }
+                                constant.Value = new Constant {Double = (double)constant.Value.UnsignedInteger};
                             }
                         }
-                    }
-                    // Convert float to int, shelved for now
-                    /*else if (constant.Type.TypeKind == TypeKind.Float)
-                    {
-                        if (type.Size < constant.Type.Size && (constant.Value.Double > float.MaxValue || constant.Value.Double < float.MinValue))
+                        else if (constant.Type.TypeKind == TypeKind.Float)
                         {
-                            ErrorReporter.Report($"Value '{constant.Value.Double}' out of range for type '{type.Name}'", constant);
-                        }
-                    }*/
-                    else
-                    {
-                        ErrorReporter.Report($"Type '{constant.Type.Name}' cannot be converted to '{type.Name}'", constant);
-                    }
-                    break;
-                case TypeKind.Float:
-                    // Convert int to float
-                    if (constant.Type.TypeKind == TypeKind.Integer)
-                    {
-                        var currentInt = (PrimitiveAst)constant.Type;
-                        if (currentInt.Signed)
-                        {
-                            constant.Value = new Constant {Double = (double)constant.Value.Integer};
+                            if (targetType.Size < constant.Type.Size && (constant.Value.Double > float.MaxValue || constant.Value.Double < float.MinValue))
+                            {
+                                ErrorReporter.Report($"Value '{constant.Value.Double}' out of range for type '{targetType.Name}'", constant);
+                            }
                         }
                         else
                         {
-                            constant.Value = new Constant {Double = (double)constant.Value.UnsignedInteger};
+                            ErrorReporter.Report($"Type '{constant.Type.Name}' cannot be converted to '{targetType.Name}'", constant);
                         }
-                    }
-                    else if (constant.Type.TypeKind == TypeKind.Float)
-                    {
-                        if (type.Size < constant.Type.Size && (constant.Value.Double > float.MaxValue || constant.Value.Double < float.MinValue))
-                        {
-                            ErrorReporter.Report($"Value '{constant.Value.Double}' out of range for type '{type.Name}'", constant);
-                        }
-                    }
-                    else
-                    {
-                        ErrorReporter.Report($"Type '{constant.Type.Name}' cannot be converted to '{type.Name}'", constant);
-                    }
-                    break;
+                        break;
+                }
+
+                constant.Type = targetType;
+                constant.TypeName = targetType.Name;
             }
-
-            constant.Type = type;
-            constant.TypeName = type.Name;
-
-            // switch (type.PrimitiveType)
-            // {
-            //     case IntegerType integer when !type.Character:
-            //         if (!integer.Signed && constant.Value[0] == '-')
-            //         {
-            //             ErrorReporter.Report($"Unsigned type '{PrintTypeDefinition(constant.TypeDefinition)}' cannot be negative", constant);
-            //             break;
-            //         }
-
-            //         var success = integer.Bytes switch
-            //         {
-            //             1 => integer.Signed ? sbyte.TryParse(constant.Value, out _) : byte.TryParse(constant.Value, out _),
-            //             2 => integer.Signed ? short.TryParse(constant.Value, out _) : ushort.TryParse(constant.Value, out _),
-            //             4 => integer.Signed ? int.TryParse(constant.Value, out _) : uint.TryParse(constant.Value, out _),
-            //             8 => integer.Signed ? long.TryParse(constant.Value, out _) : ulong.TryParse(constant.Value, out _),
-            //             _ => integer.Signed ? int.TryParse(constant.Value, out _) : uint.TryParse(constant.Value, out _),
-            //         };
-            //         if (!success)
-            //         {
-            //             ErrorReporter.Report($"Value '{constant.Value}' out of range for type '{PrintTypeDefinition(constant.TypeDefinition)}'", constant);
-            //         }
-            //         break;
-            // }
         }
 
         /*private void VerifyConstant(ConstantAst constant, TypeDefinition typeDef)
@@ -2777,11 +2751,7 @@ namespace Lang
                 var functionArg = function.Arguments[i];
                 if (call.SpecifiedArguments != null && call.SpecifiedArguments.TryGetValue(functionArg.Name, out var specifiedArgument))
                 {
-                    // TODO Don't think this is right
-                    if (functionArg.Type != null && specifiedArgument is ConstantAst constant)
-                    {
-                        VerifyConstant(constant, functionArg.Type);
-                    }
+                    VerifyConstantIfNecessary(specifiedArgument, functionArg.Type);
 
                     call.Arguments.Insert(i, specifiedArgument);
                     continue;
@@ -2825,9 +2795,9 @@ namespace Lang
                             call.Arguments[i] = typeIndex;
                             argumentTypes[i] = typeIndex.Type;*/
                         }
-                        else if ((argument.TypeKind == TypeKind.Integer || argument.TypeKind == TypeKind.Float) && call.Arguments[i] is ConstantAst constant)
+                        else
                         {
-                            VerifyConstant(constant, functionArg.Type);
+                            VerifyConstantIfNecessary(call.Arguments[i], functionArg.Type);
                         }
                     }
                 }
@@ -2877,9 +2847,9 @@ namespace Lang
                                     call.Arguments[i] = typeIndex;
                                     argumentTypes[i] = typeIndex.Type;*/
                                 }
-                                else if (argumentAst is ConstantAst constant)
+                                else
                                 {
-                                    VerifyConstant(constant, paramsType);
+                                    VerifyConstantIfNecessary(argumentAst, paramsType);
                                 }
                             }
                         }
