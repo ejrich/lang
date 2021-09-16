@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using Lang.Translation;
+﻿using System.Collections.Generic;
 
 namespace Lang.Parsing
 {
@@ -13,13 +10,6 @@ namespace Lang.Parsing
     public class ScopeAst : IAst
     {
         public List<IAst> Children { get; } = new();
-    }
-
-    public class ParseError
-    {
-        public string File { get; set; }
-        public string Error { get; init; }
-        public Token Token { get; init; }
     }
 
     public class FunctionAst : IAst
@@ -39,7 +29,7 @@ namespace Lang.Parsing
 
     public class StructFieldAst : IAst
     {
-        public TypeDefinition Type { get; set; }
+        public TypeDefinition Type { get; init; }
         public string Name { get; set; }
         public ConstantAst DefaultValue { get; set; }
         public List<IAst> Children => null;
@@ -81,7 +71,8 @@ namespace Lang.Parsing
     {
         public bool Prefix { get; init; }
         public Operator Operator { get; init; }
-        public List<IAst> Children { get; } = new();
+        public IAst Variable { get; set; }
+        public List<IAst> Children => null;
     }
 
     public class CallAst : IAst

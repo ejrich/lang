@@ -189,13 +189,10 @@ namespace Lang.Translation
                     case AssignmentAst assignment:
                         VerifyAssignment(assignment, localVariables, errors);
                         break;
+                    // TODO Handle more syntax trees
                     default:
                         VerifyExpression(syntaxTree, localVariables, errors);
                         break;
-                    // TODO Handle more syntax trees
-                    // default:
-                    //     errors.Add(new TranslationError {Error = $"Unexpected syntax tree '{syntaxTree}'"});
-                    //     break;
                 }
             }
         }
@@ -314,18 +311,59 @@ namespace Lang.Translation
                 case ConstantAst constant:
                     return constant.Type;
                 case StructFieldRefAst structField:
+                {
                     if (!localVariables.TryGetValue(structField.Name, out var structType))
                     {
                         errors.Add(new TranslationError {Error = $"Variable '{structField.Name}' not defined"});
                         return null;
                     }
                     return VerifyStructFieldRef(structField, structType, errors);
+                }
                 case VariableAst variable:
                     if (!localVariables.TryGetValue(variable.Name, out var typeDefinition))
                     {
                         errors.Add(new TranslationError {Error = $"Variable '{variable.Name}' not defined"});
                     }
                     return typeDefinition;
+                case ChangeByOneAst changeByOne:
+                    var op = changeByOne.Operator == Operator.Increment ? "increment" : "decrement";
+                    switch (changeByOne.Variable)
+                    {
+                        case VariableAst variable:
+                            if (localVariables.TryGetValue(variable.Name, out var variableType))
+                            {
+                                var type = VerifyType(variableType, errors);
+                                if (type == Type.Int || type == Type.Float) return variableType;
+                                
+                                errors.Add(new TranslationError {Error = $"Expected to {op} int or float, but got type '{PrintTypeDefinition(variableType)}'"});
+                                return null;
+                            }
+                            else
+                            {
+                                errors.Add(new TranslationError {Error = $"Variable '{variable.Name}' not defined"});
+                                return null;
+                            }
+                        case StructFieldRefAst structField:
+                            if (localVariables.TryGetValue(structField.Name, out var structType))
+                            {
+                                var fieldType = VerifyStructFieldRef(structField, structType, errors);
+                                if (fieldType == null) return null;
+
+                                var type = VerifyType(fieldType, errors);
+                                if (type == Type.Int || type == Type.Float) return fieldType;
+
+                                errors.Add(new TranslationError {Error = $"Expected to {op} int or float, but got type '{PrintTypeDefinition(fieldType)}'"});
+                                return null;
+                            }
+                            else
+                            {
+                                errors.Add(new TranslationError {Error = $"Variable '{structField.Name}' not defined"});
+                                return null;
+                            }
+                        default:
+                            errors.Add(new TranslationError {Error = $"Expected to {op} variable"});
+                            return null;
+                    }
                 case CallAst call:
                     if (_functions.TryGetValue(call.Function, out var function))
                     {
@@ -336,8 +374,24 @@ namespace Lang.Translation
                             {
                                 Error = $"Call to function '{function.Name}' expected {function.Arguments.Count} arguments, but got {call.Arguments.Count}"
                             });
+                            return null;
                         }
-                        // TODO Implement argument type verification
+
+                        for (var i = 0; i < function.Arguments.Count; i++)
+                        {
+                            var functionType = function.Arguments[i].Type;
+                            var callType = VerifyExpression(call.Arguments[i], localVariables, errors);
+                            if (callType != null)
+                            {
+                                if (!TypeEquals(functionType, callType))
+                                {
+                                    errors.Add(new TranslationError
+                                    {
+                                        Error = $"Call to function '{function.Name}' expected '{PrintTypeDefinition(functionType)}', but got '{PrintTypeDefinition(callType)}'"
+                                    });
+                                }
+                            }
+                        }
                     }
                     else
                     {
