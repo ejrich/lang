@@ -30,6 +30,20 @@ namespace Lang.Parsing
         public List<IAst> Children { get; } = new();
     }
 
+    public class StructAst : IAst
+    {
+        public string Name { get; set; }
+        public List<IAst> Children { get; } = new();
+    }
+
+    public class StructFieldAst : IAst
+    {
+        public TypeDefinition Type { get; set; }
+        public string Name { get; set; }
+        public string DefaultValue { get; set; }
+        public List<IAst> Children => null;
+    }
+
     public class ReturnAst : IAst
     {
         public IAst Value { get; set; }

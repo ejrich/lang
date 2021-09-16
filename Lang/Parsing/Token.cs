@@ -12,6 +12,7 @@
     public enum TokenType
     {
         Token,
+        Struct,
         Comment, // Ignored by parser
         Number,
         Boolean,

@@ -26,7 +26,8 @@ namespace Lang.Parsing
             {"then", TokenType.Then},
             {"while", TokenType.While},
             {"each", TokenType.Each},
-            {"in", TokenType.In}
+            {"in", TokenType.In},
+            {"struct", TokenType.Struct},
         };
 
         public List<Token> LoadFileTokens(string filePath, out List<ParseError> errors)
