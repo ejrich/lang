@@ -1262,9 +1262,23 @@ namespace Lang.Translation
                 case IdentifierAst identifier:
                     return GetVariable(identifier.Name, identifier, scopeIdentifiers);
                 case IndexAst index:
-                    var type = GetVariable(index.Name, index, scopeIdentifiers);
-                    return type != null ? VerifyIndex(index, type, currentFunction, scopeIdentifiers) : null;
+                {
+                    var variableType = GetVariable(index.Name, index, scopeIdentifiers);
+                    if (variableType == null) return null;
+                    var type = VerifyIndex(index, variableType, currentFunction, scopeIdentifiers, out var overloaded);
+                    if (type != null && overloaded)
+                    {
+                        if (type.Type != Type.Pointer)
+                        {
+                            AddError($"Overload [] for type '{PrintTypeDefinition(variableType)}' must be a pointer to be able to set the value", index);
+                            return null;
+                        }
+                        return type.Generics[0];
+                    }
+                    return type;
+                }
                 case StructFieldRefAst structFieldRef:
+                {
                     structFieldRef.Pointers = new bool[structFieldRef.Children.Count - 1];
                     structFieldRef.TypeNames = new string[structFieldRef.Children.Count - 1];
                     structFieldRef.ValueIndices = new int[structFieldRef.Children.Count - 1];
@@ -1278,7 +1292,12 @@ namespace Lang.Translation
                         case IndexAst index:
                             var variableType = GetVariable(index.Name, index, scopeIdentifiers);
                             if (variableType == null) return null;
-                            refType = VerifyIndex(index, variableType, currentFunction, scopeIdentifiers);
+                            refType = VerifyIndex(index, variableType, currentFunction, scopeIdentifiers, out var overloaded);
+                            if (refType != null && overloaded && refType.Type != Type.Pointer)
+                            {
+                                AddError($"Overload [] for type '{PrintTypeDefinition(variableType)}' must be a pointer to be able to set the value", index);
+                                return null;
+                            }
                             break;
                         default:
                             AddError("Expected to have a reference to a variable, field, or pointer", structFieldRef.Children[0]);
@@ -1299,7 +1318,22 @@ namespace Lang.Translation
                             case IndexAst index:
                                 var fieldType = VerifyStructField(index.Name, refType, structFieldRef, i-1, index);
                                 if (fieldType == null) return null;
-                                refType = VerifyIndex(index, fieldType, currentFunction, scopeIdentifiers);
+                                refType = VerifyIndex(index, fieldType, currentFunction, scopeIdentifiers, out var overloaded);
+                                if (refType != null && overloaded)
+                                {
+                                    if (refType.Type == Type.Pointer)
+                                    {
+                                        if (i == structFieldRef.Children.Count - 1)
+                                        {
+                                            refType = refType.Generics[0];
+                                        }
+                                    }
+                                    else
+                                    {
+                                        AddError($"Overload [] for type '{PrintTypeDefinition(fieldType)}' must be a pointer to be able to set the value", index);
+                                        return null;
+                                    }
+                                }
                                 break;
                             default:
                                 AddError("Expected to have a reference to a variable, field, or pointer", structFieldRef.Children[i]);
@@ -1312,6 +1346,7 @@ namespace Lang.Translation
                     }
 
                     return refType;
+                }
                 default:
                     AddError("Expected to have a reference to a variable, field, or pointer", ast);
                     return null;
@@ -1382,7 +1417,7 @@ namespace Lang.Translation
                     case IndexAst index:
                         var fieldType = VerifyStructField(index.Name, refType, structField, i-1, index);
                         if (fieldType == null) return null;
-                        refType = VerifyIndex(index, fieldType, currentFunction, scopeIdentifiers);
+                        refType = VerifyIndex(index, fieldType, currentFunction, scopeIdentifiers, out _);
                         break;
                     default:
                         AddError("Expected to have a reference to a variable, field, or pointer", structField.Children[i]);
@@ -2678,12 +2713,13 @@ namespace Lang.Translation
                 AddError($"Identifier '{index.Name}' is not a variable", index);
                 return null;
             }
-            return VerifyIndex(index, declaration.Type, currentFunction, scopeIdentifiers);
+            return VerifyIndex(index, declaration.Type, currentFunction, scopeIdentifiers, out _);
         }
 
-        private TypeDefinition VerifyIndex(IndexAst index, TypeDefinition typeDef, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private TypeDefinition VerifyIndex(IndexAst index, TypeDefinition typeDef, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers, out bool overloaded)
         {
             // 1. Verify the variable is a list or the operator overload exists
+            overloaded = false;
             var type = VerifyType(typeDef);
             TypeDefinition elementType = null;
             switch (type)
@@ -2694,6 +2730,7 @@ namespace Lang.Translation
                 case Type.String:
                     index.CallsOverload = true;
                     index.OverloadType = typeDef;
+                    overloaded = true;
                     elementType = VerifyOperatorOverloadType(typeDef, Operator.Subscript, currentFunction, index);
                     break;
                 case Type.List:
@@ -2739,6 +2776,7 @@ namespace Lang.Translation
                 }
                 overloads[op] = polymorphedOverload;
                 VerifyOperatorOverload(polymorphedOverload);
+                VerifyType(polymorphicOverload.ReturnType);
                 return polymorphedOverload.ReturnType;
             }
             else
