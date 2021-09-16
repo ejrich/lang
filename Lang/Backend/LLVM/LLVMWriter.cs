@@ -1173,6 +1173,11 @@ namespace Lang.Backend.LLVM
                         }
                     }
                     break;
+                case EnumType:
+                {
+                    var (predicate, name) = ConvertIntOperator(op);
+                    return LLVMApi.BuildICmp(_builder, predicate, lhs.value, rhs.value, name);
+                }
             }
 
             // @Future Operator overloading

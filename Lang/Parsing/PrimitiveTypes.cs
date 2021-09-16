@@ -17,4 +17,10 @@ namespace Lang.Parsing
         public ushort Bytes { get; init; }
         public bool Signed => true;
     }
+
+    public class EnumType : IPrimitive
+    {
+        public ushort Bytes => 4;
+        public bool Signed => true;
+    }
 }

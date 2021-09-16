@@ -33,6 +33,8 @@ int Main(List<string> args) {
 
     state := current_state(7);
     printf("Current state - %d\n", state);
+    if state == State.Running then printf("The state is Running\n");
+    else if state != State.Running then printf("The state is not Running\n");
 
     return 0;
 }
