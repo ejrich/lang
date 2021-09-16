@@ -52,3 +52,12 @@ struct MyStruct {
 struct OtherStruct {
     int something = 5;
 }
+
+MyStruct create() {
+    var s1 = MyStruct;
+    var s2 = OtherStruct;
+    s2.something = 8;
+    s1.field = 1;
+    s1.subValue.something = s2.something;
+    return s1;
+}

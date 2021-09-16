@@ -44,6 +44,13 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
+    public class StructFieldRefAst : IAst
+    {
+        public string Name { get; init; }
+        public IAst Value { get; set; }
+        public List<IAst> Children => null;
+    }
+
     public class ReturnAst : IAst
     {
         public IAst Value { get; set; }
@@ -92,7 +99,7 @@ namespace Lang.Parsing
 
     public class AssignmentAst : IAst
     {
-        public string Name { get; set; }
+        public IAst Variable { get; set; }
         public Operator Operator { get; set; }
         public IAst Value { get; set; }
         public List<IAst> Children => null;
