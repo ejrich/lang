@@ -137,7 +137,7 @@ namespace Lang.Parsing
                         {
                             errors.Add(new ParseError
                             {
-                                Error = $"Unexpected token '{currentToken.Value}'",
+                                Error = $"Unexpected token '{currentToken.Value + character}'",
                                 Token = currentToken
                             });
                         }
@@ -177,12 +177,23 @@ namespace Lang.Parsing
                 case TokenType.Token:
                     return type == TokenType.Token || type == TokenType.Number;
                 case TokenType.Number:
-                    if (type == TokenType.Token)
+                    switch (type)
                     {
-                        currentToken.Error = true;
-                        return false;
+                        case TokenType.Number:
+                            return true;
+                        case TokenType.Period:
+                            if (currentToken.Value.Contains('.'))
+                            {
+                                currentToken.Error = true;
+                                return false;
+                            }
+                            return true;
+                        case TokenType.Token:
+                            currentToken.Error = true;
+                            return false;
+                        default:
+                            return false;
                     }
-                    return type == TokenType.Number || type == TokenType.Period;
                 case TokenType.Divide:
                     switch (type)
                     {
