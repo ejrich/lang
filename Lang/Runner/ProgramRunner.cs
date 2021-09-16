@@ -10,9 +10,8 @@ namespace Lang.Runner
 {
     public interface IProgramRunner
     {
-        BuildSettings BuildSettings { set; }
-        void Init(ProgramGraph programGraph);
-        void RunProgram(ProgramGraph programGraph);
+        void Init(ProgramGraph programGraph, BuildSettings buildSettings);
+        void RunProgram(IAst ast, ProgramGraph programGraph);
         bool ExecuteCondition(IAst expression, ProgramGraph programGraph);
     }
 
@@ -20,6 +19,7 @@ namespace Lang.Runner
     {
         private ModuleBuilder _moduleBuilder;
         private int _version;
+        private BuildSettings _buildSettings;
         private readonly Dictionary<string, List<int>> _functionIndices = new();
         private readonly List<(Type type, object libraryObject)> _functionLibraries = new();
         private readonly Dictionary<string, ValueType> _globalVariables = new();
@@ -31,10 +31,9 @@ namespace Lang.Runner
             public object Value { get; set; }
         }
 
-        public BuildSettings BuildSettings { private get; set; }
-
-        public void Init(ProgramGraph programGraph)
+        public void Init(ProgramGraph programGraph, BuildSettings buildSettings)
         {
+            _buildSettings = buildSettings;
             // Initialize the runner
             if (_moduleBuilder == null)
             {
@@ -149,24 +148,9 @@ namespace Lang.Runner
             }
         }
 
-        public void RunProgram(ProgramGraph programGraph)
+        public void RunProgram(IAst ast, ProgramGraph programGraph)
         {
-            if (!programGraph.Directives.Any()) return;
-
-            Init(programGraph);
-
-            foreach (var directive in programGraph.Directives)
-            {
-                switch (directive.Type)
-                {
-                    case DirectiveType.Run:
-                        ExecuteAst(directive.Value, programGraph, _globalVariables, out _);
-                        break;
-                    case DirectiveType.If:
-                        // TODO Evaluate the condition
-                        break;
-                }
-            }
+            ExecuteAst(ast, programGraph, _globalVariables, out _);
         }
 
         private void CreateFunction(TypeBuilder typeBuilder, string name, string library, Type returnType, Type[] args)
@@ -243,7 +227,7 @@ namespace Lang.Runner
 
         private int GetBuildEnv()
         {
-            return BuildSettings.Release ? 2 : 1;
+            return _buildSettings.Release ? 2 : 1;
         }
 
         private object GetUninitializedValue(TypeDefinition typeDef, ProgramGraph programGraph,

@@ -8,14 +8,14 @@ namespace Lang.Translation
 {
     public interface IProgramGraphBuilder
     {
-        ProgramGraph CreateProgramGraph(ParseResult parseResult, out List<TranslationError> errors);
+        ProgramGraph CreateProgramGraph(ParseResult parseResult, BuildSettings buildSettings, out List<TranslationError> errors);
     }
 
     public class ProgramGraphBuilder : IProgramGraphBuilder
     {
         private readonly IProgramRunner _programRunner;
-
         private readonly ProgramGraph _programGraph = new();
+        private BuildSettings _buildSettings;
         private readonly Dictionary<string, StructAst> _polymorphicStructs = new();
         private readonly Dictionary<string, TypeDefinition> _globalVariables = new();
 
@@ -24,9 +24,10 @@ namespace Lang.Translation
             _programRunner = programRunner;
         }
 
-        public ProgramGraph CreateProgramGraph(ParseResult parseResult, out List<TranslationError> errors)
+        public ProgramGraph CreateProgramGraph(ParseResult parseResult, BuildSettings buildSettings, out List<TranslationError> errors)
         {
             errors = new List<TranslationError>();
+            _buildSettings = buildSettings;
             var mainDefined = false;
             bool verifyAdditional;
 
@@ -115,7 +116,7 @@ namespace Lang.Translation
                                 if (VerifyCondition(conditional!.Condition, null, _globalVariables, errors))
                                 {
                                     // Initialize program runner
-                                    _programRunner.Init(_programGraph);
+                                    _programRunner.Init(_programGraph, buildSettings);
                                     // Run the condition
                                     if (_programRunner.ExecuteCondition(conditional!.Condition, _programGraph))
                                     {
@@ -153,7 +154,6 @@ namespace Lang.Translation
                 {
                     case CompilerDirectiveAst compilerDirective:
                         VerifyTopLevelDirective(compilerDirective, errors);
-                        _programGraph.Directives.Add(compilerDirective);
                         break;
                 }
             }
@@ -452,7 +452,7 @@ namespace Lang.Translation
                                 if (VerifyCondition(conditional!.Condition, null, _globalVariables, errors))
                                 {
                                     // Initialize program runner
-                                    _programRunner.Init(_programGraph);
+                                    _programRunner.Init(_programGraph, _buildSettings);
                                     // Run the condition
                                     if (_programRunner.ExecuteCondition(conditional!.Condition, _programGraph))
                                     {
@@ -939,9 +939,14 @@ namespace Lang.Translation
             {
                 case DirectiveType.Run:
                     VerifyAst(directive.Value, null, _globalVariables, errors);
+                    if (!errors.Any())
+                    {
+                        _programRunner.Init(_programGraph, _buildSettings);
+                        _programRunner.RunProgram(directive.Value, _programGraph);
+                    }
                     break;
                 default:
-                    errors.Add(CreateError("Compiler directive not supported", directive.Value));
+                    errors.Add(CreateError($"Compiler directive '{directive.Type}' not supported", directive));
                     break;
             }
         }
