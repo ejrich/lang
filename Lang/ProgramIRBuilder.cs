@@ -217,6 +217,7 @@ namespace Lang
                             text += $"{instruction.String} {PrintInstructionValue(instruction.Value1)} => v{instruction.ValueIndex}";
                             break;
                         case InstructionType.Load:
+                        case InstructionType.LoadPointer:
                             text += $"{PrintInstructionValue(instruction.Value1)} {instruction.Value1.Type.Name} => v{instruction.ValueIndex}";
                             break;
                         case InstructionType.IsNull:
@@ -1053,7 +1054,7 @@ namespace Lang
                             var dataField = _stringStruct.Fields[1];
 
                             var dataPointer = EmitGetStructPointer(function, declaration.AllocationIndex, _stringStruct, 1, dataField, global);
-                            return EmitLoad(function, dataField.Type, dataPointer);
+                            return EmitLoadPointer(function, dataField.Type, dataPointer);
                         }
                         return EmitLoad(function, declaration.Type, declaration.AllocationIndex, global);
                     }
@@ -1067,7 +1068,7 @@ namespace Lang
                             var stringPointer = variable.AllocationIndex.HasValue ? AllocationValue(variable.AllocationIndex.Value, variable.Type, global) : variable.Pointer;
 
                             var dataPointer = EmitGetStructPointer(function, stringPointer, _stringStruct, 1, dataField);
-                            return EmitLoad(function, dataField.Type, dataPointer);
+                            return EmitLoadPointer(function, dataField.Type, dataPointer);
                         }
                         else if (variable.AllocationIndex.HasValue)
                         {
@@ -1349,7 +1350,7 @@ namespace Lang
                 {
                     if (!skipPointer)
                     {
-                        value = EmitLoad(function, type, value);
+                        value = EmitLoadPointer(function, type, value);
                     }
                 }
                 skipPointer = false;
@@ -1485,7 +1486,7 @@ namespace Lang
                 var pointerType = (PrimitiveAst)type;
                 elementType = pointerType.PointerType;
 
-                var dataPointer = EmitLoad(function, type, variable);
+                var dataPointer = EmitLoadPointer(function, type, variable);
                 return EmitGetPointer(function, dataPointer, indexValue, elementType);
             }
             else if (type.TypeKind == TypeKind.CArray)
@@ -1510,7 +1511,7 @@ namespace Lang
                 }
 
                 var data = EmitGetStructPointer(function, variable, structAst, 1, dataField);
-                var dataPointer = EmitLoad(function, data.Type, data);
+                var dataPointer = EmitLoadPointer(function, data.Type, data);
                 return EmitGetPointer(function, dataPointer, indexValue, elementType);
             }
         }
@@ -1817,6 +1818,12 @@ namespace Lang
         private InstructionValue EmitLoad(FunctionIR function, IType type, int allocationIndex, bool global = false)
         {
             var loadInstruction = new Instruction {Type = InstructionType.Load, Value1 = AllocationValue(allocationIndex, type, global)};
+            return AddInstruction(function, loadInstruction, type);
+        }
+
+        private InstructionValue EmitLoadPointer(FunctionIR function, IType type, InstructionValue value)
+        {
+            var loadInstruction = new Instruction {Type = InstructionType.LoadPointer, Value1 = value};
             return AddInstruction(function, loadInstruction, type);
         }
 

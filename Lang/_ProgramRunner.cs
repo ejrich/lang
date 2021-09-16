@@ -453,8 +453,8 @@ namespace Lang
                                 }
                                 break;
                             case TypeKind.Pointer:
-                                // register.Pointer = Marshal.ReadIntPtr(pointer.Pointer);
-                                // break;
+                                register.Pointer = Marshal.ReadIntPtr(pointer.Pointer);
+                                break;
                             case TypeKind.String:
                             case TypeKind.Array:
                             case TypeKind.Struct:
@@ -464,6 +464,13 @@ namespace Lang
                                 break;
                         }
                         registers[instruction.ValueIndex] = register;
+                        break;
+                    }
+                    case InstructionType.LoadPointer:
+                    {
+                        var pointer = GetPointerValue(instruction.Value1, registers, stackPointer, function);
+                        var loadedPointer = Marshal.ReadIntPtr(pointer.Pointer);
+                        registers[instruction.ValueIndex] = new Register {Pointer = loadedPointer};
                         break;
                     }
                     case InstructionType.Store:
