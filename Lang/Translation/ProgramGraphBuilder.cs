@@ -992,10 +992,11 @@ namespace Lang.Translation
             List<TranslationError> errors)
         {
             // 1. Load the struct definition in typeDefinition
-            structField.StructName = structType.Name; // TODO Get the polymorphic struct name
-            if (!_structs.TryGetValue(structType.Name, out var structDefinition))
+            var genericName = structType.GenericName;
+            structField.StructName = genericName;
+            if (!_structs.TryGetValue(genericName, out var structDefinition))
             {
-                errors.Add(CreateError($"Struct '{structType.Name}' not defined", structField));
+                errors.Add(CreateError($"Struct '{PrintTypeDefinition(structType)}' not defined", structField));
                 return null;
             }
 
@@ -1013,7 +1014,7 @@ namespace Lang.Translation
             }
             if (field == null)
             {
-                errors.Add(CreateError($"Struct '{structType.Name}' does not contain field '{value.Name}'", structField));
+                errors.Add(CreateError($"Struct '{PrintTypeDefinition(structType)}' does not contain field '{value.Name}'", structField));
                 return null;
             }
 
@@ -1129,17 +1130,9 @@ namespace Lang.Translation
 
             var hasGenerics = typeDef.Generics.Any();
             var hasCount = typeDef.Count != null;
-            switch (typeDef.Name)
+            switch (typeDef.PrimitiveType)
             {
-                case "int":
-                case "u64":
-                case "s64":
-                case "u32":
-                case "s32":
-                case "u16":
-                case "s16":
-                case "u8":
-                case "s8":
+                case IntegerType:
                     if (hasGenerics)
                     {
                         errors.Add(CreateError($"Type '{typeDef.Name}' cannot have generics", typeDef));
@@ -1151,11 +1144,10 @@ namespace Lang.Translation
                         return Type.Error;
                     }
                     return Type.Int;
-                case "float":
-                case "float64":
+                case FloatType:
                     if (hasGenerics)
                     {
-                        errors.Add(CreateError("Type 'float' cannot have generics", typeDef));
+                        errors.Add(CreateError($"Type '{typeDef.Name}' cannot have generics", typeDef));
                         return Type.Error;
                     }
                     if (hasCount)
@@ -1164,6 +1156,10 @@ namespace Lang.Translation
                         return Type.Error;
                     }
                     return Type.Float;
+            }
+
+            switch (typeDef.Name)
+            {
                 case "bool":
                     if (hasGenerics)
                     {
@@ -1227,6 +1223,7 @@ namespace Lang.Translation
                 {
                     if (typeDef.Generics.Count == 1)
                     {
+                        typeDef.Name = "List";
                         return VerifyList(typeDef, errors) ? Type.Params : Type.Error; 
                     }
                     if (typeDef.Generics.Count > 1)
@@ -1239,12 +1236,17 @@ namespace Lang.Translation
                 default:
                     if (typeDef.Generics.Any())
                     {
+                        var genericName = typeDef.GenericName;
+                        if (_structs.ContainsKey(genericName))
+                        {
+                            return Type.Other;
+                        }
                         if (!_polymorphicStructs.TryGetValue(typeDef.Name, out var structDef))
                         {
-                            errors.Add(CreateError($"No polymorphic structs with name '{typeDef.Name}'", typeDef));
+                            errors.Add(CreateError($"No polymorphic structs of type '{typeDef.Name}'", typeDef));
                             return Type.Error;
                         }
-                        CreatePolymorphedStruct(structDef, typeDef.Generics.ToArray());
+                        CreatePolymorphedStruct(structDef, genericName, typeDef.Generics.ToArray());
                         return Type.Other;
                     }
                     return _structs.ContainsKey(typeDef.Name) ? Type.Other : Type.Error;
@@ -1260,7 +1262,8 @@ namespace Lang.Translation
                 return false;
             }
 
-            if (_structs.TryGetValue($"List.{listType.Name}", out _))
+            var genericName = typeDef.GenericName;
+            if (_structs.ContainsKey(genericName))
             {
                 return true;
             }
@@ -1270,15 +1273,15 @@ namespace Lang.Translation
                 return false;
             }
 
-            CreatePolymorphedStruct(structDef, listType);
+            CreatePolymorphedStruct(structDef, genericName, listType);
             return true;
         }
 
-        private void CreatePolymorphedStruct(StructAst structAst, params TypeDefinition[] genericTypes)
+        private void CreatePolymorphedStruct(StructAst structAst, string name, params TypeDefinition[] genericTypes)
         {
             var polyStruct = new StructAst
             {
-                Name = structAst.Name
+                Name = name
             };
             foreach (var field in structAst.Fields)
             {
@@ -1295,11 +1298,7 @@ namespace Lang.Translation
                 }
             }
 
-            foreach (var generic in genericTypes)
-            {
-                polyStruct.Name += $".{generic.Name}"; 
-            }
-            _structs.Add(polyStruct.Name, polyStruct);
+            _structs.Add(name, polyStruct);
         }
         
         private static TypeDefinition CopyType(TypeDefinition type, TypeDefinition[] genericTypes)
