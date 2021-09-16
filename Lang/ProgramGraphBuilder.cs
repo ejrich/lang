@@ -1045,6 +1045,10 @@ namespace Lang
                     {
                         AddError($"Cannot use array initializer to declare non-array type '{PrintTypeDefinition(declaration.Type)}'", declaration.Type);
                     }
+                    else if (declaration.Type.Count != null)
+                    {
+                        AddError($"Array length should not be defined with array initializer", declaration.Type.Count);
+                    }
                     else
                     {
                         var elementType = declaration.Type.Generics[0];
