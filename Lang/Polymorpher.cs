@@ -59,6 +59,11 @@ namespace Lang
                 }
             }
 
+            if (function.Params)
+            {
+                function.ParamsElementType = TypeTable.GetType(function.Arguments[^1].TypeDefinition.Generics[0]);
+            }
+
             function.Body = CopyScope(baseFunction.Body, genericTypes, baseFunction.Generics);
 
             return function;
