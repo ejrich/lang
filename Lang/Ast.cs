@@ -213,9 +213,11 @@ namespace Lang
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
-        public TypeDefinition Type { get; set; }
+        public TypeDefinition TypeDefinition { get; set; }
+        public IType Type { get; set; }
         public List<Operator> Operators { get; } = new();
-        public List<TypeDefinition> ResultingTypes { get; } = new();
+        public List<TypeDefinition> ResultingTypeDefinitions { get; } = new();
+        public List<IType> ResultingTypes { get; } = new();
         public List<IAst> Children { get; } = new();
     }
 

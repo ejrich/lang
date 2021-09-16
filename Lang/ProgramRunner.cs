@@ -1000,7 +1000,7 @@ namespace Lang
                     for (var i = 1; i < expression.Children.Count; i++)
                     {
                         var rhs = ExecuteExpression(expression.Children[i], variables);
-                        var nextType = expression.ResultingTypes[i - 1];
+                        var nextType = expression.ResultingTypeDefinitions[i - 1];
                         expressionValue.Value = RunExpression(expressionValue, rhs, expression.Operators[i - 1], nextType);
                         expressionValue.Type = nextType;
                     }

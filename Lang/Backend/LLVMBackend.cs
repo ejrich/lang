@@ -1629,8 +1629,8 @@ namespace Lang.Backend
                     for (var i = 1; i < expression.Children.Count; i++)
                     {
                         var rhs = WriteExpression(expression.Children[i], localVariables);
-                        expressionValue.value = BuildExpression(expressionValue, rhs, expression.Operators[i - 1], expression.ResultingTypes[i - 1]);
-                        expressionValue.type = expression.ResultingTypes[i - 1];
+                        expressionValue.value = BuildExpression(expressionValue, rhs, expression.Operators[i - 1], expression.ResultingTypeDefinitions[i - 1]);
+                        expressionValue.type = expression.ResultingTypeDefinitions[i - 1];
                     }
                     return expressionValue;
                 case TypeDefinition typeDef:

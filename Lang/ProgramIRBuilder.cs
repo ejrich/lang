@@ -510,9 +510,8 @@ namespace Lang
             var value = EmitIR(function, assignment.Value, scope, block);
             if (assignment.Operator != Operator.None)
             {
-                // TODO Translate BuildExpression from LLVMBackend
                 var previousValue = EmitLoad(block, pointer.Type, pointer);
-                // value = EmitExpression(block, previousValue, value);
+                value = EmitExpression(block, previousValue, value, assignment.Operator, pointer.Type);
             }
 
             EmitStore(block, pointer, value);
@@ -660,13 +659,12 @@ namespace Lang
 
                     return index.CallsOverload ? indexPointer : EmitLoad(block, indexPointer.Type, indexPointer);
                 case ExpressionAst expression:
-                    // var expressionValue = WriteExpression(expression.Children[0], localVariables);
-                    // for (var i = 1; i < expression.Children.Count; i++)
-                    // {
-                    //     var rhs = WriteExpression(expression.Children[i], localVariables);
-                    //     expressionValue.value = BuildExpression(expressionValue, rhs, expression.Operators[i - 1], expression.ResultingTypes[i - 1]);
-                    //     expressionValue.type = expression.ResultingTypes[i - 1];
-                    // }
+                    var expressionValue = EmitIR(function, expression.Children[0], scope, block);
+                    for (var i = 1; i < expression.Children.Count; i++)
+                    {
+                        var rhs = EmitIR(function, expression.Children[i], scope, block);
+                        expressionValue = EmitExpression(block, expressionValue, rhs, expression.Operators[i - 1], expression.ResultingTypes[i - 1]);
+                    }
                     // return expressionValue;
                     return new InstructionValue();
                 case TypeDefinition typeDef:
@@ -993,6 +991,72 @@ namespace Lang
                 var dataPointer = EmitLoad(block, data.Type, data);
                 return EmitGetPointer(block, dataPointer, indexValue, elementType);
             }
+        }
+
+        private InstructionValue EmitExpression(BasicBlock block, InstructionValue lhs, InstructionValue rhs, Operator op, IType targetType)
+        {
+            // TODO Implement me
+            // // 1. Handle pointer math
+            // if (lhs.type.Name == "*")
+            // {
+            //     return BuildPointerOperation(lhs.value, rhs.value, op);
+            // }
+            // if (rhs.type.Name == "*")
+            // {
+            //     return BuildPointerOperation(rhs.value, lhs.value, op);
+            // }
+
+            // // 2. Handle compares and shifts, since the lhs and rhs should not be cast to the target type
+            // switch (op)
+            // {
+            //     case Operator.And:
+            //         return lhs.type.Name == "bool" ? _builder.BuildAnd(lhs.value, rhs.value, "tmpand")
+            //             : BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, Operator.And);
+            //     case Operator.Or:
+            //         return lhs.type.Name == "bool" ? _builder.BuildOr(lhs.value, rhs.value, "tmpor")
+            //             : BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, Operator.Or);
+            //     case Operator.Equality:
+            //     case Operator.NotEqual:
+            //     case Operator.GreaterThanEqual:
+            //     case Operator.LessThanEqual:
+            //     case Operator.GreaterThan:
+            //     case Operator.LessThan:
+            //         return BuildCompare(lhs, rhs, op);
+            //     case Operator.ShiftLeft:
+            //         return BuildShift(lhs, rhs);
+            //     case Operator.ShiftRight:
+            //         return BuildShift(lhs, rhs, true);
+            //     case Operator.RotateLeft:
+            //         return BuildRotate(lhs, rhs);
+            //     case Operator.RotateRight:
+            //         return BuildRotate(lhs, rhs, true);
+            // }
+
+            // // 3. Handle overloaded operators
+            // if (lhs.type.PrimitiveType == null && lhs.type.Name != "bool")
+            // {
+            //     return BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, op);
+            // }
+
+            // // 4. Cast lhs and rhs to the target types
+            // lhs.value = CastValue(lhs, targetType);
+            // rhs.value = CastValue(rhs, targetType);
+
+            // // 5. Handle the rest of the simple operators
+            // switch (op)
+            // {
+            //     case Operator.BitwiseAnd:
+            //         return _builder.BuildAnd(lhs.value, rhs.value, "tmpband");
+            //     case Operator.BitwiseOr:
+            //         return _builder.BuildOr(lhs.value, rhs.value, "tmpbor");
+            //     case Operator.Xor:
+            //         return _builder.BuildXor(lhs.value, rhs.value, "tmpxor");
+            // }
+
+            // // 6. Handle binary operations
+            // var signed = lhs.type.PrimitiveType.Signed || rhs.type.PrimitiveType.Signed;
+            // return BuildBinaryOperation(targetType, lhs.value, rhs.value, op, signed);
+            return null;
         }
 
         private InstructionValue EmitCastValue(BasicBlock block, InstructionValue value, IType type)
