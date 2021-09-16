@@ -512,39 +512,71 @@ namespace Lang
         private object InitializeArray(TypeDefinition type, IDictionary<string, ValueType> variables, bool structField = false, List<IAst> arrayValues = null)
         {
             var arrayType = _types[type.GenericName];
-            var genericType = GetTypeFromDefinition(type.Generics[0]);
+            var elementTypeDef = type.Generics[0];
+            var elementType = GetTypeFromDefinition(elementTypeDef);
+            var elementSize = Marshal.SizeOf(elementType);
 
-            object array;
             if (type.CArray)
             {
-                array = structField ? Array.CreateInstance(genericType, type.ConstCount.Value) :
-                    Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * (int)type.ConstCount.Value);
-
-                if (arrayValues != null)
+                if (structField)
                 {
-                    // TODO Implement me
+                    var array = Array.CreateInstance(elementType, type.ConstCount.Value);
+                    if (arrayValues != null)
+                    {
+                        for (var i = 0; i < arrayValues.Count; i++)
+                        {
+                            var value = ExecuteExpression(arrayValues[i], variables);
+
+                            array.SetValue(CastValue(value.Value, elementTypeDef), i);
+                        }
+                    }
+
+                    return array;
+                }
+                else
+                {
+                    var arrayPointer = Marshal.AllocHGlobal(elementSize * (int)type.ConstCount.Value);
+                    if (arrayValues != null)
+                    {
+                        for (var i = 0; i < arrayValues.Count; i++)
+                        {
+                            var value = ExecuteExpression(arrayValues[i], variables);
+
+                            var pointer = IntPtr.Add(arrayPointer, elementSize * i);
+                            Marshal.StructureToPtr(CastValue(value.Value, elementTypeDef), pointer, false);
+                        }
+                    }
+
+                    return arrayPointer;
                 }
             }
             else
             {
-                array = Activator.CreateInstance(arrayType);
+                var array = Activator.CreateInstance(arrayType);
                 if (type.ConstCount != null)
                 {
-                    InitializeConstArray(array, arrayType, genericType, (int)type.ConstCount.Value);
+                    var arrayPointer = InitializeConstArray(array, arrayType, elementType, (int)type.ConstCount.Value);
+
+                    if (arrayValues != null)
+                    {
+
+                        for (var i = 0; i < arrayValues.Count; i++)
+                        {
+                            var value = ExecuteExpression(arrayValues[i], variables);
+
+                            var pointer = IntPtr.Add(arrayPointer, elementSize * i);
+                            Marshal.StructureToPtr(CastValue(value.Value, elementTypeDef), pointer, false);
+                        }
+                    }
                 }
                 else if (type.Count != null)
                 {
                     var length = (int)ExecuteExpression(type.Count, variables).Value;
-                    InitializeConstArray(array, arrayType, genericType, length);
+                    InitializeConstArray(array, arrayType, elementType, length);
                 }
 
-                if (arrayValues != null)
-                {
-                    // TODO Implement me
-                }
+                return array;
             }
-
-            return array;
         }
 
         private static IntPtr InitializeConstArray(object array, Type arrayType, Type genericType, int length)
