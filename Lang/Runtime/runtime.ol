@@ -21,11 +21,6 @@ operator != string(string a, string b) {
     return !(a == b);
 }
 
-operator [] string(string a, int index) : u8 {
-    // TODO Length check
-    return *(a.data + index);
-}
-
 
 // Runtime type information data
 struct TypeInfo {

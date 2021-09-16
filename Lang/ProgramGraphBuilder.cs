@@ -650,9 +650,15 @@ namespace Lang
             else
             {
                 var targetType = VerifyType(overload.Type);
-                if (targetType != TypeKind.Error && targetType != TypeKind.Struct && targetType != TypeKind.String)
+                switch (targetType)
                 {
-                    AddError($"Cannot overload operator '{PrintOperator(overload.Operator)}' for type '{PrintTypeDefinition(overload.Type)}'", overload.Type);
+                    case TypeKind.Error:
+                    case TypeKind.Struct:
+                    case TypeKind.String when overload.Operator != Operator.Subscript:
+                        break;
+                    default:
+                        AddError($"Cannot overload operator '{PrintOperator(overload.Operator)}' for type '{PrintTypeDefinition(overload.Type)}'", overload.Type);
+                        break;
                 }
             }
 
@@ -2769,6 +2775,8 @@ namespace Lang
             return VerifyIndex(index, declaration.Type, currentFunction, scopeIdentifiers, out _);
         }
 
+        private StructAst _stringStruct;
+
         private TypeDefinition VerifyIndex(IndexAst index, TypeDefinition typeDef, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers, out bool overloaded)
         {
             // 1. Verify the variable is a list or the operator overload exists
@@ -2780,7 +2788,6 @@ namespace Lang
                 case TypeKind.Error:
                     break;
                 case TypeKind.Struct:
-                case TypeKind.String:
                     index.CallsOverload = true;
                     index.OverloadType = typeDef;
                     overloaded = true;
@@ -2793,6 +2800,10 @@ namespace Lang
                     {
                         AddError("Unable to determine element type of the List", index);
                     }
+                    break;
+                case TypeKind.String:
+                    _stringStruct ??= (StructAst)_programGraph.Types["string"];
+                    elementType = _stringStruct.Fields[1].Type.Generics[0];
                     break;
                 default:
                     AddError($"Cannot index type '{PrintTypeDefinition(typeDef)}'", index);
