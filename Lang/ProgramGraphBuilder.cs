@@ -111,13 +111,7 @@ namespace Lang
                     switch (parseResult.SyntaxTrees[i])
                     {
                         case DeclarationAst globalVariable:
-                            if (globalVariable.Value != null && globalVariable.Value is not ConstantAst)
-                            {
-                                AddError("Global variable must either not be initialized or be initialized to a constant value", globalVariable.Value);
-                            }
-
-                            // TODO Add VerifyGlobalVariable function, since the logic is different than VerifyDeclaration
-                            VerifyDeclaration(globalVariable, null, _globalScope, null);
+                            VerifyGlobalVariable(globalVariable);
                             _programGraph.Variables.Add(globalVariable);
                             parseResult.SyntaxTrees.RemoveAt(i--);
                             break;
@@ -1100,6 +1094,261 @@ namespace Lang
             }
         }
 
+        private void VerifyGlobalVariable(DeclarationAst declaration)
+        {
+            // 1. Verify the variable is already defined
+            if (GetScopeIdentifier(_globalScope, declaration.Name, out _))
+            {
+                AddError($"Identifier '{declaration.Name}' already defined", declaration);
+                return;
+            }
+
+            // 2. Verify the null values
+            if (declaration.Value is NullAst nullAst)
+            {
+                // 2a. Verify null can be assigned
+                if (declaration.TypeDefinition == null)
+                {
+                    AddError("Cannot assign null value without declaring a type", declaration.Value);
+                }
+                else
+                {
+                    var type = VerifyType(declaration.TypeDefinition);
+                    if (type == TypeKind.Error)
+                    {
+                        AddError($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                    }
+                    else if (type != TypeKind.Pointer)
+                    {
+                        AddError("Cannot assign null to non-pointer type", declaration.Value);
+                    }
+
+                    nullAst.TargetType = declaration.TypeDefinition;
+                }
+            }
+            // 3. Verify declaration values
+            else if (declaration.Value != null)
+            {
+                VerifyGlobalVariableValue(declaration);
+            }
+            // 4. Verify object initializers
+            else if (declaration.Assignments != null)
+            {
+                if (declaration.TypeDefinition == null)
+                {
+                    AddError("Struct literals are not yet supported", declaration);
+                }
+                else
+                {
+                    var type = VerifyType(declaration.TypeDefinition);
+                    if (type != TypeKind.Struct && type != TypeKind.String)
+                    {
+                        AddError($"Can only use object initializer with struct type, got '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                        return;
+                    }
+
+                    var structDef = TypeTable.Types[declaration.TypeDefinition.GenericName] as StructAst;
+                    var fields = structDef!.Fields.ToDictionary(_ => _.Name);
+                    foreach (var (name, assignment) in declaration.Assignments)
+                    {
+                        if (!fields.TryGetValue(name, out var field))
+                        {
+                            AddError($"Field '{name}' not present in struct '{PrintTypeDefinition(declaration.TypeDefinition)}'", assignment.Reference);
+                        }
+
+                        if (assignment.Operator != Operator.None)
+                        {
+                            AddError("Cannot have operator assignments in object initializers", assignment.Reference);
+                        }
+
+                        var valueType = VerifyConstantExpression(assignment.Value, null, _globalScope, out var isConstant, out _);
+                        if (valueType != null && field != null)
+                        {
+                            if (!TypeEquals(field.TypeDefinition, valueType))
+                            {
+                                AddError($"Expected field value to be type '{PrintTypeDefinition(field.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                            }
+                            else if (!isConstant)
+                            {
+                                AddError($"Global variables can only be initialized with constant values", assignment.Value);
+                            }
+                            else if (field.TypeDefinition.PrimitiveType != null && assignment.Value is ConstantAst constant)
+                            {
+                                VerifyConstant(constant, field.TypeDefinition);
+                            }
+                        }
+                    }
+                }
+            }
+            // 5. Verify array initializer
+            else if (declaration.ArrayValues != null)
+            {
+                if (declaration.TypeDefinition == null)
+                {
+                    AddError($"Declaration for variable '{declaration.Name}' with array initializer must have the type declared", declaration);
+                }
+                else
+                {
+                    var type = VerifyType(declaration.TypeDefinition);
+                    if (type != TypeKind.Error && type != TypeKind.Array && type != TypeKind.CArray)
+                    {
+                        AddError($"Cannot use array initializer to declare non-array type '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                    }
+                    else
+                    {
+                        declaration.TypeDefinition.ConstCount = (uint)declaration.ArrayValues.Count;
+                        var elementType = declaration.TypeDefinition.Generics[0];
+                        foreach (var value in declaration.ArrayValues)
+                        {
+                            var valueType = VerifyConstantExpression(value, null, _globalScope, out var isConstant, out _);
+                            if (valueType != null)
+                            {
+                                if (!TypeEquals(elementType, valueType))
+                                {
+                                    AddError($"Expected array value to be type '{PrintTypeDefinition(elementType)}', but got '{PrintTypeDefinition(valueType)}'", value);
+                                }
+                                else if (!isConstant)
+                                {
+                                    AddError($"Global variables can only be initialized with constant values", value);
+                                }
+                                else if (elementType.PrimitiveType != null && value is ConstantAst constant)
+                                {
+                                    VerifyConstant(constant, elementType);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // 6. Verify the declaration type
+            else
+            {
+                switch (declaration.Name)
+                {
+                    case "os":
+                        declaration.Value = GetOSVersion();
+                        VerifyGlobalVariableValue(declaration);
+                        break;
+                    case "build_env":
+                        declaration.Value = GetBuildEnv();
+                        VerifyGlobalVariableValue(declaration);
+                        break;
+                    default:
+                        var type = VerifyType(declaration.TypeDefinition);
+                        if (type == TypeKind.Error)
+                        {
+                            AddError($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                        }
+                        else if (type == TypeKind.Void)
+                        {
+                            AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
+                        }
+                        break;
+                }
+            }
+
+            // 7. Verify the type definition count if necessary
+            if (declaration.TypeDefinition != null)
+            {
+                if (declaration.TypeDefinition.TypeKind == TypeKind.CArray && declaration.TypeDefinition.Count == null && declaration.TypeDefinition.ConstCount == null)
+                {
+                    AddError($"Length of C array variable '{declaration.Name}' must be initialized to a constant integer", declaration.TypeDefinition);
+                }
+                else if (declaration.TypeDefinition.Count != null)
+                {
+                    var countType = VerifyConstantExpression(declaration.TypeDefinition.Count, null, _globalScope, out var isConstant, out var count);
+
+                    if (countType != null)
+                    {
+                        if (declaration.TypeDefinition.TypeKind == TypeKind.CArray && !isConstant)
+                        {
+                            AddError($"Length of C array variable '{declaration.Name}' must be initialized with a constant size", declaration.TypeDefinition.Count);
+                        }
+                        else if (countType.PrimitiveType is not IntegerType)
+                        {
+                            AddError($"Expected count of variable '{declaration.Name}' to be an integer", declaration.TypeDefinition.Count);
+                        }
+                        if (isConstant)
+                        {
+                            if (count < 0)
+                            {
+                                AddError($"Expected count of variable '{declaration.Name}' to be a positive integer", declaration.TypeDefinition.Count);
+                            }
+                            else
+                            {
+                                declaration.TypeDefinition.ConstCount = (uint)count;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 8. Verify constant values
+            if (declaration.Constant)
+            {
+                if (declaration.Value == null)
+                {
+                    AddError($"Constant variable '{declaration.Name}' should be assigned a constant value", declaration);
+                }
+                else if (declaration.TypeDefinition != null)
+                {
+                    declaration.TypeDefinition.Constant = true;
+                }
+            }
+
+            if (!_programGraph.Errors.Any())
+            {
+                declaration.Type = TypeTable.GetType(declaration.TypeDefinition);
+                _irBuilder.EmitGlobalVariable(declaration, _globalScope);
+            }
+
+            _globalScope.Identifiers.TryAdd(declaration.Name, declaration);
+        }
+
+        private void VerifyGlobalVariableValue(DeclarationAst declaration)
+        {
+            var valueType = VerifyConstantExpression(declaration.Value, null, _globalScope, out var isConstant, out _);
+            if (!isConstant)
+            {
+                AddError($"Global variables can only be initialized with constant values", declaration.Value);
+            }
+
+            // Verify the assignment value matches the type definition if it has been defined
+            if (declaration.TypeDefinition == null)
+            {
+                if (VerifyType(valueType) == TypeKind.Void)
+                {
+                    AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.Value);
+                }
+                declaration.TypeDefinition = valueType;
+            }
+            else
+            {
+                var type = VerifyType(declaration.TypeDefinition);
+                if (type == TypeKind.Error)
+                {
+                    AddError($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                }
+                else if (type == TypeKind.Void)
+                {
+                    AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
+                }
+
+                // Verify the type is correct
+                if (valueType != null)
+                {
+                    if (!TypeEquals(declaration.TypeDefinition, valueType))
+                    {
+                        AddError($"Expected declaration value to be type '{PrintTypeDefinition(declaration.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", declaration.TypeDefinition);
+                    }
+                    else if (declaration.TypeDefinition.PrimitiveType != null && declaration.Value is ConstantAst constant)
+                    {
+                        VerifyConstant(constant, declaration.TypeDefinition);
+                    }
+                }
+            }
+        }
+
         private void VerifyDeclaration(DeclarationAst declaration, IFunction currentFunction, ScopeAst scope, FunctionIR functionIR)
         {
             // 1. Verify the variable is already defined
@@ -1135,7 +1384,42 @@ namespace Lang
             // 3. Verify declaration values
             else if (declaration.Value != null)
             {
-                VerifyDeclarationValue(declaration, currentFunction, scope);
+                var valueType = VerifyExpression(declaration.Value, currentFunction, scope);
+
+                // Verify the assignment value matches the type definition if it has been defined
+                if (declaration.TypeDefinition == null)
+                {
+                    if (VerifyType(valueType) == TypeKind.Void)
+                    {
+                        AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.Value);
+                    }
+                    declaration.TypeDefinition = valueType;
+                }
+                else
+                {
+                    var type = VerifyType(declaration.TypeDefinition);
+                    if (type == TypeKind.Error)
+                    {
+                        AddError($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                    }
+                    else if (type == TypeKind.Void)
+                    {
+                        AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
+                    }
+
+                    // Verify the type is correct
+                    if (valueType != null)
+                    {
+                        if (!TypeEquals(declaration.TypeDefinition, valueType))
+                        {
+                            AddError($"Expected declaration value to be type '{PrintTypeDefinition(declaration.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", declaration.TypeDefinition);
+                        }
+                        else if (declaration.TypeDefinition.PrimitiveType != null && declaration.Value is ConstantAst constant)
+                        {
+                            VerifyConstant(constant, declaration.TypeDefinition);
+                        }
+                    }
+                }
             }
             // 4. Verify object initializers
             else if (declaration.Assignments != null)
@@ -1221,27 +1505,14 @@ namespace Lang
             // 6. Verify the declaration type
             else
             {
-                switch (declaration.Name)
+                var type = VerifyType(declaration.TypeDefinition);
+                if (type == TypeKind.Error)
                 {
-                    case "os":
-                        declaration.Value = GetOSVersion();
-                        VerifyDeclarationValue(declaration, currentFunction, scope);
-                        break;
-                    case "build_env":
-                        declaration.Value = GetBuildEnv();
-                        VerifyDeclarationValue(declaration, currentFunction, scope);
-                        break;
-                    default:
-                        var type = VerifyType(declaration.TypeDefinition);
-                        if (type == TypeKind.Error)
-                        {
-                            AddError($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
-                        }
-                        else if (type == TypeKind.Void)
-                        {
-                            AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
-                        }
-                        break;
+                    AddError($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                }
+                else if (type == TypeKind.Void)
+                {
+                    AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
                 }
             }
 
@@ -1301,60 +1572,13 @@ namespace Lang
                 }
             }
 
-            if (!_programGraph.Errors.Any())
+            if (functionIR != null && !_programGraph.Errors.Any())
             {
                 declaration.Type = TypeTable.GetType(declaration.TypeDefinition);
-                if (functionIR != null)
-                {
-                    _irBuilder.EmitDeclaration(functionIR, declaration, scope);
-                }
-                else
-                {
-                    _irBuilder.EmitGlobalVariable(declaration, scope);
-                }
+                _irBuilder.EmitDeclaration(functionIR, declaration, scope);
             }
 
             scope.Identifiers.TryAdd(declaration.Name, declaration);
-        }
-
-        private void VerifyDeclarationValue(DeclarationAst declaration, IFunction currentFunction, ScopeAst scope)
-        {
-            var valueType = VerifyExpression(declaration.Value, currentFunction, scope);
-
-            // Verify the assignment value matches the type definition if it has been defined
-            if (declaration.TypeDefinition == null)
-            {
-                if (VerifyType(valueType) == TypeKind.Void)
-                {
-                    AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.Value);
-                }
-                declaration.TypeDefinition = valueType;
-            }
-            else
-            {
-                var type = VerifyType(declaration.TypeDefinition);
-                if (type == TypeKind.Error)
-                {
-                    AddError($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
-                }
-                else if (type == TypeKind.Void)
-                {
-                    AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
-                }
-
-                // Verify the type is correct
-                if (valueType != null)
-                {
-                    if (!TypeEquals(declaration.TypeDefinition, valueType))
-                    {
-                        AddError($"Expected declaration value to be type '{PrintTypeDefinition(declaration.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", declaration.TypeDefinition);
-                    }
-                    else if (declaration.TypeDefinition.PrimitiveType != null && declaration.Value is ConstantAst constant)
-                    {
-                        VerifyConstant(constant, declaration.TypeDefinition);
-                    }
-                }
-            }
         }
 
         private StructFieldRefAst GetOSVersion()
