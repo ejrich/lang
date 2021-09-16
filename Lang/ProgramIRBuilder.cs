@@ -1197,7 +1197,7 @@ namespace Lang
                     }
                     return expressionValue;
                 case TypeDefinition typeDef:
-                    return GetConstantInteger(typeDef.TypeIndex.Value);
+                    return GetConstantInteger(typeDef.TypeIndex);
                 case CastAst cast:
                     var castValue = EmitIR(function, cast.Value, scope);
                     return EmitCastValue(function, castValue, cast.TargetType);
