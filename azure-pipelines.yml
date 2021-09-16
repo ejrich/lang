@@ -20,8 +20,7 @@ steps:
     arguments: '-c $(BuildConfiguration)'
 
 - script: |
-    ls -al /usr/lib
-    ls -al /usr/lib64
+    gcc -v a.cpp
     ./Lang/bin/Debug/net5.0/Lang Tests/tests.olproj
     ./Tests/bin/tests
   displayName: 'Compiler Tests'
