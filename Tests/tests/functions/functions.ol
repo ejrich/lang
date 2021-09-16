@@ -63,12 +63,12 @@ foo_params(int a, int b = 8, Params<float> args) {
 polymorphic_functions() {
     float_value := add_int(3.1, 2);
     int_value := add_int(35, 10);
-    printf("float_value = %.2f, should be 5.1\n", float_value);
+    int_value2 := add_int(12, 10);
+    printf("float_value = %.2f, should be 5.10\n", float_value);
     printf("int_value = %d, should be 45\n", int_value);
 
     int_list: List<int>[8];
-    temp := 3.2;
-    baz(int_list, &temp);
+    baz(int_list, &float_value);
 }
 
 T add_int<T>(T a, int b) {

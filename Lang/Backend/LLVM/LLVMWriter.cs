@@ -69,7 +69,7 @@ namespace Lang.Backend.LLVM
             }
 
             // 5. Write Function bodies
-            foreach (var (_, functions) in programGraph.Functions)
+            foreach (var (name, functions) in programGraph.Functions)
             {
                 for (var i = 0; i < functions.Count; i++)
                 {
@@ -77,7 +77,11 @@ namespace Lang.Backend.LLVM
                     if (functionAst.Extern || functionAst.Compiler || functionAst.CallsCompiler) continue;
 
                     _currentFunction = functionAst;
-                    var functionName = GetFunctionName(functionAst.Name, i, functions.Count);
+                    var functionName = name switch
+                    {
+                        "main" or "__start" => functionAst.Name,
+                        _ => GetFunctionName(name, i, functions.Count)
+                    };
                     var function = LLVMApi.GetNamedFunction(_module, functionName);
                     WriteFunction(functionAst, globals, function);
                 }
