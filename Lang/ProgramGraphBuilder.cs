@@ -848,11 +848,9 @@ namespace Lang
 
         private bool GetScopeIdentifier(ScopeAst scope, string name, out IAst ast)
         {
-            ast = null;
             do {
-                if (scope.Identifiers.TryGetValue(name, out var identifier))
+                if (scope.Identifiers.TryGetValue(name, out ast))
                 {
-                    ast = identifier;
                     return true;
                 }
                 scope = scope.Parent;
@@ -1062,6 +1060,10 @@ namespace Lang
                     return VerifyEach(each, currentFunction, scope, functionIR);
                 default:
                     VerifyExpression(syntaxTree, currentFunction, scope);
+                    if (functionIR != null && !_programGraph.Errors.Any())
+                    {
+                        _irBuilder.EmitIR(functionIR, syntaxTree, scope);
+                    }
                     break;
             }
 
@@ -1098,10 +1100,10 @@ namespace Lang
                 }
             }
 
-            if (!_programGraph.Errors.Any())
+            if (functionIR != null && !_programGraph.Errors.Any())
             {
                 var returnType = _programGraph.Types[currentFunction.ReturnType.GenericName];
-                _irBuilder.EmitReturn(functionIR, returnAst, returnType);
+                _irBuilder.EmitReturn(functionIR, returnAst, returnType, scope);
             }
         }
 
@@ -1309,7 +1311,7 @@ namespace Lang
             if (functionIR != null && !_programGraph.Errors.Any())
             {
                 var type = _programGraph.Types[declaration.Type.GenericName];
-                _irBuilder.EmitDeclaration(functionIR, declaration, type);
+                _irBuilder.EmitDeclaration(functionIR, declaration, type, scope);
             }
 
             scope.Identifiers.TryAdd(declaration.Name, declaration);
