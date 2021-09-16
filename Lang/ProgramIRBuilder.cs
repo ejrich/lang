@@ -120,7 +120,7 @@ namespace Lang
                 {
                     var instruction = function.Instructions[i++];
 
-                    var text = $"\t{instruction.Type} ";
+                    var text = $"{i}\t{instruction.Type} ";
                     switch (instruction.Type)
                     {
                         case InstructionType.Jump:
@@ -242,7 +242,7 @@ namespace Lang
                             var constArray = new InstructionValue
                             {
                                 ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
-                                Values = new [] {GetConstantInteger(0), new InstructionValue {ValueType = InstructionValueType.Null}}
+                                Values = new [] {GetConstantInteger(0), new InstructionValue {ValueType = InstructionValueType.Null, Type = arrayStruct.Fields[1].Type}}
                             };
                             globalVariable.InitialValue = constArray;
                         }
@@ -260,7 +260,7 @@ namespace Lang
                         break;
                     // Initialize pointers to null
                     case TypeKind.Pointer:
-                        globalVariable.InitialValue = new InstructionValue {ValueType = InstructionValueType.Null};
+                        globalVariable.InitialValue = new InstructionValue {ValueType = InstructionValueType.Null, Type = globalVariable.Type};
                         break;
                     // Or initialize to default
                     default:
@@ -318,7 +318,7 @@ namespace Lang
                         return new InstructionValue
                         {
                             ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
-                                      Values = new [] {GetConstantInteger(0), new InstructionValue {ValueType = InstructionValueType.Null}}
+                            Values = new [] {GetConstantInteger(0), new InstructionValue {ValueType = InstructionValueType.Null, Type = arrayStruct.Fields[1].Type}}
                         };
                     }
                 case TypeKind.CArray:
@@ -335,7 +335,7 @@ namespace Lang
                     return GetConstantStruct((StructAst)field.Type, scope, field.Assignments);
                     // Initialize pointers to null
                 case TypeKind.Pointer:
-                    return new InstructionValue {ValueType = InstructionValueType.Null};
+                    return new InstructionValue {ValueType = InstructionValueType.Null, Type = field.Type};
                     // Or initialize to default
                 default:
                     return field.Value == null ? GetDefaultConstant(field.Type) : EmitConstantIR(field.Value, scope);
@@ -483,7 +483,7 @@ namespace Lang
                         break;
                         // Initialize pointers to null
                     case TypeKind.Pointer:
-                        EmitStore(function, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Null});
+                        EmitStore(function, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Null, Type = declaration.Type});
                         break;
                         // Or initialize to default
                     default:
@@ -625,16 +625,16 @@ namespace Lang
                         InitializeArrayValues(function, pointer, field.ArrayElementType, field.ArrayValues, scope);
                     }
                     break;
-                    // Initialize struct field default values
+                // Initialize struct field default values
                 case TypeKind.Struct:
                 case TypeKind.String: // TODO String default values
                     InitializeStruct(function, (StructAst)field.Type, pointer, scope, field.Assignments);
                     break;
-                    // Initialize pointers to null
+                // Initialize pointers to null
                 case TypeKind.Pointer:
-                    EmitStore(function, pointer, new InstructionValue {ValueType = InstructionValueType.Null});
+                    EmitStore(function, pointer, new InstructionValue {ValueType = InstructionValueType.Null, Type = field.Type});
                     break;
-                    // Or initialize to default
+                // Or initialize to default
                 default:
                     var defaultValue = field.Value == null ? GetDefaultConstant(field.Type) : EmitIR(function, field.Value, scope);
                     EmitStore(function, pointer, defaultValue);
@@ -865,7 +865,7 @@ namespace Lang
                 case ConstantAst constant:
                     return GetConstant(constant, useRawString);
                 case NullAst nullAst:
-                    return new InstructionValue {ValueType = InstructionValueType.Null};
+                    return new InstructionValue {ValueType = InstructionValueType.Null, Type = nullAst.TargetType};
                 case IdentifierAst identifierAst:
                     var identifier = GetScopeIdentifier(scope, identifierAst.Name, out var global);
                     if (identifier is DeclarationAst declaration)
@@ -985,7 +985,7 @@ namespace Lang
                             return EmitInstruction(negate, function, value.Type, value);
                         case UnaryOperator.Dereference:
                             value = EmitIR(function, unary.Value, scope);
-                            return EmitLoad(function, value.Type, value);
+                            return EmitLoad(function, unary.Type, value);
                         case UnaryOperator.Reference:
                             value = EmitGetReference(function, unary.Value, scope);
                             return new InstructionValue {ValueType = value.ValueType, ValueIndex = value.ValueIndex, Type = unary.Type};
@@ -1026,7 +1026,7 @@ namespace Lang
                 case ConstantAst constant:
                     return GetConstant(constant);
                 case NullAst nullAst:
-                    return new InstructionValue {ValueType = InstructionValueType.Null};
+                    return new InstructionValue {ValueType = InstructionValueType.Null, Type = nullAst.TargetType};
                 case IdentifierAst identifierAst:
                     var identifier = GetScopeIdentifier(scope, identifierAst.Name, out var global);
                     if (identifier is DeclarationAst declaration)
@@ -1553,20 +1553,22 @@ namespace Lang
                 case TypeKind.Integer:
                 {
                     var integerType = (PrimitiveAst)targetType;
-                    if (value.Type.TypeKind == TypeKind.Integer)
+                    switch (value.Type.TypeKind)
                     {
-                        if (targetType.Size >= value.Type.Size)
-                        {
-                            castInstruction.Type = integerType.Primitive.Signed ? InstructionType.IntegerExtend : InstructionType.UnsignedIntegerExtend;
-                        }
-                        else
-                        {
-                            castInstruction.Type = InstructionType.IntegerTruncate;
-                        }
-                    }
-                    else
-                    {
-                        castInstruction.Type = integerType.Primitive.Signed ? InstructionType.FloatToIntegerCast: InstructionType.FloatToUnsignedIntegerCast;
+                        case TypeKind.Integer:
+                        case TypeKind.Enum:
+                            if (targetType.Size >= value.Type.Size)
+                            {
+                                castInstruction.Type = integerType.Primitive.Signed ? InstructionType.IntegerExtend : InstructionType.UnsignedIntegerExtend;
+                            }
+                            else
+                            {
+                                castInstruction.Type = InstructionType.IntegerTruncate;
+                            }
+                            break;
+                        case TypeKind.Float:
+                            castInstruction.Type = integerType.Primitive.Signed ? InstructionType.FloatToIntegerCast: InstructionType.FloatToUnsignedIntegerCast;
+                            break;
                     }
                     break;
                 }

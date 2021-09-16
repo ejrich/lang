@@ -1418,8 +1418,8 @@ namespace Lang.Backend
                 }
                 case NullAst nullAst:
                 {
-                    var type = ConvertTypeDefinition(nullAst.TargetType);
-                    return (nullAst.TargetType, LLVMValueRef.CreateConstNull(type));
+                    var type = ConvertTypeDefinition(nullAst.TargetTypeDefinition);
+                    return (nullAst.TargetTypeDefinition, LLVMValueRef.CreateConstNull(type));
                 }
                 case IdentifierAst identifier:
                 {

@@ -200,7 +200,8 @@ namespace Lang
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
-        public TypeDefinition TargetType { get; set; }
+        public TypeDefinition TargetTypeDefinition { get; set; }
+        public IType TargetType { get; set; }
     }
 
     public class IdentifierAst : IAst
