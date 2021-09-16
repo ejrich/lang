@@ -838,7 +838,6 @@ namespace Lang.Backend.LLVM
         private (TypeDefinition type, LLVMValueRef value) GetListPointer(IndexAst index,
             IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
         {
-            // TODO Handle varargs indices
             // 1. Get the variable pointer
             var (type, variable) = index.Variable switch
             {

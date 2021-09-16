@@ -1003,7 +1003,8 @@ namespace Lang.Translation
             List<TranslationError> errors)
         {
             // 1. Verify the variable is a list
-            if (VerifyType(typeDef, errors) != Type.List)
+            var type = VerifyType(typeDef, errors);
+            if (type != Type.List && type != Type.Params)
             {
                 errors.Add(CreateError($"Cannot index type '{PrintTypeDefinition(typeDef)}'", index.Variable));
                 return null;
