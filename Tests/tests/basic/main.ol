@@ -296,7 +296,7 @@ lists() {
 
 open_window() {
     #if os == OS.Linux {
-        XOpenDisplay("Hello");
+        // XOpenDisplay("Hello");
         printf("Opening X11 window\n");
     }
 }
@@ -324,7 +324,7 @@ build() {
 #assert global_b > 0;
 
 #if os == OS.Linux {
-    XOpenDisplay(string name) #extern "X11"
+    // XOpenDisplay(string name) #extern "X11"
 }
 
 type_information() {
