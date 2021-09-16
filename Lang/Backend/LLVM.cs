@@ -823,7 +823,7 @@ namespace Lang.Backend
         private const string libraryPath = "libLLVM";
 
         [DllImport(libraryPath, EntryPoint = "LLVMVerifyModule", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool VerifyModule(LLVMModuleRef @M, LLVMVerifierFailureAction @Action, out IntPtr @OutMessage);
+        private static extern bool VerifyModule(LLVMModuleRef @M, LLVMVerifierFailureAction @Action, out IntPtr @OutMessage);
 
         [DllImport(libraryPath, EntryPoint = "LLVMVerifyFunction", CallingConvention = CallingConvention.Cdecl)]
         public static extern bool VerifyFunction(LLVMValueRef @Fn, LLVMVerifierFailureAction @Action);
@@ -835,25 +835,25 @@ namespace Lang.Backend
         public static extern void ViewFunctionCFGOnly(LLVMValueRef @Fn);
 
         [DllImport(libraryPath, EntryPoint = "LLVMParseBitcode", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool ParseBitcode(LLVMMemoryBufferRef @MemBuf, out LLVMModuleRef @OutModule, out IntPtr @OutMessage);
+        private static extern bool ParseBitcode(LLVMMemoryBufferRef @MemBuf, out LLVMModuleRef @OutModule, out IntPtr @OutMessage);
 
         [DllImport(libraryPath, EntryPoint = "LLVMParseBitcode2", CallingConvention = CallingConvention.Cdecl)]
         public static extern bool ParseBitcode2(LLVMMemoryBufferRef @MemBuf, out LLVMModuleRef @OutModule);
 
         [DllImport(libraryPath, EntryPoint = "LLVMParseBitcodeInContext", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool ParseBitcodeInContext(LLVMContextRef @ContextRef, LLVMMemoryBufferRef @MemBuf, out LLVMModuleRef @OutModule, out IntPtr @OutMessage);
+        private static extern bool ParseBitcodeInContext(LLVMContextRef @ContextRef, LLVMMemoryBufferRef @MemBuf, out LLVMModuleRef @OutModule, out IntPtr @OutMessage);
 
         [DllImport(libraryPath, EntryPoint = "LLVMParseBitcodeInContext2", CallingConvention = CallingConvention.Cdecl)]
         public static extern bool ParseBitcodeInContext2(LLVMContextRef @ContextRef, LLVMMemoryBufferRef @MemBuf, out LLVMModuleRef @OutModule);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetBitcodeModuleInContext", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool GetBitcodeModuleInContext(LLVMContextRef @ContextRef, LLVMMemoryBufferRef @MemBuf, out LLVMModuleRef @OutM, out IntPtr @OutMessage);
+        private static extern bool GetBitcodeModuleInContext(LLVMContextRef @ContextRef, LLVMMemoryBufferRef @MemBuf, out LLVMModuleRef @OutM, out IntPtr @OutMessage);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetBitcodeModuleInContext2", CallingConvention = CallingConvention.Cdecl)]
         public static extern bool GetBitcodeModuleInContext2(LLVMContextRef @ContextRef, LLVMMemoryBufferRef @MemBuf, out LLVMModuleRef @OutM);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetBitcodeModule", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool GetBitcodeModule(LLVMMemoryBufferRef @MemBuf, out LLVMModuleRef @OutM, out IntPtr @OutMessage);
+        private static extern bool GetBitcodeModule(LLVMMemoryBufferRef @MemBuf, out LLVMModuleRef @OutM, out IntPtr @OutMessage);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetBitcodeModule2", CallingConvention = CallingConvention.Cdecl)]
         public static extern bool GetBitcodeModule2(LLVMMemoryBufferRef @MemBuf, out LLVMModuleRef @OutM);
@@ -991,7 +991,7 @@ namespace Lang.Backend
         public static extern void DumpModule(LLVMModuleRef @M);
 
         [DllImport(libraryPath, EntryPoint = "LLVMPrintModuleToFile", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool PrintModuleToFile(LLVMModuleRef @M, [MarshalAs(UnmanagedType.LPStr)] string @Filename, out IntPtr @ErrorMessage);
+        private static extern bool PrintModuleToFile(LLVMModuleRef @M, [MarshalAs(UnmanagedType.LPStr)] string @Filename, out IntPtr @ErrorMessage);
 
         [DllImport(libraryPath, EntryPoint = "LLVMPrintModuleToString", CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr PrintModuleToString(LLVMModuleRef @M);
@@ -1009,7 +1009,7 @@ namespace Lang.Backend
         public static extern uint GetNamedMetadataNumOperands(LLVMModuleRef @M, [MarshalAs(UnmanagedType.LPStr)] string @Name);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetNamedMetadataOperands", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void GetNamedMetadataOperands(LLVMModuleRef @M, [MarshalAs(UnmanagedType.LPStr)] string @Name, out LLVMValueRef @Dest);
+        private static extern void GetNamedMetadataOperands(LLVMModuleRef @M, [MarshalAs(UnmanagedType.LPStr)] string @Name, out LLVMValueRef @Dest);
 
         [DllImport(libraryPath, EntryPoint = "LLVMAddNamedMetadataOperand", CallingConvention = CallingConvention.Cdecl)]
         public static extern void AddNamedMetadataOperand(LLVMModuleRef @M, [MarshalAs(UnmanagedType.LPStr)] string @Name, LLVMValueRef @Val);
@@ -1129,7 +1129,7 @@ namespace Lang.Backend
         public static extern LLVMTypeRef PPCFP128Type();
 
         [DllImport(libraryPath, EntryPoint = "LLVMFunctionType", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LLVMTypeRef FunctionType(LLVMTypeRef @ReturnType, out LLVMTypeRef @ParamTypes, uint @ParamCount, bool @IsVarArg);
+        private static extern LLVMTypeRef FunctionType(LLVMTypeRef @ReturnType, out LLVMTypeRef @ParamTypes, uint @ParamCount, bool @IsVarArg);
 
         [DllImport(libraryPath, EntryPoint = "LLVMIsFunctionVarArg", CallingConvention = CallingConvention.Cdecl)]
         public static extern bool IsFunctionVarArg(LLVMTypeRef @FunctionTy);
@@ -1141,13 +1141,13 @@ namespace Lang.Backend
         public static extern uint CountParamTypes(LLVMTypeRef @FunctionTy);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetParamTypes", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void GetParamTypes(LLVMTypeRef @FunctionTy, out LLVMTypeRef @Dest);
+        private static extern void GetParamTypes(LLVMTypeRef @FunctionTy, out LLVMTypeRef @Dest);
 
         [DllImport(libraryPath, EntryPoint = "LLVMStructTypeInContext", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LLVMTypeRef StructTypeInContext(LLVMContextRef @C, out LLVMTypeRef @ElementTypes, uint @ElementCount, bool @Packed);
+        private static extern LLVMTypeRef StructTypeInContext(LLVMContextRef @C, out LLVMTypeRef @ElementTypes, uint @ElementCount, bool @Packed);
 
         [DllImport(libraryPath, EntryPoint = "LLVMStructType", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LLVMTypeRef StructType(out LLVMTypeRef @ElementTypes, uint @ElementCount, bool @Packed);
+        private static extern LLVMTypeRef StructType(out LLVMTypeRef @ElementTypes, uint @ElementCount, bool @Packed);
 
         [DllImport(libraryPath, EntryPoint = "LLVMStructCreateNamed", CallingConvention = CallingConvention.Cdecl)]
         public static extern LLVMTypeRef StructCreateNamed(LLVMContextRef @C, [MarshalAs(UnmanagedType.LPStr)] string @Name);
@@ -1156,13 +1156,13 @@ namespace Lang.Backend
         public static extern string GetStructName(LLVMTypeRef @Ty);
 
         [DllImport(libraryPath, EntryPoint = "LLVMStructSetBody", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void StructSetBody(LLVMTypeRef @StructTy, out LLVMTypeRef @ElementTypes, uint @ElementCount, bool @Packed);
+        private static extern void StructSetBody(LLVMTypeRef @StructTy, out LLVMTypeRef @ElementTypes, uint @ElementCount, bool @Packed);
 
         [DllImport(libraryPath, EntryPoint = "LLVMCountStructElementTypes", CallingConvention = CallingConvention.Cdecl)]
         public static extern uint CountStructElementTypes(LLVMTypeRef @StructTy);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetStructElementTypes", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void GetStructElementTypes(LLVMTypeRef @StructTy, out LLVMTypeRef @Dest);
+        private static extern void GetStructElementTypes(LLVMTypeRef @StructTy, out LLVMTypeRef @Dest);
 
         [DllImport(libraryPath, EntryPoint = "LLVMStructGetTypeAtIndex", CallingConvention = CallingConvention.Cdecl)]
         public static extern LLVMTypeRef StructGetTypeAtIndex(LLVMTypeRef @StructTy, uint @i);
@@ -1177,10 +1177,10 @@ namespace Lang.Backend
         public static extern LLVMTypeRef GetElementType(LLVMTypeRef @Ty);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetSubtypes", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void GetSubtypes(LLVMTypeRef @Tp, out LLVMTypeRef @Arr);
+        private static extern void GetSubtypes(LLVMTypeRef @Tp, out LLVMTypeRef @Arr);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetNumContainedTypes", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern uint GetNumContainedTypes(LLVMTypeRef @Tp);
+        private static extern uint GetNumContainedTypes(LLVMTypeRef @Tp);
 
         [DllImport(libraryPath, EntryPoint = "LLVMArrayType", CallingConvention = CallingConvention.Cdecl)]
         public static extern LLVMTypeRef ArrayType(LLVMTypeRef @ElementType, uint @ElementCount);
@@ -1567,22 +1567,22 @@ namespace Lang.Backend
         public static extern string GetAsString(LLVMValueRef @c, out size_t @Length);
 
         [DllImport(libraryPath, EntryPoint = "LLVMConstStructInContext", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LLVMValueRef ConstStructInContext(LLVMContextRef @C, out LLVMValueRef @ConstantVals, uint @Count, bool @Packed);
+        private static extern LLVMValueRef ConstStructInContext(LLVMContextRef @C, out LLVMValueRef @ConstantVals, uint @Count, bool @Packed);
 
         [DllImport(libraryPath, EntryPoint = "LLVMConstStruct", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LLVMValueRef ConstStruct(out LLVMValueRef @ConstantVals, uint @Count, bool @Packed);
+        private static extern LLVMValueRef ConstStruct(out LLVMValueRef @ConstantVals, uint @Count, bool @Packed);
 
         [DllImport(libraryPath, EntryPoint = "LLVMConstArray", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LLVMValueRef ConstArray(LLVMTypeRef @ElementTy, out LLVMValueRef @ConstantVals, uint @Length);
+        private static extern LLVMValueRef ConstArray(LLVMTypeRef @ElementTy, out LLVMValueRef @ConstantVals, uint @Length);
 
         [DllImport(libraryPath, EntryPoint = "LLVMConstNamedStruct", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LLVMValueRef ConstNamedStruct(LLVMTypeRef @StructTy, out LLVMValueRef @ConstantVals, uint @Count);
+        private static extern LLVMValueRef ConstNamedStruct(LLVMTypeRef @StructTy, out LLVMValueRef @ConstantVals, uint @Count);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetElementAsConstant", CallingConvention = CallingConvention.Cdecl)]
         public static extern LLVMValueRef GetElementAsConstant(LLVMValueRef @C, uint @idx);
 
         [DllImport(libraryPath, EntryPoint = "LLVMConstVector", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LLVMValueRef ConstVector(out LLVMValueRef @ScalarConstantVals, uint @Size);
+        private static extern LLVMValueRef ConstVector(out LLVMValueRef @ScalarConstantVals, uint @Size);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetConstOpcode", CallingConvention = CallingConvention.Cdecl)]
         public static extern LLVMOpcode GetConstOpcode(LLVMValueRef @ConstantVal);
@@ -1693,10 +1693,10 @@ namespace Lang.Backend
         public static extern LLVMValueRef ConstAShr(LLVMValueRef @LHSConstant, LLVMValueRef @RHSConstant);
 
         [DllImport(libraryPath, EntryPoint = "LLVMConstGEP", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LLVMValueRef ConstGEP(LLVMValueRef @ConstantVal, out LLVMValueRef @ConstantIndices, uint @NumIndices);
+        private static extern LLVMValueRef ConstGEP(LLVMValueRef @ConstantVal, out LLVMValueRef @ConstantIndices, uint @NumIndices);
 
         [DllImport(libraryPath, EntryPoint = "LLVMConstInBoundsGEP", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LLVMValueRef ConstInBoundsGEP(LLVMValueRef @ConstantVal, out LLVMValueRef @ConstantIndices, uint @NumIndices);
+        private static extern LLVMValueRef ConstInBoundsGEP(LLVMValueRef @ConstantVal, out LLVMValueRef @ConstantIndices, uint @NumIndices);
 
         [DllImport(libraryPath, EntryPoint = "LLVMConstTrunc", CallingConvention = CallingConvention.Cdecl)]
         public static extern LLVMValueRef ConstTrunc(LLVMValueRef @ConstantVal, LLVMTypeRef @ToType);
@@ -1768,10 +1768,10 @@ namespace Lang.Backend
         public static extern LLVMValueRef ConstShuffleVector(LLVMValueRef @VectorAConstant, LLVMValueRef @VectorBConstant, LLVMValueRef @MaskConstant);
 
         [DllImport(libraryPath, EntryPoint = "LLVMConstExtractValue", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LLVMValueRef ConstExtractValue(LLVMValueRef @AggConstant, out uint @IdxList, uint @NumIdx);
+        private static extern LLVMValueRef ConstExtractValue(LLVMValueRef @AggConstant, out uint @IdxList, uint @NumIdx);
 
         [DllImport(libraryPath, EntryPoint = "LLVMConstInsertValue", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LLVMValueRef ConstInsertValue(LLVMValueRef @AggConstant, LLVMValueRef @ElementValueConstant, out uint @IdxList, uint @NumIdx);
+        private static extern LLVMValueRef ConstInsertValue(LLVMValueRef @AggConstant, LLVMValueRef @ElementValueConstant, out uint @IdxList, uint @NumIdx);
 
         [DllImport(libraryPath, EntryPoint = "LLVMConstInlineAsm", CallingConvention = CallingConvention.Cdecl)]
         public static extern LLVMValueRef ConstInlineAsm(LLVMTypeRef @Ty, [MarshalAs(UnmanagedType.LPStr)] string @AsmString, [MarshalAs(UnmanagedType.LPStr)] string @Constraints, bool @HasSideEffects, bool @IsAlignStack);
@@ -1912,7 +1912,7 @@ namespace Lang.Backend
         public static extern uint GetAttributeCountAtIndex(LLVMValueRef @F, LLVMAttributeIndex @Idx);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetAttributesAtIndex", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void GetAttributesAtIndex(LLVMValueRef @F, LLVMAttributeIndex @Idx, out LLVMAttributeRef @Attrs);
+        private static extern void GetAttributesAtIndex(LLVMValueRef @F, LLVMAttributeIndex @Idx, out LLVMAttributeRef @Attrs);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetEnumAttributeAtIndex", CallingConvention = CallingConvention.Cdecl)]
         public static extern LLVMAttributeRef GetEnumAttributeAtIndex(LLVMValueRef @F, LLVMAttributeIndex @Idx, uint @KindID);
@@ -1933,7 +1933,7 @@ namespace Lang.Backend
         public static extern uint CountParams(LLVMValueRef @Fn);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetParams", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void GetParams(LLVMValueRef @Fn, out LLVMValueRef @Params);
+        private static extern void GetParams(LLVMValueRef @Fn, out LLVMValueRef @Params);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetParam", CallingConvention = CallingConvention.Cdecl)]
         public static extern LLVMValueRef GetParam(LLVMValueRef @Fn, uint @Index);
@@ -1963,10 +1963,10 @@ namespace Lang.Backend
         public static extern LLVMValueRef MDString([MarshalAs(UnmanagedType.LPStr)] string @Str, uint @SLen);
 
         [DllImport(libraryPath, EntryPoint = "LLVMMDNodeInContext", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LLVMValueRef MDNodeInContext(LLVMContextRef @C, out LLVMValueRef @Vals, uint @Count);
+        private static extern LLVMValueRef MDNodeInContext(LLVMContextRef @C, out LLVMValueRef @Vals, uint @Count);
 
         [DllImport(libraryPath, EntryPoint = "LLVMMDNode", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LLVMValueRef MDNode(out LLVMValueRef @Vals, uint @Count);
+        private static extern LLVMValueRef MDNode(out LLVMValueRef @Vals, uint @Count);
 
         [DllImport(libraryPath, EntryPoint = "LLVMMetadataAsValue", CallingConvention = CallingConvention.Cdecl)]
         public static extern LLVMValueRef MetadataAsValue(LLVMContextRef @C, LLVMMetadataRef @MD);
@@ -1981,7 +1981,7 @@ namespace Lang.Backend
         public static extern uint GetMDNodeNumOperands(LLVMValueRef @V);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetMDNodeOperands", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void GetMDNodeOperands(LLVMValueRef @V, out LLVMValueRef @Dest);
+        private static extern void GetMDNodeOperands(LLVMValueRef @V, out LLVMValueRef @Dest);
 
         [DllImport(libraryPath, EntryPoint = "LLVMBasicBlockAsValue", CallingConvention = CallingConvention.Cdecl)]
         public static extern LLVMValueRef BasicBlockAsValue(LLVMBasicBlockRef @BB);
@@ -2005,7 +2005,7 @@ namespace Lang.Backend
         public static extern uint CountBasicBlocks(LLVMValueRef @Fn);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetBasicBlocks", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void GetBasicBlocks(LLVMValueRef @Fn, out LLVMBasicBlockRef @BasicBlocks);
+        private static extern void GetBasicBlocks(LLVMValueRef @Fn, out LLVMBasicBlockRef @BasicBlocks);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetFirstBasicBlock", CallingConvention = CallingConvention.Cdecl)]
         public static extern LLVMBasicBlockRef GetFirstBasicBlock(LLVMValueRef @Fn);
@@ -2104,10 +2104,10 @@ namespace Lang.Backend
         public static extern void AddCallSiteAttribute(LLVMValueRef @C, LLVMAttributeIndex @Idx, LLVMAttributeRef @A);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetCallSiteAttributeCount", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern uint GetCallSiteAttributeCount(LLVMValueRef @C, LLVMAttributeIndex @Idx);
+        private static extern uint GetCallSiteAttributeCount(LLVMValueRef @C, LLVMAttributeIndex @Idx);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetCallSiteAttributes", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void GetCallSiteAttributes(LLVMValueRef @C, LLVMAttributeIndex @Idx, out LLVMAttributeRef @Attrs);
+        private static extern void GetCallSiteAttributes(LLVMValueRef @C, LLVMAttributeIndex @Idx, out LLVMAttributeRef @Attrs);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetCallSiteEnumAttribute", CallingConvention = CallingConvention.Cdecl)]
         public static extern LLVMAttributeRef GetCallSiteEnumAttribute(LLVMValueRef @C, LLVMAttributeIndex @Idx, uint @KindID);
@@ -2173,7 +2173,7 @@ namespace Lang.Backend
         public static extern void SetIsInBounds(LLVMValueRef @GEP, bool @InBounds);
 
         [DllImport(libraryPath, EntryPoint = "LLVMAddIncoming", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void AddIncoming(LLVMValueRef @PhiNode, out LLVMValueRef @IncomingValues, out LLVMBasicBlockRef @IncomingBlocks, uint @Count);
+        private static extern void AddIncoming(LLVMValueRef @PhiNode, out LLVMValueRef @IncomingValues, out LLVMBasicBlockRef @IncomingBlocks, uint @Count);
 
         [DllImport(libraryPath, EntryPoint = "LLVMCountIncoming", CallingConvention = CallingConvention.Cdecl)]
         public static extern uint CountIncoming(LLVMValueRef @PhiNode);
@@ -2236,7 +2236,7 @@ namespace Lang.Backend
         public static extern LLVMValueRef BuildRet(LLVMBuilderRef @param0, LLVMValueRef @V);
 
         [DllImport(libraryPath, EntryPoint = "LLVMBuildAggregateRet", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LLVMValueRef BuildAggregateRet(LLVMBuilderRef @param0, out LLVMValueRef @RetVals, uint @N);
+        private static extern LLVMValueRef BuildAggregateRet(LLVMBuilderRef @param0, out LLVMValueRef @RetVals, uint @N);
 
         [DllImport(libraryPath, EntryPoint = "LLVMBuildBr", CallingConvention = CallingConvention.Cdecl)]
         public static extern LLVMValueRef BuildBr(LLVMBuilderRef @param0, LLVMBasicBlockRef @Dest);
@@ -2251,7 +2251,7 @@ namespace Lang.Backend
         public static extern LLVMValueRef BuildIndirectBr(LLVMBuilderRef @B, LLVMValueRef @Addr, uint @NumDests);
 
         [DllImport(libraryPath, EntryPoint = "LLVMBuildInvoke", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LLVMValueRef BuildInvoke(LLVMBuilderRef @param0, LLVMValueRef @Fn, out LLVMValueRef @Args, uint @NumArgs, LLVMBasicBlockRef @Then, LLVMBasicBlockRef @Catch, [MarshalAs(UnmanagedType.LPStr)] string @Name);
+        private static extern LLVMValueRef BuildInvoke(LLVMBuilderRef @param0, LLVMValueRef @Fn, out LLVMValueRef @Args, uint @NumArgs, LLVMBasicBlockRef @Then, LLVMBasicBlockRef @Catch, [MarshalAs(UnmanagedType.LPStr)] string @Name);
 
         [DllImport(libraryPath, EntryPoint = "LLVMBuildLandingPad", CallingConvention = CallingConvention.Cdecl)]
         public static extern LLVMValueRef BuildLandingPad(LLVMBuilderRef @B, LLVMTypeRef @Ty, LLVMValueRef @PersFn, uint @NumClauses, [MarshalAs(UnmanagedType.LPStr)] string @Name);
@@ -2401,10 +2401,10 @@ namespace Lang.Backend
         public static extern LLVMValueRef BuildStore(LLVMBuilderRef @param0, LLVMValueRef @Val, LLVMValueRef @Ptr);
 
         [DllImport(libraryPath, EntryPoint = "LLVMBuildGEP", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LLVMValueRef BuildGEP(LLVMBuilderRef @B, LLVMValueRef @Pointer, out LLVMValueRef @Indices, uint @NumIndices, [MarshalAs(UnmanagedType.LPStr)] string @Name);
+        private static extern LLVMValueRef BuildGEP(LLVMBuilderRef @B, LLVMValueRef @Pointer, out LLVMValueRef @Indices, uint @NumIndices, [MarshalAs(UnmanagedType.LPStr)] string @Name);
 
         [DllImport(libraryPath, EntryPoint = "LLVMBuildInBoundsGEP", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LLVMValueRef BuildInBoundsGEP(LLVMBuilderRef @B, LLVMValueRef @Pointer, out LLVMValueRef @Indices, uint @NumIndices, [MarshalAs(UnmanagedType.LPStr)] string @Name);
+        private static extern LLVMValueRef BuildInBoundsGEP(LLVMBuilderRef @B, LLVMValueRef @Pointer, out LLVMValueRef @Indices, uint @NumIndices, [MarshalAs(UnmanagedType.LPStr)] string @Name);
 
         [DllImport(libraryPath, EntryPoint = "LLVMBuildStructGEP", CallingConvention = CallingConvention.Cdecl)]
         public static extern LLVMValueRef BuildStructGEP(LLVMBuilderRef @B, LLVMValueRef @Pointer, uint @Idx, [MarshalAs(UnmanagedType.LPStr)] string @Name);
@@ -2497,7 +2497,7 @@ namespace Lang.Backend
         public static extern LLVMValueRef BuildPhi(LLVMBuilderRef @param0, LLVMTypeRef @Ty, [MarshalAs(UnmanagedType.LPStr)] string @Name);
 
         [DllImport(libraryPath, EntryPoint = "LLVMBuildCall", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LLVMValueRef BuildCall(LLVMBuilderRef @param0, LLVMValueRef @Fn, out LLVMValueRef @Args, uint @NumArgs, [MarshalAs(UnmanagedType.LPStr)] string @Name);
+        private static extern LLVMValueRef BuildCall(LLVMBuilderRef @param0, LLVMValueRef @Fn, out LLVMValueRef @Args, uint @NumArgs, [MarshalAs(UnmanagedType.LPStr)] string @Name);
 
         [DllImport(libraryPath, EntryPoint = "LLVMBuildSelect", CallingConvention = CallingConvention.Cdecl)]
         public static extern LLVMValueRef BuildSelect(LLVMBuilderRef @param0, LLVMValueRef @If, LLVMValueRef @Then, LLVMValueRef @Else, [MarshalAs(UnmanagedType.LPStr)] string @Name);
@@ -2563,10 +2563,10 @@ namespace Lang.Backend
         public static extern void DisposeModuleProvider(LLVMModuleProviderRef @M);
 
         [DllImport(libraryPath, EntryPoint = "LLVMCreateMemoryBufferWithContentsOfFile", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool CreateMemoryBufferWithContentsOfFile([MarshalAs(UnmanagedType.LPStr)] string @Path, out LLVMMemoryBufferRef @OutMemBuf, out IntPtr @OutMessage);
+        private static extern bool CreateMemoryBufferWithContentsOfFile([MarshalAs(UnmanagedType.LPStr)] string @Path, out LLVMMemoryBufferRef @OutMemBuf, out IntPtr @OutMessage);
 
         [DllImport(libraryPath, EntryPoint = "LLVMCreateMemoryBufferWithSTDIN", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool CreateMemoryBufferWithSTDIN(out LLVMMemoryBufferRef @OutMemBuf, out IntPtr @OutMessage);
+        private static extern bool CreateMemoryBufferWithSTDIN(out LLVMMemoryBufferRef @OutMemBuf, out IntPtr @OutMessage);
 
         [DllImport(libraryPath, EntryPoint = "LLVMCreateMemoryBufferWithMemoryRange", CallingConvention = CallingConvention.Cdecl)]
         public static extern LLVMMemoryBufferRef CreateMemoryBufferWithMemoryRange(IntPtr @InputData, size_t @InputDataLength, [MarshalAs(UnmanagedType.LPStr)] string @BufferName, bool @RequiresNullTerminator);
@@ -2950,7 +2950,7 @@ namespace Lang.Backend
         public static extern LLVMTargetRef GetTargetFromName([MarshalAs(UnmanagedType.LPStr)] string @Name);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetTargetFromTriple", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool GetTargetFromTriple([MarshalAs(UnmanagedType.LPStr)] string @Triple, out LLVMTargetRef @T, out IntPtr @ErrorMessage);
+        private static extern bool GetTargetFromTriple([MarshalAs(UnmanagedType.LPStr)] string @Triple, out LLVMTargetRef @T, out IntPtr @ErrorMessage);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetTargetName", CallingConvention = CallingConvention.Cdecl)]
         public static extern string GetTargetName(LLVMTargetRef @T);
@@ -2992,10 +2992,10 @@ namespace Lang.Backend
         public static extern void SetTargetMachineAsmVerbosity(LLVMTargetMachineRef @T, bool @VerboseAsm);
 
         [DllImport(libraryPath, EntryPoint = "LLVMTargetMachineEmitToFile", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool TargetMachineEmitToFile(LLVMTargetMachineRef @T, LLVMModuleRef @M, [MarshalAs(UnmanagedType.LPStr)] string @Filename, LLVMCodeGenFileType @codegen, out IntPtr @ErrorMessage);
+        private static extern bool TargetMachineEmitToFile(LLVMTargetMachineRef @T, LLVMModuleRef @M, [MarshalAs(UnmanagedType.LPStr)] string @Filename, LLVMCodeGenFileType @codegen, out IntPtr @ErrorMessage);
 
         [DllImport(libraryPath, EntryPoint = "LLVMTargetMachineEmitToMemoryBuffer", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool TargetMachineEmitToMemoryBuffer(LLVMTargetMachineRef @T, LLVMModuleRef @M, LLVMCodeGenFileType @codegen, out IntPtr @ErrorMessage, out LLVMMemoryBufferRef @OutMemBuf);
+        private static extern bool TargetMachineEmitToMemoryBuffer(LLVMTargetMachineRef @T, LLVMModuleRef @M, LLVMCodeGenFileType @codegen, out IntPtr @ErrorMessage, out LLVMMemoryBufferRef @OutMemBuf);
 
         [DllImport(libraryPath, EntryPoint = "LLVMGetDefaultTargetTriple", CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr GetDefaultTargetTriple();
@@ -3034,19 +3034,19 @@ namespace Lang.Backend
         public static extern void DisposeGenericValue(LLVMGenericValueRef @GenVal);
 
         [DllImport(libraryPath, EntryPoint = "LLVMCreateExecutionEngineForModule", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool CreateExecutionEngineForModule(out LLVMExecutionEngineRef @OutEE, LLVMModuleRef @M, out IntPtr @OutError);
+        private static extern bool CreateExecutionEngineForModule(out LLVMExecutionEngineRef @OutEE, LLVMModuleRef @M, out IntPtr @OutError);
 
         [DllImport(libraryPath, EntryPoint = "LLVMCreateInterpreterForModule", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool CreateInterpreterForModule(out LLVMExecutionEngineRef @OutInterp, LLVMModuleRef @M, out IntPtr @OutError);
+        private static extern bool CreateInterpreterForModule(out LLVMExecutionEngineRef @OutInterp, LLVMModuleRef @M, out IntPtr @OutError);
 
         [DllImport(libraryPath, EntryPoint = "LLVMCreateJITCompilerForModule", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool CreateJITCompilerForModule(out LLVMExecutionEngineRef @OutJIT, LLVMModuleRef @M, uint @OptLevel, out IntPtr @OutError);
+        private static extern bool CreateJITCompilerForModule(out LLVMExecutionEngineRef @OutJIT, LLVMModuleRef @M, uint @OptLevel, out IntPtr @OutError);
 
         [DllImport(libraryPath, EntryPoint = "LLVMInitializeMCJITCompilerOptions", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern unsafe void InitializeMCJITCompilerOptions(LLVMMCJITCompilerOptions* @Options, size_t @SizeOfOptions);
+        private static extern unsafe void InitializeMCJITCompilerOptions(LLVMMCJITCompilerOptions* @Options, size_t @SizeOfOptions);
 
         [DllImport(libraryPath, EntryPoint = "LLVMCreateMCJITCompilerForModule", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern unsafe bool CreateMCJITCompilerForModule(out LLVMExecutionEngineRef @OutJIT, LLVMModuleRef @M, LLVMMCJITCompilerOptions* @Options, size_t @SizeOfOptions, out IntPtr @OutError);
+        private static extern unsafe bool CreateMCJITCompilerForModule(out LLVMExecutionEngineRef @OutJIT, LLVMModuleRef @M, LLVMMCJITCompilerOptions* @Options, size_t @SizeOfOptions, out IntPtr @OutError);
 
         [DllImport(libraryPath, EntryPoint = "LLVMDisposeExecutionEngine", CallingConvention = CallingConvention.Cdecl)]
         public static extern void DisposeExecutionEngine(LLVMExecutionEngineRef @EE);
@@ -3061,7 +3061,7 @@ namespace Lang.Backend
         public static extern int RunFunctionAsMain(LLVMExecutionEngineRef @EE, LLVMValueRef @F, uint @ArgC, string[] @ArgV, string[] @EnvP);
 
         [DllImport(libraryPath, EntryPoint = "LLVMRunFunction", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern LLVMGenericValueRef RunFunction(LLVMExecutionEngineRef @EE, LLVMValueRef @F, uint @NumArgs, out LLVMGenericValueRef @Args);
+        private static extern LLVMGenericValueRef RunFunction(LLVMExecutionEngineRef @EE, LLVMValueRef @F, uint @NumArgs, out LLVMGenericValueRef @Args);
 
         [DllImport(libraryPath, EntryPoint = "LLVMFreeMachineCodeForFunction", CallingConvention = CallingConvention.Cdecl)]
         public static extern void FreeMachineCodeForFunction(LLVMExecutionEngineRef @EE, LLVMValueRef @F);
@@ -3070,7 +3070,7 @@ namespace Lang.Backend
         public static extern void AddModule(LLVMExecutionEngineRef @EE, LLVMModuleRef @M);
 
         [DllImport(libraryPath, EntryPoint = "LLVMRemoveModule", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool RemoveModule(LLVMExecutionEngineRef @EE, LLVMModuleRef @M, out LLVMModuleRef @OutMod, out IntPtr @OutError);
+        private static extern bool RemoveModule(LLVMExecutionEngineRef @EE, LLVMModuleRef @M, out LLVMModuleRef @OutMod, out IntPtr @OutError);
 
         [DllImport(libraryPath, EntryPoint = "LLVMFindFunction", CallingConvention = CallingConvention.Cdecl)]
         public static extern bool FindFunction(LLVMExecutionEngineRef @EE, [MarshalAs(UnmanagedType.LPStr)] string @Name, out LLVMValueRef @OutFn);
@@ -3136,7 +3136,7 @@ namespace Lang.Backend
         public static extern void InitializeTarget(LLVMPassRegistryRef @R);
 
         [DllImport(libraryPath, EntryPoint = "LLVMParseIRInContext", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool ParseIRInContext(LLVMContextRef @ContextRef, LLVMMemoryBufferRef @MemBuf, out LLVMModuleRef @OutM, out IntPtr @OutMessage);
+        private static extern bool ParseIRInContext(LLVMContextRef @ContextRef, LLVMMemoryBufferRef @MemBuf, out LLVMModuleRef @OutM, out IntPtr @OutMessage);
 
         [DllImport(libraryPath, EntryPoint = "LLVMLinkModules2", CallingConvention = CallingConvention.Cdecl)]
         public static extern bool LinkModules2(LLVMModuleRef @Dest, LLVMModuleRef @Src);
@@ -3244,7 +3244,7 @@ namespace Lang.Backend
         public static extern string OrcGetErrorMsg(LLVMOrcJITStackRef @JITStack);
 
         [DllImport(libraryPath, EntryPoint = "LLVMOrcGetMangledSymbol", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void OrcGetMangledSymbol(LLVMOrcJITStackRef @JITStack, out IntPtr @MangledSymbol, [MarshalAs(UnmanagedType.LPStr)] string @Symbol);
+        private static extern void OrcGetMangledSymbol(LLVMOrcJITStackRef @JITStack, out IntPtr @MangledSymbol, [MarshalAs(UnmanagedType.LPStr)] string @Symbol);
 
         [DllImport(libraryPath, EntryPoint = "LLVMOrcDisposeMangledSymbol", CallingConvention = CallingConvention.Cdecl)]
         public static extern void OrcDisposeMangledSymbol(IntPtr @MangledSymbol);
@@ -3537,10 +3537,10 @@ namespace Lang.Backend
         public static extern void DIBuilderFinalize(LLVMDIBuilderRef @d);
 
         [DllImport(libraryPath, EntryPoint = "LLVMDIBuilderCreateCompileUnit", CallingConvention = CallingConvention.Cdecl)]
-        public static extern LLVMMetadataRef DIBuilderCreateCompileUnit(LLVMDIBuilderRef @D, uint @Language, [MarshalAs(UnmanagedType.LPStr)] string @File, [MarshalAs(UnmanagedType.LPStr)] string @Dir, [MarshalAs(UnmanagedType.LPStr)] string @Producer, int @Optimized, [MarshalAs(UnmanagedType.LPStr)] string @Flags, uint @RuntimeVersion);
+        private static extern LLVMMetadataRef DIBuilderCreateCompileUnit(LLVMDIBuilderRef @D, uint @Language, LLVMMetadataRef @File, [MarshalAs(UnmanagedType.LPStr)] string @Producer, uint @ProducerLen, bool @Optimized, [MarshalAs(UnmanagedType.LPStr)] string @Flags, uint @FlagsLen, uint @RuntimeVersion, [MarshalAs(UnmanagedType.LPStr)] string @SplitName, uint @SplitNameLen, uint @Kind, uint @DWOId, bool @SplitDebugInlining, bool @DebugInfoForProfiling, [MarshalAs(UnmanagedType.LPStr)] string @SysRoot, uint @SysyRootLen, [MarshalAs(UnmanagedType.LPStr)] string @SDK, uint @SDKLen);
 
         [DllImport(libraryPath, EntryPoint = "LLVMDIBuilderCreateFile", CallingConvention = CallingConvention.Cdecl)]
-        public static extern LLVMMetadataRef DIBuilderCreateFile(LLVMDIBuilderRef @D, [MarshalAs(UnmanagedType.LPStr)] string @File, [MarshalAs(UnmanagedType.LPStr)] string @Dir);
+        private static extern LLVMMetadataRef DIBuilderCreateFile(LLVMDIBuilderRef @D, [MarshalAs(UnmanagedType.LPStr)] string @File, uint @FileLen, [MarshalAs(UnmanagedType.LPStr)] string @Dir, uint @DirLen);
 
         [DllImport(libraryPath, EntryPoint = "LLVMDIBuilderCreateLexicalBlock", CallingConvention = CallingConvention.Cdecl)]
         public static extern LLVMMetadataRef DIBuilderCreateLexicalBlock(LLVMDIBuilderRef @D, LLVMMetadataRef @Scope, LLVMMetadataRef @File, uint @Line, uint @Column);
@@ -4091,6 +4091,17 @@ namespace Lang.Backend
             OrcGetMangledSymbol(JITStack, out IntPtr ptr, Symbol);
             MangledSymbol = ptr != IntPtr.Zero ? Marshal.PtrToStringAnsi(ptr) : null;
             OrcDisposeMangledSymbol(ptr);
+        }
+
+        public static LLVMMetadataRef DIBuilderCreateCompileUnit(LLVMDIBuilderRef DIBuilder, uint Language, string File, string Directory, string Producer, bool Optimized, string Flags, uint RuntimeVersion, string SplitName, uint Kind, uint DWOId, bool SplitDebugInlining, bool DebugInfoForProfiling, string SysRoot, string SDK)
+        {
+            var compileUnitFile = DIBuilderCreateFile(DIBuilder, File, Directory);
+            return DIBuilderCreateCompileUnit(DIBuilder, Language, compileUnitFile, Producer, (uint)Producer.Length, Optimized, Flags, (uint)Flags.Length, RuntimeVersion, SplitName, (uint)SplitName.Length, Kind, DWOId, SplitDebugInlining, DebugInfoForProfiling, SysRoot, (uint)SysRoot.Length, SDK, (uint)SDK.Length);
+        }
+
+        public static LLVMMetadataRef DIBuilderCreateFile(LLVMDIBuilderRef DIBuilder, string File, string Directory)
+        {
+            return DIBuilderCreateFile(DIBuilder, File, (uint)File.Length, Directory, (uint)Directory.Length);
         }
     }
 }
