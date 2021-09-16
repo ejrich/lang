@@ -269,7 +269,7 @@ namespace Lang.Runner
         private object InitializeStruct(Type type, StructAst structAst,
             IDictionary<string, ValueType> variables, List<AssignmentAst> values = null)
         {
-            var assignments = values?.ToDictionary(_ => (_.Variable as VariableAst)!.Name);
+            var assignments = values?.ToDictionary(_ => (_.Variable as IdentifierAst)!.Name);
             var instance = Activator.CreateInstance(type);
             foreach (var field in structAst.Fields)
             {
@@ -375,9 +375,9 @@ namespace Lang.Runner
 
             switch (assignment.Variable)
             {
-                case VariableAst variableAst:
+                case IdentifierAst identifier:
                 {
-                    var variable = variables[variableAst.Name];
+                    var variable = variables[identifier.Name];
                     variable.Value = expression.Value;
                     break;
                 }
@@ -560,14 +560,14 @@ namespace Lang.Runner
                     }
                     var structVariable = variables[structField.Name];
                     return GetStructFieldRef(structField, structVariable.Value);
-                case VariableAst variableAst:
-                    return variables[variableAst.Name];
+                case IdentifierAst identifier:
+                    return variables[identifier.Name];
                 case ChangeByOneAst changeByOne:
                     switch (changeByOne.Variable)
                     {
-                        case VariableAst variableAst:
+                        case IdentifierAst identifier:
                         {
-                            var variable = variables[variableAst.Name];
+                            var variable = variables[identifier.Name];
 
                             var previousValue = new ValueType {Type = variable.Type, Value = variable.Value};
                             variable.Value = PerformOperation(variable.Type, variable.Value, changeByOne.Positive ? 1 : -1, Operator.Add);

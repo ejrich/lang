@@ -34,8 +34,8 @@ enum TypeKind {
 
 __type_table: List<TypeInfo*>;
 
-TypeInfo type_of(int type_index) {
-    return *__type_table[type_index];
+TypeInfo type_of(Type type) {
+    return *__type_table[type];
 }
 
 

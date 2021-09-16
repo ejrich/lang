@@ -125,7 +125,7 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
-    public class VariableAst : IAst
+    public class IdentifierAst : IAst
     {
         public int FileIndex { get; set; }
         public int Line { get; init; }
