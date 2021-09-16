@@ -77,6 +77,7 @@ namespace Lang
                                     ErrorReporter.Report($"Multiple definitions of polymorphic struct '{structAst.Name}'", structAst);
                                 }
                                 _polymorphicStructs[structAst.Name] = structAst;
+                                asts.RemoveAt(i--);
                             }
                             else
                             {
@@ -253,6 +254,7 @@ namespace Lang
             var primitiveAst = new PrimitiveAst {Name = name, TypeKind = typeKind, Size = primitive?.Bytes ?? size, Primitive = primitive};
             _globalScope.Identifiers.Add(name, primitiveAst);
             TypeTable.Add(name, primitiveAst);
+            TypeTable.CreateTypeInfo(primitiveAst);
         }
 
         private void VerifyEnum(EnumAst enumAst)
@@ -326,6 +328,8 @@ namespace Lang
                     ErrorReporter.Report($"Enum value '{enumAst.Name}.{value.Name}' value '{value.Value}' is out of range", value);
                 }
             }
+
+            TypeTable.CreateTypeInfo(enumAst);
         }
 
         private void VerifyStruct(StructAst structAst)
@@ -561,6 +565,7 @@ namespace Lang
                 }
             }
 
+            TypeTable.CreateTypeInfo(structAst);
             structAst.Verified = true;
         }
 
