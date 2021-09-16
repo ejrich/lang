@@ -90,6 +90,11 @@ namespace Lang.Parsing
                 switch (token!.Type)
                 {
                     case TokenType.Token:
+                        if (enumerator.Peek()?.Type == TokenType.Colon)
+                        {
+                            syntaxTrees.Add(ParseDeclaration(enumerator, errors));
+                            break;
+                        }
                         syntaxTrees.Add(ParseFunction(enumerator, errors));
                         break;
                     case TokenType.Struct:
@@ -733,7 +738,7 @@ namespace Lang.Parsing
                 case TokenType.SemiColon:
                     if (declaration.Type == null)
                     {
-                        errors.Add(new ParseError {Error = "Unexpected token declaration to have value", Token = token});
+                        errors.Add(new ParseError {Error = "Expected token declaration to have value", Token = token});
                     }
                     return declaration;
                 case null:

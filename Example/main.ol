@@ -6,7 +6,7 @@ int Main(List<string> args) {
     hello := "This is an \"escaped\" string literal\nWith a new line!";
     a := 4.2;
     a++;
-    baz := foo() + bar(3 + 1);//, "Hello", 1.2);
+    baz := foo() + bar(3 + 1, "Hello", 1.2);
     b := 6 * (4 - 1);
     c := 2;
     d := a + 1 == b + 2 && (1 + b) == 2 || b > 3 + 4 * c - 1;
@@ -24,7 +24,18 @@ int Main(List<string> args) {
     printf("%s - Hello world %d, %d, %d\n", str, 1, 2, b);
     sum_test();
     overflow_test();
-    return ptr;
+
+    set_global(8);
+    printf("'global_a' = %d\n", global_a);
+    printf("'global_b' = %d\n", global_b);
+    return 0;
+}
+
+global_a := 7;
+global_b: int;
+
+void set_global(int a) {
+    if (a > 10) then global_a = a * 90;
 }
 
 bool test(int a) {
@@ -45,7 +56,7 @@ int foo() {
     return a;
 }
 
-int bar(int a) {//, string b, float c) {
+int bar(int a, string b, float c) {
     if a == 4 then return a;
     else if a == 5 {
         return 9;
