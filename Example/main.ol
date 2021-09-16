@@ -20,7 +20,8 @@ int main(List<string> args) {
     my_struct := create();
     prim := primitives();
     list := create_list(4);
-    ptr := *pointers();
+    ptr := pointers();
+    printf("Pointer = %p, Value = %d\n", ptr, *ptr);
     str := string_test();
     printf("%s - Hello world %d, %d, %d\n", str, 1, 2, b);
     sum_test();

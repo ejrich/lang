@@ -13,6 +13,7 @@ namespace Lang.Translation
         Enum,
         VarArgs,
         Params,
+        Type,
         Error
     }
 }
