@@ -13,8 +13,8 @@ c_arrays() {
     // printf("File type: %d, File name: %s\n", file.d_type, &file.d_name);
     array_size := 10; #const
 
-    array: List<int>[array_size] #c_array; // Correct
-    // array: List<int>[array_size]; #c_array // Incorrect
+    array: Array<int>[array_size] #c_array; // Correct
+    // array: Array<int>[array_size]; #c_array // Incorrect
 
     array.length = 9; // Essentially a no-op
     printf("Array size = %d, should be %d. Array pointer = %p\n", array.length, array_size, array.data);
@@ -43,7 +43,7 @@ struct_array_size := 5; #const
 
 struct ArrayStruct {
     int something;
-    List<int>[struct_array_size] #c_array array;
+    Array<int>[struct_array_size] #c_array array;
 }
 
 #run main();

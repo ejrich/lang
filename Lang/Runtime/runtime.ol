@@ -1,7 +1,7 @@
-// Runtime library with types and main function
+// ----------------- Runtime library with types and main function -----------------
 
 // Runtime structs
-struct List<T> {
+struct Array<T> {
     int length;
     T* data;
 }
@@ -38,10 +38,10 @@ struct TypeInfo {
     string name;
     TypeKind type;
     u32 size;
-    List<TypeField> fields;
-    List<EnumValue> enum_values;
+    Array<TypeField> fields;
+    Array<EnumValue> enum_values;
     TypeInfo* return_type;
-    List<ArgumentType> arguments;
+    Array<ArgumentType> arguments;
 }
 
 enum TypeKind {
@@ -51,7 +51,7 @@ enum TypeKind {
     Float;
     String;
     Pointer;
-    List;
+    Array;
     Enum;
     Struct;
     Function;
@@ -73,7 +73,7 @@ struct ArgumentType {
     TypeInfo* type_info;
 }
 
-__type_table: List<TypeInfo*>;
+__type_table: Array<TypeInfo*>;
 
 TypeInfo* type_of(Type type) {
     return __type_table[type];
@@ -92,7 +92,7 @@ exit(int exit_code) #extern "libc"
 // Runtime functions
 int __start(int argc, u8** argv) {
     exit_code := 0;
-    args: List<string>[argc-1];
+    args: Array<string>[argc-1];
 
     each i in 1..argc-1 then args[i-1] = convert_c_string(argv[i]);
 

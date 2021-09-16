@@ -209,7 +209,7 @@ index_overloading() {
     printf("Vector values: x = %.2f, y = %.2f, z = %.2f\n", vector.x, vector.y, vector.z);
     printf("Vector value: x = %.2f\n", a[3].x);
 
-    b: ListStruct<int>;
+    b: ArrayStruct<int>;
     b[8] = 7;
     b[8] += 7;
     b[5] = 5;
@@ -233,9 +233,9 @@ index_overloading() {
 }
 
 struct SOAVector3 {
-    List<float>[5] x;
-    List<float>[5] y;
-    List<float>[5] z;
+    Array<float>[5] x;
+    Array<float>[5] y;
+    Array<float>[5] z;
 }
 
 operator [] SOAVector3(SOAVector3 a, int index) : Vector3 {
@@ -243,12 +243,12 @@ operator [] SOAVector3(SOAVector3 a, int index) : Vector3 {
     return value;
 }
 
-struct ListStruct<T> {
+struct ArrayStruct<T> {
     int max = 10;
-    List<T>[10] list;
+    Array<T>[10] list;
 }
 
-operator [] ListStruct<T>(ListStruct<T> a, int index) : T* {
+operator [] ArrayStruct<T>(ArrayStruct<T> a, int index) : T* {
     if index < 0 then return &a.list[0];
     if index >= a.max then return &a.list[a.max - 1];
     return &a.list[index];
@@ -256,7 +256,7 @@ operator [] ListStruct<T>(ListStruct<T> a, int index) : T* {
 
 struct NestedStruct<T> {
     bool foo;
-    ListStruct<T> inner_list;
+    ArrayStruct<T> inner_list;
 }
 
 #run main();
