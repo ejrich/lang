@@ -173,6 +173,7 @@ namespace Lang.Backend.LLVM
                 LLVMApi.SetInitializer(typeNameString, typeName);
 
                 var typeKind = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (uint)type.TypeKind, false);
+                var typeSize = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), type.Size, false);
 
                 LLVMValueRef fields;
                 if (type is StructAst structAst)
@@ -213,7 +214,7 @@ namespace Lang.Backend.LLVM
                     }, false);
                 }
 
-                LLVMApi.SetInitializer(typeInfo, LLVMApi.ConstStruct(new [] {typeNameString, typeKind, fields}, false));
+                LLVMApi.SetInitializer(typeInfo, LLVMApi.ConstStruct(new [] {typeNameString, typeKind, typeSize, fields}, false));
             }
 
             var typeArray = LLVMApi.ConstArray(LLVMApi.PointerType(typeInfoType, 0), types);

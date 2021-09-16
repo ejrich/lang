@@ -184,6 +184,8 @@ namespace Lang.Runner
                         typeNameField.SetValue(typeInfo, GetString(type.Name));
                         var typeKindField = typeInfoType.GetField("type");
                         typeKindField.SetValue(typeInfo, type.TypeKind);
+                        var typeSizeField = typeInfoType.GetField("size");
+                        typeSizeField.SetValue(typeInfo, type.Size);
 
                         _typeInfoPointers[name] = typeInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoType));
                         newTypeInfos.Add((type, typeInfo, typeInfoPointer));

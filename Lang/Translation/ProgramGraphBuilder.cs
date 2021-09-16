@@ -37,7 +37,7 @@ namespace Lang.Translation
 
             // Add primitive types to global identifiers
             AddPrimitive("void", TypeKind.Void);
-            AddPrimitive("bool", TypeKind.Boolean);
+            AddPrimitive("bool", TypeKind.Boolean, size: 1);
             AddPrimitive("s8", TypeKind.Integer, new IntegerType {Signed = true, Bytes = 1});
             AddPrimitive("u8", TypeKind.Integer, new IntegerType {Bytes = 1});
             AddPrimitive("s16", TypeKind.Integer, new IntegerType {Signed = true, Bytes = 2});
@@ -199,9 +199,13 @@ namespace Lang.Translation
             return _programGraph;
         }
 
-        private void AddPrimitive(string name, TypeKind typeKind, IPrimitive primitive = null)
+        private void AddPrimitive(string name, TypeKind typeKind, IPrimitive primitive = null, uint size = 0)
         {
-            var primitiveAst = new PrimitiveAst {Name = name, TypeIndex = _typeIndex++, TypeKind = typeKind, Primitive = primitive};
+            var primitiveAst = new PrimitiveAst
+            {
+                Name = name, TypeIndex = _typeIndex++, TypeKind = typeKind,
+                Size = primitive?.Bytes ?? size, Primitive = primitive
+            };
             _globalIdentifiers.Add(name, primitiveAst);
             _programGraph.Types.Add(name, primitiveAst);
         }
@@ -1956,7 +1960,7 @@ namespace Lang.Translation
                         return Type.Error;
                     }
 
-                    var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeIndex = _typeIndex++, TypeKind = TypeKind.Pointer};
+                    var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeIndex = _typeIndex++, TypeKind = TypeKind.Pointer, Size = 8};
                     _programGraph.Types.Add(typeDef.GenericName, pointer);
                     return Type.Pointer;
                 case "...":
