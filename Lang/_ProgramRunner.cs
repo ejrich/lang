@@ -7,7 +7,7 @@ namespace Lang
     [StructLayout(LayoutKind.Explicit)]
     public struct Register
     {
-        [FieldOffset(0)] public bool Boolean;
+        [FieldOffset(0)] public bool Bool;
         [FieldOffset(0)] public sbyte SByte;
         [FieldOffset(0)] public byte Byte;
         [FieldOffset(0)] public short Short;
@@ -39,7 +39,7 @@ namespace Lang
         {
             try
             {
-                ExecuteFunction(function, new IntPtr[0]);
+                var returnRegister = ExecuteFunction(function, new IntPtr[0]);
             }
             catch (Exception e)
             {
@@ -54,8 +54,8 @@ namespace Lang
         {
             try
             {
-                ExecuteFunction(function, new IntPtr[0]);
-                return true;
+                var returnRegister = ExecuteFunction(function, new IntPtr[0]);
+                return returnRegister.Bool;
             }
             catch (Exception e)
             {
@@ -72,13 +72,13 @@ namespace Lang
             BuildSettings.Dependencies.Add(library);
         }
 
-        private void ExecuteFunction(FunctionIR function, IntPtr[] arguments)
+        private Register ExecuteFunction(FunctionIR function, IntPtr[] arguments)
         {
             var instructionPointer = 0;
             var stackPointer = Marshal.AllocHGlobal((int)function.StackSize);
             var registers = new Register[function.ValueCount];
 
-            while (instructionPointer < function.Instructions.Count)
+            while (true)
             {
                 var instruction = function.Instructions[instructionPointer++];
 
@@ -92,18 +92,18 @@ namespace Lang
                     case InstructionType.ConditionalJump:
                     {
                         // var condition = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // _builder.BuildCondBr(condition, basicBlocks[instruction.Value2.JumpBlock.Index], basicBlocks[blockIndex + 1]);
+                        // instructionPointer = instruction.Value2.JumpBlock.Location;
                         break;
                     }
                     case InstructionType.Return:
                     {
                         // var value = GetValue(instruction.Value1, values, allocations, functionPointer);
                         // _builder.BuildRet(value);
-                        break;
+                        return new Register();
                     }
                     case InstructionType.ReturnVoid:
                     {
-                        return;
+                        return new Register();
                     }
                     case InstructionType.Load:
                     {
@@ -552,7 +552,7 @@ namespace Lang
             }
         }
 
-        private object GetValue(InstructionValue value, object[] values)
+        private Register GetValue(InstructionValue value, Register[] values)
         {
             switch (value.ValueType)
             {
@@ -571,30 +571,57 @@ namespace Lang
                 case InstructionValueType.Constant:
                     return GetConstant(value);
                 case InstructionValueType.Null:
-                    return IntPtr.Zero;
+                    return new Register {Pointer = IntPtr.Zero};
             }
-            return null;
+
+            return new Register();
         }
 
-        private object GetConstant(InstructionValue value, bool constant = false)
+        private static Register GetConstant(InstructionValue value, bool constant = false)
         {
+            var register = new Register();
             switch (value.Type.TypeKind)
             {
                 case TypeKind.Boolean:
-                    // return LLVMValueRef.CreateConstInt(LLVM.Int1Type(), value.ConstantValue.UnsignedInteger, false);
+                    register.Bool = value.ConstantValue.Boolean;
                     break;
                 case TypeKind.Integer:
                 case TypeKind.Enum:
+                    // TODO Implement me
                     // return LLVMValueRef.CreateConstInt(_types[value.Type.TypeIndex], value.ConstantValue.UnsignedInteger, false);
                     break;
                 case TypeKind.Float:
-                    // return LLVMValueRef.CreateConstReal(_types[value.Type.TypeIndex], value.ConstantValue.Double);
+                    if (value.Type.Size == 4)
+                    {
+                        register.Float = (float)value.ConstantValue.Double;
+                    }
+                    else
+                    {
+                        register.Double = value.ConstantValue.Double;
+                    }
                     break;
                 case TypeKind.String:
+                    register.Pointer = GetString(value.ConstantString, value.UseRawString);
                     break;
-                    // return GetString(value.ConstantString, value.UseRawString, false);
             }
-            return null;
+            return register;
+        }
+
+        private static IntPtr GetString(string value, bool useRawString = false)
+        {
+            if (useRawString)
+            {
+                return Marshal.StringToHGlobalAnsi(value);
+            }
+
+            const int stringLength = 12;
+            var stringPointer = Marshal.AllocHGlobal(stringLength);
+
+            Marshal.StructureToPtr<int>(value.Length, stringPointer, false);
+            var s = Marshal.StringToHGlobalAnsi(value);
+            Marshal.StructureToPtr<IntPtr>(s, stringPointer + 4, false);
+
+            return stringPointer;
         }
     }
 }
