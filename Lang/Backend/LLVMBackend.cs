@@ -945,61 +945,80 @@ namespace Lang.Backend
             }
         }
 
-        private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, List<AssignmentAst> values)
+        private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, List<AssignmentAst> assignments)
         {
-            var assignments = values?.ToDictionary(_ => (_.Reference as IdentifierAst)!.Name);
             var structDef = _programGraph.Types[typeDef.GenericName] as StructAst;
-            for (var i = 0; i < structDef!.Fields.Count; i++)
+            if (assignments == null)
             {
-                var field = structDef.Fields[i];
-
-                var fieldPointer = _builder.BuildStructGEP(variable, (uint)i, field.Name);
-
-                if (assignments != null && assignments.TryGetValue(field.Name, out var assignment))
+                for (var i = 0; i < structDef!.Fields.Count; i++)
                 {
-                    var expression = WriteExpression(assignment.Value, localVariables);
-                    var value = CastValue(expression, field.Type);
+                    var field = structDef.Fields[i];
 
-                    LLVM.BuildStore(_builder, value, fieldPointer);
+                    var fieldPointer = _builder.BuildStructGEP(variable, (uint)i, field.Name);
+
+                    InitializeField(field, fieldPointer, localVariables);
                 }
-                else
+            }
+            else
+            {
+                var assignmentDictionary = assignments.ToDictionary(_ => (_.Reference as IdentifierAst).Name);
+                for (var i = 0; i < structDef!.Fields.Count; i++)
                 {
-                    switch (field.Type.TypeKind)
+                    var field = structDef.Fields[i];
+
+                    var fieldPointer = _builder.BuildStructGEP(variable, (uint)i, field.Name);
+
+                    if (assignmentDictionary.TryGetValue(field.Name, out var assignment))
                     {
-                        case TypeKind.Array:
-                            if (field.Type.CArray) continue;
-                            if (field.Type.ConstCount != null)
-                            {
-                                InitializeConstArray(fieldPointer, field.Type.ConstCount.Value, field.Type.Generics[0]);
-                            }
-                            else
-                            {
-                                var countPointer = _builder.BuildStructGEP(fieldPointer, 0, "countptr");
-                                LLVM.BuildStore(_builder, _zeroInt, countPointer);
-                            }
-                            break;
-                        case TypeKind.Pointer:
-                            var type = ConvertTypeDefinition(field.Type);
-                            LLVM.BuildStore(_builder, LLVM.ConstNull(type), fieldPointer);
-                            break;
-                        case TypeKind.Struct:
-                            InitializeStruct(field.Type, fieldPointer, localVariables, field.Assignments);
-                            break;
-                        default:
-                            LLVMValueRef value;
-                            if (field.Value != null)
-                            {
-                                (_, value) = WriteExpression(field.Value, localVariables);
-                            }
-                            else
-                            {
-                                var fieldType = ConvertTypeDefinition(field.Type);
-                                value = GetConstZero(fieldType);
-                            }
-                            LLVM.BuildStore(_builder, value, fieldPointer);
-                            break;
+                        var expression = WriteExpression(assignment.Value, localVariables);
+                        var value = CastValue(expression, field.Type);
+
+                        LLVM.BuildStore(_builder, value, fieldPointer);
+                    }
+                    else
+                    {
+                        InitializeField(field, fieldPointer, localVariables);
                     }
                 }
+            }
+        }
+
+        private void InitializeField(StructFieldAst field, LLVMValueRef fieldPointer, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
+        {
+            switch (field.Type.TypeKind)
+            {
+                case TypeKind.Array:
+                    if (field.Type.CArray) return;
+                    if (field.Type.ConstCount != null)
+                    {
+                        InitializeConstArray(fieldPointer, field.Type.ConstCount.Value, field.Type.Generics[0]);
+                    }
+                    else
+                    {
+                        var countPointer = _builder.BuildStructGEP(fieldPointer, 0, "countptr");
+                        LLVM.BuildStore(_builder, _zeroInt, countPointer);
+                    }
+                    break;
+                case TypeKind.Pointer:
+                    var type = ConvertTypeDefinition(field.Type);
+                    LLVM.BuildStore(_builder, LLVM.ConstNull(type), fieldPointer);
+                    break;
+                case TypeKind.Struct:
+                    InitializeStruct(field.Type, fieldPointer, localVariables, field.Assignments);
+                    break;
+                default:
+                    LLVMValueRef value;
+                    if (field.Value != null)
+                    {
+                        (_, value) = WriteExpression(field.Value, localVariables);
+                    }
+                    else
+                    {
+                        var fieldType = ConvertTypeDefinition(field.Type);
+                        value = GetConstZero(fieldType);
+                    }
+                    LLVM.BuildStore(_builder, value, fieldPointer);
+                    break;
             }
         }
 
