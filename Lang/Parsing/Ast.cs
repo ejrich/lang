@@ -181,7 +181,7 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public bool Prefix { get; set; }
         public bool Positive { get; set; }
-        public IAst Variable { get; set; }
+        public IAst Value { get; set; }
         public List<IAst> Children => null;
     }
 
