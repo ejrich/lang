@@ -34,7 +34,7 @@ namespace Lang
         public uint Offset { get; set; }
         public uint Size { get; set; }
         public bool Array { get; set; }
-        public int ArrayLength { get; set; }
+        public uint ArrayLength { get; set; }
         public IType Type { get; set; }
     }
 
@@ -46,7 +46,6 @@ namespace Lang
 
     public class Instruction
     {
-        // TODO Implement me
         public InstructionType Type { get; set; }
 
         // Used for Load, Store, GetPointer, and GetStructPointer

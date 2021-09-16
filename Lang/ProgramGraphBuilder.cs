@@ -3555,7 +3555,7 @@ namespace Lang
                         }
                         else
                         {
-                            var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeKind = TypeKind.Pointer, Size = 8, PointerType = type};
+                            var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeKind = TypeKind.Pointer, Size = 8, PointerTypeDefinition = type, PointerType = TypeTable.GetType(type)};
                             TypeTable.Add(typeDef.GenericName, pointer);
                             typeDef.TypeKind = TypeKind.Pointer;
                         }

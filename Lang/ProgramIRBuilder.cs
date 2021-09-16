@@ -37,8 +37,7 @@ namespace Lang
                 for (var i = 0; i < function.Arguments.Count; i++)
                 {
                     var argument = function.Arguments[i];
-                    var allocationIndex = functionIR.Allocations.Count;
-                    AddAllocation(functionIR, argument, allocationIndex);
+                    var allocationIndex = AddAllocation(functionIR, argument);
 
                     var storeInstruction = new Instruction
                     {
@@ -71,8 +70,7 @@ namespace Lang
             for (var i = 0; i < overload.Arguments.Count; i++)
             {
                 var argument = overload.Arguments[i];
-                var allocationIndex = functionIR.Allocations.Count;
-                AddAllocation(functionIR, argument, allocationIndex);
+                var allocationIndex = AddAllocation(functionIR, argument);
 
                 EmitStore(entryBlock, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i});
             }
@@ -125,8 +123,7 @@ namespace Lang
             }
             else
             {
-                var allocationIndex = function.Allocations.Count;
-                AddAllocation(function, declaration, allocationIndex);
+                var allocationIndex = AddAllocation(function, declaration);
 
                 // TODO Add initialization values
                 var block = function.BasicBlocks[^1];
@@ -134,37 +131,122 @@ namespace Lang
                 {
                     var value = EmitIR(function, declaration.Value, scope, block); // TODO CastValue
                     EmitStore(block, allocationIndex, value);
+                    return;
                 }
-                else if (declaration.ArrayValues != null)
+
+                switch (declaration.TypeDefinition.TypeKind)
                 {
-                    // InitializeConstArray(function, (StructAst)declaration.Type, scope, block, declaration.ArrayValues);
-                }
-                else
-                {
-                    // value = GetUninitializedValue(declaration.Type, variables, declaration.Assignments);
+                    // Initialize arrays
+                    case TypeKind.Array:
+                        var pointer = EmitGetPointer(block, allocationIndex: allocationIndex);
+                        if (declaration.TypeDefinition.ConstCount != null)
+                        {
+                            var arrayPointer = InitializeConstArray(function, block, pointer, (StructAst)declaration.Type, declaration.TypeDefinition.ConstCount.Value);
+
+                            if (declaration.ArrayValues != null)
+                            {
+                                InitializeArrayValues(function, block, arrayPointer, declaration.ArrayValues, scope);
+                            }
+                        }
+                        else if (declaration.TypeDefinition.Count != null)
+                        {
+                            // BuildStackSave();
+                            // var (_, count) = WriteExpression(declaration.TypeDefinition.Count, localVariables);
+
+                            // var countPointer = _builder.BuildStructGEP(variable, 0, "countptr");
+                            // LLVM.BuildStore(_builder, count, countPointer);
+
+                            // var targetType = ConvertTypeDefinition(elementType);
+                            // var arrayData = _builder.BuildArrayAlloca(targetType, count, "arraydata");
+                            // var dataPointer = _builder.BuildStructGEP(variable, 1, "dataptr");
+                            // LLVM.BuildStore(_builder, arrayData, dataPointer);
+                        }
+                        else
+                        {
+                            var lengthPointer = EmitGetStructPointer(block, pointer, 0);
+                            var lengthValue = new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new InstructionConstant {Integer = 0}};
+                            EmitStore(block, lengthPointer, lengthValue);
+                        }
+                        break;
+                    case TypeKind.CArray:
+                        if (declaration.ArrayValues != null)
+                        {
+                            // InitializeArrayValues(variable, declaration.TypeDefinition.Generics[0], declaration.ArrayValues, localVariables);
+                        }
+                        break;
+                    // Initialize struct field default values
+                    case TypeKind.Struct:
+                    case TypeKind.String:
+                        // InitializeStruct(declaration.TypeDefinition, variable, localVariables, declaration.Assignments);
+                        break;
+                    // Initialize pointers to null
+                    case TypeKind.Pointer:
+                        EmitStore(block, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Null});
+                        break;
+                    // Or initialize to 0
+                    default:
+                        // var zero = GetConstZero(ConvertTypeDefinition(declaration.TypeDefinition));
+                        // LLVM.BuildStore(_builder, zero, variable);
+                        break;
                 }
             }
         }
 
-        private void AddAllocation(FunctionIR function, DeclarationAst declaration, int index)
+        private int AddAllocation(FunctionIR function, DeclarationAst declaration)
         {
+            int index;
+            if (declaration.Type is ArrayType arrayType)
+            {
+                index = AddAllocation(function, arrayType.ElementType, true, declaration.TypeDefinition.ConstCount.Value);
+            }
+            else
+            {
+                index = AddAllocation(function, declaration.Type);
+            }
             declaration.AllocationIndex = index;
-            AddAllocation(function, declaration.Type, index);
+            return index;
         }
 
-        private void AddAllocation(FunctionIR function, IType type, int index)
+        private int AddAllocation(FunctionIR function, IType type, bool array = false, uint arrayLength = 0)
         {
+            var index = function.Allocations.Count;
             var allocation = new Allocation
             {
-                Index = index, Offset = function.StackSize,
-                Size = type.Size, Type = type
+                Index = index, Offset = function.StackSize, Size = type.Size,
+                Array = array, ArrayLength = arrayLength, Type = type
             };
-            function.StackSize += type.Size;
+            function.StackSize += array ? arrayLength * type.Size : type.Size;
             function.Allocations.Add(allocation);
+            return index;
         }
 
-        private void InitializeConstArray(FunctionIR function, StructAst arrayDef, ScopeAst scope, BasicBlock block, List<IAst> arrayValues = null)
+        private InstructionValue InitializeConstArray(FunctionIR function, BasicBlock block, InstructionValue arrayPointer, StructAst arrayDef, uint length)
         {
+            var lengthPointer = EmitGetStructPointer(block, arrayPointer, 0);
+            var lengthValue = new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new InstructionConstant {Integer = length}};
+            EmitStore(block, lengthPointer, lengthValue);
+
+            var pointerType = (PrimitiveAst)arrayDef.Fields[1].Type;
+            var dataIndex = AddAllocation(function, pointerType.PointerType, true, length);
+            var arrayDataPointer = EmitGetPointer(block, allocationIndex: dataIndex);
+            var dataPointer = EmitGetStructPointer(block, arrayPointer, 1);
+            EmitStore(block, dataPointer, arrayDataPointer);
+
+            return arrayDataPointer;
+        }
+
+        private void InitializeArrayValues(FunctionIR function, BasicBlock block, InstructionValue arrayPointer, List<IAst> arrayValues, ScopeAst scope)
+        {
+            for (var i = 0; i < arrayValues.Count; i++)
+            {
+                var value = EmitIR(function, arrayValues[i], scope, block);
+
+                var index = new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new InstructionConstant {Integer = i}};
+                var pointer = EmitGetPointer(block, arrayPointer, index, getFirstPointer: true);
+
+                // TODO Cast value
+                EmitStore(block, pointer, value);
+            }
         }
 
         public void EmitAssignment(FunctionIR function, AssignmentAst assignment, ScopeAst scope)
@@ -483,8 +565,7 @@ namespace Lang
                     type = value.Type;
                     if (index.CallsOverload && !structField.Pointers[0])
                     {
-                        var allocationIndex = function.Allocations.Count;
-                        AddAllocation(function, structField.Types[0], allocationIndex);
+                        var allocationIndex = AddAllocation(function, structField.Types[0]);
                         EmitStore(block, allocationIndex, value);
                         value = EmitGetPointer(block, allocationIndex: allocationIndex);
                     }
@@ -494,8 +575,7 @@ namespace Lang
                     type = value.Type;
                     if (!structField.Pointers[0])
                     {
-                        var allocationIndex = function.Allocations.Count;
-                        AddAllocation(function, structField.Types[0], allocationIndex);
+                        var allocationIndex = AddAllocation(function, structField.Types[0]);
                         EmitStore(block, allocationIndex, value);
                         value = EmitGetPointer(block, allocationIndex: allocationIndex);
                     }
@@ -557,8 +637,7 @@ namespace Lang
                             skipPointer = true;
                             if (i < structField.Pointers.Length && !structField.Pointers[i])
                             {
-                                var allocationIndex = function.Allocations.Count;
-                                AddAllocation(function, structField.Types[i], allocationIndex);
+                                var allocationIndex = AddAllocation(function, structField.Types[i]);
                                 EmitStore(block, allocationIndex, value);
                                 value = EmitGetPointer(block, allocationIndex: allocationIndex);
                             }
@@ -758,6 +837,12 @@ namespace Lang
         private void EmitStore(BasicBlock block, int allocationIndex, InstructionValue value)
         {
             var store = new Instruction {Type = InstructionType.Store, Index = allocationIndex, Value1 = value};
+            block.Instructions.Add(store);
+        }
+
+        private void EmitStore(BasicBlock block, InstructionValue pointer, InstructionValue value)
+        {
+            var store = new Instruction {Type = InstructionType.Store, Value1 = pointer, Value2 = value};
             block.Instructions.Add(store);
         }
 
