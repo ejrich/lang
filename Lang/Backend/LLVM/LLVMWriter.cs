@@ -806,10 +806,11 @@ namespace Lang.Backend.LLVM
         private void WriteAssignment(AssignmentAst assignment, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
         {
             // 1. Get the variable on the stack
+            var loaded = false;
             var (type, variable) = assignment.Reference switch
             {
                 IdentifierAst identifier => localVariables[identifier.Name],
-                StructFieldRefAst structField => BuildStructField(structField, localVariables),
+                StructFieldRefAst structField => BuildStructField(structField, localVariables, out loaded),
                 IndexAst index => GetListPointer(index, localVariables),
                 // @Cleanup This branch should never be hit
                 _ => (null, new LLVMValueRef())
@@ -817,7 +818,7 @@ namespace Lang.Backend.LLVM
 
             // 2. Evaluate the expression value
             var expression = WriteExpression(assignment.Value, localVariables);
-            if (assignment.Operator != Operator.None)
+            if (assignment.Operator != Operator.None && !loaded)
             {
                 // 2a. Build expression with variable value as the LHS
                 var value = LLVMApi.BuildLoad(_builder, variable, "tmpvalue");
@@ -827,7 +828,10 @@ namespace Lang.Backend.LLVM
 
             // 3. Reallocate the value of the variable
             var assignmentValue = CastValue(expression, type);
-            LLVMApi.BuildStore(_builder, assignmentValue, variable);
+            if (!loaded) // Loaded values are either readonly or constants, so don't store
+            {
+                LLVMApi.BuildStore(_builder, assignmentValue, variable);
+            }
         }
 
         private bool WriteScope(List<IAst> scopeChildren, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)
@@ -966,7 +970,7 @@ namespace Lang.Backend.LLVM
                     (iterationType, iterationValue) = localVariables[identifier.Name];
                     break;
                 case StructFieldRefAst structField:
-                    (iterationType, iterationValue) = BuildStructField(structField, localVariables);
+                    (iterationType, iterationValue) = BuildStructField(structField, localVariables, out _);
                     break;
                 case IndexAst index:
                     (iterationType, iterationValue) = GetListPointer(index, localVariables);
@@ -1100,8 +1104,8 @@ namespace Lang.Backend.LLVM
                         var value = enumDef.Values[structField.ValueIndices[0]].Value;
                         return (enumDef.BaseType, LLVMApi.ConstInt(GetIntegerType(enumDef.BaseType.PrimitiveType), (ulong)value, false));
                     }
-                    var (type, field) = BuildStructField(structField, localVariables);
-                    if (field.TypeOf().TypeKind == LLVMTypeKind.LLVMPointerTypeKind)
+                    var (type, field) = BuildStructField(structField, localVariables, out var loaded);
+                    if (!loaded)
                     {
                         field = LLVMApi.BuildLoad(_builder, field, "field");
                     }
@@ -1174,16 +1178,17 @@ namespace Lang.Backend.LLVM
                     }
                 case ChangeByOneAst changeByOne:
                 {
+                    var loaded = false;
                     var (variableType, pointer) = changeByOne.Value switch
                     {
                         IdentifierAst identifier => localVariables[identifier.Name],
-                        StructFieldRefAst structField => BuildStructField(structField, localVariables),
+                        StructFieldRefAst structField => BuildStructField(structField, localVariables, out loaded),
                         IndexAst index => GetListPointer(index, localVariables),
                         // @Cleanup This branch should never be hit
                         _ => (null, new LLVMValueRef())
                     };
 
-                    var value = LLVMApi.BuildLoad(_builder, pointer, "tmpvalue");
+                    var value = loaded ? pointer : LLVMApi.BuildLoad(_builder, pointer, "tmpvalue");
                     var type = ConvertTypeDefinition(variableType);
 
                     LLVMValueRef newValue;
@@ -1200,7 +1205,10 @@ namespace Lang.Backend.LLVM
                             : LLVMApi.BuildFSub(_builder, value, LLVMApi.ConstReal(type, 1), "decf");
                     }
 
-                    LLVMApi.BuildStore(_builder, newValue, pointer);
+                    if (!loaded) // Loaded values are either readonly or constants, so don't store
+                    {
+                        LLVMApi.BuildStore(_builder, newValue, pointer);
+                    }
                     return changeByOne.Prefix ? (variableType, newValue) : (variableType, value);
                 }
                 case UnaryAst unary:
@@ -1210,7 +1218,7 @@ namespace Lang.Backend.LLVM
                         var (valueType, pointer) = unary.Value switch
                         {
                             IdentifierAst identifier => localVariables[identifier.Name],
-                            StructFieldRefAst structField => BuildStructField(structField, localVariables),
+                            StructFieldRefAst structField => BuildStructField(structField, localVariables, out _),
                             IndexAst index => GetListPointer(index, localVariables),
                             // @Cleanup this branch should not be hit
                             _ => (null, new LLVMValueRef())
@@ -1341,8 +1349,9 @@ namespace Lang.Backend.LLVM
             }
         }
 
-        private (TypeDefinition type, LLVMValueRef value) BuildStructField(StructFieldRefAst structField, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
+        private (TypeDefinition type, LLVMValueRef value) BuildStructField(StructFieldRefAst structField, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, out bool loaded)
         {
+            loaded = false;
             TypeDefinition type = null;
             LLVMValueRef value = new LLVMValueRef();
 
@@ -1387,9 +1396,15 @@ namespace Lang.Backend.LLVM
                     switch (structField.Children[i])
                     {
                         case IdentifierAst identifier:
+                            loaded = true;
                             if (identifier.Name == "length")
                             {
                                 (type, value) = WriteExpression(type.Count, localVariables);
+                            }
+                            else
+                            {
+                                type = new TypeDefinition {Name = "*", Generics = {type.Generics[0]}};
+                                value = LLVMApi.BuildGEP(_builder, value, new []{_zeroInt, _zeroInt}, "dataPtr");
                             }
                             break;
                         case IndexAst index:
