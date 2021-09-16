@@ -205,6 +205,7 @@ namespace Lang.Parsing
         public bool Params { get; set; }
         public int FunctionIndex { get; set; }
         public int VarargsIndex { get; set; }
+        public Dictionary<string, IAst> SpecifiedArguments { get; set; }
         public List<IAst> Arguments { get; } = new();
         public List<IAst> Children => null;
     }
