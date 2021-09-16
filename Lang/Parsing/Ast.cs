@@ -34,7 +34,6 @@ namespace Lang.Parsing
         public TypeDefinition ReturnType { get; set; }
         public List<Argument> Arguments { get; } = new();
         public List<List<TypeDefinition>> VarargsCalls { get; set; }
-        public int VarargsCallsRegistered { get; set; }
         public List<IAst> Children { get; } = new();
     }
 
