@@ -12,9 +12,18 @@ namespace Lang.Translation
     {
         public ProgramGraph CreateProgramGraph(List<ParseResult> parseResults, out List<TranslationError> errors)
         {
-            // TODO Implement me
             errors = new List<TranslationError>();
-            return new ProgramGraph();
+            var graph = new ProgramGraph();
+
+            foreach (var parseResult in parseResults)
+            {
+                foreach (var syntaxTree in parseResult.SyntaxTrees)
+                {
+                    // TODO Interpret syntax tree and add to program graph
+                }
+            }
+
+            return graph;
         }
     }
 }
