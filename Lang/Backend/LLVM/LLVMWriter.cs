@@ -182,11 +182,22 @@ namespace Lang.Backend.LLVM
 
                     for (var i = 0; i < structAst.Fields.Count; i++)
                     {
-                        //
+                        var field = structAst.Fields[i];
+
+                        var fieldName = LLVMApi.ConstString(name, (uint)name.Length, false);
+                        var fieldNameString = LLVMApi.AddGlobal(_module, typeName.TypeOf(), "str");
+                        SetPrivateConstant(fieldNameString);
+                        LLVMApi.SetInitializer(fieldNameString, fieldName);
+
+                        var typeField = LLVMApi.ConstStruct(new [] {fieldNameString, typePointers[field.Type.GenericName].typeInfo}, false);
+
+                        typeFields[i] = typeField;
                     }
 
                     var typeFieldArray = LLVMApi.ConstArray(typeInfoType, typeFields);
                     var typeFieldArrayGlobal = LLVMApi.AddGlobal(_module, typeFieldArray.TypeOf(), "____type_fields");
+                    SetPrivateConstant(typeFieldArrayGlobal);
+                    LLVMApi.SetInitializer(typeFieldArrayGlobal, typeFieldArray);
 
                     fields = LLVMApi.ConstStruct(new []
                     {
