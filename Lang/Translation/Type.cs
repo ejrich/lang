@@ -9,6 +9,7 @@ namespace Lang.Translation
         List,
         Void,
         Pointer,
+        VarArgs,
         Other,
         Error
     }

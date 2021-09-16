@@ -20,6 +20,8 @@ int Main(List<string> args) {
     list := create_list(4);
     ptr := pointers();
     str := string_test();
+    print("Hello world\n");
+    print("Hello world %d, %d, %d\n", 1, 2, 3);
     return str.length;
 }
 
@@ -141,7 +143,7 @@ string string_test() {
 }
 
 print(string format, ... args) {
-    vprintf(format.data, args);
+    printf(format.data, args);
 }
 
-vprintf(u8* format, va_list args) #extern
+printf(u8* format, ... args) #extern

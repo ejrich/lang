@@ -186,6 +186,15 @@ namespace Lang.Translation
                 }
             }
 
+            if (function.Extern)
+            {
+                if (function.Children.Any())
+                {
+                    errors.Add(CreateError("Extern function cannot have a body", function));
+                }
+                return;
+            }
+
             VerifyScope(function.Children, localVariables, errors);
         }
 
@@ -609,6 +618,25 @@ namespace Lang.Translation
                 case CallAst call:
                     if (_functions.TryGetValue(call.Function, out var function))
                     {
+                        // Handle varargs functions
+                        if (function.Arguments.Count > 0 && function.Arguments[^1].Type.Name == "...")
+                        {
+                            for (var i = 0; i < function.Arguments.Count - 1; i++)
+                            {
+                                var functionType = function.Arguments[i].Type;
+                                var callType = VerifyExpression(call.Arguments[i], localVariables, errors);
+                                if (callType != null)
+                                {
+                                    if (!TypeEquals(functionType, callType))
+                                    {
+                                        errors.Add(CreateError($"Call to function '{function.Name}' expected '{PrintTypeDefinition(functionType)}', but got '{PrintTypeDefinition(callType)}'", call.Arguments[i]));
+                                    }
+                                }
+                            }
+
+                            return function.ReturnType;
+                        }
+
                         // Verify function arguments
                         if (function.Arguments.Count != call.Arguments.Count)
                         {
@@ -1041,6 +1069,13 @@ namespace Lang.Translation
                         return Type.Error;
                     }
                     return VerifyType(typeDef.Generics[0], errors) == Type.Error ? Type.Error : Type.Pointer;
+                case "...":
+                    if (hasGenerics)
+                    {
+                        errors.Add(CreateError("Varargs type cannot have generics", typeDef));
+                        return Type.Error;
+                    }
+                    return Type.VarArgs;
                 default:
                     return _structs.ContainsKey(typeDef.Name) ? Type.Other : Type.Error;
             }
