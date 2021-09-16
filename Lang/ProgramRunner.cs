@@ -456,57 +456,78 @@ namespace Lang
             }
         }
 
-        private object InitializeStruct(Type type, StructAst structAst, IDictionary<string, ValueType> variables, List<AssignmentAst> values)
+        private object InitializeStruct(Type type, StructAst structAst, IDictionary<string, ValueType> variables, List<AssignmentAst> assignments)
         {
-            var assignments = values?.ToDictionary(_ => (_.Reference as IdentifierAst)!.Name);
             var instance = Activator.CreateInstance(type);
-            foreach (var field in structAst.Fields)
+
+            if (assignments == null)
             {
-                var fieldInstance = instance!.GetType().GetField(field.Name);
+                foreach (var field in structAst.Fields)
+                {
+                    var fieldInstance = instance!.GetType().GetField(field.Name);
 
-                if (assignments != null && assignments.TryGetValue(field.Name, out var assignment))
+                    InitializeField(field, instance, fieldInstance, variables);
+                }
+            }
+            else
+            {
+                var assignmentDictionary = assignments.ToDictionary(_ => (_.Reference as IdentifierAst)!.Name);
+                foreach (var field in structAst.Fields)
                 {
-                    var expression = ExecuteExpression(assignment.Value, variables);
-                    var value = CastValue(expression.Value, field.Type);
+                    var fieldInstance = instance!.GetType().GetField(field.Name);
 
-                    fieldInstance!.SetValue(instance, value);
-                }
-                else if (field.Value != null)
-                {
-                    var value = ExecuteExpression(field.Value, variables);
-                    fieldInstance!.SetValue(instance, value.Value);
-                }
-                else switch (field.Type.TypeKind)
-                {
-                    case TypeKind.Array:
-                        var array = InitializeArray(field.Type, variables, true);
-                        fieldInstance!.SetValue(instance, array);
-                        break;
-                    case TypeKind.Pointer:
-                    case TypeKind.Boolean:
-                        break;
-                    default:
+                    if (assignmentDictionary.TryGetValue(field.Name, out var assignment))
                     {
-                        if (field.Type.PrimitiveType == null)
-                        {
-                            var fieldType = _types[field.Type.GenericName];
-                            var fieldTypeDef = _programGraph.Types[field.Type.GenericName];
-                            if (fieldTypeDef is StructAst fieldStructAst)
-                            {
-                                var value = InitializeStruct(fieldType, fieldStructAst, variables, field.Assignments);
-                                fieldInstance!.SetValue(instance, value);
-                            }
-                            else
-                            {
-                                fieldInstance!.SetValue(instance, Activator.CreateInstance(fieldType));
-                            }
-                        }
-                        break;
+                        var expression = ExecuteExpression(assignment.Value, variables);
+                        var value = CastValue(expression.Value, field.Type);
+
+                        fieldInstance!.SetValue(instance, value);
+                    }
+                    else
+                    {
+                        InitializeField(field, instance, fieldInstance, variables);
                     }
                 }
             }
 
             return instance;
+        }
+
+        private void InitializeField(StructFieldAst field, object instance, FieldInfo fieldInstance, IDictionary<string, ValueType> variables)
+        {
+            if (field.Value != null)
+            {
+                var value = ExecuteExpression(field.Value, variables);
+                fieldInstance.SetValue(instance, value.Value);
+            }
+            else switch (field.Type.TypeKind)
+            {
+                case TypeKind.Array:
+                    var array = InitializeArray(field.Type, variables, true);
+                    fieldInstance!.SetValue(instance, array);
+                    break;
+                case TypeKind.Pointer:
+                case TypeKind.Boolean:
+                    break;
+                default:
+                {
+                    if (field.Type.PrimitiveType == null)
+                    {
+                        var fieldType = _types[field.Type.GenericName];
+                        var fieldTypeDef = _programGraph.Types[field.Type.GenericName];
+                        if (fieldTypeDef is StructAst fieldStructAst)
+                        {
+                            var value = InitializeStruct(fieldType, fieldStructAst, variables, field.Assignments);
+                            fieldInstance.SetValue(instance, value);
+                        }
+                        else
+                        {
+                            fieldInstance.SetValue(instance, Activator.CreateInstance(fieldType));
+                        }
+                    }
+                    break;
+                }
+            }
         }
 
         private object InitializeArray(TypeDefinition type, IDictionary<string, ValueType> variables, bool structField = false, List<IAst> arrayValues = null)
