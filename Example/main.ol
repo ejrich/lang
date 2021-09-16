@@ -56,7 +56,7 @@ int factorial(int n) {
     return n * factorial(n - 1);
 }
 
-/*struct MyStruct {
+struct MyStruct {
     int field;
     float something = 4.2;
     OtherStruct subValue;
@@ -68,9 +68,9 @@ struct OtherStruct {
 
 MyStruct create() {
     s1: MyStruct;
-    s2: OtherStruct;
-    s2.something += 8;
-    s1.field++;
-    s1.subValue.something = s2.something;
+    //s2: OtherStruct;
+    //s2.something += 8;
+    //s1.field++;
+    //s1.subValue.something = s2.something;
     return s1;
-}*/
+}
