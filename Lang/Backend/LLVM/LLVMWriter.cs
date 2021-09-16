@@ -1,5 +1,5 @@
 ﻿using System.IO;
-using System.Text;
+using Lang.Parsing;
 using LLVMSharp.Interop;
 
 namespace Lang.Backend.LLVM
@@ -21,24 +21,46 @@ namespace Lang.Backend.LLVM
             if (!Directory.Exists(objectPath))
                 Directory.CreateDirectory(objectPath);
 
+            var objectFile = Path.Combine(objectPath, $"{projectName}.o");
+
             // 3. Write Data section
+            WriteData(programGraph.Data);
 
             // 4. Write Functions
             foreach (var function in programGraph.Functions)
             {
+                WriteFunction(function);
             }
 
             // 5. Write Main function
+            WriteFunction(programGraph.Main);
 
-            // 6. Write to file
+            // 6. Compile to object file
+            Compile(objectFile);
 
-            return string.Empty; // TODO put object file path here
+            return objectFile;
         }
+
 
         private void InitLLVM(string projectName)
         {
             _module = LLVMModuleRef.CreateWithName(projectName);
             _builder = LLVMBuilderRef.Create(_module.Context);
+        }
+
+        private void WriteData(Data data)
+        {
+            // TODO Implement me
+        }
+
+        private void WriteFunction(FunctionAst function)
+        {
+            // TODO Implement me
+        }
+
+        private void Compile(string objectFile)
+        {
+            // TODO Implement me
         }
     }
 }
