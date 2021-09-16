@@ -1,6 +1,10 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
+using System.Linq;
 using Lang.Parsing;
+using LLVMSharp;
 using LLVMSharp.Interop;
+using LLVMApi = LLVMSharp.Interop.LLVM;
 
 namespace Lang.Backend.LLVM
 {
@@ -33,9 +37,12 @@ namespace Lang.Backend.LLVM
             }
 
             // 5. Write Main function
-            WriteFunction(programGraph.Main);
+            WriteMainFunction(programGraph.Main);
 
             // 6. Compile to object file
+            #if DEBUG
+            _module.TryPrintToFile(Path.Combine(objectPath, $"{projectName}.ll"), out _);
+            #endif
             Compile(objectFile);
 
             return objectFile;
@@ -58,9 +65,32 @@ namespace Lang.Backend.LLVM
             // TODO Implement me
         }
 
-        private void Compile(string objectFile)
+        private void WriteMainFunction(FunctionAst main)
         {
             // TODO Implement me
+            var arguments = Array.Empty<LLVMTypeRef>();
+            var function = _module.AddFunction("main", LLVMTypeRef.CreateFunction(LLVMTypeRef.Int32, arguments));
+            function.Linkage = LLVMLinkage.LLVMExternalLinkage;
+            _builder.PositionAtEnd(function.AppendBasicBlock("entry"));
+            _builder.BuildRet(LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, 0));
+            function.VerifyFunction(LLVMVerifierFailureAction.LLVMPrintMessageAction);
+        }
+
+        private void Compile(string objectFile)
+        {
+            LLVMApi.InitializeX86TargetInfo();
+            LLVMApi.InitializeX86Target();
+            LLVMApi.InitializeX86TargetMC();
+            LLVMApi.InitializeX86AsmParser();
+            LLVMApi.InitializeX86AsmPrinter();
+
+            var target = LLVMTargetRef.Targets.First(_ => _.Name == "x86-64");
+            _module.Target = LLVMTargetRef.DefaultTriple;
+            var targetMachine = target.CreateTargetMachine(_module.Target, "generic", "",
+                LLVMCodeGenOptLevel.LLVMCodeGenLevelNone, LLVMRelocMode.LLVMRelocDefault, LLVMCodeModel.LLVMCodeModelDefault);
+            _module.DataLayout = targetMachine.CreateTargetDataLayout();
+
+            targetMachine.EmitToFile(_module, objectFile, LLVMCodeGenFileType.LLVMObjectFile);
         }
     }
 }

@@ -20,7 +20,7 @@ namespace Lang.Backend.LLVM
             {
                 StartInfo =
                 {
-                    FileName = "ld.lld",
+                    FileName = "gcc",
                     Arguments = $"{objectFile} -o {executableFile}"
                 }
             };
