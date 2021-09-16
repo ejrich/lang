@@ -21,11 +21,11 @@ namespace Lang.Backend.C
             // 2. Write Data section
             AppendData(fileContents, programGraph.Data);
 
-            // 3. Write Namespaces
-            foreach (var ns in programGraph.Namespaces)
-            {
-                AppendNamespace(fileContents, ns);
-            }
+            // // 3. Write Namespaces
+            // foreach (var ns in programGraph.Namespaces)
+            // {
+            //     AppendNamespace(fileContents, ns);
+            // }
 
             // 4. Write Functions
             foreach (var function in programGraph.Functions)

@@ -33,21 +33,22 @@ namespace Lang.Parsing
     public class StructAst : IAst
     {
         public string Name { get; set; }
-        public List<IAst> Children { get; } = new();
+        public List<StructFieldAst> Fields { get; } = new();
+        public List<IAst> Children => null;
     }
 
     public class StructFieldAst : IAst
     {
         public TypeDefinition Type { get; set; }
         public string Name { get; set; }
-        public string DefaultValue { get; set; }
+        public ConstantAst DefaultValue { get; set; }
         public List<IAst> Children => null;
     }
 
     public class StructFieldRefAst : IAst
     {
         public string Name { get; init; }
-        public IAst Value { get; set; }
+        public StructFieldRefAst Value { get; set; }
         public List<IAst> Children => null;
     }
 
@@ -168,113 +169,7 @@ namespace Lang.Parsing
         String,
         List,
         Void,
-        Auto,
         Other,
         Error
-    }
-
-    public static class Extensions
-    {
-        public static Type InferType(this TypeDefinition typeDef, out TranslationError error)
-        {
-            var hasGenerics = typeDef.Generics.Any();
-            error = null;
-            switch (typeDef.Type)
-            {
-                case "int":
-                    if (hasGenerics)
-                    {
-                        error = new TranslationError {Error = "int type cannot have generics"};
-                        return Type.Error;
-                    }
-                    return Type.Int;
-                case "float":
-                    if (hasGenerics)
-                    {
-                        error = new TranslationError {Error = "float type cannot have generics"};
-                        return Type.Error;
-                    }
-                    return Type.Float;
-                case "bool":
-                    if (hasGenerics)
-                    {
-                        error = new TranslationError {Error = "boolean type cannot have generics"};
-                        return Type.Error;
-                    }
-                    return Type.Boolean;
-                case "string":
-                    if (hasGenerics)
-                    {
-                        error = new TranslationError {Error = "string type cannot have generics"};
-                        return Type.Error;
-                    }
-                    return Type.String;
-                case "List":
-                    return Type.List;
-                case "void":
-                    if (hasGenerics)
-                    {
-                        error = new TranslationError {Error = "void type cannot have generics"};
-                        return Type.Error;
-                    }
-                    return Type.Void;
-                default:
-                    error = new TranslationError {Error = "Unable to determine type"};
-                    return Type.Other;
-            }
-        }
-
-        public static Type InferType(this Token token, out ParseError error)
-        {
-            error = null;
-
-            switch (token.Type)
-            {
-                case TokenType.Literal:
-                    return Type.String;
-                case TokenType.Number:
-                    if (int.TryParse(token.Value, out _))
-                    {
-                        return Type.Int;
-                    }
-                    else if (float.TryParse(token.Value, out _))
-                    {
-                        return Type.Float;
-                    }
-                    else
-                    {
-                        return Type.Other;
-                    }
-                case TokenType.Boolean:
-                    return Type.Boolean;
-                // TODO This isn't right, but works for now
-                case TokenType.Token:
-                    return Type.Other;
-                default:
-                    return Type.Other;
-            }
-        }
-
-        public static Operator ConvertOperator(this Token token)
-        {
-            switch (token.Type)
-            {
-                // Multi-character operators
-                case TokenType.And:
-                    return Operator.And;
-                case TokenType.Or:
-                    return Operator.Or;
-                case TokenType.Equality:
-                    return Operator.Equality;
-                case TokenType.Increment:
-                    return Operator.Increment;
-                case TokenType.Decrement:
-                    return Operator.Decrement;
-                // Handle single character operators
-                default:
-                    var op = (Operator)token.Value[0];
-                    return Enum.IsDefined(typeof(Operator), op) ? op : Operator.None;
-            }
-        }
     }
 }

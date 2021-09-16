@@ -6,8 +6,8 @@ namespace Lang
     public class ProgramGraph
     {
         public Data Data { get; set; }
-        public List<Namespace> Namespaces { get; set; } = new();
-        public List<FunctionAst> Functions { get; set; } = new();
+        // public List<Namespace> Namespaces { get; } = new(); TODO Implement later
+        public List<FunctionAst> Functions { get; } = new();
         public FunctionAst Main { get; set; }
     }
 
@@ -20,13 +20,7 @@ namespace Lang
 
     public class Data
     {
-        public List<Variable> Variables { get; set; } = new();
-        public List<Struct> Structs { get; set; } = new();
-    }
-
-    public class Struct
-    {
-        public string Name { get; set; }
-        public List<Variable> Fields { get; set; } = new();
+        public List<Variable> Variables { get; } = new();
+        public List<StructAst> Structs { get; } = new();
     }
 }
