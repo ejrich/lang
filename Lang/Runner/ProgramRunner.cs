@@ -346,7 +346,17 @@ namespace Lang.Runner
 
         public void RunProgram(IAst ast)
         {
-            ExecuteAst(ast, _globalVariables, out _);
+            try
+            {
+                ExecuteAst(ast, _globalVariables, out _);
+            }
+            catch (Exception e)
+            {
+                AddError("Internal compiler error running program", ast);
+                #if DEBUG
+                Console.WriteLine(e);
+                #endif
+            }
         }
 
         private void CreateFunction(TypeBuilder typeBuilder, string name, string library, Type returnType, Type[] args)
@@ -686,7 +696,18 @@ namespace Lang.Runner
 
         public bool ExecuteCondition(IAst expression)
         {
-            return ExecuteCondition(expression, _globalVariables);
+            try
+            {
+                return ExecuteCondition(expression, _globalVariables);
+            }
+            catch (Exception e)
+            {
+                AddError("Internal compiler error executing condition", expression);
+                #if DEBUG
+                Console.WriteLine(e);
+                #endif
+                return false;
+            }
         }
 
         private bool ExecuteCondition(IAst expression, IDictionary<string, ValueType> variables)
@@ -1311,13 +1332,7 @@ namespace Lang.Runner
             {
                 if (!_compilerFunctions.TryGetValue(function.Name, out var name))
                 {
-                    _programGraph.Errors.Add(new Translation.TranslationError
-                    {
-                        Error = $"Undefined compiler function '{function.Name}'",
-                        FileIndex = function.FileIndex,
-                        Line = function.Line,
-                        Column = function.Column
-                    });
+                    AddError($"Undefined compiler function '{function.Name}'", function);
                     return null;
                 }
                 var args = arguments.Select(GetManagedArg).ToArray();
@@ -1925,6 +1940,17 @@ namespace Lang.Runner
                 8 => typeof(ulong),
                 _ => typeof(uint)
             };
+        }
+
+        private void AddError(string message, IAst ast)
+        {
+            _programGraph.Errors.Add(new Translation.TranslationError
+            {
+                Error = message,
+                FileIndex = ast.FileIndex,
+                Line = ast.Line,
+                Column = ast.Column
+            });
         }
     }
 }
