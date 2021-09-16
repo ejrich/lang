@@ -203,10 +203,10 @@ namespace Lang.Translation
         {
             var localVariables = function.Arguments.ToDictionary(arg=> arg.Name, arg => arg.Type);
 
+            var returnType = VerifyType(function.ReturnType, errors);
             if (main)
             {
-                var type = VerifyType(function.ReturnType, errors);
-                if (!(type == Type.Void || type == Type.Int))
+                if (!(returnType == Type.Void || returnType == Type.Int))
                 {
                     errors.Add(CreateError("The main function should return type 'int' or 'void'", function));
                 }
@@ -222,25 +222,45 @@ namespace Lang.Translation
             }
 
             // TODO Verify the function has a return statement for non-void functions
-            VerifyScope(function.Children, localVariables, errors);
-        }
-
-        private void VerifyScope(List<IAst> syntaxTrees, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
-        {
-            var scopeVariables = new Dictionary<string, TypeDefinition>(localVariables);
-            foreach (var syntaxTree in syntaxTrees)
+            var returned = false;
+            foreach (var ast in function.Children)
             {
-                VerifyAst(syntaxTree, scopeVariables, errors);
+                if (VerifyAst(ast, localVariables, errors))
+                {
+                    returned = true;
+                }
+            }
+
+            if (!returned && returnType != Type.Void)
+            {
+                errors.Add(CreateError($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnType)}' on all paths", function));
             }
         }
 
-        private void VerifyAst(IAst syntaxTree, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        private bool VerifyScope(List<IAst> syntaxTrees, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        {
+            // 1. Create scope variables
+            var scopeVariables = new Dictionary<string, TypeDefinition>(localVariables);
+
+            // 2. Verify function lines
+            var returned = false;
+            foreach (var syntaxTree in syntaxTrees)
+            {
+                if (VerifyAst(syntaxTree, scopeVariables, errors))
+                {
+                    returned = true;
+                }
+            }
+            return returned;
+        }
+
+        private bool VerifyAst(IAst syntaxTree, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             switch (syntaxTree)
             {
                 case ReturnAst returnAst:
                     VerifyReturnStatement(returnAst, localVariables, _currentFunction.ReturnType, errors);
-                    break;
+                    return true;
                 case DeclarationAst declaration:
                     VerifyDeclaration(declaration, localVariables, errors);
                     break;
@@ -248,21 +268,19 @@ namespace Lang.Translation
                     VerifyAssignment(assignment, localVariables, errors);
                     break;
                 case ScopeAst scope:
-                    VerifyScope(scope.Children, localVariables, errors);
-                    break;
+                    return VerifyScope(scope.Children, localVariables, errors);
                 case ConditionalAst conditional:
-                    VerifyConditional(conditional, localVariables, errors);
-                    break;
+                    return VerifyConditional(conditional, localVariables, errors);
                 case WhileAst whileAst:
-                    VerifyWhile(whileAst, localVariables, errors);
-                    break;
+                    return VerifyWhile(whileAst, localVariables, errors);
                 case EachAst each:
-                    VerifyEach(each, localVariables, errors);
-                    break;
+                    return VerifyEach(each, localVariables, errors);
                 default:
                     VerifyExpression(syntaxTree, localVariables, errors);
                     break;
             }
+
+            return false;
         }
 
         private void VerifyReturnStatement(ReturnAst returnAst, IDictionary<string, TypeDefinition> localVariables,
@@ -458,7 +476,7 @@ namespace Lang.Translation
             return variableTypeDefinition;
         }
 
-        private void VerifyConditional(ConditionalAst conditional, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        private bool VerifyConditional(ConditionalAst conditional, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             // 1. Verify the condition expression
             var conditionalType = VerifyExpression(conditional.Condition, localVariables, errors);
@@ -475,16 +493,19 @@ namespace Lang.Translation
             }
 
             // 2. Verify the conditional scope
-            VerifyScope(conditional.Children, localVariables, errors);
+            var ifReturned = VerifyScope(conditional.Children, localVariables, errors);
 
             // 3. Verify the else block if necessary
             if (conditional.Else != null)
             {
-                VerifyAst(conditional.Else, localVariables, errors);
+                var elseReturned = VerifyAst(conditional.Else, localVariables, errors);
+                return ifReturned && elseReturned;
             }
+
+            return false;
         }
 
-        private void VerifyWhile(WhileAst whileAst, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        private bool VerifyWhile(WhileAst whileAst, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             // 1. Verify the condition expression
             var conditionalType = VerifyExpression(whileAst.Condition, localVariables, errors);
@@ -501,10 +522,10 @@ namespace Lang.Translation
             }
 
             // 2. Verify the scope of the while block
-            VerifyScope(whileAst.Children, localVariables, errors);
+            return VerifyScope(whileAst.Children, localVariables, errors);
         }
 
-        private void VerifyEach(EachAst each, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        private bool VerifyEach(EachAst each, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             var eachVariables = new Dictionary<string, TypeDefinition>(localVariables);
             // 1. Verify the iterator or range
@@ -515,7 +536,7 @@ namespace Lang.Translation
             if (each.Iteration != null)
             {
                 var variableTypeDefinition = GetVariable(each.Iteration, localVariables, errors);
-                if (variableTypeDefinition == null) return;
+                if (variableTypeDefinition == null) return false;
 
                 switch (variableTypeDefinition.Name)
                 {
@@ -558,10 +579,16 @@ namespace Lang.Translation
             }
 
             // 2. Verify the scope of the each block
+            var returned = false;
             foreach (var ast in each.Children)
             {
-                VerifyAst(ast, eachVariables, errors);
+                if (VerifyAst(ast, eachVariables, errors))
+                {
+                    returned = true;
+                }
             }
+
+            return returned;
         }
 
         private TypeDefinition VerifyExpression(IAst ast, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
