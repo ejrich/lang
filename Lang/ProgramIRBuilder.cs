@@ -34,10 +34,6 @@ namespace Lang
 
             var functionIR = new FunctionIR {Index = Program.FunctionCount++, Source = function};
 
-            #if DEBUG
-            functionIR.Name = functionName;
-            #endif
-
             if (functionName == "main")
             {
                 Program.EntryPoint = functionIR;
@@ -79,7 +75,7 @@ namespace Lang
 
         public void AddOperatorOverload(OperatorOverloadAst overload)
         {
-            var functionName = GetOperatorOverloadName(overload.Type, overload.Operator);
+            overload.Name = $"operator.{overload.Operator}.{overload.Type.GenericName}";
 
             var functionIR = new FunctionIR
             {
@@ -95,7 +91,7 @@ namespace Lang
                 EmitStore(functionIR, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i});
             }
 
-            Program.Functions[functionName] = functionIR;
+            Program.Functions[overload.Name] = functionIR;
 
             EmitScope(functionIR, entryBlock, overload.Body, overload.ReturnType);
         }
@@ -1002,7 +998,7 @@ namespace Lang
                         var rhs = EmitIR(function, expression.Children[i], scope);
                         if (expression.OperatorOverloads.TryGetValue(i, out var overload))
                         {
-                            expressionValue = EmitCall(function, GetOperatorOverloadName(overload.Type, overload.Operator), new []{expressionValue, rhs}, overload.ReturnType);
+                            expressionValue = EmitCall(function, overload.Name, new []{expressionValue, rhs}, overload.ReturnType);
                         }
                         else
                         {
@@ -1308,10 +1304,8 @@ namespace Lang
 
             if (index.CallsOverload)
             {
-                var overloadName = GetOperatorOverloadName(index.Overload.Type, Operator.Subscript);
-
                 var value = EmitLoad(function, type, variable);
-                return EmitCall(function, overloadName, new []{value, indexValue}, index.Overload.ReturnType);
+                return EmitCall(function, index.Overload.Name, new []{value, indexValue}, index.Overload.ReturnType);
             }
 
             IType elementType;
@@ -1623,11 +1617,6 @@ namespace Lang
                 "__start" => "main",
                 _ => function.OverloadIndex > 0 ? $"{function.Name}.{function.OverloadIndex}" : function.Name
             };
-        }
-
-        private string GetOperatorOverloadName(TypeDefinition type, Operator op)
-        {
-            return $"operator.{op}.{type.GenericName}";
         }
 
         private InstructionValue EmitLoad(FunctionIR function, IType type, InstructionValue value)
