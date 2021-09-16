@@ -31,128 +31,86 @@ namespace Lang.Translation
             var mainDefined = false;
             bool verifyAdditional;
 
-            do
-            {
-                // 1. Verify enum and struct definitions
-                for (var i = 0; i < parseResult.SyntaxTrees.Count; i++)
-                {
-                    switch (parseResult.SyntaxTrees[i])
-                    {
-                        case EnumAst enumAst:
-                            VerifyEnum(enumAst, errors);
-                            parseResult.SyntaxTrees.RemoveAt(i--);
-                            break;
-                        case StructAst structAst:
-                            if (_programGraph.Types.ContainsKey(structAst.Name))
-                            {
-                                errors.Add(CreateError($"Multiple definitions of struct '{structAst.Name}'",
-                                    structAst));
-                            }
-                            else if (structAst.Generics.Any())
-                            {
-                                _polymorphicStructs.Add(structAst.Name, structAst);
-                            }
-                            else
-                            {
-                                _programGraph.Types.Add(structAst.Name, structAst);
-                            }
-
-                            break;
-                    }
-                }
-
-                // 2. Verify struct bodies, global variables, and function return types and arguments
-                for (var i = 0; i < parseResult.SyntaxTrees.Count; i++)
-                {
-                    switch (parseResult.SyntaxTrees[i])
-                    {
-                        case StructAst structAst:
-                            VerifyStruct(structAst, errors);
-                            parseResult.SyntaxTrees.RemoveAt(i--);
-                            break;
-                        case DeclarationAst globalVariable:
-                            if (globalVariable.Value != null && globalVariable.Value is not ConstantAst)
-                            {
-                                errors.Add(CreateError(
-                                    "Global variable must either not be initialized or be initialized to a constant value",
-                                    globalVariable.Value));
-                            }
-
-                            VerifyDeclaration(globalVariable, _globalVariables, errors);
-                            _programGraph.Variables.Add(globalVariable);
-                            parseResult.SyntaxTrees.RemoveAt(i--);
-                            break;
-                        case FunctionAst function:
-                            var main = function.Name == "main";
-                            if (main)
-                            {
-                                if (mainDefined)
-                                {
-                                    errors.Add(CreateError("Only one main function can be defined", function));
-                                }
-
-                                mainDefined = true;
-                            }
-                            else if (function.Name == "__start")
-                            {
-                                _programGraph.Start = function;
-                            }
-
-                            VerifyFunctionDefinition(function, main, errors);
-                            parseResult.SyntaxTrees.RemoveAt(i--);
-                            break;
-                    }
-                }
-
-                verifyAdditional = false;
-                // 3. Verify and run top-level static ifs
-                for (int i = 0; i < parseResult.SyntaxTrees.Count; i++)
-                {
-                    switch (parseResult.SyntaxTrees[i])
-                    {
-                        case CompilerDirectiveAst directive:
-                            if (directive.Type == DirectiveType.If)
-                            {
-                                // TODO Implement me
-                                // 1. Init program runner
-                                // 2. Run the condition
-                                // 3. Verify the ASTs in the block
-                                verifyAdditional = true;
-                                parseResult.SyntaxTrees.RemoveAt(i--);
-                            }
-                            break;
-                    }
-                }
-            } while (verifyAdditional);
-
-            // 4. Verify function bodies
-            foreach (var (_, function) in _programGraph.Functions)
-            {
-                if (function.Verified) continue;
-                _currentFunction = function;
-                VerifyFunction(function, errors);
-            }
-            VerifyFunction(_programGraph.Start, errors);
-
-            // 5. Execute any other compiler directives
+            // 1. Verify enum and struct definitions
             foreach (var ast in parseResult.SyntaxTrees)
             {
                 switch (ast)
                 {
-                    case CompilerDirectiveAst compilerDirective:
-                        VerifyTopLevelDirective(compilerDirective, errors);
-                        _programGraph.Directives.Add(compilerDirective);
+                    case EnumAst enumAst:
+                        VerifyEnum(enumAst, errors);
+                        break;
+                    case StructAst structAst:
+                        if (_types.ContainsKey(structAst.Name))
+                        {
+                            errors.Add(CreateError($"Multiple definitions of struct '{structAst.Name}'", structAst));
+                        }
+                        else if (structAst.Generics.Any())
+                        {
+                            _polymorphicStructs.Add(structAst.Name, structAst);
+                        }
+                        else
+                        {
+                            _types.Add(structAst.Name, structAst);
+                        }
+                        break;
+                }
+            } while (verifyAdditional);
+
+            // 2. Verify struct bodies, global variables, and function return types and arguments
+            var globalVariables = new Dictionary<string, TypeDefinition>();
+            foreach (var ast in parseResult.SyntaxTrees)
+            {
+                switch (ast)
+                {
+                    case StructAst structAst:
+                        VerifyStruct(structAst, errors);
+                        break;
+                    case DeclarationAst globalVariable:
+                        if (globalVariable.Value != null && globalVariable.Value is not ConstantAst)
+                        {
+                            errors.Add(CreateError("Global variable must either not be initialized or be initialized to a constant value", globalVariable.Value));
+                        }
+                        VerifyDeclaration(globalVariable, globalVariables, errors);
+                        graph.Data.Variables.Add(globalVariable);
+                        break;
+                    case FunctionAst function:
+                        VerifyFunctionDefinition(function, errors);
                         break;
                 }
             }
 
-            if (!mainDefined)
+            // 3. Verify function bodies
+            foreach (var function in parseResult.SyntaxTrees.Where(ast => ast is FunctionAst).Cast<FunctionAst>())
             {
-                // @Cleanup allow errors to be reported without having a file/line/column
-                errors.Add(CreateError("'main' function of the program is not defined", _currentFunction));
+                _currentFunction = function;
+                // The __start function does not need to be verified
+                if (function.Name == "__start")
+                {
+                    graph.Start = function;
+                    VerifyFunction(function, false, globalVariables, errors);
+                    continue;
+                }
+
+                // Verify the function body
+                var main = function.Name.Equals("main", StringComparison.OrdinalIgnoreCase);
+                VerifyFunction(function, main, globalVariables, errors);
+                if (main)
+                {
+                    if (graph.Main != null)
+                    {
+                        errors.Add(CreateError("Only one main function can be defined", function));
+                    }
+                    graph.Main = function;
+                }
+                else
+                {
+                    graph.Functions.Add(function);
+                }
             }
 
-            return _programGraph;
+            graph.Data.Types = _types.Values.ToList();
+
+            return graph;
         }
 
         private void VerifyEnum(EnumAst enumAst, List<TranslationError> errors)
