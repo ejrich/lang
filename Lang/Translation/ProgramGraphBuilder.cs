@@ -897,9 +897,9 @@ namespace Lang.Translation
                     {
                         
                     }
-                    else if (conditional.Else != null)
+                    else if (conditional.Else.Any())
                     {
-                        return VerifyAst(conditional.Else, localVariables, errors);
+                        return VerifyScope(conditional.Else, localVariables, errors);
                     }
                     break;
                 default:

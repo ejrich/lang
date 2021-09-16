@@ -801,7 +801,7 @@ namespace Lang.Parsing
                             break;
                         }
 
-                        var ast = topLevel ? ParseTopLevelAst(enumerator, errors) : ParseLine(enumerator, errors);
+                        var ast = ParseLine(enumerator, errors);
                         if (ast != null)
                             conditionalAst.Children.Add(ast);
                     }
@@ -848,7 +848,7 @@ namespace Lang.Parsing
                                 break;
                             }
 
-                            var ast = topLevel ? ParseTopLevelAst(enumerator, errors) : ParseLine(enumerator, errors);
+                            var ast = ParseLine(enumerator, errors);
                             if (ast != null)
                                 conditionalAst.Else.Add(ast);
                         }
