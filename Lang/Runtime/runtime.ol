@@ -16,3 +16,10 @@ struct string {
 
 // Basic IO functions
 printf(string format, ... args) #extern
+
+
+// Runtime functions
+int __start(int argc, string* argv) {
+    printf("Argument count - %d\nFirst arg - %s\n", argc, *argv);
+    return 0;
+}
