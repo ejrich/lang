@@ -138,15 +138,18 @@ void* memcpy(void* dest, void* src, int length) #extern "libc"
 
 // Runtime functions
 int __start(int argc, u8** argv) {
-    exit_code := 0;
-    args: Array<string>[argc-1];
-
-    each i in 1..argc then args[i-1] = convert_c_string(argv[i]);
+    each i in 1..argc {
+        argument := convert_c_string(argv[i]);
+        array_insert(&command_line_arguments, argument);
+    }
 
     #if true then main();
 
     return exit_code;
 }
+
+command_line_arguments: Array<string>;
+exit_code := 0;
 
 assert(bool assertion, int exit_code = 1) {
     if assertion then return;
