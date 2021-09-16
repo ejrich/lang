@@ -2,7 +2,6 @@
 using System.IO;
 using System.Linq;
 using Lang.Parsing;
-using LLVMSharp;
 using LLVMSharp.Interop;
 using LLVMApi = LLVMSharp.Interop.LLVM;
 
@@ -58,11 +57,16 @@ namespace Lang.Backend.LLVM
         private void WriteData(Data data)
         {
             // TODO Implement me
+            // 1. Declare structs
+            // 2. Declare variables
         }
 
         private void WriteFunction(FunctionAst function)
         {
             // TODO Implement me
+            // 1. Declare function definition
+            // 2. Loop through function body
+            // 2a. Recursively write out lines
         }
 
         private void WriteMainFunction(FunctionAst main)
