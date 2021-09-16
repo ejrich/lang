@@ -98,7 +98,7 @@ namespace Lang.Runner
                 }
             }
 
-            var functionTypeBuilder = _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
+            TypeBuilder functionTypeBuilder = null;
             foreach (var function in programGraph.Functions.Values.Where(_ => _.Extern))
             {
                 var returnType = GetTypeFromDefinition(function.ReturnType);
@@ -110,6 +110,7 @@ namespace Lang.Runner
                 {
                     for (var i = functionIndex.Count; i < function.VarargsCalls.Count; i++)
                     {
+                        functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
                         var callTypes = function.VarargsCalls[i];
                         var varargs = callTypes.Select(arg => GetTypeFromDefinition(arg, cCall: true)).ToArray();
                         CreateFunction(functionTypeBuilder, function.Name, function.ExternLib, returnType, varargs);
@@ -120,6 +121,7 @@ namespace Lang.Runner
                 {
                     if (!functionIndex.Any())
                     {
+                        functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
                         var args = function.Arguments.Select(arg => GetTypeFromDefinition(arg.Type, cCall: true)).ToArray();
                         CreateFunction(functionTypeBuilder, function.Name, function.ExternLib, returnType, args);
                         functionIndex.Add(_version);
@@ -127,10 +129,13 @@ namespace Lang.Runner
                 }
             }
 
-            var library = functionTypeBuilder.CreateType();
-            var functionObject = Activator.CreateInstance(library);
-            _functionLibraries.Add((library, functionObject));
-            _version++;
+            if (functionTypeBuilder != null)
+            {
+                var library = functionTypeBuilder.CreateType();
+                var functionObject = Activator.CreateInstance(library);
+                _functionLibraries.Add((library, functionObject));
+                _version++;
+            }
 
             foreach (var variable in programGraph.Variables)
             {
@@ -166,45 +171,6 @@ namespace Lang.Runner
             var method = typeBuilder.DefineMethod(name, MethodAttributes.Public | MethodAttributes.Static, returnType, args);
             var caBuilder = new CustomAttributeBuilder(typeof(DllImportAttribute).GetConstructor(new []{typeof(string)}), new []{library});
             method.SetCustomAttribute(caBuilder);
-        }
-
-        private void ResolveCompilerDirectives(List<IAst> asts, ProgramGraph programGraph)
-        {
-            for (int i = 0; i < asts.Count; i++)
-            {
-                var ast = asts[i];
-                switch (ast)
-                {
-                    case ScopeAst:
-                    case WhileAst:
-                    case EachAst:
-                        ResolveCompilerDirectives(ast.Children, programGraph);
-                        break;
-                    case ConditionalAst conditional:
-                        ResolveCompilerDirectives(conditional.Children, programGraph);
-                        ResolveCompilerDirectives(conditional.Else, programGraph);
-                        break;
-                    case CompilerDirectiveAst directive:
-                        switch (directive.Type)
-                        {
-                            case DirectiveType.If:
-                                asts.RemoveAt(i);
-                                var conditional = directive.Value as ConditionalAst;
-                                // TODO Run type checking on children
-                                if (ExecuteCondition(conditional!.Condition, programGraph, _globalVariables))
-                                {
-                                    asts.InsertRange(i, conditional.Children);
-                                }
-                                else if (conditional.Else.Any())
-                                {
-                                    asts.InsertRange(i, conditional.Else);
-                                }
-                                break;
-                        }
-                        i--;
-                        break;
-                }
-            }
         }
 
         private ValueType ExecuteAst(IAst ast, ProgramGraph programGraph, IDictionary<string, ValueType> variables, out bool returned)

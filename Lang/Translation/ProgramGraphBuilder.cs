@@ -113,14 +113,12 @@ namespace Lang.Translation
                         case CompilerDirectiveAst directive:
                             if (directive.Type == DirectiveType.If)
                             {
-                                // TODO Implement me
                                 var conditional = directive.Value as ConditionalAst;
-                                // 1. Verify condition
-                                if (VerifyCondition(conditional.Condition, null, _globalVariables, errors))
+                                if (VerifyCondition(conditional!.Condition, null, _globalVariables, errors))
                                 {
-                                    // 2. Init program runner
+                                    // Initialize program runner
                                     _programRunner.Init(_programGraph);
-                                    // 3. Run the condition
+                                    // Run the condition
                                     if (_programRunner.ExecuteCondition(conditional!.Condition, _programGraph))
                                     {
                                         additionalAsts.AddRange(conditional.Children);
@@ -416,15 +414,63 @@ namespace Lang.Translation
                 return;
             }
 
-            // 3. Loop through function body and verify all ASTs
+            // 3. Resolve the compiler directives in the function
+            ResolveCompilerDirectives(function.Children, errors);
+
+            // 4. Loop through function body and verify all ASTs
             var returned = VerifyAsts(function.Children, function, localVariables, errors);
 
-            // 4. Verify the function returns on all paths
+            // 5. Verify the function returns on all paths
             if (!returned && returnType != Type.Void)
             {
                 errors.Add(CreateError($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnType)}' on all paths", function));
             }
             function.Verified = true;
+        }
+
+        private void ResolveCompilerDirectives(List<IAst> asts, List<TranslationError> errors)
+        {
+            for (int i = 0; i < asts.Count; i++)
+            {
+                var ast = asts[i];
+                switch (ast)
+                {
+                    case ScopeAst:
+                    case WhileAst:
+                    case EachAst:
+                        ResolveCompilerDirectives(ast.Children, errors);
+                        break;
+                    case ConditionalAst conditional:
+                        ResolveCompilerDirectives(conditional.Children, errors);
+                        ResolveCompilerDirectives(conditional.Else, errors);
+                        break;
+                    case CompilerDirectiveAst directive:
+                        switch (directive.Type)
+                        {
+                            case DirectiveType.If:
+                                asts.RemoveAt(i);
+
+                                var conditional = directive.Value as ConditionalAst;
+                                if (VerifyCondition(conditional!.Condition, null, _globalVariables, errors))
+                                {
+                                    // Initialize program runner
+                                    _programRunner.Init(_programGraph);
+                                    // Run the condition
+                                    if (_programRunner.ExecuteCondition(conditional!.Condition, _programGraph))
+                                    {
+                                        asts.InsertRange(i, conditional.Children);
+                                    }
+                                    else if (conditional.Else.Any())
+                                    {
+                                        asts.InsertRange(i, conditional.Else);
+                                    }
+                                }
+                                i--;
+                                break;
+                        }
+                        break;
+                }
+            }
         }
 
         private bool VerifyAsts(List<IAst> asts, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
@@ -877,10 +923,6 @@ namespace Lang.Translation
                 case DirectiveType.Run:
                     VerifyAst(directive.Value, null, _globalVariables, errors);
                     break;
-                // case DirectiveType.If:
-                //     var conditional = directive.Value as ConditionalAst;
-                //     VerifyExpression(conditional!.Condition, _globalVariables, errors);
-                //     break;
                 default:
                     errors.Add(CreateError("Compiler directive not supported", directive.Value));
                     break;
