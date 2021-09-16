@@ -49,7 +49,7 @@ namespace Lang
         private IntPtr _typeTablePointer;
         private IntPtr[] _typeInfoPointers;
 
-        private int _globalVariablesSize;
+        private uint _globalVariablesSize;
         private IntPtr[] _globals;
 
         public void Init()
@@ -126,8 +126,8 @@ namespace Lang
                     _globals = newGlobals;
                 }
 
-                var pointer = Marshal.AllocHGlobal((int)Program.GlobalVariablesSize - _globalVariablesSize);
-                _globalVariablesSize = (int)Program.GlobalVariablesSize;
+                var pointer = Marshal.AllocHGlobal((int)(Program.GlobalVariablesSize - _globalVariablesSize));
+                _globalVariablesSize = Program.GlobalVariablesSize;
 
                 for (; i < Program.GlobalVariables.Count; i++)
                 {
@@ -138,7 +138,10 @@ namespace Lang
                         _typeTablePointer = pointer;
                     }
 
-                    // TODO Set initial value
+                    if (variable.InitialValue != null)
+                    {
+                         // InitializeGlobalVariable(pointer, variable.InitialValue);
+                    }
 
                     _globals[i] = pointer;
                     pointer += (int)variable.Size;
@@ -341,6 +344,40 @@ namespace Lang
             var method = typeBuilder.DefineMethod(name, MethodAttributes.Public | MethodAttributes.Static, typeof(Register), args);
             var caBuilder = new CustomAttributeBuilder(typeof(DllImportAttribute).GetConstructor(new []{typeof(string)}), new []{library});
             method.SetCustomAttribute(caBuilder);
+        }
+
+        private void InitializeGlobalVariable(IntPtr pointer, InstructionValue value)
+        {
+            switch (value.ValueType)
+            {
+                case InstructionValueType.Value:
+                    var globalPointer = _globals[value.ValueIndex];
+                    Marshal.StructureToPtr(globalPointer, pointer, false);
+                    break;
+                case InstructionValueType.Constant:
+                    var constant = GetConstant(value);
+                    // TODO Implement me
+                    break;
+                case InstructionValueType.Null:
+                    Marshal.StructureToPtr(IntPtr.Zero, pointer, false);
+                    break;
+                case InstructionValueType.ConstantStruct:
+                    var structDef = (StructAst)value.Type;
+                    for (var i = 0; i < value.Values.Length; i++)
+                    {
+                        var field = structDef.Fields[i];
+                        pointer += (int)field.Offset;
+                        InitializeGlobalVariable(pointer, value.Values[i]);
+                    }
+                    break;
+                case InstructionValueType.ConstantArray when value.Values != null:
+                    for (var i = 0; i < value.ArrayLength; i++)
+                    {
+                        pointer += i * (int)value.Type.Size;
+                        InitializeGlobalVariable(pointer, value.Values[i]);
+                    }
+                    break;
+            }
         }
 
         public void RunProgram(FunctionIR function, IAst source)
