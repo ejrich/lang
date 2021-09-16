@@ -89,11 +89,9 @@ namespace Lang.Backend
                             CreateDebugBasicType(primitive, name);
                             break;
                         case ArrayType arrayType:
-                            using (var typeName = new MarshaledString(type.Name))
-                            {
-                                var pointerType = _debugTypes[arrayType.ElementType.TypeIndex];
-                                _debugTypes[arrayType.TypeIndex] = LLVM.DIBuilderCreatePointerType(_debugBuilder, pointerType, 64, 0, 0, typeName.Value, (UIntPtr)typeName.Length);
-                            }
+                            _types[arrayType.TypeIndex] = LLVM.ArrayType(_types[arrayType.ElementType.TypeIndex], arrayType.Length);
+                            var elementType = _debugTypes[arrayType.ElementType.TypeIndex];
+                            _debugTypes[arrayType.TypeIndex] = LLVM.DIBuilderCreateArrayType(_debugBuilder, arrayType.Length, 0, elementType, null, 0);
                             break;
                     }
                 }
@@ -115,6 +113,9 @@ namespace Lang.Backend
                             break;
                         case PrimitiveAst primitive:
                             _types[primitive.TypeIndex] = GetPrimitiveType(primitive);
+                            break;
+                        case ArrayType arrayType:
+                            _types[arrayType.TypeIndex] = LLVM.ArrayType(_types[arrayType.ElementType.TypeIndex], arrayType.Length);
                             break;
                     }
                 }
@@ -673,14 +674,6 @@ namespace Lang.Backend
                             var value = GetValue(instruction.Value1, values, allocations, functionPointer);
                             var targetType = _types[instruction.Value2.Type.TypeIndex];
                             values[instruction.ValueIndex] = _builder.BuildBitCast(value, targetType);
-                            break;
-                        }
-                        case InstructionType.ArrayCastToPointer:
-                        {
-                            var value = GetValue(instruction.Value1, values, allocations, functionPointer);
-                            var elementType = _types[instruction.Value2.Type.TypeIndex];
-                            var pointerType = LLVM.PointerType(elementType, 0);
-                            values[instruction.ValueIndex] = _builder.BuildBitCast(value, pointerType);
                             break;
                         }
                         case InstructionType.AllocateArray:

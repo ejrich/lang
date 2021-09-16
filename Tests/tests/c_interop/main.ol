@@ -4,6 +4,8 @@ main() {
     c_arrays();
 
     c_array_structs();
+
+    function_calls();
 }
 
 c_arrays() {
@@ -50,6 +52,18 @@ struct ArrayStruct {
     something: int;
     array: CArray<int>[struct_array_size];
     init_array: Array<int> = [1, 2, 3, 4, 5]
+}
+
+function_calls() {
+    array := returns_c_array();
+    each i in array {
+        printf("Return c array value %d\n", i);
+    }
+}
+
+CArray<int>[4] returns_c_array() {
+    a: CArray<int> = [1, 2, 3, 4]
+    return a;
 }
 
 #run main();

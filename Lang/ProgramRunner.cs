@@ -465,11 +465,9 @@ namespace Lang
                             case TypeKind.String:
                             case TypeKind.Array:
                             case TypeKind.Struct:
+                            case TypeKind.CArray:
                                 var copyBytes = instruction.Value2.Type.Size;
                                 Buffer.MemoryCopy(value.Pointer.ToPointer(), pointer.Pointer.ToPointer(), copyBytes, copyBytes);
-                                break;
-                            case TypeKind.CArray:
-                                // TODO How should this work?
                                 break;
                         }
                         break;
@@ -866,7 +864,6 @@ namespace Lang
                         break;
                     }
                     case InstructionType.PointerCast:
-                    case InstructionType.ArrayCastToPointer:
                     {
                         // These instructions are for LLVM, so this is a no-op
                         registers[instruction.ValueIndex] = GetValue(instruction.Value1, registers, stackPointer, function, arguments);

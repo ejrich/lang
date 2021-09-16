@@ -822,7 +822,7 @@ namespace Lang
             }
             else
             {
-                var instruction = new Instruction {Type = InstructionType.Return, Value1 = EmitIR(function, returnAst.Value, scope)};
+                var instruction = new Instruction {Type = InstructionType.Return, Value1 = EmitIR(function, returnAst.Value, scope, returnValue: true)};
                 function.Instructions.Add(instruction);
             }
         }
@@ -923,6 +923,7 @@ namespace Lang
             var indexVariable = AddAllocation(function, _s32Type);
             InstructionValue compareTarget;
             InstructionValue arrayData = null;
+            var cArrayIteration = false;
 
             if (each.Iteration != null)
             {
@@ -942,6 +943,7 @@ namespace Lang
                 if (iteration.Type.TypeKind == TypeKind.CArray)
                 {
                     arrayData = iteration;
+                    cArrayIteration = true;
                     var arrayType = (ArrayType)iteration.Type;
                     compareTarget = GetConstantInteger(arrayType.Length);
                 }
@@ -980,7 +982,7 @@ namespace Lang
             var condition = EmitInstruction(InstructionType.IntegerGreaterThanOrEqual, function, _boolType, indexValue, compareTarget);
             if (each.Iteration != null)
             {
-                var iterationVariable = EmitGetPointer(function, arrayData, indexValue, each.IterationVariable.Type);
+                var iterationVariable = EmitGetPointer(function, arrayData, indexValue, each.IterationVariable.Type, cArrayIteration);
                 each.IterationVariable.Pointer = iterationVariable;
 
                 if (!BuildSettings.Release)
@@ -1033,7 +1035,7 @@ namespace Lang
             return block;
         }
 
-        private InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, bool useRawString = false)
+        private InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, bool useRawString = false, bool returnValue = false)
         {
             switch (ast)
             {
@@ -1067,7 +1069,7 @@ namespace Lang
                             var dataPointer = EmitGetStructPointer(function, declaration.AllocationIndex, _stringStruct, 1, dataField, global);
                             return EmitLoadPointer(function, dataField.Type, dataPointer);
                         }
-                        return EmitLoad(function, declaration.Type, declaration.AllocationIndex, global);
+                        return EmitLoad(function, declaration.Type, declaration.AllocationIndex, global, returnValue);
                     }
                     else if (identifier is VariableAst variable)
                     {
@@ -1083,9 +1085,9 @@ namespace Lang
                         }
                         else if (variable.AllocationIndex.HasValue)
                         {
-                            return EmitLoad(function, variable.Type, variable.AllocationIndex.Value, global);
+                            return EmitLoad(function, variable.Type, variable.AllocationIndex.Value, global, returnValue);
                         }
-                        return EmitLoad(function, variable.Type, variable.Pointer);
+                        return EmitLoad(function, variable.Type, variable.Pointer, returnValue);
                     }
                     else if (identifier is IType type)
                     {
@@ -1838,21 +1840,20 @@ namespace Lang
             };
         }
 
-        private InstructionValue EmitLoad(FunctionIR function, IType type, int allocationIndex, bool global = false)
+        private InstructionValue EmitLoad(FunctionIR function, IType type, int allocationIndex, bool global = false, bool returnValue = false)
         {
             var allocationValue = AllocationValue(allocationIndex, type, global);
-            return EmitLoad(function, type, allocationValue);
+            return EmitLoad(function, type, allocationValue, returnValue);
         }
 
-        private InstructionValue EmitLoad(FunctionIR function, IType type, InstructionValue value)
+        private InstructionValue EmitLoad(FunctionIR function, IType type, InstructionValue value, bool returnValue = false)
         {
-            // Loading C arrays is not required, only the pointer is needed
-            if (type.TypeKind == TypeKind.CArray)
+            // Loading C arrays is not required, only the pointer is needed, unless it is a return value
+            if (type.TypeKind == TypeKind.CArray && !returnValue)
             {
-                var arrayType = (ArrayType)type;
-                var castInstruction = new Instruction {Type = InstructionType.ArrayCastToPointer, Value1 = value, Value2 = new InstructionValue {ValueType = InstructionValueType.Type, Type = arrayType.ElementType}};
-                return AddInstruction(function, castInstruction, type);
+                return value;
             }
+
             var loadInstruction = new Instruction {Type = InstructionType.Load, Value1 = value};
             return AddInstruction(function, loadInstruction, type);
         }
