@@ -68,7 +68,10 @@ polymorphic_functions() {
     printf("int_value = %d, should be 45\n", int_value);
 
     int_list: List<int>[8];
+    string_list: List<string>[8];
     baz(int_list, &float_value);
+    baz(int_list, &int_value);
+    baz(string_list, &int_value);
 }
 
 T add_int<T>(T a, int b) {
@@ -78,7 +81,11 @@ T add_int<T>(T a, int b) {
 }
 
 baz<T, U>(List<T> list, U* b) {
-    // TODO Add content
+    #if U == float then printf("b = %.2f\n", *b);
+    else {
+        if T == s32 then printf("T is an int\n");
+        else then printf("T is not an int\n");
+    }
 }
 
 #run main();

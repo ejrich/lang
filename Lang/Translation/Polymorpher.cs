@@ -191,24 +191,41 @@ namespace Lang.Translation
 
         private IAst CopyExpression(IAst ast, TypeDefinition[] genericTypes, List<string> generics)
         {
-            // TODO Implement me
             switch (ast)
             {
                 case ConstantAst:
                 case NullAst:
                     return ast;
                 case StructFieldRefAst structField:
-                    // TODO Check this
-                    return structField;
-                case IdentifierAst identifier:
-                    if (generics.Contains(identifier.Name))
+                    var structFieldCopy = CopyAst(structField);
+                    foreach (var child in structField.Children)
                     {
-                        // TODO Switch this around
+                        if (child is IdentifierAst)
+                        {
+                            structFieldCopy.Children.Add(child);
+                        }
+                        else
+                        {
+                            structFieldCopy.Children.Add(CopyExpression(child, genericTypes, generics));
+                        }
+                    }
+                    return structFieldCopy;
+                case IdentifierAst identifier:
+                    for (var i = 0; i < generics.Count; i++)
+                    {
+                        if (generics[i] == identifier.Name)
+                        {
+                            // TODO Should this copy the file and line info?
+                            return genericTypes[i];
+                        }
                     }
                     return identifier;
                 case ChangeByOneAst changeByOne:
-                    // TODO Check this
-                    return changeByOne;
+                    var changeByOneCopy = CopyAst(changeByOne);
+                    changeByOneCopy.Prefix = changeByOne.Prefix;
+                    changeByOneCopy.Positive = changeByOne.Positive;
+                    changeByOneCopy.Value = CopyExpression(changeByOne.Value, genericTypes, generics);
+                    return changeByOneCopy;
                 case UnaryAst unary:
                     var unaryCopy = CopyAst(unary);
                     unaryCopy.Operator = unary.Operator;
@@ -219,9 +236,17 @@ namespace Lang.Translation
                     callCopy.Function = call.Function;
                     if (call.SpecifiedArguments != null)
                     {
-                        // TODO Handle this and arguments
+                        callCopy.SpecifiedArguments = new Dictionary<string, IAst>();
+                        foreach (var (name, argument) in call.SpecifiedArguments)
+                        {
+                            callCopy.SpecifiedArguments[name] = CopyExpression(argument, genericTypes, generics);
+                        }
                     }
-                    return call;
+                    foreach (var argument in call.Arguments)
+                    {
+                        callCopy.Arguments.Add(CopyExpression(argument, genericTypes, generics));
+                    }
+                    return callCopy;
                 case ExpressionAst expression:
                     var expressionCopy = CopyAst(expression);
                     expressionCopy.Operators.AddRange(expression.Operators);
@@ -236,8 +261,7 @@ namespace Lang.Translation
                     indexCopy.Index = CopyExpression(index.Index, genericTypes, generics);
                     return indexCopy;
                 case TypeDefinition typeDef:
-                    // TODO Check for generics
-                    return typeDef;
+                    return CopyType(typeDef, genericTypes);
                 case CastAst cast:
                     var castCopy = CopyAst(cast);
                     castCopy.TargetType = cast.HasGenerics ? CopyType(cast.TargetType, genericTypes) : cast.TargetType;

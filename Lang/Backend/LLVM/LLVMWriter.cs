@@ -22,9 +22,10 @@ namespace Lang.Backend.LLVM
         private bool _stackSaved;
 
         private Dictionary<string, List<FunctionAst>> _functions;
-        private readonly Dictionary<string, IAst> _types = new();
+        private Dictionary<string, IType> _types;
         private readonly Queue<LLVMValueRef> _allocationQueue = new();
         private readonly LLVMValueRef _zeroInt = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 0, false);
+        private readonly TypeDefinition _intTypeDefinition = new() {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
 
         public string WriteFile(string projectPath, ProgramGraph programGraph, BuildSettings buildSettings)
         {
@@ -115,17 +116,12 @@ namespace Lang.Backend.LLVM
         {
             // 1. Declare structs and enums
             var structs = new Dictionary<string, LLVMTypeRef>();
+            _types = programGraph.Types;
             foreach (var (name, type) in programGraph.Types)
             {
-                switch (type)
+                if (type is StructAst structAst)
                 {
-                    case StructAst structAst:
-                        structs[name] = LLVMApi.StructCreateNamed(LLVMApi.GetModuleContext(_module), name);
-                        _types.Add(name, structAst);
-                        break;
-                    case EnumAst enumAst:
-                        _types.Add(enumAst.Name, enumAst);
-                        break;
+                    structs[name] = LLVMApi.StructCreateNamed(LLVMApi.GetModuleContext(_module), name);
                 }
             }
             foreach (var (name, type) in programGraph.Types)
@@ -1105,7 +1101,12 @@ namespace Lang.Backend.LLVM
                 }
                 case IdentifierAst identifier:
                 {
-                    var (type, value) = localVariables[identifier.Name];
+                    if (!localVariables.TryGetValue(identifier.Name, out var typeValue))
+                    {
+                        var typeDef = _types[identifier.Name];
+                        return (_intTypeDefinition, LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (uint)typeDef.TypeIndex, false));
+                    }
+                    var (type, value) = typeValue;
                     if (!type.Constant)
                     {
                         value = LLVMApi.BuildLoad(_builder, value, identifier.Name);
@@ -1292,6 +1293,11 @@ namespace Lang.Backend.LLVM
                         expressionValue.type = expression.ResultingTypes[i - 1];
                     }
                     return expressionValue;
+                case TypeDefinition typeDef:
+                {
+                    var type = _types[typeDef.GenericName];
+                    return (_intTypeDefinition, LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (uint)type.TypeIndex, false));
+                }
                 case CastAst cast:
                 {
                     var value = WriteExpression(cast.Value, localVariables);

@@ -1543,6 +1543,10 @@ namespace Lang.Parsing
                                 case TokenType.CloseParen:
                                     if (TryParseType(enumerator, errors, out var typeDefinition))
                                     {
+                                        for (var i = 0; i < currentFunction.Generics.Count; i++)
+                                        {
+                                            SearchForGeneric(currentFunction.Generics[i], i, typeDefinition);
+                                        }
                                         return typeDefinition;
                                     }
                                     break;
@@ -1552,6 +1556,10 @@ namespace Lang.Parsing
                         {
                             if (TryParseType(enumerator, errors, out var typeDefinition))
                             {
+                                for (var i = 0; i < currentFunction.Generics.Count; i++)
+                                {
+                                    SearchForGeneric(currentFunction.Generics[i], i, typeDefinition);
+                                }
                                 return typeDefinition;
                             }
                             break;
