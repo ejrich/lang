@@ -214,20 +214,23 @@ namespace Lang
                     }
                     case InstructionType.IsNull:
                     {
-                        // var value = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildIsNull(value);
+                        var value = GetValue(instruction.Value1, registers, stackPointer);
+                        var isNull = value.Pointer == IntPtr.Zero;
+                        registers[instruction.ValueIndex] = new Register {Bool = isNull};
                         break;
                     }
                     case InstructionType.IsNotNull:
                     {
-                        // var value = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildIsNotNull(value);
+                        var value = GetValue(instruction.Value1, registers, stackPointer);
+                        var isNotNull = value.Pointer != IntPtr.Zero;
+                        registers[instruction.ValueIndex] = new Register {Bool = isNotNull};
                         break;
                     }
                     case InstructionType.Not:
                     {
-                        // var value = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildNot(value);
+                        var value = GetValue(instruction.Value1, registers, stackPointer);
+                        var not = !value.Bool;
+                        registers[instruction.ValueIndex] = new Register {Bool = not};
                         break;
                     }
                     case InstructionType.IntegerNegate:
@@ -244,16 +247,18 @@ namespace Lang
                     }
                     case InstructionType.And:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildAnd(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var and = lhs.Bool && rhs.Bool;
+                        registers[instruction.ValueIndex] = new Register {Bool = and};
                         break;
                     }
                     case InstructionType.Or:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildOr(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var or = lhs.Bool || rhs.Bool;
+                        registers[instruction.ValueIndex] = new Register {Bool = or};
                         break;
                     }
                     case InstructionType.BitwiseAnd:
@@ -552,12 +557,12 @@ namespace Lang
             }
         }
 
-        private Register GetValue(InstructionValue value, Register[] values)
+        private Register GetValue(InstructionValue value, Register[] registers, IntPtr stackPointer)
         {
             switch (value.ValueType)
             {
                 case InstructionValueType.Value:
-                    return values[value.ValueIndex];
+                    return registers[value.ValueIndex];
                 case InstructionValueType.Allocation:
                     if (value.Global)
                     {
