@@ -218,8 +218,6 @@ namespace Lang.Runner
                     for (var i = 0; i < functions.Count; i++)
                     {
                         var function = functions[i];
-                        if (function.Generics.Any()) continue;
-
                         if (!_typeInfoPointers.TryGetValue($"{name}.{i}", out var typeInfoPointer))
                         {
                             var typeInfo = Activator.CreateInstance(typeInfoType);
