@@ -45,14 +45,14 @@ namespace Lang.Parsing
 
     public class ExpressionAst : IAst
     {
-        public bool HasErrors { get; set; }
+        public List<Operator> Operators { get; } = new();
         public List<IAst> Children { get; } = new();
     }
 
     public class CallAst : IAst
     {
         public string Function { get; set; }
-        public List<IAst> Arguments { get; set; } = new();
+        public List<IAst> Arguments { get; } = new();
         public List<IAst> Children => null;
     }
 
@@ -73,6 +73,20 @@ namespace Lang.Parsing
     {
         public string Type { get; init; }
         public List<string> Generics { get; } = new();
+    }
+
+    public enum Operator
+    {
+        Add = '+',
+        Subtract = '-',
+        Multiply = '*',
+        Divide = '/',
+        GreaterThan = '>',
+        LessThan = '<',
+        Or = '|',
+        And = '&',
+        Xor = '^',
+        Modulus = '%'
     }
 
     public enum Type
