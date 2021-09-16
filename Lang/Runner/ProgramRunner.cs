@@ -218,7 +218,7 @@ namespace Lang.Runner
                 if (assignments.TryGetValue(field.Name, out var assignment))
                 {
                     var expression = ExecuteExpression(assignment.Value, programGraph, variables);
-                    var value = CastValue(expression, field.Type);
+                    var value = CastValue(expression.Value, field.Type);
 
                     fieldInstance!.SetValue(instance, value);
                 }
@@ -268,7 +268,8 @@ namespace Lang.Runner
             if (assignment.Operator != Operator.None)
             {
                 var lhs = ExecuteExpression(assignment.Variable, programGraph, variables);
-                expression = BuildExpression(lhs, expression, assignment.Operator, lhs.Type);
+                expression.Value = RunExpression(lhs, expression, assignment.Operator, lhs.Type);
+                expression.Type = lhs.Type;
             }
 
             switch (assignment.Variable)
@@ -371,7 +372,31 @@ namespace Lang.Runner
 
         private ValueType ExecuteEach(EachAst each, ProgramGraph programGraph, IDictionary<string, ValueType> variables, out bool returned)
         {
-            throw new NotImplementedException();
+            var eachVariables = new Dictionary<string, ValueType>(variables);
+            if (each.Iteration != null)
+            {
+                // TODO Implement me
+            }
+
+            var rangeBegin = ExecuteExpression(each.RangeBegin, programGraph, variables);
+            var rangeEnd = ExecuteExpression(each.RangeEnd, programGraph, variables);
+            var iterationVariable = new ValueType {Type = rangeBegin.Type, Value = rangeBegin.Value};
+            eachVariables.Add(each.IterationVariable, iterationVariable);
+
+            while ((bool)RunExpression(iterationVariable, rangeEnd, Operator.LessThanEqual, iterationVariable.Type))
+            {
+                var value = ExecuteAsts(each.Children, programGraph, eachVariables, out returned);
+
+                if (returned)
+                {
+                    return value;
+                }
+
+                iterationVariable.Value = (int)iterationVariable.Value + 1;
+            }
+
+            returned = false;
+            return null;
         }
 
         private ValueType ExecuteAsts(List<IAst> asts, ProgramGraph programGraph,
@@ -543,11 +568,14 @@ namespace Lang.Runner
                         return CallFunction(function, programGraph, arguments);
                     }
                 case ExpressionAst expression:
-                    var expressionValue = ExecuteExpression(expression.Children[0], programGraph, variables);
+                    var firstValue = ExecuteExpression(expression.Children[0], programGraph, variables);
+                    var expressionValue = new ValueType {Type = firstValue.Type, Value = firstValue.Value};
                     for (var i = 1; i < expression.Children.Count; i++)
                     {
                         var rhs = ExecuteExpression(expression.Children[i], programGraph, variables);
-                        expressionValue = BuildExpression(expressionValue, rhs, expression.Operators[i - 1], expression.ResultingTypes[i - 1]);
+                        var nextType = expression.ResultingTypes[i - 1];
+                        expressionValue.Value = RunExpression(expressionValue, rhs, expression.Operators[i - 1], nextType);
+                        expressionValue.Type = nextType;
                     }
                     return expressionValue;
                 case IndexAst index:
@@ -611,7 +639,7 @@ namespace Lang.Runner
             return null;
         }
 
-        private ValueType BuildExpression(ValueType lhs, ValueType rhs, Operator op, TypeDefinition targetType)
+        private static object RunExpression(ValueType lhs, ValueType rhs, Operator op, TypeDefinition targetType)
         {
             // TODO Implement pointers
             // 1. Handle pointer math 
@@ -624,64 +652,406 @@ namespace Lang.Runner
             //     return BuildPointerOperation(rhs.value, lhs.value, op);
             // }
 
-            // 2. Handle simple operators like && and ||
-            if (op == Operator.And || op == Operator.Or)
-            {
-                var lhsBool = (bool)lhs.Value;
-                var rhsBool = (bool)rhs.Value;
-                return new ValueType
-                {
-                    Type = targetType, Value = op == Operator.And ? lhsBool && rhsBool : lhsBool || rhsBool
-                };
-            }
-
-            // 3. Handle compares, since the lhs and rhs should not be cast to the target type 
+            // 2. Handle compares, since the lhs and rhs should not be cast to the target type 
             switch (op)
             {
+                case Operator.And:
+                case Operator.Or:
+                    var lhsBool = (bool)lhs.Value;
+                    var rhsBool = (bool)rhs.Value;
+                    return op == Operator.And ? lhsBool && rhsBool : lhsBool || rhsBool;
                 case Operator.Equality:
                 case Operator.NotEqual:
                 case Operator.GreaterThanEqual:
                 case Operator.LessThanEqual:
                 case Operator.GreaterThan:
                 case Operator.LessThan:
-                    return new ValueType {Type = targetType, Value = Compare(lhs, rhs, op)};
+                    return Compare(lhs, rhs, op);
             }
 
-            // 4. Cast lhs and rhs to the target types
-            var lhsValue = CastValue(lhs, targetType);
-            var rhsValue = CastValue(rhs, targetType);
+            // 3. Cast lhs and rhs to the target types
+            var lhsValue = CastValue(lhs.Value, targetType);
+            var rhsValue = CastValue(rhs.Value, targetType);
 
-            // 5. Handle the rest of the simple operators
+            // 4. Handle the rest of the simple operators
             switch (op)
             {
                 case Operator.BitwiseAnd:
                 case Operator.BitwiseOr:
                 case Operator.Xor:
-                    // TODO Implement me
-                    return new ValueType {Type = targetType, Value = null};
+                    if (targetType.Name == "bool")
+                    {
+                        var lhsBool = Convert.ToBoolean(lhsValue);
+                        var rhsBool = Convert.ToBoolean(rhsValue);
+                        switch (op)
+                        {
+                            case Operator.BitwiseAnd:
+                                return lhsBool & rhsBool;
+                            case Operator.BitwiseOr:
+                                return lhsBool | rhsBool;
+                            case Operator.Xor:
+                                return lhsBool ^ rhsBool;
+                        }
+                    }
+
+                    if (targetType.PrimitiveType is IntegerType integerType)
+                    {
+                        switch (integerType.Bytes)
+                        {
+                            case 1:
+                                if (integerType.Signed)
+                                {
+                                    var lhsByte = Convert.ToSByte(lhsValue);
+                                    var rhsByte = Convert.ToSByte(rhsValue);
+                                    switch (op)
+                                    {
+                                        case Operator.BitwiseAnd:
+                                            return lhsByte & rhsByte;
+                                        case Operator.BitwiseOr:
+                                            return lhsByte | rhsByte;
+                                        case Operator.Xor:
+                                            return lhsByte ^ rhsByte;
+                                    }
+                                }
+                                else
+                                {
+                                    var lhsByte = Convert.ToByte(lhsValue);
+                                    var rhsByte = Convert.ToByte(rhsValue);
+                                    switch (op)
+                                    {
+                                        case Operator.BitwiseAnd:
+                                            return lhsByte & rhsByte;
+                                        case Operator.BitwiseOr:
+                                            return lhsByte | rhsByte;
+                                        case Operator.Xor:
+                                            return lhsByte ^ rhsByte;
+                                    }
+                                }
+                                break;
+                            case 2:
+                                if (integerType.Signed)
+                                {
+                                    var lhsShort = Convert.ToInt16(lhsValue);
+                                    var rhsShort = Convert.ToInt16(rhsValue);
+                                    switch (op)
+                                    {
+                                        case Operator.BitwiseAnd:
+                                            return lhsShort & rhsShort;
+                                        case Operator.BitwiseOr:
+                                            return lhsShort | rhsShort;
+                                        case Operator.Xor:
+                                            return lhsShort ^ rhsShort;
+                                    }
+                                }
+                                else
+                                {
+                                    var lhsShort = Convert.ToUInt16(lhsValue);
+                                    var rhsShort = Convert.ToUInt16(rhsValue);
+                                    switch (op)
+                                    {
+                                        case Operator.BitwiseAnd:
+                                            return lhsShort & rhsShort;
+                                        case Operator.BitwiseOr:
+                                            return lhsShort | rhsShort;
+                                        case Operator.Xor:
+                                            return lhsShort ^ rhsShort;
+                                    }
+                                }
+                                break;
+                            case 4:
+                                if (integerType.Signed)
+                                {
+                                    var lhsInt = Convert.ToInt32(lhsValue);
+                                    var rhsInt = Convert.ToInt32(rhsValue);
+                                    switch (op)
+                                    {
+                                        case Operator.BitwiseAnd:
+                                            return lhsInt & rhsInt;
+                                        case Operator.BitwiseOr:
+                                            return lhsInt | rhsInt;
+                                        case Operator.Xor:
+                                            return lhsInt ^ rhsInt;
+                                    }
+                                }
+                                else
+                                {
+                                    var lhsInt = Convert.ToUInt32(lhsValue);
+                                    var rhsInt = Convert.ToUInt32(rhsValue);
+                                    switch (op)
+                                    {
+                                        case Operator.BitwiseAnd:
+                                            return lhsInt & rhsInt;
+                                        case Operator.BitwiseOr:
+                                            return lhsInt | rhsInt;
+                                        case Operator.Xor:
+                                            return lhsInt ^ rhsInt;
+                                    }
+                                }
+                                break;
+                            case 8:
+                                if (integerType.Signed)
+                                {
+                                    var lhsLong = Convert.ToInt64(lhsValue);
+                                    var rhsLong = Convert.ToInt64(rhsValue);
+                                    switch (op)
+                                    {
+                                        case Operator.BitwiseAnd:
+                                            return lhsLong & rhsLong;
+                                        case Operator.BitwiseOr:
+                                            return lhsLong | rhsLong;
+                                        case Operator.Xor:
+                                            return lhsLong ^ rhsLong;
+                                    }
+                                }
+                                else
+                                {
+                                    var lhsLong = Convert.ToUInt64(lhsValue);
+                                    var rhsLong = Convert.ToUInt64(rhsValue);
+                                    switch (op)
+                                    {
+                                        case Operator.BitwiseAnd:
+                                            return lhsLong & rhsLong;
+                                        case Operator.BitwiseOr:
+                                            return lhsLong | rhsLong;
+                                        case Operator.Xor:
+                                            return lhsLong ^ rhsLong;
+                                    }
+                                }
+                                break;
+                        }
+                    }
+                    break;
             }
 
-            // 6. Handle binary operations
-            var signed = lhs.Type.PrimitiveType.Signed || rhs.Type.PrimitiveType.Signed;
-            return PerformOperation(targetType, lhsValue, rhsValue, op, signed);
+            // 5. Handle binary operations
+            return PerformOperation(targetType, lhsValue, rhsValue, op);
         }
 
-        private object Compare(ValueType lhs, ValueType rhs, Operator op)
+        private static object Compare(ValueType lhs, ValueType rhs, Operator op)
         {
-            // TODO Implement me
-            return true;
+            switch (lhs.Type.PrimitiveType)
+            {
+                case IntegerType lhsInteger:
+                    switch (rhs.Type.PrimitiveType)
+                    {
+                        case IntegerType rhsInteger:
+                        {
+                            if (lhsInteger.Signed || rhsInteger.Signed)
+                            {
+                                var lhsValue = Convert.ToInt64(lhs.Value);
+                                var rhsValue = Convert.ToInt64(rhs.Value);
+                                return IntegerOperations(lhsValue, rhsValue, op);
+                            }
+                            else
+                            {
+                                var lhsValue = Convert.ToUInt64(lhs.Value);
+                                var rhsValue = Convert.ToUInt64(rhs.Value);
+                                return UnsignedIntegerOperations(lhsValue, rhsValue, op);
+                            }
+                        }
+                        case FloatType floatType:
+                        {
+                            if (floatType.Bytes == 4)
+                            {
+                                var lhsFloat = Convert.ToSingle(lhs.Value);
+                                var rhsFloat = Convert.ToSingle(rhs.Value);
+                                return FloatOperations(lhsFloat, rhsFloat, op);
+                            }
+                            else
+                            {
+                                var lhsFloat = Convert.ToDouble(lhs.Value);
+                                var rhsFloat = Convert.ToDouble(rhs.Value);
+                                return DoubleOperations(lhsFloat, rhsFloat, op);
+                            }
+                        }
+                    }
+                    break;
+                case FloatType lhsFloatType:
+                    switch (rhs.Type.PrimitiveType)
+                    {
+                        case IntegerType:
+                        {
+                            if (lhsFloatType.Bytes == 4)
+                            {
+                                var lhsFloat = Convert.ToSingle(lhs.Value);
+                                var rhsFloat = Convert.ToSingle(rhs.Value);
+                                return FloatOperations(lhsFloat, rhsFloat, op);
+                            }
+                            else
+                            {
+                                var lhsFloat = Convert.ToDouble(lhs.Value);
+                                var rhsFloat = Convert.ToDouble(rhs.Value);
+                                return DoubleOperations(lhsFloat, rhsFloat, op);
+                            }
+                        }
+                        case FloatType rhsFloatType:
+                        {
+                            if (lhsFloatType.Bytes == 4 && rhsFloatType.Bytes == 4)
+                            {
+                                var lhsFloat = Convert.ToSingle(lhs.Value);
+                                var rhsFloat = Convert.ToSingle(rhs.Value);
+                                return FloatOperations(lhsFloat, rhsFloat, op);
+                            }
+                            else
+                            {
+                                var lhsFloat = Convert.ToDouble(lhs.Value);
+                                var rhsFloat = Convert.ToDouble(rhs.Value);
+                                return DoubleOperations(lhsFloat, rhsFloat, op);
+                            }
+                        }
+                    }
+                    break;
+                case EnumType:
+                {
+                    var lhsValue = Convert.ToInt64(lhs.Value);
+                    var rhsValue = Convert.ToInt64(rhs.Value);
+                    return IntegerOperations(lhsValue, rhsValue, op);
+                }
+            }
+
+            // @Future Operator overloading
+            throw new NotImplementedException($"{op} not compatible with types '{lhs.Type.GenericName}' and '{rhs.Type.GenericName}'");
         }
 
-        private ValueType PerformOperation(TypeDefinition targetType, object lhsValue, object rhsValue, Operator op, bool signed)
+        private static object PerformOperation(TypeDefinition targetType, object lhsValue, object rhsValue, Operator op)
         {
-            // TODO Implement me
-            return new() {Type = targetType, Value = null};
+            switch (targetType.PrimitiveType)
+            {
+                case IntegerType integerType:
+                    if (integerType.Signed)
+                    {
+                        var lhsInt = Convert.ToInt64(lhsValue);
+                        var rhsInt = Convert.ToInt64(rhsValue);
+                        var result = IntegerOperations(lhsInt, rhsInt, op);
+                        return CastValue(result, targetType);
+                    }
+                    else
+                    {
+                        var lhsInt = Convert.ToUInt64(lhsValue);
+                        var rhsInt = Convert.ToUInt64(rhsValue);
+                        var result = UnsignedIntegerOperations(lhsInt, rhsInt, op);
+                        return CastValue(result, targetType);
+                    }
+                case FloatType floatType:
+                    if (floatType.Bytes == 4)
+                    {
+                        var lhsFloat = Convert.ToSingle(lhsValue);
+                        var rhsFloat = Convert.ToSingle(lhsValue);
+                        var result = FloatOperations(lhsFloat, rhsFloat, op);
+                        return CastValue(result, targetType);
+                    }
+                    else
+                    {
+                        var lhsFloat = Convert.ToDouble(lhsValue);
+                        var rhsFloat = Convert.ToDouble(lhsValue);
+                        var result = DoubleOperations(lhsFloat, rhsFloat, op);
+                        return CastValue(result, targetType);
+                    }
+            }
+
+            // @Future Operator overloading
+            throw new NotImplementedException($"{op} not compatible with types '{lhsValue.GetType()}' and '{rhsValue.GetType()}'");
         }
 
-        private object CastValue(ValueType expression, TypeDefinition targetType)
+        private static object CastValue(object value, TypeDefinition targetType)
         {
-            // TODO Implement me
-            return expression.Value;
+            switch (targetType.PrimitiveType)
+            {
+                case IntegerType integerType:
+                    return integerType.Bytes switch
+                    {
+                        1 => integerType.Signed ? Convert.ToSByte(value) : Convert.ToByte(value),
+                        2 => integerType.Signed ? Convert.ToInt16(value) : Convert.ToUInt16(value),
+                        4 => integerType.Signed ? Convert.ToInt32(value) : Convert.ToUInt32(value),
+                        8 => integerType.Signed ? Convert.ToInt64(value) : Convert.ToUInt64(value),
+                        _ => integerType.Signed ? Convert.ToInt32(value) : Convert.ToUInt32(value)
+                    };
+                case FloatType floatType:
+                    return floatType.Bytes == 4 ? Convert.ToSingle(value) : Convert.ToDouble(value);
+            }
+
+            // @Future Polymorphic type casting
+            return value;
+        }
+
+        private static object IntegerOperations(long lhs, long rhs, Operator op)
+        {
+            return op switch
+            {
+                Operator.Equality => lhs == rhs,
+                Operator.NotEqual => lhs != rhs,
+                Operator.GreaterThan => lhs > rhs,
+                Operator.GreaterThanEqual => lhs >= rhs,
+                Operator.LessThan => lhs < rhs,
+                Operator.LessThanEqual => lhs <= rhs,
+                Operator.Add => lhs + rhs,
+                Operator.Subtract => lhs - rhs,
+                Operator.Multiply => lhs * rhs,
+                Operator.Divide => lhs / rhs,
+                Operator.Modulus => lhs % rhs,
+                // @Cleanup This branch should never be hit
+                _ => null
+            };
+        }
+
+        private static object UnsignedIntegerOperations(ulong lhs, ulong rhs, Operator op)
+        {
+            return op switch
+            {
+                Operator.Equality => lhs == rhs,
+                Operator.NotEqual => lhs != rhs,
+                Operator.GreaterThan => lhs > rhs,
+                Operator.GreaterThanEqual => lhs >= rhs,
+                Operator.LessThan => lhs < rhs,
+                Operator.LessThanEqual => lhs <= rhs,
+                Operator.Add => lhs + rhs,
+                Operator.Subtract => lhs - rhs,
+                Operator.Multiply => lhs * rhs,
+                Operator.Divide => lhs / rhs,
+                Operator.Modulus => lhs % rhs,
+                // @Cleanup This branch should never be hit
+                _ => null
+            };
+        }
+
+        private static object FloatOperations(float lhs, float rhs, Operator op)
+        {
+            return op switch
+            {
+                Operator.Equality => Math.Abs(lhs - rhs) < float.MinValue,
+                Operator.NotEqual => Math.Abs(lhs - rhs) > float.MinValue,
+                Operator.GreaterThan => lhs > rhs,
+                Operator.GreaterThanEqual => lhs >= rhs,
+                Operator.LessThan => lhs < rhs,
+                Operator.LessThanEqual => lhs <= rhs,
+                Operator.Add => lhs + rhs,
+                Operator.Subtract => lhs - rhs,
+                Operator.Multiply => lhs * rhs,
+                Operator.Divide => lhs / rhs,
+                Operator.Modulus => lhs % rhs,
+                // @Cleanup This branch should never be hit
+                _ => null
+            };
+        }
+
+        private static object DoubleOperations(double lhs, double rhs, Operator op)
+        {
+            return op switch
+            {
+                Operator.Equality => Math.Abs(lhs - rhs) < double.Epsilon,
+                Operator.NotEqual => Math.Abs(lhs - rhs) > double.Epsilon,
+                Operator.GreaterThan => lhs > rhs,
+                Operator.GreaterThanEqual => lhs >= rhs,
+                Operator.LessThan => lhs < rhs,
+                Operator.LessThanEqual => lhs <= rhs,
+                Operator.Add => lhs + rhs,
+                Operator.Subtract => lhs - rhs,
+                Operator.Multiply => lhs * rhs,
+                Operator.Divide => lhs / rhs,
+                Operator.Modulus => lhs % rhs,
+                // @Cleanup This branch should never be hit
+                _ => null
+            };
         }
 
         private static void CreateFunction(TypeBuilder typeBuilder, string name, string library, Type returnType, params Type[] args)
