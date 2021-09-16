@@ -349,7 +349,7 @@ namespace Lang
             }
             catch (Exception e)
             {
-                AddError("Internal compiler error running program", ast);
+                ErrorReporter.Report("Internal compiler error running program", ast);
                 #if DEBUG
                 Console.WriteLine(e);
                 #endif
@@ -722,7 +722,7 @@ namespace Lang
             }
             catch (Exception e)
             {
-                AddError("Internal compiler error executing condition", expression);
+                ErrorReporter.Report("Internal compiler error executing condition", expression);
                 #if DEBUG
                 Console.WriteLine(e);
                 #endif
@@ -1406,7 +1406,7 @@ namespace Lang
             {
                 if (!_compilerFunctions.TryGetValue(function.Name, out var name))
                 {
-                    AddError($"Undefined compiler function '{function.Name}'", function);
+                    ErrorReporter.Report($"Undefined compiler function '{function.Name}'", function);
                     return null;
                 }
                 var args = arguments.Select(GetManagedArg).ToArray();
@@ -2154,17 +2154,6 @@ namespace Lang
                 8 => typeof(ulong),
                 _ => typeof(uint)
             };
-        }
-
-        private void AddError(string message, IAst ast)
-        {
-            _programGraph.Errors.Add(new TranslationError
-            {
-                Error = message,
-                FileIndex = ast.FileIndex,
-                Line = ast.Line,
-                Column = ast.Column
-            });
         }
     }
 }

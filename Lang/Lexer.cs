@@ -7,7 +7,7 @@ namespace Lang
 {
     public interface ILexer
     {
-        List<Token> LoadFileTokens(string filePath, int fileIndex, out List<ParseError> errors);
+        List<Token> LoadFileTokens(string filePath, int fileIndex);
     }
 
     public class Lexer : ILexer
@@ -45,16 +45,15 @@ namespace Lang
             {"continue", TokenType.Continue}
         };
 
-        public List<Token> LoadFileTokens(string filePath, int fileIndex, out List<ParseError> errors)
+        public List<Token> LoadFileTokens(string filePath, int fileIndex)
         {
             using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
             using var reader = new StreamReader(fileStream);
 
-            errors = new List<ParseError>();
-            return GetTokens(reader, fileIndex, errors).ToList();
+            return GetTokens(reader, fileIndex).ToList();
         }
 
-        private IEnumerable<Token> GetTokens(StreamReader reader, int fileIndex, List<ParseError> errors)
+        private IEnumerable<Token> GetTokens(StreamReader reader, int fileIndex)
         {
             var lexerStatus = new LexerStatus();
 
@@ -130,10 +129,7 @@ namespace Lang
                         {
                             if (currentToken.Error)
                             {
-                                errors.Add(new ParseError
-                                {
-                                    Error = $"Unexpected token '{currentToken.Value}'", Token = currentToken
-                                });
+                                ErrorReporter.Report($"Unexpected token '{currentToken.Value}'", currentToken);
                             }
 
                             yield return currentToken;
@@ -160,7 +156,7 @@ namespace Lang
                     yield return currentToken;
                     if (character != '\'')
                     {
-                        errors.Add(new ParseError {Error = $"Expected a single digit character", Token = currentToken});
+                        ErrorReporter.Report($"Expected a single digit character", currentToken);
                     }
                     else
                     {
@@ -192,7 +188,7 @@ namespace Lang
                         }
                         else
                         {
-                            CheckForReservedTokensAndErrors(currentToken, errors, character);
+                            CheckForReservedTokensAndErrors(currentToken, character);
                         }
 
                         yield return currentToken;
@@ -230,7 +226,7 @@ namespace Lang
                         }
                         else
                         {
-                            CheckForReservedTokensAndErrors(currentToken, errors, character);
+                            CheckForReservedTokensAndErrors(currentToken, character);
                         }
 
                         yield return currentToken;
@@ -250,7 +246,7 @@ namespace Lang
             if (!lexerStatus.ReadingComment && currentToken != null) yield return currentToken;
         }
 
-        private void CheckForReservedTokensAndErrors(Token token, List<ParseError> errors, char character = default)
+        private void CheckForReservedTokensAndErrors(Token token, char character = default)
         {
             // Check tokens for reserved keywords
             if (token.Type == TokenType.Identifier)
@@ -263,7 +259,7 @@ namespace Lang
 
             if (token.Error)
             {
-                errors.Add(new ParseError {Error = $"Unexpected token '{token.Value + character}'", Token = token});
+                ErrorReporter.Report($"Unexpected token '{token.Value + character}'", token);
             }
         }
 

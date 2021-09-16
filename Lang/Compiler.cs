@@ -22,15 +22,6 @@ namespace Lang
         Dynamic
     }
 
-    public static class ErrorCodes
-    {
-        public const int ProjectFileNotFound = 1;
-        public const int ParsingError = 2;
-        public const int CompilationError = 3;
-        public const int BuildError = 4;
-        public const int LinkError = 5;
-    }
-
     public interface ICompiler
     {
         void Compile(string[] args);
@@ -80,34 +71,41 @@ namespace Lang
             var sourceFiles = _projectInterpreter.LoadProject(projectPath);
 
             // 3. Parse source files to tokens
-            var parseResult = _parser.Parse(sourceFiles);
+            var asts = _parser.Parse(sourceFiles);
 
-            if (parseResult.Errors.Any())
+            if (ErrorReporter.Errors.Any())
             {
                 var currentFile = Int32.MinValue;
-                foreach (var parseError in parseResult.Errors)
+                foreach (var parseError in ErrorReporter.Errors)
                 {
                     if (currentFile != parseError.FileIndex)
                     {
                         if (currentFile != Int32.MinValue) Console.WriteLine();
-                        currentFile = parseError.FileIndex;
+                        currentFile = parseError.FileIndex.Value;
                         Console.WriteLine($"Failed to parse file: \"{sourceFiles[currentFile].Replace(BuildSettings.Path, string.Empty)}\":");
                     }
-                    Console.WriteLine($"    {parseError.Error} at line {parseError.Token.Line}:{parseError.Token.Column}");
+                    Console.WriteLine($"    {parseError.Message} at line {parseError.Line}:{parseError.Column}");
                 }
                 Environment.Exit(ErrorCodes.ParsingError);
             }
 
             // 4. Build program graph
-            var programGraph = _graphBuilder.CreateProgramGraph(parseResult);
+            var programGraph = _graphBuilder.CreateProgramGraph(asts);
             var frontEndTime = stopwatch.Elapsed;
 
-            if (programGraph.Errors.Any())
+            if (ErrorReporter.Errors.Any())
             {
-                Console.WriteLine($"{programGraph.Errors.Count} compilation error(s):\n");
-                foreach (var error in programGraph.Errors)
+                Console.WriteLine($"{ErrorReporter.Errors.Count} compilation error(s):\n");
+                foreach (var error in ErrorReporter.Errors)
                 {
-                    Console.WriteLine($"    {sourceFiles[error.FileIndex].Replace(BuildSettings.Path, string.Empty)}: {error.Error} at line {error.Line}:{error.Column}");
+                    if (error.FileIndex.HasValue)
+                    {
+                        Console.WriteLine($"    {sourceFiles[error.FileIndex.Value].Replace(BuildSettings.Path, string.Empty)}: {error.Message} at line {error.Line}:{error.Column}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"    {error.Message}");
+                    }
                 }
                 Environment.Exit(ErrorCodes.CompilationError);
             }
