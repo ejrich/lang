@@ -298,6 +298,9 @@ u32 sleep(u32 seconds) #extern "libc"
     each i in 0..global_a {
         printf("Looping %d\n", i);
     }
+
+    //list := create_list(4);
+    list: List<int>[90];
 }
 
 /*
