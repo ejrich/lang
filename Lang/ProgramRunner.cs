@@ -1383,7 +1383,7 @@ namespace Lang
         {
             var register = new Register();
 
-            if (integerType.Primitive.Signed)
+            if (integerType.Signed)
             {
                 switch (integerType.Size)
                 {

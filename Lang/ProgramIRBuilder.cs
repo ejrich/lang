@@ -1598,8 +1598,8 @@ namespace Lang
                     Operator.Add => InstructionType.IntegerAdd,
                         Operator.Subtract => InstructionType.IntegerSubtract,
                         Operator.Multiply => InstructionType.IntegerMultiply,
-                        Operator.Divide => integerType.Primitive.Signed ? InstructionType.IntegerDivide : InstructionType.UnsignedIntegerDivide,
-                        Operator.Modulus => integerType.Primitive.Signed ? InstructionType.IntegerModulus : InstructionType.UnsignedIntegerModulus,
+                        Operator.Divide => integerType.Signed ? InstructionType.IntegerDivide : InstructionType.UnsignedIntegerDivide,
+                        Operator.Modulus => integerType.Signed ? InstructionType.IntegerModulus : InstructionType.UnsignedIntegerModulus,
                         // @Cleanup this branch should never be hit
                         _ => InstructionType.IntegerAdd
                 };
@@ -1662,7 +1662,7 @@ namespace Lang
                                 lhs = EmitCastValue(function, lhs, rhs.Type);
                             }
                             var integerType = (PrimitiveAst)lhs.Type;
-                            return EmitInstruction(GetIntCompareInstructionType(op, integerType.Primitive.Signed), function, type, lhs, rhs);
+                            return EmitInstruction(GetIntCompareInstructionType(op, integerType.Signed), function, type, lhs, rhs);
                         case TypeKind.Float:
                             lhs = EmitCastValue(function, lhs, rhs.Type);
                             return EmitInstruction(GetFloatCompareInstructionType(op), function, type, lhs, rhs);
@@ -1689,7 +1689,7 @@ namespace Lang
                 case TypeKind.Enum:
                     var enumAst = (EnumAst)lhs.Type;
                     var baseType = (PrimitiveAst)enumAst.BaseType;
-                    return EmitInstruction(GetIntCompareInstructionType(op, baseType.Primitive.Signed), function, type, lhs, rhs);
+                    return EmitInstruction(GetIntCompareInstructionType(op, baseType.Signed), function, type, lhs, rhs);
             }
 
             Console.WriteLine("Unexpected type in compare");
@@ -1753,7 +1753,7 @@ namespace Lang
                             castInstruction.Type = GetIntegerCastType(sourceIntegerType, targetIntegerType);
                             break;
                         case TypeKind.Float:
-                            castInstruction.Type = targetIntegerType.Primitive.Signed ? InstructionType.FloatToIntegerCast: InstructionType.FloatToUnsignedIntegerCast;
+                            castInstruction.Type = targetIntegerType.Signed ? InstructionType.FloatToIntegerCast: InstructionType.FloatToUnsignedIntegerCast;
                             break;
                     }
                     break;
@@ -1766,7 +1766,7 @@ namespace Lang
                     else
                     {
                         var integerType = (PrimitiveAst)value.Type;
-                        castInstruction.Type = integerType.Primitive.Signed ? InstructionType.IntegerToFloatCast : InstructionType.UnsignedIntegerToFloatCast;
+                        castInstruction.Type = integerType.Signed ? InstructionType.IntegerToFloatCast : InstructionType.UnsignedIntegerToFloatCast;
                     }
                     break;
                 case TypeKind.Pointer:
@@ -1781,19 +1781,19 @@ namespace Lang
         {
             if (targetType.Size >= sourceType.Size)
             {
-                if (targetType.Primitive.Signed)
+                if (targetType.Signed)
                 {
-                    return sourceType.Primitive.Signed ? InstructionType.IntegerExtend : InstructionType.UnsignedIntegerToIntegerExtend;
+                    return sourceType.Signed ? InstructionType.IntegerExtend : InstructionType.UnsignedIntegerToIntegerExtend;
                 }
-                return sourceType.Primitive.Signed ? InstructionType.IntegerToUnsignedIntegerExtend : InstructionType.UnsignedIntegerExtend;
+                return sourceType.Signed ? InstructionType.IntegerToUnsignedIntegerExtend : InstructionType.UnsignedIntegerExtend;
             }
             else
             {
-                if (targetType.Primitive.Signed)
+                if (targetType.Signed)
                 {
-                    return sourceType.Primitive.Signed ? InstructionType.IntegerTruncate : InstructionType.UnsignedIntegerToIntegerTruncate;
+                    return sourceType.Signed ? InstructionType.IntegerTruncate : InstructionType.UnsignedIntegerToIntegerTruncate;
                 }
-                return sourceType.Primitive.Signed ? InstructionType.IntegerToUnsignedIntegerTruncate : InstructionType.UnsignedIntegerTruncate;
+                return sourceType.Signed ? InstructionType.IntegerToUnsignedIntegerTruncate : InstructionType.UnsignedIntegerTruncate;
             }
         }
 
