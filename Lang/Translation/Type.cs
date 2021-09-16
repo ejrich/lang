@@ -14,6 +14,7 @@ namespace Lang.Translation
         VarArgs,
         Params,
         Type,
+        Generic,
         Error
     }
 }

@@ -425,7 +425,7 @@ namespace Lang.Parsing
             {
                 errors.Add(new ParseError
                 {
-                    Error = $"Incomplete function argument in function '{function.Name}'", Token = enumerator.Current
+                    Error = $"Incomplete function argument in function '{function.Name}'", Token = enumerator.Current ?? enumerator.Last
                 });
             }
 
@@ -1806,11 +1806,19 @@ namespace Lang.Parsing
 
         private static void ParseArguments(CallAst callAst, TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction)
         {
+            var nextArgumentRequired = false;
             while (enumerator.MoveNext())
             {
                 var token = enumerator.Current;
 
-                if (enumerator.Current.Type == TokenType.CloseParen) break;
+                if (enumerator.Current.Type == TokenType.CloseParen)
+                {
+                    if (nextArgumentRequired)
+                    {
+                        errors.Add(new ParseError {Error = $"Expected argument in call following a comma", Token = token});
+                    }
+                    break;
+                }
 
                 if (token.Type == TokenType.Comma)
                 {
@@ -1839,6 +1847,10 @@ namespace Lang.Parsing
 
                     var currentType = enumerator.Current?.Type;
                     if (currentType == TokenType.CloseParen) break;
+                    if (currentType == TokenType.Comma)
+                    {
+                        nextArgumentRequired = true;
+                    }
                     if (currentType == TokenType.SemiColon)
                     {
                         errors.Add(new ParseError
@@ -2218,7 +2230,7 @@ namespace Lang.Parsing
 
         private static readonly HashSet<string> FloatTypes = new() {"float", "float64"};
 
-        private static TypeDefinition ParseType(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction = null, bool argument = false)
+        private static TypeDefinition ParseType(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction = null, bool argument = false, int depth = 0)
         {
             var typeDefinition = CreateAst<TypeDefinition>(enumerator.Current);
             typeDefinition.Name = enumerator.Current.Value;
@@ -2283,13 +2295,13 @@ namespace Lang.Parsing
                         switch (token.Type)
                         {
                             case TokenType.Token:
-                                typeDefinition.Generics.Add(ParseType(enumerator, errors, currentFunction));
+                                typeDefinition.Generics.Add(ParseType(enumerator, errors, currentFunction, depth: depth + 1));
                                 commaRequiredBeforeNextType = true;
                                 break;
                             default:
                                 errors.Add(new ParseError
                                 {
-                                    Error = "Unexpected token in type definition", Token = token
+                                    Error = $"Unexpected token '{token.Value}' in type definition", Token = token
                                 });
                                 commaRequiredBeforeNextType = true;
                                 break;
@@ -2305,7 +2317,7 @@ namespace Lang.Parsing
                             default:
                                 errors.Add(new ParseError
                                 {
-                                    Error = "Unexpected token in type definition", Token = token
+                                    Error = $"Unexpected token '{token.Value}' in type definition", Token = token
                                 });
                                 commaRequiredBeforeNextType = false;
                                 break;

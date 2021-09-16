@@ -483,7 +483,7 @@ namespace Lang.Translation
                 }
 
                 // 3b. Check for errored or undefined field types
-                var type = VerifyType(argument.Type);
+                var type = VerifyType(argument.Type, argument: true);
 
                 switch (type)
                 {
@@ -2341,7 +2341,7 @@ namespace Lang.Translation
                         }
                     }
 
-                    if (match && (function.Varargs || callArgIndex == call.Arguments.Count))
+                    if (match && genericTypes.All(t => t != null) && (function.Varargs || callArgIndex == call.Arguments.Count))
                     {
                         var genericName = $"{function.Name}.{i}.{string.Join('.', genericTypes.Select(t => t.GenericName))}";
                         var name = $"{function.Name}<{string.Join(", ", genericTypes.Select(PrintTypeDefinition))}>";
@@ -2756,7 +2756,7 @@ namespace Lang.Translation
             return true;
         }
 
-        private Type VerifyType(TypeDefinition typeDef)
+        private Type VerifyType(TypeDefinition typeDef, int depth = 0, bool argument = false)
         {
             if (typeDef == null) return Type.Error;
 
@@ -2766,7 +2766,7 @@ namespace Lang.Translation
                 {
                     AddError("Generic type cannot have additional generic types", typeDef);
                 }
-                return Type.Struct;
+                return Type.Generic;
             }
 
             if (typeDef.CArray && typeDef.Name != "List")
@@ -2823,7 +2823,11 @@ namespace Lang.Translation
                         AddError($"Type 'List' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
                         return Type.Error;
                     }
-                    return VerifyList(typeDef) ? Type.List : Type.Error;
+                    if (!VerifyList(typeDef, depth, argument, out var hasGenericTypes))
+                    {
+                        return Type.Error;
+                    }
+                    return hasGenericTypes ? Type.Generic : Type.List;
                 }
                 case "void":
                     if (hasGenerics)
@@ -2842,12 +2846,16 @@ namespace Lang.Translation
                     {
                         return Type.Pointer;
                     }
-                    if (VerifyType(typeDef.Generics[0]) == Type.Error)
+                    var pointerType = VerifyType(typeDef.Generics[0], depth + 1);
+                    if (pointerType == Type.Error)
                     {
                         return Type.Error;
                     }
+                    if (pointerType == Type.Generic)
+                    {
+                        return Type.Generic;
+                    }
 
-                    // TODO If the type has generics, don't store yet
                     var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeIndex = _programGraph.TypeCount++, TypeKind = TypeKind.Pointer, Size = 8};
                     _programGraph.Types.Add(typeDef.GenericName, pointer);
                     return Type.Pointer;
@@ -2860,12 +2868,23 @@ namespace Lang.Translation
                     return Type.VarArgs;
                 case "Params":
                 {
+                    if (!argument)
+                    {
+                        AddError($"Params can only be used in function arguments", typeDef);
+                        return Type.Error;
+                    }
+                    if (depth != 0)
+                    {
+                        AddError($"Params can only be declared as a top level type, such as 'Params<int>'", typeDef);
+                        return Type.Error;
+                    }
                     if (typeDef.Generics.Count != 1)
                     {
                         AddError($"Type 'Params' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
                         return Type.Error;
                     }
-                    return VerifyList(typeDef) ? Type.Params : Type.Error;
+                    // TODO Might need to change this for generic types
+                    return VerifyList(typeDef, depth, argument, out _) ? Type.Params : Type.Error;
                 }
                 case "Type":
                     if (hasGenerics)
@@ -2875,7 +2894,7 @@ namespace Lang.Translation
                     }
                     return Type.Type;
                 default:
-                    if (typeDef.Generics.Any())
+                    if (hasGenerics)
                     {
                         var genericName = typeDef.GenericName;
                         if (_programGraph.Types.ContainsKey(genericName))
@@ -2884,11 +2903,17 @@ namespace Lang.Translation
                         }
                         var generics = typeDef.Generics.ToArray();
                         var error = false;
+                        var hasGenericTypes = false;
                         foreach (var generic in generics)
                         {
-                            if (VerifyType(generic) == Type.Error)
+                            var genericType = VerifyType(generic, depth + 1);
+                            if (genericType == Type.Error)
                             {
                                 error = true;
+                            }
+                            else if (genericType == Type.Generic)
+                            {
+                                hasGenericTypes = true;
                             }
                         }
                         if (!_polymorphicStructs.TryGetValue(typeDef.Name, out var structDef))
@@ -2901,8 +2926,14 @@ namespace Lang.Translation
                             AddError($"Expected type '{typeDef.Name}' to have {structDef.Generics.Count} generic(s), but got {typeDef.Generics.Count}", typeDef);
                             return Type.Error;
                         }
-                        if (error) return Type.Error;
-                        // TODO If the type has generics, don't store yet
+                        if (error)
+                        {
+                            return Type.Error;
+                        }
+                        if (hasGenericTypes)
+                        {
+                            return Type.Generic;
+                        }
                         var polyStruct = _polymorpher.CreatePolymorphedStruct(structDef, PrintTypeDefinition(typeDef), TypeKind.Struct, _programGraph.TypeCount++, generics);
                         _programGraph.Types.Add(genericName, polyStruct);
                         VerifyStruct(polyStruct);
@@ -2927,18 +2958,19 @@ namespace Lang.Translation
             }
         }
 
-        private bool VerifyList(TypeDefinition typeDef)
+        private bool VerifyList(TypeDefinition typeDef, int depth, bool argument, out bool hasGenerics)
         {
+            hasGenerics = false;
             var listType = typeDef.Generics[0];
-            if (listType.IsGeneric)
-            {
-                return true;
-            }
-
-            var genericType = VerifyType(listType);
+            var genericType = VerifyType(listType, depth + 1, argument);
             if (genericType == Type.Error)
             {
                 return false;
+            }
+            else if (genericType == Type.Generic)
+            {
+                hasGenerics = true;
+                return true;
             }
 
             var genericName = $"List.{listType.GenericName}";
