@@ -131,7 +131,7 @@ int factorial(int n) {
 struct MyStruct {
     field: u8;
     something := 4.2;
-    subValue: OtherStruct;
+    subValue: OtherStruct = { something = 8; }
 }
 
 struct OtherStruct {
@@ -140,10 +140,10 @@ struct OtherStruct {
 
 MyStruct create() {
     s1: MyStruct;
-    s2: OtherStruct;
-    s2.something += 8;
-    s1.field++;
-    s1.subValue.something = s2.something;
+    // s2: OtherStruct;
+    // s2.something += 8;
+    // s1.field++;
+    // s1.subValue.something = s2.something;
     return s1;
 }
 
