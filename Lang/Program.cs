@@ -1,4 +1,4 @@
-﻿using Lang;
+using Lang;
 using Lang.Backend;
 using Lang.Backend.C;
 using Lang.Backend.LLVM;

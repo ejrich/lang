@@ -1,4 +1,4 @@
-﻿namespace Lang
+namespace Lang
 {
     public static class ErrorCodes
     {

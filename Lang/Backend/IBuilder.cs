@@ -1,4 +1,4 @@
-﻿namespace Lang.Backend
+namespace Lang.Backend
 {
     public interface IBuilder
     {
