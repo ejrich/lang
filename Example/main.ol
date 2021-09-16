@@ -24,7 +24,7 @@ int main(List<string> args) {
     str := string_test();
     printf("%s - Hello world %d, %d, %d\n", str, 1, 2, b);
     sum_test();
-    //overflow_test();
+    // overflow_test();
 
     set_global(8);
     printf("'global_a' = %d\n", global_a);
@@ -48,9 +48,9 @@ int main(List<string> args) {
 
     sdl_video := 0x20;
     x := 0xfeABD4;
-    /* sdl := SDL_Init(sdl_video); */
-    /* SDL_CreateWindow("Hello world", 805240832, 805240832, 400, 300, 0); */
-    /* sleep(5); */
+    sdl := SDL_Init(sdl_video);
+    SDL_CreateWindow("Hello world", 805240832, 805240832, 400, 300, 0);
+    // sleep(5);
 
     z := 1;
     each i in create_list(5) {
@@ -227,7 +227,7 @@ int sum2(Params<int> args) {
 overflow_test() {
     each i in 1..1000000 {
         a := i * 9;
-        //printf("%d\n", a);
+        printf("%d\n", a);
     }
     a := 4;
 }
