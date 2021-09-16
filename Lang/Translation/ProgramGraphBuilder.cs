@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -136,7 +137,7 @@ namespace Lang.Translation
                                     var conditional = directive.Value as ConditionalAst;
                                     if (VerifyCondition(conditional!.Condition, null, _globalIdentifiers))
                                     {
-                                        _programRunner.Init(_programGraph, buildSettings);
+                                        _programRunner.Init(_programGraph);
                                         if (_programRunner.ExecuteCondition(conditional!.Condition))
                                         {
                                             additionalAsts.AddRange(conditional.Children);
@@ -151,7 +152,7 @@ namespace Lang.Translation
                                 case DirectiveType.Assert:
                                     if (VerifyCondition(directive.Value, null, _globalIdentifiers))
                                     {
-                                        _programRunner.Init(_programGraph, buildSettings);
+                                        _programRunner.Init(_programGraph);
                                         if (!_programRunner.ExecuteCondition(directive.Value))
                                         {
                                             AddError("Assertion failed", directive.Value);
@@ -508,7 +509,7 @@ namespace Lang.Translation
                                 var conditional = directive.Value as ConditionalAst;
                                 if (VerifyCondition(conditional!.Condition, null, _globalIdentifiers))
                                 {
-                                    _programRunner.Init(_programGraph, _buildSettings);
+                                    _programRunner.Init(_programGraph);
                                     if (_programRunner.ExecuteCondition(conditional!.Condition))
                                     {
                                         asts.InsertRange(i, conditional.Children);
@@ -522,7 +523,7 @@ namespace Lang.Translation
                             case DirectiveType.Assert:
                                 if (VerifyCondition(directive.Value, null, _globalIdentifiers))
                                 {
-                                    _programRunner.Init(_programGraph, _buildSettings);
+                                    _programRunner.Init(_programGraph);
                                     if (!_programRunner.ExecuteCondition(directive.Value))
                                     {
                                         AddError("Assertion failed", directive.Value);
@@ -703,6 +704,19 @@ namespace Lang.Translation
             // 4. Verify declaration values
             else
             {
+                if (declaration.Value == null)
+                {
+                    switch (declaration.Name)
+                    {
+                        case "os":
+                            declaration.Value = GetOSVersion();
+                            break;
+                        case "build_env":
+                            declaration.Value = GetBuildEnv();
+                            break;
+                    }
+                }
+
                 var valueType = VerifyExpression(declaration.Value, currentFunction, scopeIdentifiers);
 
                 // 4a. Verify the assignment value matches the type definition if it has been defined
@@ -724,7 +738,7 @@ namespace Lang.Translation
                     }
                     else if (type == Type.Void)
                     {
-                        AddError($"Variables cannot be assigned type 'void'", declaration.Type);
+                        AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.Type);
                     }
 
                     // Verify the type is correct
@@ -752,9 +766,14 @@ namespace Lang.Translation
             // 6. Verify constant values
             if (declaration.Constant)
             {
-                if (declaration.Value == null || declaration.Value is not ConstantAst)
+                switch (declaration.Value)
                 {
-                    AddError($"Constant variable '{declaration.Name}' should be assigned a constant value", declaration);
+                    case ConstantAst:
+                    case StructFieldRefAst structField when structField.IsEnum:
+                        break;
+                    default:
+                        AddError($"Constant variable '{declaration.Name}' should be assigned a constant value", declaration);
+                        break;
                 }
                 if (declaration.Type != null)
                 {
@@ -763,6 +782,36 @@ namespace Lang.Translation
             }
 
             scopeIdentifiers.Add(declaration.Name, declaration);
+        }
+
+        private StructFieldRefAst GetOSVersion()
+        {
+            return new StructFieldRefAst
+            {
+                Name = "OS",
+                Value = new StructFieldRefAst
+                {
+                    Name = Environment.OSVersion.Platform switch
+                    {
+                        PlatformID.Unix => "Linux",
+                        PlatformID.Win32NT => "Windows",
+                        PlatformID.MacOSX => "Mac",
+                        _ => "None"
+                    }
+                }
+            };
+        }
+
+        private StructFieldRefAst GetBuildEnv()
+        {
+            return new StructFieldRefAst
+            {
+                Name = "BuildEnv",
+                Value = new StructFieldRefAst
+                {
+                    Name = _buildSettings.Release ? "Release" : "Debug"
+                }
+            };
         }
 
         private void VerifyAssignment(AssignmentAst assignment, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
@@ -1012,7 +1061,7 @@ namespace Lang.Translation
                     VerifyAst(directive.Value, null, _globalIdentifiers);
                     if (!_programGraph.Errors.Any())
                     {
-                        _programRunner.Init(_programGraph, _buildSettings);
+                        _programRunner.Init(_programGraph);
                         _programRunner.RunProgram(directive.Value);
                     }
                     break;
