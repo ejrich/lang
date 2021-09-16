@@ -363,3 +363,5 @@ type_casts() {
     d := cast(u8, State.Running);
     printf("a = %llu, b = %d, c = %f, d = %d\n", a, b, c, d);
 }
+
+// #run main();
