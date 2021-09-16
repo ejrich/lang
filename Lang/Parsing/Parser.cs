@@ -153,7 +153,58 @@ namespace Lang.Parsing
                     enumerator.MoveNext();
                     break;
                 case TokenType.OpenParen:
-                    // TODO Switch the return type to be the function name and generics
+                    if (function.ReturnType.Name == "*" || function.ReturnType.Count != null || function.ReturnType.CArray)
+                    {
+                        errors.Add(new ParseError
+                        {
+                            Error = "Expected the function name to be declared",
+                            Token = new Token
+                            {
+                                FileIndex = function.ReturnType.FileIndex,
+                                Line = function.ReturnType.Line,
+                                Column = function.ReturnType.Column
+                            }
+                        });
+                    }
+                    else
+                    {
+                        function.Name = function.ReturnType.Name;
+                        foreach (var generic in function.ReturnType.Generics)
+                        {
+                            if (generic.Generics.Any())
+                            {
+                                errors.Add(new ParseError
+                                {
+                                    Error = $"Invalid generic in function '{function.Name}'",
+                                    Token = new Token
+                                    {
+                                        FileIndex = generic.FileIndex,
+                                        Line = generic.Line,
+                                        Column = generic.Column
+                                    }
+                                });
+                            }
+                            else if (function.Generics.Contains(generic.Name))
+                            {
+                                errors.Add(new ParseError
+                                {
+                                    Error = $"Duplicate generic '{generic.Name}' in function '{function.Name}'",
+                                    Token = new Token
+                                    {
+                                        FileIndex = generic.FileIndex,
+                                        Line = generic.Line,
+                                        Column = generic.Column
+                                    }
+                                });
+                            }
+                            else
+                            {
+                                function.Generics.Add(generic.Name);
+                            }
+                        }
+                        function.ReturnType.Name = "void";
+                        function.ReturnType.Generics.Clear();
+                    }
                     break;
                 case null:
                     errors.Add(new ParseError {Error = "Expected the function name to be declared", Token = enumerator.Last});
@@ -236,7 +287,7 @@ namespace Lang.Parsing
                     });
                 }
                 enumerator.MoveNext();
-                // TODO function.Generics.AddRange(generics);
+                function.Generics.AddRange(generics);
             }
 
             // 3. Find open paren to start parsing arguments

@@ -45,6 +45,7 @@ namespace Lang.Parsing
         public bool HasDirectives { get; set; }
         public bool CallsCompiler { get; set; }
         public TypeDefinition ReturnType { get; set; }
+        public List<string> Generics { get; } = new();
         public List<DeclarationAst> Arguments { get; } = new();
         public List<List<TypeDefinition>> VarargsCalls { get; set; }
         public List<IAst> Children { get; } = new();
