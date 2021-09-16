@@ -384,6 +384,9 @@ namespace Lang
                                         break;
                                 }
                                 break;
+                            case TypeKind.Type:
+                                register.UInteger = Marshal.PtrToStructure<uint>(pointer.Pointer);
+                                break;
                             case TypeKind.Float:
                                 if (instruction.Value1.Type.Size == 4)
                                 {
@@ -442,6 +445,9 @@ namespace Lang
                                         Marshal.StructureToPtr(value.ULong, pointer.Pointer, false);
                                         break;
                                 }
+                                break;
+                            case TypeKind.Type:
+                                Marshal.StructureToPtr(value.UInteger, pointer.Pointer, false);
                                 break;
                             case TypeKind.Float:
                                 if (instruction.Value2.Type.Size == 4)

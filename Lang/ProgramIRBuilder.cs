@@ -1737,7 +1737,7 @@ namespace Lang
 
         private InstructionValue EmitCastValue(FunctionIR function, InstructionValue value, IType targetType)
         {
-            if (value.Type == targetType || value.UseRawString)
+            if (value.Type == targetType || value.UseRawString || targetType.TypeKind == TypeKind.Type)
             {
                 return value;
             }

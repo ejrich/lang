@@ -106,7 +106,6 @@ namespace Lang
         public bool Verified { get; set; }
         public bool Verifying { get; set; }
         public List<string> Generics { get; set; }
-        // TODO Implement
         public IType[] GenericTypes { get; set; }
         public List<StructFieldAst> Fields { get; } = new();
     }
@@ -347,7 +346,7 @@ namespace Lang
         public uint Line { get; init; }
         public uint Column { get; init; }
         public string Name { get; set; }
-        // public TypeDefinition TypeDefinition { get; set; } // TODO Remove
+        // public TypeDefinition TypeDefinition { get; set; }
         public IType Type { get; set; }
         public int? AllocationIndex { get; set; }
         public InstructionValue Pointer { get; set; }

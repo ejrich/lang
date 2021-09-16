@@ -600,7 +600,7 @@ namespace Lang
             switch (enumerator.Current?.Type)
             {
                 case TokenType.Identifier:
-                    enumAst.Name = enumerator.Current.Value;
+                    enumAst.Name = enumAst.BackendName = enumerator.Current.Value;
                     break;
                 case null:
                     ErrorReporter.Report("Expected enum to have name", enumerator.Last);
