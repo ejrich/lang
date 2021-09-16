@@ -7,7 +7,7 @@ namespace Lang
     {
         int FileIndex { get; set; }
         uint Line { get; init; }
-        int Column { get; init; }
+        uint Column { get; init; }
         List<IAst> Children { get; }
     }
 
@@ -34,7 +34,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public List<IAst> Children { get; } = new();
     }
 
@@ -42,7 +42,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public string Name { get; set; }
         public int TypeIndex { get; set; }
         public TypeKind TypeKind { get; set; } = TypeKind.Function;
@@ -67,7 +67,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public string Name { get; set; }
         public int TypeIndex { get; set; }
         public TypeKind TypeKind { get; set; }
@@ -82,7 +82,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public bool HasGeneric { get; set; }
         public string Name { get; set; }
         public uint Offset { get; set; }
@@ -96,7 +96,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public bool IsEnum { get; set; }
         public bool[] Pointers { get; set; }
         public string[] TypeNames { get; set; }
@@ -108,7 +108,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public string Name { get; set; }
         public int TypeIndex { get; set; }
         public uint Size { get; set; } = 4;
@@ -122,7 +122,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public string Name { get; set; }
         public int Value { get; set; }
         public bool Defined { get; set; }
@@ -133,7 +133,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public IAst Value { get; set; }
         public List<IAst> Children => null;
     }
@@ -142,7 +142,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public string Name { get; set; }
         public int TypeIndex { get; set; }
         public uint Size { get; set; }
@@ -156,7 +156,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public TypeDefinition Type { get; set; }
         public string Value { get; set; }
         public List<IAst> Children => null;
@@ -166,7 +166,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public TypeDefinition TargetType { get; set; }
         public List<IAst> Children => null;
     }
@@ -175,7 +175,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public string Name { get; set; }
         public List<IAst> Children => null;
     }
@@ -184,7 +184,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public TypeDefinition Type { get; set; }
         public List<Operator> Operators { get; } = new();
         public List<TypeDefinition> ResultingTypes { get; } = new();
@@ -195,7 +195,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public bool Prefix { get; set; }
         public bool Positive { get; set; }
         public IAst Value { get; set; }
@@ -206,7 +206,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public UnaryOperator Operator { get; set; }
         public IAst Value { get; set; }
         public List<IAst> Children => null;
@@ -216,7 +216,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public string Function { get; set; }
         public bool Params { get; set; }
         public int FunctionIndex { get; set; }
@@ -231,7 +231,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public string Name { get; set; }
         public TypeDefinition Type { get; set; }
         public IAst Value { get; set; }
@@ -245,7 +245,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public IAst Reference { get; set; }
         public Operator Operator { get; set; }
         public IAst Value { get; set; }
@@ -256,7 +256,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public IAst Condition { get; set; }
         public List<IAst> Children { get; } = new();
         public List<IAst> Else { get; } = new();
@@ -266,7 +266,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public IAst Condition { get; set; }
         public List<IAst> Children { get; } = new();
     }
@@ -275,7 +275,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public string IterationVariable { get; set; }
         public IAst Iteration { get; set; }
         public TypeDefinition IteratorType { get; set; }
@@ -288,7 +288,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public string Name { get; set; }
         public bool CallsOverload { get; set; }
         public TypeDefinition OverloadType { get; set; }
@@ -300,7 +300,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public DirectiveType Type { get; set; }
         public IAst Value { get; set; }
         public List<IAst> Children => null;
@@ -310,7 +310,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public TypeDefinition TargetType { get; set; }
         public bool HasGenerics { get; set; }
         public IAst Value { get; set; }
@@ -321,7 +321,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public Operator Operator { get; set; }
         public TypeDefinition Type { get; set; }
         public bool Verified { get; set; }
@@ -338,7 +338,7 @@ namespace Lang
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
-        public int Column { get; init; }
+        public uint Column { get; init; }
         public TypeKind? TypeKind { get; set; }
         public string Name { get; set; }
         public bool IsGeneric { get; set; }

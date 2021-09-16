@@ -91,7 +91,7 @@ namespace Lang.Backend
                     };
                     var function = _module.GetNamedFunction(functionName);
                     var argumentCount = functionAst.Varargs ? functionAst.Arguments.Count - 1 : functionAst.Arguments.Count;
-                    WriteFunction(functionAst, argumentCount, globals, function);
+                    WriteFunction(functionAst, argumentCount, globals, function, functionName);
                 }
             }
             foreach (var (type, overloads) in _programGraph.OperatorOverloads)
@@ -100,7 +100,7 @@ namespace Lang.Backend
                 {
                     var overloadName = GetOperatorOverloadName(type, op);
                     var function = _module.GetNamedFunction(overloadName);
-                    WriteFunction(overload, 2, globals, function);
+                    WriteFunction(overload, 2, globals, function, overloadName);
                 }
             }
 
@@ -158,7 +158,7 @@ namespace Lang.Backend
                                 using var structName = new MarshaledString(structAst.Name);
 
                                 var file = _debugFiles[structAst.FileIndex];
-                                _debugTypes[name] = LLVM.DIBuilderCreateForwardDecl(_debugBuilder, (uint)DwarfTag.Structure_type, structName.Value, (UIntPtr)structName.Length, file, file, structAst.Line, 0, structAst.Size * 8, 0, null, (UIntPtr)0);
+                                _debugTypes[name] = LLVM.DIBuilderCreateForwardDecl(_debugBuilder, (uint)DwarfTag.Structure_type, structName.Value, (UIntPtr)structName.Length, null, file, structAst.Line, 0, structAst.Size * 8, 0, null, (UIntPtr)0);
                             }
                             else
                             {
@@ -430,19 +430,42 @@ namespace Lang.Backend
             var function = _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(functionAst.ReturnType), argumentTypes.ToArray(), varargs));
         }
 
-        private void WriteFunction(IFunction functionAst, int argumentCount, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> globals, LLVMValueRef function)
+        private void WriteFunction(IFunction functionAst, int argumentCount, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> globals, LLVMValueRef function, string functionName)
         {
             _currentFunction = functionAst;
             // 1. Get function definition
-            LLVM.PositionBuilderAtEnd(_builder, function.AppendBasicBlock("entry"));
+            var entryBlock = function.AppendBasicBlock("entry");
+            LLVM.PositionBuilderAtEnd(_builder, entryBlock);
             var localVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>(globals);
 
             // 2. Allocate arguments on the stack
-            for (var i = 0; i < argumentCount; i++)
+            LLVMMetadataRef block = null;
+            if (_emitDebug)
             {
-                var arg = functionAst.Arguments[i];
-                var allocation = _builder.BuildAlloca(ConvertTypeDefinition(arg.Type), arg.Name);
-                localVariables[arg.Name] = (arg.Type, allocation);
+                block = _debugFunctions[functionName];
+                var file = _debugFiles[functionAst.FileIndex];
+                for (var i = 0; i < argumentCount; i++)
+                {
+                    var arg = functionAst.Arguments[i];
+                    var allocation = _builder.BuildAlloca(ConvertTypeDefinition(arg.Type), arg.Name);
+                    localVariables[arg.Name] = (arg.Type, allocation);
+
+                    using var argName = new MarshaledString(arg.Name);
+
+                    var debugType = GetDebugType(arg.Type);
+                    var debugVariable = LLVM.DIBuilderCreateParameterVariable(_debugBuilder, block, argName.Value, (UIntPtr)argName.Length, (uint)i+1, file, arg.Line, debugType, 0, LLVMDIFlags.LLVMDIFlagZero);
+                    var location = LLVM.DIBuilderCreateDebugLocation(_context, arg.Line, arg.Column, block, null);
+                    LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, allocation, debugType, null, location, entryBlock);
+                }
+            }
+            else
+            {
+                for (var i = 0; i < argumentCount; i++)
+                {
+                    var arg = functionAst.Arguments[i];
+                    var allocation = _builder.BuildAlloca(ConvertTypeDefinition(arg.Type), arg.Name);
+                    localVariables[arg.Name] = (arg.Type, allocation);
+                }
             }
 
             // 3. Build allocations at the beginning of the function
@@ -721,8 +744,9 @@ namespace Lang.Backend
             }
         }
 
-        private bool WriteFunctionLine(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)
+        private bool WriteFunctionLine(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)//, LLVMMetadataRef block)
         {
+            var returned = false;
             switch (ast)
             {
                 case ReturnAst returnAst:
@@ -735,18 +759,28 @@ namespace Lang.Backend
                     WriteAssignment(assignment, localVariables);
                     break;
                 case ScopeAst scope:
-                    return WriteScope(scope.Children, localVariables, function);
+                    returned = WriteScope(scope.Children, localVariables, function);
+                    break;
                 case ConditionalAst conditional:
-                    return WriteConditional(conditional, localVariables, function);
+                    returned = WriteConditional(conditional, localVariables, function);
+                    break;
                 case WhileAst whileAst:
-                    return WriteWhile(whileAst, localVariables, function);
+                    returned = WriteWhile(whileAst, localVariables, function);
+                    break;
                 case EachAst each:
-                    return WriteEach(each, localVariables, function);
+                    returned = WriteEach(each, localVariables, function);
+                    break;
                 default:
                     WriteExpression(ast, localVariables);
                     break;
             }
-            return false;
+
+            // if (_emitDebug)
+            // {
+            //     LLVM.CurrentDebugLocation;
+            // }
+
+            return returned;
         }
 
         private void WriteReturnStatement(ReturnAst returnAst, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
@@ -2158,7 +2192,7 @@ namespace Lang.Backend
 
             fixed (LLVMMetadataRef* fieldsPointer = fields)
             {
-                _debugTypes[name] = LLVM.DIBuilderCreateStructType(_debugBuilder, file, structName.Value, (UIntPtr)structName.Length, file, structAst.Line, structAst.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, (LLVMOpaqueMetadata**)fieldsPointer, (uint)fields.Length, 0, null, null, (UIntPtr)0);
+                _debugTypes[name] = LLVM.DIBuilderCreateStructType(_debugBuilder, null, structName.Value, (UIntPtr)structName.Length, file, structAst.Line, structAst.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, (LLVMOpaqueMetadata**)fieldsPointer, (uint)fields.Length, 0, null, null, (UIntPtr)0);
             }
         }
 
@@ -2180,7 +2214,7 @@ namespace Lang.Backend
 
             fixed (LLVMMetadataRef* enumValuesPointer = enumValues)
             {
-                _debugTypes[enumAst.Name] = LLVM.DIBuilderCreateEnumerationType(_debugBuilder, file, enumName.Value, (UIntPtr)enumName.Length, file, enumAst.Line, (uint)enumAst.BaseType.PrimitiveType.Bytes * 8, 0, (LLVMOpaqueMetadata**)enumValuesPointer, (uint)enumValues.Length, GetDebugType(enumAst.BaseType));
+                _debugTypes[enumAst.Name] = LLVM.DIBuilderCreateEnumerationType(_debugBuilder, null, enumName.Value, (UIntPtr)enumName.Length, file, enumAst.Line, (uint)enumAst.BaseType.PrimitiveType.Bytes * 8, 0, (LLVMOpaqueMetadata**)enumValuesPointer, (uint)enumValues.Length, GetDebugType(enumAst.BaseType));
             }
         }
 
