@@ -81,7 +81,10 @@ namespace Lang.Translation
 
         private void VerifyStruct(StructAst structAst, HashSet<string> definedStructs, List<TranslationError> errors)
         {
-            // 1. Verify struct fields have valid types
+            // 1. Load the struct into the dictionary
+            _structs.TryAdd(structAst.Name, structAst);
+
+            // 2. Verify struct fields have valid types
             var fieldNames = new HashSet<string>();
             foreach (var structField in structAst.Fields)
             {
@@ -122,9 +125,6 @@ namespace Lang.Translation
                     }
                 }
             }
-
-            // 2. Load the struct into the dictionary
-            _structs.TryAdd(structAst.Name, structAst);
         }
 
         private void VerifyFunctionDefinition(FunctionAst function, List<TranslationError> errors)
@@ -578,35 +578,17 @@ namespace Lang.Translation
                             errors.Add(CreateError($"Negation not compatible with type '{PrintTypeDefinition(valueType)}'", unary.Value));
                             return null;
                         case UnaryOperator.Dereference:
-                            if (valueType.Pointer)
+                            if (type == Type.Pointer)
                             {
-                                var rawType = new TypeDefinition
-                                {
-                                    Name = valueType.Name,
-                                    PrimitiveType = valueType.PrimitiveType,
-                                    Count = valueType.Count
-                                };
-                                rawType.Generics.AddRange(valueType.Generics);
-                                return rawType;
+                                return valueType.Generics[0];
                             }
                             errors.Add(CreateError($"Cannot dereference type '{PrintTypeDefinition(valueType)}'", unary.Value));
                             return null;
                         case UnaryOperator.Reference:
-                            if (valueType.Pointer)
+                            if (unary.Value is VariableAst || unary.Value is StructFieldRefAst || type == Type.Pointer)
                             {
-                                // TODO Figure out how to reference existing pointer types
-                            }
-
-                            if (unary.Value is VariableAst || unary.Value is StructFieldRefAst)
-                            {
-                                var pointerType = new TypeDefinition
-                                {
-                                    Pointer = true,
-                                    Name = valueType.Name,
-                                    PrimitiveType = valueType.PrimitiveType,
-                                    Count = valueType.Count
-                                };
-                                pointerType.Generics.AddRange(valueType.Generics);
+                                var pointerType = new TypeDefinition {Name = "*"};
+                                pointerType.Generics.Add(valueType);
                                 return pointerType;
                             }
                             errors.Add(CreateError("Cannot only reference variables, structs, or struct fields", unary.Value));
@@ -897,9 +879,6 @@ namespace Lang.Translation
 
         private static bool TypeEquals(TypeDefinition a, TypeDefinition b)
         {
-            // Check if pointers
-            if (a.Pointer != b.Pointer) return false;
-
             // Check by primitive type
             switch (a.PrimitiveType)
             {
@@ -1021,6 +1000,13 @@ namespace Lang.Translation
                         return Type.Error;
                     }
                     return Type.Void;
+                case "*":
+                    if (typeDef.Generics.Count != 1)
+                    {
+                        errors.Add(CreateError($"pointer type should have reference to 1 type, but got {typeDef.Generics.Count}", typeDef));
+                        return Type.Error;
+                    }
+                    return VerifyType(typeDef.Generics[0], errors) == Type.Error ? Type.Error : Type.Pointer;
                 default:
                     if (!verifyStruct) return Type.Other;
                     return _structs.ContainsKey(typeDef.Name) ? Type.Other : Type.Error;
@@ -1047,13 +1033,19 @@ namespace Lang.Translation
             if (type == null) return string.Empty;
 
             var sb = new StringBuilder();
+
+            if (type.Name == "*")
+            {
+                sb.Append($"{PrintTypeDefinition(type.Generics[0])}*");
+                return sb.ToString();
+            }
+
             sb.Append(type.Name);
             if (type.Generics.Any())
             {
                 sb.Append($"<{string.Join(", ", type.Generics.Select(PrintTypeDefinition))}>");
             }
 
-            if (type.Pointer) sb.Append('*');
             return sb.ToString();
         }
 

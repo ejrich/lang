@@ -211,7 +211,6 @@ namespace Lang.Parsing
         public int Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
-        public bool Pointer { get; set; }
         public IPrimitive PrimitiveType { get; set; }
         public List<TypeDefinition> Generics { get; } = new();
         public IAst Count { get; set; }

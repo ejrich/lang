@@ -1385,10 +1385,13 @@ namespace Lang.Parsing
                 }
             }
 
-            if (enumerator.Peek()?.Type == TokenType.Asterisk)
+            while (enumerator.Peek()?.Type == TokenType.Asterisk)
             {
                 enumerator.MoveNext();
-                typeDefinition.Pointer = true;
+                var pointerType = CreateAst<TypeDefinition>(enumerator.Current);
+                pointerType.Name = "*";
+                pointerType.Generics.Add(typeDefinition);
+                typeDefinition = pointerType;
             }
 
             if (enumerator.Peek()?.Type == TokenType.OpenBracket)

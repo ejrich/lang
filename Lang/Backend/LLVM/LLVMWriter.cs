@@ -585,14 +585,8 @@ namespace Lang.Backend.LLVM
                             // @Cleanup this branch should not be hit
                             _ => (null, new LLVMValueRef())
                         };
-                        var pointerType = new TypeDefinition
-                        {
-                            Pointer = true,
-                            Name = valueType.Name,
-                            PrimitiveType = valueType.PrimitiveType,
-                            Count = valueType.Count
-                        };
-                        pointerType.Generics.AddRange(valueType.Generics);
+                        var pointerType = new TypeDefinition {Name = "*"};
+                        pointerType.Generics.Add(valueType);
                         return (pointerType, pointer);
                     }
 
@@ -607,7 +601,7 @@ namespace Lang.Backend.LLVM
                             // @Cleanup This branch should not be hit
                             _ => (null, new LLVMValueRef())
                         },
-                        UnaryOperator.Dereference => (type, LLVMApi.BuildLoad(_builder, value, "tmpderef")),
+                        UnaryOperator.Dereference => (type.Generics[0], LLVMApi.BuildLoad(_builder, value, "tmpderef")),
                         // @Cleanup This branch should not be hit
                         _ => (null, new LLVMValueRef())
                     };
@@ -857,9 +851,6 @@ namespace Lang.Backend.LLVM
 
         private static bool TypeEquals(TypeDefinition a, TypeDefinition b)
         {
-            // Check if pointers
-            if (a.Pointer != b.Pointer) return false;
-
             // Check by primitive type
             switch (a.PrimitiveType)
             {
@@ -954,7 +945,12 @@ namespace Lang.Backend.LLVM
 
         private LLVMTypeRef ConvertTypeDefinition(TypeDefinition typeDef)
         {
-            var type = typeDef.PrimitiveType switch
+            if (typeDef.Name == "*")
+            {
+                return LLVMTypeRef.PointerType(ConvertTypeDefinition(typeDef.Generics[0]), 0);
+            }
+
+            return typeDef.PrimitiveType switch
             {
                 IntegerType integerType => integerType.Bytes switch
                 {
@@ -973,7 +969,6 @@ namespace Lang.Backend.LLVM
                     _ => LLVMApi.GetTypeByName(_module, typeDef.Name)
                 }
             };
-            return typeDef.Pointer ? LLVMTypeRef.PointerType(type, 0) : type;
         }
 
         private LLVMTypeRef GetArrayType(TypeDefinition typeDef)
