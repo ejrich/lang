@@ -2408,6 +2408,14 @@ namespace Lang.Parsing
                     return Operator.GreaterThanEqual;
                 case TokenType.LessThanEqual:
                     return Operator.LessThanEqual;
+                case TokenType.ShiftLeft:
+                    return Operator.ShiftLeft;
+                case TokenType.ShiftRight:
+                    return Operator.ShiftRight;
+                case TokenType.RotateLeft:
+                    return Operator.RotateLeft;
+                case TokenType.RotateRight:
+                    return Operator.RotateRight;
                 // Handle single character operators
                 default:
                     var op = (Operator)token.Value[0];
