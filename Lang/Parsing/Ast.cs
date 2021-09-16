@@ -262,7 +262,7 @@ namespace Lang.Parsing
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
-        public IAst Variable { get; set; }
+        public string Name { get; set; }
         public IAst Index { get; set; }
         public List<IAst> Children => null;
     }

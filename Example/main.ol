@@ -285,45 +285,45 @@ default_args(int val = 5) {
 }
 
 open_window() {
-    #if os == OS.Linux {
-        XOpenDisplay("Hello");
-        printf("Opening X11 window\n");
-    }
+    // #if os == OS.Linux {
+    //     XOpenDisplay("Hello");
+    //     printf("Opening X11 window\n");
+    // }
 }
 
 int SDL_Init(u32 flags) #extern "SDL2"
 SDL_CreateWindow(string title, int x, int y, int w, int h, u32 flags) #extern "SDL2"
 u32 sleep(u32 seconds) #extern "libc"
 
-#run {
-    args: List<string>[1];
-    args[0] = "Hello world";
-    main(args);
+// #run {
+//     args: List<string>[1];
+//     args[0] = "Hello world";
+//     main(args);
 
-    build();
-}
+//     build();
+// }
 
 compiler_directives() {
     const_value := 7; #const
     printf("Constant value = %d\n", const_value);
-    #assert factorial(6) == 720;
-    #if build_env == BuildEnv.Debug then
-        printf("Running Debug code\n");
-    #if build_env == BuildEnv.Release then
-        printf("Running Release code\n");
+//     #assert factorial(6) == 720;
+//     #if build_env == BuildEnv.Debug then
+//         printf("Running Debug code\n");
+//     #if build_env == BuildEnv.Release then
+//         printf("Running Release code\n");
 }
 
-build() {
-    if os == OS.Linux {
-        add_dependency("X11");
-    }
-}
+// build() {
+//     if os == OS.Linux {
+//         add_dependency("X11");
+//     }
+// }
 
-#assert global_b > 0;
+// #assert global_b > 0;
 
-#if os == OS.Linux {
-    XOpenDisplay(string name) #extern "X11"
-}
+// #if os == OS.Linux {
+//     XOpenDisplay(string name) #extern "X11"
+// }
 
 print_type_info(Type type) {
     type_info := type_of(type);

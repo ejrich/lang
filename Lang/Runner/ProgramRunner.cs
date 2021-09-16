@@ -886,7 +886,7 @@ namespace Lang.Runner
         {
             var index = (int)ExecuteExpression(indexAst.Index, variables).Value;
 
-            var variable = ExecuteExpression(indexAst.Variable, variables);
+            var variable = variables[indexAst.Name];
             var typeDef = variable.Type.Generics[0];
             var elementType = GetTypeFromDefinition(typeDef);
 
