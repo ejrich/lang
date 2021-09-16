@@ -5,11 +5,12 @@ int Main(List<string> args) {
     */
     //hello := "This is an \"escaped\" string literal";
     a := 4.2;
-    //baz := foo() + bar(3 + 1, "Hello", 1.2);
+    baz := foo();// + bar(3 + 1, "Hello", 1.2);
     //b := 6 * (4 - 1);
     c := 2;
+    d := false;
     //d := a + 1 == b + 2 && (1 + b) == 2 || b > 3 + 4 * c - 1;
-    //e := !d;
+    e := !d;
     return 0;
 }
 
@@ -18,7 +19,7 @@ int foo() {
     a++;
     ++a;
     a += 1;
-    b := --a + 1;
+    b := --a;
     while a < 10 {
         a = a + 1;
     }
