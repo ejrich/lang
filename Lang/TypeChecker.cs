@@ -1127,19 +1127,19 @@ namespace Lang
                     ErrorReporter.Report("Function return should be void", returnAst);
                 }
             }
-            else
+            else if (currentFunction.ReturnType != null)
             {
                 // 3. Determine if the expression returns the correct value
                 var returnValueType = VerifyExpression(returnAst.Value, currentFunction, scope);
                 if (returnValueType == null)
                 {
-                    ErrorReporter.Report($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnTypeDefinition)}'", returnAst);
+                    ErrorReporter.Report($"Expected to return type '{currentFunction.ReturnType.Name}'", returnAst);
                 }
                 else
                 {
                     if (!TypeEquals(currentFunction.ReturnType, returnValueType))
                     {
-                        ErrorReporter.Report($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnTypeDefinition)}', but returned type '{returnValueType.Name}'", returnAst.Value);
+                        ErrorReporter.Report($"Expected to return type '{currentFunction.ReturnType.Name}', but returned type '{returnValueType.Name}'", returnAst.Value);
                     }
                 }
             }
@@ -3509,10 +3509,11 @@ namespace Lang
                                 }
                             }
 
+                            var name = $"{PrintTypeDefinition(type)}[{arrayLength}]";
                             var backendName = $"{type.GenericName}.{arrayLength}";
                             if (!TypeTable.Types.TryGetValue(backendName, out var arrayType))
                             {
-                                arrayType = new ArrayType {Name = PrintTypeDefinition(type), BackendName = backendName, Size = elementType.Size * arrayLength, Length = arrayLength, ElementType = elementType};
+                                arrayType = new ArrayType {Name = name, BackendName = backendName, Size = elementType.Size * arrayLength, Length = arrayLength, ElementType = elementType};
                                 TypeTable.Add(backendName, arrayType);
                                 TypeTable.CreateTypeInfo(arrayType);
                             }
