@@ -20,9 +20,7 @@ namespace Lang.Project
         {
             // 1. Check if project file is null
             if (string.IsNullOrWhiteSpace(projectPath))
-            {
                 projectPath = GetProjectPathInDirectory(Directory.GetCurrentDirectory());
-            }
 
             // 2. Load the project file
             var fileAttributes = File.GetAttributes(projectPath);
@@ -36,7 +34,7 @@ namespace Lang.Project
                 new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
             // 3. Recurse through the directories and load the files to build
-            var sourceFiles = GetSourceFiles(new DirectoryInfo(Path.GetDirectoryName(projectPath)));
+            var sourceFiles = GetSourceFiles(new DirectoryInfo(Path.GetDirectoryName(Path.GetFullPath(projectPath))));
 
             return new Project
             {
@@ -47,8 +45,8 @@ namespace Lang.Project
 
         private static string GetProjectPathInDirectory(string directory)
         {
-            // a. Search for an olproj file in the current directory
-            var projectPath = Directory.EnumerateFiles(Directory.GetCurrentDirectory())
+            // a. Search for an project file in the current directory
+            var projectPath = Directory.EnumerateFiles(directory)
                 .FirstOrDefault(_ => _.EndsWith(ProjectFileExtension));
 
             // b. If no project file, throw and exit
