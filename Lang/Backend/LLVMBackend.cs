@@ -623,7 +623,7 @@ namespace Lang.Backend
                             BuildStackPointer();
                         }
                     }
-                    else if (LLVM.GetTypeKind(type) == LLVMTypeKind.LLVMStructTypeKind)
+                    else if (declaration.Type.TypeKind == TypeKind.Struct)
                     {
                         BuildStructAllocations(declaration.Type.GenericName, declaration.Assignments);
                     }
@@ -764,14 +764,13 @@ namespace Lang.Backend
                 {
                     BuildAllocations(assignment.Value);
                 }
-                else if (field.Type.TypeKind == TypeKind.Array)
+                else if (field.Type.TypeKind == TypeKind.Array && !field.Type.CArray && field.Type.Count != null)
                 {
-                    if (field.Type.CArray) continue;
                     var elementType = field.Type.Generics[0];
                     var targetType = ConvertTypeDefinition(elementType);
 
-                    var count = (ConstantAst)field.Type.Count;
-                    var arrayType = LLVM.ArrayType(targetType, uint.Parse(count.Value));
+                    var count = field.Type.ConstCount.Value;
+                    var arrayType = LLVM.ArrayType(targetType, count);
                     var arrayData = _builder.BuildAlloca(arrayType, "arraydata");
                     _allocationQueue.Enqueue(arrayData);
                 }
@@ -838,8 +837,6 @@ namespace Lang.Backend
         private void WriteDeclaration(DeclarationAst declaration, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMMetadataRef block)
         {
             // 1. Declare variable on the stack
-            var type = ConvertTypeDefinition(declaration.Type);
-
             if (declaration.Constant)
             {
                 var (_, value) = WriteExpression(declaration.Value, localVariables);
@@ -869,39 +866,53 @@ namespace Lang.Backend
                 var value = CastValue(expression, declaration.Type);
 
                 LLVM.BuildStore(_builder, value, variable);
+                return;
             }
-            // 3. Initialize arrays
-            else if (declaration.Type.TypeKind == TypeKind.Array && !declaration.Type.CArray)
-            {
-                var elementType = declaration.Type.Generics[0];
-                if (declaration.Type.ConstCount != null)
-                {
-                    InitializeConstArray(variable, declaration.Type.ConstCount.Value, elementType);
-                }
-                else if (declaration.Type.Count != null)
-                {
-                    BuildStackSave();
-                    var (_, count) = WriteExpression(declaration.Type.Count, localVariables);
 
-                    var countPointer = _builder.BuildStructGEP(variable, 0, "countptr");
-                    LLVM.BuildStore(_builder, count, countPointer);
+            switch (declaration.Type.TypeKind)
+            {
+                // Initialize arrays
+                case TypeKind.Array:
+                    if (declaration.Type.CArray) return;
+                    var elementType = declaration.Type.Generics[0];
+                    if (declaration.Type.ConstCount != null)
+                    {
+                        InitializeConstArray(variable, declaration.Type.ConstCount.Value, elementType);
+                    }
+                    else if (declaration.Type.Count != null)
+                    {
+                        BuildStackSave();
+                        var (_, count) = WriteExpression(declaration.Type.Count, localVariables);
 
-                    var targetType = ConvertTypeDefinition(elementType);
-                    var arrayData = _builder.BuildArrayAlloca(targetType, count, "arraydata");
-                    var dataPointer = _builder.BuildStructGEP(variable, 1, "dataptr");
-                    LLVM.BuildStore(_builder, arrayData, dataPointer);
-                }
-            }
-            // 4. Initialize struct field default values
-            else if (LLVM.GetTypeKind(type) == LLVMTypeKind.LLVMStructTypeKind)
-            {
-                InitializeStruct(declaration.Type, variable, localVariables, declaration.Assignments);
-            }
-            // 5. Or initialize to 0
-            else if (LLVM.GetTypeKind(type) != LLVMTypeKind.LLVMArrayTypeKind)
-            {
-                var zero = GetConstZero(type);
-                LLVM.BuildStore(_builder, zero, variable);
+                        var countPointer = _builder.BuildStructGEP(variable, 0, "countptr");
+                        LLVM.BuildStore(_builder, count, countPointer);
+
+                        var targetType = ConvertTypeDefinition(elementType);
+                        var arrayData = _builder.BuildArrayAlloca(targetType, count, "arraydata");
+                        var dataPointer = _builder.BuildStructGEP(variable, 1, "dataptr");
+                        LLVM.BuildStore(_builder, arrayData, dataPointer);
+                    }
+                    else
+                    {
+                        var countPointer = _builder.BuildStructGEP(variable, 0, "countptr");
+                        LLVM.BuildStore(_builder, _zeroInt, countPointer);
+                    }
+                    break;
+                // Initialize struct field default values
+                case TypeKind.Struct:
+                case TypeKind.String:
+                    InitializeStruct(declaration.Type, variable, localVariables, declaration.Assignments);
+                    break;
+                // Initialize pointers to null
+                case TypeKind.Pointer:
+                    var nullValue = LLVM.ConstNull(ConvertTypeDefinition(declaration.Type));
+                    LLVM.BuildStore(_builder, nullValue, variable);
+                    break;
+                // Or initialize to 0
+                default:
+                    var zero = GetConstZero(ConvertTypeDefinition(declaration.Type));
+                    LLVM.BuildStore(_builder, zero, variable);
+                    break;
             }
         }
 
@@ -913,7 +924,7 @@ namespace Lang.Backend
             {
                 var structField = structDef.Fields[i];
 
-                var field = _builder.BuildStructGEP(variable, (uint) i, structField.Name);
+                var field = _builder.BuildStructGEP(variable, (uint)i, structField.Name);
 
                 if (assignments != null && assignments.TryGetValue(structField.Name, out var assignment))
                 {
@@ -924,37 +935,39 @@ namespace Lang.Backend
                 }
                 else
                 {
-                    var type = ConvertTypeDefinition(structField.Type);
                     switch (structField.Type.TypeKind)
                     {
                         case TypeKind.Array:
                             if (structField.Type.CArray) continue;
-                            InitializeConstArray(field, structField.Type.ConstCount.Value, structField.Type.Generics[0]);
+                            if (structField.Type.ConstCount != null)
+                            {
+                                InitializeConstArray(field, structField.Type.ConstCount.Value, structField.Type.Generics[0]);
+                            }
+                            else
+                            {
+                                var countPointer = _builder.BuildStructGEP(field, 0, "countptr");
+                                LLVM.BuildStore(_builder, _zeroInt, countPointer);
+                            }
                             break;
                         case TypeKind.Pointer:
+                            var type = ConvertTypeDefinition(structField.Type);
                             LLVM.BuildStore(_builder, LLVM.ConstNull(type), field);
                             break;
                         case TypeKind.Struct:
                             InitializeStruct(structField.Type, field, localVariables);
                             break;
                         default:
-                            switch (structField.DefaultValue)
+                            LLVMValueRef value;
+                            if (structField.DefaultValue != null)
                             {
-                                case ConstantAst constant:
-                                    var constantValue = BuildConstant(type, constant);
-                                    LLVM.BuildStore(_builder, constantValue, field);
-                                    break;
-                                case StructFieldRefAst structFieldRef:
-                                    var enumName = structFieldRef.TypeNames[0];
-                                    var enumDef = (EnumAst)_programGraph.Types[enumName];
-                                    var value = enumDef.Values[structFieldRef.ValueIndices[0]].Value;
-                                    var enumValue = LLVM.ConstInt(LLVM.Int32Type(), (ulong)value, 0);
-                                    LLVM.BuildStore(_builder, enumValue, field);
-                                    break;
-                                case null:
-                                    LLVM.BuildStore(_builder, GetConstZero(type), field);
-                                    break;
+                                (_, value) = WriteExpression(structField.DefaultValue, localVariables);
                             }
+                            else
+                            {
+                                var fieldType = ConvertTypeDefinition(structField.Type);
+                                value = GetConstZero(fieldType);
+                            }
+                            LLVM.BuildStore(_builder, value, field);
                             break;
                     }
                 }
