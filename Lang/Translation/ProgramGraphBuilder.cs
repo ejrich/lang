@@ -269,28 +269,12 @@ namespace Lang.Translation
                 }
 
                 // 1b. Check for errored or undefined field types
-                var type = VerifyType(structField.Type);
+                var type = VerifyType(structField.Type, true);
 
                 if (type == Type.Error)
                 {
                     invalid = true;
                     AddError($"Type '{PrintTypeDefinition(structField.Type)}' of field {structAst.Name}.{structField.Name} is not defined", structField);
-                }
-                else if (structField.Type.Count != null)
-                {
-                    if (structField.Type.Count is ConstantAst constant)
-                    {
-                        if (!uint.TryParse(constant.Value, out _))
-                        {
-                            invalid = true;
-                            AddError($"Expected type count to be positive integer, but got '{constant.Value}'", constant);
-                        }
-                    }
-                    else
-                    {
-                        invalid = true;
-                        AddError("Type count should be a constant value", structField.Type.Count);
-                    }
                 }
 
                 // 1c. Check if the default value has the correct type
@@ -1910,7 +1894,7 @@ namespace Lang.Translation
         }
 
 
-        private Type VerifyType(TypeDefinition typeDef)
+        private Type VerifyType(TypeDefinition typeDef, bool listCountAsConstant = false)
         {
             if (typeDef == null) return Type.Error;
 
@@ -1925,6 +1909,17 @@ namespace Lang.Translation
 
             var hasGenerics = typeDef.Generics.Any();
             var hasCount = typeDef.Count != null;
+
+            if (typeDef.CArray && typeDef.Name != "List")
+            {
+                AddError("Directive #c_array can only be applied to List", typeDef);
+            }
+
+            if (typeDef.Count != null && typeDef.Name != "List")
+            {
+                AddError("Count can only be applied to List", typeDef);
+            }
+
             switch (typeDef.PrimitiveType)
             {
                 case IntegerType:
@@ -1985,6 +1980,36 @@ namespace Lang.Translation
                     {
                         AddError($"Type 'List' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
                         return Type.Error;
+                    }
+                    if (typeDef.Count != null)
+                    {
+                        if (listCountAsConstant)
+                        {
+                            if (typeDef.Count is ConstantAst constant)
+                            {
+                                if (!uint.TryParse(constant.Value, out _))
+                                {
+                                    AddError($"Expected type count to be positive integer, but got '{constant.Value}'", constant);
+                                }
+                            }
+                            else
+                            {
+                                AddError("Type count should be a constant value", typeDef.Count);
+                            }
+                        }
+                        else if (typeDef.CArray)
+                        {
+                            if (typeDef.Count is not ConstantAst constant)
+                            {
+                                AddError("C array should have a constant size", typeDef.Count);
+                                return Type.Error;
+                            }
+                            if (!uint.TryParse(constant.Value, out _))
+                            {
+                                AddError($"Expected type count to be positive integer, but got '{constant.Value}'", constant);
+                                return Type.Error;
+                            }
+                        }
                     }
                     return VerifyList(typeDef) ? Type.List : Type.Error;
                 }
