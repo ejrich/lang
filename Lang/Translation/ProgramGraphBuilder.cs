@@ -1884,7 +1884,10 @@ namespace Lang.Translation
             var type = VerifyType(typeDef);
             if (type != Type.List && type != Type.Params)
             {
-                AddError($"Cannot index type '{PrintTypeDefinition(typeDef)}'", index);
+                if (typeDef?.Name != "List" && typeDef?.Name != "Params")
+                {
+                    AddError($"Cannot index type '{PrintTypeDefinition(typeDef)}'", index);
+                }
                 return null;
             }
 
