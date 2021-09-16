@@ -999,13 +999,20 @@ namespace Lang.Backend.LLVM
                 {
                     case "List":
                     case "Params":
-                        // Load the List data
-                        var dataPointer = LLVMApi.BuildStructGEP(_builder, iterationValue, 1, "dataptr");
-                        listData = LLVMApi.BuildLoad(_builder, dataPointer, "data");
+                        // Load the List data and set the compareTarget to the list count
+                        if (iterationType.CArray)
+                        {
+                            listData = iterationValue;
+                            compareTarget = WriteExpression(iterationType.Count, localVariables).value;
+                        }
+                        else
+                        {
+                            var dataPointer = LLVMApi.BuildStructGEP(_builder, iterationValue, 1, "dataptr");
+                            listData = LLVMApi.BuildLoad(_builder, dataPointer, "data");
 
-                        // Set the compareTarget to the list count
-                        var lengthPointer= LLVMApi.BuildStructGEP(_builder, iterationValue, 0, "lengthptr");
-                        compareTarget = LLVMApi.BuildLoad(_builder, lengthPointer, "length");
+                            var lengthPointer= LLVMApi.BuildStructGEP(_builder, iterationValue, 0, "lengthptr");
+                            compareTarget = LLVMApi.BuildLoad(_builder, lengthPointer, "length");
+                        }
                         break;
                 }
             }
@@ -1035,7 +1042,8 @@ namespace Lang.Backend.LLVM
                 {
                     case "List":
                     case "Params":
-                        var iterationVariable = LLVMApi.BuildGEP(_builder, listData, new []{indexValue}, each.IterationVariable);
+                        var pointerIndices = iterationType.CArray ? new []{LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 0, false), indexValue} : new []{indexValue};
+                        var iterationVariable = LLVMApi.BuildGEP(_builder, listData, pointerIndices, each.IterationVariable);
                         eachVariables.TryAdd(each.IterationVariable, (each.IteratorType, iterationVariable));
                         break;
                 }
