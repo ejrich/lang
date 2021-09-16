@@ -1,10 +1,11 @@
-struct DIR {
-
-}
+struct DIR {}
 
 struct dirent {
-    string d_name;
-
+    u64 d_ino;
+    u64 d_off;
+    u16 d_reclen;
+    u8 d_type;
+    List<u8>[256] #c_array d_name;
 }
 
 enum DirType {
@@ -18,3 +19,7 @@ enum DirType {
     DT_SOCK = 12;
     DT_WHT = 14;
 }
+
+DIR* opendir(string dirname) #extern "libc"
+int closedir(DIR* dir) #extern "libc"
+dirent* readdir(DIR* dir) #extern "libc"

@@ -115,7 +115,7 @@ namespace Lang.Backend.LLVM
             }
             foreach (var (name, type) in programGraph.Types)
             {
-                if (type is StructAst structAst)
+                if (type is StructAst structAst && structAst.Fields.Any())
                 {
                     var fields = structAst.Fields.Select(field => ConvertTypeDefinition(field.Type)).ToArray();
                     LLVMApi.StructSetBody(structs[name], fields, false);

@@ -303,6 +303,7 @@ namespace Lang.Parsing
         public bool Constant { get; set; }
         public int GenericIndex { get; set; }
         public int? TypeIndex { get; set; }
+        public bool CArray { get; set; }
         public IPrimitive PrimitiveType { get; set; }
         public List<TypeDefinition> Generics { get; } = new();
         public IAst Count { get; set; }

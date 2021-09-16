@@ -1828,6 +1828,32 @@ namespace Lang.Parsing
                 typeDefinition.Count = ParseExpression(enumerator, errors, null, TokenType.CloseBracket);
             }
 
+            if (enumerator.Peek()?.Type == TokenType.Pound)
+            {
+                enumerator.MoveNext();
+                switch (enumerator.Peek()?.Value)
+                {
+                    case "c_array":
+                        typeDefinition.CArray = true;
+                        break;
+                    case null:
+                        errors.Add(new ParseError
+                        {
+                            Error = "Expected compiler directive value",
+                            Token = enumerator.Last
+                        });
+                        break;
+                    default:
+                        errors.Add(new ParseError
+                        {
+                            Error = $"Unexpected compiler directive '{enumerator.Current.Value}'",
+                            Token = enumerator.Current
+                        });
+                        break;
+                }
+                enumerator.MoveNext();
+            }
+
             return typeDefinition;
         }
 
