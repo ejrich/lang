@@ -5,38 +5,32 @@ using System.Text;
 
 namespace Lang
 {
-    public class ProgramGraph
+    public interface ITypeChecker
     {
-        public List<DeclarationAst> Variables { get; } = new();
-        public Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> OperatorOverloads { get; } = new();
+        void CheckTypes(List<IAst> asts);
     }
 
-    public interface IProgramGraphBuilder
-    {
-        void CreateProgramGraph(List<IAst> asts);
-    }
-
-    public class ProgramGraphBuilder : IProgramGraphBuilder
+    public class TypeChecker : ITypeChecker
     {
         private readonly IPolymorpher _polymorpher;
         private readonly IProgramIRBuilder _irBuilder;
         private readonly IProgramRunner _runner;
 
-        private readonly ProgramGraph _programGraph = new();
+        private readonly Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> _operatorOverloads = new();
         private readonly Dictionary<string, StructAst> _polymorphicStructs = new();
         private readonly Dictionary<string, List<FunctionAst>> _polymorphicFunctions = new();
         private readonly Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads = new();
         private readonly ScopeAst _globalScope = new();
         private readonly TypeDefinition _s32Type = new() {Name = "s32", TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
 
-        public ProgramGraphBuilder(IPolymorpher polymorpher, IProgramIRBuilder irBuilder, IProgramRunner runner)
+        public TypeChecker(IPolymorpher polymorpher, IProgramIRBuilder irBuilder, IProgramRunner runner)
         {
             _polymorpher = polymorpher;
             _irBuilder = irBuilder;
             _runner = runner;
         }
 
-        public void CreateProgramGraph(List<IAst> asts)
+        public void CheckTypes(List<IAst> asts)
         {
             var mainDefined = false;
             bool verifyAdditional;
@@ -110,7 +104,6 @@ namespace Lang
                     {
                         case DeclarationAst globalVariable:
                             VerifyGlobalVariable(globalVariable);
-                            _programGraph.Variables.Add(globalVariable);
                             asts.RemoveAt(i--);
                             break;
                     }
@@ -211,7 +204,7 @@ namespace Lang
             } while (verifyAdditional);
 
             // 6. Verify operator overload bodies
-            foreach (var overloads in _programGraph.OperatorOverloads.Values)
+            foreach (var overloads in _operatorOverloads.Values)
             {
                 foreach (var overload in overloads.Values)
                 {
@@ -852,9 +845,9 @@ namespace Lang
             }
             else
             {
-                if (!_programGraph.OperatorOverloads.TryGetValue(overload.Type.GenericName, out var overloads))
+                if (!_operatorOverloads.TryGetValue(overload.Type.GenericName, out var overloads))
                 {
-                    _programGraph.OperatorOverloads[overload.Type.GenericName] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
+                    _operatorOverloads[overload.Type.GenericName] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
                 }
                 if (overloads.ContainsKey(overload.Operator))
                 {
@@ -3401,7 +3394,7 @@ namespace Lang
 
         private OperatorOverloadAst VerifyOperatorOverloadType(TypeDefinition type, Operator op, IFunction currentFunction, IAst ast)
         {
-            if (_programGraph.OperatorOverloads.TryGetValue(type.GenericName, out var overloads) && overloads.TryGetValue(op, out var overload))
+            if (_operatorOverloads.TryGetValue(type.GenericName, out var overloads) && overloads.TryGetValue(op, out var overload))
             {
                 if (!overload.Flags.HasFlag(FunctionFlags.Verified) && overload != currentFunction)
                 {
@@ -3414,7 +3407,7 @@ namespace Lang
                 var polymorphedOverload = _polymorpher.CreatePolymorphedOperatorOverload(polymorphicOverload, type.Generics.ToArray());
                 if (overloads == null)
                 {
-                    _programGraph.OperatorOverloads[type.GenericName] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
+                    _operatorOverloads[type.GenericName] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
                 }
                 overloads[op] = polymorphedOverload;
                 VerifyType(polymorphedOverload.ReturnTypeDefinition);

@@ -31,15 +31,15 @@ namespace Lang
     {
         private readonly IProjectInterpreter _projectInterpreter;
         private readonly IParser _parser;
-        private readonly IProgramGraphBuilder _graphBuilder;
+        private readonly ITypeChecker _typeChecker;
         private readonly IBackend _backend;
         private readonly ILinker _linker;
 
-        public Compiler(IProjectInterpreter projectInterpreter, IParser parser, IProgramGraphBuilder graphBuilder, IBackend backend, ILinker linker)
+        public Compiler(IProjectInterpreter projectInterpreter, IParser parser, ITypeChecker typeChecker, IBackend backend, ILinker linker)
         {
             _projectInterpreter = projectInterpreter;
             _parser = parser;
-            _graphBuilder = graphBuilder;
+            _typeChecker = typeChecker;
             _backend = backend;
             _linker = linker;
         }
@@ -89,8 +89,8 @@ namespace Lang
                 Environment.Exit(ErrorCodes.ParsingError);
             }
 
-            // 4. Build program graph
-            _graphBuilder.CreateProgramGraph(asts);
+            // 4. Check types and build the program ir
+            _typeChecker.CheckTypes(asts);
             var frontEndTime = stopwatch.Elapsed;
 
             if (ErrorReporter.Errors.Any())

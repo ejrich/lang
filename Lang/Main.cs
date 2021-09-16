@@ -7,7 +7,7 @@ serviceCollection.AddTransient<ICompiler, Compiler>();
 serviceCollection.AddTransient<ILexer, Lexer>();
 serviceCollection.AddTransient<IParser, Parser>();
 serviceCollection.AddTransient<IProjectInterpreter, ProjectInterpreter>();
-serviceCollection.AddTransient<IProgramGraphBuilder, ProgramGraphBuilder>();
+serviceCollection.AddTransient<ITypeChecker, TypeChecker>();
 serviceCollection.AddTransient<IPolymorpher, Polymorpher>();
 serviceCollection.AddTransient<IProgramRunner, ProgramRunner>();
 serviceCollection.AddTransient<IProgramIRBuilder, ProgramIRBuilder>();
