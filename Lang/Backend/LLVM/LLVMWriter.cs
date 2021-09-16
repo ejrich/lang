@@ -859,10 +859,14 @@ namespace Lang.Backend.LLVM
                 // @Cleanup This branch should never be hit
                 _ => (null, new LLVMValueRef())
             };
+            if (assignment.Reference is IndexAst indexAst && indexAst.CallsOverload && type.Type == Lang.Translation.Type.Pointer)
+            {
+                type = type.Generics[0];
+            }
 
             // 2. Evaluate the expression value
             var expression = WriteExpression(assignment.Value, localVariables);
-            if (assignment.Operator != Operator.None && !loaded)
+            if (assignment.Operator != Operator.None && !constant) // TODO Test this
             {
                 // 2a. Build expression with variable value as the LHS
                 var value = LLVMApi.BuildLoad(_builder, variable, "tmpvalue");
@@ -1238,16 +1242,21 @@ namespace Lang.Backend.LLVM
                 case ChangeByOneAst changeByOne:
                 {
                     var loaded = false;
+                    var constant = false;
                     var (variableType, pointer) = changeByOne.Value switch
                     {
                         IdentifierAst identifier => localVariables[identifier.Name],
-                        StructFieldRefAst structField => BuildStructField(structField, localVariables, out loaded, out _), // TODO Test this if constant needs to be set
+                        StructFieldRefAst structField => BuildStructField(structField, localVariables, out loaded, out constant),
                         IndexAst index => GetListPointer(index, localVariables, out _),
                         // @Cleanup This branch should never be hit
                         _ => (null, new LLVMValueRef())
                     };
 
-                    var value = loaded ? pointer : LLVMApi.BuildLoad(_builder, pointer, "tmpvalue");
+                    var value = loaded || constant ? pointer : LLVMApi.BuildLoad(_builder, pointer, "tmpvalue");
+                    if (variableType.Type == Lang.Translation.Type.Pointer)
+                    {
+                        variableType = variableType.Generics[0];
+                    }
                     var type = ConvertTypeDefinition(variableType);
 
                     LLVMValueRef newValue;
@@ -1264,7 +1273,7 @@ namespace Lang.Backend.LLVM
                             : LLVMApi.BuildFSub(_builder, value, LLVMApi.ConstReal(type, 1), "decf");
                     }
 
-                    if (!loaded) // Loaded values are either readonly or constants, so don't store
+                    if (!constant) // Values are either readonly or constants, so don't store
                     {
                         LLVMApi.BuildStore(_builder, newValue, pointer);
                     }
@@ -1312,8 +1321,8 @@ namespace Lang.Backend.LLVM
                 }
                 case IndexAst index:
                 {
-                    var (elementType, elementValue) = GetListPointer(index, localVariables, out var load);
-                    if (load)
+                    var (elementType, elementValue) = GetListPointer(index, localVariables, out var loaded);
+                    if (!loaded)
                     {
                         elementValue = LLVMApi.BuildLoad(_builder, elementValue, "tmpindex");
                     }
@@ -1574,7 +1583,7 @@ namespace Lang.Backend.LLVM
             return (type, value);
         }
 
-        private (TypeDefinition type, LLVMValueRef value) GetListPointer(IndexAst index, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, out bool load)
+        private (TypeDefinition type, LLVMValueRef value) GetListPointer(IndexAst index, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, out bool loaded)
         {
             // 1. Get the variable pointer
             var (type, variable) = localVariables[index.Name];
@@ -1589,7 +1598,7 @@ namespace Lang.Backend.LLVM
                 var overload = LLVMApi.GetNamedFunction(_module, overloadName);
                 var overloadDef = _programGraph.OperatorOverloads[type.GenericName][Operator.Subscript];
 
-                load = false;
+                loaded = true;
                 return (overloadDef.ReturnType, LLVMApi.BuildCall(_builder, overload, new []{LLVMApi.BuildLoad(_builder, variable, index.Name), indexValue}, string.Empty));
             }
 
@@ -1606,7 +1615,7 @@ namespace Lang.Backend.LLVM
                 var dataPointer = LLVMApi.BuildLoad(_builder, listData, "dataptr");
                 listPointer = LLVMApi.BuildGEP(_builder, dataPointer, new [] {indexValue}, "indexptr");
             }
-            load = true;
+            loaded = false;
             return (elementType, listPointer);
         }
 
