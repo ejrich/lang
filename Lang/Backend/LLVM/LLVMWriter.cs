@@ -577,12 +577,12 @@ namespace Lang.Backend.LLVM
                     for (var i = 1; i < expression.Children.Count; i++)
                     {
                         var rhs = WriteExpression(expression.Children[i], localVariables);
-                        // TODO Update expression type
-                        expressionValue.value = BuildExpression(expressionValue.value, rhs.value, expression.Operators[i - 1]);
+                        expressionValue.value = BuildExpression(expressionValue, rhs, expression.Operators[i - 1], expression.ResultingTypes[i - 1]);
+                        expressionValue.type = expression.ResultingTypes[i - 1];
                     }
                     return expressionValue;
                 default:
-                    // This branch should not be hit since we've already verified that these ASTs are handled,
+                    // @Cleanup This branch should not be hit since we've already verified that these ASTs are handled,
                     // but notify the user and exit just in case
                     Console.WriteLine("Unexpected syntax tree");
                     Environment.Exit(ErrorCodes.BuildError);
@@ -629,14 +629,58 @@ namespace Lang.Backend.LLVM
         private LLVMValueRef BuildExpression((TypeDefinition type, LLVMValueRef value) lhs,
             (TypeDefinition type, LLVMValueRef value) rhs, Operator op, TypeDefinition targetType)
         {
-            // TODO Actually implement me based on these steps
-            // 1. Check the signage of the input types
-            // 1a. If both are unsigned, expand to larger type and perform unsigned operations
-            // 1b. return
-            // 2. Cast any unsigned values to signed
-            // 3. Do similar to what I'm doing now for signed operators, but considering the target type
-            // 4. return
-            return BuildExpression(lhs.value, rhs.value, op);
+            // 1. Handle simple operators like && and ||
+            switch (op)
+            {
+                case Operator.And:
+                    return LLVMApi.BuildAnd(_builder, lhs.value, rhs.value, "tmpand");
+                case Operator.Or:
+                    return LLVMApi.BuildOr(_builder, lhs.value, rhs.value, "tmpor");
+            }
+
+            // 2. Check the signage of the input types
+            var signed = lhs.type.PrimitiveType.Signed || rhs.type.PrimitiveType.Signed;
+            // TODO Implement 2a
+            // 2a. If both are unsigned, expand to larger type and perform unsigned operations
+            switch (op)
+            {
+                case Operator.Equality:
+                    return BuildCompare(lhs.value, rhs.value, op, signed);
+                case Operator.NotEqual:
+                    return BuildCompare(lhs.value, rhs.value, op, signed);
+                case Operator.GreaterThanEqual:
+                    return BuildCompare(lhs.value, rhs.value, op, signed);
+                case Operator.LessThanEqual:
+                    return BuildCompare(lhs.value, rhs.value, op, signed);
+                case Operator.GreaterThan:
+                    return BuildCompare(lhs.value, rhs.value, op, signed);
+                case Operator.LessThan:
+                    return BuildCompare(lhs.value, rhs.value, op, signed);
+            }
+
+            // 3. Cast any unsigned values to signed
+            lhs.value = CastValue(lhs.value, targetType);
+            rhs.value = CastValue(rhs.value, targetType);
+
+            // 4. Handle different operators
+            switch (op)
+            {
+                case Operator.BitwiseAnd:
+                    return LLVMApi.BuildAnd(_builder, lhs.value, rhs.value, "tmpband");
+                case Operator.BitwiseOr:
+                    return LLVMApi.BuildOr(_builder, lhs.value, rhs.value, "tmpbor");
+                case Operator.Xor:
+                    return LLVMApi.BuildXor(_builder, lhs.value, rhs.value, "tmpxor");
+                case Operator.Add:
+                case Operator.Subtract:
+                case Operator.Multiply:
+                case Operator.Divide:
+                case Operator.Modulus:
+                    return BuildBinaryOperation(lhs.value, rhs.value, op, signed);
+                default:
+                    // @Cleanup This branch should never be hit
+                    return new LLVMValueRef();
+            }
         }
 
         private LLVMValueRef BuildExpression(LLVMValueRef lhs, LLVMValueRef rhs, Operator op)
@@ -650,24 +694,24 @@ namespace Lang.Backend.LLVM
                 Operator.BitwiseOr => LLVMApi.BuildOr(_builder, lhs, rhs, "tmpbor"),
                 Operator.Xor => LLVMApi.BuildXor(_builder, lhs, rhs, "tmpxor"),
                 // Comparison operators
-                Operator.Equality => BuildCompare(lhs, rhs, op, "tmpeq"),
-                Operator.NotEqual => BuildCompare(lhs, rhs, op, "tmpne"),
-                Operator.GreaterThanEqual => BuildCompare(lhs, rhs, op, "tmpgte"),
-                Operator.LessThanEqual => BuildCompare(lhs, rhs, op, "tmplte"),
-                Operator.GreaterThan => BuildCompare(lhs, rhs, op, "tmpgt"),
-                Operator.LessThan => BuildCompare(lhs, rhs, op, "tmplt"),
+                Operator.Equality => BuildCompare(lhs, rhs, op),
+                Operator.NotEqual => BuildCompare(lhs, rhs, op),
+                Operator.GreaterThanEqual => BuildCompare(lhs, rhs, op),
+                Operator.LessThanEqual => BuildCompare(lhs, rhs, op),
+                Operator.GreaterThan => BuildCompare(lhs, rhs, op),
+                Operator.LessThan => BuildCompare(lhs, rhs, op),
                 // Arithmetic operators
                 Operator.Add => BuildBinaryOperation(lhs, rhs, op),
                 Operator.Subtract => BuildBinaryOperation(lhs, rhs, op),
                 Operator.Multiply => BuildBinaryOperation(lhs, rhs, op),
                 Operator.Divide => BuildBinaryOperation(lhs, rhs, op),
                 Operator.Modulus => BuildBinaryOperation(lhs, rhs, op),
-                // This branch should never be hit
+                // @Cleanup This branch should never be hit
                 _ => new LLVMValueRef()
             };
         }
 
-        private LLVMValueRef BuildCompare(LLVMValueRef lhs, LLVMValueRef rhs, Operator op, string name)
+        private LLVMValueRef BuildCompare(LLVMValueRef lhs, LLVMValueRef rhs, Operator op, bool signed = true)
         {
             var lhsType = lhs.TypeOf();
             var rhsType = rhs.TypeOf();
@@ -677,6 +721,7 @@ namespace Lang.Backend.LLVM
                     switch (rhsType.TypeKind)
                     {
                         case LLVMTypeKind.LLVMIntegerTypeKind:
+                        {
                             var lhsWidth = lhsType.GetIntTypeWidth();
                             var rhsWidth = rhsType.GetIntTypeWidth();
                             if (lhsWidth > rhsWidth)
@@ -687,16 +732,21 @@ namespace Lang.Backend.LLVM
                             {
                                 lhs = CastValue(lhs, rhsType);
                             }
-                            return LLVMApi.BuildICmp(_builder, ConvertIntOperator(op), lhs, rhs, name);
+                            var (predicate, name) = ConvertIntOperator(op, signed);
+                            return LLVMApi.BuildICmp(_builder, predicate, lhs, rhs, name);
+                        }
                         case LLVMTypeKind.LLVMFloatTypeKind:
                         case LLVMTypeKind.LLVMDoubleTypeKind:
+                        {
+                            var (predicate, name) = ConvertRealOperator(op);
                             lhs = LLVMApi.BuildSIToFP(_builder, lhs, rhsType, "tmpfloat");
-                            return LLVMApi.BuildFCmp(_builder, ConvertRealOperator(op), lhs, rhs, name);
+                            return LLVMApi.BuildFCmp(_builder, predicate, lhs, rhs, name);
+                        }
                     }
                     break;
                 case LLVMTypeKind.LLVMFloatTypeKind:
                 {
-                    var predicate = ConvertRealOperator(op);
+                    var (predicate, name) = ConvertRealOperator(op);
                     switch (rhsType.TypeKind)
                     {
                         case LLVMTypeKind.LLVMFloatTypeKind:
@@ -705,6 +755,7 @@ namespace Lang.Backend.LLVM
                             lhs = LLVMApi.BuildFPExt(_builder, lhs, rhsType, "tmpfloat");
                             return LLVMApi.BuildFCmp(_builder, predicate, lhs, rhs, name);
                         case LLVMTypeKind.LLVMIntegerTypeKind:
+                            // TODO Check if signed or unsigned
                             rhs = LLVMApi.BuildSIToFP(_builder, rhs, lhsType, "tmpfloat");
                             return LLVMApi.BuildFCmp(_builder, predicate, lhs, rhs, name);
                     }
@@ -712,7 +763,7 @@ namespace Lang.Backend.LLVM
                 }
                 case LLVMTypeKind.LLVMDoubleTypeKind:
                 {
-                    var predicate = ConvertRealOperator(op);
+                    var (predicate, name) = ConvertRealOperator(op);
                     switch (rhsType.TypeKind)
                     {
                         case LLVMTypeKind.LLVMDoubleTypeKind:
@@ -721,6 +772,7 @@ namespace Lang.Backend.LLVM
                             rhs = LLVMApi.BuildFPExt(_builder, rhs, lhsType, "tmpfloat");
                             return LLVMApi.BuildFCmp(_builder, predicate, lhs, rhs, name);
                         case LLVMTypeKind.LLVMIntegerTypeKind:
+                            // TODO Check if signed or unsigned
                             rhs = LLVMApi.BuildSIToFP(_builder, rhs, lhsType, "tmpfloat");
                             return LLVMApi.BuildFCmp(_builder, predicate, lhs, rhs, name);
                     }
@@ -731,7 +783,7 @@ namespace Lang.Backend.LLVM
             throw new NotImplementedException($"{op} not compatible with types '{lhs.TypeOf().TypeKind}' and '{rhs.TypeOf().TypeKind}'");
         }
 
-        private LLVMValueRef BuildBinaryOperation(LLVMValueRef lhs, LLVMValueRef rhs, Operator op)
+        private LLVMValueRef BuildBinaryOperation(LLVMValueRef lhs, LLVMValueRef rhs, Operator op, bool signed = true)
         {
             var lhsType = lhs.TypeOf();
             var rhsType = rhs.TypeOf();
@@ -751,7 +803,7 @@ namespace Lang.Backend.LLVM
                             {
                                 lhs = CastValue(lhs, rhsType);
                             }
-                            return BuildIntOperation(lhs, rhs, op);
+                            return BuildIntOperation(lhs, rhs, op, signed);
                         case LLVMTypeKind.LLVMFloatTypeKind:
                         case LLVMTypeKind.LLVMDoubleTypeKind:
                             lhs = LLVMApi.BuildSIToFP(_builder, lhs, rhsType, "tmpfloat");
@@ -767,6 +819,7 @@ namespace Lang.Backend.LLVM
                             lhs = LLVMApi.BuildFPExt(_builder, lhs, rhsType, "tmpfloat");
                             return BuildRealOperation(lhs, rhs, op);
                         case LLVMTypeKind.LLVMIntegerTypeKind:
+                            // TODO Check if signed or unsigned
                             rhs = LLVMApi.BuildSIToFP(_builder, rhs, lhsType, "tmpfloat");
                             return BuildRealOperation(lhs, rhs, op);
                     }
@@ -780,6 +833,7 @@ namespace Lang.Backend.LLVM
                             rhs = LLVMApi.BuildFPExt(_builder, rhs, rhsType, "tmpfloat");
                             return BuildRealOperation(lhs, rhs, op);
                         case LLVMTypeKind.LLVMIntegerTypeKind:
+                            // TODO Check if signed or unsigned
                             rhs = LLVMApi.BuildSIToFP(_builder, rhs, lhsType, "tmpfloat");
                             return BuildRealOperation(lhs, rhs, op);
                     }
@@ -791,10 +845,10 @@ namespace Lang.Backend.LLVM
 
         private LLVMValueRef CastValue(LLVMValueRef value, TypeDefinition typeDef)
         {
-            return CastValue(value, ConvertTypeDefinition(typeDef));
+            return CastValue(value, ConvertTypeDefinition(typeDef), typeDef.PrimitiveType?.Signed);
         }
 
-        private LLVMValueRef CastValue(LLVMValueRef value, LLVMTypeRef targetType)
+        private LLVMValueRef CastValue(LLVMValueRef value, LLVMTypeRef targetType, bool? signed = true)
         {
             var a = value.TypeOf().PrintTypeToString();
             var b = targetType.PrintTypeToString();
@@ -812,48 +866,48 @@ namespace Lang.Backend.LLVM
             return value;
         }
 
-        private static LLVMIntPredicate ConvertIntOperator(Operator op)
+        private static (LLVMIntPredicate predicate, string name) ConvertIntOperator(Operator op, bool signed = true)
         {
             return op switch
             {
-                Operator.Equality => LLVMIntPredicate.LLVMIntEQ,
-                Operator.NotEqual => LLVMIntPredicate.LLVMIntNE,
-                Operator.GreaterThan => LLVMIntPredicate.LLVMIntSGT,
-                Operator.GreaterThanEqual => LLVMIntPredicate.LLVMIntSGE,
-                Operator.LessThan => LLVMIntPredicate.LLVMIntSLT,
-                Operator.LessThanEqual => LLVMIntPredicate.LLVMIntSLE,
-                // TODO Handle unsigned compares
-                // This branch should never be hit
-                _ => LLVMIntPredicate.LLVMIntEQ
+                Operator.Equality => (LLVMIntPredicate.LLVMIntEQ, "tmpeq"),
+                Operator.NotEqual => (LLVMIntPredicate.LLVMIntNE, "tmpne"),
+                Operator.GreaterThan => (signed ? LLVMIntPredicate.LLVMIntSGT : LLVMIntPredicate.LLVMIntUGT, "tmpgt"),
+                Operator.GreaterThanEqual => (signed ? LLVMIntPredicate.LLVMIntSGE : LLVMIntPredicate.LLVMIntUGE, "tmpgte"),
+                Operator.LessThan => (signed ? LLVMIntPredicate.LLVMIntSLT : LLVMIntPredicate.LLVMIntULT, "tmplt"),
+                Operator.LessThanEqual => (signed ? LLVMIntPredicate.LLVMIntSLE : LLVMIntPredicate.LLVMIntULE, "tmplte"),
+                // @Cleanup This branch should never be hit
+                _ => (LLVMIntPredicate.LLVMIntEQ, "tmpeq")
             };
         }
 
-        private static LLVMRealPredicate ConvertRealOperator(Operator op)
+        private static (LLVMRealPredicate predicate, string name) ConvertRealOperator(Operator op)
         {
             return op switch
             {
-                Operator.Equality => LLVMRealPredicate.LLVMRealOEQ,
-                Operator.NotEqual => LLVMRealPredicate.LLVMRealONE,
-                Operator.GreaterThan => LLVMRealPredicate.LLVMRealOGT,
-                Operator.GreaterThanEqual => LLVMRealPredicate.LLVMRealOGE,
-                Operator.LessThan => LLVMRealPredicate.LLVMRealOLT,
-                Operator.LessThanEqual => LLVMRealPredicate.LLVMRealOLE,
-               // This branch should never be hit
-                _ => LLVMRealPredicate.LLVMRealOEQ
+                Operator.Equality => (LLVMRealPredicate.LLVMRealOEQ, "tmpeq"),
+                Operator.NotEqual => (LLVMRealPredicate.LLVMRealONE, "tmpne"),
+                Operator.GreaterThan => (LLVMRealPredicate.LLVMRealOGT, "tmpgt"),
+                Operator.GreaterThanEqual => (LLVMRealPredicate.LLVMRealOGE, "tmpgte"),
+                Operator.LessThan => (LLVMRealPredicate.LLVMRealOLT, "tmplt"),
+                Operator.LessThanEqual => (LLVMRealPredicate.LLVMRealOLE, "tmplte"),
+               // @Cleanup This branch should never be hit
+                _ => (LLVMRealPredicate.LLVMRealOEQ, "tmpeq")
             };
         }
 
-        private LLVMValueRef BuildIntOperation(LLVMValueRef lhs, LLVMValueRef rhs, Operator op)
+        private LLVMValueRef BuildIntOperation(LLVMValueRef lhs, LLVMValueRef rhs, Operator op, bool signed = true)
         {
             return op switch
             {
                 Operator.Add => LLVMApi.BuildAdd(_builder, lhs, rhs, "tmpadd"),
                 Operator.Subtract => LLVMApi.BuildSub(_builder, lhs, rhs, "tmpsub"),
                 Operator.Multiply => LLVMApi.BuildMul(_builder, lhs, rhs, "tmpmul"),
-                Operator.Divide => LLVMApi.BuildSDiv(_builder, lhs, rhs, "tmpdiv"),
-                Operator.Modulus => LLVMApi.BuildSRem(_builder, lhs, rhs, "tmpmod"),
-                // TODO Handle unsigned operations
-                // This branch should never be hit
+                Operator.Divide => signed ? LLVMApi.BuildSDiv(_builder, lhs, rhs, "tmpdiv") :
+                    LLVMApi.BuildUDiv(_builder, lhs, rhs, "tmpdiv"),
+                Operator.Modulus => signed ? LLVMApi.BuildSRem(_builder, lhs, rhs, "tmpmod") :
+                    LLVMApi.BuildURem(_builder, lhs, rhs, "tmpmod"),
+                // @Cleanup This branch should never be hit
                 _ => new LLVMValueRef()
             };
         }
@@ -867,7 +921,7 @@ namespace Lang.Backend.LLVM
                 Operator.Multiply => LLVMApi.BuildFMul(_builder, lhs, rhs, "tmpmul"),
                 Operator.Divide => LLVMApi.BuildFDiv(_builder, lhs, rhs, "tmpdiv"),
                 Operator.Modulus => LLVMApi.BuildFRem(_builder, lhs, rhs, "tmpmod"),
-                // This branch should never be hit
+                // @Cleanup This branch should never be hit
                 _ => new LLVMValueRef()
             };
         }
