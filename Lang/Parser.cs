@@ -1576,7 +1576,7 @@ namespace Lang
                                         FileIndex = typeDefinition.FileIndex, Line = typeDefinition.Line,
                                         Column = typeDefinition.Column
                                     };
-                                    callAst.Function = typeDefinition.Name;
+                                    callAst.FunctionName = typeDefinition.Name;
                                     callAst.Generics = typeDefinition.Generics;
                                     enumerator.MoveNext();
                                     ParseArguments(callAst, enumerator, errors, currentFunction);
@@ -1771,7 +1771,7 @@ namespace Lang
         private static CallAst ParseCall(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction, bool requiresSemicolon = false)
         {
             var callAst = CreateAst<CallAst>(enumerator.Current);
-            callAst.Function = enumerator.Current.Value;
+            callAst.FunctionName = enumerator.Current.Value;
 
             // This enumeration is the open paren
             enumerator.MoveNext();

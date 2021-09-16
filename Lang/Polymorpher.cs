@@ -268,7 +268,7 @@ namespace Lang
                     return unaryCopy;
                 case CallAst call:
                     var callCopy = CopyAst(call);
-                    callCopy.Function = call.Function;
+                    callCopy.FunctionName = call.FunctionName;
                     if (call.SpecifiedArguments != null)
                     {
                         callCopy.SpecifiedArguments = new Dictionary<string, IAst>();
