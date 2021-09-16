@@ -327,4 +327,17 @@ namespace Lang.Parsing
         If,
         Assert
     }
+
+    public enum TypeKind
+    {
+        Void,
+        Boolean,
+        Integer,
+        Float,
+        String,
+        Pointer,
+        List,
+        Enum,
+        Struct
+    }
 }

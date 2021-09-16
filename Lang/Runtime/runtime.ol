@@ -13,6 +13,32 @@ struct string {
 }
 
 
+// Runtime type information data
+struct TypeInfo {
+    string name;
+    TypeKind type;
+    List<string> fields;
+}
+
+enum TypeKind {
+    Void;
+    Boolean;
+    Integer;
+    Float;
+    String;
+    Pointer;
+    List;
+    Enum;
+    Struct;
+}
+
+type_table: List<TypeInfo*>;
+
+TypeInfo type_of(int type_index) {
+    return *type_table[type_index];
+}
+
+
 // Basic IO functions
 printf(string format, ... args) #extern "libc"
 

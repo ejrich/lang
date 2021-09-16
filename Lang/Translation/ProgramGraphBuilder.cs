@@ -1235,7 +1235,7 @@ namespace Lang.Translation
                                         var argument = arguments[i];
                                         // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
                                         // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
-                                        if (argument.PrimitiveType is FloatType {Bytes: 4})
+                                        if (argument?.PrimitiveType is FloatType {Bytes: 4})
                                         {
                                             arguments[i] = argument = new TypeDefinition
                                             {

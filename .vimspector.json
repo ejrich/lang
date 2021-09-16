@@ -5,7 +5,7 @@
       "configuration": {
         "request": "launch",
         "program": "${workspaceRoot}/Lang/bin/Debug/net5.0/Lang.dll",
-        "args": ["${workspaceRoot}/Example/Example.olproj"],
+        "args": ["-S", "${workspaceRoot}/Example/Example.olproj"],
         "stopAtEntry": false,
         "cwd": "${workspaceRoot}"
       }
