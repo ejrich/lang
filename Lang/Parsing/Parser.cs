@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 
 namespace Lang.Parsing
 {
@@ -53,6 +55,7 @@ namespace Lang.Parsing
         {
             var parseResult = new ParseResult();
 
+            // 1. Parse project files
             for (var fileIndex = 0; fileIndex < projectFiles.Count; fileIndex++)
             {
                 var file = projectFiles[fileIndex];
@@ -72,6 +75,20 @@ namespace Lang.Parsing
                 }
             }
 
+            // 2. Parse runtime library files
+            var runtime = Assembly.GetExecutingAssembly().GetManifestResourceStream("Lang.Runtime.runtime.ol");
+            {
+                var syntaxTrees = ParseFileStream(runtime, out var errors);
+                if (errors.Any())
+                {
+                    parseResult.Errors.AddRange(errors);
+                }
+                else if (parseResult.Success)
+                {
+                    parseResult.SyntaxTrees.AddRange(syntaxTrees);
+                }
+            }
+
             return parseResult;
         }
 
@@ -80,7 +97,22 @@ namespace Lang.Parsing
             // 1. Load file tokens
             var tokens = _lexer.LoadFileTokens(file, fileIndex, out errors);
 
-            // 2. Iterate through tokens, tracking different ASTs
+            // 2. Parse tokens into ASTs
+            return ParseTokens(tokens, errors);
+        }
+
+        private List<IAst> ParseFileStream(Stream fileStream, out List<ParseError> errors)
+        {
+            // 1. Load file tokens
+            var tokens = _lexer.LoadFileTokens(fileStream, -1, out errors);
+
+            // 2. Parse tokens into ASTs
+            return ParseTokens(tokens, errors);
+        }
+
+        private static List<IAst> ParseTokens(List<Token> tokens, List<ParseError> errors)
+        {
+            // Iterate through tokens, tracking different ASTs
             var syntaxTrees = new List<IAst>();
             var enumerator = new TokenEnumerator(tokens);
             while (enumerator.MoveNext())

@@ -9,6 +9,7 @@ namespace Lang.Parsing
     public interface ILexer
     {
         List<Token> LoadFileTokens(string filePath, int fileIndex, out List<ParseError> errors);
+        List<Token> LoadFileTokens(Stream fileStream, int fileIndex, out List<ParseError> errors);
     }
 
     public class Lexer : ILexer
@@ -31,13 +32,20 @@ namespace Lang.Parsing
 
         public List<Token> LoadFileTokens(string filePath, int fileIndex, out List<ParseError> errors)
         {
-            var fileContents = File.ReadAllText(filePath);
+            using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
 
-            errors = new List<ParseError>();
-            return GetTokens(fileContents, fileIndex, errors).ToList();
+            return LoadFileTokens(fileStream, fileIndex, out errors);
         }
 
-        private IEnumerable<Token> GetTokens(string fileContents, int fileIndex, List<ParseError> errors)
+        public List<Token> LoadFileTokens(Stream fileStream, int fileIndex, out List<ParseError> errors)
+        {
+            using var reader = new StreamReader(fileStream);
+
+            errors = new List<ParseError>();
+            return GetTokens(reader, fileIndex, errors).ToList();
+        }
+
+        private IEnumerable<Token> GetTokens(StreamReader reader, int fileIndex, List<ParseError> errors)
         {
             var lexerStatus = new LexerStatus();
 
@@ -46,8 +54,11 @@ namespace Lang.Parsing
             var literalEscapeToken = false;
             var line = 1;
             var column = 0;
-            foreach (var character in fileContents)
+
+            while (reader.Peek() > 0)
             {
+                var character = (char)reader.Read();
+ 
                 column++;
                 if (character == '\n')
                 {
