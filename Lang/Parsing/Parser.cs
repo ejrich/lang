@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Lang.Parsing
@@ -286,7 +287,6 @@ namespace Lang.Parsing
                         };
                         if (error != null)
                             errors.Add(error);
-                        enumerator.MoveNext();
                         break;
                     case TokenType.Token:
                         declaration.Value = new VariableAst {Name = token.Value};
@@ -299,49 +299,111 @@ namespace Lang.Parsing
                         });
                         break;
                 }
+                enumerator.MoveNext();
             }
             else
             {
-                var expression = ParseExpression(enumerator, errors);
-                if (expression.HasErrors)
-                {
-                    errors.Add(new ParseError
-                    {
-                        Error = "Expected declaration to have value",
-                        Token = token
-                    });
-                }
+                declaration.Value = ParseExpression(enumerator, errors);
             }
 
             return declaration;
         }
 
-        private static ExpressionAst ParseExpression(TokenEnumerator enumerator, List<ParseError> errors)
+        private static ExpressionAst ParseExpression(TokenEnumerator enumerator, List<ParseError> errors, params TokenType[] endToken)
         {
             var expression = new ExpressionAst();
-
-            while (enumerator.Current.Type != TokenType.SemiColon)
+            if (!endToken.Any())
             {
-                switch (enumerator.Current.Type)
+                endToken = new[] {TokenType.SemiColon};
+            }
+
+            var operatorRequired = false;
+
+            do
+            {
+                var token = enumerator.Current;
+
+                if (endToken.Contains(token.Type))
+                {
+                    if (!expression.Children.Any())
+                    {
+                        errors.Add(new ParseError
+                        {
+                            Error = "Expression should contain elements",
+                            Token = token
+                        });
+                    }
+                    else if (!operatorRequired && expression.Children.Any())
+                    {
+                        errors.Add(new ParseError
+                        {
+                            Error = "Value required after operator",
+                            Token = token
+                        });
+                    }
+                    break;
+                }
+
+                var nextToken = enumerator.Peek();
+                switch (token.Type)
                 {
                     case TokenType.Number:
                     case TokenType.Boolean:
                     case TokenType.Literal:
-                        // TODO Implement me
+                        // Parse constant or expression
+                        expression.Children.Add(new ConstantAst
+                        {
+                            Type = token.InferType(out var error),
+                            Value = token.Value
+                        });
+                        if (error != null)
+                            errors.Add(error);
+                        operatorRequired = true;
                         break;
                     case TokenType.Token:
-                        // Parse call
-                        var nextToken = enumerator.Peek();
+                        // Parse variable, call, or expression
                         switch (nextToken.Type)
                         {
                             case TokenType.OpenParen:
-                                var call = ParseCall(enumerator, errors);
+                                expression.Children.Add(ParseCall(enumerator, errors));
                                 break;
+                            default:
+                                expression.Children.Add(new VariableAst {Name = token.Value});
+                                break;
+                        }
+                        operatorRequired = true;
+                        break;
+                    // TODO Handle OpenParen for subexpressions
+                    default:
+                        var op = (Operator)token.Value[0];
+                        if (Enum.IsDefined(typeof(Operator), op))
+                        {
+                            if (operatorRequired)
+                            {
+                                expression.Operators.Add(op);
+                                operatorRequired = false;
+                            }
+                            else
+                            {
+                                errors.Add(new ParseError
+                                {
+                                    Error = $"Unexpected operator '{token.Value}' after another operator",
+                                    Token = token
+                                });
+                            }
+                        }
+                        else
+                        {
+                            errors.Add(new ParseError
+                            {
+                                Error = $"Unexpected token '{token.Value}' in expression",
+                                Token = token
+                            });
                         }
                         break;
                 }
-                enumerator.MoveNext();
-            }
+
+            } while (enumerator.MoveNext());
 
             return expression;
         }
@@ -391,30 +453,50 @@ namespace Lang.Parsing
                 }
                 else
                 {
+                    var nextToken = enumerator.Peek();
                     switch (token.Type)
                     {
                         case TokenType.Number:
                         case TokenType.Boolean:
                         case TokenType.Literal:
-                            var constant = new ConstantAst
-                            {
-                                Type = token.InferType(out var error),
-                                Value = token.Value
-                            };
-                            if (error != null)
-                                errors.Add(error);
-                            callAst.Arguments.Add(constant);
-                            commaRequired = true;
-                            break;
-                        case TokenType.Token:
-                            // Parse call
-                            var nextToken = enumerator.Peek();
+                            // Parse constant or expression
                             switch (nextToken.Type)
                             {
-                                case TokenType.OpenParen:
-                                    var call = ParseCall(enumerator, errors);
+                                case TokenType.Comma:
+                                case TokenType.CloseParen:
+                                    var constant = new ConstantAst
+                                    {
+                                        Type = token.InferType(out var error),
+                                        Value = token.Value
+                                    };
+                                    if (error != null)
+                                        errors.Add(error);
+                                    commaRequired = true;
+                                    callAst.Arguments.Add(constant);
                                     break;
-                                // TODO Implement expressions
+                                default:
+                                    // TODO Make sure this works and setting commaRequired isn't required
+                                    callAst.Arguments.Add(ParseExpression(enumerator, errors, TokenType.Comma, TokenType.CloseParen));
+                                    break;
+                            }
+                            break;
+                        case TokenType.Token:
+                            // Parse variable, call, or expression
+                            switch (nextToken.Type)
+                            {
+                                case TokenType.Comma:
+                                case TokenType.CloseParen:
+                                    callAst.Arguments.Add(new VariableAst {Name = token.Value});
+                                    commaRequired = true;
+                                    break;
+                                case TokenType.OpenParen:
+                                    callAst.Arguments.Add(ParseCall(enumerator, errors));
+                                    commaRequired = true;
+                                    break;
+                                default:
+                                    // TODO Make sure this works and setting commaRequired isn't required
+                                    callAst.Arguments.Add(ParseExpression(enumerator, errors, TokenType.Comma, TokenType.CloseParen));
+                                    break;
                             }
                             break;
                         default:
@@ -431,6 +513,66 @@ namespace Lang.Parsing
             return callAst;
         }
 
+        private static ReturnAst ParseReturn(TokenEnumerator enumerator, List<ParseError> errors)
+        {
+            var returnAst = new ReturnAst();
+
+            enumerator.MoveNext();
+            var token = enumerator.Current;
+
+            // Constant or variable case
+            var nextToken = enumerator.Peek();
+            switch (nextToken?.Type)
+            {
+                case TokenType.SemiColon:
+                    switch (token.Type)
+                    {
+                        case TokenType.Number:
+                        case TokenType.Boolean:
+                        case TokenType.Literal:
+                            returnAst.Value = new ConstantAst
+                            {
+                                Type = token.InferType(out var error),
+                                Value = token.Value
+                            };
+                            if (error != null)
+                                errors.Add(error);
+                            break;
+                        case TokenType.Token:
+                            returnAst.Value = new VariableAst {Name = token.Value};
+                            break;
+                        default:
+                            errors.Add(new ParseError
+                            {
+                                Error = $"Unexpected token '{token.Value}' in return statement",
+                                Token = token
+                            });
+                            break;
+                    }
+                    enumerator.MoveNext();
+                    break;
+                case TokenType.OpenParen:
+                    if (token.Type == TokenType.Token)
+                    {
+                        returnAst.Value = ParseCall(enumerator, errors);
+                    }
+                    else
+                    {
+                        errors.Add(new ParseError
+                        {
+                            Error = $"Unexpected token in '{token.Value}' in return statement",
+                            Token = token
+                        });
+                    }
+                    break;
+                default:
+                    returnAst.Value = ParseExpression(enumerator, errors);
+                    break;
+            }
+
+            return returnAst;
+        }
+
         private static TypeDefinition ParseType(TokenEnumerator enumerator, List<ParseError> errors)
         {
             var typeDefinition = new TypeDefinition
@@ -440,7 +582,7 @@ namespace Lang.Parsing
 
             // Determine whether to parse a generic type, otherwise return
             enumerator.MoveNext();
-            if (enumerator.Current!.Type == TokenType.LessThan)
+            if (enumerator.Current?.Type == TokenType.LessThan)
             {
                 var commaRequiredBeforeNextType = false;
                 while (enumerator.MoveNext())
@@ -499,47 +641,6 @@ namespace Lang.Parsing
             }
 
             return typeDefinition;
-        }
-
-        private static ReturnAst ParseReturn(TokenEnumerator enumerator, List<ParseError> errors)
-        {
-            var returnAst = new ReturnAst();
-
-            while (enumerator.MoveNext())
-            {
-                var token = enumerator.Current;
-
-                if (token.Type == TokenType.SemiColon)
-                {
-                    break;
-                }
-
-                switch (token.Type)
-                {
-                    case TokenType.Token:
-                    case TokenType.Number:
-                    case TokenType.Boolean:
-                    case TokenType.Literal:
-                        returnAst.Value = new ConstantAst
-                        {
-                            Type = token.InferType(out var error),
-                            Value = token.Value
-                        };
-                        if (error != null)
-                            errors.Add(error);
-                        // TODO Add support for expressions and calls
-                        break;
-                    default:
-                        errors.Add(new ParseError
-                        {
-                            Error = "Unexpected token in return statement",
-                            Token = token
-                        });
-                        break;
-                }
-            }
-
-            return returnAst;
         }
     }
 }
