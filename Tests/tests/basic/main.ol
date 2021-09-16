@@ -317,7 +317,7 @@ compiler_directives() {
 
 build() {
     if os == OS.Linux {
-        add_dependency("X11");
+        // add_dependency("X11");
     }
 }
 

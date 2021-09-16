@@ -20,6 +20,7 @@ steps:
     arguments: '-c $(BuildConfiguration)'
 
 - script: |
+    ./Lang/bin/Debug/net5.0/Lang Tests/tests/basic
     ./Lang/bin/Debug/net5.0/Lang Tests/tests.olproj
     ./Tests/bin/tests
   displayName: 'Compiler Tests'
