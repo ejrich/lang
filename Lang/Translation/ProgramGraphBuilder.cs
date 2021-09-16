@@ -1144,8 +1144,9 @@ namespace Lang.Translation
                         else if (function.Varargs)
                         {
                             var found = false;
-                            foreach (var callTypes in function.VarargsCalls)
+                            for (var index = 0; index < function.VarargsCalls.Count; index++)
                             {
+                                var callTypes = function.VarargsCalls[index];
                                 if (callTypes.Count == arguments.Count)
                                 {
                                     var callMatches = true;
@@ -1171,6 +1172,7 @@ namespace Lang.Translation
                                     if (callMatches)
                                     {
                                         found = true;
+                                        call.VarargsIndex = index;
                                         break;
                                     }
                                 }
@@ -1178,6 +1180,7 @@ namespace Lang.Translation
 
                             if (!found)
                             {
+                                call.VarargsIndex = function.VarargsCalls.Count;
                                 function.VarargsCalls.Add(arguments);
                             }
                         }

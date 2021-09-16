@@ -17,7 +17,7 @@ namespace Lang.Runner
 
     public class ProgramRunner : IProgramRunner
     {
-        private ModuleBuilder _moduleBuilder;
+        private int _version;
         private readonly Dictionary<string, List<MethodInfo>> _functions = new();
         private readonly Dictionary<string, ValueType> _globalVariables = new();
         private readonly Dictionary<string, Type> _types = new();
@@ -31,12 +31,9 @@ namespace Lang.Runner
         public void Init(ProgramGraph programGraph)
         {
             // Initialize the runner
-            if (_moduleBuilder == null)
-            {
-                var assemblyName = new AssemblyName("Runner");
-                var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
-                _moduleBuilder = assemblyBuilder.DefineDynamicModule("Runner");
-            }
+            var assemblyName = new AssemblyName($"Runner{_version++}");
+            var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
+            var moduleBuilder = assemblyBuilder.DefineDynamicModule("Runner");
 
             var temporaryStructs = new Dictionary<string, TypeBuilder>();
             foreach (var (_, type) in programGraph.Types)
@@ -45,7 +42,7 @@ namespace Lang.Runner
                 {
                     case EnumAst enumAst:
                         if (_types.ContainsKey(enumAst.Name)) break;
-                        var enumBuilder = _moduleBuilder.DefineEnum(enumAst.Name, TypeAttributes.Public, typeof(int));
+                        var enumBuilder = moduleBuilder.DefineEnum(enumAst.Name, TypeAttributes.Public, typeof(int));
                         foreach (var value in enumAst.Values)
                         {
                             enumBuilder.DefineLiteral(value.Name, value.Value);
@@ -54,7 +51,7 @@ namespace Lang.Runner
                         break;
                     case StructAst structAst:
                         if (_types.ContainsKey(structAst.Name)) break;
-                        var structBuilder = _moduleBuilder.DefineType(structAst.Name, TypeAttributes.Public | TypeAttributes.SequentialLayout);
+                        var structBuilder = moduleBuilder.DefineType(structAst.Name, TypeAttributes.Public | TypeAttributes.SequentialLayout);
                         temporaryStructs[structAst.Name] = structBuilder;
                         break;
                 }
@@ -109,16 +106,19 @@ namespace Lang.Runner
                     {
                         var callTypes = function.VarargsCalls[i];
                         var varargs = callTypes.Select(arg => GetTypeFromDefinition(arg, cCall: true)).ToArray();
-                        CreateFunction(function.Name, function.ExternLib, returnType, varargs, functions);
+                        CreateFunction(moduleBuilder, function.Name, function.ExternLib, returnType, varargs, functions);
                     }
-                    continue;
                 }
                 else
                 {
-                    var args = function.Arguments.Select(arg => GetTypeFromDefinition(arg.Type, cCall: true)).ToArray();
-                    CreateFunction(function.Name, function.ExternLib, returnType, args, functions);
+                    if (!functions.Any())
+                    {
+                        var args = function.Arguments.Select(arg => GetTypeFromDefinition(arg.Type, cCall: true)).ToArray();
+                        CreateFunction(moduleBuilder, function.Name, function.ExternLib, returnType, args, functions);
+                    }
                 }
             }
+            moduleBuilder.CreateGlobalFunctions();
 
             foreach (var variable in programGraph.Variables)
             {
@@ -146,9 +146,9 @@ namespace Lang.Runner
             }
         }
 
-        private void CreateFunction(string name, string library, Type returnType, Type[] args, List<MethodInfo> functions)
+        private void CreateFunction(ModuleBuilder moduleBuilder, string name, string library, Type returnType, Type[] args, List<MethodInfo> functions)
         {
-            var method = _moduleBuilder.DefineGlobalMethod(name, MethodAttributes.Public | MethodAttributes.Static, returnType, args);
+            var method = moduleBuilder.DefineGlobalMethod(name, MethodAttributes.Public | MethodAttributes.Static, returnType, args);
             var caBuilder = new CustomAttributeBuilder(typeof(DllImportAttribute).GetConstructor(new []{typeof(string)}), new []{library});
             method.SetCustomAttribute(caBuilder);
 
@@ -872,24 +872,22 @@ namespace Lang.Runner
         }
 
         private ValueType CallFunction(string functionName, FunctionAst function, ProgramGraph programGraph,
-            object[] arguments, Type[] argumentTypes = null)
+            object[] arguments, Type[] argumentTypes = null, int callIndex = 0)
         {
             if (function.Extern)
             {
                 var args = arguments.Select(GetCArg).ToArray();
                 if (function.Varargs)
                 {
-                    // TODO Fix me
-                    /* var functionDecl = _library.GetMethod(functionName, argumentTypes!); */
-                    /* var returnValue = functionDecl!.Invoke(_functionObject, args); */
-                    /* return new ValueType {Type = function.ReturnType, Value = returnValue}; */
+                    var functionDecl = _functions[functionName][callIndex];
+                    var returnValue = functionDecl.Invoke(null, args);
+                    return new ValueType {Type = function.ReturnType, Value = returnValue};
                 }
                 else
                 {
-                    // TODO Fix me
-                    /* var functionDecl = _library.GetMethod(functionName); */
-                    /* var returnValue = functionDecl!.Invoke(_functionObject, args); */
-                    /* return new ValueType {Type = function.ReturnType, Value = returnValue}; */
+                    var functionDecl = _functions[functionName][callIndex];
+                    var returnValue = functionDecl.Invoke(null, args);
+                    return new ValueType {Type = function.ReturnType, Value = returnValue};
                 }
             }
 
