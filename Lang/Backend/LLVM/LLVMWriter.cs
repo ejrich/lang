@@ -226,6 +226,9 @@ namespace Lang.Backend.LLVM
             if (assignment.Operator != Operator.None)
             {
                 // TODO If operator exists, create expression using the existing expression value
+                // 2a. Build expression with variable value as the LHS
+                var value = _builder.BuildLoad(variable, variableName);
+                expressionValue = BuildExpression(value, expressionValue, assignment.Operator);
             }
 
             // 3. Reallocate the value of the variable
@@ -315,19 +318,44 @@ namespace Lang.Backend.LLVM
                     else
                     {
                         // TODO Implement StructFieldRef writing
+                        return null;
                     }
-                    break;
                 case NotAst not:
                     var notValue = WriteExpression(not.Value, localVariables);
                     return _builder.BuildNot(notValue, "not");
                 case ExpressionAst expression:
-                    // TODO Implement expression writing
-                    break;
+                    var expressionValue = WriteExpression(expression.Children[0], localVariables);
+                    for (var i = 1; i < expression.Children.Count; i++)
+                    {
+                        var rhs = WriteExpression(expression.Children[i], localVariables);
+                        expressionValue = BuildExpression(expressionValue, rhs, expression.Operators[i - 1]);
+                    }
+                    return expressionValue;
                 default:
                     return null;
             }
 
             return LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, 0);
+        }
+
+        private LLVMValueRef BuildExpression(LLVMValueRef lhs, LLVMValueRef rhs, Operator op)
+        {
+            switch (op)
+            {
+                // TODO Get value type to determine correct instruction to use
+                case Operator.Add:
+                    return _builder.BuildAdd(lhs, rhs, "tmpadd");
+                case Operator.Subtract:
+                    return _builder.BuildSub(lhs, rhs, "tmpsub");
+                case Operator.Multiply:
+                    // @Fix Stack overflow error here
+                    return _builder.BuildMul(lhs, rhs, "tmpmul");
+                case Operator.Divide:
+                    return _builder.BuildSDiv(lhs, rhs, "tmpdiv");
+                // TODO Implement more operators
+                default:
+                    return null;
+            }
         }
 
         private static LLVMTypeRef ConvertTypeDefinition(TypeDefinition typeDef)
