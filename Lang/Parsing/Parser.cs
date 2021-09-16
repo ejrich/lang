@@ -104,7 +104,7 @@ namespace Lang.Parsing
                         syntaxTrees.Add(ParseEnum(enumerator, errors));
                         break;
                     case TokenType.Pound:
-                        // TODO Add this
+                        syntaxTrees.Add(ParseTopLevelDirective(enumerator, errors));
                         break;
                     default:
                         errors.Add(new ParseError
@@ -1656,23 +1656,6 @@ namespace Lang.Parsing
             }
         }
 
-        private static IAst ParseCompilerDirective(TokenEnumerator enumerator, List<ParseError> errors)
-        {
-            var directive = CreateAst<CompilerDirectiveAst>(enumerator.Current);
-
-            if (!enumerator.MoveNext())
-            {
-                errors.Add(new ParseError { Error = "Expected compiler directive to have a value", Token = enumerator.Last});
-                return null;
-            }
-
-            var ast = ParseLine(enumerator, errors);
-            if (ast != null)
-                directive.Value = ast;
-
-            return directive;
-        }
-
         private static IndexAst ParseIndex(TokenEnumerator enumerator, List<ParseError> errors, IAst variable)
         {
             // 1. Initialize the index ast
@@ -1704,28 +1687,13 @@ namespace Lang.Parsing
 
             if (!enumerator.MoveNext())
             {
-                errors.Add(new ParseError {Error = "Expected compiler directive to have a value", Token = enumerator.Last});
+                errors.Add(new ParseError { Error = "Expected compiler directive to have a value", Token = enumerator.Last});
                 return null;
             }
 
-            var token = enumerator.Current;
-            switch (token.Value)
-            {
-                case "run":
-                    directive.Type = DirectiveType.Run;
-                    enumerator.MoveNext();
-                    var ast = ParseLine(enumerator, errors);
-                    if (ast != null)
-                        directive.Value = ast;
-                    break;
-                case "if":
-                    directive.Type = DirectiveType.If;
-                    directive.Value = ParseConditional(enumerator, errors, true);
-                    break;
-                default:
-                    errors.Add(new ParseError {Error = $"Unsupported top-level compiler directive '{token.Value}'", Token = token});
-                    return null;
-            }
+            var ast = ParseLine(enumerator, errors);
+            if (ast != null)
+                directive.Value = ast;
 
             return directive;
         }
@@ -1736,21 +1704,13 @@ namespace Lang.Parsing
 
             if (!enumerator.MoveNext())
             {
-                errors.Add(new ParseError {Error = "Expected compiler directive to have a value", Token = enumerator.Last});
+                errors.Add(new ParseError { Error = "Expected compiler directive to have a value", Token = enumerator.Last});
                 return null;
             }
 
-            var token = enumerator.Current;
-            switch (token.Value)
-            {
-                case "if":
-                    directive.Type = DirectiveType.If;
-                    directive.Value = ParseConditional(enumerator, errors);
-                    break;
-                default:
-                    errors.Add(new ParseError {Error = $"Unsupported compiler directive '{token.Value}'", Token = token});
-                    return null;
-            }
+            var ast = ParseLine(enumerator, errors);
+            if (ast != null)
+                directive.Value = ast;
 
             return directive;
         }
