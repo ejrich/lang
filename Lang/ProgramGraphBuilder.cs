@@ -1280,7 +1280,7 @@ namespace Lang
                     var type = VerifyIndex(index, variableType, currentFunction, scopeIdentifiers, out var overloaded);
                     if (type != null && overloaded)
                     {
-                        if (type.Type != TypeKind.Pointer)
+                        if (type.TypeKind != TypeKind.Pointer)
                         {
                             AddError($"Overload [] for type '{PrintTypeDefinition(variableType)}' must be a pointer to be able to set the value", index);
                             return null;
@@ -1306,7 +1306,7 @@ namespace Lang
                             var variableType = GetVariable(index.Name, index, scopeIdentifiers);
                             if (variableType == null) return null;
                             refType = VerifyIndex(index, variableType, currentFunction, scopeIdentifiers, out var overloaded);
-                            if (refType != null && overloaded && refType.Type != TypeKind.Pointer)
+                            if (refType != null && overloaded && refType.TypeKind != TypeKind.Pointer)
                             {
                                 AddError($"Overload [] for type '{PrintTypeDefinition(variableType)}' must be a pointer to be able to set the value", index);
                                 return null;
@@ -1334,7 +1334,7 @@ namespace Lang
                                 refType = VerifyIndex(index, fieldType, currentFunction, scopeIdentifiers, out var overloaded);
                                 if (refType != null && overloaded)
                                 {
-                                    if (refType.Type == TypeKind.Pointer)
+                                    if (refType.TypeKind == TypeKind.Pointer)
                                     {
                                         if (i == structFieldRef.Children.Count - 1)
                                         {
@@ -1369,7 +1369,7 @@ namespace Lang
                         return null;
                     }
 
-                    if (reference.Type != TypeKind.Pointer)
+                    if (reference.TypeKind != TypeKind.Pointer)
                     {
                         AddError("Expected to get pointer to dereference", unary.Value);
                         return null;
@@ -2874,7 +2874,7 @@ namespace Lang
         private TypeKind VerifyType(TypeDefinition typeDef, int depth = 0, bool argument = false)
         {
             if (typeDef == null) return TypeKind.Error;
-            if (typeDef.Type != null) return typeDef.Type.Value;
+            if (typeDef.TypeKind != null) return typeDef.TypeKind.Value;
 
             if (typeDef.IsGeneric)
             {
@@ -2904,19 +2904,19 @@ namespace Lang
                     if (hasGenerics)
                     {
                         AddError($"Type '{typeDef.Name}' cannot have generics", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                         return TypeKind.Error;
                     }
-                    typeDef.Type = TypeKind.Integer;
+                    typeDef.TypeKind = TypeKind.Integer;
                     return TypeKind.Integer;
                 case FloatType:
                     if (hasGenerics)
                     {
                         AddError($"Type '{typeDef.Name}' cannot have generics", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                         return TypeKind.Error;
                     }
-                    typeDef.Type = TypeKind.Float;
+                    typeDef.TypeKind = TypeKind.Float;
                     return TypeKind.Float;
             }
 
@@ -2926,76 +2926,76 @@ namespace Lang
                     if (hasGenerics)
                     {
                         AddError("Type 'bool' cannot have generics", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = TypeKind.Boolean;
+                        typeDef.TypeKind = TypeKind.Boolean;
                     }
                     break;
                 case "string":
                     if (hasGenerics)
                     {
                         AddError("Type 'string' cannot have generics", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = TypeKind.String;
+                        typeDef.TypeKind = TypeKind.String;
                     }
                     break;
                 case "List":
                     if (typeDef.Generics.Count != 1)
                     {
                         AddError($"Type 'List' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     else if (!VerifyList(typeDef, depth, argument, out var hasGenericTypes))
                     {
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = hasGenericTypes ? TypeKind.Generic : TypeKind.List;
+                        typeDef.TypeKind = hasGenericTypes ? TypeKind.Generic : TypeKind.List;
                     }
                     break;
                 case "void":
                     if (hasGenerics)
                     {
                         AddError("Type 'void' cannot have generics", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = TypeKind.Void;
+                        typeDef.TypeKind = TypeKind.Void;
                     }
                     break;
                 case "*":
                     if (typeDef.Generics.Count != 1)
                     {
                         AddError($"pointer type should have reference to 1 type, but got {typeDef.Generics.Count}", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     else if (_programGraph.Types.ContainsKey(typeDef.GenericName))
                     {
-                        typeDef.Type = TypeKind.Pointer;
+                        typeDef.TypeKind = TypeKind.Pointer;
                     }
                     else
                     {
                         var pointerType = VerifyType(typeDef.Generics[0], depth + 1);
                         if (pointerType == TypeKind.Error)
                         {
-                            typeDef.Type = TypeKind.Error;
+                            typeDef.TypeKind = TypeKind.Error;
                         }
                         else if (pointerType == TypeKind.Generic)
                         {
-                            typeDef.Type = TypeKind.Generic;
+                            typeDef.TypeKind = TypeKind.Generic;
                         }
                         else
                         {
                             var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeIndex = _programGraph.TypeCount++, TypeKind = TypeKind.Pointer, Size = 8};
                             _programGraph.Types.Add(typeDef.GenericName, pointer);
-                            typeDef.Type = TypeKind.Pointer;
+                            typeDef.TypeKind = TypeKind.Pointer;
                         }
                     }
                     break;
@@ -3003,44 +3003,44 @@ namespace Lang
                     if (hasGenerics)
                     {
                         AddError("Type 'varargs' cannot have generics", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                         return TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = TypeKind.VarArgs;
+                        typeDef.TypeKind = TypeKind.VarArgs;
                     }
                     break;
                 case "Params":
                     if (!argument)
                     {
                         AddError($"Params can only be used in function arguments", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     else if (depth != 0)
                     {
                         AddError($"Params can only be declared as a top level type, such as 'Params<int>'", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     else if (typeDef.Generics.Count != 1)
                     {
                         AddError($"Type 'Params' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = VerifyList(typeDef, depth, argument, out _) ? TypeKind.Params : TypeKind.Error;
+                        typeDef.TypeKind = VerifyList(typeDef, depth, argument, out _) ? TypeKind.Params : TypeKind.Error;
                     }
                     break;
                 case "Type":
                     if (hasGenerics)
                     {
                         AddError("Type 'Type' cannot have generics", typeDef);
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.Type = TypeKind.Type;
+                        typeDef.TypeKind = TypeKind.Type;
                     }
                     break;
                 default:
@@ -3049,7 +3049,7 @@ namespace Lang
                         var genericName = typeDef.GenericName;
                         if (_programGraph.Types.ContainsKey(genericName))
                         {
-                            typeDef.Type = TypeKind.Struct;
+                            typeDef.TypeKind = TypeKind.Struct;
                         }
                         else
                         {
@@ -3071,27 +3071,27 @@ namespace Lang
                             if (!_polymorphicStructs.TryGetValue(typeDef.Name, out var structDef))
                             {
                                 AddError($"No polymorphic structs of type '{typeDef.Name}'", typeDef);
-                                typeDef.Type = TypeKind.Error;
+                                typeDef.TypeKind = TypeKind.Error;
                             }
                             else if (structDef.Generics.Count != typeDef.Generics.Count)
                             {
                                 AddError($"Expected type '{typeDef.Name}' to have {structDef.Generics.Count} generic(s), but got {typeDef.Generics.Count}", typeDef);
-                                typeDef.Type = TypeKind.Error;
+                                typeDef.TypeKind = TypeKind.Error;
                             }
                             else if (error)
                             {
-                                typeDef.Type = TypeKind.Error;
+                                typeDef.TypeKind = TypeKind.Error;
                             }
                             else if (hasGenericTypes)
                             {
-                                typeDef.Type = TypeKind.Generic;
+                                typeDef.TypeKind = TypeKind.Generic;
                             }
                             else
                             {
                                 var polyStruct = _polymorpher.CreatePolymorphedStruct(structDef, PrintTypeDefinition(typeDef), TypeKind.Struct, _programGraph.TypeCount++, generics);
                                 _programGraph.Types.Add(genericName, polyStruct);
                                 VerifyStruct(polyStruct);
-                                typeDef.Type = TypeKind.Struct;
+                                typeDef.TypeKind = TypeKind.Struct;
                             }
                         }
                     }
@@ -3100,25 +3100,25 @@ namespace Lang
                         switch (type)
                         {
                             case StructAst:
-                                typeDef.Type = TypeKind.Struct;
+                                typeDef.TypeKind = TypeKind.Struct;
                                 break;
                             case EnumAst enumAst:
                                 var primitive = enumAst.BaseType.PrimitiveType;
                                 typeDef.PrimitiveType ??= new EnumType {Bytes = primitive.Bytes, Signed = primitive.Signed};
-                                typeDef.Type = TypeKind.Enum;
+                                typeDef.TypeKind = TypeKind.Enum;
                                 break;
                             default:
-                                typeDef.Type = TypeKind.Error;
+                                typeDef.TypeKind = TypeKind.Error;
                                 break;
                         }
                     }
                     else
                     {
-                        typeDef.Type = TypeKind.Error;
+                        typeDef.TypeKind = TypeKind.Error;
                     }
                     break;
             }
-            return typeDef.Type.Value;
+            return typeDef.TypeKind.Value;
         }
 
         private bool VerifyList(TypeDefinition typeDef, int depth, bool argument, out bool hasGenerics)
