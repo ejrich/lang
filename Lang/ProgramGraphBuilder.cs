@@ -901,7 +901,7 @@ namespace Lang
             }
 
             // 4. Loop through function body and verify all ASTs
-            var returned = VerifyScope(function.Body, function, _globalScope);
+            var returned = VerifyScope(function.Body, function, _globalScope, false);
 
             // 5. Verify the main function doesn't call the compiler
             if (function.Name == "main" && function.CallsCompiler)
@@ -950,7 +950,7 @@ namespace Lang
             }
 
             // 3. Loop through body and verify all ASTs
-            var returned = VerifyScope(overload.Body, overload, _globalScope);
+            var returned = VerifyScope(overload.Body, overload, _globalScope, false);
 
             // 4. Verify the body returns on all paths
             if (!returned)
@@ -1029,7 +1029,7 @@ namespace Lang
             }
         }
 
-        private bool VerifyScope(ScopeAst scope, IFunction currentFunction, ScopeAst parentScope)
+        private bool VerifyScope(ScopeAst scope, IFunction currentFunction, ScopeAst parentScope, bool canBreak)
         {
             // 1. Set the parent scope
             scope.Parent = parentScope;
@@ -1038,7 +1038,7 @@ namespace Lang
             var returns = false;
             foreach (var ast in scope.Children)
             {
-                if (VerifyAst(ast, currentFunction, scope))
+                if (VerifyAst(ast, currentFunction, scope, canBreak))
                 {
                     returns = true;
                 }
@@ -1046,7 +1046,7 @@ namespace Lang
             return returns;
         }
 
-        private bool VerifyAst(IAst syntaxTree, IFunction currentFunction, ScopeAst scope)
+        private bool VerifyAst(IAst syntaxTree, IFunction currentFunction, ScopeAst scope, bool canBreak)
         {
             switch (syntaxTree)
             {
@@ -1060,15 +1060,24 @@ namespace Lang
                     VerifyAssignment(assignment, currentFunction, scope);
                     break;
                 case ScopeAst newScope:
-                    return VerifyScope(newScope, currentFunction, scope);
+                    return VerifyScope(newScope, currentFunction, scope, canBreak);
                 case ConditionalAst conditional:
-                    return VerifyConditional(conditional, currentFunction, scope);
+                    return VerifyConditional(conditional, currentFunction, scope, canBreak);
                 case WhileAst whileAst:
                     return VerifyWhile(whileAst, currentFunction, scope);
                 case EachAst each:
                     return VerifyEach(each, currentFunction, scope);
                 case BreakAst:
+                    if (!canBreak)
+                    {
+                        AddError("No parent loop to break", syntaxTree);
+                    }
+                    break;
                 case ContinueAst:
+                    if (!canBreak)
+                    {
+                        AddError("No parent loop to continue", syntaxTree);
+                    }
                     break;
                 default:
                     VerifyExpression(syntaxTree, currentFunction, scope);
@@ -2001,18 +2010,18 @@ namespace Lang
             return field.TypeDefinition;
         }
 
-        private bool VerifyConditional(ConditionalAst conditional, IFunction currentFunction, ScopeAst scope)
+        private bool VerifyConditional(ConditionalAst conditional, IFunction currentFunction, ScopeAst scope, bool canBreak)
         {
             // 1. Verify the condition expression
             VerifyCondition(conditional.Condition, currentFunction, scope);
 
             // 2. Verify the conditional scope
-            var ifReturned = VerifyScope(conditional.IfBlock, currentFunction, scope);
+            var ifReturned = VerifyScope(conditional.IfBlock, currentFunction, scope, canBreak);
 
             // 3. Verify the else block if necessary
             if (conditional.ElseBlock != null)
             {
-                var elseReturned = VerifyScope(conditional.ElseBlock, currentFunction, scope);
+                var elseReturned = VerifyScope(conditional.ElseBlock, currentFunction, scope, canBreak);
                 return ifReturned && elseReturned;
             }
 
@@ -2025,7 +2034,7 @@ namespace Lang
             VerifyCondition(whileAst.Condition, currentFunction, scope);
 
             // 2. Verify the scope of the while block
-            return VerifyScope(whileAst.Body, currentFunction, scope);
+            return VerifyScope(whileAst.Body, currentFunction, scope, true);
         }
 
         private bool VerifyCondition(IAst ast, IFunction currentFunction, ScopeAst scope)
@@ -2099,7 +2108,7 @@ namespace Lang
             }
 
             // 2. Verify the scope of the each block
-            return VerifyScope(each.Body, currentFunction, scope);
+            return VerifyScope(each.Body, currentFunction, scope, true);
         }
 
         private void VerifyTopLevelDirective(CompilerDirectiveAst directive)
@@ -2108,7 +2117,7 @@ namespace Lang
             {
                 case DirectiveType.Run:
                     // TODO Figure out where to put this IR
-                    VerifyAst(directive.Value, null, _globalScope);
+                    VerifyAst(directive.Value, null, _globalScope, false);
                     if (!_programGraph.Errors.Any())
                     {
                         _programRunner.Init(_programGraph);
