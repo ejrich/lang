@@ -22,19 +22,19 @@ namespace Lang.Translation
             errors = new List<TranslationError>();
 
             // 1. First load the user defined structs
-            var definedStructs = new HashSet<string>();
             var structs = parseResult.SyntaxTrees.Where(ast => ast is StructAst).Cast<StructAst>().ToList();
             foreach (var structAst in structs)
             {
-                if (!definedStructs.Add(structAst.Name))
+                if (!_structs.TryAdd(structAst.Name, structAst))
                 {
                     errors.Add(CreateError($"Multiple definitions of struct '{structAst.Name}'", structAst));
                 }
             }
+
             // 2. Verify struct bodies
             foreach (var structAst in structs)
             {
-                VerifyStruct(structAst, definedStructs, errors);
+                VerifyStruct(structAst, errors);
             }
 
             // 3. Load and verify function return types and arguments
@@ -79,12 +79,9 @@ namespace Lang.Translation
             return graph;
         }
 
-        private void VerifyStruct(StructAst structAst, HashSet<string> definedStructs, List<TranslationError> errors)
+        private void VerifyStruct(StructAst structAst, List<TranslationError> errors)
         {
-            // 1. Load the struct into the dictionary
-            _structs.TryAdd(structAst.Name, structAst);
-
-            // 2. Verify struct fields have valid types
+            // 1. Verify struct fields have valid types
             var fieldNames = new HashSet<string>();
             foreach (var structField in structAst.Fields)
             {
@@ -95,9 +92,9 @@ namespace Lang.Translation
                 }
 
                 // 1b. Check for errored or undefined field types
-                var type = VerifyType(structField.Type, errors, false);
+                var type = VerifyType(structField.Type, errors);
 
-                if (type == Type.Error || (type == Type.Other && !definedStructs.Contains(structField.Type.Name)))
+                if (type == Type.Error)
                 {
                     errors.Add(CreateError($"Type '{PrintTypeDefinition(structField.Type)}' of field {structAst.Name}.{structField.Name} is not defined", structField));
                 }
@@ -552,6 +549,17 @@ namespace Lang.Translation
                                 errors.Add(CreateError($"Variable '{structField.Name}' not defined", structField));
                                 return null;
                             }
+                        case IndexAst index:
+                            var indexType = VerifyIndexType(index, localVariables, errors, out var variableAst);
+                            if (indexType != null)
+                            {
+                                var type = VerifyType(indexType, errors);
+                                if (type == Type.Int || type == Type.Float) return indexType;
+
+                                var op = changeByOne.Positive ? "increment" : "decrement";
+                                errors.Add(CreateError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(indexType)}'", variableAst));
+                            }
+                            return null;
                         default:
                             var operand = changeByOne.Positive ? "increment" : "decrement";
                             errors.Add(CreateError($"Expected to {operand} variable", changeByOne));
@@ -585,13 +593,13 @@ namespace Lang.Translation
                             errors.Add(CreateError($"Cannot dereference type '{PrintTypeDefinition(valueType)}'", unary.Value));
                             return null;
                         case UnaryOperator.Reference:
-                            if (unary.Value is VariableAst || unary.Value is StructFieldRefAst || type == Type.Pointer)
+                            if (unary.Value is VariableAst || unary.Value is StructFieldRefAst || unary.Value is IndexAst || type == Type.Pointer)
                             {
                                 var pointerType = new TypeDefinition {Name = "*"};
                                 pointerType.Generics.Add(valueType);
                                 return pointerType;
                             }
-                            errors.Add(CreateError("Cannot only reference variables, structs, or struct fields", unary.Value));
+                            errors.Add(CreateError("Can only reference variables, structs, or struct fields", unary.Value));
                             return null;
                         default:
                             errors.Add(CreateError($"Unexpected unary operator '{unary.Operator}'", unary.Value));
@@ -629,33 +637,7 @@ namespace Lang.Translation
                 case ExpressionAst expression:
                     return VerifyExpressionType(expression, localVariables, errors);
                 case IndexAst index:
-                    switch (index.Variable)
-                    {
-                        case VariableAst variable:
-                            if (localVariables.TryGetValue(variable.Name, out var variableType))
-                            {
-                                return VerifyIndex(index, variableType, localVariables, errors);
-                            }
-                            else
-                            {
-                                errors.Add(CreateError($"Variable '{variable.Name}' not defined", variable));
-                                return null;
-                            }
-                        case StructFieldRefAst structField:
-                            if (localVariables.TryGetValue(structField.Name, out var structType))
-                            {
-                                var fieldType = VerifyStructFieldRef(structField, structType, errors);
-                                return fieldType == null ? null : VerifyIndex(index, fieldType, localVariables, errors);
-                            }
-                            else
-                            {
-                                errors.Add(CreateError($"Variable '{structField.Name}' not defined", structField));
-                                return null;
-                            }
-                        default:
-                            errors.Add(CreateError($"Expected to index a variable", index));
-                            return null;
-                    }
+                    return VerifyIndexType(index, localVariables, errors, out _);
                 case null:
                     return null;
                 default:
@@ -866,17 +848,60 @@ namespace Lang.Translation
             return value.Value == null ? field.Type : VerifyStructFieldRef(value, field.Type, errors);
         }
 
+        private TypeDefinition VerifyIndexType(IndexAst index, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors,
+            out IAst variableAst)
+        {
+            switch (index.Variable)
+            {
+                case VariableAst variable:
+                    variableAst = variable;
+                    if (localVariables.TryGetValue(variable.Name, out var variableType))
+                    {
+                        return VerifyIndex(index, variableType, localVariables, errors);
+                    }
+                    else
+                    {
+                        errors.Add(CreateError($"Variable '{variable.Name}' not defined", variable));
+                        return null;
+                    }
+                case StructFieldRefAst structField:
+                    variableAst = structField;
+                    if (localVariables.TryGetValue(structField.Name, out var structType))
+                    {
+                        var fieldType = VerifyStructFieldRef(structField, structType, errors);
+                        return fieldType == null ? null : VerifyIndex(index, fieldType, localVariables, errors);
+                    }
+                    else
+                    {
+                        errors.Add(CreateError($"Variable '{structField.Name}' not defined", structField));
+                        return null;
+                    }
+                default:
+                    variableAst = null;
+                    errors.Add(CreateError("Expected to index a variable", index));
+                    return null;
+            }
+        }
+        
+        
         private TypeDefinition VerifyIndex(IndexAst index, TypeDefinition typeDef, IDictionary<string, TypeDefinition> localVariables,
             List<TranslationError> errors)
         {
-            // 1. Load the list element type definition
+            // 1. Verify the variable is a list
+            if (VerifyType(typeDef, errors) != Type.List)
+            {
+                errors.Add(CreateError($"Cannot index type '{PrintTypeDefinition(typeDef)}'", index.Variable));
+                return null;
+            }
+
+            // 2. Load the list element type definition
             var indexType = typeDef.Generics.FirstOrDefault();
             if (indexType == null)
             {
                 errors.Add(CreateError("Unable to determine element type of the List", index));
             }
 
-            // 2. Verify the count expression is an integer
+            // 3. Verify the count expression is an integer
             var countType = VerifyExpression(index.Index, localVariables, errors);
             if (VerifyType(countType, errors) != Type.Int)
             {
@@ -912,7 +937,7 @@ namespace Lang.Translation
             return true;
         }
 
-        private Type VerifyType(TypeDefinition typeDef, List<TranslationError> errors, bool verifyStruct = true)
+        private Type VerifyType(TypeDefinition typeDef, List<TranslationError> errors)
         {
             if (typeDef == null) return Type.Error;
 
@@ -1017,7 +1042,6 @@ namespace Lang.Translation
                     }
                     return VerifyType(typeDef.Generics[0], errors) == Type.Error ? Type.Error : Type.Pointer;
                 default:
-                    if (!verifyStruct) return Type.Other;
                     return _structs.ContainsKey(typeDef.Name) ? Type.Other : Type.Error;
             }
         }
