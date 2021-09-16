@@ -29,14 +29,17 @@ namespace Lang.Translation
                         if (function.Name == "Main")
                         {
                             graph.Main = function;
+                            var functionErrors = StepThroughFunction(function, true);
+                            if (functionErrors.Any())
+                                errors.AddRange(functionErrors);
                         }
                         else
                         {
                             _functions.Add(function.Name, function);
+                            var functionErrors = StepThroughFunction(function);
+                            if (functionErrors.Any())
+                                errors.AddRange(functionErrors);
                         }
-                        var functionErrors = StepThroughFunction(function);
-                        if (functionErrors.Any())
-                            errors.AddRange(functionErrors);
                         break;
                     // TODO Handle more type of ASTs
                 }
@@ -47,9 +50,22 @@ namespace Lang.Translation
             return graph;
         }
 
-        private List<TranslationError> StepThroughFunction(FunctionAst function)
+        private List<TranslationError> StepThroughFunction(FunctionAst function, bool main = false)
         {
             var translationErrors = new List<TranslationError>();
+
+            if (main)
+            {
+                var type = function.ReturnType.InferType(out _);
+                if (!(type == Type.Void || type == Type.Int))
+                {
+                    translationErrors.Add(new TranslationError
+                    {
+                        Error = "The main function should be of type 'int' or 'void'"
+                    });
+                }
+            }
+
             foreach (var syntaxTree in function.Children)
             {
                 switch (syntaxTree)
