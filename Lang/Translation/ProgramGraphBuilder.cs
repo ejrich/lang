@@ -670,6 +670,7 @@ namespace Lang.Translation
             List<TranslationError> errors)
         {
             // 1. Load the struct definition in typeDefinition
+            structField.StructName = structType.Name;
             if (!_structs.TryGetValue(structType.Name, out var structDefinition))
             {
                 errors.Add(CreateError($"Struct '{structType.Name}' not defined", structField));

@@ -104,16 +104,16 @@ namespace Lang.Backend.LLVM
             // 1. Get function definition
             var function = LLVMApi.GetNamedFunction(_module, functionAst.Name);
             LLVMApi.PositionBuilderAtEnd(_builder, function.AppendBasicBlock("entry"));
-            var localVariables = new Dictionary<string, LLVMValueRef>();
+            var localVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>();
 
             // 2. Allocate arguments on the stack
             for (var i = 0; i < functionAst.Arguments.Count; i++)
             {
                 var argument = LLVMApi.GetParam(function, (uint) i);
-                var argumentName = functionAst.Arguments[i].Name;
-                var allocation = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(functionAst.Arguments[i].Type), argumentName);
+                var arg = functionAst.Arguments[i];
+                var allocation = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(arg.Type), arg.Name);
                 LLVMApi.BuildStore(_builder, argument, allocation);
-                localVariables.Add(argumentName, allocation);
+                localVariables.Add(arg.Name, (arg.Type, allocation));
             }
 
             // 3. Loop through function body
@@ -132,16 +132,16 @@ namespace Lang.Backend.LLVM
             // 1. Define main function
             var function = WriteFunctionDefinition("main", main.Arguments, main.ReturnType);
             LLVMApi.PositionBuilderAtEnd(_builder, LLVMApi.AppendBasicBlock(function, "entry"));
-            var localVariables = new Dictionary<string, LLVMValueRef>();
+            var localVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>();
 
             // 2. Allocate arguments on the stack
             for (var i = 0; i < main.Arguments.Count; i++)
             {
                 var argument = function.GetParam((uint) i);
-                var argumentName = main.Arguments[i].Name;
-                var allocation = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(main.Arguments[i].Type), argumentName);
+                var arg = main.Arguments[i];
+                var allocation = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(arg.Type), arg.Name);
                 LLVMApi.BuildStore(_builder, argument, allocation);
-                localVariables.Add(argumentName, allocation);
+                localVariables.Add(arg.Name, (arg.Type, allocation));
             }
 
             // 2. Loop through function body
@@ -175,7 +175,7 @@ namespace Lang.Backend.LLVM
             LLVMApi.TargetMachineEmitToFile(targetMachine, _module, file, LLVMCodeGenFileType.LLVMObjectFile, out _);
         }
 
-        private bool WriteFunctionLine(IAst ast, IDictionary<string, LLVMValueRef> localVariables, LLVMValueRef function)
+        private bool WriteFunctionLine(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)
         {
             switch (ast)
             {
@@ -203,7 +203,7 @@ namespace Lang.Backend.LLVM
             return false;
         }
 
-        private void WriteReturnStatement(ReturnAst returnAst, IDictionary<string, LLVMValueRef> localVariables)
+        private void WriteReturnStatement(ReturnAst returnAst, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
         {
             // 1. Get the return value
             var returnValue = WriteExpression(returnAst.Value, localVariables);
@@ -213,12 +213,12 @@ namespace Lang.Backend.LLVM
             LLVMApi.BuildRet(_builder, returnValue);
         }
 
-        private void WriteDeclaration(DeclarationAst declaration, IDictionary<string, LLVMValueRef> localVariables)
+        private void WriteDeclaration(DeclarationAst declaration, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
         {
             // 1. Declare variable on the stack
             var type = ConvertTypeDefinition(declaration.Type);
             var variable = LLVMApi.BuildAlloca(_builder, type, declaration.Name);
-            localVariables.Add(declaration.Name, variable);
+            localVariables.Add(declaration.Name, (declaration.Type, variable));
 
             // 2. Set value if it exists
             if (declaration.Value != null)
@@ -272,7 +272,7 @@ namespace Lang.Backend.LLVM
             };
         }
 
-        private void WriteAssignment(AssignmentAst assignment, IDictionary<string, LLVMValueRef> localVariables)
+        private void WriteAssignment(AssignmentAst assignment, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
         {
             // 1. Get the variable on the stack
             var variableName = assignment.Variable switch
@@ -284,27 +284,27 @@ namespace Lang.Backend.LLVM
             var variable = localVariables[variableName];
             if (assignment.Variable is StructFieldRefAst structField)
             {
-                variable = BuildStructField(structField, variable);
+                variable = BuildStructField(structField, variable.value);
             }
 
             // 2. Evaluate the expression value
             var expressionValue = WriteExpression(assignment.Value, localVariables);
-            var value = LLVMApi.BuildLoad(_builder, variable, variableName);
             if (assignment.Operator != Operator.None)
             {
                 // 2a. Build expression with variable value as the LHS
+                var value = LLVMApi.BuildLoad(_builder, variable.value, variableName);
                 expressionValue = BuildExpression(value, expressionValue, assignment.Operator);
             }
 
             // 3. Reallocate the value of the variable
-            expressionValue = CastValue(expressionValue, value.TypeOf());
-            LLVMApi.BuildStore(_builder, expressionValue, variable);
+            expressionValue = CastValue(expressionValue, variable.type);
+            LLVMApi.BuildStore(_builder, expressionValue, variable.value);
         }
 
-        private bool WriteScope(List<IAst> scopeChildren, IDictionary<string, LLVMValueRef> localVariables, LLVMValueRef function)
+        private bool WriteScope(List<IAst> scopeChildren, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)
         {
             // 1. Create scope variables
-            var scopeVariables = new Dictionary<string, LLVMValueRef>(localVariables);
+            var scopeVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>(localVariables);
 
             // 2. Write function lines
             foreach (var ast in scopeChildren)
@@ -318,7 +318,7 @@ namespace Lang.Backend.LLVM
             return false;
         }
 
-        private bool WriteConditional(ConditionalAst conditional, IDictionary<string, LLVMValueRef> localVariables, LLVMValueRef function)
+        private bool WriteConditional(ConditionalAst conditional, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)
         {
             // 1. Write out the condition
             var conditionExpression = WriteExpression(conditional.Condition, localVariables);
@@ -377,7 +377,7 @@ namespace Lang.Backend.LLVM
             return false;
         }
 
-        private bool WriteWhile(WhileAst whileAst, IDictionary<string, LLVMValueRef> localVariables, LLVMValueRef function)
+        private bool WriteWhile(WhileAst whileAst, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)
         {
             // 1. Break to the while loop
             var whileCondition = LLVMApi.AppendBasicBlock(function, "whilecondblock");
@@ -418,9 +418,9 @@ namespace Lang.Backend.LLVM
             return false;
         }
 
-        private bool WriteEach(EachAst each, IDictionary<string, LLVMValueRef> localVariables, LLVMValueRef function)
+        private bool WriteEach(EachAst each, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)
         {
-            var eachVariables = new Dictionary<string, LLVMValueRef>(localVariables);
+            var eachVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>(localVariables);
 
             LLVMValueRef variable;
             if (each.Iteration != null)
@@ -433,7 +433,8 @@ namespace Lang.Backend.LLVM
                 variable = LLVMApi.BuildAlloca(_builder, LLVMTypeRef.Int32Type(), each.IterationVariable);
                 var value = WriteExpression(each.RangeBegin, localVariables);
                 LLVMApi.BuildStore(_builder, value, variable);
-                eachVariables.Add(each.IterationVariable, variable);
+                var type = new TypeDefinition {Name = "int", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
+                eachVariables.Add(each.IterationVariable, (type, variable));
             }
 
             // 1. Break to the each condition loop
@@ -490,17 +491,19 @@ namespace Lang.Backend.LLVM
             return false;
         }
 
-        private LLVMValueRef WriteExpression(IAst ast, IDictionary<string, LLVMValueRef> localVariables)
+        private LLVMValueRef WriteExpression(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
         {
             switch (ast)
             {
                 case ConstantAst constant:
+                {
                     var type = ConvertTypeDefinition(constant.Type);
                     return BuildConstant(type, constant);
+                }
                 case VariableAst variable:
-                    return LLVMApi.BuildLoad(_builder, localVariables[variable.Name], variable.Name);
+                    return LLVMApi.BuildLoad(_builder, localVariables[variable.Name].value, variable.Name);
                 case StructFieldRefAst structField:
-                    var field = BuildStructField(structField, localVariables[structField.Name]);
+                    var (_, field) = BuildStructField(structField, localVariables[structField.Name].value);
                     return LLVMApi.BuildLoad(_builder, field, structField.Name);
                 case CallAst call:
                     var function = LLVMApi.GetNamedFunction(_module, call.Function);
@@ -522,26 +525,27 @@ namespace Lang.Backend.LLVM
                     var variable = localVariables[variableName];
                     if (changeByOne.Variable is StructFieldRefAst structField)
                     {
-                        variable = BuildStructField(structField, variable);
+                        variable = BuildStructField(structField, variable.value);
                     }
 
-                    var value = LLVMApi.BuildLoad(_builder, variable, variableName);
+                    var value = LLVMApi.BuildLoad(_builder, variable.value, variableName);
+                    var type = ConvertTypeDefinition(variable.type);
 
                     LLVMValueRef newValue;
-                    if (value.TypeOf().TypeKind == LLVMTypeKind.LLVMIntegerTypeKind)
+                    if (variable.type.PrimitiveType is IntegerType)
                     {
                         newValue = changeByOne.Positive
-                            ? LLVMApi.BuildAdd(_builder, value, LLVMApi.ConstInt(value.TypeOf(), 1, false), "inc")
-                            : LLVMApi.BuildSub(_builder, value, LLVMApi.ConstInt(value.TypeOf(), 1, false), "dec");
+                            ? LLVMApi.BuildAdd(_builder, value, LLVMApi.ConstInt(type, 1, false), "inc")
+                            : LLVMApi.BuildSub(_builder, value, LLVMApi.ConstInt(type, 1, false), "dec");
                     }
                     else
                     {
                         newValue = changeByOne.Positive
-                            ? LLVMApi.BuildFAdd(_builder, value, LLVMApi.ConstReal(value.TypeOf(), 1), "incf")
-                            : LLVMApi.BuildFSub(_builder, value, LLVMApi.ConstReal(value.TypeOf(), 1), "decf");
+                            ? LLVMApi.BuildFAdd(_builder, value, LLVMApi.ConstReal(type, 1), "incf")
+                            : LLVMApi.BuildFSub(_builder, value, LLVMApi.ConstReal(type, 1), "decf");
                     }
 
-                    LLVMApi.BuildStore(_builder, newValue, variable);
+                    LLVMApi.BuildStore(_builder, newValue, variable.value);
                     return changeByOne.Prefix ? newValue : value;
                 }
                 case NotAst not:
@@ -586,12 +590,18 @@ namespace Lang.Backend.LLVM
             return LLVMApi.ConstInt(LLVMApi.Int32Type(), 0, true);
         }
 
-        private LLVMValueRef BuildStructField(StructFieldRefAst structField, LLVMValueRef variable)
+        private (TypeDefinition type, LLVMValueRef value) BuildStructField(StructFieldRefAst structField, LLVMValueRef variable)
         {
             var value = structField.Value;
             var field = LLVMApi.BuildStructGEP(_builder, variable, (uint) structField.ValueIndex, value.Name);
 
-            return value.Value == null ? field : BuildStructField(value, field);
+            if (value.Value == null)
+            {
+                var type = _structs[structField.StructName].Fields[structField.ValueIndex].Type;
+                return (type, field);
+            }
+
+            return BuildStructField(value, field);
         }
 
         private LLVMValueRef BuildExpression(LLVMValueRef lhs, LLVMValueRef rhs, Operator op)
