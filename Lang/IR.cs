@@ -15,6 +15,9 @@ namespace Lang
     {
         public uint StackSize { get; set; }
         public bool SaveStack { get; set; }
+        public bool Varargs { get; set; }
+        public IType[] Arguments { get; set; }
+        public IType ReturnType { get; set; }
         public List<Allocation> Allocations { get; set; }
         public List<Instruction> Instructions { get; set; }
         public List<BasicBlock> BasicBlocks { get; set; }
@@ -53,7 +56,7 @@ namespace Lang
     {
         public InstructionType Type { get; set; }
 
-        // Used for Load, Store, GetPointer, and GetStructPointer
+        // Used for Jump, Load, Store, GetPointer, and GetStructPointer
         public int? Index { get; set; }
         public bool Global { get; set; }
         public bool GetFirstPointer { get; set; }
