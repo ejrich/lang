@@ -6,6 +6,17 @@ struct List<T> {
     T* data;
 }
 
+/* TODO Implement enums to get this working
+struct Any {
+    Type type;
+    void* data;
+}
+
+enum TypeKind {
+    // TODO Coordinate types from builder
+}*/
+
+
 /* @Future Update strings to use this struct
 struct string {
     int length;
@@ -25,4 +36,14 @@ int __start(int argc, string* argv) {
     each i in 0..argc-1 then args[i] = *(argv + i);
 
     return Main(args);
+
+    /* @Future Add compile time execution to write the correct return
+    #if function(Main).return == Type.Void {
+        Main(args);
+        return 0;
+    }
+    else {
+        #if function(Main).arguments.length == 0 then return Main();
+        else then return Main(args);
+    }*/
 }
