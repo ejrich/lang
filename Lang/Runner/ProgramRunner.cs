@@ -99,13 +99,13 @@ namespace Lang.Runner
                 {
                     foreach (var callTypes in function.VarargsCalls)
                     {
-                        var varargs = callTypes.Select(arg => GetTypeFromDefinition(arg)).ToArray();
+                        var varargs = callTypes.Select(arg => GetTypeFromDefinition(arg, cCall: true)).ToArray();
                         CreateFunction(typeBuilder, function.Name, function.ExternLib, returnType, varargs);
                     }
                     continue;
                 }
 
-                var args = function.Arguments.Select(arg => GetTypeFromDefinition(arg.Type)).ToArray();
+                var args = function.Arguments.Select(arg => GetTypeFromDefinition(arg.Type, cCall: true)).ToArray();
                 CreateFunction(typeBuilder, function.Name, function.ExternLib, returnType, args);
             }
 
@@ -633,10 +633,12 @@ namespace Lang.Runner
                     else if (function.Varargs)
                     {
                         var arguments = new object[call.Arguments.Count];
+                        var types = new Type[call.Arguments.Count];
                         for (var i = 0; i < function.Arguments.Count - 1; i++)
                         {
-                            var value = ExecuteExpression(call.Arguments[i], programGraph, variables).Value;
-                            arguments[i] = value;
+                            var valueType = ExecuteExpression(call.Arguments[i], programGraph, variables);
+                            arguments[i] = valueType.Value;
+                            types[i] = GetTypeFromDefinition(valueType.Type, cCall: true);
                         }
 
                         // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
@@ -647,24 +649,30 @@ namespace Lang.Runner
                             if (valueType.Type.Name == "float")
                             {
                                 arguments[i] = Convert.ToDouble(valueType.Value);
+                                types[i] = typeof(double);
                             }
                             else
                             {
                                 arguments[i] = valueType.Value;
+                                types[i] = GetTypeFromDefinition(valueType.Type, cCall: true);
                             }
                         }
 
-                        return CallFunction(call.Function, function, programGraph, arguments);
+                        return CallFunction(call.Function, function, programGraph, arguments, types);
                     }
                     else
                     {
                         var arguments = new object[call.Arguments.Count];
+                        var types = new Type[call.Arguments.Count];
                         for (var i = 0; i < call.Arguments.Count; i++)
                         {
-                            var value = ExecuteExpression(call.Arguments[i], programGraph, variables).Value;
-                            arguments[i] = value;
+                            var argument = call.Arguments[i];
+                            var valueType = ExecuteExpression(argument, programGraph, variables);
+                            arguments[i] = valueType.Value;
+                            types[i] = GetTypeFromDefinition(valueType.Type, cCall: function.Extern);
                         }
-                        return CallFunction(call.Function, function, programGraph, arguments);
+
+                        return CallFunction(call.Function, function, programGraph, arguments, types);
                     }
                 case ExpressionAst expression:
                     var firstValue = ExecuteExpression(expression.Children[0], programGraph, variables);
@@ -687,7 +695,7 @@ namespace Lang.Runner
             return null;
         }
 
-        private static object GetConstant(TypeDefinition type, string value)
+        private object GetConstant(TypeDefinition type, string value)
         {
             switch (type.PrimitiveType)
             {
@@ -708,7 +716,17 @@ namespace Lang.Runner
                     {
                         return value == "true";
                     }
-                    return value;
+
+                    var stringType = _types["string"];
+                    var stringInstance = Activator.CreateInstance(stringType);
+                    var lengthField = stringType.GetField("length");
+                    lengthField!.SetValue(stringInstance, value.Length);
+
+                    var dataField = stringType.GetField("data");
+                    var stringPointer = Marshal.StringToHGlobalAnsi(value);
+                    dataField!.SetValue(stringInstance, stringPointer);
+
+                    return stringInstance;
             }
         }
 
@@ -780,20 +798,22 @@ namespace Lang.Runner
             return Marshal.PtrToStructure(pointer, type);
         }
 
-        private ValueType CallFunction(string functionName, FunctionAst function, ProgramGraph programGraph, object[] arguments)
+        private ValueType CallFunction(string functionName, FunctionAst function, ProgramGraph programGraph,
+            object[] arguments, Type[] argumentTypes = null)
         {
             if (function.Extern)
             {
+                var args = arguments.Select(GetCArg).ToArray();
                 if (function.Varargs)
                 {
-                    var functionDecl = _library.GetMethod(functionName, arguments.Select(arg => arg.GetType()).ToArray());
-                    var returnValue = functionDecl!.Invoke(_functionObject, arguments);
+                    var functionDecl = _library.GetMethod(functionName, argumentTypes!);
+                    var returnValue = functionDecl!.Invoke(_functionObject, args);
                     return new ValueType {Type = function.ReturnType, Value = returnValue};
                 }
                 else
                 {
                     var functionDecl = _library.GetMethod(functionName);
-                    var returnValue = functionDecl!.Invoke(_functionObject, arguments);
+                    var returnValue = functionDecl!.Invoke(_functionObject, args);
                     return new ValueType {Type = function.ReturnType, Value = returnValue};
                 }
             }
@@ -816,6 +836,18 @@ namespace Lang.Runner
                 }
             }
             return null;
+        }
+
+        private static object GetCArg(object argument)
+        {
+            var type = argument.GetType();
+            if (type.Name == "string")
+            {
+                var dataField = type.GetField("data");
+                return GetPointer(dataField!.GetValue(argument));
+            }
+
+            return argument;
         }
 
         private static object RunExpression(ValueType lhs, ValueType rhs, Operator op, TypeDefinition targetType)
@@ -1266,7 +1298,7 @@ namespace Lang.Runner
             method.SetCustomAttribute(caBuilder);
         }
 
-        private Type GetTypeFromDefinition(TypeDefinition typeDef, string parentName = null, Type parentType = null)
+        private Type GetTypeFromDefinition(TypeDefinition typeDef, string parentName = null, Type parentType = null, bool cCall = false)
         {
             switch (typeDef.PrimitiveType)
             {
@@ -1299,7 +1331,8 @@ namespace Lang.Runner
                 case "bool":
                     return typeof(bool);
                 case "string":
-                    return typeof(string);
+                    if (!cCall) break;
+                    return typeof(char).MakePointerType();
                 case "*":
                     var pointerType = GetTypeFromDefinition(typeDef.Generics[0], parentName, parentType);
                     if (pointerType == null)
