@@ -1478,7 +1478,7 @@ namespace Lang.Runner
                 {
                     return lhsPointer != IntPtr.Zero;
                 }
-                return lhsPointer == GetPointer(rhs);
+                return lhsPointer != GetPointer(rhs);
             }
             if (op == Operator.Subtract)
             {
