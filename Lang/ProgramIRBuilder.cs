@@ -1124,7 +1124,7 @@ namespace Lang
                             var dataPointer = EmitGetStructPointer(function, structFieldPointer, _stringStruct, 1, dataField);
                             return EmitLoad(function, dataField.Type, dataPointer);
                         }
-                        return EmitLoad(function, structFieldPointer.Type, structFieldPointer);
+                        return EmitLoad(function, structFieldPointer.Type, structFieldPointer, returnValue);
                     }
                     return structFieldPointer;
                 case CallAst call:

@@ -59,11 +59,25 @@ function_calls() {
     each i in array {
         printf("Return c array value %d\n", i);
     }
+
+    struct_array := returns_c_array_from_struct();
+    each i in struct_array {
+        printf("Return c array value from struct %d\n", i);
+    }
 }
 
 CArray<int>[4] returns_c_array() {
     a: CArray<int> = [1, 2, 3, 4]
     return a;
+}
+
+CArray<int>[5] returns_c_array_from_struct() {
+    array_struct: ArrayStruct;
+    each i in 0..struct_array_size {
+        array_struct.array[i] = 3 * i;
+    }
+
+    return array_struct.array;
 }
 
 #run main();
