@@ -99,7 +99,7 @@ namespace Lang.Backend.LLVM
 
         private IDictionary<string, (TypeDefinition type, LLVMValueRef value)> WriteData(ProgramGraph programGraph)
         {
-            // 1. Declare structs
+            // 1. Declare structs and enums
             var structs = new Dictionary<string, LLVMTypeRef>();
             foreach (var (name, type) in programGraph.Types)
             {
@@ -149,7 +149,44 @@ namespace Lang.Backend.LLVM
                 }
             }
 
+            // 3. Write type table
+            var typeTable = globals["type_table"].value;
+            SetPrivateConstant(typeTable);
+            var typeInfoType = structs["TypeInfo"];
+
+            var types = new LLVMValueRef[programGraph.Types.Count];
+            var i = 0;
+            foreach (var (name, type) in programGraph.Types)
+            {
+                var typeInfo = LLVMApi.AddGlobal(_module, typeInfoType, "____type_info");
+                SetPrivateConstant(typeInfo);
+
+                var typeName = LLVMApi.ConstString(name, (uint)name.Length, false);
+                var typeNameString = LLVMApi.AddGlobal(_module, typeName.TypeOf(), "str");
+                SetPrivateConstant(typeNameString);
+                LLVMApi.SetInitializer(typeNameString, typeName);
+
+                var typeKind = GetTypeKind(type is StructAst ? TypeKind.Struct : TypeKind.Enum);
+                LLVMApi.SetInitializer(typeInfo, LLVMApi.ConstStruct(new [] {typeNameString, typeKind}, false));
+                types[i++] = typeInfo;
+            }
+
+            var typeArray = LLVMApi.ConstArray(LLVMApi.PointerType(typeInfoType, 0), types);
+            var typeArrayGlobal = LLVMApi.AddGlobal(_module, typeArray.TypeOf(), "____type_array");
+            SetPrivateConstant(typeArrayGlobal);
+            LLVMApi.SetInitializer(typeArrayGlobal, typeArray);
+
+            var typeCount = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (ulong)types.Length, false);
+            LLVMApi.SetInitializer(typeTable, LLVMApi.ConstStruct(new [] {typeCount, typeArrayGlobal}, false));
+
             return globals;
+        }
+
+        private void SetPrivateConstant(LLVMValueRef variable)
+        {
+            LLVMApi.SetLinkage(variable, LLVMLinkage.LLVMPrivateLinkage);
+            LLVMApi.SetGlobalConstant(variable, true);
+            LLVMApi.SetUnnamedAddr(variable, true);
         }
 
         private LLVMValueRef WriteFunctionDefinition(string name, List<Argument> arguments, TypeDefinition returnType, bool varargs = false)
@@ -303,6 +340,8 @@ namespace Lang.Backend.LLVM
                     var type = ConvertTypeDefinition(declaration.Type);
                     var variable = LLVMApi.BuildAlloca(_builder, type, declaration.Name);
                     _allocationQueue.Enqueue(variable);
+
+                    if (declaration.Value != null) break;
 
                     if (declaration.Type.Name == "List")
                     {
@@ -1466,6 +1505,28 @@ namespace Lang.Backend.LLVM
                     _ => GetStructType(type)
                 }
             };
+        }
+
+        private LLVMValueRef GetTypeKind(TypeDefinition type)
+        {
+            return type.PrimitiveType switch
+            {
+                IntegerType integerType => GetTypeKind(TypeKind.Integer),
+                FloatType floatType => GetTypeKind(TypeKind.Float),
+                _ => type.Name switch
+                {
+                    "bool" => GetTypeKind(TypeKind.Boolean),
+                    "void" => GetTypeKind(TypeKind.Void),
+                    "List" => GetTypeKind(TypeKind.List),
+                    "string" => GetTypeKind(TypeKind.String),
+                    _ => _types[type.Name] is EnumAst ? GetTypeKind(TypeKind.Enum) : GetTypeKind(TypeKind.Struct)
+                }
+            };
+        }
+
+        private LLVMValueRef GetTypeKind(TypeKind typeKind)
+        {
+            return LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (uint)typeKind, false);
         }
 
         private LLVMTypeRef GetListType(TypeDefinition type)
