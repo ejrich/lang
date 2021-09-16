@@ -728,8 +728,7 @@ namespace Lang.Runner
             return null;
         }
 
-        private ValueType ExecuteAsts(List<IAst> asts,
-            IDictionary<string, ValueType> variables, out bool returned)
+        private ValueType ExecuteAsts(List<IAst> asts, IDictionary<string, ValueType> variables, out bool returned)
         {
             foreach (var ast in asts)
             {
@@ -1012,7 +1011,6 @@ namespace Lang.Runner
 
                 if (structField.Pointers[i-1])
                 {
-                    var snth = PointerToTargetType(pointer, type.Generics[0]);
                     if (!skipPointer)
                     {
                         pointer = Marshal.ReadIntPtr(pointer);
@@ -1313,16 +1311,7 @@ namespace Lang.Runner
                 variables[arg.Name] = new ValueType {Type = arg.Type, Value = pointer};
             }
 
-            foreach (var ast in function.Children)
-            {
-                var value = ExecuteAst(ast, variables, out var returned);
-
-                if (returned)
-                {
-                    return value;
-                }
-            }
-            return null;
+            return ExecuteAsts(function.Children, variables, out _);
         }
 
         private static object GetCArg(object argument)
