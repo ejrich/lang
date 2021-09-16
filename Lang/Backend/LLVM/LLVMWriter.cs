@@ -280,45 +280,28 @@ namespace Lang.Backend.LLVM
         private void WriteAssignment(AssignmentAst assignment, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
         {
             // 1. Get the variable on the stack
-            var variableName = assignment.Variable switch
+            var (type, variable) = assignment.Variable switch
             {
-                VariableAst var => var.Name,
-                StructFieldRefAst fieldRef => fieldRef.Name,
-                IndexAst index => index.Variable switch
-                {
-                    VariableAst var => var.Name,
-                    StructFieldRefAst fieldRef => fieldRef.Name,
-                    _ => string.Empty
-                },
-                _ => string.Empty
+                VariableAst var => localVariables[var.Name],
+                StructFieldRefAst structField => BuildStructField(structField,  localVariables[structField.Name].value),
+                IndexAst index => GetListPointer(index, localVariables),
+                // @Cleanup This branch should never be hit
+                _ => (null, new LLVMValueRef())
             };
-            var variable = localVariables[variableName];
-            if (assignment.Variable is StructFieldRefAst structField)
-            {
-                variable = BuildStructField(structField, variable.value);
-            }
-            else if (assignment.Variable is IndexAst index)
-            {
-                if (index.Variable is StructFieldRefAst indexStructField)
-                {
-                    variable = BuildStructField(indexStructField, variable.value);
-                }
-                variable = BuildListIndex(index, variable, localVariables);
-            }
 
             // 2. Evaluate the expression value
             var expression = WriteExpression(assignment.Value, localVariables);
             if (assignment.Operator != Operator.None)
             {
                 // 2a. Build expression with variable value as the LHS
-                var value = LLVMApi.BuildLoad(_builder, variable.value, variableName);
-                expression.value = BuildExpression((variable.type, value), expression, assignment.Operator, variable.type);
-                expression.type = variable.type; // The type should now be the type of the variable
+                var value = LLVMApi.BuildLoad(_builder, variable, "tmpvalue");
+                expression.value = BuildExpression((type, value), expression, assignment.Operator, type);
+                expression.type = type; // The type should now be the type of the variable
             }
 
             // 3. Reallocate the value of the variable
-            var assignmentValue = CastValue(expression, variable.type);
-            LLVMApi.BuildStore(_builder, assignmentValue, variable.value);
+            var assignmentValue = CastValue(expression, type);
+            LLVMApi.BuildStore(_builder, assignmentValue, variable);
         }
 
         private bool WriteScope(List<IAst> scopeChildren, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)
@@ -674,12 +657,6 @@ namespace Lang.Backend.LLVM
                 variable = BuildStructField(structField, variable.value);
             }
 
-            return BuildListIndex(index, variable, localVariables);
-        }
-
-        private (TypeDefinition type, LLVMValueRef value) BuildListIndex(IndexAst index, (TypeDefinition type, LLVMValueRef value) variable,
-            IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
-        {
             var indexValue = WriteExpression(index.Index, localVariables);
             var elementType = variable.type.Generics[0];
             return (elementType, LLVMApi.BuildGEP(_builder, variable.value,
