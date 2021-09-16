@@ -673,6 +673,7 @@ namespace Lang.Backend
                 case EachAst each:
                     var indexVariable = _builder.BuildAlloca(LLVM.Int32Type(), each.IterationVariable);
                     _allocationQueue.Enqueue(indexVariable);
+                    // TODO Handle each.IndexVariable
 
                     switch (each.Iteration)
                     {
@@ -1191,6 +1192,7 @@ namespace Lang.Backend
             if (each.Iteration != null)
             {
                 LLVM.BuildStore(_builder, _zeroInt, indexVariable);
+                // TODO Handle each.IndexVariable
 
                 switch (iterationType!.Name)
                 {
