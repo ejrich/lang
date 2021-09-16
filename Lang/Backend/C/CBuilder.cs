@@ -4,7 +4,8 @@
     {
         public string BuildTranslatedFile(string filePath)
         {
-            throw new System.NotImplementedException();
+            // TODO Implement me
+            return string.Empty;
         }
     }
 }
