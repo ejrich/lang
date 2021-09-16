@@ -795,7 +795,7 @@ namespace Lang.Parsing
                 case TokenType.Decrement:
                     enumerator.MoveNext();
                     var changeByOneAst = CreateAst<ChangeByOneAst>(enumerator.Current);
-                    changeByOneAst.Operator = enumerator.Current.Type == TokenType.Increment ? Operator.Increment : Operator.Decrement;
+                    changeByOneAst.Positive = enumerator.Current.Type == TokenType.Increment;
                     changeByOneAst.Variable = structField;
                     enumerator.MoveNext();
                     if (enumerator.Current?.Type == TokenType.SemiColon)
@@ -867,23 +867,21 @@ namespace Lang.Parsing
 
                 if (operatorRequired)
                 {
+                    if (token.Type == TokenType.Increment || token.Type == TokenType.Decrement)
+                    {
+                        // Create subexpression to hold the operation
+                        // This case would be `var b = 4 + a++`, where we have a value before the operator
+                        var changeByOneAst = CreateAst<ChangeByOneAst>(token);
+                        changeByOneAst.Positive = token.Type == TokenType.Increment;
+                        changeByOneAst.Variable = expression.Children[^1];
+                        expression.Children[^1] = changeByOneAst;
+                        continue;
+                    }
                     var op = ConvertOperator(token);
                     if (op != Operator.None)
                     {
-                        if (op == Operator.Increment || op == Operator.Decrement)
-                        {
-                            // Create subexpression to hold the operation
-                            // This case would be `var b = 4 + a++`, where we have a value before the operator
-                            var changeByOneAst = CreateAst<ChangeByOneAst>(token);
-                            changeByOneAst.Operator = op;
-                            changeByOneAst.Variable = expression.Children[^1];
-                            expression.Children[^1] = changeByOneAst;
-                        }
-                        else
-                        {
-                            expression.Operators.Add(op);
-                            operatorRequired = false;
-                        }
+                        expression.Operators.Add(op);
+                        operatorRequired = false;
                     }
                     else
                     {
@@ -964,12 +962,12 @@ namespace Lang.Parsing
                     }
                 case TokenType.Increment:
                 case TokenType.Decrement:
-                    var op = ConvertOperator(token);
+                    var positive = token.Type == TokenType.Increment;
                     if (enumerator.MoveNext())
                     {
                         var changeByOneAst = CreateAst<ChangeByOneAst>(enumerator.Current);
                         changeByOneAst.Prefix = true;
-                        changeByOneAst.Operator = op;
+                        changeByOneAst.Positive = positive;
                         changeByOneAst.Variable = ParseNextExpressionUnit(enumerator, errors, out operatorRequired);
                         return changeByOneAst;
                     }
@@ -1316,10 +1314,6 @@ namespace Lang.Parsing
                     return Operator.Equality;
                 case TokenType.NotEqual:
                     return Operator.NotEqual;
-                case TokenType.Increment:
-                    return Operator.Increment;
-                case TokenType.Decrement:
-                    return Operator.Decrement;
                 case TokenType.GreaterThanEqual:
                     return Operator.GreaterThanEqual;
                 case TokenType.LessThanEqual:

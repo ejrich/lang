@@ -406,7 +406,6 @@ namespace Lang.Translation
                     }
                     return typeDefinition;
                 case ChangeByOneAst changeByOne:
-                    var op = changeByOne.Operator == Operator.Increment ? "increment" : "decrement";
                     switch (changeByOne.Variable)
                     {
                         case VariableAst variable:
@@ -414,7 +413,8 @@ namespace Lang.Translation
                             {
                                 var type = VerifyType(variableType, errors);
                                 if (type == Type.Int || type == Type.Float) return variableType;
-                                
+
+                                var op = changeByOne.Positive ? "increment" : "decrement";
                                 errors.Add(CreateError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(variableType)}'", variable));
                                 return null;
                             }
@@ -432,6 +432,7 @@ namespace Lang.Translation
                                 var type = VerifyType(fieldType, errors);
                                 if (type == Type.Int || type == Type.Float) return fieldType;
 
+                                var op = changeByOne.Positive ? "increment" : "decrement";
                                 errors.Add(CreateError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(fieldType)}'", structField));
                                 return null;
                             }
@@ -441,7 +442,8 @@ namespace Lang.Translation
                                 return null;
                             }
                         default:
-                            errors.Add(CreateError( $"Expected to {op} variable", changeByOne));
+                            var operand = changeByOne.Positive ? "increment" : "decrement";
+                            errors.Add(CreateError( $"Expected to {operand} variable", changeByOne));
                             return null;
                     }
                 case NotAst not:
@@ -682,8 +684,6 @@ namespace Lang.Translation
                 Operator.Or => "||",
                 Operator.Equality => "==",
                 Operator.NotEqual => "!=",
-                Operator.Increment => "++",
-                Operator.Decrement => "--",
                 Operator.GreaterThanEqual => ">=",
                 Operator.LessThanEqual => "<=",
                 _ => ((char)op).ToString()
