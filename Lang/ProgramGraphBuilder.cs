@@ -611,6 +611,7 @@ namespace Lang
                             AddError($"Function '{function.Name}' cannot have multiple varargs", argument.TypeDefinition);
                         }
                         function.Params = true;
+                        function.ParamsType = TypeTable.GetType(argument.TypeDefinition.Generics[0]);
                         break;
                     case TypeKind.Error:
                         AddError($"Type '{PrintTypeDefinition(argument.TypeDefinition)}' of argument '{argument.Name}' in function '{function.Name}' is not defined", argument.TypeDefinition);

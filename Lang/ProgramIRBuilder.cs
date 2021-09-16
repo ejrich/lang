@@ -125,7 +125,6 @@ namespace Lang
             {
                 var allocationIndex = AddAllocation(function, declaration);
 
-                // TODO Add initialization values
                 var block = function.BasicBlocks[^1];
                 if (declaration.Value != null)
                 {
@@ -246,11 +245,10 @@ namespace Lang
         {
             for (var i = 0; i < arrayValues.Count; i++)
             {
-                var value = EmitIR(function, arrayValues[i], scope, block);
-
                 var index = new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new InstructionConstant {Integer = i}};
                 var pointer = EmitGetPointer(block, arrayPointer, index, getFirstPointer: true);
 
+                var value = EmitIR(function, arrayValues[i], scope, block);
                 // TODO Cast value
                 EmitStore(block, pointer, value);
             }
@@ -349,8 +347,7 @@ namespace Lang
                     value.ConstantValue = new InstructionConstant {Integer = 0};
                     break;
                 case TypeKind.Float:
-                    var floatType = (PrimitiveAst)type;
-                    if (floatType.Primitive.Bytes == 4)
+                    if (type.Size == 4)
                     {
                         value.ConstantValue = new InstructionConstant {Float = 0};
                     }
@@ -781,24 +778,24 @@ namespace Lang
                 }
 
                 // Rollup the rest of the arguments into an array
-                // TODO Make this work
-                // var paramsAllocationIndex = AddAllocation(function, call.Function.ParamsType);
-                // var paramsPointer = EmitGetPointer(block, allocationIndex: paramsAllocationIndex);
-                // InitializeConstArray(function, block, paramsPointer, (StructAst)call.Function.ParamsType, (uint)(call.Arguments.Count - call.Function.Arguments.Count + 1), call.Function.ParamsElementType);
+                var paramsType = call.Function.Arguments[^1].Type;
+                var paramsAllocationIndex = AddAllocation(function, paramsType);
+                var paramsPointer = EmitGetPointer(block, allocationIndex: paramsAllocationIndex);
+                var dataPointer = InitializeConstArray(function, block, paramsPointer, (StructAst)paramsType, (uint)(call.Arguments.Count - call.Function.Arguments.Count + 1), call.Function.ParamsType);
 
-                // var arrayData = _builder.BuildStructGEP(paramsPointer, 1, "arraydata");
-                // var dataPointer = _builder.BuildLoad(arrayData, "dataptr");
+                uint paramsIndex = 0;
+                for (var i = call.Function.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
+                {
+                    var index = new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new InstructionConstant {Integer = i}};
+                    var pointer = EmitGetPointer(block, dataPointer, index, getFirstPointer: true);
 
-                // uint paramsIndex = 0;
-                // for (var i = functionDef.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
-                // {
-                //     var pointer = _builder.BuildGEP(dataPointer, new [] {LLVMValueRef.CreateConstInt(LLVM.Int32Type(), paramsIndex, false)}, "indexptr");
-                //     var (_, value) = WriteExpression(call.Arguments[i], localVariables);
-                //     LLVM.BuildStore(_builder, value, pointer);
-                // }
+                    var value = EmitIR(function, call.Arguments[i], scope, block);
+                    // TODO Cast value
+                    EmitStore(block, pointer, value);
+                }
 
-                // var paramsValue = _builder.BuildLoad(paramsPointer, "params");
-                // callArguments[functionDef.Arguments.Count - 1] = paramsValue;
+                var paramsValue = EmitLoad(block, allocationIndex: paramsAllocationIndex);
+                arguments[argumentCount - 1] = paramsValue;
             }
             else if (call.Function.Varargs)
             {
