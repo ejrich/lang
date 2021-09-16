@@ -160,6 +160,7 @@ namespace Lang
         public uint Size { get; set; }
         public TypeKind TypeKind { get; set; }
         public IPrimitive Primitive { get; set; }
+        // TODO Change to IType
         public TypeDefinition PointerType { get; set; }
     }
 
