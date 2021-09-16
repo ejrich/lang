@@ -275,10 +275,12 @@ namespace Lang
                 {
                     AddError($"Base type of enum must be an integer, but got '{PrintTypeDefinition(enumAst.BaseTypeDefinition)}'", enumAst.BaseTypeDefinition);
                     enumAst.BaseTypeDefinition.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
+                    enumAst.BaseType = TypeTable.Types["s32"];
                 }
                 else
                 {
                     enumAst.BaseType = TypeTable.GetType(enumAst.BaseTypeDefinition);
+                    enumAst.Size = enumAst.BaseType.Size;
                 }
             }
 
