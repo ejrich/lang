@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 
 namespace Lang.Parsing
 {
@@ -13,7 +12,18 @@ namespace Lang.Parsing
 
     public class Lexer : ILexer
     {
-        private readonly Regex _escapableCharacters = new(@"['""\\abfnrtv]");
+        private readonly IDictionary<char, char> _escapableCharacters = new Dictionary<char, char>
+        {
+            {'"', '"'},
+            {'\\', '\\'},
+            {'a', '\a'},
+            {'b', '\b'},
+            {'f', '\f'},
+            {'n', '\n'},
+            {'r', '\r'},
+            {'t', '\t'},
+            {'v', '\v'},
+        };
 
         private readonly IDictionary<string, TokenType> _reservedTokens = new Dictionary<string, TokenType>
         {
@@ -89,21 +99,24 @@ namespace Lang.Parsing
                     currentToken.Value = string.Empty;
                 }
 
+                // Add characters to the string literal
                 if (currentToken?.Type == TokenType.Literal)
                 {
                     if (character == '\\' && !literalEscapeToken)
                     {
-                        currentToken.Value += character;
                         literalEscapeToken = true;
                     }
                     else if (literalEscapeToken)
                     {
-                        if (!_escapableCharacters.IsMatch(character.ToString()))
+                        if (_escapableCharacters.TryGetValue(character, out var escapedCharacter))
+                        {
+                            currentToken.Value += escapedCharacter;
+                        }
+                        else
                         {
                             currentToken.Error = true;
+                            currentToken.Value += character;
                         }
-
-                        currentToken.Value += character;
                         literalEscapeToken = false;
                     }
                     else

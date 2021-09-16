@@ -3,7 +3,7 @@ int Main(List<string> args) {
     /*
         Multi line comment
     */
-    //hello := "This is an \"escaped\" string literal";
+    hello := "This is an \"escaped\" string literal\nWith a new line!";
     a := 4.2;
     a++;
     baz := foo() + bar(3 + 1);//, "Hello", 1.2);
