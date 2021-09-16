@@ -322,6 +322,15 @@ namespace Lang.Backend.LLVM
                     var indexVariable = LLVMApi.BuildAlloca(_builder, LLVMTypeRef.Int32Type(), each.IterationVariable);
                     _allocationQueue.Enqueue(indexVariable);
 
+                    switch (each.Iteration)
+                    {
+                        case CallAst call:
+                            var function = _functions[call.Function];
+                            var iterationValue = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(function.ReturnType), "iterval");
+                            _allocationQueue.Enqueue(iterationValue);
+                            break;
+                    }
+
                     return BuildAllocations(each.Children);
                 case ExpressionAst:
                     BuildAllocations(ast.Children);
@@ -537,7 +546,7 @@ namespace Lang.Backend.LLVM
             var (type, variable) = assignment.Variable switch
             {
                 VariableAst var => localVariables[var.Name],
-                StructFieldRefAst structField => BuildStructField(structField,  localVariables[structField.Name].value),
+                StructFieldRefAst structField => BuildStructField(structField, localVariables[structField.Name].value),
                 IndexAst index => GetListPointer(index, localVariables),
                 // @Cleanup This branch should never be hit
                 _ => (null, new LLVMValueRef())
@@ -686,20 +695,35 @@ namespace Lang.Backend.LLVM
             var indexVariable = _allocationQueue.Dequeue();
             var listData = new LLVMValueRef();
             var compareTarget = new LLVMValueRef();
-            var (iterationType, iterationValue) = each.Iteration switch
+            TypeDefinition iterationType = null;
+            var iterationValue = new LLVMValueRef();
+            switch (each.Iteration)
             {
-                VariableAst var => localVariables[var.Name],
-                StructFieldRefAst structField => BuildStructField(structField, localVariables[structField.Name].value),
-                IndexAst index => GetListPointer(index, localVariables),
-                _ => (null, new LLVMValueRef())
-            };
+                case VariableAst var:
+                    (iterationType, iterationValue) = localVariables[var.Name];
+                    break;
+                case StructFieldRefAst structField:
+                    (iterationType, iterationValue) = BuildStructField(structField, localVariables[structField.Name].value);
+                    break;
+                case IndexAst index:
+                    (iterationType, iterationValue) = GetListPointer(index, localVariables);
+                    break;
+                case null:
+                    break;
+                default:
+                    var (type, value) = WriteExpression(each.Iteration, localVariables);
+                    iterationType = type;
+                    iterationValue = _allocationQueue.Dequeue();
+                    LLVMApi.BuildStore(_builder, value, iterationValue);
+                    break;
+            }
 
             // 2. Initialize the first variable in the loop and the compare target
             if (each.Iteration != null)
             {
                 LLVMApi.BuildStore(_builder, GetConstZero(LLVMTypeRef.Int32Type()), indexVariable);
 
-                switch (iterationType.Name)
+                switch (iterationType!.Name)
                 {
                     case "List":
                     case "Params":
@@ -735,7 +759,7 @@ namespace Lang.Backend.LLVM
                 indexValue, compareTarget, "listcmp");
             if (each.Iteration != null)
             {
-                switch (iterationType.Name)
+                switch (iterationType!.Name)
                 {
                     case "List":
                     case "Params":

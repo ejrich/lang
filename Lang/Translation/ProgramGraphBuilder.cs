@@ -746,7 +746,7 @@ namespace Lang.Translation
             };
             if (each.Iteration != null)
             {
-                var variableTypeDefinition = GetVariable(each.Iteration, localVariables, errors);
+                var variableTypeDefinition = VerifyExpression(each.Iteration, localVariables, errors);
                 if (variableTypeDefinition == null) return false;
                 var iteratorType = variableTypeDefinition.Generics.FirstOrDefault();
 

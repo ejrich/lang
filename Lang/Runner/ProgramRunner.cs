@@ -166,10 +166,10 @@ namespace Lang.Runner
             var value = declaration.Value == null ? GetUninitializedValue(declaration.Type) :
                 ExecuteExpression(declaration.Value, programGraph, null).value;
 
-            _globalVariables[declaration.Name] = (declaration.Type, value);
+            variables[declaration.Name] = (declaration.Type, value);
         }
 
-        private static object GetUninitializedValue(TypeDefinition typeDef)
+        private object GetUninitializedValue(TypeDefinition typeDef)
         {
             switch (typeDef.PrimitiveType)
             {
@@ -179,7 +179,8 @@ namespace Lang.Runner
                     return floatType.Bytes == 4 ? 0f : 0.0;
                 default:
                     // TODO Handle more types
-                    return 0;
+                    var type = _types[typeDef.GenericName];
+                    return Activator.CreateInstance(type);
             }
         }
 
@@ -241,7 +242,7 @@ namespace Lang.Runner
             {
                 IntegerType => (int)value != 0,
                 FloatType => (float)value != 0f,
-                _ when type.Name == "*" => value != null,
+                _ when type.Name == "*" => (IntPtr)value != IntPtr.Zero,
                 _ => (bool)value
             };
         }
@@ -285,21 +286,9 @@ namespace Lang.Runner
                 case NullAst:
                     return (null, null);
                 case StructFieldRefAst structField:
-                    // if (!localVariables.TryGetValue(structField.Name, out var structType))
-                    // {
-                    //     if (_types.TryGetValue(structField.Name, out var type))
-                    //     {
-                    //         if (type is EnumAst enumAst)
-                    //         {
-                    //             structField.IsEnum = true;
-                    //             return VerifyEnumValue(structField, enumAst, errors);
-                    //         }
-                    //         return null;
-                    //     }
-                    //     return null;
-                    // }
-                    // return VerifyStructFieldRef(structField, structType, errors);
-                    break;
+                    var (_, structVariable) = variables[structField.Name];
+                    var structType = _types[structField.StructName];
+                    return GetStructFieldRef(structField, programGraph, structVariable, structType);
                 case VariableAst variable:
                     return variables[variable.Name];
                 case ChangeByOneAst changeByOne:
@@ -389,6 +378,24 @@ namespace Lang.Runner
             }
 
             return (null, null);
+        }
+
+        private (TypeDefinition type, object value) GetStructFieldRef(StructFieldRefAst structField, ProgramGraph programGraph,
+            object structVariable, Type structType)
+        {
+            var value = structField.Value;
+            var structDefinition = (StructAst) programGraph.Data.Types[structField.StructName];
+
+            var field = structType.GetField(value.Name);
+            var fieldValue = field!.GetValue(structVariable);
+
+            if (value.Value == null)
+            {
+                var fieldType = structDefinition.Fields[structField.ValueIndex].Type;
+                return (fieldType, fieldValue);
+            }
+
+            return GetStructFieldRef(value, programGraph, fieldValue, field.GetType());
         }
 
         private (TypeDefinition type, object value) GetVariable(IAst ast, ProgramGraph programGraph,
