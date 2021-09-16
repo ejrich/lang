@@ -291,7 +291,8 @@ namespace Lang
         public IAst Condition { get; set; }
         public ScopeAst IfBlock { get; set; }
         public ScopeAst ElseBlock { get; set; }
-        public bool Returns { get; set; }
+        public bool IfReturns { get; set; }
+        public bool ElseReturns { get; set; }
     }
 
     public class WhileAst : IAst

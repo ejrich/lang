@@ -2018,14 +2018,13 @@ namespace Lang
             VerifyCondition(conditional.Condition, currentFunction, scope);
 
             // 2. Verify the conditional scope
-            var ifReturned = VerifyScope(conditional.IfBlock, currentFunction, scope, canBreak);
+            conditional.IfReturns = VerifyScope(conditional.IfBlock, currentFunction, scope, canBreak);
 
             // 3. Verify the else block if necessary
             if (conditional.ElseBlock != null)
             {
-                var elseReturned = VerifyScope(conditional.ElseBlock, currentFunction, scope, canBreak);
-                conditional.Returns = ifReturned && elseReturned;
-                return conditional.Returns;
+                conditional.ElseReturns = VerifyScope(conditional.ElseBlock, currentFunction, scope, canBreak);
+                return conditional.IfReturns && conditional.ElseReturns;
             }
 
             return false;
