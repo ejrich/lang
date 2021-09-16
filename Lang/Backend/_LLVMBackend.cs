@@ -520,9 +520,13 @@ namespace Lang.Backend
             }
 
             LLVMMetadataRef debugBlock = null;
+            LLVMMetadataRef file = null;
+            LLVMMetadataRef expression = null;
             if (_emitDebug)
             {
                 debugBlock = _debugFunctions[function.Index];
+                file = _debugFiles[function.Source.FileIndex];
+                expression = LLVM.DIBuilderCreateExpression(_debugBuilder, null, UIntPtr.Zero);
             }
 
             // Write the instructions
@@ -1026,10 +1030,27 @@ namespace Lang.Backend
                         }
                         case InstructionType.DebugDeclareParameter:
                         {
+                            var argument = LLVM.GetParam(functionPointer, (uint)instruction.Index);
+                            var functionArg = function.Source.Arguments[instruction.Index];
+
+                            using var argName = new MarshaledString(functionArg.Name);
+
+                            var debugType = _debugTypes[functionArg.Type.TypeIndex];
+                            var debugVariable = LLVM.DIBuilderCreateParameterVariable(_debugBuilder, debugBlock, argName.Value, (UIntPtr)argName.Length, (uint)instruction.Index+1, file, functionArg.Line, debugType, 0, LLVMDIFlags.LLVMDIFlagZero);
+                            var location = LLVM.DIBuilderCreateDebugLocation(_context, functionArg.Line, functionArg.Column, debugBlock, null);
+
+                            LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, allocations[instruction.Index], debugVariable, expression, location, basicBlocks[blockIndex]);
                             break;
                         }
                         case InstructionType.DebugDeclareVariable:
                         {
+                            using var name = new MarshaledString(instruction.String);
+
+                            var debugVariable = LLVM.DIBuilderCreateAutoVariable(_debugBuilder, debugBlock, name.Value, (UIntPtr)name.Length, file, instruction.Source.Line, _debugTypes[instruction.Value1.Type.TypeIndex], 0, LLVMDIFlags.LLVMDIFlagZero, 0);
+                            var location = LLVM.GetCurrentDebugLocation2(_builder);
+                            var variable = GetValue(instruction.Value1, values, allocations, functionPointer);
+
+                            LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, variable, debugVariable, expression, location, _builder.InsertBlock);
                             break;
                         }
                     }
@@ -1182,7 +1203,6 @@ namespace Lang.Backend
             }
         }
 
-        // TODO Rework the debugging info
         private void CreateDebugStructType(StructAst structAst, string name)
         {
             using var structName = new MarshaledString(structAst.Name);

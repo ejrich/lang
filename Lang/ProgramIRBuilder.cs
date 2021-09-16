@@ -445,7 +445,7 @@ namespace Lang
 
                 if (!BuildSettings.Release)
                 {
-                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, Index = allocationIndex, String = declaration.Name, Source = declaration});
+                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, Index = allocationIndex, String = declaration.Name, Source = declaration, Value1 = new InstructionValue {ValueType = InstructionValueType.Allocation, ValueIndex = allocationIndex, Type = declaration.Type}});
                 }
 
                 if (declaration.Value != null)
