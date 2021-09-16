@@ -245,6 +245,8 @@ namespace Lang.Parsing
                     return ParseConditional(enumerator, errors);
                 case TokenType.While:
                     return ParseWhile(enumerator, errors);
+                case TokenType.Each:
+                    return ParseEach(enumerator, errors);
                 case TokenType.Token:
                     var nextToken = enumerator.Peek();
                     switch (nextToken?.Type)
@@ -337,19 +339,7 @@ namespace Lang.Parsing
                 case TokenType.OpenBrace:
                 {
                     // Parse until close brace
-                    while (enumerator.MoveNext())
-                    {
-                        var token = enumerator.Current;
-
-                        if (token.Type == TokenType.CloseBrace)
-                        {
-                            break;
-                        }
-
-                        var ast = ParseLine(enumerator, errors);
-                        if (ast != null)
-                            conditionalAst.Children.Add(ast);
-                    }
+                    conditionalAst.Children.Add(ParseScope(enumerator, errors));
                     break;
                 }
                 case null:
@@ -438,25 +428,13 @@ namespace Lang.Parsing
                 case TokenType.OpenBrace:
                 {
                     // Parse until close brace
-                    while (enumerator.MoveNext())
-                    {
-                        var token = enumerator.Current;
-
-                        if (token.Type == TokenType.CloseBrace)
-                        {
-                            break;
-                        }
-
-                        var ast = ParseLine(enumerator, errors);
-                        if (ast != null)
-                            whileAst.Children.Add(ast);
-                    }
+                    whileAst.Children.Add(ParseScope(enumerator, errors));
                     break;
                 }
                 case null:
                     errors.Add(new ParseError
                     {
-                        Error = "Expected while to contain conditional expression",
+                        Error = "Expected while loop to contain body",
                         Token = enumerator.Last
                     });
                     break;
@@ -470,6 +448,118 @@ namespace Lang.Parsing
             }
 
             return whileAst;
+        }
+
+        private static EachAst ParseEach(TokenEnumerator enumerator, List<ParseError> errors)
+        {
+            var eachAst = new EachAst();
+
+            // 1. Parse the iteration variable by first iterating over the initial 'each'
+            enumerator.MoveNext();
+            if (enumerator.Current?.Type == TokenType.Token)
+            {
+                eachAst.IterationVariable = enumerator.Current.Value;
+            }
+            else
+            {
+                errors.Add(new ParseError
+                {
+                    Error = "Expected variable in each block definition",
+                    Token = enumerator.Current ?? enumerator.Last
+                });
+            }
+
+            // 2. Parse over the in keyword
+            enumerator.MoveNext();
+            if (enumerator.Current?.Type != TokenType.In)
+            {
+                errors.Add(new ParseError
+                {
+                    Error = "Expected 'in' token in each block",
+                    Token = enumerator.Current ?? enumerator.Last
+                });
+                while (enumerator.Current != null && enumerator.Current.Type != TokenType.In)
+                    enumerator.MoveNext();
+            }
+
+            // 3. Determine the iterator
+            enumerator.MoveNext();
+            var expression = ParseExpression(enumerator, errors, TokenType.OpenBrace, TokenType.Then, TokenType.Range);
+
+            // 3a. Check if the next token is a range
+            switch (enumerator.Current?.Type)
+            {
+                case TokenType.Range:
+                    eachAst.RangeBegin = expression;
+                    enumerator.MoveNext();
+                    if (enumerator.Current == null)
+                    {
+                        errors.Add(new ParseError
+                        {
+                            Error = "Expected range to have an end",
+                            Token = enumerator.Last
+                        });
+                        return eachAst;
+                    }
+                    eachAst.RangeEnd = ParseExpression(enumerator, errors, TokenType.OpenBrace, TokenType.Then);
+                    if (enumerator.Current == null)
+                    {
+                        errors.Add(new ParseError
+                        {
+                            Error = "Expected each block to have iteration and body",
+                            Token = enumerator.Last
+                        });
+                        return eachAst;
+                    }
+                    break;
+                case TokenType.OpenBrace:
+                case TokenType.Then:
+                    eachAst.Iteration = expression;
+                    break;
+                case null:
+                    errors.Add(new ParseError
+                    {
+                        Error = "Expected each block to have iteration and body",
+                        Token = enumerator.Last
+                    });
+                    return eachAst;
+                default:
+                    errors.Add(new ParseError
+                    {
+                        Error = $"Unexpected token '{enumerator.Current.Value}' in each block",
+                        Token = enumerator.Current
+                    });
+                    return eachAst;
+            }
+
+            // 4. Determine how many lines to parse
+            switch (enumerator.Current?.Type)
+            {
+                case TokenType.Then:
+                {
+                    // Parse single AST
+                    enumerator.MoveNext();
+                    var ast = ParseLine(enumerator, errors);
+                    if (ast != null)
+                        eachAst.Children.Add(ast);
+                    break;
+                }
+                case TokenType.OpenBrace:
+                {
+                    // Parse until close brace
+                    eachAst.Children.Add(ParseScope(enumerator, errors));
+                    break;
+                }
+                default:
+                    errors.Add(new ParseError
+                    {
+                        Error = $"Unexpected token '{enumerator.Current.Value}'",
+                        Token = enumerator.Current
+                    });
+                    break;
+            }
+
+            return eachAst;
         }
 
         private static DeclarationAst ParseDeclaration(TokenEnumerator enumerator, List<ParseError> errors)

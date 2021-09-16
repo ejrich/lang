@@ -97,6 +97,15 @@ namespace Lang.Parsing
         public List<IAst> Children { get; } = new();
     }
 
+    public class EachAst : IAst
+    {
+        public string IterationVariable { get; set; }
+        public IAst Iteration { get; set; }
+        public IAst RangeBegin { get; set; }
+        public IAst RangeEnd { get; set; }
+        public List<IAst> Children { get; } = new();
+    }
+
     public class Variable
     {
         public TypeDefinition Type { get; init; }
