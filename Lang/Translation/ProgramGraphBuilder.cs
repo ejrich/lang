@@ -16,13 +16,20 @@ namespace Lang.Translation
         private readonly Dictionary<string, FunctionAst> _functions = new();
         private readonly Dictionary<string, StructAst> _structs = new();
         private readonly Dictionary<string, StructAst> _polymorphicStructs = new();
+        private readonly Dictionary<string, EnumAst> _enums = new();
         private FunctionAst _currentFunction;
 
         public ProgramGraph CreateProgramGraph(ParseResult parseResult, out List<TranslationError> errors)
         {
             errors = new List<TranslationError>();
 
-            // 1. First load the user defined structs
+            // 1. Verify enum definitions
+            foreach (var enumAst in parseResult.Enums)
+            {
+                VerifyEnum(enumAst, errors);
+            }
+
+            // 2. First load the struct definitions
             foreach (var structAst in parseResult.Structs)
             {
                 if (_structs.ContainsKey(structAst.Name))
@@ -40,16 +47,19 @@ namespace Lang.Translation
             }
             var graph = new ProgramGraph
             {
-                Data = new Data()
+                Data = new Data
+                {
+                    Enums = _enums.Values.ToList()
+                }
             };
 
-            // 2. Verify struct bodies
+            // 3. Verify struct bodies
             foreach (var structAst in parseResult.Structs)
             {
                 VerifyStruct(structAst, errors);
             }
 
-            // 3. Verify global variables
+            // 4. Verify global variables
             var globalVariables = new Dictionary<string, TypeDefinition>();
             foreach (var globalVariable in parseResult.GlobalVariables)
             {
@@ -61,13 +71,13 @@ namespace Lang.Translation
                 graph.Data.Variables.Add(globalVariable);
             }
 
-            // 4. Load and verify function return types and arguments
+            // 5. Load and verify function return types and arguments
             foreach (var function in parseResult.Functions)
             {
                 VerifyFunctionDefinition(function, errors);
             }
 
-            // 5. Verify function bodies
+            // 6. Verify function bodies
             foreach (var function in parseResult.Functions)
             {
                 _currentFunction = function;
@@ -99,6 +109,46 @@ namespace Lang.Translation
             graph.Data.Structs = _structs.Values.ToList();
 
             return graph;
+        }
+
+        private void VerifyEnum(EnumAst enumAst, List<TranslationError> errors)
+        {
+            // 1. Verify enum has not already been defined
+            if (!_enums.TryAdd(enumAst.Name, enumAst))
+            {
+                errors.Add(CreateError($"Multiple definitions of enum '{enumAst.Name}'", enumAst));
+            }
+
+            // 2. Verify enums don't have repeated values
+            var valueNames = new HashSet<string>();
+            var values = new HashSet<int>();
+            var largestValue = -1;
+            foreach (var value in enumAst.Values)
+            {
+                // 2a. Check if the value has been previously defined
+                if (!valueNames.Add(value.Name))
+                {
+                    errors.Add(CreateError($"Enum '{enumAst.Name}' already contains value '{value.Name}'", value));
+                }
+                
+                // 2b. Check if the value has been previously used
+                if (value.Defined)
+                {
+                    if (!values.Add(value.Value))
+                    {
+                        errors.Add(CreateError($"Value '{value.Value}' previously defined in enum '{enumAst.Name}'", value));
+                    }
+                    else if (value.Value > largestValue)
+                    {
+                        largestValue = value.Value;
+                    }
+                }
+                // 2c. Assign the value if not specified
+                else
+                {
+                    value.Value = ++largestValue;
+                }
+            }
         }
 
         private void VerifyStruct(StructAst structAst, List<TranslationError> errors)
@@ -1130,7 +1180,7 @@ namespace Lang.Translation
                 {
                     errors.Add(CreateError("Generic type cannot have additional generic types", typeDef));
                 }
-                return Type.Other;
+                return Type.Struct;
             }
 
             var hasGenerics = typeDef.Generics.Any();
@@ -1244,7 +1294,7 @@ namespace Lang.Translation
                         var genericName = typeDef.GenericName;
                         if (_structs.ContainsKey(genericName))
                         {
-                            return Type.Other;
+                            return Type.Struct;
                         }
                         if (!_polymorphicStructs.TryGetValue(typeDef.Name, out var structDef))
                         {
@@ -1252,9 +1302,9 @@ namespace Lang.Translation
                             return Type.Error;
                         }
                         CreatePolymorphedStruct(structDef, genericName, typeDef.Generics.ToArray());
-                        return Type.Other;
+                        return Type.Struct;
                     }
-                    return _structs.ContainsKey(typeDef.Name) ? Type.Other : Type.Error;
+                    return _structs.ContainsKey(typeDef.Name) ? Type.Struct : Type.Error;
             }
         }
 
