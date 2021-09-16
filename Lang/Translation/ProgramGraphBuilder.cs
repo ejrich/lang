@@ -1008,7 +1008,7 @@ namespace Lang.Translation
                     }
                 }
                 case CallAst call:
-                    if (!_programGraph.Functions.TryGetValue(call.Function, out var function))
+                    if (!_functions.TryGetValue(call.Function, out var function))
                     {
                         errors.Add(CreateError($"Call to undefined function '{call.Function}'", call));
                     }
@@ -1072,10 +1072,6 @@ namespace Lang.Translation
                                     {
                                         callError = true;
                                     }
-                                    else if (argument.PrimitiveType != null && call.Arguments[i] is ConstantAst constant)
-                                    {
-                                        callError = true;
-                                    }
                                 }
                             }
                         }
@@ -1107,10 +1103,6 @@ namespace Lang.Translation
                                             {
                                                 callError = true;
                                             }
-                                            else if (argument.PrimitiveType != null && argumentAst is ConstantAst constant)
-                                            {
-                                                VerifyConstant(constant, paramsType, errors);
-                                            }
                                         }
                                     }
                                 }
@@ -1129,14 +1121,21 @@ namespace Lang.Translation
                                         var argument = arguments[i];
                                         // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
                                         // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
-                                        if (argument.PrimitiveType is FloatType {Bytes: 4})
+                                        if (argument.PrimitiveType is FloatType floatType)
                                         {
-                                            callError = true;
+                                            floatType.Bytes = 8;
+                                        }
+                                        if (!TypeEquals(callTypes[i], argument, true))
+                                        {
+                                            callMatches = false;
+                                            break;
                                         }
                                     }
-                                    else
+
+                                    if (callMatches)
                                     {
-                                        callError = true;
+                                        found = true;
+                                        break;
                                     }
                                 }
                             }
@@ -1152,16 +1151,6 @@ namespace Lang.Translation
                             errors.Add(CreateError($"Call to function '{function.Name}' expected arguments (" +
                                 $"{string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.Type)))})", call));
                         }
-
-                        if (callError)
-                        {
-                            errors.Add(CreateError($"Call to function '{function.Name}' expected arguments (" +
-                                $"{string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.Type)))})", call));
-                        }
-                    }
-                    else
-                    {
-                        errors.Add(CreateError($"Call to undefined function '{call.Function}'", call));
                     }
                     return function?.ReturnType;
                 case ExpressionAst expression:
@@ -1512,10 +1501,20 @@ namespace Lang.Translation
             // Check by primitive type
             switch (a?.PrimitiveType)
             {
-                case IntegerType:
-                    return b?.PrimitiveType is IntegerType;
-                case FloatType:
-                    return b?.PrimitiveType is FloatType;
+                case IntegerType aInt:
+                    if (b?.PrimitiveType is IntegerType bInt)
+                    {
+                        if (!checkPrimitives) return true;
+                        return aInt.Bytes == bInt.Bytes && aInt.Signed == bInt.Signed;
+                    }
+                    return false;
+                case FloatType aFloat:
+                    if (b?.PrimitiveType is FloatType bFloat)
+                    {
+                        if (!checkPrimitives) return true;
+                        return aFloat.Bytes == bFloat.Bytes;
+                    }
+                    return false;
                 case null:
                     if (b?.PrimitiveType != null) return false;
                     break;

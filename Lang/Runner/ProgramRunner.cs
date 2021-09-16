@@ -93,18 +93,21 @@ namespace Lang.Runner
 
             foreach (var function in programGraph.Functions.Values.Where(_ => _.Extern))
             {
+                var returnType = GetTypeFromDefinition(function.ReturnType);
+
                 if (function.Varargs)
                 {
-                    // TODO For varargs functions, get usages instead of only using the definition
+                    foreach (var callTypes in function.VarargsCalls)
+                    {
+                        var varargs = callTypes.Select(arg => GetTypeFromDefinition(arg)).ToArray();
+                        CreateFunction(typeBuilder, function.Name, function.ExternLib, returnType, varargs);
+                    }
                     continue;
                 }
 
-                var returnType = GetTypeFromDefinition(function.ReturnType);
                 var args = function.Arguments.Select(arg => GetTypeFromDefinition(arg.Type)).ToArray();
                 CreateFunction(typeBuilder, function.Name, function.ExternLib, returnType, args);
             }
-
-            CreateFunction(typeBuilder, "printf", "libc", null, typeof(string), typeof(int));
 
             _library = typeBuilder.CreateType();
             _functionObject = Activator.CreateInstance(_library!);
@@ -475,8 +478,8 @@ namespace Lang.Runner
             {
                 case ConstantAst constant:
                     return new ValueType {Type = constant.Type, Value = GetConstant(constant.Type, constant.Value)};
-                case NullAst:
-                    return new ValueType();
+                case NullAst nullAst:
+                    return new ValueType {Type = nullAst.TargetType, Value = IntPtr.Zero};
                 case StructFieldRefAst structField:
                     if (structField.IsEnum)
                     {
@@ -536,20 +539,8 @@ namespace Lang.Runner
                             }
 
                             var previousValue = field!.GetValue(fieldObject);
-                            object newValue;
-
-                            if (fieldType.PrimitiveType is IntegerType)
-                            {
-                                var value = (int)previousValue!;
-                                newValue = changeByOne.Positive ? value + 1 : value - 1;
-                                field.SetValue(fieldObject, newValue);
-                            }
-                            else
-                            {
-                                var value = (float)previousValue!;
-                                newValue = changeByOne.Positive ? value + 1 : value - 1;
-                                field.SetValue(fieldObject, newValue);
-                            }
+                            var newValue = PerformOperation(fieldType, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
+                            field.SetValue(fieldObject, newValue);
 
                             return new ValueType {Type = fieldType, Value = changeByOne.Prefix ? newValue : previousValue};
                         }
@@ -597,13 +588,13 @@ namespace Lang.Runner
                         case UnaryOperator.Negate:
                             if (valueType.Type.PrimitiveType is IntegerType)
                             {
-                                var intValue = (int)valueType.Value;
-                                return new ValueType {Type = valueType.Type, Value = -intValue};
+                                var intValue = PerformOperation(valueType.Type, valueType.Value, -1, Operator.Multiply);
+                                return new ValueType {Type = valueType.Type, Value = intValue};
                             }
                             else
                             {
-                                var floatValue = (float)valueType.Value;
-                                return new ValueType {Type = valueType.Type, Value = -floatValue};
+                                var floatValue = PerformOperation(valueType.Type, valueType.Value, -1.0, Operator.Multiply);
+                                return new ValueType {Type = valueType.Type, Value = floatValue};
                             }
                         case UnaryOperator.Dereference:
                         {
@@ -719,14 +710,27 @@ namespace Lang.Runner
 
         private static object GetConstant(TypeDefinition type, string value)
         {
-            object result = type.PrimitiveType switch
+            switch (type.PrimitiveType)
             {
-                IntegerType => int.Parse(value),
-                FloatType => float.Parse(value),
-                _ when type.Name == "bool" => value == "true",
-                _ => value
-            };
-            return result;
+                case IntegerType integerType:
+                    return integerType.Bytes switch
+                    {
+                        1 => integerType.Signed ? sbyte.Parse(value) : byte.Parse(value),
+                        2 => integerType.Signed ? short.Parse(value) : ushort.Parse(value),
+                        4 => integerType.Signed ? int.Parse(value) : uint.Parse(value),
+                        8 => integerType.Signed ? long.Parse(value) : ulong.Parse(value),
+                        _ => integerType.Signed ? int.Parse(value) : uint.Parse(value)
+                    };
+                case FloatType floatType:
+                    if (floatType.Bytes == 4) return float.Parse(value);
+                    return double.Parse(value);
+                default:
+                    if (type.Name == "bool")
+                    {
+                        return value == "true";
+                    }
+                    return value;
+            }
         }
 
         private ValueType GetStructFieldRef(StructFieldRefAst structField, ProgramGraph programGraph, object structVariable)
@@ -787,12 +791,16 @@ namespace Lang.Runner
             {
                 if (function.Varargs)
                 {
-                    // TODO Create overloads for varargs functions
+                    var functionDecl = _library.GetMethod(functionName, arguments.Select(arg => arg.GetType()).ToArray());
+                    var returnValue = functionDecl!.Invoke(_functionObject, arguments);
+                    return new ValueType {Type = function.ReturnType, Value = returnValue};
                 }
-
-                var functionDecl = _library.GetMethod(functionName);
-                var returnValue = functionDecl!.Invoke(_functionObject, arguments);
-                return new ValueType {Type = function.ReturnType, Value = returnValue};
+                else
+                {
+                    var functionDecl = _library.GetMethod(functionName);
+                    var returnValue = functionDecl!.Invoke(_functionObject, arguments);
+                    return new ValueType {Type = function.ReturnType, Value = returnValue};
+                }
             }
 
             var variables = new Dictionary<string, ValueType>(_globalVariables);
