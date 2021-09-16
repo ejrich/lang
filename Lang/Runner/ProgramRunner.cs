@@ -634,6 +634,7 @@ namespace Lang.Runner
                             case IndexAst index:
                                 var list = variable!.GetType().GetField(index.Name);
                                 var listValue = list!.GetValue(variable);
+                                // TODO Test this
                                 var (_, _, listPointer) = GetListPointer(index, variables, listValue, fieldType);
                                 fieldType = fieldType.Generics[0];
                                 if (i == structField.Children.Count - 1)
@@ -651,22 +652,30 @@ namespace Lang.Runner
                     break;
                 }
                 case IndexAst indexAst:
-                    var (_, _, pointer) = GetListPointer(indexAst, variables);
-                    Marshal.StructureToPtr(expression.Value, pointer, false);
+                    if (indexAst.CallsOverload)
+                    {
+                        var index = (int)ExecuteExpression(indexAst.Index, variables).Value;
+                        var variable = variables[indexAst.Name];
+                        var pointer = HandleOverloadedOperator(variable.Type, Operator.Subscript, variable.Value, index).Value;
+                        Marshal.StructureToPtr(expression.Value, GetPointer(pointer), false);
+                    }
+                    else
+                    {
+                        var (_, _, pointer) = GetListPointer(indexAst, variables);
+                        Marshal.StructureToPtr(expression.Value, pointer, false);
+                    }
                     break;
             }
         }
 
-        private ValueType ExecuteScope(List<IAst> asts,
-            IDictionary<string, ValueType> variables, out bool returned)
+        private ValueType ExecuteScope(List<IAst> asts, IDictionary<string, ValueType> variables, out bool returned)
         {
             var scopeVariables = new Dictionary<string, ValueType>(variables);
 
             return ExecuteAsts(asts, scopeVariables, out returned);
         }
 
-        private ValueType ExecuteConditional(ConditionalAst conditional,
-            IDictionary<string, ValueType> variables, out bool returned)
+        private ValueType ExecuteConditional(ConditionalAst conditional, IDictionary<string, ValueType> variables, out bool returned)
         {
             if (ExecuteCondition(conditional.Condition, variables))
             {
@@ -682,8 +691,7 @@ namespace Lang.Runner
             return null;
         }
 
-        private ValueType ExecuteWhile(WhileAst whileAst,
-            IDictionary<string, ValueType> variables, out bool returned)
+        private ValueType ExecuteWhile(WhileAst whileAst, IDictionary<string, ValueType> variables, out bool returned)
         {
             while (ExecuteCondition(whileAst.Condition, variables))
             {
@@ -934,6 +942,7 @@ namespace Lang.Runner
                                     case IndexAst index:
                                         var list = variable!.GetType().GetField(index.Name);
                                         var listValue = list!.GetValue(variable);
+                                        // TODO Check this
                                         var (_, _, listPointer) = GetListPointer(index, variables, listValue, fieldType);
                                         fieldType = fieldType.Generics[0];
                                         variable = PointerToTargetType(listPointer, fieldType);
@@ -950,6 +959,7 @@ namespace Lang.Runner
                         }
                         case IndexAst indexAst:
                         {
+                            // TODO Check this
                             var (typeDef, elementType, pointer) = GetListPointer(indexAst, variables);
 
                             var previousValue = Marshal.PtrToStructure(pointer, elementType);
@@ -969,6 +979,7 @@ namespace Lang.Runner
                         switch (unary.Value)
                         {
                             case IndexAst index:
+                                // TODO Check this
                                 (typeDef, _, pointer) = GetListPointer(index, variables);
                                 break;
                             case StructFieldRefAst structField when structField.Children[^1] is IndexAst:
@@ -1247,6 +1258,7 @@ namespace Lang.Runner
                     case IndexAst index:
                         var list = value!.GetType().GetField(index.Name);
                         var listValue = list!.GetValue(value);
+                        // TODO Test this
                         var (_, _, listPointer) = GetListPointer(index, variables, listValue, fieldType);
                         fieldType = fieldType.Generics[0];
                         if (getPointer && i == structField.Children.Count - 1)

@@ -192,6 +192,11 @@ index_overloading() {
     vector := a[2];
     printf("Vector values: x = %.2f, y = %.2f, z = %.2f\n", vector.x, vector.y, vector.z);
     printf("Vector value: x = %.2f\n", a[3].x);
+
+    // TODO Check for setting and when pointers are returned
+    b: ListStruct<int>;
+    b[8] = 7;
+    printf("Integer value: b[8] = %d\n", *b[8]);
 }
 
 struct SOAVector3 {
@@ -205,5 +210,15 @@ operator [] SOAVector3(SOAVector3 a, int index) : Vector3 {
     return value;
 }
 
+struct ListStruct<T> {
+    int max = 10;
+    List<T>[10] list;
+}
+
+operator [] ListStruct<T>(ListStruct<T> a, int index) : T* {
+    if index < 0 then return &a.list[0];
+    if index >= a.max then return &a.list[a.max - 1];
+    return &a.list[index];
+}
 
 #run main();
