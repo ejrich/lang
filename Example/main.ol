@@ -64,7 +64,7 @@ global_a := 7;
 global_b: int;
 
 set_global(int a) {
-    if a > 10 then global_a = a;// * 90;
+    if a > 10 then global_a = a * 90;
 }
 
 bool test(int a) {
@@ -253,6 +253,7 @@ enum State {
 struct StateStruct {
     State state = State.Running;
     int something;
+    bool flag = true;
 }
 
 State current_state(int a) {
@@ -284,13 +285,15 @@ u32 sleep(u32 seconds) #extern "libc"
     node.value = 7;
     printf("Node Value = %d\n", node.value);
     global_a = 3;
+    ++global_a;
     if global_a then
         printf("Global variable = %d\n", global_a);
     my_struct: MyStruct;
     my_struct.subValue.something = 8;
-    printf("Struct field value = %d\n", my_struct.subValue.something);
+    my_struct.subValue.something++;
+    printf("Struct field value = %d\n", -my_struct.subValue.something);
     state: StateStruct = { something = 8; }
-    printf("State = %d\n", state.state);
+    state.flag = !state.flag;
 }
 
 /*
