@@ -2108,7 +2108,6 @@ namespace Lang.Translation
                 }
             }
 
-            // TODO Calculate the size of the type
             CalculateStructSize(polyStruct);
             _programGraph.Types.Add(genericName, polyStruct);
         }
