@@ -156,7 +156,7 @@ namespace Lang.Parsing
 
             // 3. Parse arguments until a close paren
             var commaRequiredBeforeNextArgument = false;
-            Argument currentArgument = null;
+            DeclarationAst currentArgument = null;
             while (enumerator.MoveNext())
             {
                 var token = enumerator.Current;
@@ -183,7 +183,7 @@ namespace Lang.Parsing
                         }
                         else if (currentArgument == null)
                         {
-                            currentArgument = CreateAst<Argument>(token);
+                            currentArgument = CreateAst<DeclarationAst>(token);
                             currentArgument.Type = ParseType(enumerator, errors, true);
                         }
                         else
@@ -208,7 +208,7 @@ namespace Lang.Parsing
                         if (commaRequiredBeforeNextArgument)
                         {
                             enumerator.MoveNext();
-                            currentArgument.DefaultValue = ParseNextExpressionUnit(enumerator, errors, out _);
+                            currentArgument.Value = ParseNextExpressionUnit(enumerator, errors, out _);
                         }
                         else
                         {

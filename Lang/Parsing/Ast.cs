@@ -34,7 +34,7 @@ namespace Lang.Parsing
         public bool HasDirectives { get; set; }
         public bool CallsCompiler { get; set; }
         public TypeDefinition ReturnType { get; set; }
-        public List<Argument> Arguments { get; } = new();
+        public List<DeclarationAst> Arguments { get; } = new();
         public List<List<TypeDefinition>> VarargsCalls { get; set; }
         public List<IAst> Children { get; } = new();
     }
@@ -251,17 +251,6 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public DirectiveType Type { get; set; }
         public IAst Value { get; set; }
-        public List<IAst> Children => null;
-    }
-
-    public class Argument : IAst
-    {
-        public int FileIndex { get; set; }
-        public int Line { get; init; }
-        public int Column { get; init; }
-        public string Name { get; set; }
-        public TypeDefinition Type { get; set; }
-        public IAst DefaultValue { get; set; }
         public List<IAst> Children => null;
     }
 

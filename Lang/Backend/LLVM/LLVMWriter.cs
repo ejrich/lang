@@ -209,7 +209,7 @@ namespace Lang.Backend.LLVM
             LLVMApi.SetUnnamedAddr(variable, true);
         }
 
-        private LLVMValueRef WriteFunctionDefinition(string name, List<Argument> arguments, TypeDefinition returnType, bool varargs = false)
+        private LLVMValueRef WriteFunctionDefinition(string name, List<DeclarationAst> arguments, TypeDefinition returnType, bool varargs = false)
         {
             var argumentCount = varargs ? arguments.Count - 1 : arguments.Count;
             var argumentTypes = new LLVMTypeRef[argumentCount];
@@ -1109,7 +1109,7 @@ namespace Lang.Backend.LLVM
             var function = LLVMApi.GetNamedFunction(_module, "llvm.stacksave");
             if (function.Pointer == IntPtr.Zero)
             {
-                function = WriteFunctionDefinition("llvm.stacksave", new List<Argument>(), _stackPointerType);
+                function = WriteFunctionDefinition("llvm.stacksave", new List<DeclarationAst>(), _stackPointerType);
             }
 
             var stackPointer = LLVMApi.BuildCall(_builder, function, Array.Empty<LLVMValueRef>(), "stackPointer");
@@ -1124,7 +1124,7 @@ namespace Lang.Backend.LLVM
             var function = LLVMApi.GetNamedFunction(_module, "llvm.stackrestore");
             if (function.Pointer == IntPtr.Zero)
             {
-                function = WriteFunctionDefinition("llvm.stackrestore", new List<Argument> { new()
+                function = WriteFunctionDefinition("llvm.stackrestore", new List<DeclarationAst> { new()
                 {
                     Name = "ptr", Type = _stackPointerType
                 }}, new TypeDefinition {Name = "void"});
@@ -1522,6 +1522,7 @@ namespace Lang.Backend.LLVM
                     "List" => GetListType(type),
                     "Params" => GetListType(type),
                     "string" => LLVMTypeRef.PointerType(LLVMTypeRef.Int8Type(), 0),
+                    "Type" => LLVMTypeRef.Int32Type(),
                     _ => GetStructType(type)
                 }
             };
