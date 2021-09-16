@@ -169,13 +169,13 @@ namespace Lang.Runner
 
         private void ExecuteDeclaration(DeclarationAst declaration, ProgramGraph programGraph, IDictionary<string, ValueType> variables)
         {
-            var value = declaration.Value == null ? GetUninitializedValue(declaration.Type) :
+            var value = declaration.Value == null ? GetUninitializedValue(declaration.Type, programGraph) :
                 ExecuteExpression(declaration.Value, programGraph, null).Value;
 
             variables[declaration.Name] = new ValueType {Type = declaration.Type, Value = value};
         }
 
-        private object GetUninitializedValue(TypeDefinition typeDef)
+        private object GetUninitializedValue(TypeDefinition typeDef, ProgramGraph programGraph)
         {
             switch (typeDef.PrimitiveType)
             {
@@ -184,29 +184,90 @@ namespace Lang.Runner
                 case FloatType floatType:
                     return floatType.Bytes == 4 ? 0f : 0.0;
                 default:
-                    // TODO Handle more types
-                    var type = _types[typeDef.GenericName];
-                    return Activator.CreateInstance(type);
+                    switch (typeDef.Name)
+                    {
+                        case "List":
+                            // TODO Handle lists
+                            return null;
+                        case "*":
+                            // TODO Handle pointers
+                            return null;
+                    }
+                    var instanceType = _types[typeDef.GenericName];
+                    var type = programGraph.Data.Types[typeDef.GenericName];
+                    var instance = Activator.CreateInstance(instanceType);
+                    if (type is StructAst structAst)
+                    {
+                        foreach (var field in structAst.Fields)
+                        {
+                            // TODO Make this better, just hard coding for now to bypass null reference exceptions
+                            if (field.Type.PrimitiveType == null && field.Type.Name != "*")
+                            {
+                                var fieldType = _types[field.Type.GenericName];
+                                var fieldInstance = instance!.GetType().GetField(field.Name);
+                                fieldInstance!.SetValue(instance, Activator.CreateInstance(fieldType));
+                            }
+                        }
+                    }
+
+                    return instance;
             }
         }
 
         private void ExecuteAssignment(AssignmentAst assignment, ProgramGraph programGraph, IDictionary<string, ValueType> variables)
         {
-            var valueType = assignment.Variable switch
-            {
-                VariableAst variable => variables[variable.Name],
-                // TODO Implement StructFieldRef and Index ASTs
-                _ => null
-            };
-
             var expression = ExecuteExpression(assignment.Value, programGraph, variables);
             if (assignment.Operator != Operator.None)
             {
-                // TODO Implement this
+                var lhs = ExecuteExpression(assignment.Variable, programGraph, variables);
+                expression = BuildExpression(lhs, expression, assignment.Operator, lhs.Type);
             }
 
-            // TODO This doesn't work, need to get the pointer
-            valueType!.Value = expression.Value;
+            switch (assignment.Variable)
+            {
+                case VariableAst variableAst:
+                {
+                    var variable = variables[variableAst.Name];
+                    variable.Value = expression.Value;
+                    break;
+                }
+                case StructFieldRefAst structField:
+                {
+                    var variable = variables[structField.Name];
+
+                    var fieldObject = variable.Value;
+                    var value = structField.Value;
+                    FieldInfo field;
+                    while (true)
+                    {
+                        field = fieldObject!.GetType().GetField(value.Name);
+                        if (value.Value == null)
+                        {
+                            break;
+                        }
+
+                        fieldObject = field!.GetValue(fieldObject);
+                        value = value.Value;
+                    }
+                    field!.SetValue(fieldObject, expression.Value);
+                    break;
+                }
+                case IndexAst index:
+                    switch (index.Variable)
+                    {
+                        case VariableAst variableAst:
+                        {
+                            var variable = variables[variableAst.Name];
+                            break;
+                        }
+                        case StructFieldRefAst structField:
+                        {
+                            var variable = variables[structField.Name];
+                            break;
+                        }
+                    }
+                    break;
+            }
         }
 
         private ValueType ExecuteScope(List<IAst> asts, ProgramGraph programGraph,
@@ -428,6 +489,12 @@ namespace Lang.Runner
                 }
             }
 
+            return null;
+        }
+
+        private ValueType BuildExpression(ValueType lhs, ValueType rhs, Operator op, TypeDefinition targetType)
+        {
+            // TODO Implement me
             return null;
         }
 
