@@ -156,12 +156,35 @@ namespace Lang.Runner
 
             if (_typeCount != programGraph.Types.Count)
             {
-                _typeCount = programGraph.Types.Count;
-                Console.WriteLine("Updating types");
+                var typeTable = _globalVariables["__type_table"];
+
+                // Save the previous pointer
+                var listType = _types[typeTable.Type.GenericName];
+                var dataField = listType.GetField("data");
+                var typeDataPointer = GetPointer(dataField.GetValue(typeTable.Value));
+
                 // Reallocate array
-                // Copy memory using Buffer.MemoryCopy()
-                // Set length
+                var genericType = GetTypeFromDefinition(typeTable.Type.Generics[0]);
+                var size = Marshal.SizeOf(genericType);
+                InitializeConstList(typeTable.Value, listType, genericType, programGraph.Types.Count);
+                var newDataPointer = GetPointer(dataField.GetValue(typeTable.Value));
+
                 // Create TypeInfo pointers
+                var typeInfoType = _types["TypeInfo"];
+                foreach (var (name, type) in programGraph.Types)
+                {
+                    var typeInfo = Activator.CreateInstance(typeInfoType);
+
+                    var typeNameField = typeInfoType.GetField("name");
+                    typeNameField.SetValue(typeInfo, GetString(name));
+                    var typeKindField = typeInfoType.GetField("type");
+                    typeKindField.SetValue(typeInfo, type.TypeKind);
+
+                    var pointer = IntPtr.Add(newDataPointer, size * type.TypeIndex);
+                    Marshal.StructureToPtr(typeInfo, pointer, false);
+                }
+
+                _typeCount = programGraph.Types.Count;
             }
         }
 
@@ -323,31 +346,29 @@ namespace Lang.Runner
             var listType = _types[typeDef.GenericName];
             var genericType = GetTypeFromDefinition(typeDef.Generics[0]);
 
+            var list = Activator.CreateInstance(listType);
             if (typeDef.Count != null)
             {
                 var length = (int)ExecuteExpression(typeDef.Count, variables).Value;
-                return InitializeConstList(listType, genericType, length);
+                InitializeConstList(list, listType, genericType, length);
             }
-
-            var list = Activator.CreateInstance(listType);
-            var dataField = listType.GetField("data");
-            var array = Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * 10);
-            dataField!.SetValue(list, array);
+            else
+            {
+                var dataField = listType.GetField("data");
+                var array = Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * 10);
+                dataField!.SetValue(list, array);
+            }
 
             return list;
         }
 
-        private static object InitializeConstList(Type listType, Type genericType, int length)
+        private static void InitializeConstList(object list, Type listType, Type genericType, int length)
         {
-            var list = Activator.CreateInstance(listType);
-            var dataField = listType.GetField("data");
-
             var countField = listType.GetField("length");
             countField!.SetValue(list, length);
+            var dataField = listType.GetField("data");
             var array = Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * length);
             dataField!.SetValue(list, array);
-
-            return list;
         }
 
         private void ExecuteAssignment(AssignmentAst assignment, IDictionary<string, ValueType> variables)
@@ -667,9 +688,10 @@ namespace Lang.Runner
                         var elementType = function.Arguments[^1].Type.Generics[0];
                         var paramsType = GetTypeFromDefinition(elementType);
                         var listType = _types[$"List.{elementType.GenericName}"];
-                        var paramsList = InitializeConstList(listType, paramsType, call.Arguments.Count - function.Arguments.Count + 1);
+                        var paramsList = Activator.CreateInstance(listType);
+                        InitializeConstList(paramsList, listType, paramsType, call.Arguments.Count - function.Arguments.Count + 1);
 
-                        var dataField = paramsList.GetType().GetField("data");
+                        var dataField = listType.GetField("data");
                         var data = dataField!.GetValue(paramsList);
                         var dataPointer = GetPointer(data!);
 
@@ -773,17 +795,22 @@ namespace Lang.Runner
                         return value == "true";
                     }
 
-                    var stringType = _types["string"];
-                    var stringInstance = Activator.CreateInstance(stringType);
-                    var lengthField = stringType.GetField("length");
-                    lengthField!.SetValue(stringInstance, value.Length);
-
-                    var dataField = stringType.GetField("data");
-                    var stringPointer = Marshal.StringToHGlobalAnsi(value);
-                    dataField!.SetValue(stringInstance, stringPointer);
-
-                    return stringInstance;
+                    return GetString(value);
             }
+        }
+
+        private object GetString(string value)
+        {
+            var stringType = _types["string"];
+            var stringInstance = Activator.CreateInstance(stringType);
+            var lengthField = stringType.GetField("length");
+            lengthField!.SetValue(stringInstance, value.Length);
+
+            var dataField = stringType.GetField("data");
+            var stringPointer = Marshal.StringToHGlobalAnsi(value);
+            dataField!.SetValue(stringInstance, stringPointer);
+
+            return stringInstance;
         }
 
         private ValueType GetStructFieldRef(StructFieldRefAst structField, object structVariable)

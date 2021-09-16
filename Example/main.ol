@@ -61,8 +61,8 @@ int main(List<string> args) {
     compiler_directives();
     open_window();
 
-    type_info := type_of(MyStruct);
-    printf("Type Name = %s, Type Kind = %d\n", type_info.name, type_info.type);
+    // type_info := type_of(MyStruct);
+    // printf("Type Name = %s, Type Kind = %d\n", type_info.name, type_info.type);
 
     return 0;
 }
