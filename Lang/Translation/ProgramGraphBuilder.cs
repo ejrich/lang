@@ -324,14 +324,7 @@ namespace Lang.Translation
             }
 
             // 4. Loop through function body and verify all ASTs
-            var returned = false;
-            foreach (var ast in function.Children)
-            {
-                if (VerifyAst(ast, localVariables, errors))
-                {
-                    returned = true;
-                }
-            }
+            var returned = VerifyAsts(function.Children, localVariables, errors);
 
             // 5. Verify the function returns on all paths
             if (!returned && returnType != Type.Void)
@@ -340,21 +333,25 @@ namespace Lang.Translation
             }
         }
 
+        private bool VerifyAsts(List<IAst> asts, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        {
+            foreach (var ast in asts)
+            {
+                if (VerifyAst(ast, localVariables, errors))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private bool VerifyScope(List<IAst> syntaxTrees, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             // 1. Create scope variables
             var scopeVariables = new Dictionary<string, TypeDefinition>(localVariables);
 
             // 2. Verify function lines
-            var returned = false;
-            foreach (var syntaxTree in syntaxTrees)
-            {
-                if (VerifyAst(syntaxTree, scopeVariables, errors))
-                {
-                    returned = true;
-                }
-            }
-            return returned;
+            return VerifyAsts(syntaxTrees, scopeVariables, errors);
         }
 
         private bool VerifyAst(IAst syntaxTree, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
@@ -766,16 +763,7 @@ namespace Lang.Translation
             }
 
             // 2. Verify the scope of the each block
-            var returned = false;
-            foreach (var ast in each.Children)
-            {
-                if (VerifyAst(ast, eachVariables, errors))
-                {
-                    returned = true;
-                }
-            }
-
-            return returned;
+            return VerifyAsts(each.Children, eachVariables, errors);
         }
 
         private bool VerifyCompilerDirective(CompilerDirectiveAst directive, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
@@ -785,11 +773,11 @@ namespace Lang.Translation
                 case ConditionalAst conditional:
                     if (EvaluateCompileTimeExpression(conditional.Condition, errors))
                     {
-                        
+                        return VerifyAsts(conditional.Children, localVariables, errors);
                     }
                     else if (conditional.Else.Any())
                     {
-                        return VerifyScope(conditional.Else, localVariables, errors);
+                        return VerifyAsts(conditional.Else, localVariables, errors);
                     }
                     break;
                 default:
