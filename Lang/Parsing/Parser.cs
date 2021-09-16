@@ -86,33 +86,7 @@ namespace Lang.Parsing
             var enumerator = new TokenEnumerator(tokens);
             while (enumerator.MoveNext())
             {
-                var token = enumerator.Current!;
-                switch (token!.Type)
-                {
-                    case TokenType.Token:
-                        if (enumerator.Peek()?.Type == TokenType.Colon)
-                        {
-                            syntaxTrees.Add(ParseDeclaration(enumerator, errors));
-                            break;
-                        }
-                        syntaxTrees.Add(ParseFunction(enumerator, errors));
-                        break;
-                    case TokenType.Struct:
-                        syntaxTrees.Add(ParseStruct(enumerator, errors));
-                        break;
-                    case TokenType.Enum:
-                        syntaxTrees.Add(ParseEnum(enumerator, errors));
-                        break;
-                    case TokenType.Pound:
-                        syntaxTrees.Add(ParseTopLevelDirective(enumerator, errors));
-                        break;
-                    default:
-                        errors.Add(new ParseError
-                        {
-                            Error = $"Unexpected token '{token.Value}'", Token = enumerator.Current
-                        });
-                        break;
-                }
+                syntaxTrees.Add(ParseTopLevelAst(enumerator, errors));
             }
 
             return syntaxTrees;
@@ -801,7 +775,7 @@ namespace Lang.Parsing
                             break;
                         }
 
-                        var ast = ParseLine(enumerator, errors);
+                        var ast = topLevel ? ParseTopLevelAst(enumerator, errors) : ParseLine(enumerator, errors);
                         if (ast != null)
                             conditionalAst.Children.Add(ast);
                     }
@@ -848,7 +822,7 @@ namespace Lang.Parsing
                                 break;
                             }
 
-                            var ast = ParseLine(enumerator, errors);
+                            var ast = topLevel ? ParseTopLevelAst(enumerator, errors) : ParseLine(enumerator, errors);
                             if (ast != null)
                                 conditionalAst.Else.Add(ast);
                         }
@@ -1703,7 +1677,7 @@ namespace Lang.Parsing
                     break;
                 case "if":
                     directive.Type = DirectiveType.If;
-                    directive.Value = ParseConditional(enumerator, errors);
+                    directive.Value = ParseConditional(enumerator, errors, true);
                     break;
                 default:
                     errors.Add(new ParseError {Error = $"Unsupported top-level compiler directive '{token.Value}'", Token = token});
