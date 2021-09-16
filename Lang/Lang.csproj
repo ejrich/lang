@@ -12,7 +12,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Remove="Runtime\compiler.ol" />
     <None Remove="Runtime\runtime.ol" />
+    <Content Include="Runtime\compiler.ol">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Runtime\runtime.ol">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
