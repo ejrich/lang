@@ -33,11 +33,26 @@ namespace Lang.Parsing
         private IEnumerable<Token> GetTokens(string fileContents)
         {
             Token currentToken = null;
+            var closingMultiLineComment = false;
             foreach (var character in fileContents)
             {
                 if (_readingComment)
                 {
-                    if (character == '\n')
+                    if (_multiLineComment)
+                    {
+                        if (character == '*')
+                        {
+                            closingMultiLineComment = true;
+                        }
+                        else if (closingMultiLineComment && character == '/')
+                        {
+                            closingMultiLineComment = false;
+                            _multiLineComment = false;
+                            _readingComment = false;
+                            currentToken = null;
+                        }
+                    }
+                    else if (character == '\n')
                     {
                         _readingComment = false;
                         currentToken = null;
@@ -96,20 +111,20 @@ namespace Lang.Parsing
                 case TokenType.Token:
                     return type == TokenType.Token;
                 case TokenType.Divide:
-                    if (currentToken.Type != TokenType.Divide)
-                        return false;
-
-                    currentToken.Type = TokenType.Comment;
-                    _readingComment = true;
-                    return true;
-                case TokenType.Multiply:
-                    if (currentToken.Type != TokenType.Divide)
-                        return false;
-
-                    currentToken.Type = TokenType.Comment;
-                    _readingComment = true;
-                    _multiLineComment = true;
-                    return true;
+                    switch (type)
+                    {
+                        case TokenType.Divide:
+                            currentToken.Type = TokenType.Comment;
+                            _readingComment = true;
+                            return true;
+                        case TokenType.Multiply:
+                            currentToken.Type = TokenType.Comment;
+                            _readingComment = true;
+                            _multiLineComment = true;
+                            return true;
+                        default:
+                            return false;
+                    }
                 // TODO More validation eventually
                 default:
                     return false;
