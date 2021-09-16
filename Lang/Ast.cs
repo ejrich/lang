@@ -23,7 +23,8 @@ namespace Lang
         bool Verified { get; set; }
         bool HasDirectives { get; set; }
         bool CallsCompiler { get; set; }
-        TypeDefinition ReturnType { get; set; }
+        IType ReturnType { get; set; }
+        TypeDefinition ReturnTypeDefinition { get; set; }
         bool ReturnTypeHasGenerics { get; set; }
         List<string> Generics { get; }
         List<DeclarationAst> Arguments { get; }
@@ -70,7 +71,8 @@ namespace Lang
         public bool Verified { get; set; }
         public bool HasDirectives { get; set; }
         public bool CallsCompiler { get; set; }
-        public TypeDefinition ReturnType { get; set; }
+        public IType ReturnType { get; set; }
+        public TypeDefinition ReturnTypeDefinition { get; set; }
         public bool ReturnTypeHasGenerics { get; set; }
         public List<string> Generics { get; } = new();
         public List<DeclarationAst> Arguments { get; } = new();
@@ -114,6 +116,8 @@ namespace Lang
         public uint Line { get; init; }
         public uint Column { get; init; }
         public bool IsEnum { get; set; }
+        public bool IsConstant { get; set; }
+        public IAst ConstantValue { get; set; }
         public bool[] Pointers { get; set; }
         public IType[] Types { get; set; }
         public int[] ValueIndices { get; set; }
@@ -129,7 +133,8 @@ namespace Lang
         public int TypeIndex { get; set; }
         public uint Size { get; set; } = 4;
         public TypeKind TypeKind { get; set; } = TypeKind.Enum;
-        public TypeDefinition BaseType { get; set; }
+        public TypeDefinition BaseTypeDefinition { get; set; }
+        public IType BaseType { get; set; }
         public List<EnumValueAst> Values { get; } = new();
     }
 
@@ -180,7 +185,8 @@ namespace Lang
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
-        public TypeDefinition Type { get; set; }
+        public TypeDefinition TypeDefinition { get; set; }
+        public IType Type { get; set; }
         public string Value { get; set; }
     }
 
@@ -219,7 +225,7 @@ namespace Lang
         public bool Prefix { get; set; }
         public bool Positive { get; set; }
         public IAst Value { get; set; }
-        public TypeDefinition Type { get; set; }
+        public IType Type { get; set; }
     }
 
     public class UnaryAst : IAst
@@ -312,7 +318,7 @@ namespace Lang
         public string Name { get; set; }
         public bool CallsOverload { get; set; }
         public TypeDefinition OverloadType { get; set; }
-        public TypeDefinition OverloadReturnType { get; set; }
+        public IType OverloadReturnType { get; set; }
         public IAst Index { get; set; }
     }
 
@@ -330,7 +336,8 @@ namespace Lang
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
-        public TypeDefinition TargetType { get; set; }
+        public TypeDefinition TargetTypeDefinition { get; set; }
+        public IType TargetType { get; set; }
         public bool HasGenerics { get; set; }
         public IAst Value { get; set; }
     }
@@ -345,7 +352,8 @@ namespace Lang
         public bool Verified { get; set; }
         public bool HasDirectives { get; set; }
         public bool CallsCompiler { get; set; }
-        public TypeDefinition ReturnType { get; set; }
+        public IType ReturnType { get; set; }
+        public TypeDefinition ReturnTypeDefinition { get; set; }
         public bool ReturnTypeHasGenerics { get; set; }
         public List<string> Generics { get; } = new();
         public List<DeclarationAst> Arguments { get; } = new();

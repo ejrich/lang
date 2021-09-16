@@ -45,7 +45,7 @@ namespace Lang
             function.Name = name;
             function.HasDirectives = baseFunction.HasDirectives;
             function.Params = baseFunction.Params;
-            function.ReturnType = baseFunction.ReturnTypeHasGenerics ? CopyType(baseFunction.ReturnType, genericTypes) : baseFunction.ReturnType;
+            function.ReturnTypeDefinition = baseFunction.ReturnTypeHasGenerics ? CopyType(baseFunction.ReturnTypeDefinition, genericTypes) : baseFunction.ReturnTypeDefinition;
 
             foreach (var argument in baseFunction.Arguments)
             {
@@ -70,7 +70,7 @@ namespace Lang
             overload.Operator = baseOverload.Operator;
             overload.Type = CopyType(baseOverload.Type, genericTypes);
             overload.HasDirectives = baseOverload.HasDirectives;
-            overload.ReturnType = baseOverload.ReturnTypeHasGenerics ? CopyType(baseOverload.ReturnType, genericTypes) : baseOverload.ReturnType;
+            overload.ReturnTypeDefinition = baseOverload.ReturnTypeHasGenerics ? CopyType(baseOverload.ReturnTypeDefinition, genericTypes) : baseOverload.ReturnTypeDefinition;
 
             foreach (var argument in baseOverload.Arguments)
             {
@@ -297,7 +297,7 @@ namespace Lang
                     return CopyType(typeDef, genericTypes);
                 case CastAst cast:
                     var castCopy = CopyAst(cast);
-                    castCopy.TargetType = cast.HasGenerics ? CopyType(cast.TargetType, genericTypes) : cast.TargetType;
+                    castCopy.TargetTypeDefinition = cast.HasGenerics ? CopyType(cast.TargetTypeDefinition, genericTypes) : cast.TargetTypeDefinition;
                     castCopy.Value = CopyExpression(cast.Value, genericTypes, generics);
                     return castCopy;
                 default:

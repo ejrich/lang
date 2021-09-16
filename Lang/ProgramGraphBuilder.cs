@@ -69,6 +69,8 @@ namespace Lang
             AddPrimitive("float", TypeKind.Float, new FloatType {Bytes = 4});
             AddPrimitive("float64", TypeKind.Float, new FloatType {Bytes = 8});
 
+            _irBuilder.Init();
+
             var functionNames = new HashSet<string>();
             do
             {
@@ -257,17 +259,22 @@ namespace Lang
             }
             _globalScope.Identifiers.Add(enumAst.Name, enumAst);
 
-            if (enumAst.BaseType == null)
+            if (enumAst.BaseTypeDefinition == null)
             {
-                enumAst.BaseType = _s32Type;
+                enumAst.BaseTypeDefinition = _s32Type; // TODO Remove
+                enumAst.BaseType = TypeTable.Types["s32"];
             }
             else
             {
-                var baseType = VerifyType(enumAst.BaseType);
+                var baseType = VerifyType(enumAst.BaseTypeDefinition);
                 if (baseType != TypeKind.Integer && baseType != TypeKind.Error)
                 {
-                    AddError($"Base type of enum must be an integer, but got '{PrintTypeDefinition(enumAst.BaseType)}'", enumAst.BaseType);
-                    enumAst.BaseType.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
+                    AddError($"Base type of enum must be an integer, but got '{PrintTypeDefinition(enumAst.BaseTypeDefinition)}'", enumAst.BaseTypeDefinition);
+                    enumAst.BaseTypeDefinition.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
+                }
+                else
+                {
+                    enumAst.BaseType = TypeTable.GetType(enumAst.BaseTypeDefinition);
                 }
             }
 
@@ -275,7 +282,7 @@ namespace Lang
             var valueNames = new HashSet<string>();
             var values = new HashSet<int>();
 
-            var primitive = enumAst.BaseType.PrimitiveType;
+            var primitive = enumAst.BaseTypeDefinition.PrimitiveType;
             var lowestAllowedValue = primitive.Signed ? -Math.Pow(2, 4 * primitive.Bytes - 1) : 0;
             var largestAllowedValue = primitive.Signed ? Math.Pow(2, 4 * primitive.Bytes - 1) - 1 : Math.Pow(2, 4 * primitive.Bytes) - 1;
 
@@ -547,18 +554,18 @@ namespace Lang
         private void VerifyFunctionDefinition(FunctionAst function, HashSet<string> functionNames, bool main)
         {
             // 1. Verify the return type of the function is valid
-            var returnType = VerifyType(function.ReturnType);
+            var returnType = VerifyType(function.ReturnTypeDefinition);
             if (returnType == TypeKind.Error)
             {
-                AddError($"Return type '{function.ReturnType.Name}' of function '{function.Name}' is not defined", function.ReturnType);
+                AddError($"Return type '{function.ReturnTypeDefinition.Name}' of function '{function.Name}' is not defined", function.ReturnTypeDefinition);
             }
-            else if (returnType == TypeKind.CArray && function.ReturnType.Count == null)
+            else if (returnType == TypeKind.CArray && function.ReturnTypeDefinition.Count == null)
             {
-                AddError($"C array for function '{function.Name}' must have a constant size", function.ReturnType);
+                AddError($"C array for function '{function.Name}' must have a constant size", function.ReturnTypeDefinition);
             }
-            else if (function.ReturnType.Count != null)
+            else if (function.ReturnTypeDefinition.Count != null)
             {
-                var countType = VerifyConstantExpression(function.ReturnType.Count, null, _globalScope, out var isConstant, out var count);
+                var countType = VerifyConstantExpression(function.ReturnTypeDefinition.Count, null, _globalScope, out var isConstant, out var count);
 
                 if (countType != null)
                 {
@@ -566,19 +573,20 @@ namespace Lang
                     {
                         if (count < 0)
                         {
-                            AddError($"Expected size of return type of function '{function.Name}' to be a positive integer", function.ReturnType.Count);
+                            AddError($"Expected size of return type of function '{function.Name}' to be a positive integer", function.ReturnTypeDefinition.Count);
                         }
                         else
                         {
-                            function.ReturnType.ConstCount = (uint)count;
+                            function.ReturnTypeDefinition.ConstCount = (uint)count;
                         }
                     }
                     else
                     {
-                        AddError($"Return type of function '{function.Name}' should have constant size", function.ReturnType.Count);
+                        AddError($"Return type of function '{function.Name}' should have constant size", function.ReturnTypeDefinition.Count);
                     }
                 }
             }
+            function.ReturnType = TypeTable.GetType(function.ReturnTypeDefinition);
 
             // 2. Verify the argument types
             var argumentNames = new HashSet<string>();
@@ -864,7 +872,7 @@ namespace Lang
                     function.Body.Identifiers[argument.Name] = argument;
                 }
             }
-            var returnType = VerifyType(function.ReturnType);
+            var returnType = VerifyType(function.ReturnTypeDefinition);
             var functionIR = _irBuilder.AddFunction(function);
 
             // 2. For extern functions, simply verify there is no body and return
@@ -901,7 +909,7 @@ namespace Lang
             // 6. Verify the function returns on all paths
             if (!returned && returnType != TypeKind.Void)
             {
-                AddError($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnType)}' on all paths", function);
+                AddError($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnTypeDefinition)}' on all paths", function);
             }
             function.Verified = true;
         }
@@ -924,7 +932,8 @@ namespace Lang
                     overload.Body.Identifiers[argument.Name] = argument;
                 }
             }
-            var returnType = VerifyType(overload.ReturnType);
+            var returnType = VerifyType(overload.ReturnTypeDefinition);
+            overload.ReturnType = TypeTable.GetType(overload.ReturnTypeDefinition);
 
             // 2. Resolve the compiler directives in the body
             if (overload.HasDirectives)
@@ -939,7 +948,7 @@ namespace Lang
             // 4. Verify the body returns on all paths
             if (!returned)
             {
-                AddError($"Overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}' does not return type '{PrintTypeDefinition(overload.ReturnType)}' on all paths", overload);
+                AddError($"Overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}' does not return type '{PrintTypeDefinition(overload.ReturnTypeDefinition)}' on all paths", overload);
             }
             overload.Verified = true;
         }
@@ -1061,7 +1070,7 @@ namespace Lang
         private void VerifyReturnStatement(ReturnAst returnAst, IFunction currentFunction, ScopeAst scope, FunctionIR functionIR)
         {
             // 1. Infer the return type of the function
-            var returnTypeKind = VerifyType(currentFunction.ReturnType);
+            var returnTypeKind = VerifyType(currentFunction.ReturnTypeDefinition);
 
             // 2. Handle void case since it's the easiest to interpret
             if (returnTypeKind == TypeKind.Void)
@@ -1077,20 +1086,20 @@ namespace Lang
                 var returnValueType = VerifyExpression(returnAst.Value, currentFunction, scope);
                 if (returnValueType == null)
                 {
-                    AddError($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnType)}'", returnAst);
+                    AddError($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnTypeDefinition)}'", returnAst);
                 }
                 else
                 {
-                    if (!TypeEquals(currentFunction.ReturnType, returnValueType))
+                    if (!TypeEquals(currentFunction.ReturnTypeDefinition, returnValueType))
                     {
-                        AddError($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnType)}', but returned type '{PrintTypeDefinition(returnValueType)}'", returnAst.Value);
+                        AddError($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnTypeDefinition)}', but returned type '{PrintTypeDefinition(returnValueType)}'", returnAst.Value);
                     }
                 }
             }
 
             if (functionIR != null && !_programGraph.Errors.Any())
             {
-                var returnType = TypeTable.GetType(currentFunction.ReturnType);
+                var returnType = TypeTable.GetType(currentFunction.ReturnTypeDefinition);
                 _irBuilder.EmitReturn(functionIR, returnAst, returnType, scope);
             }
         }
@@ -1559,7 +1568,7 @@ namespace Lang
                 switch (declaration.Value)
                 {
                     case ConstantAst constant:
-                        constant.Type.Constant = true;
+                        constant.TypeDefinition.Constant = true;
                         break;
                     case StructFieldRefAst structField when structField.IsEnum:
                         break;
@@ -1950,8 +1959,7 @@ namespace Lang
                 structType = structType.Generics[0];
                 structField.Pointers[fieldIndex] = true;
             }
-            var genericName = structType.GenericName;
-            if (!TypeTable.Types.TryGetValue(genericName, out var typeDefinition))
+            if (!TypeTable.Types.TryGetValue(structType.GenericName, out var typeDefinition))
             {
                 AddError($"Type '{PrintTypeDefinition(structType)}' not defined", ast);
                 return null;
@@ -1959,6 +1967,8 @@ namespace Lang
             structField.Types[fieldIndex] = typeDefinition;
             if (typeDefinition is ArrayType && fieldName == "length")
             {
+                structField.IsConstant = true;
+                structField.ConstantValue = structType.Count;
                 return _s32Type;
             }
             if (typeDefinition is not StructAst structDefinition)
@@ -2048,7 +2058,7 @@ namespace Lang
 
                 if (each.IndexVariable != null)
                 {
-                    var indexVariable = new DeclarationAst {Name = each.IndexVariable, TypeDefinition = _s32Type};
+                    var indexVariable = new DeclarationAst {Name = each.IndexVariable, TypeDefinition = _s32Type, Type = TypeTable.Types["s32"]};
                     each.Body.Identifiers.TryAdd(each.IndexVariable, indexVariable);
                 }
 
@@ -2058,6 +2068,7 @@ namespace Lang
                     case TypeKind.CArray:
                     case TypeKind.Params:
                         each.IteratorType = iterator.TypeDefinition;
+                        iterator.Type = TypeTable.GetType(iterator.TypeDefinition);
                         each.Body.Identifiers.TryAdd(each.IterationVariable, iterator);
                         break;
                     default:
@@ -2079,7 +2090,7 @@ namespace Lang
                 {
                     AddError($"Expected range to end with 'int', but got '{PrintTypeDefinition(end)}'", each.RangeEnd);
                 }
-                var iterType = new DeclarationAst {Name = each.IterationVariable, TypeDefinition = _s32Type};
+                var iterType = new DeclarationAst {Name = each.IterationVariable, TypeDefinition = _s32Type, Type = TypeTable.Types["s32"]};
                 each.Body.Identifiers.TryAdd(each.IterationVariable, iterType);
             }
 
@@ -2114,12 +2125,12 @@ namespace Lang
             {
                 case ConstantAst constant:
                     isConstant = true;
-                    if (constant.Type.PrimitiveType is IntegerType)
+                    if (constant.TypeDefinition.PrimitiveType is IntegerType)
                     {
                         int.TryParse(constant.Value, out count);
                     }
-                    VerifyType(constant.Type);
-                    return constant.Type;
+                    VerifyType(constant.TypeDefinition);
+                    return constant.TypeDefinition;
                 case NullAst:
                     isConstant = true;
                     return null;
@@ -2173,8 +2184,8 @@ namespace Lang
             switch (ast)
             {
                 case ConstantAst constant:
-                    VerifyType(constant.Type);
-                    return constant.Type;
+                    VerifyType(constant.TypeDefinition);
+                    return constant.TypeDefinition;
                 case NullAst:
                     return null;
                 case StructFieldRefAst structField:
@@ -2216,13 +2227,13 @@ namespace Lang
                             var expressionType = GetReference(changeByOne.Value, currentFunction, scope, out _);
                             if (expressionType != null)
                             {
-                                changeByOne.Type = expressionType;
                                 var type = VerifyType(expressionType);
                                 if (type != TypeKind.Integer && type != TypeKind.Float)
                                 {
                                     AddError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(expressionType)}'", changeByOne.Value);
                                     return null;
                                 }
+                                changeByOne.Type = TypeTable.GetType(expressionType);
                             }
 
                             return expressionType;
@@ -2319,7 +2330,7 @@ namespace Lang
                 }
                 case CastAst cast:
                 {
-                    var targetType = VerifyType(cast.TargetType);
+                    var targetType = VerifyType(cast.TargetTypeDefinition);
                     var valueType = VerifyExpression(cast.Value, currentFunction, scope);
                     switch (targetType)
                     {
@@ -2327,13 +2338,13 @@ namespace Lang
                         case TypeKind.Float:
                             if (valueType != null && valueType.PrimitiveType == null)
                             {
-                                AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetType)}'", cast.Value);
+                                AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast.Value);
                             }
                             break;
                         case TypeKind.Pointer:
                             if (valueType != null && valueType.Name != "*")
                             {
-                                AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetType)}'", cast.Value);
+                                AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast.Value);
                             }
                             break;
                         case TypeKind.Error:
@@ -2342,11 +2353,11 @@ namespace Lang
                         default:
                             if (valueType != null)
                             {
-                                AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetType)}'", cast);
+                                AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast);
                             }
                             break;
                     }
-                    return cast.TargetType;
+                    return cast.TargetTypeDefinition;
                 }
                 case null:
                     return null;
@@ -2358,16 +2369,16 @@ namespace Lang
 
         private void VerifyConstant(ConstantAst constant, TypeDefinition typeDef)
         {
-            constant.Type.Name = typeDef.Name;
-            constant.Type.PrimitiveType = typeDef.PrimitiveType;
+            constant.TypeDefinition.Name = typeDef.Name;
+            constant.TypeDefinition.PrimitiveType = typeDef.PrimitiveType;
 
-            var type = constant.Type;
+            var type = constant.TypeDefinition;
             switch (type.PrimitiveType)
             {
                 case IntegerType integer when !type.Character:
                     if (!integer.Signed && constant.Value[0] == '-')
                     {
-                        AddError($"Unsigned type '{PrintTypeDefinition(constant.Type)}' cannot be negative", constant);
+                        AddError($"Unsigned type '{PrintTypeDefinition(constant.TypeDefinition)}' cannot be negative", constant);
                         break;
                     }
 
@@ -2381,7 +2392,7 @@ namespace Lang
                     };
                     if (!success)
                     {
-                        AddError($"Value '{constant.Value}' out of range for type '{PrintTypeDefinition(constant.Type)}'", constant);
+                        AddError($"Value '{constant.Value}' out of range for type '{PrintTypeDefinition(constant.TypeDefinition)}'", constant);
                     }
                     break;
             }
@@ -2421,7 +2432,7 @@ namespace Lang
                 return null;
             }
 
-            var primitive = enumAst.BaseType.PrimitiveType;
+            var primitive = enumAst.BaseTypeDefinition.PrimitiveType;
             return new TypeDefinition {Name = enumAst.Name, TypeKind = TypeKind.Enum, PrimitiveType = new EnumType {Bytes = primitive.Bytes, Signed = primitive.Signed}};
         }
 
@@ -2482,12 +2493,12 @@ namespace Lang
                     if (polymorphicFunctions.Count == 1)
                     {
                         var calledFunction = polymorphicFunctions[0];
-                        return calledFunction.ReturnTypeHasGenerics ? null : calledFunction.ReturnType;
+                        return calledFunction.ReturnTypeHasGenerics ? null : calledFunction.ReturnTypeDefinition;
                     }
                 }
                 else if (polymorphicFunctions == null && functions.Count == 1)
                 {
-                    return functions[0].ReturnType;
+                    return functions[0].ReturnTypeDefinition;
                 }
                 return null;
             }
@@ -2545,7 +2556,7 @@ namespace Lang
                         {
                             var typeIndex = new ConstantAst
                             {
-                                Type = new TypeDefinition {TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Signed = true, Bytes = 4}}
+                                TypeDefinition = new TypeDefinition {TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Signed = true, Bytes = 4}}
                             };
                             if (argument.TypeIndex.HasValue)
                             {
@@ -2561,7 +2572,7 @@ namespace Lang
                                 typeIndex.Value = type.TypeIndex.ToString();
                             }
                             call.Arguments[i] = typeIndex;
-                            arguments[i] = typeIndex.Type;
+                            arguments[i] = typeIndex.TypeDefinition;
                         }
                         else if (argument.PrimitiveType != null && call.Arguments[i] is ConstantAst constant)
                         {
@@ -2594,7 +2605,7 @@ namespace Lang
                                 {
                                     var typeIndex = new ConstantAst
                                     {
-                                        Type = new TypeDefinition {TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Signed = true, Bytes = 4}}
+                                        TypeDefinition = new TypeDefinition {TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Signed = true, Bytes = 4}}
                                     };
                                     if (argument.TypeIndex.HasValue)
                                     {
@@ -2610,7 +2621,7 @@ namespace Lang
                                         typeIndex.Value = type.TypeIndex.ToString();
                                     }
                                     call.Arguments[i] = typeIndex;
-                                    arguments[i] = typeIndex.Type;
+                                    arguments[i] = typeIndex.TypeDefinition;
                                 }
                                 else if (argument.PrimitiveType != null && argumentAst is ConstantAst constant)
                                 {
@@ -2679,7 +2690,7 @@ namespace Lang
                 }
             }
 
-            return function.ReturnType;
+            return function.ReturnTypeDefinition;
         }
 
         private FunctionAst DetermineCallingFunction(CallAst call, TypeDefinition[] arguments, Dictionary<string, TypeDefinition> specifiedArguments)
@@ -2937,7 +2948,7 @@ namespace Lang
                         }
 
                         var polymorphedFunction = _polymorpher.CreatePolymorphedFunction(function, name, genericTypes);
-                        VerifyType(polymorphedFunction.ReturnType);
+                        VerifyType(polymorphedFunction.ReturnTypeDefinition);
                         polymorphedFunction.Arguments.ForEach(arg => {
                             VerifyType(arg.TypeDefinition, argument: true);
 
@@ -3084,7 +3095,7 @@ namespace Lang
                 {
                     if (TypeEquals(expression.Type, nextExpressionType, true))
                     {
-                        var resultType = VerifyOperatorOverloadType(expression.Type, op, currentFunction, expression.Children[i]);
+                        var resultType = VerifyOperatorOverloadType(expression.Type, op, currentFunction, expression.Children[i], out _);
                         if (resultType != null)
                         {
                             expression.Type = resultType;
@@ -3284,8 +3295,8 @@ namespace Lang
                     index.CallsOverload = true;
                     index.OverloadType = typeDef;
                     overloaded = true;
-                    elementType = VerifyOperatorOverloadType(typeDef, Operator.Subscript, currentFunction, index);
-                    index.OverloadReturnType = elementType;
+                    elementType = VerifyOperatorOverloadType(typeDef, Operator.Subscript, currentFunction, index, out var returnType);
+                    index.OverloadReturnType = returnType;
                     break;
                 case TypeKind.Array:
                 case TypeKind.CArray:
@@ -3317,7 +3328,7 @@ namespace Lang
             return elementType;
         }
 
-        private TypeDefinition VerifyOperatorOverloadType(TypeDefinition type, Operator op, IFunction currentFunction, IAst ast)
+        private TypeDefinition VerifyOperatorOverloadType(TypeDefinition type, Operator op, IFunction currentFunction, IAst ast, out IType returnType)
         {
             if (_programGraph.OperatorOverloads.TryGetValue(type.GenericName, out var overloads) && overloads.TryGetValue(op, out var overload))
             {
@@ -3325,7 +3336,8 @@ namespace Lang
                 {
                     VerifyOperatorOverload(overload);
                 }
-                return overload.ReturnType;
+                returnType = overload.ReturnType;
+                return overload.ReturnTypeDefinition; // TODO Switch with ReturnType
             }
             else if (_polymorphicOperatorOverloads.TryGetValue(type.Name, out var polymorphicOverloads) && polymorphicOverloads.TryGetValue(op, out var polymorphicOverload))
             {
@@ -3335,7 +3347,7 @@ namespace Lang
                     _programGraph.OperatorOverloads[type.GenericName] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
                 }
                 overloads[op] = polymorphedOverload;
-                VerifyType(polymorphedOverload.ReturnType);
+                VerifyType(polymorphedOverload.ReturnTypeDefinition);
                 polymorphedOverload.Arguments.ForEach(arg => {
                     VerifyType(arg.TypeDefinition, argument: true);
 
@@ -3347,11 +3359,13 @@ namespace Lang
                 });
 
                 VerifyOperatorOverload(polymorphedOverload);
-                return polymorphedOverload.ReturnType;
+                returnType = polymorphedOverload.ReturnType;
+                return polymorphedOverload.ReturnTypeDefinition; // TODO Switch with ReturnType
             }
             else
             {
                 AddError($"Type '{PrintTypeDefinition(type)}' does not contain an overload for operator '{PrintOperator(op)}'", ast);
+                returnType = null;
                 return null;
             }
         }
@@ -3666,7 +3680,7 @@ namespace Lang
                                 typeDef.TypeKind = TypeKind.Struct;
                                 break;
                             case EnumAst enumAst:
-                                var primitive = enumAst.BaseType.PrimitiveType;
+                                var primitive = enumAst.BaseTypeDefinition.PrimitiveType;
                                 typeDef.PrimitiveType ??= new EnumType {Bytes = primitive.Bytes, Signed = primitive.Signed};
                                 typeDef.TypeKind = TypeKind.Enum;
                                 break;

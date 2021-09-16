@@ -63,7 +63,8 @@ namespace Lang
         public InstructionValueType ValueType { get; set; }
 
         public int ValueIndex { get; set; }
-        public TypeDefinition Type { get; set; }
+        // public TypeDefinition TypeDefinition { get; set; } // TODO Remove
+        public IType Type { get; set; }
 
         // For constant values
         public InstructionConstant ConstantValue { get; set; }
