@@ -284,15 +284,10 @@ namespace Lang.Backend
             }
 
             // 4. Declare variables
-            var typeTableIndex = 0;
+            LLVMValueRef typeTable = null;
             _globals = new LLVMValueRef[Program.GlobalVariables.Count];
             foreach (var globalVariable in Program.GlobalVariables)
             {
-                if (globalVariable.Name == "__type_table")
-                {
-                    typeTableIndex = globalVariable.Index;
-                }
-
                 LLVMValueRef global;
                 if (globalVariable.Array)
                 {
@@ -321,6 +316,7 @@ namespace Lang.Backend
                             break;
                     }
                 }
+
                 // if (_emitDebug)
                 // {
                 //     using var name = new MarshaledString(globalVariable.Name);
@@ -333,12 +329,15 @@ namespace Lang.Backend
 
                 LLVM.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
                 _globals[globalVariable.Index] = global;
+
+                if (globalVariable.Name == "__type_table")
+                {
+                    typeTable = global;
+                    SetPrivateConstant(typeTable);
+                }
             }
 
             // 5. Write type table
-            var typeTable = _globals[typeTableIndex];
-            SetPrivateConstant(typeTable);
-
             var typeArray = LLVMValueRef.CreateConstArray(LLVM.PointerType(typeInfoType, 0), typeInfos);
             var typeArrayGlobal = _module.AddGlobal(LLVM.TypeOf(typeArray), "____type_array");
             SetPrivateConstant(typeArrayGlobal);
