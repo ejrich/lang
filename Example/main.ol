@@ -19,10 +19,11 @@ int Main(List<string> args) {
     my_struct := create();
     prim := primitives();
     list := create_list(4);
-    ptr := pointers();
+    ptr := *pointers();
     str := string_test();
     printf("%s - Hello world %d, %d, %d\n", str, 1, 2, b);
-    return *ptr;
+    sum_test();
+    return ptr;
 }
 
 bool test(int a) {
@@ -141,3 +142,29 @@ int* pointers() {
 string string_test() {
     return "something";
 }
+
+sum_test() {
+    sum_list: List<int>[7];
+    sum_list[0] = 4;
+    sum_list[1] = 41;
+    sum_list[2] = 544;
+    sum_list[3] = 244;
+    sum_list[4] = 42;
+    sum_list[5] = 14;
+    sum_list[6] = 23;
+
+    printf("Sum of List = %d\n", sum(sum_list));
+    //printf("Sum of ... = %d\n", sum2(4, 41, 544, 244, 42, 14, 23));
+}
+
+int sum(List<int> args) {
+    sum := 0;
+    each i in args then sum += i;
+    return sum;
+}
+
+//int sum2(...<int> args) {
+//    sum := 0;
+//    each i in args then sum += i;
+//    return sum;
+//}
