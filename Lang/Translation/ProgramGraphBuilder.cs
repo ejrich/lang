@@ -288,6 +288,12 @@ namespace Lang.Translation
             {
                 VariableAst variable => variable.Name,
                 StructFieldRefAst fieldRef => fieldRef.Name,
+                IndexAst index => index.Variable switch
+                {
+                    VariableAst variable => variable.Name,
+                    StructFieldRefAst fieldRef => fieldRef.Name,
+                    _ => string.Empty
+                },
                 _ => string.Empty
             };
             if (!localVariables.TryGetValue(variableName, out var variableTypeDefinition))
@@ -303,6 +309,16 @@ namespace Lang.Translation
             if (assignment.Variable is StructFieldRefAst structField)
             {
                 variableTypeDefinition = VerifyStructFieldRef(structField, variableTypeDefinition, errors);
+                if (variableTypeDefinition == null) return;
+            }
+            else if (assignment.Variable is IndexAst index)
+            {
+                if (index.Variable is StructFieldRefAst indexStructField)
+                {
+                    variableTypeDefinition = VerifyStructFieldRef(indexStructField, variableTypeDefinition, errors);
+                    if (variableTypeDefinition == null) return;
+                }
+                variableTypeDefinition = VerifyIndex(index, variableTypeDefinition, localVariables, errors);
                 if (variableTypeDefinition == null) return;
             }
             if (valueType != null)
@@ -436,14 +452,18 @@ namespace Lang.Translation
                 {
                     errors.Add(CreateError($"Expected range to end with 'int', but got '{PrintTypeDefinition(endType)}'", each.RangeEnd));
                 }
-                if (!eachVariables.TryAdd(each.IterationVariable, new TypeDefinition {Name = "int"}))
+                var iterType = new TypeDefinition {Name = "int", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
+                if (!eachVariables.TryAdd(each.IterationVariable, iterType))
                 {
                     errors.Add(CreateError($"Iteration variable '{each.IterationVariable}' already exists in scope", each));
                 };
             }
 
             // 2. Verify the scope of the each block
-            VerifyScope(each.Children, eachVariables, errors);
+            foreach (var ast in each.Children)
+            {
+                VerifyAst(ast, eachVariables, errors);
+            }
         }
 
         private TypeDefinition VerifyExpression(IAst ast, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
@@ -554,6 +574,34 @@ namespace Lang.Translation
                     return function?.ReturnType;
                 case ExpressionAst expression:
                     return VerifyExpressionType(expression, localVariables, errors);
+                case IndexAst index:
+                    switch (index.Variable)
+                    {
+                        case VariableAst variable:
+                            if (localVariables.TryGetValue(variable.Name, out var variableType))
+                            {
+                                return VerifyIndex(index, variableType, localVariables, errors);
+                            }
+                            else
+                            {
+                                errors.Add(CreateError($"Variable '{variable.Name}' not defined", variable));
+                                return null;
+                            }
+                        case StructFieldRefAst structField:
+                            if (localVariables.TryGetValue(structField.Name, out var structType))
+                            {
+                                var fieldType = VerifyStructFieldRef(structField, structType, errors);
+                                return fieldType == null ? null : VerifyIndex(index, fieldType, localVariables, errors);
+                            }
+                            else
+                            {
+                                errors.Add(CreateError($"Variable '{structField.Name}' not defined", structField));
+                                return null;
+                            }
+                        default:
+                            errors.Add(CreateError($"Expected to index a variable", index));
+                            return null;
+                    }
                 case null:
                     return null;
                 default:
@@ -754,6 +802,26 @@ namespace Lang.Translation
             return value.Value == null ? field.Type : VerifyStructFieldRef(value, field.Type, errors);
         }
 
+        private TypeDefinition VerifyIndex(IndexAst index, TypeDefinition typeDef, IDictionary<string, TypeDefinition> localVariables,
+            List<TranslationError> errors)
+        {
+            // 1. Load the list element type definition
+            var indexType = typeDef.Generics.FirstOrDefault();
+            if (indexType == null)
+            {
+                errors.Add(CreateError("Unable to determine element type of the List", index));
+            }
+
+            // 2. Verify the count expression is an integer
+            var countType = VerifyExpression(index.Index, localVariables, errors);
+            if (VerifyType(countType, errors) != Type.Int)
+            {
+                errors.Add(CreateError($"Expected List index to be type 'int', but got '{PrintTypeDefinition(countType)}'", index));
+            }
+
+            return indexType;
+        }
+
         private static bool TypeEquals(TypeDefinition a, TypeDefinition b)
         {
             // Check by primitive type
@@ -785,6 +853,7 @@ namespace Lang.Translation
             if (typeDef == null) return Type.Error;
 
             var hasGenerics = typeDef.Generics.Any();
+            var hasCount = typeDef.Count != null;
             switch (typeDef.Name)
             {
                 case "int":
@@ -801,11 +870,21 @@ namespace Lang.Translation
                         errors.Add(CreateError($"Type '{typeDef.Name}' cannot have generics", typeDef));
                         return Type.Error;
                     }
+                    if (hasCount)
+                    {
+                        errors.Add(CreateError($"Type '{typeDef.Name}' cannot have count", typeDef));
+                        return Type.Error;
+                    }
                     return VerifyIntegerType(typeDef);
                 case "float":
                     if (hasGenerics)
                     {
                         errors.Add(CreateError("Type 'float' cannot have generics", typeDef));
+                        return Type.Error;
+                    }
+                    if (hasCount)
+                    {
+                        errors.Add(CreateError($"Type '{typeDef.Name}' cannot have count", typeDef));
                         return Type.Error;
                     }
                     typeDef.PrimitiveType = new FloatType {Bytes = 4};
@@ -816,12 +895,22 @@ namespace Lang.Translation
                         errors.Add(CreateError("Type 'float64' cannot have generics", typeDef));
                         return Type.Error;
                     }
+                    if (hasCount)
+                    {
+                        errors.Add(CreateError($"Type '{typeDef.Name}' cannot have count", typeDef));
+                        return Type.Error;
+                    }
                     typeDef.PrimitiveType = new FloatType {Bytes = 8};
                     return Type.Float;
                 case "bool":
                     if (hasGenerics)
                     {
                         errors.Add(CreateError("boolean type cannot have generics", typeDef));
+                        return Type.Error;
+                    }
+                    if (hasCount)
+                    {
+                        errors.Add(CreateError($"Type '{typeDef.Name}' cannot have count", typeDef));
                         return Type.Error;
                     }
                     return Type.Boolean;
@@ -831,13 +920,28 @@ namespace Lang.Translation
                         errors.Add(CreateError("string type cannot have generics", typeDef));
                         return Type.Error;
                     }
+                    if (hasCount)
+                    {
+                        errors.Add(CreateError($"Type '{typeDef.Name}' cannot have count", typeDef));
+                        return Type.Error;
+                    }
                     return Type.String;
                 case "List":
-                    return Type.List;
+                    if (typeDef.Generics.Count != 1)
+                    {
+                        errors.Add(CreateError($"List type should have 1 generic type, but got {typeDef.Generics.Count}", typeDef));
+                        return Type.Error;
+                    }
+                    return VerifyType(typeDef.Generics[0], errors) == Type.Error ? Type.Error : Type.List;
                 case "void":
                     if (hasGenerics)
                     {
                         errors.Add(CreateError("void type cannot have generics", typeDef));
+                        return Type.Error;
+                    }
+                    if (hasCount)
+                    {
+                        errors.Add(CreateError($"Type '{typeDef.Name}' cannot have count", typeDef));
                         return Type.Error;
                     }
                     return Type.Void;

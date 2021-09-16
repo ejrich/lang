@@ -879,6 +879,16 @@ namespace Lang.Parsing
                         expression.Children[^1] = changeByOneAst;
                         continue;
                     }
+                    if (token.Type == TokenType.Number && token.Value[0] == '-')
+                    {
+                        token.Value = token.Value[1..];
+                        expression.Operators.Add(Operator.Subtract);
+                        var constant = CreateAst<ConstantAst>(token);
+                        constant.Type = InferType(token, errors);
+                        constant.Value = token.Value;
+                        expression.Children.Add(constant);
+                        continue;
+                    }
                     var op = ConvertOperator(token);
                     if (op != Operator.None)
                     {
