@@ -308,6 +308,7 @@ namespace Lang.Parsing
         public IPrimitive PrimitiveType { get; set; }
         public List<TypeDefinition> Generics { get; } = new();
         public IAst Count { get; set; }
+        public uint? ConstCount { get; set; }
         public List<IAst> Children => null;
 
         private string _genericName;

@@ -87,18 +87,11 @@ namespace Lang.Translation
                     }
                 }
 
-                // 2. Verify struct bodies, global variables, and function return types and arguments
+                // 2. Verify global variables and function return types/arguments
                 for (var i = 0; i < parseResult.SyntaxTrees.Count; i++)
                 {
                     switch (parseResult.SyntaxTrees[i])
                     {
-                        case StructAst structAst:
-                            if (!structAst.Verified)
-                            {
-                                VerifyStruct(structAst);
-                            }
-                            parseResult.SyntaxTrees.RemoveAt(i--);
-                            break;
                         case DeclarationAst globalVariable:
                             if (globalVariable.Value != null && globalVariable.Value is not ConstantAst)
                             {
@@ -126,9 +119,24 @@ namespace Lang.Translation
                     }
                 }
 
+                // 3. Verify struct bodies
+                for (var i = 0; i < parseResult.SyntaxTrees.Count; i++)
+                {
+                    switch (parseResult.SyntaxTrees[i])
+                    {
+                        case StructAst structAst:
+                            if (!structAst.Verified)
+                            {
+                                VerifyStruct(structAst);
+                            }
+                            parseResult.SyntaxTrees.RemoveAt(i--);
+                            break;
+                    }
+                }
+
+                // 4. Verify and run top-level static ifs
                 verifyAdditional = false;
                 var additionalAsts = new List<IAst>();
-                // 3. Verify and run top-level static ifs
                 for (int i = 0; i < parseResult.SyntaxTrees.Count; i++)
                 {
                     switch (parseResult.SyntaxTrees[i])
@@ -174,14 +182,14 @@ namespace Lang.Translation
                 }
             } while (verifyAdditional);
 
-            // 4. Verify function bodies
+            // 5. Verify function bodies
             foreach (var function in _programGraph.Functions.Values)
             {
                 if (function.Verified) continue;
                 VerifyFunction(function);
             }
 
-            // 5. Execute any other compiler directives
+            // 6. Execute any other compiler directives
             foreach (var ast in parseResult.SyntaxTrees)
             {
                 switch (ast)
@@ -282,86 +290,79 @@ namespace Lang.Translation
         private void VerifyStruct(StructAst structAst)
         {
             // 1. Verify struct fields have valid types
-            var invalid = false;
+            var errorCount = _programGraph.Errors.Count;
             var fieldNames = new HashSet<string>();
             foreach (var structField in structAst.Fields)
             {
                 // 1a. Check if the field has been previously defined
                 if (!fieldNames.Add(structField.Name))
                 {
-                    invalid = true;
                     AddError($"Struct '{structAst.Name}' already contains field '{structField.Name}'", structField);
                 }
 
                 // 1b. Check for errored or undefined field types
-                var type = VerifyType(structField.Type, true);
+                var type = VerifyType(structField.Type);
 
                 if (type == Type.Error)
                 {
-                    invalid = true;
                     AddError($"Type '{PrintTypeDefinition(structField.Type)}' of field {structAst.Name}.{structField.Name} is not defined", structField);
                 }
 
-                // 1c. Check if the default value has the correct type
-                switch (structField.DefaultValue)
+                // 1c. Check type count
+                if (structField.Type.CArray && structField.Type.Count == null)
                 {
-                    case ConstantAst constant:
-                        if (!TypeEquals(structField.Type, constant.Type))
+                    AddError($"C array of field '{structAst.Name}.{structField.Name}' must be initialized with a constant size", structField.Type);
+                }
+                else if (structField.Type.Count != null)
+                {
+                    // Verify the count is a constant
+                    var countType = VerifyConstantExpression(structField.Type.Count, null, _globalIdentifiers, out var isConstant, out var count);
+
+                    if (countType != null)
+                    {
+                        if (!isConstant || countType.PrimitiveType is not IntegerType)
                         {
-                            invalid = true;
-                            AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(constant.Type)}'", constant);
+                            AddError($"Expected size of '{structAst.Name}.{structField.Name}' to be a constant integer", structField.Type.Count);
                         }
-                        break;
-                    case StructFieldRefAst structFieldRef:
-                        if (structFieldRef.Children[0] is IdentifierAst identifier)
+                        else if (count < 0)
                         {
-                            if (_programGraph.Types.TryGetValue(identifier.Name, out var fieldType))
-                            {
-                                if (fieldType is EnumAst enumAst)
-                                {
-                                    var enumType = VerifyEnumValue(enumAst, structFieldRef);
-                                    if (enumType != null && !TypeEquals(structField.Type, enumType))
-                                    {
-                                        invalid = true;
-                                        AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(enumType)}'", structFieldRef);
-                                    }
-                                }
-                                else
-                                {
-                                    invalid = true;
-                                    AddError($"Default value of '{structAst.Name}.{structField.Name}' must be constant or enum value", structFieldRef);
-                                }
-                            }
-                            else
-                            {
-                                invalid = true;
-                                AddError($"Type '{identifier.Name}' is not defined", identifier);
-                            }
+                            AddError($"Expected size of '{structAst.Name}.{structField.Name}' to be a positive integer", structField.Type.Count);
                         }
                         else
                         {
-                            invalid = true;
-                            AddError($"Default value of '{structAst.Name}.{structField.Name}' must be constant or enum value", structFieldRef);
+                            structField.Type.ConstCount = (uint)count;
                         }
-                        break;
-                    case null:
-                        break;
-                    default:
-                        invalid = true;
-                        AddError($"Expected default value of {structAst.Name}.{structField.Name} to be a constant value", structField.DefaultValue);
-                        break;
+                    }
                 }
 
-                // 1d. Check for circular dependencies
+                // 1d. Check if the default value has the correct type
+                if (structField.DefaultValue != null)
+                {
+                    var defaultType = VerifyConstantExpression(structField.DefaultValue, null, _globalIdentifiers, out var isConstant, out _);
+
+                    if (defaultType != null)
+                    {
+                        if (!isConstant)
+                        {
+                            AddError($"Expected default value of '{structAst.Name}.{structField.Name}' to be a constant value", structField.DefaultValue);
+
+                        }
+                        else if (!TypeEquals(structField.Type, defaultType))
+                        {
+                            AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(defaultType)}'", structField.DefaultValue);
+                        }
+                    }
+                }
+
+                // 1e. Check for circular dependencies
                 if (structAst.Name == structField.Type.Name)
                 {
-                    invalid = true;
-                    AddError($"Struct '{structAst.Name}' has circular reference in field '{structField.Name}'", structField);
+                    AddError($"Struct '{structAst.Name}' contains circular reference in field '{structField.Name}'", structField);
                 }
             }
 
             // 2. Calculate the size of the struct
-            if (!structAst.Generics.Any() && !invalid)
+            if (!structAst.Generics.Any() && errorCount == _programGraph.Errors.Count)
             {
                 CalculateStructSize(structAst);
             }
@@ -376,18 +377,31 @@ namespace Lang.Translation
             {
                 AddError($"Return type '{function.ReturnType.Name}' of function '{function.Name}' is not defined", function.ReturnType);
             }
+            else if (function.ReturnType.CArray && function.ReturnType.Count == null)
+            {
+                AddError($"C array for function '{function.Name}' must have a constant size", function.ReturnType);
+            }
             else if (function.ReturnType.Count != null)
             {
-                if (function.ReturnType.Count is ConstantAst constant)
+                var countType = VerifyConstantExpression(function.ReturnType.Count, null, _globalIdentifiers, out var isConstant, out var count);
+
+                if (countType != null)
                 {
-                    if (!uint.TryParse(constant.Value, out _))
+                    if (isConstant)
                     {
-                        AddError($"Expected type count to be positive integer, but got '{constant.Value}'", constant);
+                        if (count < 0)
+                        {
+                            AddError($"Expected size of return type of function '{function.Name}' to be a positive integer", function.ReturnType.Count);
+                        }
+                        else
+                        {
+                            function.ReturnType.ConstCount = (uint)count;
+                        }
                     }
-                }
-                else
-                {
-                    AddError("Type count should be a constant value", function.ReturnType.Count);
+                    else
+                    {
+                        AddError($"Return type of function '{function.Name}' should have constant size", function.ReturnType.Count);
+                    }
                 }
             }
 
@@ -810,9 +824,39 @@ namespace Lang.Translation
             }
 
             // 5. Verify the type definition count if necessary
-            if (declaration.Type?.Count != null)
+            if (declaration.Type != null)
             {
-                VerifyExpression(declaration.Type.Count, currentFunction, scopeIdentifiers);
+                if (declaration.Type.CArray && declaration.Type.Count == null)
+                {
+                    AddError($"C array of variable '{declaration.Name}' must be initialized to a constant integer", declaration.Type);
+                }
+                else if (declaration.Type.Count != null)
+                {
+                    var countType = VerifyConstantExpression(declaration.Type.Count, currentFunction, scopeIdentifiers, out var isConstant, out var count);
+
+                    if (countType != null)
+                    {
+                        if (declaration.Type.CArray && !isConstant)
+                        {
+                            AddError($"C array of variable '{declaration.Name}' must be initialized with a constant size", declaration.Type.Count);
+                        }
+                        else if (countType.PrimitiveType is not IntegerType)
+                        {
+                            AddError($"Expected count of variable '{declaration.Name}' to be an integer", declaration.Type.Count);
+                        }
+                        if (isConstant)
+                        {
+                            if (count < 0)
+                            {
+                                AddError($"Expected size of variable '{declaration.Name}' to be a positive integer", declaration.Type.Count);
+                            }
+                            else
+                            {
+                                declaration.Type.ConstCount = (uint)count;
+                            }
+                        }
+                    }
+                }
             }
 
             // 6. Verify constant values
@@ -1041,6 +1085,65 @@ namespace Lang.Translation
             return declaration.Type;
         }
 
+        private TypeDefinition VerifyStructFieldRef(StructFieldRefAst structField, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        {
+            TypeDefinition refType;
+            switch (structField.Children[0])
+            {
+                case IdentifierAst identifier:
+                    if (!scopeIdentifiers.TryGetValue(identifier.Name, out var value))
+                    {
+                        AddError($"Identifier '{identifier.Name}' not defined", structField);
+                        return null;
+                    }
+                    switch (value)
+                    {
+                        case EnumAst enumAst:
+                            return VerifyEnumValue(enumAst, structField);
+                        case DeclarationAst declaration:
+                            refType = declaration.Type;
+                            break;
+                        default:
+                            AddError($"Cannot reference static field of type '{identifier.Name}'", structField);
+                            return null;
+                    }
+                    break;
+                default:
+                    refType = VerifyExpression(structField.Children[0], currentFunction, scopeIdentifiers);
+                    break;
+            }
+            if (refType == null)
+            {
+                return null;
+            }
+            structField.Pointers = new bool[structField.Children.Count - 1];
+            structField.TypeNames = new string[structField.Children.Count - 1];
+            structField.ValueIndices = new int[structField.Children.Count - 1];
+
+            for (var i = 1; i < structField.Children.Count; i++)
+            {
+                switch (structField.Children[i])
+                {
+                    case IdentifierAst identifier:
+                        refType = VerifyStructField(identifier.Name, refType, structField, i-1, identifier);
+                        break;
+                    case IndexAst index:
+                        var fieldType = VerifyStructField(index.Name, refType, structField, i-1, index);
+                        if (fieldType == null) return null;
+                        refType = VerifyIndex(index, fieldType, currentFunction, scopeIdentifiers);
+                        break;
+                    default:
+                        AddError("Expected to have a reference to a variable, field, or pointer", structField.Children[i]);
+                        return null;
+                }
+                if (refType == null)
+                {
+                    return null;
+                }
+            }
+            return refType;
+        }
+
         private TypeDefinition VerifyStructField(string fieldName, TypeDefinition structType, StructFieldRefAst structField, int fieldIndex, IAst ast)
         {
             // 1. Load the struct definition in typeDefinition
@@ -1205,6 +1308,58 @@ namespace Lang.Translation
             }
         }
 
+        private TypeDefinition VerifyConstantExpression(IAst ast, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers, out bool isConstant, out int count)
+        {
+            isConstant = false;
+            count = 0;
+            switch (ast)
+            {
+                case ConstantAst constant:
+                    isConstant = true;
+                    if (constant.Type.PrimitiveType is IntegerType)
+                    {
+                        int.TryParse(constant.Value, out count);
+                    }
+                    return constant.Type;
+                case StructFieldRefAst structField:
+                    var structFieldType = VerifyStructFieldRef(structField, currentFunction, scopeIdentifiers);
+                    isConstant = structFieldType?.PrimitiveType is EnumType;
+                    return structFieldType;
+                case IdentifierAst identifierAst:
+                    if (!scopeIdentifiers.TryGetValue(identifierAst.Name, out var identifier))
+                    {
+                        if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functionAst))
+                        {
+                            return new TypeDefinition {Name = "Type", TypeIndex = functionAst.TypeIndex};
+                        }
+                        AddError($"Identifier '{identifierAst.Name}' not defined", identifierAst);
+                    }
+                    switch (identifier)
+                    {
+                        case DeclarationAst declaration:
+                            isConstant = declaration.Constant;
+                            if (isConstant && declaration.Type.PrimitiveType is IntegerType)
+                            {
+                                if (declaration.Value is ConstantAst constValue)
+                                {
+                                    int.TryParse(constValue.Value, out count);
+                                }
+                            }
+                            return declaration.Type;
+                        case IType type:
+                            if (type is StructAst structAst && structAst.Generics.Any())
+                            {
+                                AddError($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
+                            }
+                            return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
+                        default:
+                            return null;
+                    }
+                default:
+                    return VerifyExpression(ast, currentFunction, scopeIdentifiers);
+            }
+        }
+
         private TypeDefinition VerifyExpression(IAst ast, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Verify the expression value
@@ -1215,61 +1370,7 @@ namespace Lang.Translation
                 case NullAst:
                     return null;
                 case StructFieldRefAst structField:
-                    TypeDefinition refType;
-                    switch (structField.Children[0])
-                    {
-                        case IdentifierAst identifier:
-                            if (!scopeIdentifiers.TryGetValue(identifier.Name, out var value))
-                            {
-                                AddError($"Identifier '{identifier.Name}' not defined", ast);
-                                return null;
-                            }
-                            switch (value)
-                            {
-                                case EnumAst enumAst:
-                                    return VerifyEnumValue(enumAst, structField);
-                                case DeclarationAst declaration:
-                                    refType = declaration.Type;
-                                    break;
-                                default:
-                                    AddError($"Cannot reference static field of type '{identifier.Name}'", ast);
-                                    return null;
-                            }
-                            break;
-                        default:
-                            refType = VerifyExpression(structField.Children[0], currentFunction, scopeIdentifiers);
-                            break;
-                    }
-                    if (refType == null)
-                    {
-                        return null;
-                    }
-                    structField.Pointers = new bool[structField.Children.Count - 1];
-                    structField.TypeNames = new string[structField.Children.Count - 1];
-                    structField.ValueIndices = new int[structField.Children.Count - 1];
-
-                    for (var i = 1; i < structField.Children.Count; i++)
-                    {
-                        switch (structField.Children[i])
-                        {
-                            case IdentifierAst identifier:
-                                refType = VerifyStructField(identifier.Name, refType, structField, i-1, identifier);
-                                break;
-                            case IndexAst index:
-                                var fieldType = VerifyStructField(index.Name, refType, structField, i-1, index);
-                                if (fieldType == null) return null;
-                                refType = VerifyIndex(index, fieldType, currentFunction, scopeIdentifiers);
-                                break;
-                            default:
-                                AddError("Expected to have a reference to a variable, field, or pointer", structField.Children[i]);
-                                return null;
-                        }
-                        if (refType == null)
-                        {
-                            return null;
-                        }
-                    }
-                    return refType;
+                    return VerifyStructFieldRef(structField, currentFunction, scopeIdentifiers);
                 case IdentifierAst identifierAst:
                 {
                     if (!scopeIdentifiers.TryGetValue(identifierAst.Name, out var identifier))
@@ -1947,8 +2048,7 @@ namespace Lang.Translation
             return true;
         }
 
-
-        private Type VerifyType(TypeDefinition typeDef, bool listCountAsConstant = false)
+        private Type VerifyType(TypeDefinition typeDef)
         {
             if (typeDef == null) return Type.Error;
 
@@ -2034,36 +2134,6 @@ namespace Lang.Translation
                     {
                         AddError($"Type 'List' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
                         return Type.Error;
-                    }
-                    if (typeDef.Count != null)
-                    {
-                        if (listCountAsConstant)
-                        {
-                            if (typeDef.Count is ConstantAst constant)
-                            {
-                                if (!uint.TryParse(constant.Value, out _))
-                                {
-                                    AddError($"Expected type count to be positive integer, but got '{constant.Value}'", constant);
-                                }
-                            }
-                            else
-                            {
-                                AddError("Type count should be a constant value", typeDef.Count);
-                            }
-                        }
-                        else if (typeDef.CArray)
-                        {
-                            if (typeDef.Count is not ConstantAst constant)
-                            {
-                                AddError("C array should have a constant size", typeDef.Count);
-                                return Type.Error;
-                            }
-                            if (!uint.TryParse(constant.Value, out _))
-                            {
-                                AddError($"Expected type count to be positive integer, but got '{constant.Value}'", constant);
-                                return Type.Error;
-                            }
-                        }
                     }
                     return VerifyList(typeDef) ? Type.List : Type.Error;
                 }
