@@ -53,6 +53,7 @@ namespace Lang
         IType Type { get; set; }
         IType ArrayElementType { get; set; }
         bool HasGenerics { get; set; }
+        bool IsType { get; set; }
         IAst Value { get; set; }
         Dictionary<string, AssignmentAst> Assignments { get; set; }
         List<IAst> ArrayValues { get; set; }
@@ -118,6 +119,7 @@ namespace Lang
         public TypeDefinition TypeDefinition { get; set; }
         public IType Type { get; set; }
         public IType ArrayElementType { get; set; }
+        public bool IsType { get; set; }
         public bool HasGenerics { get; set; }
         public IAst Value { get; set; }
         public Dictionary<string, AssignmentAst> Assignments { get; set; }
@@ -284,6 +286,7 @@ namespace Lang
         public TypeDefinition TypeDefinition { get; set; }
         public IType Type { get; set; }
         public IType ArrayElementType { get; set; }
+        public bool IsType { get; set; }
         public bool HasGenerics { get; set; }
         public bool Constant { get; set; }
         public int AllocationIndex { get; set; }
@@ -418,7 +421,7 @@ namespace Lang
         public string Name { get; set; }
         public bool IsGeneric { get; set; }
         // public bool Constant { get; set; }
-        public bool Character { get; set; }
+        // public bool Character { get; set; }
         public int GenericIndex { get; set; }
         public int? TypeIndex { get; set; }
         public IPrimitive PrimitiveType { get; set; }
@@ -518,10 +521,10 @@ namespace Lang
         Function,
         CArray,
         // Below not used in the backend
-        VarArgs,
-        Params,
-        Type,
-        Generic,
-        Error
+        // VarArgs,
+        // Params,
+        // Type,
+        // Generic,
+        // Error
     }
 }

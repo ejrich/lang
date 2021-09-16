@@ -251,7 +251,7 @@ namespace Lang
 
         private PrimitiveAst AddPrimitive(string name, TypeKind typeKind, uint size = 0, bool signed = false)
         {
-            var primitiveAst = new PrimitiveAst {Name = name, TypeKind = typeKind, Size = size, Signed = signed};
+            var primitiveAst = new PrimitiveAst {Name = name, BackendName = name, TypeKind = typeKind, Size = size, Signed = signed};
             _globalScope.Identifiers.Add(name, primitiveAst);
             TypeTable.Add(name, primitiveAst);
             TypeTable.CreateTypeInfo(primitiveAst);
@@ -274,7 +274,7 @@ namespace Lang
             }
             else
             {
-                var baseType = VerifyType(enumAst.BaseTypeDefinition, out _, out _, out _);
+                var baseType = VerifyType(enumAst.BaseTypeDefinition);
                 if (baseType?.TypeKind != TypeKind.Integer)
                 {
                     ErrorReporter.Report($"Base type of enum must be an integer, but got '{PrintTypeDefinition(enumAst.BaseTypeDefinition)}'", enumAst.BaseTypeDefinition);
@@ -623,7 +623,8 @@ namespace Lang
                 }
 
                 // 3b. Check for errored or undefined field types
-                argument.Type = VerifyType(argument.TypeDefinition, out isGeneric, out isVarargs, out isParams, allowParams: true);
+                argument.Type = VerifyType(argument.TypeDefinition, out isGeneric, out isVarargs, out isParams, out var isType, allowParams: true);
+                argument.IsType = isType;
 
                 if (isVarargs)
                 {
@@ -979,7 +980,7 @@ namespace Lang
                 }
             }
             // var returnType = VerifyType(overload.ReturnTypeDefinition);
-            overload.ReturnType = VerifyType(overload.ReturnTypeDefinition, out _, out _, out _);
+            overload.ReturnType = VerifyType(overload.ReturnTypeDefinition);
 
             // 2. Resolve the compiler directives in the body
             if (overload.Flags.HasFlag(FunctionFlags.HasDirectives))
@@ -2123,7 +2124,7 @@ namespace Lang
                         each.Body.Identifiers.TryAdd(each.IterationVariable.Name, each.IterationVariable);
                         break;
                     case TypeKind.Array:
-                    case TypeKind.Params:
+                    // case TypeKind.Params:
                         each.IterationVariable.Type = TypeTable.GetType(each.IterationVariable.TypeDefinition);
                         each.Body.Identifiers.TryAdd(each.IterationVariable.Name, each.IterationVariable);
                         break;
@@ -2333,19 +2334,32 @@ namespace Lang
                             return null;
                         }
 
-                        // TODO Get this figured out, translate from VerifyType
-                        var pointerType = new TypeDefinition {Name = "*"};
-                        if (type == TypeKind.CArray)
+                        if (referenceType.TypeKind == TypeKind.CArray)
                         {
-                            pointerType.Generics.Add(referenceType.Generics[0]);
+                            var arrayType = (ArrayType)referenceType;
+                            var backendName = $"*.{arrayType.ElementType.BackendName}";
+                            if (!TypeTable.Types.TryGetValue(backendName, out var pointerType))
+                            {
+                                var name = $"{arrayType.ElementType.Name}*";
+                                pointerType = new PrimitiveAst {Name = name, BackendName = backendName, TypeKind = TypeKind.Pointer, Size = 8, PointerType = arrayType.ElementType};
+                                TypeTable.Add(backendName, pointerType);
+                                TypeTable.CreateTypeInfo(pointerType);
+                            }
+                            unary.Type = pointerType;
                         }
                         else
                         {
-                            pointerType.Generics.Add(referenceType);
+                            var backendName = $"*.{referenceType.BackendName}";
+                            if (!TypeTable.Types.TryGetValue(backendName, out var pointerType))
+                            {
+                                var name = $"{referenceType.Name}*";
+                                pointerType = new PrimitiveAst {Name = name, BackendName = backendName, TypeKind = TypeKind.Pointer, Size = 8, PointerType = referenceType};
+                                TypeTable.Add(backendName, pointerType);
+                                TypeTable.CreateTypeInfo(pointerType);
+                            }
+                            unary.Type = pointerType;
                         }
-                        unary.Type = TypeTable.GetType(pointerType);
-                        return pointerType;
-                        // return unary.Type;
+                        return unary.Type;
                     }
                     else
                     {
@@ -2401,7 +2415,7 @@ namespace Lang
                     return VerifyIndexType(index, currentFunction, scope);
                 case TypeDefinition typeDef:
                 {
-                    var type = VerifyType(typeDef, out _, out _, out _);
+                    var type = VerifyType(typeDef);
                     if (type == null)
                     {
                         return null;
@@ -2412,7 +2426,7 @@ namespace Lang
                 }
                 case CastAst cast:
                 {
-                    cast.TargetType = VerifyType(cast.TargetTypeDefinition, out _, out _, out _);
+                    cast.TargetType = VerifyType(cast.TargetTypeDefinition);
                     var valueType = VerifyExpression(cast.Value, currentFunction, scope, out _);
                     switch (cast.TargetType?.TypeKind)
                     {
@@ -2491,7 +2505,22 @@ namespace Lang
                         }
                         else
                         {
-                            var lowestAllowedValue = newInt.Signed ? -Math.Pow(2, 4 * newInt.Size - 1) : 0;
+                            var largestAllowedValue = Math.Pow(2, 4 * newInt.Size - 1) - 1;
+                            if (currentInt.Signed)
+                            {
+                                var lowestAllowedValue = -Math.Pow(2, 4 * newInt.Size - 1);
+                                if (constant.Value.Integer < lowestAllowedValue || constant.Value.Integer > largestAllowedValue)
+                                {
+                                    ErrorReporter.Report($"Value '{constant.Value.Integer}' out of range for type '{type.Name}'", constant);
+                                }
+                            }
+                            else
+                            {
+                                if (constant.Value.UnsignedInteger > largestAllowedValue)
+                                {
+                                    ErrorReporter.Report($"Value '{constant.Value.Integer}' out of range for type '{type.Name}'", constant);
+                                }
+                            }
                         }
                     }
                     // Convert float to int, shelved for now
@@ -2511,6 +2540,15 @@ namespace Lang
                     // Convert int to float
                     if (constant.Type.TypeKind == TypeKind.Integer)
                     {
+                        var currentInt = (PrimitiveAst)constant.Type;
+                        if (currentInt.Signed)
+                        {
+                            constant.Value = new Constant {Double = (double)constant.Value.Integer};
+                        }
+                        else
+                        {
+                            constant.Value = new Constant {Double = (double)constant.Value.UnsignedInteger};
+                        }
                     }
                     else if (constant.Type.TypeKind == TypeKind.Float)
                     {
@@ -2663,7 +2701,7 @@ namespace Lang
             {
                 foreach (var generic in call.Generics)
                 {
-                    var genericType = VerifyType(generic, out _, out _, out _);
+                    var genericType = VerifyType(generic);
                     if (genericType == null)
                     {
                         ErrorReporter.Report($"Undefined generic type '{PrintTypeDefinition(generic)}'", generic);
@@ -2748,11 +2786,11 @@ namespace Lang
                     var argument = argumentTypes[i];
                     if (argument != null)
                     {
-                        // TODO Figure this out, maybe add flag like IsType
-                        if (functionArg.Type.TypeKind == TypeKind.Type)
+                        if (functionArg.IsType)
                         {
-                            var typeIndex = new ConstantAst {Type = _s32Type};
-                            if (argument.TypeIndex.HasValue)
+                            // TODO Figure this out, this is not going to work for Type arguments
+                            var typeIndex = new ConstantAst {Type = _s32Type, Value = new Constant {Integer = argument.TypeIndex}};
+                            /*if (argument.TypeIndex.HasValue)
                             {
                                 typeIndex.Value = argument.TypeIndex.ToString();
                             }
@@ -2764,13 +2802,13 @@ namespace Lang
                             {
                                 var type = TypeTable.Types[argument.GenericName];
                                 typeIndex.Value = type.TypeIndex.ToString();
-                            }
+                            }*/
                             call.Arguments[i] = typeIndex;
                             argumentTypes[i] = typeIndex.Type;
                         }
-                        else if (argument.PrimitiveType != null && call.Arguments[i] is ConstantAst constant)
+                        else if (call.Arguments[i] is ConstantAst constant)
                         {
-                            VerifyConstant(constant, functionArg.TypeDefinition);
+                            VerifyConstant(constant, functionArg.Type);
                         }
                     }
                 }
@@ -2779,7 +2817,8 @@ namespace Lang
             // Verify varargs call arguments
             if (function.Flags.HasFlag(FunctionFlags.Params))
             {
-                var paramsType = function.Arguments[argumentCount].TypeDefinition.Generics.FirstOrDefault();
+                // var paramsType = function.Arguments[argumentCount].TypeDefinition.Generics.FirstOrDefault();
+                var paramsType = function.ParamsElementType;
 
                 if (paramsType != null)
                 {
@@ -2797,8 +2836,9 @@ namespace Lang
                             {
                                 if (paramsType.TypeKind == TypeKind.Type)
                                 {
-                                    var typeIndex = new ConstantAst {Type = _s32Type};
-                                    if (argument.TypeIndex.HasValue)
+                                    // TODO Figure this out, this is not going to work for Type arguments
+                                    var typeIndex = new ConstantAst {Type = _s32Type, Value = new Constant {Integer = argument.TypeIndex}};
+                                    /*if (argument.TypeIndex.HasValue)
                                     {
                                         typeIndex.Value = argument.TypeIndex.ToString();
                                     }
@@ -2810,11 +2850,11 @@ namespace Lang
                                     {
                                         var type = TypeTable.Types[argument.GenericName];
                                         typeIndex.Value = type.TypeIndex.ToString();
-                                    }
+                                    }*/
                                     call.Arguments[i] = typeIndex;
-                                    argumentTypes[i] = typeIndex.TypeDefinition;
+                                    argumentTypes[i] = typeIndex.Type;
                                 }
-                                else if (argument.PrimitiveType != null && argumentAst is ConstantAst constant)
+                                else if (argumentAst is ConstantAst constant)
                                 {
                                     VerifyConstant(constant, paramsType);
                                 }
@@ -2987,7 +3027,7 @@ namespace Lang
                         for (var index = 0; index < call.Generics.Count; index++)
                         {
                             var generic = call.Generics[i];
-                            genericTypes[i] = VerifyType(generic, out _, out _, out _);
+                            genericTypes[i] = VerifyType(generic);
                             if (genericTypes[i] == null)
                             {
                                 genericsError = true;
@@ -3150,13 +3190,13 @@ namespace Lang
                         var polymorphedFunction = _polymorpher.CreatePolymorphedFunction(function, name, genericTypes);
                         if (polymorphedFunction.ReturnType == null)
                         {
-                            polymorphedFunction.ReturnType = VerifyType(polymorphedFunction.ReturnTypeDefinition, out _, out _, out _);
+                            polymorphedFunction.ReturnType = VerifyType(polymorphedFunction.ReturnTypeDefinition);
                         }
                         foreach (var argument in polymorphedFunction.Arguments)
                         {
                             if (argument.Type == null)
                             {
-                                argument.Type = VerifyType(argument.TypeDefinition, out _, out _, out _, allowParams: true);
+                                argument.Type = VerifyType(argument.TypeDefinition, out _, out _, out _, out _, allowParams: true);
                             }
                         }
 
@@ -3299,7 +3339,7 @@ namespace Lang
                 {
                     if (TypeEquals(expression.Type, nextExpressionType, true))
                     {
-                        var overload = VerifyOperatorOverloadType(expression.Type, op, currentFunction, expression.Children[i]);
+                        var overload = VerifyOperatorOverloadType((StructAst)expression.Type, op, currentFunction, expression.Children[i]);
                         if (overload != null)
                         {
                             expression.OperatorOverloads[i] = overload;
@@ -3505,7 +3545,7 @@ namespace Lang
                 case TypeKind.Struct:
                     index.CallsOverload = true;
                     overloaded = true;
-                    index.Overload = VerifyOperatorOverloadType(type, Operator.Subscript, currentFunction, index);
+                    index.Overload = VerifyOperatorOverloadType((StructAst)type, Operator.Subscript, currentFunction, index);
                     // elementType = index.Overload.ReturnTypeDefinition;
                     elementType = index.Overload.ReturnType;
                     break;
@@ -3540,7 +3580,7 @@ namespace Lang
             return elementType;
         }
 
-        private OperatorOverloadAst VerifyOperatorOverloadType(IType type, Operator op, IFunction currentFunction, IAst ast)
+        private OperatorOverloadAst VerifyOperatorOverloadType(StructAst type, Operator op, IFunction currentFunction, IAst ast)
         {
             if (_operatorOverloads.TryGetValue(type.BackendName, out var overloads) && overloads.TryGetValue(op, out var overload))
             {
@@ -3563,7 +3603,7 @@ namespace Lang
                 {
                     if (argument.Type == null)
                     {
-                        argument.Type = VerifyType(argument.TypeDefinition, out _, out _, out _);
+                        argument.Type = VerifyType(argument.TypeDefinition);
                     }
                 }
 
@@ -3664,12 +3704,23 @@ namespace Lang
             return true;
         }*/
 
+        private IType VerifyType(TypeDefinition type, int depth = 0)
+        {
+            return VerifyType(type, out _, out _, out _, out _, depth);
+        }
+
+        private IType VerifyType(TypeDefinition type, out bool isGeneric, out bool isVarargs, out bool isParams, int depth = 0)
+        {
+            return VerifyType(type, out isGeneric, out isVarargs, out isParams, out _, depth);
+        }
+
         // TODO Add isType out argument?
-        private IType VerifyType(TypeDefinition type, out bool isGeneric, out bool isVarargs, out bool isParams, int depth = 0, bool allowParams = false)
+        private IType VerifyType(TypeDefinition type, out bool isGeneric, out bool isVarargs, out bool isParams, out bool isType, int depth = 0, bool allowParams = false)
         {
             isGeneric = false;
             isVarargs = false;
             isParams = false;
+            isType = false;
             if (type == null) return null;
 
             if (type.IsGeneric)
@@ -3719,7 +3770,7 @@ namespace Lang
                     else
                     {
                         var elementTypeDef = type.Generics[0];
-                        var elementType = VerifyType(elementTypeDef, out isGeneric, out _, out _, depth + 1, allowParams);
+                        var elementType = VerifyType(elementTypeDef, out isGeneric, out _, out _, out _, depth + 1, allowParams);
                         if (elementType == null || isGeneric)
                         {
                             return null;
@@ -3754,7 +3805,7 @@ namespace Lang
                     else
                     {
                         var typeDef = type.Generics[0];
-                        var pointedToType = VerifyType(typeDef, out isGeneric, out _, out _, depth + 1, allowParams);
+                        var pointedToType = VerifyType(typeDef, out isGeneric, out _, out _, out _, depth + 1, allowParams);
                         if (pointedToType == null || isGeneric)
                         {
                             return null;
@@ -3765,7 +3816,7 @@ namespace Lang
                             // To account for this, the type table needs to be checked for again for the type
                             if (!TypeTable.Types.TryGetValue(type.GenericName, out pointerType))
                             {
-                                pointerType = new PrimitiveAst {Name = PrintTypeDefinition(type), TypeKind = TypeKind.Pointer, Size = 8, PointerType = pointedToType};
+                                pointerType = new PrimitiveAst {Name = PrintTypeDefinition(type), BackendName = type.GenericName, TypeKind = TypeKind.Pointer, Size = 8, PointerType = pointedToType};
                                 TypeTable.Add(type.GenericName, pointerType);
                                 TypeTable.CreateTypeInfo(pointerType);
                             }
@@ -3797,6 +3848,7 @@ namespace Lang
                     }
                     return VerifyArray(type, depth, out isGeneric);
                 case "Type":
+                    isType = true;
                     if (hasGenerics)
                     {
                         ErrorReporter.Report("Type 'Type' cannot have generics", type);
@@ -3816,7 +3868,7 @@ namespace Lang
                             var error = false;
                             foreach (var generic in generics)
                             {
-                                var genericType = VerifyType(generic, out var hasGeneric, out _, out _, depth + 1, allowParams);
+                                var genericType = VerifyType(generic, out var hasGeneric, out _, out _, out _, depth + 1, allowParams);
                                 if (genericType == null)
                                 {
                                     error = true;
