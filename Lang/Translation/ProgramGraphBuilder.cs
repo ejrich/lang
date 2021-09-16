@@ -889,7 +889,7 @@ namespace Lang.Translation
                                 }
                                 else
                                 {
-                                    call.Arguments.Add(functionArg.DefaultValue);
+                                    call.Arguments.Insert(i, functionArg.DefaultValue);
                                 }
                             }
                             else if (argument is NullAst nullAst)
