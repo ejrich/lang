@@ -14,6 +14,7 @@ namespace Lang
         public uint StackSize { get; set; }
         public List<Allocation> Allocations { get; set; }
         public List<BasicBlock> BasicBlocks { get; set; }
+        public Dictionary<string, InstructionValue> Constants { get; set; }
     }
 
     public class Allocation
@@ -97,11 +98,10 @@ namespace Lang
 
     public enum InstructionValueType
     {
-        None = 0,
+        Value, // TODO IDK?
         Argument,
         Constant,
         Null,
         Type,
-        Value // TODO IDK?
     }
 }

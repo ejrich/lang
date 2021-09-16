@@ -7,9 +7,9 @@ namespace Lang
         ProgramIR Program { get; }
         FunctionIR AddFunction(FunctionAst function, Dictionary<string, IType> types);
         FunctionIR AddOperatorOverload(OperatorOverloadAst overload, Dictionary<string, IType> types);
-        void EmitDeclaration(FunctionIR function, DeclarationAst declaration, IType type);
-        void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType);
-        InstructionValue EmitIR(FunctionIR function, IAst ast, BasicBlock block = null);
+        void EmitDeclaration(FunctionIR function, DeclarationAst declaration, IType type, ScopeAst scope);
+        void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, ScopeAst scope, BasicBlock block = null);
+        InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block = null);
     }
 
     public class ProgramIRBuilder : IProgramIRBuilder
@@ -20,12 +20,7 @@ namespace Lang
 
         public FunctionIR AddFunction(FunctionAst function, Dictionary<string, IType> types)
         {
-            var functionName = function.Name switch
-            {
-                "main" => "__main",
-                "__start" => "main",
-                _ => function.OverloadIndex > 0 ? $"{function.Name}.{function.OverloadIndex}" : function.Name
-            };
+            var functionName = GetFunctionName(function);
 
             var functionIR = new FunctionIR();
             if (!function.Extern && !function.Compiler)
@@ -95,23 +90,32 @@ namespace Lang
             return functionIR;
         }
 
-        public void EmitDeclaration(FunctionIR function, DeclarationAst declaration, IType type)
+        public void EmitDeclaration(FunctionIR function, DeclarationAst declaration, IType type, ScopeAst scope)
         {
-            var allocationIndex = function.Allocations.Count;
-            AddAllocation(function, declaration, type, allocationIndex);
+            if (declaration.Constant)
+            {
+                function.Constants ??= new();
 
-            // TODO Add initialization values
-            if (declaration.Value != null)
-            {
-                // value = CastValue(ExecuteExpression(declaration.Value, variables).Value, declaration.Type);
-            }
-            else if (declaration.ArrayValues != null)
-            {
-                // value = InitializeArray(declaration.Type, variables, declaration.ArrayValues);
+                function.Constants[declaration.Name] = EmitIR(function, declaration.Value, scope);
             }
             else
             {
-                // value = GetUninitializedValue(declaration.Type, variables, declaration.Assignments);
+                var allocationIndex = function.Allocations.Count;
+                AddAllocation(function, declaration, type, allocationIndex);
+
+                // TODO Add initialization values
+                if (declaration.Value != null)
+                {
+                    // value = CastValue(ExecuteExpression(declaration.Value, variables).Value, declaration.Type);
+                }
+                else if (declaration.ArrayValues != null)
+                {
+                    // value = InitializeArray(declaration.Type, variables, declaration.ArrayValues);
+                }
+                else
+                {
+                    // value = GetUninitializedValue(declaration.Type, variables, declaration.Assignments);
+                }
             }
         }
 
@@ -127,7 +131,7 @@ namespace Lang
             function.Allocations.Add(allocation);
         }
 
-        public void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, BasicBlock block = null)
+        public void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, ScopeAst scope, BasicBlock block = null)
         {
             if (block == null)
             {
@@ -137,13 +141,13 @@ namespace Lang
             var instruction = new Instruction {Type = InstructionType.Return};
             if (returnAst.Value != null)
             {
-                instruction.Value1 = EmitIR(function, returnAst.Value, block);
+                instruction.Value1 = EmitIR(function, returnAst.Value, scope, block);
             }
 
             block.Instructions.Add(instruction);
         }
 
-        public InstructionValue EmitIR(FunctionIR function, IAst ast, BasicBlock block = null)
+        public InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block = null)
         {
             if (block == null)
             {
@@ -192,27 +196,46 @@ namespace Lang
                 case NullAst nullAst:
                     return new InstructionValue {ValueType = InstructionValueType.Null};
                 case IdentifierAst identifier:
-                // {
-                //     if (!localVariables.TryGetValue(identifier.Name, out var typeValue))
-                //     {
-                //         var typeDef = _programGraph.Types[identifier.Name];
-                //         return (_s32Type, LLVMValueRef.CreateConstInt(LLVM.Int32Type(), (uint)typeDef.TypeIndex, false));
-                //     }
-                //     var (type, value) = typeValue;
-                //     if (type.TypeKind == TypeKind.String)
-                //     {
-                //         if (getStringPointer)
-                //         {
-                //             value = _builder.BuildStructGEP(value, 1, "stringdata");
-                //         }
-                //         value = _builder.BuildLoad(value, identifier.Name);
-                //     }
-                //     else if (!type.Constant)
-                //     {
-                //         value = _builder.BuildLoad(value, identifier.Name);
-                //     }
-                //     return (type, value);
-                // }
+                    if (!GetScopeIdentifier(scope, identifier.Name, out var identifierAst))
+                    {
+                        return null;
+                        // var typeDef = _programGraph.Types[identifier.Name];
+                        // return (_s32Type, LLVMValueRef.CreateConstInt(LLVM.Int32Type(), (uint)typeDef.TypeIndex, false));
+                    }
+                    if (identifierAst is DeclarationAst declaration)
+                    {
+                        if (declaration.Constant)
+                        {
+                            return function.Constants[declaration.Name];
+                        }
+
+                        var loadInstruction = new Instruction {Type = InstructionType.Load, AllocationIndex = declaration.AllocationIndex};
+                        var loadValue = new InstructionValue {ValueIndex = block.Instructions.Count};
+                        block.Instructions.Add(loadInstruction);
+                        return loadValue;
+                    }
+                    else if (identifierAst is IType type)
+                    {
+                        return new InstructionValue
+                        {
+                            ValueType = InstructionValueType.Constant, Type = _s32Type,
+                            ConstantValue = new InstructionConstant {Integer = (uint)type.TypeIndex}
+                        };
+                    }
+                    break;
+                    // TODO Implement getStringPointer
+                    // if (type.TypeKind == TypeKind.String)
+                    // {
+                    //     if (getStringPointer)
+                    //     {
+                    //         value = _builder.BuildStructGEP(value, 1, "stringdata");
+                    //     }
+                    //     value = _builder.BuildLoad(value, identifier.Name);
+                    // }
+                    // else if (!type.Constant)
+                    // {
+                    //     value = _builder.BuildLoad(value, identifier.Name);
+                    // }
                 case StructFieldRefAst structField:
                 // {
                 //     if (structField.IsEnum)
@@ -408,18 +431,43 @@ namespace Lang
                     // return expressionValue;
                     break;
                 case TypeDefinition typeDef:
-                    var typeIndex = new InstructionConstant {Integer = (uint)typeDef.TypeIndex};
-                    return new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = typeIndex};
+                    return new InstructionValue
+                    {
+                        ValueType = InstructionValueType.Constant, Type = _s32Type,
+                        ConstantValue = new InstructionConstant {Integer = (uint)typeDef.TypeIndex}
+                    };
                 case CastAst cast:
-                    var value = EmitIR(function, cast.Value);
+                    var castValue = EmitIR(function, cast.Value, scope);
                     var targetType = new InstructionValue {ValueType = InstructionValueType.Type, Type = cast.TargetType};
-                    var instruction = new Instruction {Type = InstructionType.Cast, Value1 = value, Value2 = targetType};
+                    var instruction = new Instruction {Type = InstructionType.Cast, Value1 = castValue, Value2 = targetType};
 
                     var valueIndex = block.Instructions.Count;
                     block.Instructions.Add(instruction);
                     return new InstructionValue {ValueType = InstructionValueType.Value, ValueIndex = valueIndex};
             }
             return null;
+        }
+
+        private bool GetScopeIdentifier(ScopeAst scope, string name, out IAst ast)
+        {
+            do {
+                if (scope.Identifiers.TryGetValue(name, out ast))
+                {
+                    return true;
+                }
+                scope = scope.Parent;
+            } while (scope != null);
+            return false;
+        }
+
+        private string GetFunctionName(FunctionAst function)
+        {
+            return function.Name switch
+            {
+                "main" => "__main",
+                "__start" => "main",
+                _ => function.OverloadIndex > 0 ? $"{function.Name}.{function.OverloadIndex}" : function.Name
+            };
         }
     }
 }
