@@ -564,6 +564,11 @@ namespace Lang.Runner
             if (assignment.Operator != Operator.None)
             {
                 var lhs = ExecuteExpression(assignment.Reference, variables);
+                if (assignment.Reference is IndexAst indexAst && indexAst.CallsOverload && lhs.Type.Name == "*")
+                {
+                    lhs.Type = lhs.Type.Generics[0];
+                    lhs.Value = Marshal.PtrToStructure(GetPointer(lhs.Value), GetTypeFromDefinition(lhs.Type));
+                }
                 expression.Value = RunExpression(lhs, expression, assignment.Operator, lhs.Type);
                 expression.Type = lhs.Type;
             }
@@ -997,7 +1002,6 @@ namespace Lang.Runner
                         }
                         case IndexAst indexAst:
                         {
-                            // TODO Check this
                             TypeDefinition typeDef;
                             object previousValue, newValue;
                             if (indexAst.CallsOverload)
@@ -1037,7 +1041,6 @@ namespace Lang.Runner
                         switch (unary.Value)
                         {
                             case IndexAst index:
-                                // TODO Check this
                                 (typeDef, _, pointer) = GetListPointer(index, variables);
                                 break;
                             case StructFieldRefAst structField when structField.Children[^1] is IndexAst:
