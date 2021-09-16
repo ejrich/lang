@@ -318,43 +318,13 @@ namespace Lang.Translation
         private void VerifyAssignment(AssignmentAst assignment, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             // 1. Verify the variable is already defined
-            var variableName = assignment.Variable switch
-            {
-                VariableAst variable => variable.Name,
-                StructFieldRefAst fieldRef => fieldRef.Name,
-                IndexAst index => index.Variable switch
-                {
-                    VariableAst variable => variable.Name,
-                    StructFieldRefAst fieldRef => fieldRef.Name,
-                    _ => string.Empty
-                },
-                _ => string.Empty
-            };
-            if (!localVariables.TryGetValue(variableName, out var variableTypeDefinition))
-            {
-                errors.Add(CreateError($"Variable '{variableName}' not defined", assignment));
-                return;
-            }
+            var variableTypeDefinition = GetVariable(assignment.Variable, localVariables, errors);
+            if (variableTypeDefinition == null) return;
 
             // 2. Verify the assignment value
             var valueType = VerifyExpression(assignment.Value, localVariables, errors);
 
             // 3. Verify the assignment value matches the variable type definition
-            if (assignment.Variable is StructFieldRefAst structField)
-            {
-                variableTypeDefinition = VerifyStructFieldRef(structField, variableTypeDefinition, errors);
-                if (variableTypeDefinition == null) return;
-            }
-            else if (assignment.Variable is IndexAst index)
-            {
-                if (index.Variable is StructFieldRefAst indexStructField)
-                {
-                    variableTypeDefinition = VerifyStructFieldRef(indexStructField, variableTypeDefinition, errors);
-                    if (variableTypeDefinition == null) return;
-                }
-                variableTypeDefinition = VerifyIndex(index, variableTypeDefinition, localVariables, errors);
-                if (variableTypeDefinition == null) return;
-            }
             if (valueType != null)
             {
                 // 3a. Verify the operator is valid
@@ -420,6 +390,47 @@ namespace Lang.Translation
             }
         }
 
+        private TypeDefinition GetVariable(IAst ast, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        {
+            // 2. Get the variable name
+            var variableName = ast switch
+            {
+                VariableAst variable => variable.Name,
+                StructFieldRefAst fieldRef => fieldRef.Name,
+                IndexAst index => index.Variable switch
+                {
+                    VariableAst variable => variable.Name,
+                    StructFieldRefAst fieldRef => fieldRef.Name,
+                    _ => string.Empty
+                },
+                _ => string.Empty
+            };
+            if (!localVariables.TryGetValue(variableName, out var variableTypeDefinition))
+            {
+                errors.Add(CreateError($"Variable '{variableName}' not defined", ast));
+                return null;
+            }
+
+            // 2. Get the exact type definition
+            if (ast is StructFieldRefAst structField)
+            {
+                variableTypeDefinition = VerifyStructFieldRef(structField, variableTypeDefinition, errors);
+                if (variableTypeDefinition == null) return null;
+            }
+            else if (ast is IndexAst index)
+            {
+                if (index.Variable is StructFieldRefAst indexStructField)
+                {
+                    variableTypeDefinition = VerifyStructFieldRef(indexStructField, variableTypeDefinition, errors);
+                    if (variableTypeDefinition == null) return null;
+                }
+                variableTypeDefinition = VerifyIndex(index, variableTypeDefinition, localVariables, errors);
+                if (variableTypeDefinition == null) return null;
+            }
+
+            return variableTypeDefinition;
+        }
+
         private void VerifyConditional(ConditionalAst conditional, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             // 1. Verify the condition expression
@@ -470,9 +481,35 @@ namespace Lang.Translation
         {
             var eachVariables = new Dictionary<string, TypeDefinition>(localVariables);
             // 1. Verify the iterator or range
+            if (eachVariables.ContainsKey(each.IterationVariable))
+            {
+                errors.Add(CreateError($"Iteration variable '{each.IterationVariable}' already exists in scope", each));
+            };
             if (each.Iteration != null)
             {
-                // TODO Implement iterators
+                var variableTypeDefinition = GetVariable(each.Iteration, localVariables, errors);
+                if (variableTypeDefinition == null) return;
+
+                switch (variableTypeDefinition.Name)
+                {
+                    case "List":
+                        eachVariables.TryAdd(each.IterationVariable, variableTypeDefinition.Generics[0]);
+                        break;
+                    case "...":
+                        if (variableTypeDefinition.Generics.Any())
+                        {
+                            eachVariables.TryAdd(each.IterationVariable, variableTypeDefinition.Generics[0]);
+                        }
+                        else
+                        {
+                            var anyType = new TypeDefinition {Name = "Any"};
+                            eachVariables.TryAdd(each.IterationVariable, anyType);
+                        }
+                        break;
+                    default:
+                        errors.Add(CreateError($"Type {PrintTypeDefinition(variableTypeDefinition)} cannot be used as an iterator", each.Iteration));
+                        break;
+                }
             }
             else
             {
@@ -1070,9 +1107,13 @@ namespace Lang.Translation
                     }
                     return VerifyType(typeDef.Generics[0], errors) == Type.Error ? Type.Error : Type.Pointer;
                 case "...":
-                    if (hasGenerics)
+                    if (typeDef.Generics.Count == 1)
                     {
-                        errors.Add(CreateError("Varargs type cannot have generics", typeDef));
+                        return VerifyType(typeDef.Generics[0], errors) == Type.Error ? Type.Error : Type.Pointer;
+                    }
+                    else if (typeDef.Generics.Count > 1)
+                    {
+                        errors.Add(CreateError($"Varargs type should have 0 or 1 generic type, but got {typeDef.Generics.Count}", typeDef));
                         return Type.Error;
                     }
                     return Type.VarArgs;
