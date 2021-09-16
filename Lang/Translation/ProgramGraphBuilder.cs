@@ -201,17 +201,26 @@ namespace Lang.Translation
 
         private void VerifyFunction(FunctionAst function, bool main, List<TranslationError> errors)
         {
+            // 1. Initialize local variables
             var localVariables = function.Arguments.ToDictionary(arg=> arg.Name, arg => arg.Type);
-
             var returnType = VerifyType(function.ReturnType, errors);
+
+            // 2. Verify main function return type and arguments
             if (main)
             {
                 if (!(returnType == Type.Void || returnType == Type.Int))
                 {
                     errors.Add(CreateError("The main function should return type 'int' or 'void'", function));
                 }
+
+                var argument = function.Arguments.FirstOrDefault();
+                if (!(argument != null && (function.Arguments.Count == 1 && argument.Type.Name == "List" && argument.Type.Generics.FirstOrDefault()?.Name == "string")))
+                {
+                    errors.Add(CreateError("The main function should either have 0 arguments or 'List<string>' argument", function));
+                }
             }
 
+            // 3. For extern functions, simply verify there is no body and return
             if (function.Extern)
             {
                 if (function.Children.Any())
@@ -221,7 +230,7 @@ namespace Lang.Translation
                 return;
             }
 
-            // TODO Verify the function has a return statement for non-void functions
+            // 4. Loop through function body and verify all ASTs
             var returned = false;
             foreach (var ast in function.Children)
             {
@@ -231,6 +240,7 @@ namespace Lang.Translation
                 }
             }
 
+            // 5. Verify the function returns on all paths
             if (!returned && returnType != Type.Void)
             {
                 errors.Add(CreateError($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnType)}' on all paths", function));
