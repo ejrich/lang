@@ -76,7 +76,7 @@ namespace Lang.Parsing
             }
 
             // 2. Parse runtime library files
-            var runtime = Assembly.GetExecutingAssembly().GetManifestResourceStream("Lang.Runtime.runtime.ol");
+            using var runtime = Assembly.GetExecutingAssembly().GetManifestResourceStream("Lang.Runtime.runtime.ol");
             {
                 var syntaxTrees = ParseFileStream(runtime, out var errors);
                 if (errors.Any())
