@@ -632,16 +632,17 @@ namespace Lang.Backend
                     return BuildAllocations(ast.Children);
                 case ConditionalAst conditional:
                     BuildAllocations(conditional.Condition);
-                    var ifReturned = BuildAllocations(conditional.Children);
+                    var ifReturned = BuildAllocations(conditional.IfBlock.Children);
 
-                    if (conditional.Else.Any())
+                    if (conditional.ElseBlock != null)
                     {
-                        var elseReturned = BuildAllocations(conditional.Else);
+                        var elseReturned = BuildAllocations(conditional.ElseBlock.Children);
                         return ifReturned && elseReturned;
                     }
                     break;
-                case WhileAst:
-                    return BuildAllocations(ast.Children);
+                case WhileAst whileAst:
+                    BuildAllocations(whileAst.Condition);
+                    return BuildAllocations(whileAst.Block.Children);
                 case EachAst each:
                     var indexVariable = _builder.BuildAlloca(LLVM.Int32Type(), each.IterationVariable);
                     _allocationQueue.Enqueue(indexVariable);
@@ -770,7 +771,7 @@ namespace Lang.Backend
                     WriteAssignment(assignment, localVariables);
                     break;
                 case ScopeAst scope:
-                    return WriteScope(scope, scope.Children, localVariables, function, block);
+                    return WriteScope(scope, localVariables, function, block);
                 case ConditionalAst conditional:
                     return WriteConditional(conditional, localVariables, function, block);
                 case WhileAst whileAst:
@@ -1001,9 +1002,9 @@ namespace Lang.Backend
             }
         }
 
-        private bool WriteScope(IAst sourceAst, List<IAst> scopeChildren, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function, LLVMMetadataRef block)
+        private bool WriteScope(ScopeAst scope, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function, LLVMMetadataRef block)
         {
-            if (!scopeChildren.Any()) return false;
+            if (!scope.Children.Any()) return false;
 
             // 1. Create scope variables
             var scopeVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>(localVariables);
@@ -1011,11 +1012,10 @@ namespace Lang.Backend
             // 2. Write function lines
             if (_emitDebug)
             {
-                var file = _debugFiles[sourceAst.FileIndex];
-                // TODO Update this to be the line and column of the beginning of the scope more accurately if necessary
-                block = LLVM.DIBuilderCreateLexicalBlock(_debugBuilder, block, file, sourceAst.Line, sourceAst.Column);
+                var file = _debugFiles[scope.FileIndex];
+                block = LLVM.DIBuilderCreateLexicalBlock(_debugBuilder, block, file, scope.Line, scope.Column);
             }
-            foreach (var ast in scopeChildren)
+            foreach (var ast in scope.Children)
             {
                 if (WriteFunctionLine(ast, scopeVariables, function, block))
                 {
@@ -1038,11 +1038,11 @@ namespace Lang.Backend
 
             // 3. Write out if body
             LLVM.PositionBuilderAtEnd(_builder, thenBlock);
-            var ifReturned = WriteScope(conditional, conditional.Children, localVariables, function, block);
+            var ifReturned = WriteScope(conditional.IfBlock, localVariables, function, block);
 
             if (!ifReturned)
             {
-                if (!conditional.Else.Any())
+                if (conditional.ElseBlock == null)
                 {
                     LLVM.BuildBr(_builder, elseBlock);
                     LLVM.PositionBuilderAtEnd(_builder, elseBlock);
@@ -1054,13 +1054,13 @@ namespace Lang.Backend
 
             LLVM.PositionBuilderAtEnd(_builder, elseBlock);
 
-            if (!conditional.Else.Any())
+            if (conditional.ElseBlock == null)
             {
                 return false;
             }
 
             // 4. Write out the else if necessary
-            var elseReturned = WriteScope(conditional, conditional.Else, localVariables, function, block);
+            var elseReturned = WriteScope(conditional.ElseBlock, localVariables, function, block);
 
             // 5. Return if both branches return
             if (ifReturned && elseReturned)
@@ -1097,14 +1097,10 @@ namespace Lang.Backend
 
             // 3. Write out while body
             LLVM.PositionBuilderAtEnd(_builder, whileBody);
-            foreach (var ast in whileAst.Children)
+            if (WriteScope(whileAst.Block, localVariables, function, block))
             {
-                var returned = WriteFunctionLine(ast, localVariables, function, block);
-                if (returned)
-                {
-                    LLVM.DeleteBasicBlock(afterWhile);
-                    return true;
-                }
+                LLVM.DeleteBasicBlock(afterWhile);
+                return true;
             }
 
             // 4. Jump back to the loop
@@ -1229,8 +1225,7 @@ namespace Lang.Backend
             }
             foreach (var ast in each.Children)
             {
-                var returned = WriteFunctionLine(ast, eachVariables, function, block);
-                if (returned)
+                if (WriteFunctionLine(ast, eachVariables, function, block))
                 {
                     LLVM.DeleteBasicBlock(afterEach);
                     return true;

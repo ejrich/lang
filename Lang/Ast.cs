@@ -258,8 +258,9 @@ namespace Lang
         public uint Line { get; init; }
         public uint Column { get; init; }
         public IAst Condition { get; set; }
-        public List<IAst> Children { get; } = new();
-        public List<IAst> Else { get; } = new();
+        public ScopeAst IfBlock { get; set; }
+        public ScopeAst ElseBlock { get; set; }
+        public List<IAst> Children => null;
     }
 
     public class WhileAst : IAst
@@ -268,7 +269,8 @@ namespace Lang
         public uint Line { get; init; }
         public uint Column { get; init; }
         public IAst Condition { get; set; }
-        public List<IAst> Children { get; } = new();
+        public ScopeAst Block { get; set; }
+        public List<IAst> Children => null;
     }
 
     public class EachAst : IAst

@@ -387,7 +387,7 @@ namespace Lang
                     ExecuteAssignment(assignment, variables);
                     break;
                 case ScopeAst scope:
-                    returnValue = ExecuteScope(scope.Children, variables, out returned);
+                    returnValue = ExecuteScope(scope, variables, out returned);
                     break;
                 case ConditionalAst conditional:
                     returnValue = ExecuteConditional(conditional, variables, out returned);
@@ -603,23 +603,23 @@ namespace Lang
             }
         }
 
-        private ValueType ExecuteScope(List<IAst> asts, IDictionary<string, ValueType> variables, out bool returned)
+        private ValueType ExecuteScope(ScopeAst scope, IDictionary<string, ValueType> variables, out bool returned)
         {
             var scopeVariables = new Dictionary<string, ValueType>(variables);
 
-            return ExecuteAsts(asts, scopeVariables, out returned);
+            return ExecuteAsts(scope.Children, scopeVariables, out returned);
         }
 
         private ValueType ExecuteConditional(ConditionalAst conditional, IDictionary<string, ValueType> variables, out bool returned)
         {
             if (ExecuteCondition(conditional.Condition, variables))
             {
-                return ExecuteScope(conditional.Children, variables, out returned);
+                return ExecuteScope(conditional.IfBlock, variables, out returned);
             }
 
-            if (conditional.Else.Any())
+            if (conditional.ElseBlock != null)
             {
-                return ExecuteScope(conditional.Else, variables, out returned);
+                return ExecuteScope(conditional.ElseBlock, variables, out returned);
             }
 
             returned = false;
@@ -630,7 +630,7 @@ namespace Lang
         {
             while (ExecuteCondition(whileAst.Condition, variables))
             {
-                var value = ExecuteScope(whileAst.Children, variables, out returned);
+                var value = ExecuteScope(whileAst.Block, variables, out returned);
 
                 if (returned)
                 {

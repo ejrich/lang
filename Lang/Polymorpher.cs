@@ -175,8 +175,11 @@ namespace Lang
         {
             var copy = CopyAst(conditional);
             copy.Condition = CopyExpression(conditional.Condition, genericTypes, generics);
-            CopyAsts(copy.Children, conditional.Children, genericTypes, generics);
-            CopyAsts(copy.Else, conditional.Else, genericTypes, generics);
+            copy.IfBlock = CopyScope(conditional.IfBlock, genericTypes, generics);
+            if (conditional.ElseBlock != null)
+            {
+                copy.ElseBlock = CopyScope(conditional.ElseBlock, genericTypes, generics);
+            }
             return copy;
         }
 
@@ -184,7 +187,7 @@ namespace Lang
         {
             var copy = CopyAst(whileAst);
             copy.Condition = CopyExpression(whileAst.Condition, genericTypes, generics);
-            CopyAsts(copy.Children, whileAst.Children, genericTypes, generics);
+            copy.Block = CopyScope(whileAst.Block, genericTypes, generics);
             return copy;
         }
 
