@@ -1695,11 +1695,11 @@ namespace Lang.Parsing
             switch (token.Value)
             {
                 case "run":
-                    directive.Directive = Directive.Run;
+                    directive.Type = DirectiveType.Run;
                     enumerator.MoveNext();
                     break;
                 case "if":
-                    directive.Directive = Directive.If;
+                    directive.Type = DirectiveType.If;
                     break;
                 default:
                     errors.Add(new ParseError {Error = $"Unsupported top-level compiler directive '{token.Value}'", Token = token});
@@ -1727,7 +1727,7 @@ namespace Lang.Parsing
             switch (token.Value)
             {
                 case "if":
-                    directive.Directive = Directive.If;
+                    directive.Type = DirectiveType.If;
                     break;
                 default:
                     errors.Add(new ParseError {Error = $"Unsupported compiler directive '{token.Value}'", Token = token});

@@ -245,7 +245,7 @@ namespace Lang.Parsing
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
-        public Directive Directive { get; set; }
+        public DirectiveType Type { get; set; }
         public IAst Value { get; set; }
         public List<IAst> Children => null;
     }
@@ -315,7 +315,7 @@ namespace Lang.Parsing
         Reference = '&'
     }
 
-    public enum Directive
+    public enum DirectiveType
     {
         None,
         Run,

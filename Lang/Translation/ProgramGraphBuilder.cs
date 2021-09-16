@@ -106,7 +106,7 @@ namespace Lang.Translation
                             }
                             mainDefined = true;
                         }
-                        graph.Functions.Add(function);
+                        graph.Functions.Add(function.Name, function);
                         break;
                     case CompilerDirectiveAst compilerDirective:
                         VerifyTopLevelDirective(compilerDirective, globalVariables, errors);
@@ -839,12 +839,12 @@ namespace Lang.Translation
 
         private void VerifyTopLevelDirective(CompilerDirectiveAst directive, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
-            switch (directive.Directive)
+            switch (directive.Type)
             {
-                case Directive.Run:
+                case DirectiveType.Run:
                     VerifyAst(directive.Value, localVariables, errors);
                     break;
-                case Directive.If:
+                case DirectiveType.If:
                     var conditional = directive.Value as ConditionalAst;
                     VerifyAst(conditional!.Condition, localVariables, errors);
                     break;
