@@ -24,10 +24,11 @@ DIR* opendir(string dirname) #extern "libc"
 int closedir(DIR* dir) #extern "libc"
 dirent* readdir(DIR* dir) #extern "libc"
 
-sprintf(u8* buffer, string format, ... args) #extern "libc"
+u8* malloc(int size) #extern "libc"
+free(u8* data) #extern "libc"
 
 struct FILE {}
 
 FILE* popen(string command, string type) #extern "libc"
 int pclose(FILE* stream) #extern "libc"
-u8* fgets(string buffer, int n, FILE* stream) #extern "libc"
+u8* fgets(u8* buffer, int n, FILE* stream) #extern "libc"

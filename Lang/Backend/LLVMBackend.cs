@@ -1239,7 +1239,7 @@ namespace Lang.Backend
                         // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
                         for (var i = functionDef.Arguments.Count - 1; i < call.Arguments.Count; i++)
                         {
-                            var (type, value) = WriteExpression(call.Arguments[i], localVariables);
+                            var (type, value) = WriteExpression(call.Arguments[i], localVariables, true);
                             if (type.Name == "float")
                             {
                                 value = LLVM.BuildFPExt(_builder, value, LLVMTypeRef.DoubleType(), "tmpdouble");

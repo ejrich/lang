@@ -1363,6 +1363,10 @@ namespace Lang
                 }
                 case UnaryAst unary when unary.Operator == UnaryOperator.Dereference:
                     var reference = GetReference(unary.Value, currentFunction, scopeIdentifiers, out var canDereference);
+                    if (reference == null)
+                    {
+                        return null;
+                    }
                     if (!canDereference)
                     {
                         AddError("Cannot dereference pointer to assign value", unary.Value);
