@@ -121,7 +121,7 @@ namespace Lang
 
     public enum InstructionValueType
     {
-        Value, // TODO IDK?
+        Value,
         Argument,
         Constant,
         Null,
