@@ -1465,6 +1465,22 @@ namespace Lang.Translation
                                         call.Arguments[i] = typeIndex;
                                         arguments[i] = typeIndex.Type;
                                     }
+                                    else if (function.Extern && functionArg.Type.Name == "string")
+                                    {
+                                        if (argument.Name == "string") {} // Valid case
+                                        else if (argument.Name == "*")
+                                        {
+                                            var pointerType = argument.Generics.FirstOrDefault();
+                                            if (pointerType?.Name != "u8" || pointerType.Generics.Any())
+                                            {
+                                                callError = true;
+                                            }
+                                        }
+                                        else
+                                        {
+                                            callError = true;
+                                        }
+                                    }
                                     else if (!TypeEquals(functionArg.Type, argument))
                                     {
                                         callError = true;
