@@ -1506,7 +1506,6 @@ namespace Lang.Translation
                         errors.Add(CreateError($"Params type should have 1 generic type, but got {typeDef.Generics.Count}", typeDef));
                         return Type.Error;
                     }
-                    typeDef.Name = "List";
                     return VerifyList(typeDef, errors) ? Type.Params : Type.Error; 
                 }
                 default:
@@ -1554,7 +1553,7 @@ namespace Lang.Translation
                 return false;
             }
 
-            var genericName = typeDef.GenericName;
+            var genericName = $"List.{listType.GenericName}";
             if (_types.ContainsKey(genericName))
             {
                 return true;

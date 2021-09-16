@@ -58,8 +58,8 @@ namespace Lang.Backend.LLVM
             // 6. Write Main function
             var main = programGraph.Main;
             _currentFunction = main;
-            _functions.Add("Main", main);
-            var mainFunction = WriteFunctionDefinition("Main", main.Arguments, main.ReturnType);
+            _functions.Add("main", main);
+            var mainFunction = WriteFunctionDefinition("main", main.Arguments, main.ReturnType);
             WriteFunction(main, globals, mainFunction);
 
             // 7. Write __start function
