@@ -15,9 +15,14 @@ namespace Lang.Backend.LLVM
 
         private LLVMModuleRef _module;
         private LLVMBuilderRef _builder;
+        private FunctionAst _currentFunction;
+        private LLVMValueRef _stackPointer;
+        private bool _stackPointerExists;
+        private bool _stackSaved;
+
         private readonly Dictionary<string, FunctionAst> _functions = new();
         private readonly Dictionary<string, StructAst> _structs = new();
-        private FunctionAst _currentFunction;
+        private readonly Queue<LLVMValueRef> _allocationQueue = new();
 
         public string WriteFile(ProgramGraph programGraph, string projectName, string projectPath)
         {
@@ -42,15 +47,20 @@ namespace Lang.Backend.LLVM
             }
 
             // 5. Write Function bodies
-            foreach (var function in programGraph.Functions.Where(func => !func.Extern))
+            foreach (var functionAst in programGraph.Functions.Where(func => !func.Extern))
             {
-                _currentFunction = function;
-                WriteFunction(function);
+                _currentFunction = functionAst;
+                var function = LLVMApi.GetNamedFunction(_module, functionAst.Name);
+                WriteFunction(functionAst, function);
             }
 
             // 6. Write Main function
-            _currentFunction = programGraph.Main;
-            WriteMainFunction(programGraph.Main);
+            {
+                var main = programGraph.Main;
+                _currentFunction = main;
+                var function = WriteFunctionDefinition("main", main.Arguments, main.ReturnType);
+                WriteFunction(main, function);
+            }
 
             // 7. Compile to object file
             Compile(objectFile);
@@ -108,76 +118,64 @@ namespace Lang.Backend.LLVM
             return function;
         }
 
-        private void WriteFunction(FunctionAst functionAst)
+        private void WriteFunction(FunctionAst functionAst, LLVMValueRef function)
         {
             // 1. Get function definition
-            var function = LLVMApi.GetNamedFunction(_module, functionAst.Name);
             LLVMApi.PositionBuilderAtEnd(_builder, function.AppendBasicBlock("entry"));
             var localVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>();
 
             // 2. Allocate arguments on the stack
-            for (var i = 0; i < functionAst.Arguments.Count; i++)
+            var argumentCount = functionAst.Varargs ? functionAst.Arguments.Count - 1 : functionAst.Arguments.Count;
+            for (var i = 0; i < argumentCount; i++)
             {
                 var arg = functionAst.Arguments[i];
-                if (arg.Type.Name != "...")
+                var allocation = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(arg.Type), arg.Name);
+                localVariables.Add(arg.Name, (arg.Type, allocation));
+            }
+
+            // 3. Build allocations at the beginning of the function
+            foreach (var ast in functionAst.Children)
+            {
+                if (BuildAllocations(ast))
                 {
-                    var argument = LLVMApi.GetParam(function, (uint) i);
-                    var allocation = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(arg.Type), arg.Name);
-                    LLVMApi.BuildStore(_builder, argument, allocation);
-                    localVariables.Add(arg.Name, (arg.Type, allocation));
+                    break;
                 }
             }
 
-            // 3. Loop through function body
+            // 4. Store initial argument values
+            for (var i = 0; i < argumentCount; i++)
+            {
+                var arg = functionAst.Arguments[i];
+                var argument = LLVMApi.GetParam(function, (uint) i);
+                var variable = localVariables[arg.Name].value;
+                LLVMApi.BuildStore(_builder, argument, variable);
+            }
+
+            // 5. Loop through function body
             var returned = false;
             foreach (var ast in functionAst.Children)
             {
-                // 3a. Recursively write out lines
+                // 5a. Recursively write out lines
                 if (WriteFunctionLine(ast, localVariables, function))
                 {
                     returned = true;
                     break;
                 }
             }
- 
-            // 4. Write returns for void functions
+            
+            // 6. Write returns for void functions
             if (!returned && functionAst.ReturnType.Name == "void")
             {
+                BuildStackRestore();
                 LLVMApi.BuildRetVoid(_builder);
             }
+            _stackPointerExists = false; 
+            _stackSaved = false;
 
-            // 5. Verify the function
+            // 7. Verify the function
             #if DEBUG
             function.VerifyFunction(LLVMVerifierFailureAction.LLVMPrintMessageAction);
             #endif
-        }
-
-        private void WriteMainFunction(FunctionAst main)
-        {
-            // 1. Define main function
-            var function = WriteFunctionDefinition("main", main.Arguments, main.ReturnType);
-            LLVMApi.PositionBuilderAtEnd(_builder, LLVMApi.AppendBasicBlock(function, "entry"));
-            var localVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>();
-
-            // 2. Allocate arguments on the stack
-            for (var i = 0; i < main.Arguments.Count; i++)
-            {
-                var argument = function.GetParam((uint) i);
-                var arg = main.Arguments[i];
-                var allocation = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(arg.Type), arg.Name);
-                LLVMApi.BuildStore(_builder, argument, allocation);
-                localVariables.Add(arg.Name, (arg.Type, allocation));
-            }
-
-            // 2. Loop through function body
-            foreach (var ast in main.Children)
-            {
-                // 2a. Recursively write out lines
-                WriteFunctionLine(ast, localVariables, function);
-            }
-
-            // 3. Verify the function
-            function.VerifyFunction(LLVMVerifierFailureAction.LLVMPrintMessageAction);
         }
 
         private void Compile(string objectFile)
@@ -207,6 +205,98 @@ namespace Lang.Backend.LLVM
 
             var file = Marshal.StringToCoTaskMemAnsi(objectFile);
             LLVMApi.TargetMachineEmitToFile(targetMachine, _module, file, LLVMCodeGenFileType.LLVMObjectFile, out _);
+        }
+
+        private bool BuildAllocations(IAst ast)
+        {
+            switch (ast)
+            {
+                case ReturnAst:
+                    return true;
+                case DeclarationAst declaration:
+                    var type = ConvertTypeDefinition(declaration.Type);
+                    if (declaration.Type.Name == "List" || (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind && StructHasList(declaration.Type.Name)))
+                    {
+                        BuildStackPointer();
+                    }
+
+                    var variable = LLVMApi.BuildAlloca(_builder, type, declaration.Name);
+                    _allocationQueue.Enqueue(variable);
+                    break;
+                case ScopeAst scope:
+                    foreach (var childAst in scope.Children)
+                    {
+                        if (BuildAllocations(childAst))
+                        {
+                            return true;
+                        }
+                    }
+                    break;
+                case ConditionalAst conditional:
+                    var ifReturned = false;
+                    foreach (var childAst in conditional.Children)
+                    {
+                        if (BuildAllocations(childAst))
+                        {
+                            ifReturned = true;
+                            break;
+                        }
+                    }
+
+                    if (conditional.Else != null)
+                    {
+                        var elseReturned = BuildAllocations(conditional.Else);
+                        return ifReturned && elseReturned;
+                    }
+                    break;
+                case WhileAst whileAst:
+                    foreach (var childAst in whileAst.Children)
+                    {
+                        if (BuildAllocations(childAst))
+                        {
+                            return true;
+                        }
+                    }
+                    break;
+                case EachAst each:
+                    var iterationVariable = LLVMApi.BuildAlloca(_builder, LLVMTypeRef.Int32Type(), each.IterationVariable);
+                    _allocationQueue.Enqueue(iterationVariable);
+                    if (each.Iteration != null)
+                    {
+                        BuildStackPointer();
+                    }
+
+                    foreach (var childAst in each.Children)
+                    {
+                        if (BuildAllocations(childAst))
+                        {
+                            return true;
+                        }
+                    }
+                    break;
+            }
+            return false;
+        }
+
+        private bool StructHasList(string name)
+        {
+            var structDef = _structs[name];
+            foreach (var field in structDef.Fields)
+            {
+                if (field.Type.Name == "List")
+                {
+                    return true;
+                }
+
+                if (ConvertTypeDefinition(field.Type).TypeKind != LLVMTypeKind.LLVMStructTypeKind) continue;
+
+                if (StructHasList(field.Type.Name))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private bool WriteFunctionLine(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)
@@ -249,8 +339,11 @@ namespace Lang.Backend.LLVM
             // 2. Get the return value
             var returnExpression = WriteExpression(returnAst.Value, localVariables);
 
-            // 2. Write expression as return value
+            // 3. Write expression as return value
             var returnValue = CastValue(returnExpression, _currentFunction.ReturnType);
+
+            // 4. Restore the stack pointer if necessary and return
+            BuildStackRestore();
             LLVMApi.BuildRet(_builder, returnValue);
         }
 
@@ -258,7 +351,7 @@ namespace Lang.Backend.LLVM
         {
             // 1. Declare variable on the stack
             var type = ConvertTypeDefinition(declaration.Type);
-            var variable = LLVMApi.BuildAlloca(_builder, type, declaration.Name);
+            var variable = _allocationQueue.Dequeue();
             localVariables.Add(declaration.Name, (declaration.Type, variable));
 
             // 2. Set value if it exists
@@ -272,6 +365,7 @@ namespace Lang.Backend.LLVM
             // 3. Initialize lists
             else if (declaration.Type.Name == "List")
             {
+                BuildStackSave();
                 if (declaration.Type.Count is ConstantAst constant)
                 {
                     InitializeConstList(variable, int.Parse(constant.Value));
@@ -316,6 +410,7 @@ namespace Lang.Backend.LLVM
 
                 if (structField.Type.Name == "List")
                 {
+                    BuildStackSave();
                     var count = (ConstantAst)structField.Type.Count;
                     InitializeConstList(field, int.Parse(count.Value));
                 }
@@ -518,13 +613,14 @@ namespace Lang.Backend.LLVM
                     _ => (null, new LLVMValueRef())
                 };
 
-                iterationVariable = LLVMApi.BuildAlloca(_builder, LLVMTypeRef.Int32Type(), "iterator");
+                iterationVariable = _allocationQueue.Dequeue();
                 LLVMApi.BuildStore(_builder, GetConstZero(LLVMTypeRef.Int32Type()), iterationVariable);
 
                 switch (type.Name)
                 {
                     case "List":
                     case "Params": // TODO Add 'Any' type case
+                        BuildStackSave();
                         var iterType = type.Generics[0];
                         variable = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(iterType), each.IterationVariable);
 
@@ -544,7 +640,7 @@ namespace Lang.Backend.LLVM
             }
             else
             {
-                variable = LLVMApi.BuildAlloca(_builder, LLVMTypeRef.Int32Type(), each.IterationVariable);
+                variable = _allocationQueue.Dequeue();
                 var (type, value) = WriteExpression(each.RangeBegin, localVariables);
                 LLVMApi.BuildStore(_builder, value, variable);
                 eachVariables.Add(each.IterationVariable, (type, variable));
@@ -685,6 +781,8 @@ namespace Lang.Backend.LLVM
 
                         // Rollup the rest of the arguments into a list
                         var paramsType = ConvertTypeDefinition(functionDef.Arguments[^1].Type);
+                        BuildStackPointer();
+                        BuildStackSave();
                         var paramsPointer = LLVMApi.BuildAlloca(_builder, paramsType, "paramsptr");
                         InitializeConstList(paramsPointer, call.Arguments.Count - functionDef.Arguments.Count + 1);
 
@@ -798,6 +896,51 @@ namespace Lang.Backend.LLVM
                     Environment.Exit(ErrorCodes.BuildError);
                     return (null, new LLVMValueRef()); // Return never happens
             }
+        }
+
+        private readonly TypeDefinition _stackPointerType = new()
+        {
+            Name = "*", Generics = {new TypeDefinition {Name = "u8", PrimitiveType = new IntegerType {Bytes = 1}}}
+        };
+
+        private void BuildStackPointer()
+        {
+            if (_stackPointerExists) return;
+
+            _stackPointer = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(_stackPointerType), "stackPtr");
+            _stackPointerExists = true;
+        }
+
+        private void BuildStackSave()
+        {
+            if (_stackSaved) return;
+
+            var function = LLVMApi.GetNamedFunction(_module, "llvm.stacksave");
+            if (function.Pointer == IntPtr.Zero)
+            {
+                function = WriteFunctionDefinition("llvm.stacksave", new List<Argument>(), _stackPointerType);
+            }
+
+            var stackPointer = LLVMApi.BuildCall(_builder, function, Array.Empty<LLVMValueRef>(), "stackPointer");
+            LLVMApi.BuildStore(_builder, stackPointer, _stackPointer);
+            _stackSaved = true;
+        }
+
+        private void BuildStackRestore()
+        {
+            if (!_stackSaved) return;
+
+            var function = LLVMApi.GetNamedFunction(_module, "llvm.stackrestore");
+            if (function.Pointer == IntPtr.Zero)
+            {
+                function = WriteFunctionDefinition("llvm.stackrestore", new List<Argument> { new()
+                {
+                    Name = "ptr", Type = _stackPointerType
+                }}, new TypeDefinition {Name = "void"});
+            }
+
+            var stackPointer = LLVMApi.BuildLoad(_builder, _stackPointer, "stackPointer");
+            LLVMApi.BuildCall(_builder, function, new []{stackPointer}, "");
         }
 
         private LLVMValueRef BuildConstant(LLVMTypeRef type, ConstantAst constant)
