@@ -16,6 +16,7 @@ namespace Lang.Parsing
         string Name { get; set; }
         int TypeIndex { get; set; }
         TypeKind TypeKind { get; set; }
+        uint Size { get; set; }
     }
 
     public class ScopeAst : IAst
@@ -53,6 +54,7 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public string Name { get; set; }
         public int TypeIndex { get; set; }
+        public uint Size { get; set; }
         public TypeKind TypeKind { get; set; }
         public List<string> Generics { get; } = new();
         public List<StructFieldAst> Fields { get; } = new();
@@ -90,6 +92,7 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public string Name { get; set; }
         public int TypeIndex { get; set; }
+        public uint Size { get; set; } = 4;
         public TypeKind TypeKind { get; set; } = TypeKind.Enum;
         public List<EnumValueAst> Values { get; } = new();
         public List<IAst> Children => null;
@@ -122,6 +125,7 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public string Name { get; set; }
         public int TypeIndex { get; set; }
+        public uint Size { get; set; }
         public TypeKind TypeKind { get; set; }
         public IPrimitive Primitive { get; set; }
         public List<IAst> Children => null;
