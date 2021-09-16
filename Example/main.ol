@@ -294,7 +294,7 @@ u32 sleep(u32 seconds) #extern "libc"
 #run {
     args: List<string>[1];
     args[0] = "Hello world";
-    // main(args);
+    main(args);
 
     build();
 }
