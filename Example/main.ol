@@ -33,6 +33,7 @@ int main(Array<string> args) { //#print_ir {
 
     printf("Initial array values %d, %p\n", global_array.length, global_array.data);
     printf("Initial PolyStruct values %d, %.2f\n", global_poly_struct.field1, global_poly_struct.field2);
+    printf("Initial MyStruct values %d, %.2f, {%d, %d}\n", global_struct.field, global_struct.something, global_struct.subValue.something, global_struct.subValue.foo);
     set_global(8);
     printf("'global_a' = %d\n", global_a);
     printf("'global_b' = %d\n", global_b);

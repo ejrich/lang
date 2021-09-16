@@ -3632,8 +3632,13 @@ namespace Lang
                         }
                         else
                         {
-                            var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeKind = TypeKind.Pointer, Size = 8, PointerTypeDefinition = type, PointerType = TypeTable.GetType(type)};
-                            TypeTable.Add(typeDef.GenericName, pointer);
+                            // There are some cases where the pointed to type is a struct that contains a field for the pointer type
+                            // To account for this, the type table needs to be checked for again for the type
+                            if (!TypeTable.Types.ContainsKey(typeDef.GenericName))
+                            {
+                                var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeKind = TypeKind.Pointer, Size = 8, PointerTypeDefinition = type, PointerType = TypeTable.GetType(type)};
+                                TypeTable.Add(typeDef.GenericName, pointer);
+                            }
                             typeDef.TypeKind = TypeKind.Pointer;
                         }
                     }
