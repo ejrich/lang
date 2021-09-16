@@ -13,7 +13,16 @@ namespace Lang.Parsing
 
     public class Lexer : ILexer
     {
-        private readonly Regex _escapableCharacters = new(@"['""\\abfnrtv]");
+        private static readonly Regex EscapableCharacters = new(@"['""\\abfnrtv]");
+        private static readonly IDictionary<string, TokenType> ReservedTokens = new Dictionary<string, TokenType>
+        {
+            { "return", TokenType.Return },
+            { "true", TokenType.Boolean },
+            { "false", TokenType.Boolean },
+            { "var", TokenType.Var },
+            { "if", TokenType.If },
+            { "else", TokenType.Else }
+        };
 
         public List<Token> LoadFileTokens(string filePath, out List<ParseError> errors)
         {
@@ -23,7 +32,7 @@ namespace Lang.Parsing
             return GetTokens(fileContents, filePath, errors).ToList();
         }
 
-        private IEnumerable<Token> GetTokens(string fileContents, string filePath, List<ParseError> errors)
+        private static IEnumerable<Token> GetTokens(string fileContents, string filePath, List<ParseError> errors)
         {
             var lexerStatus = new LexerStatus();
 
@@ -79,7 +88,7 @@ namespace Lang.Parsing
                     }
                     else if (literalEscapeToken)
                     {
-                        if (!_escapableCharacters.IsMatch(character.ToString()))
+                        if (!EscapableCharacters.IsMatch(character.ToString()))
                         {
                             currentToken.Error = true;
                         }
@@ -113,7 +122,11 @@ namespace Lang.Parsing
                 if (char.IsWhiteSpace(character))
                 {
                     if (currentToken != null)
+                    {
+                        CheckForReservedTokensAndErrors(currentToken, errors);
+
                         yield return currentToken;
+                    }
                     currentToken = null;
                     continue;
                 }
@@ -129,18 +142,7 @@ namespace Lang.Parsing
                 {
                     if (currentToken != null)
                     {
-                        if (currentToken.Type == TokenType.Token &&
-                            (currentToken.Value == "true" || currentToken.Value == "false"))
-                            currentToken.Type = TokenType.Boolean;
-
-                        if (currentToken.Error)
-                        {
-                            errors.Add(new ParseError
-                            {
-                                Error = $"Unexpected token '{currentToken.Value + character}'",
-                                Token = currentToken
-                            });
-                        }
+                        CheckForReservedTokensAndErrors(currentToken, errors, character);
 
                         yield return currentToken;
                     }
@@ -157,7 +159,27 @@ namespace Lang.Parsing
 
             if (currentToken != null) yield return currentToken;
         }
-        
+
+        private static void CheckForReservedTokensAndErrors(Token token, List<ParseError> errors, char character = default)
+        {
+            // Check tokens for reserved keywords
+            if (token.Type == TokenType.Token)
+            {
+                if (ReservedTokens.TryGetValue(token.Value, out var type))
+                {
+                    token.Type = type;
+                }
+            }
+
+            if (token.Error)
+            {
+                errors.Add(new ParseError
+                {
+                    Error = $"Unexpected token '{token.Value + character}'",
+                    Token = token
+                });
+            }
+        }
 
         private static TokenType GetTokenType(char character)
         {
