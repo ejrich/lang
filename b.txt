@@ -12,7 +12,7 @@ Sum of Params = 912
 Initial array values 4, 0x56496ac8e35a
 Initial PolyStruct values 0, 0.00
 Initial MyStruct values 0, 0.00, {-1073741824, 5} - TODO Fix
-'global_a' = 1791539301 - TODO Fix
+'global_a' = 7
 'global_b' = 456
 87, 3.141590
 State is 6

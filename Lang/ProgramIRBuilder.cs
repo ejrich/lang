@@ -444,6 +444,7 @@ namespace Lang
                 Array = true, ArrayLength = length, Type = elementType
             };
             Program.GlobalVariables.Add(arrayVariable);
+            Program.GlobalVariablesSize += arrayVariable.Size;
 
             if (declaration.ArrayValues != null)
             {
