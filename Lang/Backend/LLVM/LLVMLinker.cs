@@ -32,11 +32,16 @@ namespace Lang.Backend.LLVM
                 {
                     FileName = "ld",
                     Arguments = $"{linker} -o {executableFile} {objectFile} {defaultObjects} " +
-                                $"{dependencyList} -L{gccDirectory} --start-group -lgcc -lgcc_eh -lc --end-group"
+                                $"-L{gccDirectory} --start-group {dependencyList} -lgcc -lgcc_eh -lc --end-group"
                 }
             };
             buildProcess.Start();
             buildProcess.WaitForExit();
+            if (buildProcess.ExitCode != 0)
+            {
+                Console.WriteLine("Unable to link executable, please see output");
+                Environment.Exit(ErrorCodes.LinkError);
+            }
         }
 
         private static DirectoryInfo DetermineLibDirectory()
