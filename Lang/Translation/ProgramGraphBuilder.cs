@@ -947,7 +947,7 @@ namespace Lang.Translation
                 {
                     AddError($"Expected range to end with 'int', but got '{PrintTypeDefinition(endType)}'", each.RangeEnd);
                 }
-                var iterType = new TypeDefinition {Name = "int", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
+                var iterType = new TypeDefinition {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
                 if (!eachVariables.TryAdd(each.IterationVariable, iterType))
                 {
                     AddError($"Iteration variable '{each.IterationVariable}' already exists in scope", each);
@@ -1466,7 +1466,7 @@ namespace Lang.Translation
                             else if (!(type == Type.Boolean || type == Type.Int))
                             {
                                 // If the type can't be determined, default to int
-                                expression.Type = new TypeDefinition {Name = "int"};
+                                expression.Type = new TypeDefinition {Name = "s32"};
                             }
                         }
                         break;
