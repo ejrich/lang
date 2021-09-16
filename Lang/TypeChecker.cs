@@ -354,27 +354,25 @@ namespace Lang
                     ErrorReporter.Report($"Struct '{structAst.Name}' already contains field '{structField.Name}'", structField);
                 }
 
-                IType fieldType = null;
-
                 if (structField.TypeDefinition != null)
                 {
-                    fieldType = VerifyType(structField.TypeDefinition, _globalScope, out var isGeneric, out var isVarargs, out var isParams);
+                    structField.Type = VerifyType(structField.TypeDefinition, _globalScope, out var isGeneric, out var isVarargs, out var isParams);
 
                     if (isVarargs || isParams)
                     {
                         ErrorReporter.Report($"Struct field '{structAst.Name}.{structField.Name}' cannot be varargs or Params", structField.TypeDefinition);
                     }
-                    else if (fieldType == null)
+                    else if (structField.Type == null)
                     {
                         ErrorReporter.Report($"Undefined type '{PrintTypeDefinition(structField.TypeDefinition)}' in struct field '{structAst.Name}.{structField.Name}'", structField.TypeDefinition);
                     }
-                    else if (fieldType.TypeKind == TypeKind.Void)
+                    else if (structField.Type.TypeKind == TypeKind.Void)
                     {
                         ErrorReporter.Report($"Struct field '{structAst.Name}.{structField.Name}' cannot be assigned type 'void'", structField.TypeDefinition);
                     }
                     else
                     {
-                        if (fieldType.TypeKind == TypeKind.Array || fieldType.TypeKind == TypeKind.CArray)
+                        if (structField.Type.TypeKind == TypeKind.Array || structField.Type.TypeKind == TypeKind.CArray)
                         {
                             var elementType = structField.TypeDefinition.Generics[0];
                             structField.ArrayElementType = TypeTable.GetType(elementType);
@@ -385,7 +383,7 @@ namespace Lang
                     {
                         if (structField.Value is NullAst nullAst)
                         {
-                            if (fieldType != null && fieldType.TypeKind != TypeKind.Pointer)
+                            if (structField.Type != null && structField.Type.TypeKind != TypeKind.Pointer)
                             {
                                 ErrorReporter.Report("Cannot assign null to non-pointer type", structField.Value);
                             }
@@ -417,14 +415,14 @@ namespace Lang
                     }
                     else if (structField.Assignments != null)
                     {
-                        if (fieldType != null && fieldType.TypeKind != TypeKind.Struct && fieldType.TypeKind != TypeKind.String)
+                        if (structField.Type != null && structField.Type.TypeKind != TypeKind.Struct && structField.Type.TypeKind != TypeKind.String)
                         {
                             ErrorReporter.Report($"Can only use object initializer with struct type, got '{PrintTypeDefinition(structField.TypeDefinition)}'", structField.TypeDefinition);
                         }
                         // Catch circular references
-                        else if (fieldType != null && fieldType != structAst)
+                        else if (structField.Type != null && structField.Type != structAst)
                         {
-                            var structDef = fieldType as StructAst;
+                            var structDef = structField.Type as StructAst;
                             if (structDef != null && !structDef.Verified)
                             {
                                 VerifyStruct(structDef);
@@ -463,7 +461,7 @@ namespace Lang
                     }
                     else if (structField.ArrayValues != null)
                     {
-                        if (fieldType != null && fieldType.TypeKind != TypeKind.Array && fieldType.TypeKind != TypeKind.CArray)
+                        if (structField.Type != null && structField.Type.TypeKind != TypeKind.Array && structField.Type.TypeKind != TypeKind.CArray)
                         {
                             ErrorReporter.Report($"Cannot use array initializer to declare non-array type '{PrintTypeDefinition(structField.TypeDefinition)}'", structField.TypeDefinition);
                         }
@@ -529,7 +527,7 @@ namespace Lang
                             {
                                 ErrorReporter.Report($"Struct field '{structAst.Name}.{structField.Name}' cannot be assigned type 'void'", structField.Value);
                             }
-                            structField.Type = fieldType = valueType;
+                            structField.Type = valueType;
                             // TypeTable.Types.TryGetValue(valueType?.GenericName, out fieldType);
                         }
                     }
@@ -544,25 +542,25 @@ namespace Lang
                 }
 
                 // Check for circular dependencies
-                if (structAst == fieldType)
+                if (structAst == structField.Type)
                 {
                     ErrorReporter.Report($"Struct '{structAst.Name}' contains circular reference in field '{structField.Name}'", structField);
                 }
 
                 // Set the size and offset
-                if (fieldType != null)
+                if (structField.Type != null)
                 {
-                    if (fieldType is StructAst fieldStruct)
+                    if (structField.Type is StructAst fieldStruct)
                     {
                         if (!fieldStruct.Verified && fieldStruct != structAst)
                         {
                             VerifyStruct(fieldStruct);
                         }
                     }
-                    structField.Type = fieldType;
+                    structField.Type = structField.Type;
                     structField.Offset = structAst.Size;
-                    structField.Size = fieldType.Size;
-                    structAst.Size += fieldType.Size;
+                    structField.Size = structField.Type.Size;
+                    structAst.Size += structField.Type.Size;
                 }
             }
 
