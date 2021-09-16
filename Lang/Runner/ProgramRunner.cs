@@ -17,15 +17,16 @@ namespace Lang.Runner
             // CreateMethod(typeBuilder, "SDL_Init", "SDL2", typeof(int), typeof(int));
             // CreateMethod(typeBuilder, "SDL_CreateWindow", "SDL2", null, typeof(string), typeof(int), typeof(int), typeof(int), typeof(int), typeof(uint));
             // CreateMethod(typeBuilder, "cosf", "libm", typeof(float), typeof(float));
-            CreateMethod(typeBuilder, "puts", "libc", null, typeof(string));
+            CreateMethod(typeBuilder, "printf", "libc", null, typeof(string), typeof(int));
+            CreateMethod(typeBuilder, "printf", "libc", null, typeof(string), typeof(float));
 
             var type = typeBuilder.CreateType();
 
             var classObject = type!.GetConstructor(Type.EmptyTypes)!.Invoke(new object[]{});
             // var cos = type.GetMethod("cosf");
-            var puts = type.GetMethod("puts");
+            var printf = type.GetMethod("printf", new []{typeof(string), typeof(int)});
 
-            puts!.Invoke(classObject, new[] {"Hello world"});
+            printf!.Invoke(classObject, new object[] {"Hello world %d\n", 4});
             // var cosine = cos!.Invoke(classObject, new object[]{3.2f});
         }
 

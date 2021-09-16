@@ -1666,7 +1666,7 @@ namespace Lang.Translation
                         errors.Add(CreateError($"Params type should have 1 generic type, but got {typeDef.Generics.Count}", typeDef));
                         return Type.Error;
                     }
-                    return VerifyList(typeDef, errors) ? Type.Params : Type.Error;
+                    return VerifyList(typeDef, errors) ? Type.Params : Type.Error; 
                 }
                 default:
                     if (typeDef.Generics.Any())
@@ -1714,7 +1714,7 @@ namespace Lang.Translation
             }
 
             var genericName = $"List.{listType.GenericName}";
-            if (_programGraph.Types.ContainsKey(genericName))
+            if (_types.ContainsKey(genericName))
             {
                 return true;
             }

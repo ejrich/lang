@@ -27,8 +27,7 @@ int __start(int argc, string* argv) {
 
     /* @Future Add compile time execution to write the correct return
     #if function(main).return == Type.Void {
-        #if function(main).arguments.length == 0 then main();
-        else then main(args);
+        main(args);
         return 0;
     }
     else {
