@@ -1,7 +1,13 @@
+using System.Collections.Generic;
+
 namespace Lang
 {
     public class _ProgramRunner //: IProgramRunner
     {
+        private readonly Dictionary<string, string> _compilerFunctions = new() {
+            { "add_dependency", "AddDependency" }
+        };
+
         public void Init()
         {
             // How this should work

@@ -169,8 +169,9 @@ namespace Lang
                             {
                                 case DirectiveType.If:
                                     var conditional = directive.Value as ConditionalAst;
-                                    if (VerifyCondition(conditional!.Condition, null, _globalScope))
+                                    if (VerifyCondition(conditional.Condition, null, _globalScope))
                                     {
+                                        var condition = _irBuilder.CreateRunnableCondition(conditional.Condition, _globalScope);
                                         _programRunner.Init(_programGraph);
                                         if (_programRunner.ExecuteCondition(conditional!.Condition))
                                         {
@@ -186,6 +187,7 @@ namespace Lang
                                 case DirectiveType.Assert:
                                     if (VerifyCondition(directive.Value, null, _globalScope))
                                     {
+                                        var condition = _irBuilder.CreateRunnableCondition(directive.Value, _globalScope);
                                         _programRunner.Init(_programGraph);
                                         if (!_programRunner.ExecuteCondition(directive.Value))
                                         {
@@ -1003,8 +1005,9 @@ namespace Lang
                             case DirectiveType.If:
 
                                 var conditional = directive.Value as ConditionalAst;
-                                if (VerifyCondition(conditional!.Condition, null, _globalScope))
+                                if (VerifyCondition(conditional.Condition, null, _globalScope))
                                 {
+                                    var condition = _irBuilder.CreateRunnableCondition(conditional.Condition, _globalScope);
                                     _programRunner.Init(_programGraph);
                                     if (_programRunner.ExecuteCondition(conditional!.Condition))
                                     {
@@ -1019,6 +1022,7 @@ namespace Lang
                             case DirectiveType.Assert:
                                 if (VerifyCondition(directive.Value, null, _globalScope))
                                 {
+                                    var condition = _irBuilder.CreateRunnableCondition(directive.Value, _globalScope);
                                     _programRunner.Init(_programGraph);
                                     if (!_programRunner.ExecuteCondition(directive.Value))
                                     {
@@ -2152,6 +2156,7 @@ namespace Lang
                     VerifyAst(directive.Value, null, _globalScope, false);
                     if (!ErrorReporter.Errors.Any())
                     {
+                        var function = _irBuilder.CreateRunnableFunction(directive.Value, _globalScope);
                         _programRunner.Init(_programGraph);
                         _programRunner.RunProgram(directive.Value);
                     }
