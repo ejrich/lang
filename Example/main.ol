@@ -126,6 +126,7 @@ int* pointers() {
     node.next = &next;
     a := 6;
     b := &a;
+    d := &a + 1;
     c := *b;
     return b;
 }

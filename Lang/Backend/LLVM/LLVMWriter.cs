@@ -685,8 +685,17 @@ namespace Lang.Backend.LLVM
         private LLVMValueRef BuildExpression((TypeDefinition type, LLVMValueRef value) lhs,
             (TypeDefinition type, LLVMValueRef value) rhs, Operator op, TypeDefinition targetType)
         {
-            // TODO Handle pointer math
-            // 1. Handle simple operators like && and ||
+            // 1. Handle pointer math 
+            if (lhs.type.Name == "*")
+            {
+                return BuildPointerOperation(lhs.value, rhs.value, op);
+            }
+            if (rhs.type.Name == "*")
+            {
+                return BuildPointerOperation(rhs.value, lhs.value, op);
+            }
+
+            // 2. Handle simple operators like && and ||
             switch (op)
             {
                 case Operator.And:
@@ -707,11 +716,11 @@ namespace Lang.Backend.LLVM
                     return BuildCompare(lhs, rhs, op);
             }
 
-            // 3. Cast lhs and rhs to the target types
+            // 4. Cast lhs and rhs to the target types
             lhs.value = CastValue(lhs, targetType);
             rhs.value = CastValue(rhs, targetType);
 
-            // 4. Handle the rest of the simple operators
+            // 5. Handle the rest of the simple operators
             switch (op)
             {
                 case Operator.BitwiseAnd:
@@ -722,9 +731,18 @@ namespace Lang.Backend.LLVM
                     return LLVMApi.BuildXor(_builder, lhs.value, rhs.value, "tmpxor");
             }
 
-            // 5. Handle binary operations
+            // 6. Handle binary operations
             var signed = lhs.type.PrimitiveType.Signed || rhs.type.PrimitiveType.Signed;
             return BuildBinaryOperation(targetType, lhs.value, rhs.value, op, signed);
+        }
+
+        private LLVMValueRef BuildPointerOperation(LLVMValueRef pointer, LLVMValueRef offset, Operator op)
+        {
+            if (op == Operator.Subtract)
+            {
+                offset = LLVMApi.BuildNeg(_builder, offset, "tmpneg");
+            }
+            return LLVMApi.BuildGEP(_builder, pointer, new []{offset}, "tmpptr");
         }
 
         private LLVMValueRef BuildCompare((TypeDefinition type, LLVMValueRef value) lhs,

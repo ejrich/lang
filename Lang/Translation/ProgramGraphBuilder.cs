@@ -739,7 +739,16 @@ namespace Lang.Translation
                     case Operator.Multiply:
                     case Operator.Divide:
                     case Operator.Modulus:
-                        if ((type == Type.Int || type == Type.Float) ||
+                        if (((type == Type.Pointer && nextType == Type.Int) ||
+                            (type == Type.Int && nextType == Type.Pointer)) &&
+                            (op == Operator.Add || op == Operator.Subtract))
+                        {
+                            if (nextType == Type.Pointer)
+                            {
+                                expression.Type = nextExpressionType;
+                            }
+                        }
+                        else if ((type == Type.Int || type == Type.Float) &&
                             (nextType == Type.Int || nextType == Type.Float))
                         {
                             // For integer operations, use the larger size and convert to signed if one type is signed
