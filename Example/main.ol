@@ -280,7 +280,7 @@ u32 sleep(u32 seconds) #extern "libc"
 
 #run {
     default_args(87);
-    set_global(99);
+    set_global(11);
     node: Node;
     node.value = 7;
     printf("Node Value = %d\n", node.value);
@@ -294,6 +294,10 @@ u32 sleep(u32 seconds) #extern "libc"
     printf("Struct field value = %d\n", -my_struct.subValue.something);
     state: StateStruct = { something = 8; }
     state.flag = !state.flag;
+
+    each i in 0..global_a {
+        printf("Looping %d\n", i);
+    }
 }
 
 /*
