@@ -940,11 +940,22 @@ namespace Lang.Backend.LLVM
                 _ => typeDef.Name switch
                 {
                     "bool" => LLVMTypeRef.Int1Type(),
-                    "List" => LLVMTypeRef.ArrayType(ConvertTypeDefinition(typeDef.Generics[0]), 10), // TODO Implement variable sized arrays
+                    "List" => GetArrayType(typeDef),
                     "string" => LLVMTypeRef.Int8Type(),
                     _ => LLVMApi.GetTypeByName(_module, typeDef.Name)
                 }
             };
+        }
+
+        private LLVMTypeRef GetArrayType(TypeDefinition typeDef)
+        {
+            if (typeDef.Count is ConstantAst constantAst)
+            {
+                var count = uint.Parse(constantAst.Value);
+                return LLVMTypeRef.ArrayType(ConvertTypeDefinition(typeDef.Generics[0]), count);
+            }
+            // TODO Implement variable sized arrays
+            return LLVMTypeRef.ArrayType(ConvertTypeDefinition(typeDef.Generics[0]), 10);
         }
     }
 }
