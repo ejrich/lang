@@ -104,7 +104,7 @@ namespace Lang.Backend.LLVM
             foreach (var ast in functionAst.Children)
             {
                 // 3a. Recursively write out lines
-                WriteFunctionLine(ast, localVariables);
+                WriteFunctionLine(ast, localVariables, function);
             }
 
             // 4. Verify the function
@@ -132,7 +132,7 @@ namespace Lang.Backend.LLVM
             foreach (var ast in main.Children)
             {
                 // 2a. Recursively write out lines
-                WriteFunctionLine(ast, localVariables);
+                WriteFunctionLine(ast, localVariables, function);
             }
 
             // 3. Verify the function
@@ -159,7 +159,7 @@ namespace Lang.Backend.LLVM
             LLVMApi.TargetMachineEmitToFile(targetMachine, _module, file, LLVMCodeGenFileType.LLVMObjectFile, out _);
         }
 
-        private void WriteFunctionLine(IAst ast, IDictionary<string, LLVMValueRef> localVariables)
+        private void WriteFunctionLine(IAst ast, IDictionary<string, LLVMValueRef> localVariables, LLVMValueRef function)
         {
             switch (ast)
             {
@@ -176,7 +176,7 @@ namespace Lang.Backend.LLVM
                     WriteScope(scope.Children, localVariables);
                     break;
                 case ConditionalAst conditional:
-                    WriteConditional(conditional, localVariables);
+                    WriteConditional(conditional, localVariables, function);
                     break;
                 case WhileAst whileAst:
                     WriteWhile(whileAst, localVariables);
@@ -228,7 +228,6 @@ namespace Lang.Backend.LLVM
             var expressionValue = WriteExpression(assignment.Value, localVariables);
             if (assignment.Operator != Operator.None)
             {
-                // TODO If operator exists, create expression using the existing expression value
                 // 2a. Build expression with variable value as the LHS
                 var value = LLVMApi.BuildLoad(_builder, variable, variableName);
                 expressionValue = BuildExpression(value, expressionValue, assignment.Operator);
@@ -244,9 +243,52 @@ namespace Lang.Backend.LLVM
             // TODO Implement me
         }
 
-        private void WriteConditional(ConditionalAst conditional, IDictionary<string, LLVMValueRef> localVariables)
+        private void WriteConditional(ConditionalAst conditional, IDictionary<string, LLVMValueRef> localVariables, LLVMValueRef function)
         {
-            // TODO Implement me
+            // 1. Write out the condition
+            var conditionExpression = WriteExpression(conditional.Condition, localVariables);
+
+            // 2. Write out the condition jump and blocks
+            var condition = conditionExpression.TypeOf().TypeKind switch
+            {
+                LLVMTypeKind.LLVMIntegerTypeKind => LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntNE,
+                    conditionExpression, LLVMApi.ConstInt(conditionExpression.TypeOf(), 0, false), "ifcond"),
+                LLVMTypeKind.LLVMFloatTypeKind => LLVMApi.BuildFCmp(_builder, LLVMRealPredicate.LLVMRealONE,
+                    conditionExpression, LLVMApi.ConstReal(conditionExpression.TypeOf(), 0), "ifcond"),
+                _ => new LLVMValueRef()
+            };
+            var thenBlock = LLVMApi.AppendBasicBlock(function, "then");
+            var elseBlock = LLVMApi.AppendBasicBlock(function, "else");
+            var endBlock = LLVMApi.AppendBasicBlock(function, "ifcont");
+            LLVMApi.BuildCondBr(_builder, condition, thenBlock, elseBlock);
+            
+            // 3. Write out if body
+            LLVMApi.PositionBuilderAtEnd(_builder, thenBlock);
+            var returned = false;
+            foreach (var ast in conditional.Children)
+            {
+                WriteFunctionLine(ast, localVariables, function);
+                if (ast is ReturnAst)
+                {
+                    returned = true;
+                    break;
+                }
+            }
+            if (!returned)
+            {
+                LLVMApi.BuildBr(_builder, endBlock);
+            }
+
+            // 4. Write out the else if necessary
+            LLVMApi.PositionBuilderAtEnd(_builder, elseBlock);
+            if (conditional.Else != null)
+            {
+                WriteFunctionLine(conditional.Else, localVariables, function);
+            }
+            LLVMApi.BuildBr(_builder, endBlock);
+
+            // 6. Write go to block
+            LLVMApi.PositionBuilderAtEnd(_builder, endBlock);
         }
 
         private void WriteWhile(WhileAst whileAst, IDictionary<string, LLVMValueRef> localVariables)
@@ -339,7 +381,7 @@ namespace Lang.Backend.LLVM
                     // but notify the user and exit just in case
                     Console.WriteLine("Unexpected syntax tree");
                     Environment.Exit(ErrorCodes.BuildError);
-                    break;
+                    return new LLVMValueRef(); // Return never happens
             }
 
             return LLVMApi.ConstInt(LLVMApi.Int32Type(), 0, true);
@@ -358,6 +400,8 @@ namespace Lang.Backend.LLVM
                     return LLVMApi.BuildMul(_builder, lhs, rhs, "tmpmul");
                 case Operator.Divide:
                     return LLVMApi.BuildSDiv(_builder, lhs, rhs, "tmpdiv");
+                case Operator.Equality:
+                    return LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntEQ, lhs, rhs, "eq");
                 // TODO Implement more operators
                 default:
                     throw new NotImplementedException(op.ToString());
