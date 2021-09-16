@@ -5,7 +5,7 @@ namespace Lang
 {
     public class ProgramGraph
     {
-        public Data Data { get; init; }
+        public Data Data { get; } = new();
         public List<FunctionAst> Functions { get; } = new();
         public FunctionAst Main { get; set; }
         public FunctionAst Start { get; set; }
@@ -14,7 +14,6 @@ namespace Lang
     public class Data
     {
         public List<DeclarationAst> Variables { get; } = new();
-        public List<StructAst> Structs { get; set; }
-        public List<EnumAst> Enums { get; set; }
+        public List<IAst> Types { get; set; }
     }
 }

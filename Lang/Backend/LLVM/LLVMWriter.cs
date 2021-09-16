@@ -82,17 +82,24 @@ namespace Lang.Backend.LLVM
         private IDictionary<string, (TypeDefinition type, LLVMValueRef value)> WriteData(Data data)
         {
             // 1. Declare structs
-            var structs = new LLVMTypeRef[data.Structs.Count];
-            for (var i = 0; i < data.Structs.Count; i++)
+            var structs = new LLVMTypeRef[data.Types.Count];
+            for (var i = 0; i < data.Types.Count; i++)
             {
-                var structAst = data.Structs[i];
-                structs[i] = LLVMApi.StructCreateNamed(LLVMApi.GetModuleContext(_module), structAst.Name);
-                _structs.Add(structAst.Name, structAst);
+                var type = data.Types[i];
+                if (type is StructAst structAst)
+                {
+                    structs[i] = LLVMApi.StructCreateNamed(LLVMApi.GetModuleContext(_module), structAst.Name);
+                    _structs.Add(structAst.Name, structAst);
+                }
             }
-            for (var i = 0; i < data.Structs.Count; i++)
+            for (var i = 0; i < data.Types.Count; i++)
             {
-                var fields = data.Structs[i].Fields.Select(field => ConvertTypeDefinition(field.Type)).ToArray();
-                LLVMApi.StructSetBody(structs[i], fields, false);
+                var type = data.Types[i];
+                if (type is StructAst structAst)
+                {
+                    var fields = structAst.Fields.Select(field => ConvertTypeDefinition(field.Type)).ToArray();
+                    LLVMApi.StructSetBody(structs[i], fields, false);
+                }
             }
 
             // 2. Declare variables
