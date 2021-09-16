@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 
 namespace Lang.Project
 {
@@ -14,7 +13,8 @@ namespace Lang.Project
     public class ProjectInterpreter : IProjectInterpreter
     {
         private const string ProjectFileExtension = ".olproj";
-        private const string SourceFileExtension = ".ol";
+        private const string ProjectFilePattern = "*.olproj";
+        private const string SourceFilePattern = "*.ol";
 
         public Project LoadProject(string projectPath)
         {
@@ -44,8 +44,8 @@ namespace Lang.Project
         private static string GetProjectPathInDirectory(string directory)
         {
             // a. Search for an project file in the current directory
-            var projectPath = Directory.EnumerateFiles(directory)
-                .FirstOrDefault(_ => _.EndsWith(ProjectFileExtension));
+            var projectPath = Directory.EnumerateFiles(directory, ProjectFilePattern)
+                .FirstOrDefault();
 
             // b. If no project file, throw and exit
             if (projectPath == null)
@@ -100,7 +100,7 @@ namespace Lang.Project
 
         private static IEnumerable<string> GetSourceFiles(DirectoryInfo directory)
         {
-            foreach (var sourceFile in directory.GetFiles("*.ol"))
+            foreach (var sourceFile in directory.GetFiles(SourceFilePattern))
             {
                 yield return sourceFile.FullName;
             }
