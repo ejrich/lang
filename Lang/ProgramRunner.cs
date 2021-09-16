@@ -113,11 +113,6 @@ namespace Lang
                     {
                         return typeof(double);
                     }
-                // case TypeKind.String:
-                // case TypeKind.Pointer:
-                // case TypeKind.Array:
-                // case TypeKind.Struct:
-                // case TypeKind.CArray:
                 default:
                     return typeof(IntPtr);
             }
