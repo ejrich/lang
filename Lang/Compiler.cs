@@ -43,9 +43,6 @@ namespace Lang
                     case "-S":
                         buildSettings.OutputAssembly = true;
                         break;
-                    case "--no-stats":
-                        buildSettings.NoStats = true;
-                        break;
                     default:
                         buildSettings.ProjectPath ??= arg;
                         break;
@@ -101,13 +98,10 @@ namespace Lang
             var buildTime = stopwatch.Elapsed;
 
             // 6. Log statistics
-            if (!buildSettings.NoStats)
-            {
-                Console.WriteLine($"Project time: {projectTime.TotalSeconds} seconds\n" +
-                                  $"Lexing/Parsing time: {parseTime.TotalSeconds} seconds\n" +
-                                  $"Project Graph time: {graphTime.TotalSeconds} seconds\n" +
-                                  $"Building time: {buildTime.TotalSeconds} seconds");
-            }
+            Console.WriteLine($"Project time: {projectTime.TotalSeconds} seconds\n" +
+                              $"Lexing/Parsing time: {parseTime.TotalSeconds} seconds\n" +
+                              $"Project Graph time: {graphTime.TotalSeconds} seconds\n" +
+                              $"Building time: {buildTime.TotalSeconds} seconds");
         }
     }
 }

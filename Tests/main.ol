@@ -32,9 +32,9 @@ bool run_test(u8* test_dir) {
     executable := "./Lang/bin/Debug/net5.0/Lang"; #const
 
     command: List<u8>[100];
-    sprintf(command.data, "%s %s --no-stats", executable, test_dir);
+    sprintf(command.data, "%s %s", executable, test_dir);
     printf("Compiling: %s\n", command.data);
-    exit_code := system(command.data);
+    exit_code := run_command(command.data);
 
     if exit_code {
         printf("Test Failed\n");
@@ -68,7 +68,7 @@ bool run_test(u8* test_dir) {
     }
 
     printf("Running: %s\n", command.data);
-    exit_code = system(command.data);
+    exit_code = run_command(command.data);
 
     if exit_code {
         printf("Test Failed\n");
@@ -77,7 +77,18 @@ bool run_test(u8* test_dir) {
     return true;
 }
 
-// #run main();
+int run_command(u8* command) {
+    handle := popen(command, "r");
+    if handle == null {
+        printf("Failed popen: %s\n", command);
+        return -1;
+    }
 
-sprintf(u8* buffer, string format, ... args) #extern "libc"
-int system(string command) #extern "libc"
+    buffer: List<u8>[50];
+    while fgets(buffer.data, 50, handle) != null {}
+
+    status := pclose(handle);
+    return (status & 0xFF00) / 256;
+}
+
+// #run main();
