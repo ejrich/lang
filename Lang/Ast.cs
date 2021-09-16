@@ -6,7 +6,7 @@ namespace Lang
     public interface IAst
     {
         int FileIndex { get; set; }
-        int Line { get; init; }
+        uint Line { get; init; }
         int Column { get; init; }
         List<IAst> Children { get; }
     }
@@ -33,7 +33,7 @@ namespace Lang
     public class ScopeAst : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public List<IAst> Children { get; } = new();
     }
@@ -41,7 +41,7 @@ namespace Lang
     public class FunctionAst : IFunction, IType
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
         public int TypeIndex { get; set; }
@@ -66,7 +66,7 @@ namespace Lang
     public class StructAst : IAst, IType
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
         public int TypeIndex { get; set; }
@@ -81,7 +81,7 @@ namespace Lang
     public class StructFieldAst : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public bool HasGeneric { get; set; }
         public string Name { get; set; }
@@ -94,7 +94,7 @@ namespace Lang
     public class StructFieldRefAst : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public bool IsEnum { get; set; }
         public bool[] Pointers { get; set; }
@@ -106,7 +106,7 @@ namespace Lang
     public class EnumAst : IAst, IType
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
         public int TypeIndex { get; set; }
@@ -120,7 +120,7 @@ namespace Lang
     public class EnumValueAst : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
         public int Value { get; set; }
@@ -131,7 +131,7 @@ namespace Lang
     public class ReturnAst : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public IAst Value { get; set; }
         public List<IAst> Children => null;
@@ -140,20 +140,21 @@ namespace Lang
     public class PrimitiveAst : IAst, IType
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
         public int TypeIndex { get; set; }
         public uint Size { get; set; }
         public TypeKind TypeKind { get; set; }
         public IPrimitive Primitive { get; set; }
+        public TypeDefinition PointerType { get; set; }
         public List<IAst> Children => null;
     }
 
     public class ConstantAst : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public TypeDefinition Type { get; set; }
         public string Value { get; set; }
@@ -163,7 +164,7 @@ namespace Lang
     public class NullAst : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public TypeDefinition TargetType { get; set; }
         public List<IAst> Children => null;
@@ -172,7 +173,7 @@ namespace Lang
     public class IdentifierAst : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
         public List<IAst> Children => null;
@@ -181,7 +182,7 @@ namespace Lang
     public class ExpressionAst : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public TypeDefinition Type { get; set; }
         public List<Operator> Operators { get; } = new();
@@ -192,7 +193,7 @@ namespace Lang
     public class ChangeByOneAst : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public bool Prefix { get; set; }
         public bool Positive { get; set; }
@@ -203,7 +204,7 @@ namespace Lang
     public class UnaryAst : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public UnaryOperator Operator { get; set; }
         public IAst Value { get; set; }
@@ -213,7 +214,7 @@ namespace Lang
     public class CallAst : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public string Function { get; set; }
         public bool Params { get; set; }
@@ -228,7 +229,7 @@ namespace Lang
     public class DeclarationAst : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
         public TypeDefinition Type { get; set; }
@@ -242,7 +243,7 @@ namespace Lang
     public class AssignmentAst : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public IAst Reference { get; set; }
         public Operator Operator { get; set; }
@@ -253,7 +254,7 @@ namespace Lang
     public class ConditionalAst : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public IAst Condition { get; set; }
         public List<IAst> Children { get; } = new();
@@ -263,7 +264,7 @@ namespace Lang
     public class WhileAst : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public IAst Condition { get; set; }
         public List<IAst> Children { get; } = new();
@@ -272,7 +273,7 @@ namespace Lang
     public class EachAst : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public string IterationVariable { get; set; }
         public IAst Iteration { get; set; }
@@ -285,7 +286,7 @@ namespace Lang
     public class IndexAst : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
         public bool CallsOverload { get; set; }
@@ -297,7 +298,7 @@ namespace Lang
     public class CompilerDirectiveAst : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public DirectiveType Type { get; set; }
         public IAst Value { get; set; }
@@ -307,7 +308,7 @@ namespace Lang
     public class CastAst : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public TypeDefinition TargetType { get; set; }
         public bool HasGenerics { get; set; }
@@ -318,7 +319,7 @@ namespace Lang
     public class OperatorOverloadAst : IFunction
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public Operator Operator { get; set; }
         public TypeDefinition Type { get; set; }
@@ -335,7 +336,7 @@ namespace Lang
     public class TypeDefinition : IAst
     {
         public int FileIndex { get; set; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; init; }
         public TypeKind? TypeKind { get; set; }
         public string Name { get; set; }

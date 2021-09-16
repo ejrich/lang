@@ -59,7 +59,7 @@ namespace Lang
             Token currentToken = null;
             var closingMultiLineComment = false;
             var literalEscapeToken = false;
-            var line = 1;
+            uint line = 1;
             var column = 0;
 
             while (reader.Peek() > 0)
@@ -419,7 +419,7 @@ namespace Lang
         public string Value { get; set; }
         public TokenFlags Flags { get; set; }
         public int FileIndex { get; init; }
-        public int Line { get; init; }
+        public uint Line { get; init; }
         public int Column { get; set; }
         public bool Error { get; set; }
     }

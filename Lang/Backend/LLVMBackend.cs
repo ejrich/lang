@@ -27,6 +27,7 @@ namespace Lang.Backend
         private LLVMDIBuilderRef _debugBuilder;
         private LLVMMetadataRef _debugCompilationUnit;
         private List<LLVMMetadataRef> _debugFiles;
+        private Dictionary<string, LLVMMetadataRef> _debugTypes;
 
         private readonly Queue<LLVMValueRef> _allocationQueue = new();
         private readonly LLVMValueRef _zeroInt = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), 0, false);
@@ -133,6 +134,7 @@ namespace Lang.Backend
                 var compileUnitFile = _debugBuilder.CreateFile($"{project.Name}.ll", objectPath);
                 _debugCompilationUnit = _debugBuilder.CreateCompileUnit(LLVMDWARFSourceLanguage.LLVMDWARFSourceLanguageC, compileUnitFile, "ol", 0, string.Empty, 0, string.Empty, LLVMDWARFEmissionKind.LLVMDWARFEmissionNone, 0, 0, 0, string.Empty, string.Empty);
                 _debugFiles = project.SourceFiles.Select(file => _debugBuilder.CreateFile(Path.GetFileName(file), Path.GetDirectoryName(file))).ToList();
+                _debugTypes = new Dictionary<string, LLVMMetadataRef>();
             }
         }
 
@@ -140,19 +142,60 @@ namespace Lang.Backend
         {
             // 1. Declare structs and enums
             var structs = new Dictionary<string, LLVMTypeRef>();
-            foreach (var (name, type) in _programGraph.Types)
+            if (_emitDebug)
             {
-                if (type is StructAst structAst)
+                foreach (var (name, type) in _programGraph.Types)
                 {
-                    structs[name] = _context.CreateNamedStruct(name);
+                    switch (type)
+                    {
+                        case StructAst structAst:
+                        {
+                            structs[name] = _context.CreateNamedStruct(name);
+
+                            using var structName = new MarshaledString(structAst.Name);
+
+                            var file = _debugFiles[structAst.FileIndex];
+                            _debugTypes[name] = LLVM.DIBuilderCreateForwardDecl(_debugBuilder, (uint)DwarfTag.Structure_type, structName.Value, (UIntPtr)structName.Length, file, file, structAst.Line, 0, structAst.Size * 8, 0, null, (UIntPtr)0);
+                            break;
+                        }
+                        case EnumAst enumAst:
+                        {
+                            using var enumName = new MarshaledString(enumAst.Name);
+
+                            var encoding = enumAst.BaseType.PrimitiveType.Signed ? DwarfTypeEncoding.Signed : DwarfTypeEncoding.Unsigned;
+                            _debugTypes[type.Name] = LLVM.DIBuilderCreateBasicType(_debugBuilder, enumName.Value, (UIntPtr)enumName.Length, (uint)enumAst.BaseType.PrimitiveType.Bytes * 8, (uint)encoding, LLVMDIFlags.LLVMDIFlagZero);
+                            break;
+                        }
+                        case PrimitiveAst primitive:
+                            CreateDebugBasicType(primitive, name);
+                            break;
+                    }
+                }
+                foreach (var (name, type) in _programGraph.Types)
+                {
+                    if (type is StructAst structAst && structAst.Fields.Any())
+                    {
+                        var fields = structAst.Fields.Select(field => ConvertTypeDefinition(field.Type)).ToArray();
+                        structs[name].StructSetBody(fields, false);
+                    }
                 }
             }
-            foreach (var (name, type) in _programGraph.Types)
+            else
             {
-                if (type is StructAst structAst && structAst.Fields.Any())
+                foreach (var (name, type) in _programGraph.Types)
                 {
-                    var fields = structAst.Fields.Select(field => ConvertTypeDefinition(field.Type)).ToArray();
-                    structs[name].StructSetBody(fields, false);
+                    if (type is StructAst structAst)
+                    {
+                        structs[name] = _context.CreateNamedStruct(name);
+                    }
+                }
+                foreach (var (name, type) in _programGraph.Types)
+                {
+                    if (type is StructAst structAst && structAst.Fields.Any())
+                    {
+                        var fields = structAst.Fields.Select(field => ConvertTypeDefinition(field.Type)).ToArray();
+                        structs[name].StructSetBody(fields, false);
+                    }
                 }
             }
             _stringType = _module.GetTypeByName("string");
@@ -354,24 +397,22 @@ namespace Lang.Backend
             var argumentCount = varargs ? functionAst.Arguments.Count - 1 : functionAst.Arguments.Count;
             var argumentTypes = new LLVMTypeRef[argumentCount];
 
-            // 1. Determine argument types and varargs
-
-            // 3. Create debug function
+            // 1. Get the argument types and create debug symbols
             if (_emitDebug && !externFunction)
             {
-                var debugArgumentTypes = new LLVMMetadataRef[argumentCount];
+                var debugArgumentTypes = new LLVMMetadataRef[argumentCount + 1];
+                debugArgumentTypes[0] = GetDebugType(functionAst.ReturnType);
 
                 for (var i = 0; i < argumentCount; i++)
                 {
-                    var argument = functionAst.Arguments[i];
-                    argumentTypes[i] = ConvertTypeDefinition(argument.Type);
-                    // debugArgumentTypes[i] = GetDebugType(argument.Type);
+                    var argumentType = functionAst.Arguments[i].Type;
+                    argumentTypes[i] = ConvertTypeDefinition(argumentType);
+                    debugArgumentTypes[i] = GetDebugType(argumentType);
                 }
-                var file = _debugFiles[functionAst.FileIndex];
 
-                // var functionType = LLVM.DIBuilderGetOrCreateTypeArray(_debugBuilder, );
-                // var debugFunction = LLVM.DIBuilderCreateFunction(_debugBuilder, debugName, (uint)debugName.Length, "private", 7, file, functionAst.Line, functionType, false, false, functionAst.Line, 0, false);
-                // TODO Implement me
+                var file = _debugFiles[functionAst.FileIndex];
+                var functionType = _debugBuilder.CreateSubroutineType(file, debugArgumentTypes, LLVMDIFlags.LLVMDIFlagPrototyped);
+                var debugFunction = _debugBuilder.CreateFunction(file, debugName, name, file, functionAst.Line, functionType, 0, 0, functionAst.Line, 0, 0);
             }
             else
             {
@@ -381,7 +422,7 @@ namespace Lang.Backend
                 }
             }
 
-            // 3. Declare function
+            // 2. Declare function
             var function = _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(functionAst.ReturnType), argumentTypes.ToArray(), varargs));
         }
 
@@ -2024,7 +2065,7 @@ namespace Lang.Backend
 
         private LLVMTypeRef ConvertTypeDefinition(TypeDefinition type, bool externFunction = false, bool pointer = false)
         {
-            if (type.Name == "*")
+            if (type.TypeKind == TypeKind.Pointer)
             {
                 return LLVM.PointerType(ConvertTypeDefinition(type.Generics[0], externFunction, true), 0);
             }
@@ -2034,14 +2075,13 @@ namespace Lang.Backend
                 IntegerType integerType => GetIntegerType(integerType),
                 FloatType floatType => floatType.Bytes == 8 ? LLVM.DoubleType() : LLVM.FloatType(),
                 EnumType enumType => GetIntegerType(enumType),
-                _ => type.Name switch
+                _ => type.TypeKind switch
                 {
-                    "bool" => LLVM.Int1Type(),
-                    "void" => pointer ? LLVM.Int8Type() : LLVM.VoidType(),
-                    "List" => GetListType(type),
-                    "Params" => GetListType(type),
-                    "string" => externFunction ? LLVM.PointerType(LLVM.Int8Type(), 0) : _module.GetTypeByName("string"),
-                    "Type" => LLVM.Int32Type(),
+                    TypeKind.Boolean => LLVM.Int1Type(),
+                    TypeKind.Void => pointer ? LLVM.Int8Type() : LLVM.VoidType(),
+                    TypeKind.List or TypeKind.Params => GetListType(type),
+                    TypeKind.String => externFunction ? LLVM.PointerType(LLVM.Int8Type(), 0) : _module.GetTypeByName("string"),
+                    TypeKind.Type => LLVM.Int32Type(),
                     _ => GetStructType(type)
                 }
             };
@@ -2080,6 +2120,84 @@ namespace Lang.Backend
             }
 
             return _module.GetTypeByName(type.GenericName);
+        }
+
+
+        private LLVMMetadataRef GetDebugType(TypeDefinition type)
+        {
+            return type.TypeKind switch
+            {
+                TypeKind.Params => _debugTypes[$"List.{type.Generics[0].GenericName}"],
+                TypeKind.Type => _debugTypes["s32"],
+                _ => _debugTypes[type.GenericName]
+            };
+        }
+
+        private void CreateDebugStructType(StructAst structAst)
+        {
+            // TODO Implement me
+        }
+
+        private void CreateDebugBasicType(PrimitiveAst type, string typeName)
+        {
+            using var name = new MarshaledString(type.Name);
+            switch (type.TypeKind)
+            {
+                case TypeKind.Void:
+                    _debugTypes[type.Name] = null;
+                    break;
+                case TypeKind.Boolean:
+                    _debugTypes[type.Name] = LLVM.DIBuilderCreateBasicType(_debugBuilder, name.Value, (UIntPtr)name.Length, 8, (uint)DwarfTypeEncoding.Boolean, LLVMDIFlags.LLVMDIFlagZero);
+                    break;
+                case TypeKind.Integer:
+                    var encoding = type.Primitive.Signed ? DwarfTypeEncoding.Signed : DwarfTypeEncoding.Unsigned;
+                    _debugTypes[type.Name] = LLVM.DIBuilderCreateBasicType(_debugBuilder, name.Value, (UIntPtr)name.Length, (uint)type.Primitive.Bytes * 8, (uint)encoding, LLVMDIFlags.LLVMDIFlagZero);
+                    break;
+                case TypeKind.Float:
+                    _debugTypes[type.Name] = LLVM.DIBuilderCreateBasicType(_debugBuilder, name.Value, (UIntPtr)name.Length, (uint)type.Primitive.Bytes * 8, (uint)DwarfTypeEncoding.Float, LLVMDIFlags.LLVMDIFlagZero);
+                    break;
+                case TypeKind.Pointer:
+                    var pointerType = _debugTypes[type.PointerType.GenericName];
+                    _debugTypes[typeName] = LLVM.DIBuilderCreatePointerType(_debugBuilder, pointerType, 64, 0, 0, name.Value, (UIntPtr)name.Length);
+                    break;
+            }
+        }
+
+        private enum DwarfTag : uint
+        {
+            Lexical_block = 0x0b,
+            Compile_unit = 0x11,
+            Variable = 0x34,
+            Base_type = 0x24,
+            Pointer_type = 0x0F,
+            Structure_type = 0x13,
+            Subroutine_type = 0x15,
+            File_type = 0x29,
+            Subprogram = 0x2E,
+            Auto_variable = 0x100,
+            Arg_variable = 0x101
+        }
+
+        private enum DwarfTypeEncoding : uint
+        {
+            Address = 0x01,
+            Boolean = 0x02,
+            Complex_float = 0x03,
+            Float = 0x04,
+            Signed = 0x05,
+            Signed_char = 0x06,
+            Unsigned = 0x07,
+            Unsigned_char = 0x08,
+            Imaginary_float = 0x09,
+            Packed_decimal = 0x0a,
+            Numeric_string = 0x0b,
+            Edited = 0x0c,
+            Signed_fixed = 0x0d,
+            Unsigned_fixed = 0x0e,
+            Decimal_float = 0x0f,
+            UTF = 0x10,
+            Lo_user = 0x80,
+            Hi_user = 0xff
         }
     }
 }
