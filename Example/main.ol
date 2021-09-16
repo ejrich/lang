@@ -36,6 +36,12 @@ int Main(List<string> args) {
     if state == State.Running then printf("The state is Running\n");
     else if state != State.Running then printf("The state is not Running\n");
 
+    null_val: int* = null;
+    null_val = null;
+    test_int := 7;
+    null_test(&test_int);
+    null_test(null);
+
     return 0;
 }
 
@@ -221,4 +227,9 @@ State current_state(int a) {
     if a > 5 then return State.Running;
     else if a == 5 then return State.Starting;
     return State.Stopped;
+}
+
+void null_test(int* value_ptr) {
+    if value_ptr == null then printf("Pointer is null\n");
+    else then printf("Pointer value is %d\n", *value_ptr);
 }
