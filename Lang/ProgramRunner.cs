@@ -559,7 +559,6 @@ namespace Lang
 
                     if (arrayValues != null)
                     {
-
                         for (var i = 0; i < arrayValues.Count; i++)
                         {
                             var value = ExecuteExpression(arrayValues[i], variables);
