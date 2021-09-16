@@ -94,7 +94,7 @@ namespace Lang.Translation
             switch (returnAst.Value)
             {
                 case ConstantAst constant:
-                    return constant.Type == type ? null : new TranslationError {Error = $"Expected to return type '{constant.Type}'"};
+                    return constant.Type == type ? null : new TranslationError {Error = $"Expected to return type '{type}', but returned type '{constant.Type}'"};
                 // TODO Implement these branches
                 case CallAst call:
                     break;
