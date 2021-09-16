@@ -6,7 +6,7 @@ struct List {
     int* data; // TODO Make this polymorphic
 }
 
-/* TODO Update strings to use this struct
+/* @Future Update strings to use this struct
 struct string {
     int length;
     u8* data;

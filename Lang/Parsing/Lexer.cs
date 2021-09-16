@@ -341,7 +341,6 @@ namespace Lang.Parsing
                     return ChangeTypeIfSame(currentToken, type, TokenType.Decrement);
                 case TokenType.Period:
                     return ChangeTypeIfSame(currentToken, type, TokenType.Range);
-                // TODO More validation eventually
                 default:
                     return false;
             }
