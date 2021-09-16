@@ -469,7 +469,7 @@ namespace Lang.Backend.LLVM
                     {
                         BuildAllocations(declaration.Value);
                     }
-                    else if (declaration.Type.Name == "List")
+                    else if (declaration.Type.Name == "List" && !declaration.Type.CArray)
                     {
                         if (declaration.Type.Count is ConstantAst constant)
                         {
@@ -695,7 +695,7 @@ namespace Lang.Backend.LLVM
                 LLVMApi.BuildStore(_builder, value, variable);
             }
             // 3. Initialize lists
-            else if (declaration.Type.Name == "List")
+            else if (declaration.Type.Name == "List" && !declaration.Type.CArray)
             {
                 var listType = declaration.Type.Generics[0];
                 if (declaration.Type.Count is ConstantAst constant)
@@ -750,7 +750,7 @@ namespace Lang.Backend.LLVM
 
                     LLVMApi.BuildStore(_builder, value, field);
                 }
-                else if (structField.Type.Name == "List")
+                else if (structField.Type.Name == "List" && !structField.Type.CArray)
                 {
                     var count = (ConstantAst)structField.Type.Count;
                     InitializeConstList(field, int.Parse(count.Value), structField.Type.Generics[0]);
@@ -1428,17 +1428,18 @@ namespace Lang.Backend.LLVM
 
             // 3. Build the pointer with the first index of 0
             var elementType = type.Generics[0];
-            LLVMValueRef dataPointer;
+            LLVMValueRef listPointer;
             if (type.CArray)
             {
-                dataPointer = variable;
+                listPointer = LLVMApi.BuildGEP(_builder, variable, new []{LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 0, false), indexValue}, "dataptr");
             }
             else
             {
                 var listData = LLVMApi.BuildStructGEP(_builder, variable, 1, "listdata");
-                dataPointer = LLVMApi.BuildLoad(_builder, listData, "dataptr");
+                var dataPointer = LLVMApi.BuildLoad(_builder, listData, "dataptr");
+                listPointer = LLVMApi.BuildGEP(_builder, dataPointer, new [] {indexValue}, "indexptr");
             }
-            return (elementType, LLVMApi.BuildGEP(_builder, dataPointer, new [] {indexValue}, "indexptr"));
+            return (elementType, listPointer);
         }
 
         private LLVMValueRef BuildExpression((TypeDefinition type, LLVMValueRef value) lhs,
