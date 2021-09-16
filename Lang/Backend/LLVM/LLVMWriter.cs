@@ -589,17 +589,9 @@ namespace Lang.Backend.LLVM
         private bool WriteConditional(ConditionalAst conditional, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)
         {
             // 1. Write out the condition
-            var (type, conditionExpression) = WriteExpression(conditional.Condition, localVariables);
+            var condition = BuildConditionExpression(conditional.Condition, localVariables);
 
             // 2. Write out the condition jump and blocks
-            var condition = type.PrimitiveType switch
-            {
-                IntegerType => LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntNE,
-                    conditionExpression, LLVMApi.ConstInt(conditionExpression.TypeOf(), 0, false), "ifcond"),
-                FloatType => LLVMApi.BuildFCmp(_builder, LLVMRealPredicate.LLVMRealONE,
-                    conditionExpression, LLVMApi.ConstReal(conditionExpression.TypeOf(), 0), "ifcond"),
-                _ => conditionExpression
-            };
             var thenBlock = LLVMApi.AppendBasicBlock(function, "then");
             var elseBlock = LLVMApi.AppendBasicBlock(function, "else");
             var endBlock = new LLVMBasicBlockRef();
@@ -666,16 +658,7 @@ namespace Lang.Backend.LLVM
 
             // 2. Check condition of while loop and break if condition is not met
             LLVMApi.PositionBuilderAtEnd(_builder, whileCondition);
-            var (type, conditionExpression) = WriteExpression(whileAst.Condition, localVariables);
-            var condition = type.PrimitiveType switch
-            {
-                IntegerType => LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntEQ,
-                    conditionExpression, LLVMApi.ConstInt(conditionExpression.TypeOf(), 1, false), "whilecond"),
-                FloatType => LLVMApi.BuildFCmp(_builder, LLVMRealPredicate.LLVMRealOEQ,
-                    conditionExpression, LLVMApi.ConstReal(conditionExpression.TypeOf(), 1), "whilecond"),
-                _ when type.Name == "*" => LLVMApi.BuildIsNotNull(_builder, conditionExpression, "whilecond"),
-                _ => conditionExpression
-            };
+            var condition = BuildConditionExpression(whileAst.Condition, localVariables);
             var whileBody = LLVMApi.AppendBasicBlock(function, "whilebody");
             var afterWhile = LLVMApi.AppendBasicBlock(function, "afterwhile");
             LLVMApi.BuildCondBr(_builder, condition, whileBody, afterWhile);
@@ -698,6 +681,20 @@ namespace Lang.Backend.LLVM
             // 5. Position builder to after block
             LLVMApi.PositionBuilderAtEnd(_builder, afterWhile);
             return false;
+        }
+
+        private LLVMValueRef BuildConditionExpression(IAst expression, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
+        {
+            var (type, conditionExpression) = WriteExpression(expression, localVariables);
+            return type.PrimitiveType switch
+            {
+                IntegerType => LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntNE,
+                    conditionExpression, LLVMApi.ConstInt(conditionExpression.TypeOf(), 0, false), "ifcond"),
+                FloatType => LLVMApi.BuildFCmp(_builder, LLVMRealPredicate.LLVMRealONE,
+                    conditionExpression, LLVMApi.ConstReal(conditionExpression.TypeOf(), 0), "ifcond"),
+                _ when type.Name == "*" => LLVMApi.BuildIsNotNull(_builder, conditionExpression, "whilecond"),
+                _ => conditionExpression
+            };
         }
 
         private bool WriteEach(EachAst each, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)
