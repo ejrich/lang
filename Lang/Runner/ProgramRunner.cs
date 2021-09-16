@@ -17,7 +17,8 @@ namespace Lang.Runner
     {
         private Type _library;
         private object _functionObject;
-        private Dictionary<string, (TypeDefinition type, object value)> _globalVariables = new();
+        private readonly Dictionary<string, (TypeDefinition type, object value)> _globalVariables = new();
+        private readonly Dictionary<string, Type> _types = new();
 
         public void RunProgram(ProgramGraph programGraph)
         {
@@ -28,22 +29,43 @@ namespace Lang.Runner
             var moduleBuilder = assemblyBuilder.DefineDynamicModule("ExternFunctions");
             var typeBuilder = moduleBuilder.DefineType("Functions", TypeAttributes.Class | TypeAttributes.Public);
 
+            var temporaryStructs = new Dictionary<string, TypeBuilder>();
             foreach (var type in programGraph.Data.Types)
             {
                 switch (type)
                 {
                     case EnumAst enumAst:
+                        var enumBuilder = moduleBuilder.DefineEnum(enumAst.Name, TypeAttributes.Public, typeof(int));
+                        foreach (var value in enumAst.Values)
+                        {
+                            enumBuilder.DefineLiteral(value.Name, value.Value);
+                        }
+
+                        _types[enumAst.Name] = enumBuilder.CreateTypeInfo();
                         break;
                     case StructAst structAst:
                         var structBuilder = moduleBuilder.DefineType(structAst.Name, TypeAttributes.Public | TypeAttributes.SequentialLayout);
-                        foreach (var field in structAst.Fields)
-                        {
-                            // TODO Do a first pass over types to get the type object
-                            structBuilder.DefineField(field.Name, GetTypeFromDefinition(field.Type), FieldAttributes.Public);
-                        }
+                        temporaryStructs[structAst.Name] = structBuilder;
                         break;
                 }
                 // TODO Make structs as the types
+            }
+
+            foreach (var type in programGraph.Data.Types)
+            {
+                if (type is StructAst structAst)
+                {
+                    var structBuilder = temporaryStructs[structAst.Name];
+                    foreach (var field in structAst.Fields)
+                    {
+                        var fieldType = GetTypeFromDefinition(field.Type);
+                        if (fieldType == null)
+                        {
+                            fieldType = temporaryStructs[field.Type.GenericName];
+                        }
+                        structBuilder.DefineField(field.Name, fieldType, FieldAttributes.Public);
+                    }
+                }
             }
 
             foreach (var function in programGraph.Functions.Values.Where(_ => _.Extern))
@@ -389,7 +411,7 @@ namespace Lang.Runner
             method.SetCustomAttribute(caBuilder);
         }
 
-        private static Type GetTypeFromDefinition(TypeDefinition typeDef)
+        private Type GetTypeFromDefinition(TypeDefinition typeDef)
         {
             switch (typeDef.PrimitiveType)
             {
@@ -424,7 +446,7 @@ namespace Lang.Runner
             }
 
             // TODO Handle more types
-            return null;
+            return _types.TryGetValue(typeDef.GenericName, out var type) ? type : null;
         }
     }
 }
