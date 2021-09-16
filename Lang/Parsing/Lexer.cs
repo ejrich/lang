@@ -9,7 +9,6 @@ namespace Lang.Parsing
     public interface ILexer
     {
         List<Token> LoadFileTokens(string filePath, int fileIndex, out List<ParseError> errors);
-        List<Token> LoadFileTokens(Stream fileStream, int fileIndex, out List<ParseError> errors);
     }
 
     public class Lexer : ILexer
@@ -33,12 +32,6 @@ namespace Lang.Parsing
         public List<Token> LoadFileTokens(string filePath, int fileIndex, out List<ParseError> errors)
         {
             using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
-
-            return LoadFileTokens(fileStream, fileIndex, out errors);
-        }
-
-        public List<Token> LoadFileTokens(Stream fileStream, int fileIndex, out List<ParseError> errors)
-        {
             using var reader = new StreamReader(fileStream);
 
             errors = new List<ParseError>();

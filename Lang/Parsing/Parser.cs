@@ -75,20 +75,6 @@ namespace Lang.Parsing
                 }
             }
 
-            // 2. Parse runtime library files
-            using var runtime = Assembly.GetExecutingAssembly().GetManifestResourceStream("Lang.Runtime.runtime.ol");
-            {
-                var syntaxTrees = ParseFileStream(runtime, out var errors);
-                if (errors.Any())
-                {
-                    parseResult.Errors.AddRange(errors);
-                }
-                else if (parseResult.Success)
-                {
-                    parseResult.SyntaxTrees.AddRange(syntaxTrees);
-                }
-            }
-
             return parseResult;
         }
 
@@ -100,16 +86,6 @@ namespace Lang.Parsing
             // 2. Parse tokens into ASTs
             return ParseTokens(tokens, errors);
         }
-
-        private List<IAst> ParseFileStream(Stream fileStream, out List<ParseError> errors)
-        {
-            // 1. Load file tokens
-            var tokens = _lexer.LoadFileTokens(fileStream, -1, out errors);
-
-            // 2. Parse tokens into ASTs
-            return ParseTokens(tokens, errors);
-        }
-
         private static List<IAst> ParseTokens(List<Token> tokens, List<ParseError> errors)
         {
             // Iterate through tokens, tracking different ASTs
