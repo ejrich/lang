@@ -32,6 +32,7 @@ int foo() {
     ++a;
     a += 1;
     b := --a + 1;
+    b = -b;
     while a < 10 {
         a = a + 1;
     }

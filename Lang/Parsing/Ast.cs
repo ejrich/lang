@@ -95,6 +95,7 @@ namespace Lang.Parsing
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
+        public TypeDefinition Type { get; set; }
         public List<Operator> Operators { get; } = new();
         public List<IAst> Children { get; } = new();
     }
@@ -110,11 +111,12 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
-    public class NotAst : IAst
+    public class UnaryAst : IAst
     {
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
+        public UnaryOperator Operator { get; set; }
         public IAst Value { get; set; }
         public List<IAst> Children => null;
     }
@@ -222,5 +224,11 @@ namespace Lang.Parsing
         BitwiseAnd = '&',
         Xor = '^',
         Modulus = '%',
+    }
+
+    public enum UnaryOperator
+    {
+        Not = '!',
+        Minus = '-'
     }
 }

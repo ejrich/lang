@@ -206,7 +206,7 @@ namespace Lang.Backend.LLVM
         private void WriteReturnStatement(ReturnAst returnAst, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
         {
             // 1. Get the return value
-            var returnValue = WriteExpression(returnAst.Value, localVariables);
+            var (_, returnValue) = WriteExpression(returnAst.Value, localVariables);
 
             // 2. Write expression as return value
             returnValue = CastValue(returnValue, _currentFunction.ReturnType);
@@ -223,7 +223,7 @@ namespace Lang.Backend.LLVM
             // 2. Set value if it exists
             if (declaration.Value != null)
             {
-                var expressionValue = WriteExpression(declaration.Value, localVariables);
+                var (_, expressionValue) = WriteExpression(declaration.Value, localVariables);
                 var value = CastValue(expressionValue, type);
 
                 LLVMApi.BuildStore(_builder, value, variable);
@@ -288,7 +288,7 @@ namespace Lang.Backend.LLVM
             }
 
             // 2. Evaluate the expression value
-            var expressionValue = WriteExpression(assignment.Value, localVariables);
+            var (_, expressionValue) = WriteExpression(assignment.Value, localVariables);
             if (assignment.Operator != Operator.None)
             {
                 // 2a. Build expression with variable value as the LHS
@@ -321,7 +321,7 @@ namespace Lang.Backend.LLVM
         private bool WriteConditional(ConditionalAst conditional, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)
         {
             // 1. Write out the condition
-            var conditionExpression = WriteExpression(conditional.Condition, localVariables);
+            var (_, conditionExpression) = WriteExpression(conditional.Condition, localVariables);
 
             // 2. Write out the condition jump and blocks
             var condition = conditionExpression.TypeOf().TypeKind switch
@@ -385,7 +385,7 @@ namespace Lang.Backend.LLVM
 
             // 2. Check condition of while loop and break if condition is not met
             LLVMApi.PositionBuilderAtEnd(_builder, whileCondition);
-            var conditionExpression = WriteExpression(whileAst.Condition, localVariables);
+            var (_, conditionExpression) = WriteExpression(whileAst.Condition, localVariables);
             var condition = conditionExpression.TypeOf().TypeKind switch
             {
                 LLVMTypeKind.LLVMIntegerTypeKind => LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntEQ,
@@ -431,9 +431,8 @@ namespace Lang.Backend.LLVM
             else
             {
                 variable = LLVMApi.BuildAlloca(_builder, LLVMTypeRef.Int32Type(), each.IterationVariable);
-                var value = WriteExpression(each.RangeBegin, localVariables);
+                var (type, value) = WriteExpression(each.RangeBegin, localVariables);
                 LLVMApi.BuildStore(_builder, value, variable);
-                var type = new TypeDefinition {Name = "int", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
                 eachVariables.Add(each.IterationVariable, (type, variable));
             }
 
@@ -452,7 +451,7 @@ namespace Lang.Backend.LLVM
             else
             {
                 var value = LLVMApi.BuildLoad(_builder, variable, "curr");
-                var rangeEnd = WriteExpression(each.RangeEnd, localVariables);
+                var (_, rangeEnd) = WriteExpression(each.RangeEnd, localVariables);
                 condition = LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntSLE, value, rangeEnd, "rangecond");
             }
             var eachBody = LLVMApi.AppendBasicBlock(function, "eachbody");
@@ -491,29 +490,35 @@ namespace Lang.Backend.LLVM
             return false;
         }
 
-        private LLVMValueRef WriteExpression(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
+        private (TypeDefinition type, LLVMValueRef value) WriteExpression(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
         {
             switch (ast)
             {
                 case ConstantAst constant:
                 {
                     var type = ConvertTypeDefinition(constant.Type);
-                    return BuildConstant(type, constant);
+                    return (constant.Type, BuildConstant(type, constant));
                 }
                 case VariableAst variable:
-                    return LLVMApi.BuildLoad(_builder, localVariables[variable.Name].value, variable.Name);
+                {
+                    var (type, value) = localVariables[variable.Name];
+                    return (type, LLVMApi.BuildLoad(_builder, value, variable.Name));
+                }
                 case StructFieldRefAst structField:
-                    var (_, field) = BuildStructField(structField, localVariables[structField.Name].value);
-                    return LLVMApi.BuildLoad(_builder, field, structField.Name);
+                {
+                    var (type, field) = BuildStructField(structField, localVariables[structField.Name].value);
+                    return (type, LLVMApi.BuildLoad(_builder, field, structField.Name));
+                }
                 case CallAst call:
                     var function = LLVMApi.GetNamedFunction(_module, call.Function);
                     var callArguments = new LLVMValueRef[call.Arguments.Count];
                     for (var i = 0; i < call.Arguments.Count; i++)
                     {
                         var value = WriteExpression(call.Arguments[i], localVariables);
-                        callArguments[i] = value;
+                        callArguments[i] = value.value;
                     }
-                    return LLVMApi.BuildCall(_builder, function, callArguments, "callTmp");
+                    // TODO Get function return type
+                    return (null, LLVMApi.BuildCall(_builder, function, callArguments, "callTmp"));
                 case ChangeByOneAst changeByOne:
                 {
                     var variableName = changeByOne.Variable switch
@@ -546,17 +551,32 @@ namespace Lang.Backend.LLVM
                     }
 
                     LLVMApi.BuildStore(_builder, newValue, variable.value);
-                    return changeByOne.Prefix ? newValue : value;
+                    return changeByOne.Prefix ? (variable.type, newValue) : (variable.type, value);
                 }
-                case NotAst not:
-                    var notValue = WriteExpression(not.Value, localVariables);
-                    return LLVMApi.BuildNot(_builder, notValue, "not");
+                case UnaryAst unary:
+                {
+                    var (type, value) = WriteExpression(unary.Value, localVariables);
+                    return unary.Operator switch
+                    {
+                        UnaryOperator.Not => (type, LLVMApi.BuildNot(_builder, value, "not")),
+                        UnaryOperator.Minus => type.PrimitiveType switch
+                        {
+                            IntegerType => (type, LLVMApi.BuildNeg(_builder, value, "neg")),
+                            FloatType => (type, LLVMApi.BuildFNeg(_builder, value, "fneg")),
+                            // @Cleanup This branch should not be hit
+                            _ => (null, new LLVMValueRef())
+                        },
+                        // @Cleanup This branch should not be hit
+                        _ => (null, new LLVMValueRef())
+                    };
+                }
                 case ExpressionAst expression:
                     var expressionValue = WriteExpression(expression.Children[0], localVariables);
                     for (var i = 1; i < expression.Children.Count; i++)
                     {
                         var rhs = WriteExpression(expression.Children[i], localVariables);
-                        expressionValue = BuildExpression(expressionValue, rhs, expression.Operators[i - 1]);
+                        // TODO Update expression type
+                        expressionValue.value = BuildExpression(expressionValue.value, rhs.value, expression.Operators[i - 1]);
                     }
                     return expressionValue;
                 default:
@@ -564,7 +584,7 @@ namespace Lang.Backend.LLVM
                     // but notify the user and exit just in case
                     Console.WriteLine("Unexpected syntax tree");
                     Environment.Exit(ErrorCodes.BuildError);
-                    return new LLVMValueRef(); // Return never happens
+                    return (null, new LLVMValueRef()); // Return never happens
             }
         }
 

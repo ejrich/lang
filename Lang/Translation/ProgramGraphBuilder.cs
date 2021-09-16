@@ -504,12 +504,21 @@ namespace Lang.Translation
                             errors.Add(CreateError($"Expected to {operand} variable", changeByOne));
                             return null;
                     }
-                case NotAst not:
-                    var valueType = VerifyExpression(not.Value, localVariables, errors);
-                    if (VerifyType(valueType, errors) == Type.Boolean) return valueType;
-
-                    errors.Add(CreateError($"Expected type 'bool', but got type '{PrintTypeDefinition(valueType)}'", not.Value));
-                    return null;
+                case UnaryAst unary:
+                {
+                    var valueType = VerifyExpression(unary.Value, localVariables, errors);
+                    var type = VerifyType(valueType, errors);
+                    switch (unary.Operator)
+                    {
+                        case UnaryOperator.Not when type == Type.Boolean:
+                            return valueType;
+                        case UnaryOperator.Minus when (type == Type.Int || type == Type.Float):
+                            return valueType;
+                        default:
+                            errors.Add(CreateError($"Expected type 'bool', but got type '{PrintTypeDefinition(valueType)}'", unary.Value));
+                            return null;
+                    }
+                }
                 case CallAst call:
                     if (_functions.TryGetValue(call.Function, out var function))
                     {

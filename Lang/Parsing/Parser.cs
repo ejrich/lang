@@ -986,11 +986,13 @@ namespace Lang.Parsing
                         return null;
                     }
                 case TokenType.Not:
+                case TokenType.Minus:
                     if (enumerator.MoveNext())
                     {
-                        var notAst = CreateAst<NotAst>(enumerator.Current);
-                        notAst.Value = ParseNextExpressionUnit(enumerator, errors, out operatorRequired);
-                        return notAst;
+                        var unaryAst = CreateAst<UnaryAst>(token);
+                        unaryAst.Operator = (UnaryOperator)token.Value[0];
+                        unaryAst.Value = ParseNextExpressionUnit(enumerator, errors, out operatorRequired);
+                        return unaryAst;
                     }
                     else
                     {
