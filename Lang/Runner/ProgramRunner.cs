@@ -1462,11 +1462,17 @@ namespace Lang.Runner
                     return Shift(lhs, rhs, true, true);
             }
 
-            // 3. Cast lhs and rhs to the target types
+            // 3. Handle overloaded operators
+            if (lhs.Type.PrimitiveType == null && lhs.Type.Name != "bool")
+            {
+                return HandleOverloadedOperator(lhs.Type, op, lhs.Value, rhs.Value);
+            }
+
+            // 4. Cast lhs and rhs to the target types
             var lhsValue = CastValue(lhs.Value, targetType);
             var rhsValue = CastValue(rhs.Value, targetType);
 
-            // 4. Handle the rest of the simple operators
+            // 5. Handle the rest of the simple operators
             switch (op)
             {
                 case Operator.BitwiseAnd:
@@ -1616,7 +1622,7 @@ namespace Lang.Runner
                     break;
             }
 
-            // 5. Handle binary operations
+            // 6. Handle binary operations
             return PerformOperation(targetType, lhsValue, rhsValue, op);
         }
 
