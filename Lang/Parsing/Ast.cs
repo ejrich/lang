@@ -93,6 +93,7 @@ namespace Lang.Parsing
     public class DeclarationAst : IAst
     {
         public string Name { get; set; }
+        public TypeDefinition Type { get; set; }
         public IAst Value { get; set; }
         public List<IAst> Children => null;
     }
@@ -166,8 +167,8 @@ namespace Lang.Parsing
         Boolean,
         String,
         List,
-        Struct,
         Void,
+        Auto,
         Other,
         Error
     }
@@ -210,8 +211,6 @@ namespace Lang.Parsing
                     return Type.String;
                 case "List":
                     return Type.List;
-                case "struct":
-                    return Type.Struct;
                 case "void":
                     if (hasGenerics)
                     {

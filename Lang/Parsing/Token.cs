@@ -18,7 +18,6 @@
         Boolean,
         Literal,
         Return,
-        Var,
         If,
         Else,
         Then,

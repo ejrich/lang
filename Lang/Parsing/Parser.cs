@@ -346,8 +346,6 @@ namespace Lang.Parsing
             {
                 case TokenType.Return:
                     return ParseReturn(enumerator, errors);
-                case TokenType.Var:
-                    return ParseDeclaration(enumerator, errors);
                 case TokenType.If:
                     return ParseConditional(enumerator, errors);
                 case TokenType.While:
@@ -360,8 +358,10 @@ namespace Lang.Parsing
                     {
                         case TokenType.OpenParen:
                             return ParseCall(enumerator, errors);
+                        case TokenType.Colon:
+                            return ParseDeclaration(enumerator, errors);
                         case TokenType.Equals:
-                            return ParseAssignment(new VariableAst {Name = token.Value}, enumerator, errors);
+                            return ParseAssignment(enumerator, errors);
                         case TokenType.Period:
                             return ParseStructFieldExpression(enumerator, errors);
                         // TODO Handle other things
@@ -369,7 +369,7 @@ namespace Lang.Parsing
                             // Peek again for an '=', this is likely an operator assignment
                             if (enumerator.Peek(1)?.Type == TokenType.Equals)
                             {
-                                return ParseAssignment(new VariableAst {Name = token.Value}, enumerator, errors);
+                                return ParseAssignment(enumerator, errors);
                             }
 
                             return ParseExpression(enumerator, errors);
@@ -650,64 +650,70 @@ namespace Lang.Parsing
 
         private static DeclarationAst ParseDeclaration(TokenEnumerator enumerator, List<ParseError> errors)
         {
-            var declaration = new DeclarationAst();
+            var declaration = new DeclarationAst {Name = enumerator.Current.Value};
 
-            // 1. Expect to get variable name
+            // 1. Expect to get colon
             enumerator.MoveNext();
-            switch (enumerator.Current?.Type)
+            if (enumerator.Current?.Type != TokenType.Colon)
             {
-                case TokenType.Token:
-                    declaration.Name = enumerator.Current.Value;
-                    break;
-                case TokenType.SemiColon:
-                    errors.Add(new ParseError
-                    {
-                        Error = $"Unexpected token in declaration '{enumerator.Current.Value}'",
-                        Token = enumerator.Current
-                    });
-                    return declaration;
-                case null:
-                    errors.Add(new ParseError {Error = "Expected variable to have name", Token = enumerator.Last});
-                    return declaration;
-                default:
-                    errors.Add(new ParseError
-                    {
-                        Error = $"Unexpected token in declaration '{enumerator.Current.Value}'",
-                        Token = enumerator.Current
-                    });
-                    break;
-            }
-
-            // 2. Expect to get equals sign
-            enumerator.MoveNext();
-            if (enumerator.Current?.Type != TokenType.Equals)
-            {
-                var unexpectedToken = enumerator.Current ?? enumerator.Last;
+                var errorToken = enumerator.Current ?? enumerator.Last;
                 errors.Add(new ParseError
                 {
-                    Error = $"Unexpected token '{unexpectedToken.Value}' in declaration'", Token = unexpectedToken
+                    Error = $"Unexpected token in declaration '{errorToken.Value}'",
+                    Token = errorToken
                 });
-                while (enumerator.Current != null && enumerator.Current.Type != TokenType.Equals)
-                    enumerator.MoveNext();
+                return declaration;
             }
 
-            // 3. Step over '=' sign
+            // 2. Check if type is given
+            if (enumerator.Peek()?.Type == TokenType.Token)
+            {
+                enumerator.MoveNext();
+                declaration.Type = ParseType(enumerator, errors);
+            }
+
+            // 3. Get the value or return
+            enumerator.MoveNext();
+            var token = enumerator.Current;
+            switch (token?.Type)
+            {
+                case TokenType.Equals:
+                    // Valid case
+                    break;
+                case TokenType.SemiColon:
+                    if (declaration.Type == null)
+                    {
+                        errors.Add(new ParseError {Error = "Unexpected token declaration to have value", Token = token});
+                    }
+                    return declaration;
+                case null:
+                    errors.Add(new ParseError {Error = "Expected declaration to have value", Token = enumerator.Last});
+                    return declaration;
+                default:
+                    errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}' in declaration", Token = token});
+                    // Parse until there is an equals sign
+                    while (enumerator.Current != null && enumerator.Current.Type != TokenType.Equals)
+                        enumerator.MoveNext();
+                    break;
+            }
+            
+            // 4. Step over '=' sign
             if (!enumerator.MoveNext())
             {
-                errors.Add(new ParseError {Error = "Expected to have a value", Token = enumerator.Last});
+                errors.Add(new ParseError {Error = "Expected declaration to have a value", Token = enumerator.Last});
                 return null;
             }
 
-            // 3. Parse expression, constant, or another token as the value
+            // 5. Parse expression, constant, or another token as the value
             declaration.Value = ParseExpression(enumerator, errors);
 
             return declaration;
         }
 
-        private static AssignmentAst ParseAssignment(IAst variable, TokenEnumerator enumerator, List<ParseError> errors)
+        private static AssignmentAst ParseAssignment(TokenEnumerator enumerator, List<ParseError> errors, IAst variable = null)
         {
             // 1. Set the variable
-            var assignment = new AssignmentAst {Variable = variable};
+            var assignment = new AssignmentAst {Variable = variable ?? new VariableAst {Name = enumerator.Current.Value}};
 
             // 2. Expect to get equals sign
             if (!enumerator.MoveNext())
@@ -764,14 +770,14 @@ namespace Lang.Parsing
                 case TokenType.SemiColon:
                     return structField;
                 case TokenType.Equals:
-                    return ParseAssignment(structField, enumerator, errors);
+                    return ParseAssignment(enumerator, errors, structField);
                 case null:
                     errors.Add(new ParseError {Error = "Expected value", Token = enumerator.Last});
                     return null;
                 default:
                     if (enumerator.Peek()?.Type == TokenType.Equals)
                     {
-                        return ParseAssignment(structField, enumerator, errors);
+                        return ParseAssignment(enumerator, errors, structField);
                     }
                     else
                     {

@@ -20,7 +20,6 @@ namespace Lang.Parsing
             {"return", TokenType.Return},
             {"true", TokenType.Boolean},
             {"false", TokenType.Boolean},
-            {"var", TokenType.Var},
             {"if", TokenType.If},
             {"else", TokenType.Else},
             {"then", TokenType.Then},
