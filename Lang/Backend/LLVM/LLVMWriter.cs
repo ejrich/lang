@@ -69,7 +69,7 @@ namespace Lang.Backend.LLVM
 
         private LLVMValueRef WriteFunctionDefinition(string name, List<Argument> arguments, TypeDefinition returnType)
         {
-            var argumentTypes = arguments.Select(_ => LLVMTypeRef.Double).ToArray();
+            var argumentTypes = arguments.Select(arg => ConvertTypeDefinition(arg.Type)).ToArray();
             var function = _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(returnType), argumentTypes));
             function.Linkage = LLVMLinkage.LLVMExternalLinkage;
 
@@ -87,15 +87,25 @@ namespace Lang.Backend.LLVM
             // 1. Get function definition
             var function = _module.GetNamedFunction(functionAst.Name);
             _builder.PositionAtEnd(function.AppendBasicBlock("entry"));
+            var localVariables = new Dictionary<string, LLVMValueRef>();
 
-            // 2. Loop through function body
-            foreach (var ast in functionAst.Children)
+            // 2. Allocate arguments on the stack
+            for (var i = 0; i < functionAst.Arguments.Count; i++)
             {
-                // 2a. Recursively write out lines
-                WriteFunctionLine(ast);
+                var argument = function.GetParam((uint) i);
+                var allocation = _builder.BuildAlloca(ConvertTypeDefinition(functionAst.Arguments[i].Type), argument.Name);
+                _builder.BuildStore(argument, allocation);
+                localVariables.Add(argument.Name, allocation);
             }
 
-            // 3. Verify the function
+            // 3. Loop through function body
+            foreach (var ast in functionAst.Children)
+            {
+                // 3a. Recursively write out lines
+                WriteFunctionLine(ast, localVariables);
+            }
+
+            // 4. Verify the function
             function.VerifyFunction(LLVMVerifierFailureAction.LLVMPrintMessageAction);
         }
 
@@ -104,12 +114,22 @@ namespace Lang.Backend.LLVM
             // 1. Define main function
             var function = WriteFunctionDefinition("main", main.Arguments, main.ReturnType);
             _builder.PositionAtEnd(function.AppendBasicBlock("entry"));
+            var localVariables = new Dictionary<string, LLVMValueRef>();
+
+            // 2. Allocate arguments on the stack
+            for (var i = 0; i < main.Arguments.Count; i++)
+            {
+                var argument = function.GetParam((uint) i);
+                var allocation = _builder.BuildAlloca(ConvertTypeDefinition(main.Arguments[i].Type), argument.Name);
+                _builder.BuildStore(argument, allocation);
+                localVariables.Add(argument.Name, allocation);
+            }
 
             // 2. Loop through function body
             foreach (var ast in main.Children)
             {
                 // 2a. Recursively write out lines
-                WriteFunctionLine(ast);
+                WriteFunctionLine(ast, localVariables);
             }
 
             // 3. Verify the function
@@ -133,93 +153,103 @@ namespace Lang.Backend.LLVM
             targetMachine.EmitToFile(_module, objectFile, LLVMCodeGenFileType.LLVMObjectFile);
         }
 
-        private void WriteFunctionLine(IAst ast)
+        private void WriteFunctionLine(IAst ast, IDictionary<string, LLVMValueRef> localVariables)
         {
             switch (ast)
             {
                 case ReturnAst returnAst:
-                    WriteReturnStatement(returnAst);
+                    WriteReturnStatement(returnAst, localVariables);
                     break;
                 case DeclarationAst declaration:
-                    WriteDeclaration(declaration);
+                    WriteDeclaration(declaration, localVariables);
                     break;
                 case AssignmentAst assignment:
-                    WriteAssignment(assignment);
+                    WriteAssignment(assignment, localVariables);
                     break;
                 case ScopeAst scope:
-                    WriteScope(scope.Children);
+                    WriteScope(scope.Children, localVariables);
                     break;
                 case ConditionalAst conditional:
-                    WriteConditional(conditional);
+                    WriteConditional(conditional, localVariables);
                     break;
                 case WhileAst whileAst:
-                    WriteWhile(whileAst);
+                    WriteWhile(whileAst, localVariables);
                     break;
                 case EachAst each:
-                    WriteEach(each);
+                    WriteEach(each, localVariables);
                     break;
                 default:
-                    WriteExpression(ast);
+                    WriteExpression(ast, localVariables);
                     break;
             }
         }
 
-        private void WriteReturnStatement(ReturnAst returnAst)
+        private void WriteReturnStatement(ReturnAst returnAst, IDictionary<string, LLVMValueRef> localVariables)
         {
-            // 1. Determine to write constant, variable, or evaluate an expression
-            switch (returnAst.Value)
+            // 1. Get the return value
+            var returnValue = EvaluateExpression(returnAst.Value, localVariables);
+
+            // 2. Write expression as return value
+            _builder.BuildRet(returnValue);
+        }
+
+        private void WriteDeclaration(DeclarationAst declaration, IDictionary<string, LLVMValueRef> localVariables)
+        {
+            // TODO Implement me
+        }
+        
+        private void WriteAssignment(AssignmentAst assignment, IDictionary<string, LLVMValueRef> localVariables)
+        {
+            // TODO Implement me
+        }
+
+        private void WriteScope(List<IAst> scopeChildren, IDictionary<string, LLVMValueRef> localVariables)
+        {
+            // TODO Implement me
+        }
+
+        private void WriteConditional(ConditionalAst conditional, IDictionary<string, LLVMValueRef> localVariables)
+        {
+            // TODO Implement me
+        }
+
+        private void WriteWhile(WhileAst whileAst, IDictionary<string, LLVMValueRef> localVariables)
+        {
+            // TODO Implement me
+        }
+
+        private void WriteEach(EachAst each, IDictionary<string, LLVMValueRef> localVariables)
+        {
+            // TODO Implement me
+        }
+
+        private void WriteExpression(IAst ast, IDictionary<string, LLVMValueRef> localVariables)
+        {
+            // TODO Implement me
+        }
+
+        private LLVMValueRef EvaluateExpression(IAst ast, IDictionary<string, LLVMValueRef> localVariables)
+        {
+            switch (ast)
             {
                 case ConstantAst constant:
                     var type = ConvertTypeDefinition(constant.Type);
                     switch (type.Kind)
                     {
                         case LLVMTypeKind.LLVMIntegerTypeKind:
-                            _builder.BuildRet(LLVMValueRef.CreateConstInt(type, ulong.Parse(constant.Value), true));
+                            return LLVMValueRef.CreateConstInt(type, ulong.Parse(constant.Value), true);
+                        // TODO Implement more branches
+                        default:
                             break;
                     }
-                    return;
+                    break;
                 case VariableAst variable:
+                    // TODO Implement more asts
+                default:
                     break;
             }
 
-            // 2. Write expression as return value
-            _builder.BuildRet(LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, 0));
-        }
-
-        private void WriteDeclaration(DeclarationAst declaration)
-        {
-            // TODO Implement me
-            // _builder.BuildAlloca();
-        }
-        
-        private void WriteAssignment(AssignmentAst assignment)
-        {
-            // TODO Implement me
-        }
-
-        private void WriteScope(List<IAst> scopeChildren)
-        {
-            // TODO Implement me
-        }
-
-        private void WriteConditional(ConditionalAst conditional)
-        {
-            // TODO Implement me
-        }
-
-        private void WriteWhile(WhileAst whileAst)
-        {
-            // TODO Implement me
-        }
-
-        private void WriteEach(EachAst each)
-        {
-            // TODO Implement me
-        }
-
-        private void WriteExpression(IAst ast)
-        {
-            // TODO Implement me
+            return LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, 0);
         }
 
         private static LLVMTypeRef ConvertTypeDefinition(TypeDefinition typeDef)
