@@ -33,11 +33,11 @@ bool run_test(u8* test_dir) {
 
     command: List<u8>[100];
     sprintf(command.data, "%s %s", executable, test_dir);
-    printf("Compiling: %s\n", command.data);
+    printf("Compiling: %s", command.data);
     exit_code := run_command(command.data);
 
     if exit_code {
-        printf("Test Failed\n");
+        printf(" -- Test Failed\n");
         return false;
     }
 
@@ -45,7 +45,7 @@ bool run_test(u8* test_dir) {
     sprintf(bin_dir.data, "%s/bin", test_dir);
     dir := opendir(bin_dir.data);
     if dir == null {
-        printf("Test Failed, unable to open directory '%s'\n", bin_dir.data);
+        printf(" -- Test Failed, unable to open directory '%s'\n", bin_dir.data);
         return false;
     }
 
@@ -63,17 +63,18 @@ bool run_test(u8* test_dir) {
     closedir(dir);
 
     if !found_executable {
-        printf("Test Failed, executable not found in directory '%s'\n", bin_dir.data);
+        printf(" -- Test Failed, executable not found in directory '%s'\n", bin_dir.data);
         return false;
     }
 
-    printf("Running: %s\n", command.data);
+    printf("\nRunning: %s", command.data);
     exit_code = run_command(command.data);
 
     if exit_code {
-        printf("Test Failed\n");
+        printf(" -- Test Failed\n");
         return false;
     }
+    printf("\n");
     return true;
 }
 
