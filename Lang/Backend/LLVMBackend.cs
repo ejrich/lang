@@ -133,9 +133,9 @@ namespace Lang.Backend
             {
                 _emitDebug = true;
                 _debugBuilder = LLVM.CreateDIBuilder(_module);
-                // _debugCompilationUnit = LLVM.DIBuilderCreateCompileUnit(_debugBuilder, 2, "", "obj", "ol", 0, string.Empty, 0);
-                // _debugFiles = project.SourceFiles.Select(file =>
-                //     LLVM.DIBuilderCreateFile(_debugBuilder, Path.GetFileName(file), Path.GetDirectoryName(file))).ToList();
+                _debugCompilationUnit = LLVM.DIBuilderCreateCompileUnit(_debugBuilder, 2, "", "obj", "ol", false, string.Empty, 0, string.Empty, 0, 0, false, false, string.Empty, string.Empty);
+                _debugFiles = project.SourceFiles.Select(file =>
+                    LLVM.DIBuilderCreateFile(_debugBuilder, Path.GetFileName(file), Path.GetDirectoryName(file))).ToList();
             }
         }
 
@@ -461,15 +461,18 @@ namespace Lang.Backend
             if (outputIntermediate)
             {
                 var llvmIrFile = objectFile[..^1] + "ll";
-                LLVM.PrintModuleToFile(_module, llvmIrFile, out string _);
+                LLVM.PrintModuleToFile(_module, llvmIrFile, out _);
 
                 var assemblyFile = objectFile[..^1] + "s";
-                // var assemblyFilePtr = Marshal.StringToCoTaskMemAnsi(assemblyFile);
-                LLVM.TargetMachineEmitToFile(targetMachine, _module, assemblyFile, LLVMCodeGenFileType.LLVMAssemblyFile, out string _);
+                LLVM.TargetMachineEmitToFile(targetMachine, _module, assemblyFile, LLVMCodeGenFileType.LLVMAssemblyFile, out _);
             }
 
-            // var file = Marshal.StringToCoTaskMemAnsi(objectFile);
-            LLVM.TargetMachineEmitToFile(targetMachine, _module, objectFile, LLVMCodeGenFileType.LLVMObjectFile, out string _);
+            LLVM.TargetMachineEmitToFile(targetMachine, _module, objectFile, LLVMCodeGenFileType.LLVMObjectFile, out var errorMessage);
+            if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                Console.WriteLine($"LLVM Build error: {errorMessage}");
+                Environment.Exit(ErrorCodes.BuildError);
+            }
         }
 
         private bool BuildAllocations(IAst ast)
