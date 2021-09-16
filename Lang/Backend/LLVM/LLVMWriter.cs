@@ -510,14 +510,10 @@ namespace Lang.Backend.LLVM
                         switch (structField.DefaultValue)
                         {
                             case ConstantAst constant:
-                                var constantValue = BuildConstant(type, constant);
-                                LLVMApi.BuildStore(_builder, constantValue, field);
+                                BuildConstant(type, constant);
                                 break;
                             case StructFieldRefAst structFieldRef:
-                                var enumDef = (EnumAst)_types[structFieldRef.Name];
-                                var value = enumDef.Values[structFieldRef.ValueIndex].Value;
-                                var enumValue = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (ulong)value, false);
-                                LLVMApi.BuildStore(_builder, enumValue, field);
+                                // TODO Implement this
                                 break;
                             case null:
                                 LLVMApi.BuildStore(_builder, GetConstZero(type), field);
