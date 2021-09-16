@@ -1225,7 +1225,6 @@ namespace Lang.Backend
                         callArguments[functionDef.Arguments.Count - 1] = paramsValue;
                         return (functionDef.ReturnType, LLVM.BuildCall(_builder, function, callArguments, string.Empty));
                     }
-                    // TODO If the function is extern, get the pointer of the string
                     else if (functionDef.Varargs)
                     {
                         var callArguments = new LLVMValueRef[call.Arguments.Count];
@@ -1239,7 +1238,7 @@ namespace Lang.Backend
                         // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
                         for (var i = functionDef.Arguments.Count - 1; i < call.Arguments.Count; i++)
                         {
-                            var (type, value) = WriteExpression(call.Arguments[i], localVariables, true);
+                            var (type, value) = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
                             if (type.Name == "float")
                             {
                                 value = LLVM.BuildFPExt(_builder, value, LLVMTypeRef.DoubleType(), "tmpdouble");
@@ -1267,7 +1266,6 @@ namespace Lang.Backend
                         IdentifierAst identifier => localVariables[identifier.Name],
                         StructFieldRefAst structField => BuildStructField(structField, localVariables, out _, out constant),
                         IndexAst index => GetListPointer(index, localVariables, out _),
-                        // TODO Test unary deref
                         // @Cleanup This branch should never be hit
                         _ => (null, new LLVMValueRef())
                     };
@@ -1308,7 +1306,6 @@ namespace Lang.Backend
                             IdentifierAst identifier => localVariables[identifier.Name],
                             StructFieldRefAst structField => BuildStructField(structField, localVariables, out _, out _),
                             IndexAst index => GetListPointer(index, localVariables, out _),
-                            // TODO Test unary deref?
                             // @Cleanup this branch should not be hit
                             _ => (null, new LLVMValueRef())
                         };
@@ -1602,17 +1599,7 @@ namespace Lang.Backend
                         }
                         else
                         {
-                            if (type.CArray)
-                            {
-                                value = LLVM.BuildGEP(_builder, value, new []{_zeroInt, indexValue}, "indexptr");
-                            }
-                            else
-                            {
-                                var listData = LLVM.BuildStructGEP(_builder, value, 1, "listdata");
-                                var dataPointer = LLVM.BuildLoad(_builder, listData, "dataptr");
-                                value = LLVM.BuildGEP(_builder, dataPointer, new [] {indexValue}, "indexptr");
-                            }
-                            type = type.Generics[0];
+                            (type, value) = GetListPointer(index, localVariables, out _, type, value);
                         }
                         break;
                 }
@@ -1623,10 +1610,13 @@ namespace Lang.Backend
 
         private StructAst _stringStruct;
 
-        private (TypeDefinition type, LLVMValueRef value) GetListPointer(IndexAst index, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, out bool loaded)
+        private (TypeDefinition type, LLVMValueRef value) GetListPointer(IndexAst index, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, out bool loaded, TypeDefinition type = null, LLVMValueRef variable = default)
         {
             // 1. Get the variable pointer
-            var (type, variable) = localVariables[index.Name];
+            if (type == null)
+            {
+                (type, variable) = localVariables[index.Name];
+            }
 
             // 2. Determine the index
             var (_, indexValue) = WriteExpression(index.Index, localVariables);
@@ -1654,7 +1644,12 @@ namespace Lang.Backend
                 elementType = type.Generics[0];
             }
             LLVMValueRef listPointer;
-            if (type.CArray)
+            if (type.TypeKind == TypeKind.Pointer)
+            {
+                var dataPointer = LLVM.BuildLoad(_builder, variable, "dataptr");
+                listPointer = LLVM.BuildGEP(_builder, dataPointer, new []{indexValue}, "indexptr");
+            }
+            else if (type.CArray)
             {
                 listPointer = LLVM.BuildGEP(_builder, variable, new []{_zeroInt, indexValue}, "dataptr");
             }
@@ -1668,8 +1663,7 @@ namespace Lang.Backend
             return (elementType, listPointer);
         }
 
-        private LLVMValueRef BuildExpression((TypeDefinition type, LLVMValueRef value) lhs,
-            (TypeDefinition type, LLVMValueRef value) rhs, Operator op, TypeDefinition targetType)
+        private LLVMValueRef BuildExpression((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, Operator op, TypeDefinition targetType)
         {
             // 1. Handle pointer math
             if (lhs.type.Name == "*")
