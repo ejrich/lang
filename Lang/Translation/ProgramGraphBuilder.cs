@@ -2426,8 +2426,8 @@ namespace Lang.Translation
         {
             foreach (var field in structAst.Fields)
             {
-                // 1. Get the type from program graph
-                var type = _programGraph.Types[field.Type.GenericName];
+                // 1. Get the type from type dictionary
+                var type = field.Type.CArray ? _programGraph.Types[field.Type.Generics[0].GenericName] :_programGraph.Types[field.Type.GenericName];
 
                 // 2. If the type is a struct and the size hasn't been calculated, verify the struct and calculate the size
                 if (type is StructAst fieldStruct)
@@ -2437,7 +2437,7 @@ namespace Lang.Translation
                         VerifyStruct(fieldStruct);
                     }
                 }
-                structAst.Size += type.Size;
+                structAst.Size += field.Type.CArray ? type.Size * field.Type.ConstCount.Value : type.Size;
             }
         }
 
