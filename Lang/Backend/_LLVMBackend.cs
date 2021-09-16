@@ -28,7 +28,7 @@ namespace Lang.Backend
         private LLVMMetadataRef _debugCompilationUnit;
         private List<LLVMMetadataRef> _debugFiles;
         private LLVMMetadataRef[] _debugTypes;
-        private Dictionary<string, LLVMMetadataRef> _debugFunctions;
+        private LLVMMetadataRef[] _debugFunctions;
 
         private readonly LLVMValueRef _zeroInt = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), 0, false);
 
@@ -416,54 +416,98 @@ namespace Lang.Backend
             // 4. Declare variables
             LLVMValueRef typeTable = null;
             _globals = new LLVMValueRef[Program.GlobalVariables.Count];
-            foreach (var globalVariable in Program.GlobalVariables)
+            if (_emitDebug)
             {
-                LLVMValueRef global;
-                if (globalVariable.Array)
+                foreach (var globalVariable in Program.GlobalVariables)
                 {
-                    global = _module.AddGlobal(LLVM.ArrayType(_types[globalVariable.Type.TypeIndex], globalVariable.ArrayLength), globalVariable.Name);
-
-                    if (globalVariable.InitialArrayValues != null)
+                    LLVMValueRef global;
+                    if (globalVariable.Array)
                     {
-                        // TODO Get the initial values
+                        global = _module.AddGlobal(LLVM.ArrayType(_types[globalVariable.Type.TypeIndex], globalVariable.ArrayLength), globalVariable.Name);
+
+                        if (globalVariable.InitialArrayValues != null)
+                        {
+                            // TODO Get the initial values
+                        }
+                    }
+                    else
+                    {
+                        var type = _types[globalVariable.Type.TypeIndex];
+                        global = _module.AddGlobal(type, globalVariable.Name);
+
+                        switch (globalVariable.InitialValue.ValueType)
+                        {
+                            case InstructionValueType.Constant:
+                                LLVM.SetInitializer(global, GetConstant(globalVariable.InitialValue));
+                                break;
+                            case InstructionValueType.Null:
+                                LLVM.SetInitializer(global, LLVM.ConstNull(type));
+                                break;
+                            case InstructionValueType.ConstantStruct:
+                                // TODO Implement me
+                                break;
+                        }
+                    }
+
+                    using (var name = new MarshaledString(globalVariable.Name))
+                    {
+                        // var file = _debugFiles[globalVariable.FileIndex];
+                        var debugType = _debugTypes[globalVariable.Type.TypeIndex];
+                        // var globalDebug = LLVM.DIBuilderCreateGlobalVariableExpression(_debugBuilder, _debugCompilationUnit, name.Value, (UIntPtr)name.Length, null, (UIntPtr)0, file, globalVariable.Line, debugType, 0, null, null, 0);
+                        // LLVM.GlobalSetMetadata(global, 0, globalDebug);
+                    }
+
+                    LLVM.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
+                    _globals[globalVariable.Index] = global;
+
+                    if (globalVariable.Name == "__type_table")
+                    {
+                        typeTable = global;
+                        SetPrivateConstant(typeTable);
                     }
                 }
-                else
+            }
+            else
+            {
+                foreach (var globalVariable in Program.GlobalVariables)
                 {
-                    var type = _types[globalVariable.Type.TypeIndex];
-                    global = _module.AddGlobal(type, globalVariable.Name);
-
-                    switch (globalVariable.InitialValue.ValueType)
+                    LLVMValueRef global;
+                    if (globalVariable.Array)
                     {
-                        case InstructionValueType.Constant:
-                            LLVM.SetInitializer(global, GetConstant(globalVariable.InitialValue));
-                            break;
-                        case InstructionValueType.Null:
-                            LLVM.SetInitializer(global, LLVM.ConstNull(type));
-                            break;
-                        case InstructionValueType.ConstantStruct:
-                            // TODO Implement me
-                            break;
+                        global = _module.AddGlobal(LLVM.ArrayType(_types[globalVariable.Type.TypeIndex], globalVariable.ArrayLength), globalVariable.Name);
+
+                        if (globalVariable.InitialArrayValues != null)
+                        {
+                            // TODO Get the initial values
+                        }
                     }
-                }
+                    else
+                    {
+                        var type = _types[globalVariable.Type.TypeIndex];
+                        global = _module.AddGlobal(type, globalVariable.Name);
 
-                // if (_emitDebug)
-                // {
-                //     using var name = new MarshaledString(globalVariable.Name);
+                        switch (globalVariable.InitialValue.ValueType)
+                        {
+                            case InstructionValueType.Constant:
+                                LLVM.SetInitializer(global, GetConstant(globalVariable.InitialValue));
+                                break;
+                            case InstructionValueType.Null:
+                                LLVM.SetInitializer(global, LLVM.ConstNull(type));
+                                break;
+                            case InstructionValueType.ConstantStruct:
+                                // TODO Implement me
+                                break;
+                        }
+                    }
 
-                //     var file = _debugFiles[globalVariable.FileIndex];
-                //     var debugType = GetDebugType(globalVariable.TypeDefinition);
-                //     var globalDebug = LLVM.DIBuilderCreateGlobalVariableExpression(_debugBuilder, _debugCompilationUnit, name.Value, (UIntPtr)name.Length, null, (UIntPtr)0, file, globalVariable.Line, debugType, 0, null, null, 0);
-                //     LLVM.GlobalSetMetadata(global, 0, globalDebug);
-                // }
+                    LLVM.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
+                    _globals[globalVariable.Index] = global;
 
-                LLVM.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
-                _globals[globalVariable.Index] = global;
-
-                if (globalVariable.Name == "__type_table")
-                {
-                    typeTable = global;
-                    SetPrivateConstant(typeTable);
+                    if (globalVariable.Name == "__type_table")
+                    {
+                        typeTable = global;
+                        SetPrivateConstant(typeTable);
+                    }
                 }
             }
 
@@ -521,7 +565,7 @@ namespace Lang.Backend
                 AddModuleFlag("PIE Level", 2);
 
                 _debugTypes = new LLVMMetadataRef[TypeTable.Count];
-                _debugFunctions = new Dictionary<string, LLVMMetadataRef>();
+                _debugFunctions = new LLVMMetadataRef[Program.FunctionCount];
             }
         }
 
@@ -576,12 +620,43 @@ namespace Lang.Backend
 
         private LLVMValueRef WriteFunctionDefinition(string name, FunctionIR function)
         {
-            var argumentTypes = new LLVMTypeRef[function.Arguments.Length];
-            for (var i = 0; i < function.Arguments.Length; i++)
+            var varargs = function.Source.Varargs;
+            var sourceArguments = function.Source.Arguments;
+            var argumentCount = varargs ? sourceArguments.Count - 1 : sourceArguments.Count;
+
+            var argumentTypes = new LLVMTypeRef[argumentCount];
+            LLVMValueRef functionPointer;
+
+            if (_emitDebug)
             {
-                argumentTypes[i] = _types[function.Arguments[i].TypeIndex];
+                // Get the argument types and create debug symbols
+                var debugArgumentTypes = new LLVMMetadataRef[argumentCount + 1];
+                debugArgumentTypes[0] = _debugTypes[function.Source.ReturnType.TypeIndex];
+
+                for (var i = 0; i < argumentCount; i++)
+                {
+                    var argumentType = sourceArguments[i].Type.TypeIndex;
+                    argumentTypes[i] = _types[argumentType];
+                    debugArgumentTypes[i + 1] = _debugTypes[argumentType];
+                }
+
+                var file = _debugFiles[function.Source.FileIndex];
+                var functionType = _debugBuilder.CreateSubroutineType(file, debugArgumentTypes, LLVMDIFlags.LLVMDIFlagZero);
+                // TODO Add debugName?
+                var debugFunction = _debugFunctions[function.Index] = _debugBuilder.CreateFunction(file, name, name, file, function.Source.Line, functionType, 0, 1, function.Source.Line, LLVMDIFlags.LLVMDIFlagPrototyped, 0);
+
+                // Declare the function
+                functionPointer = _module.AddFunction(name, LLVMTypeRef.CreateFunction(_types[function.Source.ReturnType.TypeIndex], argumentTypes, varargs));
+                LLVM.SetSubprogram(functionPointer, debugFunction);
             }
-            var functionPointer = _module.AddFunction(name, LLVMTypeRef.CreateFunction(_types[function.ReturnType.TypeIndex], argumentTypes, function.Varargs));
+            else
+            {
+                for (var i = 0; i < argumentCount; i++)
+                {
+                    argumentTypes[i] = _types[sourceArguments[i].Type.TypeIndex];
+                }
+                functionPointer = _module.AddFunction(name, LLVMTypeRef.CreateFunction(_types[function.Source.ReturnType.TypeIndex], argumentTypes, varargs));
+            }
 
             if (function.Instructions != null)
             {
