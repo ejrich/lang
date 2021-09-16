@@ -242,6 +242,8 @@ namespace Lang.Runner
 
                                     var typeFieldName = typeFieldType.GetField("name");
                                     typeFieldName.SetValue(typeField, GetString(field.Name));
+                                    var typeFieldOffset = typeFieldType.GetField("offset");
+                                    typeFieldOffset.SetValue(typeField, field.Offset);
                                     var typeFieldInfo = typeFieldType.GetField("type_info");
                                     var typePointer = _typeInfoPointers[field.Type.GenericName];
                                     typeFieldInfo.SetValue(typeField, typePointer);
@@ -320,8 +322,15 @@ namespace Lang.Runner
 
                 // Free old data
                 var typeTableVariable = _globalVariables["__type_table"];
-                var oldData = GetPointer(typeTableVariable.Value);
-                Marshal.FreeHGlobal(oldData);
+                var oldPointer = GetPointer(typeTableVariable.Value);
+                var oldData = Marshal.PtrToStructure(oldPointer, typeInfoListType);
+                var dataField = typeInfoListType.GetField("data");
+                var oldDataPointer = GetPointer(dataField.GetValue(oldData));
+                if (oldDataPointer != IntPtr.Zero)
+                {
+                    Marshal.FreeHGlobal(oldDataPointer);
+                }
+                Marshal.FreeHGlobal(oldPointer);
 
                 // Set the variable
                 var variable = programGraph.Types["List.*.TypeInfo"];

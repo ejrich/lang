@@ -227,8 +227,9 @@ namespace Lang.Backend.LLVM
                         var fieldNameString = LLVMApi.AddGlobal(_module, typeName.TypeOf(), "str");
                         SetPrivateConstant(fieldNameString);
                         LLVMApi.SetInitializer(fieldNameString, fieldName);
+                        var fieldOffset = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), field.Offset, false);
 
-                        var typeField = LLVMApi.ConstStruct(new [] {fieldNameString, typePointers[field.Type.GenericName].typeInfo}, false);
+                        var typeField = LLVMApi.ConstStruct(new [] {fieldNameString, fieldOffset, typePointers[field.Type.GenericName].typeInfo}, false);
 
                         typeFields[i] = typeField;
                     }
