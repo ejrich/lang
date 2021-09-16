@@ -113,7 +113,17 @@ List<int> create_list(int count) {
     return list;
 }
 
+struct Node {
+    int value;
+    Node* next;
+}
+
 int* pointers() {
+    node: Node;
+    node.value = 9;
+    next: Node;
+    next.value = 8;
+    node.next = &next;
     a := 6;
     b := &a;
     c := *b;
