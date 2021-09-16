@@ -347,6 +347,7 @@ namespace Lang.Runner
                             var constantValue = GetConstant(field.Type, constant.Value);
                             fieldInstance!.SetValue(instance, constantValue);
                             break;
+                        // TODO Get this working
                         // case StructFieldRefAst structField:
                         //     var enumDef = (EnumAst)_programGraph.Types[structField.Value];
                         //     var value = enumDef.Values[structField.ValueIndex].Value;
@@ -436,6 +437,7 @@ namespace Lang.Runner
                     variable.Value = expression.Value;
                     break;
                 }
+                // TODO Get this working
                 // case StructFieldRefAst structField:
                 // {
                 //     var variable = variables[structField.Value];
@@ -604,6 +606,7 @@ namespace Lang.Runner
                     return new ValueType {Type = constant.Type, Value = GetConstant(constant.Type, constant.Value)};
                 case NullAst nullAst:
                     return new ValueType {Type = nullAst.TargetType, Value = IntPtr.Zero};
+                // TODO Get this working
                 // case StructFieldRefAst structField:
                 //     if (structField.IsEnum)
                 //     {
@@ -629,6 +632,7 @@ namespace Lang.Runner
 
                             return changeByOne.Prefix ? variable : previousValue;
                         }
+                        // TODO Get this working
                         // case StructFieldRefAst structField:
                         // {
                         //     var variable = variables[structField.Value];
@@ -860,27 +864,48 @@ namespace Lang.Runner
             return stringInstance;
         }
 
-        // private ValueType GetStructFieldRef(StructFieldRefAst structField, object structVariable)
-        // {
-        //     var value = structField.Value;
-        //     var structDefinition = (StructAst) _programGraph.Types[structField.StructName];
+        // TODO Modify this to be similar to the PGB implementation
+        private ValueType GetStructFieldRef(StructFieldRefAst structField, object structVariable)
+        {
+            // var value = structField.Value;
+            var valueType = new ValueType();
 
-        //     if (structField.IsPointer)
-        //     {
-        //         var type = _types[structField.StructName];
-        //         structVariable = Marshal.PtrToStructure(GetPointer(structVariable), type);
-        //     }
-        //     var field = structVariable!.GetType().GetField(value.Name);
-        //     var fieldValue = field!.GetValue(structVariable);
+            for (var i = 1; i < structField.Children.Count; i++)
+            {
+                var structName = structField.StructNames[i-1];
+                var structDefinition = (StructAst) _programGraph.Types[structName];
 
-        //     if (value.Value == null)
-        //     {
-        //         var fieldType = structDefinition.Fields[structField.ValueIndex].Type;
-        //         return new ValueType {Type = fieldType, Value = fieldValue};
-        //     }
+                if (structField.Pointers[i-1])
+                {
+                    var type = _types[structName];
+                    structVariable = Marshal.PtrToStructure(GetPointer(structVariable), type);
+                }
 
-        //     return GetStructFieldRef(value, fieldValue);
-        // }
+                switch (structField.Children[i])
+                {
+                    case IdentifierAst identifier:
+                        var field = structVariable!.GetType().GetField(identifier.Name);
+                        var fieldValue = field!.GetValue(structVariable);
+                        valueType.Type = structDefinition.Fields[structField.ValueIndices[i-1]].Type;
+                        valueType.Value = fieldValue;
+                        break;
+                    case IndexAst index:
+                        var list = structVariable!.GetType().GetField(index.Name);
+                        var listValue = list!.GetValue(structVariable);
+                        // var indexValue = VerifyIndex(index, fieldType, currentFunction, scopeIdentifiers);
+                        break;
+                }
+
+                // if (value.Value == null)
+                // {
+                //     var fieldType = structDefinition.Fields[structField.ValueIndex].Type;
+                //     return new ValueType {Type = fieldType, Value = fieldValue};
+                // }
+            }
+
+            // return GetStructFieldRef(value, fieldValue);
+            return valueType;
+        }
 
         private (TypeDefinition typeDef, Type elementType, IntPtr pointer) GetListPointer(IndexAst indexAst, IDictionary<string, ValueType> variables)
         {

@@ -298,6 +298,7 @@ namespace Lang.Translation
                             {
                                 if (fieldType is EnumAst enumAst)
                                 {
+                                    structFieldRef.ValueIndices = new int[1];
                                     var enumType = VerifyEnumValue(enumAst, structFieldRef);
                                     if (enumType != null && !TypeEquals(structField.Type, enumType))
                                     {
@@ -1016,12 +1017,11 @@ namespace Lang.Translation
                 AddError($"Struct '{PrintTypeDefinition(structType)}' not defined", ast);
                 return null;
             }
-            if (typeDefinition is not StructAst)
+            if (typeDefinition is not StructAst structDefinition)
             {
                 AddError($"Type '{PrintTypeDefinition(structType)}' does not contain field '{fieldName}'", ast);
                 return null;
             }
-            var structDefinition = (StructAst) typeDefinition;
 
             // 2. Get the field definition and set the field index
             StructFieldAst field = null;
@@ -1172,6 +1172,7 @@ namespace Lang.Translation
                     return null;
                 case StructFieldRefAst structField:
                     TypeDefinition refType;
+                    structField.ValueIndices = new int[structField.Children.Count - 1];
                     switch (structField.Children[0])
                     {
                         case IdentifierAst identifier:
@@ -1192,7 +1193,6 @@ namespace Lang.Translation
                                     return null;
                             }
                             break;
-                        // TODO have some exclusionary cases
                         default:
                             refType = VerifyExpression(structField.Children[0], currentFunction, scopeIdentifiers);
                             break;
@@ -1203,7 +1203,6 @@ namespace Lang.Translation
                     }
                     structField.Pointers = new bool[structField.Children.Count - 1];
                     structField.StructNames = new string[structField.Children.Count - 1];
-                    structField.ValueIndices = new int[structField.Children.Count - 1];
 
                     for (var i = 1; i < structField.Children.Count; i++)
                     {
@@ -1732,7 +1731,7 @@ namespace Lang.Translation
             {
                 if (enumAst.Values[i].Name == value.Name)
                 {
-                    // enumRef.ValueIndex = i;
+                    structField.ValueIndices[0] = i;
                     enumValue = enumAst.Values[i];
                     break;
                 }
