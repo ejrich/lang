@@ -8,6 +8,6 @@ namespace Lang.Backend
         /// </summary>
         /// <param name="filePath">The path to the translated source file</param>
         /// <returns>The path to the object file</returns>
-        string BuildFile(string filePath);
+        string BuildFile(string filePath, BuildSettings buildSettings);
     }
 }

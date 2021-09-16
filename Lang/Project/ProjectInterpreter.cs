@@ -44,6 +44,7 @@ namespace Lang.Project
             {
                 Name = projectFile.Name,
                 Path = projectDirectory,
+                Linker = projectFile.Linker,
                 BuildFiles = sourceFiles,
                 Dependencies = projectFile.Dependencies
             };
@@ -89,6 +90,9 @@ namespace Lang.Project
                         case ProjectFileSection.Packages:
                             projectFile.Packages.Add(line);
                             break;
+                        case ProjectFileSection.Linker:
+                            projectFile.Linker = (Linker) Enum.Parse(typeof(Linker), line, true);
+                            break;
                     }
                 }
                 else
@@ -98,6 +102,7 @@ namespace Lang.Project
                         "#name" => ProjectFileSection.Name,
                         "#dependencies" => ProjectFileSection.Dependencies,
                         "#packages" => ProjectFileSection.Packages,
+                        "#linker" => ProjectFileSection.Linker,
                         _ => ProjectFileSection.None,
                     };
                 }

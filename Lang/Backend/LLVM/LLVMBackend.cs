@@ -17,7 +17,7 @@ namespace Lang.Backend.LLVM
             var objectFile = _writer.WriteFile(programGraph, project.Name, project.Path, buildSettings);
 
             // 2. Link binaries
-            _linker.Link(objectFile, project.Path, project.Dependencies, buildSettings);
+            _linker.Link(objectFile, project, buildSettings);
         }
     }
 }
