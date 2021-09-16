@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using System.Text;
+using Lang.Parsing;
 
 namespace Lang.Backend.C
 {
@@ -51,13 +52,14 @@ namespace Lang.Backend.C
             // TODO Write out data and functions in namespace
         }
 
-        private static void AppendFunction(StringBuilder fileContents, Function function)
+        private static void AppendFunction(StringBuilder fileContents, FunctionAst function)
         {
             // TODO Write out functions
         }
 
-        private static void AppendMainFunction(StringBuilder fileContents, Function main)
+        private static void AppendMainFunction(StringBuilder fileContents, FunctionAst main)
         {
+            // TODO Write out main function
             fileContents.AppendLine("int main() {");
             fileContents.AppendLine("\treturn 0;");
             fileContents.AppendLine("}");
