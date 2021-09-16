@@ -47,17 +47,26 @@ namespace Lang
         // public FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, TypeDefinition[] genericTypes)
         public FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, IType[] genericTypes)
         {
-            var genericTypeDefinitions = GetGenericTypeDefinitions(genericTypes);
+            var genericTypeDefs = GetGenericTypeDefinitions(genericTypes);
             var function = CopyAst(baseFunction);
             function.Name = name;
             function.Flags = baseFunction.Flags;
-            function.ReturnTypeDefinition = baseFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? CopyType(baseFunction.ReturnTypeDefinition, genericTypeDefinitions) : baseFunction.ReturnTypeDefinition;
+            // function.ReturnTypeDefinition = baseFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? CopyType(baseFunction.ReturnTypeDefinition, genericTypeDefs) : baseFunction.ReturnTypeDefinition;
+
+            if (baseFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics))
+            {
+                function.ReturnTypeDefinition = CopyType(baseFunction.ReturnTypeDefinition, genericTypeDefs);
+            }
+            else
+            {
+                function.ReturnType = baseFunction.ReturnType;
+            }
 
             foreach (var argument in baseFunction.Arguments)
             {
                 if (argument.HasGenerics)
                 {
-                    function.Arguments.Add(CopyDeclaration(argument, genericTypeDefinitions, baseFunction.Generics));
+                    function.Arguments.Add(CopyDeclaration(argument, genericTypeDefs, baseFunction.Generics));
                 }
                 else
                 {
@@ -70,7 +79,7 @@ namespace Lang
                 function.ParamsElementType = TypeTable.GetType(function.Arguments[^1].TypeDefinition.Generics[0]);
             }
 
-            function.Body = CopyScope(baseFunction.Body, genericTypeDefinitions, baseFunction.Generics);
+            function.Body = CopyScope(baseFunction.Body, genericTypeDefs, baseFunction.Generics);
 
             return function;
         }
@@ -78,19 +87,19 @@ namespace Lang
         // public OperatorOverloadAst CreatePolymorphedOperatorOverload(OperatorOverloadAst baseOverload, TypeDefinition[] genericTypes)
         public OperatorOverloadAst CreatePolymorphedOperatorOverload(OperatorOverloadAst baseOverload, IType[] genericTypes)
         {
-            var genericTypeDefinitions = GetGenericTypeDefinitions(genericTypes);
+            var genericTypeDefs = GetGenericTypeDefinitions(genericTypes);
             var overload = CopyAst(baseOverload);
             overload.Operator = baseOverload.Operator;
-            overload.Type = CopyType(baseOverload.Type, genericTypeDefinitions);
+            overload.Type = CopyType(baseOverload.Type, genericTypeDefs);
             overload.Flags = baseOverload.Flags;
-            overload.ReturnTypeDefinition = baseOverload.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? CopyType(baseOverload.ReturnTypeDefinition, genericTypeDefinitions) : baseOverload.ReturnTypeDefinition;
+            overload.ReturnTypeDefinition = baseOverload.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? CopyType(baseOverload.ReturnTypeDefinition, genericTypeDefs) : baseOverload.ReturnTypeDefinition;
 
             foreach (var argument in baseOverload.Arguments)
             {
-                overload.Arguments.Add(CopyDeclaration(argument, genericTypeDefinitions, baseOverload.Generics));
+                overload.Arguments.Add(CopyDeclaration(argument, genericTypeDefs, baseOverload.Generics));
             }
 
-            overload.Body = CopyScope(baseOverload.Body, genericTypeDefinitions, baseOverload.Generics);
+            overload.Body = CopyScope(baseOverload.Body, genericTypeDefs, baseOverload.Generics);
 
             return overload;
         }
