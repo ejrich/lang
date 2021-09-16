@@ -13,7 +13,7 @@ namespace Lang
 
     public interface IProgramGraphBuilder
     {
-        ProgramGraph CreateProgramGraph(List<IAst> asts);
+        void CreateProgramGraph(List<IAst> asts);
     }
 
     public class ProgramGraphBuilder : IProgramGraphBuilder
@@ -36,7 +36,7 @@ namespace Lang
             _irBuilder = irBuilder;
         }
 
-        public ProgramGraph CreateProgramGraph(List<IAst> asts)
+        public void CreateProgramGraph(List<IAst> asts)
         {
             var mainDefined = false;
             bool verifyAdditional;
@@ -242,8 +242,6 @@ namespace Lang
                 // @Cleanup allow errors to be reported without having a file/line/column
                 ErrorReporter.Report("'main' function of the program is not defined");
             }
-
-            return _programGraph;
         }
 
         private void AddPrimitive(string name, TypeKind typeKind, IPrimitive primitive = null, uint size = 0)

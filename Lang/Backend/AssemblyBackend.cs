@@ -4,7 +4,7 @@ namespace Lang.Backend.Assembly
 {
     public class AssemblyBackend : IBackend
     {
-        public string Build(ProgramGraph programGraph, List<string> sourceFiles)
+        public string Build(List<string> sourceFiles)
         {
             throw new System.NotImplementedException();
         }
