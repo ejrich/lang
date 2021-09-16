@@ -1160,15 +1160,17 @@ namespace Lang.Translation
             }
             else
             {
-                var beginType = VerifyExpression(each.RangeBegin, currentFunction, scopeIdentifiers);
-                if (VerifyType(beginType) != Type.Int)
+                var begin = VerifyExpression(each.RangeBegin, currentFunction, scopeIdentifiers);
+                var beginType = VerifyType(begin);
+                if (beginType != Type.Int && beginType != Type.Error)
                 {
-                    AddError($"Expected range to begin with 'int', but got '{PrintTypeDefinition(beginType)}'", each.RangeBegin);
+                    AddError($"Expected range to begin with 'int', but got '{PrintTypeDefinition(begin)}'", each.RangeBegin);
                 }
-                var endType = VerifyExpression(each.RangeEnd, currentFunction, scopeIdentifiers);
-                if (VerifyType(endType) != Type.Int)
+                var end = VerifyExpression(each.RangeEnd, currentFunction, scopeIdentifiers);
+                var endType = VerifyType(end);
+                if (endType != Type.Int && endType != Type.Error)
                 {
-                    AddError($"Expected range to end with 'int', but got '{PrintTypeDefinition(endType)}'", each.RangeEnd);
+                    AddError($"Expected range to end with 'int', but got '{PrintTypeDefinition(end)}'", each.RangeEnd);
                 }
                 var iterType = new DeclarationAst
                 {
