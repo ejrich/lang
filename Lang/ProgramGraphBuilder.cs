@@ -629,7 +629,7 @@ namespace Lang
                             ErrorReporter.Report($"Function '{function.Name}' cannot have multiple varargs", argument.TypeDefinition);
                         }
                         function.Flags |= FunctionFlags.Varargs;
-                        function.VarargsCalls = new HashSet<int>();
+                        function.VarargsCalls = new List<TypeDefinition[]>();
                         break;
                     case TypeKind.Params:
                         if (function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params))
@@ -2707,9 +2707,54 @@ namespace Lang
                     }
                 }
             }
-            else if (function.Flags.HasFlag(FunctionFlags.Varargs) && !function.VarargsCalls.Contains(arguments.Length))
+            else if (function.Flags.HasFlag(FunctionFlags.Varargs))
             {
-                _runner.InitVarargsFunction(function, arguments.Length);
+                for (var i = 0; i < arguments.Length; i++)
+                {
+                    var argument = arguments[i];
+                    switch (argument?.PrimitiveType)
+                    {
+                        // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
+                        // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
+                        case FloatType {Bytes: 4}:
+                            arguments[i] = argument = new TypeDefinition
+                            {
+                                Name = "float64", TypeKind = TypeKind.Float, PrimitiveType = new FloatType {Bytes = 8}
+                            };
+                            break;
+                    }
+                }
+                var found = false;
+                for (var index = 0; index < function.VarargsCalls.Count; index++)
+                {
+                    var callTypes = function.VarargsCalls[index];
+                    if (callTypes.Length == arguments.Length)
+                    {
+                        var callMatches = true;
+                        for (var i = 0; i < callTypes.Length; i++)
+                        {
+                            if (!TypeEquals(callTypes[i], arguments[i], true))
+                            {
+                                callMatches = false;
+                                break;
+                            }
+                        }
+
+                        if (callMatches)
+                        {
+                            found = true;
+                            call.ExternIndex = index;
+                            break;
+                        }
+                    }
+                }
+
+                if (!found)
+                {
+                    call.ExternIndex = function.VarargsCalls.Count;
+                    _runner.InitVarargsFunction(function, arguments);
+                    function.VarargsCalls.Add(arguments);
+                }
             }
 
             return function.ReturnTypeDefinition;
@@ -2800,7 +2845,6 @@ namespace Lang
 
                     if (match && (function.Flags.HasFlag(FunctionFlags.Varargs) || callArgIndex == call.Arguments.Count))
                     {
-                        call.FunctionIndex = i;
                         return function;
                     }
                 }
