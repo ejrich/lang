@@ -33,18 +33,22 @@ namespace Lang
     {
         private readonly IPolymorpher _polymorpher;
         private readonly IProgramRunner _programRunner;
+        private readonly IProgramIRBuilder _irBuilder;
+
         private readonly ProgramGraph _programGraph = new();
         private BuildSettings _buildSettings;
         private readonly Dictionary<string, StructAst> _polymorphicStructs = new();
         private readonly Dictionary<string, List<FunctionAst>> _polymorphicFunctions = new();
         private readonly Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads = new();
-        private readonly Dictionary<string, IAst> _globalIdentifiers = new();
+        // private readonly Dictionary<string, IAst> _globalIdentifiers = new();
+        private readonly ScopeAst _globalScope = new();
         private readonly TypeDefinition _s32Type = new() {Name = "s32", TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
 
-        public ProgramGraphBuilder(IPolymorpher polymorpher, IProgramRunner programRunner)
+        public ProgramGraphBuilder(IPolymorpher polymorpher, IProgramRunner programRunner, IProgramIRBuilder irBuilder)
         {
             _polymorpher = polymorpher;
             _programRunner = programRunner;
+            _irBuilder = irBuilder;
         }
 
         public ProgramGraph CreateProgramGraph(ParseResult parseResult, ProjectFile project, BuildSettings buildSettings)
@@ -103,7 +107,7 @@ namespace Lang
                                 _programGraph.Types.Add(structAst.Name, structAst);
                             }
 
-                            _globalIdentifiers[structAst.Name] = structAst;
+                            _globalScope.Identifiers[structAst.Name] = structAst;
                             break;
                     }
                 }
@@ -119,7 +123,7 @@ namespace Lang
                                 AddError("Global variable must either not be initialized or be initialized to a constant value", globalVariable.Value);
                             }
 
-                            VerifyDeclaration(globalVariable, null, _globalIdentifiers);
+                            VerifyDeclaration(globalVariable, null, _globalScope);
                             _programGraph.Variables.Add(globalVariable);
                             parseResult.SyntaxTrees.RemoveAt(i--);
                             break;
@@ -172,7 +176,7 @@ namespace Lang
                             {
                                 case DirectiveType.If:
                                     var conditional = directive.Value as ConditionalAst;
-                                    if (VerifyCondition(conditional!.Condition, null, _globalIdentifiers))
+                                    if (VerifyCondition(conditional!.Condition, null, _globalScope))
                                     {
                                         _programRunner.Init(_programGraph);
                                         if (_programRunner.ExecuteCondition(conditional!.Condition))
@@ -187,7 +191,7 @@ namespace Lang
                                     parseResult.SyntaxTrees.RemoveAt(i--);
                                     break;
                                 case DirectiveType.Assert:
-                                    if (VerifyCondition(directive.Value, null, _globalIdentifiers))
+                                    if (VerifyCondition(directive.Value, null, _globalScope))
                                     {
                                         _programRunner.Init(_programGraph);
                                         if (!_programRunner.ExecuteCondition(directive.Value))
@@ -256,7 +260,7 @@ namespace Lang
                 Name = name, TypeIndex = _programGraph.TypeCount++, TypeKind = typeKind,
                 Size = primitive?.Bytes ?? size, Primitive = primitive
             };
-            _globalIdentifiers.Add(name, primitiveAst);
+            _globalScope.Identifiers.Add(name, primitiveAst);
             _programGraph.Types.Add(name, primitiveAst);
         }
 
@@ -268,7 +272,7 @@ namespace Lang
                 AddError($"Multiple definitions of enum '{enumAst.Name}'", enumAst);
             }
             enumAst.TypeIndex = _programGraph.TypeCount++;
-            _globalIdentifiers.Add(enumAst.Name, enumAst);
+            _globalScope.Identifiers.Add(enumAst.Name, enumAst);
 
             if (enumAst.BaseType == null)
             {
@@ -370,7 +374,7 @@ namespace Lang
                         }
                         else
                         {
-                            var valueType = VerifyConstantExpression(structField.Value, null, _globalIdentifiers, out var isConstant, out _);
+                            var valueType = VerifyConstantExpression(structField.Value, null, _globalScope, out var isConstant, out _);
 
                             // Verify the type is correct
                             if (valueType != null)
@@ -417,7 +421,7 @@ namespace Lang
                                     AddError("Cannot have operator assignments in object initializers", assignment.Reference);
                                 }
 
-                                var valueType = VerifyConstantExpression(assignment.Value, null, _globalIdentifiers, out var isConstant, out _);
+                                var valueType = VerifyConstantExpression(assignment.Value, null, _globalScope, out var isConstant, out _);
                                 if (valueType != null && field != null)
                                 {
                                     if (!TypeEquals(field.Type, valueType))
@@ -448,7 +452,7 @@ namespace Lang
                             var elementType = structField.Type.Generics[0];
                             foreach (var value in structField.ArrayValues)
                             {
-                                var valueType = VerifyConstantExpression(value, null, _globalIdentifiers, out var isConstant, out _);
+                                var valueType = VerifyConstantExpression(value, null, _globalScope, out var isConstant, out _);
                                 if (valueType != null)
                                 {
                                     if (!TypeEquals(elementType, valueType))
@@ -476,7 +480,7 @@ namespace Lang
                     else if (structField.Type.Count != null)
                     {
                         // Verify the count is a constant
-                        var countType = VerifyConstantExpression(structField.Type.Count, null, _globalIdentifiers, out var isConstant, out var count);
+                        var countType = VerifyConstantExpression(structField.Type.Count, null, _globalScope, out var isConstant, out var count);
 
                         if (countType != null)
                         {
@@ -505,7 +509,7 @@ namespace Lang
                         }
                         else
                         {
-                            var valueType = VerifyConstantExpression(structField.Value, null, _globalIdentifiers, out var isConstant, out _);
+                            var valueType = VerifyConstantExpression(structField.Value, null, _globalScope, out var isConstant, out _);
 
                             if (!isConstant)
                             {
@@ -568,7 +572,7 @@ namespace Lang
             }
             else if (function.ReturnType.Count != null)
             {
-                var countType = VerifyConstantExpression(function.ReturnType.Count, null, _globalIdentifiers, out var isConstant, out var count);
+                var countType = VerifyConstantExpression(function.ReturnType.Count, null, _globalScope, out var isConstant, out var count);
 
                 if (countType != null)
                 {
@@ -638,7 +642,7 @@ namespace Lang
                 // 3c. Check for default arguments
                 if (argument.Value != null)
                 {
-                    var defaultType = VerifyConstantExpression(argument.Value, null, _globalIdentifiers, out var isConstant, out _);
+                    var defaultType = VerifyConstantExpression(argument.Value, null, _globalScope, out var isConstant, out _);
 
                     if (argument.HasGenerics)
                     {
@@ -715,6 +719,7 @@ namespace Lang
                 }
                 if (functions.Any())
                 {
+                    function.OverloadIndex = functions.Count;
                     if (function.Extern)
                     {
                         AddError($"Multiple definitions of external function '{function.Name}'", function);
@@ -841,31 +846,53 @@ namespace Lang
             }
         }
 
+        private bool GetScopeIdentifier(ScopeAst scope, string name, out IAst ast)
+        {
+            ast = null;
+            do {
+                if (scope.Identifiers.TryGetValue(name, out var identifier))
+                {
+                    ast = identifier;
+                    return true;
+                }
+                scope = scope.Parent;
+            } while (scope != null);
+            return false;
+        }
+
         private void VerifyFunction(FunctionAst function)
         {
             // 1. Initialize local variables
-            var scopeIdentifiers = new Dictionary<string, IAst>(_globalIdentifiers);
             foreach (var argument in function.Arguments)
             {
                 // Arguments with the same name as a global variable will be used instead of the global
-                if (scopeIdentifiers.TryGetValue(argument.Name, out var identifier))
+                if (GetScopeIdentifier(_globalScope, argument.Name, out var identifier))
                 {
                     if (identifier is not DeclarationAst)
                     {
                         AddError($"Argument '{argument.Name}' already exists as a type", argument);
                     }
                 }
-                scopeIdentifiers[argument.Name] = argument;
+                if (function.Body != null)
+                {
+                    function.Body.Identifiers[argument.Name] = argument;
+                }
             }
             var returnType = VerifyType(function.ReturnType);
+            var functionIR = _irBuilder.AddFunction(function);
 
             // 2. For extern functions, simply verify there is no body and return
             if (function.Extern)
             {
-                if (function.Children.Any())
+                if (function.Body != null)
                 {
                     AddError("Extern function cannot have a body", function);
                 }
+                function.Verified = true;
+                return;
+            }
+            else if (function.Compiler)
+            {
                 function.Verified = true;
                 return;
             }
@@ -873,11 +900,11 @@ namespace Lang
             // 3. Resolve the compiler directives in the function
             if (function.HasDirectives)
             {
-                ResolveCompilerDirectives(function.Children, function);
+                ResolveCompilerDirectives(function.Body.Children, function);
             }
 
             // 4. Loop through function body and verify all ASTs
-            var returned = VerifyAsts(function.Children, function, scopeIdentifiers);
+            var returned = VerifyScope(function.Body, function, _globalScope);
 
             // 5. Verify the main function doesn't call the compiler
             if (function.Name == "main" && function.CallsCompiler)
@@ -896,29 +923,32 @@ namespace Lang
         private void VerifyOperatorOverload(OperatorOverloadAst overload)
         {
             // 1. Initialize local variables
-            var scopeIdentifiers = new Dictionary<string, IAst>(_globalIdentifiers);
+            // var scope = new Dictionary<string, IAst>(_globalIdentifiers);
             foreach (var argument in overload.Arguments)
             {
                 // Arguments with the same name as a global variable will be used instead of the global
-                if (scopeIdentifiers.TryGetValue(argument.Name, out var identifier))
+                if (GetScopeIdentifier(_globalScope, argument.Name, out var identifier))
                 {
                     if (identifier is not DeclarationAst)
                     {
                         AddError($"Argument '{argument.Name}' already exists as a type", argument);
                     }
                 }
-                scopeIdentifiers[argument.Name] = argument;
+                if (overload.Body != null)
+                {
+                    overload.Body.Identifiers[argument.Name] = argument;
+                }
             }
             var returnType = VerifyType(overload.ReturnType);
 
             // 2. Resolve the compiler directives in the body
             if (overload.HasDirectives)
             {
-                ResolveCompilerDirectives(overload.Children, overload);
+                ResolveCompilerDirectives(overload.Body.Children, overload);
             }
 
             // 3. Loop through body and verify all ASTs
-            var returned = VerifyAsts(overload.Children, overload, scopeIdentifiers);
+            var returned = VerifyScope(overload.Body, overload, _globalScope);
 
             // 4. Verify the body returns on all paths
             if (!returned)
@@ -939,10 +969,10 @@ namespace Lang
                         ResolveCompilerDirectives(scope.Children, function);
                         break;
                     case WhileAst whileAst:
-                        ResolveCompilerDirectives(whileAst.Block.Children, function);
+                        ResolveCompilerDirectives(whileAst.Body.Children, function);
                         break;
                     case EachAst each:
-                        ResolveCompilerDirectives(each.Children, function);
+                        ResolveCompilerDirectives(each.Body.Children, function);
                         break;
                     case ConditionalAst conditional:
                         if (conditional.IfBlock != null) ResolveCompilerDirectives(conditional.IfBlock.Children, function);
@@ -955,7 +985,7 @@ namespace Lang
                             case DirectiveType.If:
 
                                 var conditional = directive.Value as ConditionalAst;
-                                if (VerifyCondition(conditional!.Condition, null, _globalIdentifiers))
+                                if (VerifyCondition(conditional!.Condition, null, _globalScope))
                                 {
                                     _programRunner.Init(_programGraph);
                                     if (_programRunner.ExecuteCondition(conditional!.Condition))
@@ -969,7 +999,7 @@ namespace Lang
                                 }
                                 break;
                             case DirectiveType.Assert:
-                                if (VerifyCondition(directive.Value, null, _globalIdentifiers))
+                                if (VerifyCondition(directive.Value, null, _globalScope))
                                 {
                                     _programRunner.Init(_programGraph);
                                     if (!_programRunner.ExecuteCondition(directive.Value))
@@ -992,12 +1022,16 @@ namespace Lang
             }
         }
 
-        private bool VerifyAsts(List<IAst> asts, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private bool VerifyScope(ScopeAst scope, IFunction currentFunction, ScopeAst parentScope)
         {
+            // 1. Set the parent scope
+            scope.Parent = parentScope;
+
+            // 2. Verify function lines
             var returns = false;
-            foreach (var ast in asts)
+            foreach (var ast in scope.Children)
             {
-                if (VerifyAst(ast, currentFunction, scopeIdentifiers))
+                if (VerifyAst(ast, currentFunction, scope))
                 {
                     returns = true;
                 }
@@ -1005,45 +1039,36 @@ namespace Lang
             return returns;
         }
 
-        private bool VerifyScope(ScopeAst scope, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
-        {
-            // 1. Create scope variables
-            var scopeVariables = new Dictionary<string, IAst>(scopeIdentifiers);
-
-            // 2. Verify function lines
-            return VerifyAsts(scope.Children, currentFunction, scopeVariables);
-        }
-
-        private bool VerifyAst(IAst syntaxTree, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private bool VerifyAst(IAst syntaxTree, IFunction currentFunction, ScopeAst scope)
         {
             switch (syntaxTree)
             {
                 case ReturnAst returnAst:
-                    VerifyReturnStatement(returnAst, currentFunction, scopeIdentifiers);
+                    VerifyReturnStatement(returnAst, currentFunction, scope);
                     return true;
                 case DeclarationAst declaration:
-                    VerifyDeclaration(declaration, currentFunction, scopeIdentifiers);
+                    VerifyDeclaration(declaration, currentFunction, scope);
                     break;
                 case AssignmentAst assignment:
-                    VerifyAssignment(assignment, currentFunction, scopeIdentifiers);
+                    VerifyAssignment(assignment, currentFunction, scope);
                     break;
-                case ScopeAst scope:
-                    return VerifyScope(scope, currentFunction, scopeIdentifiers);
+                case ScopeAst newScope:
+                    return VerifyScope(newScope, currentFunction, scope);
                 case ConditionalAst conditional:
-                    return VerifyConditional(conditional, currentFunction, scopeIdentifiers);
+                    return VerifyConditional(conditional, currentFunction, scope);
                 case WhileAst whileAst:
-                    return VerifyWhile(whileAst, currentFunction, scopeIdentifiers);
+                    return VerifyWhile(whileAst, currentFunction, scope);
                 case EachAst each:
-                    return VerifyEach(each, currentFunction, scopeIdentifiers);
+                    return VerifyEach(each, currentFunction, scope);
                 default:
-                    VerifyExpression(syntaxTree, currentFunction, scopeIdentifiers);
+                    VerifyExpression(syntaxTree, currentFunction, scope);
                     break;
             }
 
             return false;
         }
 
-        private void VerifyReturnStatement(ReturnAst returnAst, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private void VerifyReturnStatement(ReturnAst returnAst, IFunction currentFunction, ScopeAst scope)
         {
             // 1. Infer the return type of the function
             var returnType = VerifyType(currentFunction.ReturnType);
@@ -1059,7 +1084,7 @@ namespace Lang
             }
 
             // 3. Determine if the expression returns the correct value
-            var returnValueType = VerifyExpression(returnAst.Value, currentFunction, scopeIdentifiers);
+            var returnValueType = VerifyExpression(returnAst.Value, currentFunction, scope);
             if (returnValueType == null)
             {
                 AddError($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnType)}'", returnAst);
@@ -1073,10 +1098,10 @@ namespace Lang
             }
         }
 
-        private void VerifyDeclaration(DeclarationAst declaration, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private void VerifyDeclaration(DeclarationAst declaration, IFunction currentFunction, ScopeAst scope)
         {
             // 1. Verify the variable is already defined
-            if (scopeIdentifiers.ContainsKey(declaration.Name))
+            if (GetScopeIdentifier(scope, declaration.Name, out _))
             {
                 AddError($"Identifier '{declaration.Name}' already defined", declaration);
                 return;
@@ -1108,7 +1133,7 @@ namespace Lang
             // 3. Verify declaration values
             else if (declaration.Value != null)
             {
-                VerifyDeclarationValue(declaration, currentFunction, scopeIdentifiers);
+                VerifyDeclarationValue(declaration, currentFunction, scope);
             }
             // 4. Verify object initializers
             else if (declaration.Assignments != null)
@@ -1140,7 +1165,7 @@ namespace Lang
                             AddError("Cannot have operator assignments in object initializers", assignment.Reference);
                         }
 
-                        var valueType = VerifyExpression(assignment.Value, currentFunction, scopeIdentifiers);
+                        var valueType = VerifyExpression(assignment.Value, currentFunction, scope);
                         if (valueType != null && field != null)
                         {
                             if (!TypeEquals(field.Type, valueType))
@@ -1175,7 +1200,7 @@ namespace Lang
                         var elementType = declaration.Type.Generics[0];
                         foreach (var value in declaration.ArrayValues)
                         {
-                            var valueType = VerifyExpression(value, currentFunction, scopeIdentifiers);
+                            var valueType = VerifyExpression(value, currentFunction, scope);
                             if (valueType != null)
                             {
                                 if (!TypeEquals(elementType, valueType))
@@ -1198,11 +1223,11 @@ namespace Lang
                 {
                     case "os":
                         declaration.Value = GetOSVersion();
-                        VerifyDeclarationValue(declaration, currentFunction, scopeIdentifiers);
+                        VerifyDeclarationValue(declaration, currentFunction, scope);
                         break;
                     case "build_env":
                         declaration.Value = GetBuildEnv();
-                        VerifyDeclarationValue(declaration, currentFunction, scopeIdentifiers);
+                        VerifyDeclarationValue(declaration, currentFunction, scope);
                         break;
                     default:
                         var type = VerifyType(declaration.Type);
@@ -1227,7 +1252,7 @@ namespace Lang
                 }
                 else if (declaration.Type.Count != null)
                 {
-                    var countType = VerifyConstantExpression(declaration.Type.Count, currentFunction, scopeIdentifiers, out var isConstant, out var count);
+                    var countType = VerifyConstantExpression(declaration.Type.Count, currentFunction, scope, out var isConstant, out var count);
 
                     if (countType != null)
                     {
@@ -1274,12 +1299,12 @@ namespace Lang
                 }
             }
 
-            scopeIdentifiers.Add(declaration.Name, declaration);
+            scope.Identifiers.TryAdd(declaration.Name, declaration);
         }
 
-        private void VerifyDeclarationValue(DeclarationAst declaration, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private void VerifyDeclarationValue(DeclarationAst declaration, IFunction currentFunction, ScopeAst scope)
         {
-            var valueType = VerifyExpression(declaration.Value, currentFunction, scopeIdentifiers);
+            var valueType = VerifyExpression(declaration.Value, currentFunction, scope);
 
             // Verify the assignment value matches the type definition if it has been defined
             if (declaration.Type == null)
@@ -1348,11 +1373,11 @@ namespace Lang
             };
         }
 
-        private void VerifyAssignment(AssignmentAst assignment, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private void VerifyAssignment(AssignmentAst assignment, IFunction currentFunction, ScopeAst scope)
         {
             // 1. Verify the variable is already defined, that it is not a constant, and the r-value
-            var variableTypeDefinition = GetReference(assignment.Reference, currentFunction, scopeIdentifiers, out _);
-            var valueType = VerifyExpression(assignment.Value, currentFunction, scopeIdentifiers);
+            var variableTypeDefinition = GetReference(assignment.Reference, currentFunction, scope, out _);
+            var valueType = VerifyExpression(assignment.Value, currentFunction, scope);
 
             if (variableTypeDefinition == null) return;
 
@@ -1450,22 +1475,22 @@ namespace Lang
             }
         }
 
-        private TypeDefinition GetReference(IAst ast, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers, out bool hasPointer, bool fromUnaryReference = false)
+        private TypeDefinition GetReference(IAst ast, IFunction currentFunction, ScopeAst scope, out bool hasPointer, bool fromUnaryReference = false)
         {
             hasPointer = true;
             switch (ast)
             {
                 case IdentifierAst identifier:
-                    return GetVariable(identifier.Name, identifier, scopeIdentifiers);
+                    return GetVariable(identifier.Name, identifier, scope);
                 case IndexAst index:
                 {
-                    var variableType = GetVariable(index.Name, index, scopeIdentifiers);
+                    var variableType = GetVariable(index.Name, index, scope);
                     if (variableType == null) return null;
                     if (variableType.Constant)
                     {
                         AddError($"Cannot reassign value of constant variable '{index.Name}'", index);
                     }
-                    var type = VerifyIndex(index, variableType, currentFunction, scopeIdentifiers, out var overloaded);
+                    var type = VerifyIndex(index, variableType, currentFunction, scope, out var overloaded);
                     if (type != null && overloaded)
                     {
                         if (type.TypeKind != TypeKind.Pointer)
@@ -1488,7 +1513,7 @@ namespace Lang
                     switch (structFieldRef.Children[0])
                     {
                         case IdentifierAst identifier:
-                            refType = GetVariable(identifier.Name, identifier, scopeIdentifiers, true);
+                            refType = GetVariable(identifier.Name, identifier, scope, true);
                             if (refType == null) return null;
                             if (refType.Constant)
                             {
@@ -1497,14 +1522,14 @@ namespace Lang
                             }
                             break;
                         case IndexAst index:
-                            var variableType = GetVariable(index.Name, index, scopeIdentifiers);
+                            var variableType = GetVariable(index.Name, index, scope);
                             if (variableType == null) return null;
                             if (variableType.Constant)
                             {
                                 AddError($"Cannot reassign value of constant variable '{index.Name}'", index);
                                 return null;
                             }
-                            refType = VerifyIndex(index, variableType, currentFunction, scopeIdentifiers, out var overloaded);
+                            refType = VerifyIndex(index, variableType, currentFunction, scope, out var overloaded);
                             if (refType != null && overloaded && refType.TypeKind != TypeKind.Pointer)
                             {
                                 AddError($"Overload [] for type '{PrintTypeDefinition(variableType)}' must be a pointer to be able to set the value", index);
@@ -1530,7 +1555,7 @@ namespace Lang
                             case IndexAst index:
                                 var fieldType = VerifyStructField(index.Name, refType, structFieldRef, i-1, index);
                                 if (fieldType == null) return null;
-                                refType = VerifyIndex(index, fieldType, currentFunction, scopeIdentifiers, out var overloaded);
+                                refType = VerifyIndex(index, fieldType, currentFunction, scope, out var overloaded);
                                 if (refType != null && overloaded)
                                 {
                                     if (refType.TypeKind == TypeKind.Pointer)
@@ -1566,7 +1591,7 @@ namespace Lang
                         AddError("Operators '*' and '&' cancel each other out", unary);
                         return null;
                     }
-                    var reference = GetReference(unary.Value, currentFunction, scopeIdentifiers, out var canDereference);
+                    var reference = GetReference(unary.Value, currentFunction, scope, out var canDereference);
                     if (reference == null)
                     {
                         return null;
@@ -1589,9 +1614,9 @@ namespace Lang
             }
         }
 
-        private TypeDefinition GetVariable(string name, IAst ast, IDictionary<string, IAst> scopeIdentifiers, bool allowEnums = false)
+        private TypeDefinition GetVariable(string name, IAst ast, ScopeAst scope, bool allowEnums = false)
         {
-            if (!scopeIdentifiers.TryGetValue(name, out var identifier))
+            if (!GetScopeIdentifier(scope, name, out var identifier))
             {
                 AddError($"Variable '{name}' not defined", ast);
                 return null;
@@ -1608,13 +1633,13 @@ namespace Lang
             return declaration.Type;
         }
 
-        private TypeDefinition VerifyStructFieldRef(StructFieldRefAst structField, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private TypeDefinition VerifyStructFieldRef(StructFieldRefAst structField, IFunction currentFunction, ScopeAst scope)
         {
             TypeDefinition refType;
             switch (structField.Children[0])
             {
                 case IdentifierAst identifier:
-                    if (!scopeIdentifiers.TryGetValue(identifier.Name, out var value))
+                    if (!GetScopeIdentifier(scope, identifier.Name, out var value))
                     {
                         AddError($"Identifier '{identifier.Name}' not defined", structField);
                         return null;
@@ -1632,7 +1657,7 @@ namespace Lang
                     }
                     break;
                 default:
-                    refType = VerifyExpression(structField.Children[0], currentFunction, scopeIdentifiers);
+                    refType = VerifyExpression(structField.Children[0], currentFunction, scope);
                     break;
             }
             if (refType == null)
@@ -1653,7 +1678,7 @@ namespace Lang
                     case IndexAst index:
                         var fieldType = VerifyStructField(index.Name, refType, structField, i-1, index);
                         if (fieldType == null) return null;
-                        refType = VerifyIndex(index, fieldType, currentFunction, scopeIdentifiers, out _);
+                        refType = VerifyIndex(index, fieldType, currentFunction, scope, out _);
                         break;
                     default:
                         AddError("Expected to have a reference to a variable, field, or pointer", structField.Children[i]);
@@ -1708,36 +1733,36 @@ namespace Lang
             return field.Type;
         }
 
-        private bool VerifyConditional(ConditionalAst conditional, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private bool VerifyConditional(ConditionalAst conditional, IFunction currentFunction, ScopeAst scope)
         {
             // 1. Verify the condition expression
-            VerifyCondition(conditional.Condition, currentFunction, scopeIdentifiers);
+            VerifyCondition(conditional.Condition, currentFunction, scope);
 
             // 2. Verify the conditional scope
-            var ifReturned = VerifyScope(conditional.IfBlock, currentFunction, scopeIdentifiers);
+            var ifReturned = VerifyScope(conditional.IfBlock, currentFunction, scope);
 
             // 3. Verify the else block if necessary
             if (conditional.ElseBlock != null)
             {
-                var elseReturned = VerifyScope(conditional.ElseBlock, currentFunction, scopeIdentifiers);
+                var elseReturned = VerifyScope(conditional.ElseBlock, currentFunction, scope);
                 return ifReturned && elseReturned;
             }
 
             return false;
         }
 
-        private bool VerifyWhile(WhileAst whileAst, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private bool VerifyWhile(WhileAst whileAst, IFunction currentFunction, ScopeAst scope)
         {
             // 1. Verify the condition expression
-            VerifyCondition(whileAst.Condition, currentFunction, scopeIdentifiers);
+            VerifyCondition(whileAst.Condition, currentFunction, scope);
 
             // 2. Verify the scope of the while block
-            return VerifyScope(whileAst.Block, currentFunction, scopeIdentifiers);
+            return VerifyScope(whileAst.Body, currentFunction, scope);
         }
 
-        private bool VerifyCondition(IAst ast, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private bool VerifyCondition(IAst ast, IFunction currentFunction, ScopeAst scope)
         {
-            var conditionalType = VerifyExpression(ast, currentFunction, scopeIdentifiers);
+            var conditionalType = VerifyExpression(ast, currentFunction, scope);
             switch (VerifyType(conditionalType))
             {
                 case TypeKind.Integer:
@@ -1754,24 +1779,23 @@ namespace Lang
             }
         }
 
-        private bool VerifyEach(EachAst each, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private bool VerifyEach(EachAst each, IFunction currentFunction, ScopeAst scope)
         {
-            var eachIdentifiers = new Dictionary<string, IAst>(scopeIdentifiers);
             // 1. Verify the iterator or range
-            if (eachIdentifiers.ContainsKey(each.IterationVariable))
+            if (GetScopeIdentifier(scope, each.IterationVariable, out _))
             {
                 AddError($"Iteration variable '{each.IterationVariable}' already exists in scope", each);
             };
             if (each.Iteration != null)
             {
-                var variableTypeDefinition = VerifyExpression(each.Iteration, currentFunction, scopeIdentifiers);
+                var variableTypeDefinition = VerifyExpression(each.Iteration, currentFunction, scope);
                 if (variableTypeDefinition == null) return false;
                 var iterator = new DeclarationAst {Name = each.IterationVariable, Type = variableTypeDefinition.Generics.FirstOrDefault()};
 
                 if (each.IndexVariable != null)
                 {
                     var indexVariable = new DeclarationAst {Name = each.IndexVariable, Type = _s32Type};
-                    eachIdentifiers.TryAdd(each.IndexVariable, indexVariable);
+                    each.Body.Identifiers.TryAdd(each.IndexVariable, indexVariable);
                 }
 
                 switch (variableTypeDefinition.TypeKind)
@@ -1779,7 +1803,7 @@ namespace Lang
                     case TypeKind.Array:
                     case TypeKind.Params:
                         each.IteratorType = iterator.Type;
-                        eachIdentifiers.TryAdd(each.IterationVariable, iterator);
+                        each.Body.Identifiers.TryAdd(each.IterationVariable, iterator);
                         break;
                     default:
                         AddError($"Type {PrintTypeDefinition(variableTypeDefinition)} cannot be used as an iterator", each.Iteration);
@@ -1788,27 +1812,24 @@ namespace Lang
             }
             else
             {
-                var begin = VerifyExpression(each.RangeBegin, currentFunction, scopeIdentifiers);
+                var begin = VerifyExpression(each.RangeBegin, currentFunction, scope);
                 var beginType = VerifyType(begin);
                 if (beginType != TypeKind.Integer && beginType != TypeKind.Error)
                 {
                     AddError($"Expected range to begin with 'int', but got '{PrintTypeDefinition(begin)}'", each.RangeBegin);
                 }
-                var end = VerifyExpression(each.RangeEnd, currentFunction, scopeIdentifiers);
+                var end = VerifyExpression(each.RangeEnd, currentFunction, scope);
                 var endType = VerifyType(end);
                 if (endType != TypeKind.Integer && endType != TypeKind.Error)
                 {
                     AddError($"Expected range to end with 'int', but got '{PrintTypeDefinition(end)}'", each.RangeEnd);
                 }
                 var iterType = new DeclarationAst {Name = each.IterationVariable, Type = _s32Type};
-                if (!eachIdentifiers.TryAdd(each.IterationVariable, iterType))
-                {
-                    AddError($"Iteration variable '{each.IterationVariable}' already exists in scope", each);
-                };
+                each.Body.Identifiers.TryAdd(each.IterationVariable, iterType);
             }
 
             // 2. Verify the scope of the each block
-            return VerifyAsts(each.Children, currentFunction, eachIdentifiers);
+            return VerifyScope(each.Body, currentFunction, scope);
         }
 
         private void VerifyTopLevelDirective(CompilerDirectiveAst directive)
@@ -1816,7 +1837,7 @@ namespace Lang
             switch (directive.Type)
             {
                 case DirectiveType.Run:
-                    VerifyAst(directive.Value, null, _globalIdentifiers);
+                    VerifyAst(directive.Value, null, _globalScope);
                     if (!_programGraph.Errors.Any())
                     {
                         _programRunner.Init(_programGraph);
@@ -1829,7 +1850,7 @@ namespace Lang
             }
         }
 
-        private TypeDefinition VerifyConstantExpression(IAst ast, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers, out bool isConstant, out int count)
+        private TypeDefinition VerifyConstantExpression(IAst ast, IFunction currentFunction, ScopeAst scope, out bool isConstant, out int count)
         {
             isConstant = false;
             count = 0;
@@ -1847,11 +1868,11 @@ namespace Lang
                     isConstant = true;
                     return null;
                 case StructFieldRefAst structField:
-                    var structFieldType = VerifyStructFieldRef(structField, currentFunction, scopeIdentifiers);
+                    var structFieldType = VerifyStructFieldRef(structField, currentFunction, scope);
                     isConstant = structFieldType?.PrimitiveType is EnumType;
                     return structFieldType;
                 case IdentifierAst identifierAst:
-                    if (!scopeIdentifiers.TryGetValue(identifierAst.Name, out var identifier))
+                    if (!GetScopeIdentifier(scope, identifierAst.Name, out var identifier))
                     {
                         if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functions))
                         {
@@ -1886,11 +1907,11 @@ namespace Lang
                             return null;
                     }
                 default:
-                    return VerifyExpression(ast, currentFunction, scopeIdentifiers);
+                    return VerifyExpression(ast, currentFunction, scope);
             }
         }
 
-        private TypeDefinition VerifyExpression(IAst ast, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private TypeDefinition VerifyExpression(IAst ast, IFunction currentFunction, ScopeAst scope)
         {
             // 1. Verify the expression value
             switch (ast)
@@ -1901,9 +1922,9 @@ namespace Lang
                 case NullAst:
                     return null;
                 case StructFieldRefAst structField:
-                    return VerifyStructFieldRef(structField, currentFunction, scopeIdentifiers);
+                    return VerifyStructFieldRef(structField, currentFunction, scope);
                 case IdentifierAst identifierAst:
-                    if (!scopeIdentifiers.TryGetValue(identifierAst.Name, out var identifier))
+                    if (!GetScopeIdentifier(scope, identifierAst.Name, out var identifier))
                     {
                         if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functions))
                         {
@@ -1936,7 +1957,7 @@ namespace Lang
                         case IdentifierAst:
                         case StructFieldRefAst:
                         case IndexAst:
-                            var expressionType = GetReference(changeByOne.Value, currentFunction, scopeIdentifiers, out _);
+                            var expressionType = GetReference(changeByOne.Value, currentFunction, scope, out _);
                             if (expressionType != null)
                             {
                                 var type = VerifyType(expressionType);
@@ -1955,7 +1976,7 @@ namespace Lang
                 case UnaryAst unary:
                     if (unary.Operator == UnaryOperator.Reference)
                     {
-                        var referenceType = GetReference(unary.Value, currentFunction, scopeIdentifiers, out var hasPointer, true);
+                        var referenceType = GetReference(unary.Value, currentFunction, scope, out var hasPointer, true);
                         if (!hasPointer)
                         {
                             AddError("Unable to get reference of unary value", unary.Value);
@@ -1981,7 +2002,7 @@ namespace Lang
                     }
                     else
                     {
-                        var valueType = VerifyExpression(unary.Value, currentFunction, scopeIdentifiers);
+                        var valueType = VerifyExpression(unary.Value, currentFunction, scope);
                         var type = VerifyType(valueType);
                         switch (unary.Operator)
                         {
@@ -2021,11 +2042,11 @@ namespace Lang
                         }
                     }
                 case CallAst call:
-                    return VerifyCall(call, currentFunction, scopeIdentifiers);
+                    return VerifyCall(call, currentFunction, scope);
                 case ExpressionAst expression:
-                    return VerifyExpressionType(expression, currentFunction, scopeIdentifiers);
+                    return VerifyExpressionType(expression, currentFunction, scope);
                 case IndexAst index:
-                    return VerifyIndexType(index, currentFunction, scopeIdentifiers);
+                    return VerifyIndexType(index, currentFunction, scope);
                 case TypeDefinition typeDef:
                 {
                     if (VerifyType(typeDef) == TypeKind.Error)
@@ -2041,7 +2062,7 @@ namespace Lang
                 case CastAst cast:
                 {
                     var targetType = VerifyType(cast.TargetType);
-                    var valueType = VerifyExpression(cast.Value, currentFunction, scopeIdentifiers);
+                    var valueType = VerifyExpression(cast.Value, currentFunction, scope);
                     switch (targetType)
                     {
                         case TypeKind.Integer:
@@ -2146,7 +2167,7 @@ namespace Lang
             return new TypeDefinition {Name = enumAst.Name, TypeKind = TypeKind.Enum, PrimitiveType = new EnumType {Bytes = primitive.Bytes, Signed = primitive.Signed}};
         }
 
-        private TypeDefinition VerifyCall(CallAst call, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private TypeDefinition VerifyCall(CallAst call, IFunction currentFunction, ScopeAst scope)
         {
             var arguments = new TypeDefinition[call.Arguments.Count];
             var argumentsError = false;
@@ -2154,7 +2175,7 @@ namespace Lang
             for (var i = 0; i < call.Arguments.Count; i++)
             {
                 var argument = call.Arguments[i];
-                var argumentType = VerifyExpression(argument, currentFunction, scopeIdentifiers);
+                var argumentType = VerifyExpression(argument, currentFunction, scope);
                 if (argumentType == null && argument is not NullAst)
                 {
                     argumentsError = true;
@@ -2167,7 +2188,7 @@ namespace Lang
             {
                 foreach (var (name, argument) in call.SpecifiedArguments)
                 {
-                    var argumentType = VerifyExpression(argument, currentFunction, scopeIdentifiers);
+                    var argumentType = VerifyExpression(argument, currentFunction, scope);
                     if (argumentType == null && argument is not NullAst)
                     {
                         argumentsError = true;
@@ -2764,10 +2785,10 @@ namespace Lang
             return true;
         }
 
-        private TypeDefinition VerifyExpressionType(ExpressionAst expression, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private TypeDefinition VerifyExpressionType(ExpressionAst expression, IFunction currentFunction, ScopeAst scope)
         {
             // 1. Get the type of the initial child
-            expression.Type = VerifyExpression(expression.Children[0], currentFunction, scopeIdentifiers);
+            expression.Type = VerifyExpression(expression.Children[0], currentFunction, scope);
             if (expression.Type == null) return null;
             for (var i = 1; i < expression.Children.Count; i++)
             {
@@ -2787,7 +2808,7 @@ namespace Lang
                     continue;
                 }
 
-                var nextExpressionType = VerifyExpression(next, currentFunction, scopeIdentifiers);
+                var nextExpressionType = VerifyExpression(next, currentFunction, scope);
                 if (nextExpressionType == null) return null;
 
                 // 3. Verify the operator and expression types are compatible and convert the expression type if necessary
@@ -2967,9 +2988,9 @@ namespace Lang
             return expression.Type;
         }
 
-        private TypeDefinition VerifyIndexType(IndexAst index, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private TypeDefinition VerifyIndexType(IndexAst index, IFunction currentFunction, ScopeAst scope)
         {
-            if (!scopeIdentifiers.TryGetValue(index.Name, out var identifier))
+            if (!GetScopeIdentifier(scope, index.Name, out var identifier))
             {
                 AddError($"Variable '{index.Name}' not defined", index);
                 return null;
@@ -2979,12 +3000,12 @@ namespace Lang
                 AddError($"Identifier '{index.Name}' is not a variable", index);
                 return null;
             }
-            return VerifyIndex(index, declaration.Type, currentFunction, scopeIdentifiers, out _);
+            return VerifyIndex(index, declaration.Type, currentFunction, scope, out _);
         }
 
         private StructAst _stringStruct;
 
-        private TypeDefinition VerifyIndex(IndexAst index, TypeDefinition typeDef, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers, out bool overloaded)
+        private TypeDefinition VerifyIndex(IndexAst index, TypeDefinition typeDef, IFunction currentFunction, ScopeAst scope, out bool overloaded)
         {
             // 1. Verify the variable is an array or the operator overload exists
             overloaded = false;
@@ -3019,7 +3040,7 @@ namespace Lang
             }
 
             // 2. Verify the count expression is an integer
-            var indexValue = VerifyExpression(index.Index, currentFunction, scopeIdentifiers);
+            var indexValue = VerifyExpression(index.Index, currentFunction, scope);
             var indexType = VerifyType(indexValue);
             if (indexType != TypeKind.Integer && indexType != TypeKind.Type)
             {

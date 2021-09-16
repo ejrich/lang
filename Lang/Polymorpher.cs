@@ -61,7 +61,7 @@ namespace Lang
                 }
             }
 
-            CopyAsts(function.Children, baseFunction.Children, genericTypes, baseFunction.Generics);
+            function.Body = CopyScope(baseFunction.Body, genericTypes, baseFunction.Generics);
 
             return function;
         }
@@ -79,7 +79,7 @@ namespace Lang
                 overload.Arguments.Add(CopyDeclaration(argument, genericTypes, baseOverload.Generics));
             }
 
-            CopyAsts(overload.Children, baseOverload.Children, genericTypes, baseOverload.Generics);
+            overload.Body = CopyScope(baseOverload.Body, genericTypes, baseOverload.Generics);
 
             return overload;
         }
@@ -200,7 +200,7 @@ namespace Lang
         {
             var copy = CopyAst(whileAst);
             copy.Condition = CopyExpression(whileAst.Condition, genericTypes, generics);
-            copy.Block = CopyScope(whileAst.Block, genericTypes, generics);
+            copy.Body = CopyScope(whileAst.Body, genericTypes, generics);
             return copy;
         }
 
@@ -212,7 +212,7 @@ namespace Lang
             copy.Iteration = CopyExpression(each.Iteration, genericTypes, generics);
             copy.RangeBegin = CopyExpression(each.RangeBegin, genericTypes, generics);
             copy.RangeEnd = CopyExpression(each.RangeEnd, genericTypes, generics);
-            CopyAsts(copy.Children, each.Children, genericTypes, generics);
+            copy.Body = CopyScope(each.Body, genericTypes, generics);
             return copy;
         }
 
