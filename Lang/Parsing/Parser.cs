@@ -41,7 +41,6 @@ namespace Lang.Parsing
             {
                 if (IgnoreChar(character))
                 {
-                    // Console.WriteLine($"Ignoring character: {character}");
                     if (currentToken != null)
                         yield return currentToken;
                     currentToken = null;
