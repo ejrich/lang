@@ -1,7 +1,6 @@
 using System.Collections.Generic;
-using Lang.Parsing;
 
-namespace Lang.Translation
+namespace Lang
 {
     public interface IPolymorpher
     {

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace Lang.Parsing
+namespace Lang
 {
     public interface ILexer
     {
@@ -230,7 +230,7 @@ namespace Lang.Parsing
         private void CheckForReservedTokensAndErrors(Token token, List<ParseError> errors, char character = default)
         {
             // Check tokens for reserved keywords
-            if (token.Type == TokenType.Token)
+            if (token.Type == TokenType.Identifier)
             {
                 if (_reservedTokens.TryGetValue(token.Value, out var type))
                 {
@@ -250,7 +250,7 @@ namespace Lang.Parsing
 
             if (char.IsDigit(character)) return TokenType.Number;
 
-            return Enum.IsDefined(typeof(TokenType), token) ? token : TokenType.Token;
+            return Enum.IsDefined(typeof(TokenType), token) ? token : TokenType.Identifier;
         }
 
         private static bool ContinueToken(Token currentToken, TokenType type, char character, LexerStatus lexerStatus)
@@ -259,8 +259,8 @@ namespace Lang.Parsing
 
             switch (currentToken.Type)
             {
-                case TokenType.Token:
-                    return type == TokenType.Token || type == TokenType.Number;
+                case TokenType.Identifier:
+                    return type == TokenType.Identifier || type == TokenType.Number;
                 case TokenType.Number:
                     switch (type)
                     {
@@ -281,7 +281,7 @@ namespace Lang.Parsing
                             }
                             currentToken.Flags |= TokenFlags.Float;
                             return true;
-                        case TokenType.Token:
+                        case TokenType.Identifier:
                             if (currentToken.Value == "0" && character == 'x')
                             {
                                 currentToken.Flags |= TokenFlags.HexNumber;
@@ -389,5 +389,84 @@ namespace Lang.Parsing
             public bool ReadingComment { get; set; }
             public bool MultiLineComment { get; set; }
         }
+    }
+
+    public class Token
+    {
+        public TokenType Type { get; set; }
+        public string Value { get; set; }
+        public TokenFlags Flags { get; set; }
+        public int FileIndex { get; init; }
+        public int Line { get; init; }
+        public int Column { get; set; }
+        public bool Error { get; set; }
+    }
+
+    public enum TokenType
+    {
+        Identifier,
+        Struct,
+        Comment, // Ignored by parser
+        Number,
+        Boolean,
+        Literal,
+        Return,
+        If,
+        Else,
+        Then,
+        While,
+        Each,
+        And,
+        Or,
+        Equality,
+        NotEqual,
+        Increment,
+        Decrement,
+        GreaterThanEqual,
+        LessThanEqual,
+        In,
+        Range,
+        Enum,
+        Null,
+        Cast,
+        ShiftLeft,
+        ShiftRight,
+        RotateLeft,
+        RotateRight,
+        Operator,
+        NumberRange, // Ignored by parser
+        VarArgs, // Ignored by parser
+        OpenParen = '(',
+        CloseParen = ')',
+        OpenBracket = '[',
+        CloseBracket = ']',
+        OpenBrace = '{',
+        CloseBrace = '}',
+        Not = '!',
+        Ampersand = '&',
+        Pipe = '|',
+        Caret = '^',
+        Plus = '+',
+        Minus = '-',
+        Asterisk = '*',
+        ForwardSlash = '/',
+        Percent = '%',
+        Equals = '=',
+        Colon = ':',
+        SemiColon = ';',
+        Quote = '"',
+        LessThan = '<',
+        GreaterThan = '>',
+        Comma = ',',
+        Period = '.',
+        Pound = '#'
+    }
+
+    [Flags]
+    public enum TokenFlags : byte
+    {
+        None = 0,
+        Float = 1,
+        HexNumber = 2
     }
 }

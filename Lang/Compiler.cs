@@ -2,12 +2,25 @@ using System;
 using System.Diagnostics;
 using System.Linq;
 using Lang.Backend;
-using Lang.Parsing;
-using Lang.Project;
-using Lang.Translation;
 
 namespace Lang
 {
+    public class BuildSettings
+    {
+        public bool Release { get; set; }
+        public bool OutputAssembly { get; set; }
+        public string ProjectPath { get; set; }
+    }
+
+    public static class ErrorCodes
+    {
+        public const int ProjectFileNotFound = 1;
+        public const int ParsingError = 2;
+        public const int CompilationError = 3;
+        public const int BuildError = 4;
+        public const int LinkError = 5;
+    }
+
     public interface ICompiler
     {
         void Compile(string[] args);

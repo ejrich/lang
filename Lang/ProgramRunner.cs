@@ -4,9 +4,8 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
-using Lang.Parsing;
 
-namespace Lang.Runner
+namespace Lang
 {
     public interface IProgramRunner
     {
@@ -2035,7 +2034,7 @@ namespace Lang.Runner
 
         private void AddError(string message, IAst ast)
         {
-            _programGraph.Errors.Add(new Translation.TranslationError
+            _programGraph.Errors.Add(new TranslationError
             {
                 Error = message,
                 FileIndex = ast.FileIndex,
