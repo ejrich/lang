@@ -160,21 +160,35 @@ namespace Lang.Translation
                 // 1b. Check for errored or undefined field types
                 var type = VerifyType(argument.Type, errors);
 
-                if (type == Type.VarArgs)
+                switch (type)
                 {
-                    if (function.Varargs)
-                    {
-                        errors.Add(CreateError($"Function '{function.Name}' cannot have multiple varargs", argument.Type));
-                    }
-                    function.Varargs = true;
-                }
-                else if (type == Type.Error)
-                {
-                    errors.Add(CreateError($"Type '{PrintTypeDefinition(argument.Type)}' of argument '{argument.Name}' in function '{function.Name}' is not defined", argument.Type));
-                }
-                else if (function.Varargs)
-                {
-                    errors.Add(CreateError($"Cannot declare argument '{argument.Name}' following varargs", argument));
+                    case Type.VarArgs:
+                        if (function.Varargs || function.Params)
+                        {
+                            errors.Add(CreateError($"Function '{function.Name}' cannot have multiple varargs", argument.Type));
+                        }
+                        function.Varargs = true;
+                        break;
+                    case Type.Params:
+                        if (function.Varargs || function.Params)
+                        {
+                            errors.Add(CreateError($"Function '{function.Name}' cannot have multiple varargs", argument.Type));
+                        }
+                        function.Params = true;
+                        break;
+                    case Type.Error:
+                        errors.Add(CreateError($"Type '{PrintTypeDefinition(argument.Type)}' of argument '{argument.Name}' in function '{function.Name}' is not defined", argument.Type));
+                        break;
+                    default:
+                        if (function.Varargs)
+                        {
+                            errors.Add(CreateError($"Cannot declare argument '{argument.Name}' following varargs", argument));
+                        }
+                        else if (function.Params)
+                        {
+                            errors.Add(CreateError($"Cannot declare argument '{argument.Name}' following params", argument));
+                        }
+                        break;
                 }
             }
             
@@ -508,7 +522,7 @@ namespace Lang.Translation
                     case "List":
                         eachVariables.TryAdd(each.IterationVariable, variableTypeDefinition.Generics[0]);
                         break;
-                    case "...":
+                    case "Params":
                         if (variableTypeDefinition.Generics.Any())
                         {
                             eachVariables.TryAdd(each.IterationVariable, variableTypeDefinition.Generics[0]);
@@ -668,11 +682,11 @@ namespace Lang.Translation
                 case CallAst call:
                     if (_functions.TryGetValue(call.Function, out var function))
                     {
-                        var argumentCount = function.Varargs ? function.Arguments.Count - 1 : function.Arguments.Count;
+                        var argumentCount = function.Varargs || function.Params ? function.Arguments.Count - 1 : function.Arguments.Count;
                         var callArgumentCount = call.Arguments.Count;
 
                         // Verify function argument count
-                        if (function.Varargs)
+                        if (function.Varargs || function.Params)
                         {
                             if (argumentCount > callArgumentCount)
                             {
@@ -702,7 +716,7 @@ namespace Lang.Translation
                         }
 
                         // Verify varargs call arguments
-                        if (function.Varargs)
+                        if (function.Varargs || function.Params)
                         {
                             var varargsType = function.Arguments[argumentCount].Type.Generics.FirstOrDefault();
 
@@ -1143,16 +1157,23 @@ namespace Lang.Translation
                     }
                     return VerifyType(typeDef.Generics[0], errors) == Type.Error ? Type.Error : Type.Pointer;
                 case "...":
-                    if (typeDef.Generics.Count == 1)
+                    if (hasGenerics)
                     {
-                        return VerifyType(typeDef.Generics[0], errors) == Type.Error ? Type.Error : Type.VarArgs;
-                    }
-                    else if (typeDef.Generics.Count > 1)
-                    {
-                        errors.Add(CreateError($"Varargs type should have 0 or 1 generic type, but got {typeDef.Generics.Count}", typeDef));
+                        errors.Add(CreateError("Varargs type cannot have generics", typeDef));
                         return Type.Error;
                     }
                     return Type.VarArgs;
+                case "Params":
+                    if (typeDef.Generics.Count == 1)
+                    {
+                        return VerifyType(typeDef.Generics[0], errors) == Type.Error ? Type.Error : Type.Params;
+                    }
+                    else if (typeDef.Generics.Count > 1)
+                    {
+                        errors.Add(CreateError($"Params type should have 0 or 1 generic type, but got {typeDef.Generics.Count}", typeDef));
+                        return Type.Error;
+                    }
+                    return Type.Params;
                 default:
                     return _structs.ContainsKey(typeDef.Name) ? Type.Other : Type.Error;
             }

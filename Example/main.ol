@@ -163,8 +163,8 @@ int sum(List<int> args) {
     return sum;
 }
 
-int sum2(...<int> args) {
+int sum2(Params<int> args) {
     sum := 0;
-    //each i in args then sum += i;
+    each i in args then sum += i;
     return sum;
 }

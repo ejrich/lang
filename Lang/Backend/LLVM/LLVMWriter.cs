@@ -15,7 +15,7 @@ namespace Lang.Backend.LLVM
 
         private LLVMModuleRef _module;
         private LLVMBuilderRef _builder;
-        private readonly Dictionary<string, TypeDefinition> _functionTypes = new();
+        private readonly Dictionary<string, FunctionAst> _functions = new();
         private readonly Dictionary<string, StructAst> _structs = new();
         private FunctionAst _currentFunction;
 
@@ -37,6 +37,7 @@ namespace Lang.Backend.LLVM
             // 4. Write Function definitions
             foreach (var function in programGraph.Functions)
             {
+                _functions.Add(function.Name, function);
                 WriteFunctionDefinition(function.Name, function.Arguments, function.ReturnType, function.Varargs);
             }
 
@@ -85,7 +86,6 @@ namespace Lang.Backend.LLVM
 
         private LLVMValueRef WriteFunctionDefinition(string name, List<Argument> arguments, TypeDefinition returnType, bool varargs = false)
         {
-            _functionTypes.Add(name, returnType);
             var argumentCount = varargs ? arguments.Count - 1 : arguments.Count;
             var argumentTypes = new LLVMTypeRef[argumentCount];
 
@@ -119,17 +119,7 @@ namespace Lang.Backend.LLVM
             for (var i = 0; i < functionAst.Arguments.Count; i++)
             {
                 var arg = functionAst.Arguments[i];
-                if (arg.Type.Name == "...")
-                {
-                    // TODO Initialize varargs
-                    WriteFunctionDefinition("llvm.va_start", new List<Argument> {new() {Name = "arglist", Type = new TypeDefinition
-                    {
-                        Name = "*",
-                        Generics = {new TypeDefinition {Name = "u8", PrimitiveType = new IntegerType {Bytes = 1}}}}}
-                    }, new TypeDefinition {Name = "void"});
-                    localVariables.Add(arg.Name, (arg.Type, new LLVMValueRef()));
-                }
-                else
+                if (arg.Type.Name != "...")
                 {
                     var argument = LLVMApi.GetParam(function, (uint) i);
                     var allocation = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(arg.Type), arg.Name);
@@ -143,8 +133,7 @@ namespace Lang.Backend.LLVM
             foreach (var ast in functionAst.Children)
             {
                 // 3a. Recursively write out lines
-                WriteFunctionLine(ast, localVariables, function);
-                if (ast is ReturnAst)
+                if (WriteFunctionLine(ast, localVariables, function))
                 {
                     returned = true;
                     break;
@@ -285,7 +274,7 @@ namespace Lang.Backend.LLVM
             {
                 if (declaration.Type.Count is ConstantAst constant)
                 {
-                    InitializeConstList(variable, constant);
+                    InitializeConstList(variable, int.Parse(constant.Value));
                 }
                 else if (declaration.Type.Count != null)
                 {
@@ -327,7 +316,8 @@ namespace Lang.Backend.LLVM
 
                 if (structField.Type.Name == "List")
                 {
-                    InitializeConstList(field, structField.Type.Count as ConstantAst);
+                    var count = (ConstantAst)structField.Type.Count;
+                    InitializeConstList(field, int.Parse(count.Value));
                 }
                 else if (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind)
                 {
@@ -341,17 +331,16 @@ namespace Lang.Backend.LLVM
             }
         }
 
-        private void InitializeConstList(LLVMValueRef list, ConstantAst constant)
+        private void InitializeConstList(LLVMValueRef list, int length)
         {
             // 1. Set the count field
-            var count = ulong.Parse(constant.Value);
-            var countValue = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), ulong.Parse(constant.Value), false);
+            var countValue = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (ulong)length, false);
             var countPointer = LLVMApi.BuildStructGEP(_builder, list, 0, "countptr");
             LLVMApi.BuildStore(_builder, countValue, countPointer);
 
             // 2. Initialize the list data array
             var targetType = LLVMTypeRef.Int32Type(); // TODO Get this from the type
-            var arrayType = LLVMTypeRef.ArrayType(targetType, (uint)count);
+            var arrayType = LLVMTypeRef.ArrayType(targetType, (uint)length);
             var listData = LLVMApi.BuildAlloca(_builder, arrayType, "listdata");
             var listDataPointer = LLVMApi.BuildBitCast(_builder, listData, LLVMTypeRef.PointerType(targetType, 0), "tmpdata");
             var dataPointer = LLVMApi.BuildStructGEP(_builder, list, 1, "dataptr");
@@ -535,6 +524,7 @@ namespace Lang.Backend.LLVM
                 switch (type.Name)
                 {
                     case "List":
+                    case "Params": // TODO Add 'Any' type case
                         var iterType = type.Generics[0];
                         variable = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(iterType), each.IterationVariable);
 
@@ -545,10 +535,6 @@ namespace Lang.Backend.LLVM
 
                         LLVMApi.BuildStore(_builder, first, variable);
                         eachVariables.TryAdd(each.IterationVariable, (iterType, variable));
-                        break;
-                    case "...":
-                        // TODO Implement varargs
-                        variable = new LLVMValueRef();
                         break;
                     // @Cleanup This branch should never be hit
                     default:
@@ -585,15 +571,12 @@ namespace Lang.Backend.LLVM
                 switch (type.Name)
                 {
                     case "List":
+                    case "Params":
                         var countPointer = LLVMApi.BuildStructGEP(_builder, value, 0, "count");
                         var count = LLVMApi.BuildLoad(_builder, countPointer, "data");
                         var iterationValue = LLVMApi.BuildLoad(_builder, iterationVariable, "curr");
 
                         condition = LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntSLT, iterationValue, count, "listcmp");
-                        break;
-                    case "...":
-                        // TODO Implement varargs
-                        condition = new LLVMValueRef();
                         break;
                     // @Cleanup This branch should never be hit
                     default:
@@ -642,15 +625,13 @@ namespace Lang.Backend.LLVM
                 switch (type.Name)
                 {
                     case "List":
+                    case "Params":
                         var dataPointer = LLVMApi.BuildStructGEP(_builder, value, 1, "dataptr");
                         var data = LLVMApi.BuildLoad(_builder, dataPointer, "data");
                         var nextPointer = LLVMApi.BuildGEP(_builder, data, new []{nextValue}, "nextptr");
                         var nextVariable = LLVMApi.BuildLoad(_builder, nextPointer, "nextvar");
 
                         LLVMApi.BuildStore(_builder, nextVariable, variable);
-                        break;
-                    case "...":
-                        // TODO Implement varargs
                         break;
                 }
             }
@@ -691,14 +672,47 @@ namespace Lang.Backend.LLVM
                 }
                 case CallAst call:
                     var function = LLVMApi.GetNamedFunction(_module, call.Function);
-                    var callArguments = new LLVMValueRef[call.Arguments.Count];
-                    for (var i = 0; i < call.Arguments.Count; i++)
+                    var functionDef = _functions[call.Function];
+
+                    if (functionDef.Params)
                     {
-                        var value = WriteExpression(call.Arguments[i], localVariables);
-                        callArguments[i] = value.value;
+                        var callArguments = new LLVMValueRef[functionDef.Arguments.Count];
+                        for (var i = 0; i < functionDef.Arguments.Count - 1; i++)
+                        {
+                            var value = WriteExpression(call.Arguments[i], localVariables);
+                            callArguments[i] = value.value;
+                        }
+
+                        // Rollup the rest of the arguments into a list
+                        var paramsType = ConvertTypeDefinition(functionDef.Arguments[^1].Type);
+                        var paramsPointer = LLVMApi.BuildAlloca(_builder, paramsType, "paramsptr");
+                        InitializeConstList(paramsPointer, call.Arguments.Count - functionDef.Arguments.Count + 1);
+
+                        var listData = LLVMApi.BuildStructGEP(_builder, paramsPointer, 1, "listdata");
+                        var dataPointer = LLVMApi.BuildLoad(_builder, listData, "dataptr");
+
+                        ulong paramsIndex = 0;
+                        for (var i = functionDef.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
+                        {
+                            var pointer = LLVMApi.BuildGEP(_builder, dataPointer, new [] {LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), paramsIndex, false)}, "indexptr");
+                            var (_, value) = WriteExpression(call.Arguments[i], localVariables);
+                            LLVMApi.BuildStore(_builder, value, pointer);
+                        }
+
+                        var paramsValue = LLVMApi.BuildLoad(_builder, paramsPointer, "params");
+                        callArguments[functionDef.Arguments.Count - 1] = paramsValue;
+                        return (functionDef.ReturnType, LLVMApi.BuildCall(_builder, function, callArguments, string.Empty));
                     }
-                    var functionType = _functionTypes[call.Function];
-                    return (functionType, LLVMApi.BuildCall(_builder, function, callArguments, string.Empty));
+                    else
+                    {
+                        var callArguments = new LLVMValueRef[call.Arguments.Count];
+                        for (var i = 0; i < call.Arguments.Count; i++)
+                        {
+                            var value = WriteExpression(call.Arguments[i], localVariables);
+                            callArguments[i] = value.value;
+                        }
+                        return (functionDef.ReturnType, LLVMApi.BuildCall(_builder, function, callArguments, string.Empty));
+                    }
                 case ChangeByOneAst changeByOne:
                 {
                     var (variableType, pointer) = changeByOne.Variable switch
@@ -1146,6 +1160,7 @@ namespace Lang.Backend.LLVM
                     "bool" => LLVMTypeRef.Int1Type(),
                     "void" => LLVMTypeRef.VoidType(),
                     "List" => GetListType(typeDef),
+                    "Params" => GetListType(typeDef),
                     "string" => LLVMTypeRef.PointerType(LLVMTypeRef.Int8Type(), 0), // LLVMApi.GetTypeByName(_module, "string"),
                     _ => LLVMApi.GetTypeByName(_module, typeDef.Name)
                 }
@@ -1154,7 +1169,7 @@ namespace Lang.Backend.LLVM
 
         private LLVMTypeRef GetListType(TypeDefinition typeDef)
         {
-            // TODO Get list polymorphic type
+            // TODO Get list polymorphic type and params without generic
             return LLVMApi.GetTypeByName(_module, "List");
         }
     }

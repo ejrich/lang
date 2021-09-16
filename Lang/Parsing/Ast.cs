@@ -26,6 +26,7 @@ namespace Lang.Parsing
         public string Name { get; set; }
         public bool Extern { get; set; }
         public bool Varargs { get; set; }
+        public bool Params { get; set; }
         public TypeDefinition ReturnType { get; set; }
         public List<Argument> Arguments { get; } = new();
         public List<IAst> Children { get; } = new();

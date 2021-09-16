@@ -13,13 +13,6 @@ struct string {
 }
 */
 
-struct va_list {
-    int a;
-    int b;
-    u8* c;
-    u8* d;
-}
-
 
 // Basic IO functions
 printf(string format, ... args) #extern
