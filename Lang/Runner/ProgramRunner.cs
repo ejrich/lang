@@ -1095,7 +1095,10 @@ namespace Lang.Runner
                         {
                             if (!type.CArray)
                             {
-                                pointer = IntPtr.Add(pointer, 4);
+                                var listObject = PointerToTargetType(pointer, type);
+                                var dataField = listObject.GetType().GetField("data");
+                                var data = dataField!.GetValue(listObject);
+                                pointer = GetPointer(data!);
                             }
 
                             type = type.Generics[0];
