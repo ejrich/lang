@@ -15,7 +15,8 @@ int Main(List<string> args) {
     g := test_each();
     h := 3 > a;
     fac6 := factorial(6);
-    return g;
+    my_struct := create();
+    return my_struct.subValue.something;
 }
 
 bool test(int a) {
@@ -68,9 +69,9 @@ struct OtherStruct {
 
 MyStruct create() {
     s1: MyStruct;
-    //s2: OtherStruct;
+    s2: OtherStruct;
     //s2.something += 8;
-    //s1.field++;
+    s1.field++;
     //s1.subValue.something = s2.something;
     return s1;
 }
