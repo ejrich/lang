@@ -48,8 +48,8 @@ int main(List<string> args) {
 
     sdl_video := 0x20;
     x := 0xfeABD4;
-    sdl := SDL_Init(sdl_video);
-    SDL_CreateWindow("Hello world", 805240832, 805240832, 400, 300, 0);
+    // sdl := SDL_Init(sdl_video);
+    // SDL_CreateWindow("Hello world", 805240832, 805240832, 400, 300, 0);
     // sleep(5);
 
     z := 1;

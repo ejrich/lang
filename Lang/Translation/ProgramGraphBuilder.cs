@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Lang.Parsing;
-using Lang.Project;
 using Lang.Runner;
 
 namespace Lang.Translation
