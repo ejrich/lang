@@ -5,25 +5,30 @@ namespace Lang
 {
     public interface IPolymorpher
     {
-        StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, TypeKind typeKind, params TypeDefinition[] genericTypes);
-        FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, TypeDefinition[] genericTypes);
-        OperatorOverloadAst CreatePolymorphedOperatorOverload(OperatorOverloadAst baseOverload, TypeDefinition[] genericTypes);
+        StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, string backendName, TypeKind typeKind, IType[] genericTypes, params TypeDefinition[] genericTypeDefinitions);
+        // FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, TypeDefinition[] genericTypes);
+        FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, IType[] genericTypes);
+        // OperatorOverloadAst CreatePolymorphedOperatorOverload(OperatorOverloadAst baseOverload, TypeDefinition[] genericTypes);
+        OperatorOverloadAst CreatePolymorphedOperatorOverload(OperatorOverloadAst baseOverload, IType[] genericTypes);
     }
 
     public class Polymorpher : IPolymorpher
     {
-        public StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, TypeKind typeKind, params TypeDefinition[] genericTypes)
+        public StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, string backendName, TypeKind typeKind, IType[] genericTypes, params TypeDefinition[] genericTypeDefinitions)
         {
             var polyStruct = CopyAst(baseStruct);
             polyStruct.Name = name;
+            polyStruct.BackendName = backendName;
+            polyStruct.BaseName = baseStruct.Name;
             polyStruct.TypeKind = typeKind;
+            polyStruct.GenericTypes = genericTypes;
 
             foreach (var field in baseStruct.Fields)
             {
                 if (field.HasGenerics)
                 {
                     var newField = CopyAst(field);
-                    newField.TypeDefinition = CopyType(field.TypeDefinition, genericTypes);
+                    newField.TypeDefinition = CopyType(field.TypeDefinition, genericTypeDefinitions);
                     newField.Name = field.Name;
                     newField.Value = field.Value;
                     newField.Assignments = field.Assignments;
@@ -39,18 +44,20 @@ namespace Lang
             return polyStruct;
         }
 
-        public FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, TypeDefinition[] genericTypes)
+        // public FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, TypeDefinition[] genericTypes)
+        public FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, IType[] genericTypes)
         {
+            var genericTypeDefinitions = GetGenericTypeDefinitions(genericTypes);
             var function = CopyAst(baseFunction);
             function.Name = name;
             function.Flags = baseFunction.Flags;
-            function.ReturnTypeDefinition = baseFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? CopyType(baseFunction.ReturnTypeDefinition, genericTypes) : baseFunction.ReturnTypeDefinition;
+            function.ReturnTypeDefinition = baseFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? CopyType(baseFunction.ReturnTypeDefinition, genericTypeDefinitions) : baseFunction.ReturnTypeDefinition;
 
             foreach (var argument in baseFunction.Arguments)
             {
                 if (argument.HasGenerics)
                 {
-                    function.Arguments.Add(CopyDeclaration(argument, genericTypes, baseFunction.Generics));
+                    function.Arguments.Add(CopyDeclaration(argument, genericTypeDefinitions, baseFunction.Generics));
                 }
                 else
                 {
@@ -63,27 +70,80 @@ namespace Lang
                 function.ParamsElementType = TypeTable.GetType(function.Arguments[^1].TypeDefinition.Generics[0]);
             }
 
-            function.Body = CopyScope(baseFunction.Body, genericTypes, baseFunction.Generics);
+            function.Body = CopyScope(baseFunction.Body, genericTypeDefinitions, baseFunction.Generics);
 
             return function;
         }
 
-        public OperatorOverloadAst CreatePolymorphedOperatorOverload(OperatorOverloadAst baseOverload, TypeDefinition[] genericTypes)
+        // public OperatorOverloadAst CreatePolymorphedOperatorOverload(OperatorOverloadAst baseOverload, TypeDefinition[] genericTypes)
+        public OperatorOverloadAst CreatePolymorphedOperatorOverload(OperatorOverloadAst baseOverload, IType[] genericTypes)
         {
+            var genericTypeDefinitions = GetGenericTypeDefinitions(genericTypes);
             var overload = CopyAst(baseOverload);
             overload.Operator = baseOverload.Operator;
-            overload.Type = CopyType(baseOverload.Type, genericTypes);
+            overload.Type = CopyType(baseOverload.Type, genericTypeDefinitions);
             overload.Flags = baseOverload.Flags;
-            overload.ReturnTypeDefinition = baseOverload.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? CopyType(baseOverload.ReturnTypeDefinition, genericTypes) : baseOverload.ReturnTypeDefinition;
+            overload.ReturnTypeDefinition = baseOverload.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? CopyType(baseOverload.ReturnTypeDefinition, genericTypeDefinitions) : baseOverload.ReturnTypeDefinition;
 
             foreach (var argument in baseOverload.Arguments)
             {
-                overload.Arguments.Add(CopyDeclaration(argument, genericTypes, baseOverload.Generics));
+                overload.Arguments.Add(CopyDeclaration(argument, genericTypeDefinitions, baseOverload.Generics));
             }
 
-            overload.Body = CopyScope(baseOverload.Body, genericTypes, baseOverload.Generics);
+            overload.Body = CopyScope(baseOverload.Body, genericTypeDefinitions, baseOverload.Generics);
 
             return overload;
+        }
+
+        // This probably isn't the best idea, but ok for now
+        private TypeDefinition[] GetGenericTypeDefinitions(IType[] genericTypes)
+        {
+            var genericTypeDefinitions = new TypeDefinition[genericTypes.Length];
+
+            for (var i = 0; i < genericTypes.Length; i++)
+            {
+                genericTypeDefinitions[i] = GetTypeDefinition(genericTypes[i]);
+            }
+
+            return genericTypeDefinitions;
+        }
+
+        private TypeDefinition GetTypeDefinition(IType type)
+        {
+            var typeDef = new TypeDefinition();
+            switch (type.TypeKind)
+            {
+                case TypeKind.Void:
+                case TypeKind.Boolean:
+                case TypeKind.Integer:
+                case TypeKind.Float:
+                case TypeKind.String:
+                case TypeKind.Enum:
+                case TypeKind.Type:
+                case TypeKind.Function:
+                    typeDef.Name = type.Name;
+                    break;
+                case TypeKind.Pointer:
+                    var pointerType = (PrimitiveAst)type;
+                    typeDef.Name = "*";
+                    typeDef.Generics.Add(GetTypeDefinition(pointerType.PointerType));
+                    break;
+                case TypeKind.CArray:
+                    var arrayType = (ArrayType)type;
+                    typeDef.Name = "CArray";
+                    typeDef.Generics.Add(GetTypeDefinition(arrayType.ElementType));
+                    break;
+                case TypeKind.Array:
+                case TypeKind.Struct:
+                    var structDef = (StructAst)type;
+                    typeDef.Name = structDef.BaseName;
+                    foreach (var genericType in structDef.GenericTypes)
+                    {
+                        typeDef.Generics.Add(GetTypeDefinition(genericType));
+                    }
+                    break;
+            }
+            return typeDef;
         }
 
         private TypeDefinition CopyType(TypeDefinition type, TypeDefinition[] genericTypes)
