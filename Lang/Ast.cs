@@ -188,7 +188,7 @@ namespace Lang
         public int TypeIndex { get; set; }
         public TypeKind TypeKind { get; set; } = TypeKind.CArray;
         public uint Size { get; set; }
-        public TypeDefinition ElementTypeDefinition { get; set; }
+        // public TypeDefinition ElementTypeDefinition { get; set; }
         public IType ElementType { get; set; }
     }
 
