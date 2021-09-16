@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace Lang.Parsing
 {
@@ -12,26 +13,16 @@ namespace Lang.Parsing
 
     public class Lexer : ILexer
     {
-        private readonly IDictionary<char, char> _escapableCharacters = new Dictionary<char, char>
-        {
-            { '\'', '\'' },
-            { '"', '"' },
-            { '\\', '\\' },
-            { '0', '\0' },
-            { 'b', '\b' },
-            { 'n', '\n' },
-            { 'r', '\r' },
-            { 't', '\t' }
-        };
+        private readonly Regex _escapableCharacters = new(@"['""\\abfnrtv]");
 
         public List<Token> LoadFileTokens(string filePath)
         {
             var fileContents = File.ReadAllText(filePath);
 
-            return GetTokens(fileContents).ToList();
+            return GetTokens(fileContents, filePath).ToList();
         }
 
-        private IEnumerable<Token> GetTokens(string fileContents)
+        private IEnumerable<Token> GetTokens(string fileContents, string filePath)
         {
             var lexerStatus = new LexerStatus();
 
@@ -82,19 +73,17 @@ namespace Lang.Parsing
                 {
                     if (character == '\\' && !literalEscapeToken)
                     {
+                        currentToken.Value += character;
                         literalEscapeToken = true;
                     }
                     else if (literalEscapeToken)
                     {
-                        if (_escapableCharacters.TryGetValue(character, out var escapeChar))
+                        if (!_escapableCharacters.IsMatch(character.ToString()))
                         {
-                            currentToken.Value += escapeChar;
-                            literalEscapeToken = false;
+                            currentToken.Error = true;
                         }
-                        else
-                        {
-                            // TODO Communicate an error
-                        }
+                        currentToken.Value += character;
+                        literalEscapeToken = false;
                     }
                     else
                     {
@@ -102,7 +91,6 @@ namespace Lang.Parsing
                         {
                             yield return currentToken;
                             currentToken = null;
-                            literalEscapeToken = false; // Set to false just to be safe
                         }
                         else
                         {
