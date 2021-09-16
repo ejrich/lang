@@ -166,23 +166,61 @@ namespace Lang
                     }
                     case InstructionType.IntegerToFloatCast:
                     {
-                        // var value = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var targetType = _types[instruction.Value2.Type.TypeIndex];
-                        // values[instruction.ValueIndex] = _builder.BuildSIToFP(value, targetType);
+                        var value = GetValue(instruction.Value1, registers, stackPointer);
+                        var register = new Register();
+                        if (instruction.Value2.Type.Size == 4)
+                        {
+                            register.Float = instruction.Value1.Type.Size switch
+                            {
+                                1 => (float)value.SByte,
+                                2 => (float)value.Short,
+                                4 => (float)value.Integer,
+                                8 => (float)value.Long,
+                                _ => (float)value.Integer,
+                            };
+                        }
+                        else
+                        {
+                            register.Double = instruction.Value1.Type.Size switch
+                            {
+                                1 => (double)value.SByte,
+                                2 => (double)value.Short,
+                                4 => (double)value.Integer,
+                                8 => (double)value.Long,
+                                _ => (double)value.Integer,
+                            };
+                        }
+                        registers[instruction.ValueIndex] = register;
                         break;
                     }
                     case InstructionType.UnsignedIntegerToFloatCast:
                     {
-                        // var value = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var targetType = _types[instruction.Value2.Type.TypeIndex];
-                        // values[instruction.ValueIndex] = _builder.BuildUIToFP(value, targetType);
+                        var value = GetValue(instruction.Value1, registers, stackPointer);
+                        var register = new Register();
+                        if (instruction.Value2.Type.Size == 4)
+                        {
+                            register.Float = (float)value.ULong;
+                        }
+                        else
+                        {
+                            register.Double = (double)value.ULong;
+                        }
+                        registers[instruction.ValueIndex] = register;
                         break;
                     }
                     case InstructionType.FloatCast:
                     {
-                        // var value = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var targetType = _types[instruction.Value2.Type.TypeIndex];
-                        // values[instruction.ValueIndex] = _builder.BuildFPCast(value, targetType);
+                        var value = GetValue(instruction.Value1, registers, stackPointer);
+                        var register = new Register();
+                        if (instruction.Value2.Type.Size == 4)
+                        {
+                            register.Float = (float)value.Double;
+                        }
+                        else
+                        {
+                            register.Double = (double)value.Float;
+                        }
+                        registers[instruction.ValueIndex] = register;
                         break;
                     }
                     case InstructionType.FloatToIntegerCast:
@@ -194,16 +232,23 @@ namespace Lang
                     }
                     case InstructionType.FloatToUnsignedIntegerCast:
                     {
-                        // var value = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var targetType = _types[instruction.Value2.Type.TypeIndex];
-                        // values[instruction.ValueIndex] = _builder.BuildFPToUI(value, targetType);
+                        var value = GetValue(instruction.Value1, registers, stackPointer);
+                        var register = new Register();
+                        if (instruction.Value1.Type.Size == 4)
+                        {
+                            register.ULong = (ulong)value.Float;
+                        }
+                        else
+                        {
+                            register.ULong = (ulong)value.Double;
+                        }
+                        registers[instruction.ValueIndex] = register;
                         break;
                     }
                     case InstructionType.PointerCast:
                     {
-                        // var value = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var targetType = _types[instruction.Value2.Type.TypeIndex];
-                        // values[instruction.ValueIndex] = _builder.BuildBitCast(value, targetType);
+                        // This instruction is mostly for LLVM, so this is pretty much a no-op
+                        registers[instruction.ValueIndex] = GetValue(instruction.Value1, registers, stackPointer);
                         break;
                     }
                     case InstructionType.AllocateArray:
