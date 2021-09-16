@@ -92,8 +92,15 @@ namespace Lang.Runner
                         var structField = structBuilder.DefineField(field.Name, fieldType, FieldAttributes.Public);
                         if (field.Type.CArray)
                         {
-                            var caBuilder = new CustomAttributeBuilder(typeof(MarshalAsAttribute).GetConstructor(new []{typeof(UnmanagedType)}), new object[]{UnmanagedType.ByValArray});
-                            // TODO Look more into this and finish it up
+                            var marshalAsType = typeof(MarshalAsAttribute);
+                            var sizeConstField = marshalAsType.GetField("SizeConst");
+                            var size = 0;
+                            if (field.Type.Count != null)
+                            {
+                                size = (int)ExecuteExpression(field.Type.Count, null).Value;
+                            }
+
+                            var caBuilder = new CustomAttributeBuilder(typeof(MarshalAsAttribute).GetConstructor(new []{typeof(UnmanagedType)}), new object[]{UnmanagedType.ByValArray}, new []{sizeConstField}, new object[]{size});
                             structField.SetCustomAttribute(caBuilder);
                         }
                     }
@@ -673,17 +680,29 @@ namespace Lang.Runner
             if (each.Iteration != null)
             {
                 var iterator = ExecuteExpression(each.Iteration, variables);
-                var lengthField = iterator.Value.GetType().GetField("length");
-                var length = (int)lengthField!.GetValue(iterator.Value)!;
 
                 var elementType = iterator.Type.Generics[0];
                 var type = GetTypeFromDefinition(elementType);
                 var iterationVariable = new ValueType {Type = elementType};
                 eachVariables.Add(each.IterationVariable, iterationVariable);
 
-                var dataField = iterator.Value.GetType().GetField("data");
-                var data = dataField!.GetValue(iterator.Value);
-                var dataPointer = GetPointer(data!);
+                IntPtr dataPointer;
+                int length;
+                if (iterator.Type.CArray)
+                {
+                    var pinnedArray = GCHandle.Alloc(iterator.Value, GCHandleType.Pinned);
+                    dataPointer = pinnedArray.AddrOfPinnedObject();
+                    length = (int)ExecuteExpression(iterator.Type.Count, variables).Value;
+                }
+                else
+                {
+                    var dataField = iterator.Value.GetType().GetField("data");
+                    var data = dataField!.GetValue(iterator.Value);
+                    dataPointer = GetPointer(data!);
+
+                    var lengthField = iterator.Value.GetType().GetField("length");
+                    length = (int)lengthField!.GetValue(iterator.Value)!;
+                }
 
                 for (var i = 0; i < length; i++)
                 {
@@ -860,7 +879,6 @@ namespace Lang.Runner
                                 typeDef = referenceValueType.Type;
                                 if (typeDef.CArray)
                                 {
-                                    // TODO Better handle this
                                     var pinnedArray = GCHandle.Alloc(referenceValueType.Value, GCHandleType.Pinned);
                                     pointer = pinnedArray.AddrOfPinnedObject();
                                 }
@@ -1063,7 +1081,6 @@ namespace Lang.Runner
 
                 if (structField.Pointers[i-1])
                 {
-                    // TODO Figure this out
                     var type = _types[structName];
                     value = Marshal.PtrToStructure(GetPointer(value), type);
                 }
@@ -1116,8 +1133,8 @@ namespace Lang.Runner
             IntPtr dataPointer;
             if (listTypeDef.CArray)
             {
-                // TODO Implement me
-                dataPointer = IntPtr.Zero;
+                var pinnedArray = GCHandle.Alloc(listObject, GCHandleType.Pinned);
+                dataPointer = pinnedArray.AddrOfPinnedObject();
             }
             else
             {
@@ -1733,7 +1750,6 @@ namespace Lang.Runner
                 case "List" when typeDef.CArray:
                     var elementType = GetTypeFromDefinition(typeDef.Generics[0]);
                     return elementType.MakeArrayType();
-                    // TODO Implement me and make sure this works
             }
 
             if (_types.TryGetValue(typeDef.GenericName, out var type))
