@@ -2064,6 +2064,7 @@ namespace Lang
                     {
                         return null;
                     }
+                    typeDef.TypeIndex = type.TypeIndex;
                     return new TypeDefinition {Name = "Type", TypeKind = TypeKind.Type, TypeIndex = type.TypeIndex};
                 }
                 case CastAst cast:

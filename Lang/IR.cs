@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace Lang
 {
@@ -43,9 +44,22 @@ namespace Lang
 
     public class InstructionValue
     {
-        public InstructionValueType Type { get; set; }
+        public InstructionValueType ValueType { get; set; }
 
         public int ValueIndex { get; set; }
+        public TypeDefinition Type { get; set; }
+
+        public InstructionConstant ConstantValue { get; set; }
+        public string ConstantString { get; set; }
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public struct InstructionConstant
+    {
+        [FieldOffset(0)] public bool Boolean;
+        [FieldOffset(0)] public ulong Integer;
+        [FieldOffset(0)] public float Float;
+        [FieldOffset(0)] public double Double;
     }
 
     public enum InstructionType
@@ -55,6 +69,7 @@ namespace Lang
         Return,
         Load,
         Store,
+        Call,
         Cast,
         Not,
         Negate,
@@ -85,6 +100,8 @@ namespace Lang
         None = 0,
         Argument,
         Constant,
+        Null,
+        Type,
         Value // TODO IDK?
     }
 }
