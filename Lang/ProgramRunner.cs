@@ -1214,6 +1214,8 @@ namespace Lang
             }
         }
 
+        private StructAst _stringStruct;
+
         private (TypeDefinition typeDef, Type elementType, object pointer) GetListPointer(IndexAst index, IDictionary<string, ValueType> variables, out bool loaded, IntPtr pointer = default, TypeDefinition listTypeDef = null)
         {
             var indexValue = (int)ExecuteExpression(index.Index, variables).Value;
@@ -1235,7 +1237,15 @@ namespace Lang
                 return (value.Type, GetTypeFromDefinition(value.Type), value.Value);
             }
 
-            elementTypeDef = listTypeDef.Generics[0];
+            if (listTypeDef.TypeKind == TypeKind.String)
+            {
+                _stringStruct ??= (StructAst)_programGraph.Types["string"];
+                elementTypeDef = _stringStruct.Fields[1].Type.Generics[0];
+            }
+            else
+            {
+                elementTypeDef = listTypeDef.Generics[0];
+            }
             var elementType = GetTypeFromDefinition(elementTypeDef);
 
             if (!listTypeDef.CArray)
