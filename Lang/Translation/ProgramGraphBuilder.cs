@@ -671,18 +671,18 @@ namespace Lang.Translation
                     foreach (var assignment in declaration.Assignments)
                     {
                         StructFieldAst field = null;
-                        if (assignment.Variable is not IdentifierAst identifier)
+                        if (assignment.Reference is not IdentifierAst identifier)
                         {
-                            AddError("Expected to get field in object initializer", assignment.Variable);
+                            AddError("Expected to get field in object initializer", assignment.Reference);
                         }
                         else if (!fields.TryGetValue(identifier.Name, out field))
                         {
-                            AddError($"Field '{identifier.Name}' not present in struct '{PrintTypeDefinition(declaration.Type)}'", assignment.Variable);
+                            AddError($"Field '{identifier.Name}' not present in struct '{PrintTypeDefinition(declaration.Type)}'", assignment.Reference);
                         }
 
                         if (assignment.Operator != Operator.None)
                         {
-                            AddError("Cannot have operator assignments in object initializers", assignment.Variable);
+                            AddError("Cannot have operator assignments in object initializers", assignment.Reference);
                         }
 
                         var valueType = VerifyExpression(assignment.Value, currentFunction, scopeIdentifiers);
@@ -817,12 +817,12 @@ namespace Lang.Translation
         private void VerifyAssignment(AssignmentAst assignment, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Verify the variable is already defined and that it is not a constant
-            var variableTypeDefinition = GetVariable(assignment.Variable, currentFunction, scopeIdentifiers);
+            var variableTypeDefinition = GetVariable(assignment.Reference, currentFunction, scopeIdentifiers);
             if (variableTypeDefinition == null) return;
 
             if (variableTypeDefinition.Constant)
             {
-                var variable = assignment.Variable as IdentifierAst;
+                var variable = assignment.Reference as IdentifierAst;
                 AddError($"Cannot reassign value of constant variable '{variable?.Name}'", assignment);
             }
 

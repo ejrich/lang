@@ -590,7 +590,7 @@ namespace Lang.Backend.LLVM
         private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable,
             IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables = null, List<AssignmentAst> values = null)
         {
-            var assignments = values?.ToDictionary(_ => (_.Variable as IdentifierAst)!.Name);
+            var assignments = values?.ToDictionary(_ => (_.Reference as IdentifierAst)!.Name);
             var structDef = _types[typeDef.GenericName] as StructAst;
             for (var i = 0; i < structDef!.Fields.Count; i++)
             {
@@ -672,7 +672,7 @@ namespace Lang.Backend.LLVM
         private void WriteAssignment(AssignmentAst assignment, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
         {
             // 1. Get the variable on the stack
-            var (type, variable) = assignment.Variable switch
+            var (type, variable) = assignment.Reference switch
             {
                 IdentifierAst identifier => localVariables[identifier.Name],
                 // StructFieldRefAst structField => BuildStructField(structField, localVariables[structField.Name].value),
