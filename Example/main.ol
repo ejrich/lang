@@ -272,7 +272,7 @@ int SDL_Init(u32 flags) #extern "SDL2"
 SDL_CreateWindow(string title, int x, int y, int w, int h, u32 flags) #extern "SDL2"
 u32 sleep(u32 seconds) #extern "libc"
 
-//#run main();
+#run default_args(87);
 
 /*
 compiler_directives() {
