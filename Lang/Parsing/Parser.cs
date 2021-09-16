@@ -256,6 +256,19 @@ namespace Lang.Parsing
                 {
                     case "extern":
                         function.Extern = true;
+                        if (enumerator.Peek()?.Type != TokenType.Literal)
+                        {
+                            errors.Add(new ParseError
+                            {
+                                Error = "Extern function definition should be followed by the library in use", 
+                                Token = enumerator.Current
+                            });
+                        }
+                        else
+                        {
+                            enumerator.MoveNext();
+                            function.ExternLib = enumerator.Current.Value;
+                        }
                         return function;
                     case null:
                         errors.Add(new ParseError

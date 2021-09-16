@@ -15,7 +15,7 @@ struct string {
 
 
 // Basic IO functions
-printf(string format, ... args) #extern
+printf(string format, ... args) #extern "libc"
 
 
 // Runtime functions
