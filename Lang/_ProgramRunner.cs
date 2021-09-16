@@ -227,17 +227,17 @@ namespace Lang
                     }
                     case InstructionType.GetPointer:
                     {
-                        // TODO Implement me
-                        // var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var index = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildGEP(pointer, instruction.GetFirstPointer ? new []{_zeroInt, index} : new []{index});
+                        var pointer = GetValue(instruction.Value1, registers, stackPointer);
+                        var index = GetValue(instruction.Value2, registers, stackPointer);
+                        var indexedPointer = pointer.Pointer + (int)instruction.Offset * index.Integer;
+                        registers[instruction.ValueIndex] = new Register {Pointer = indexedPointer};
                         break;
                     }
                     case InstructionType.GetStructPointer:
                     {
-                        // TODO Implement me
-                        // var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildStructGEP(pointer, (uint)instruction.Index);
+                        var pointer = GetValue(instruction.Value1, registers, stackPointer);
+                        var structPointer = pointer.Pointer + (int)instruction.Offset;
+                        registers[instruction.ValueIndex] = new Register {Pointer = structPointer};
                         break;
                     }
                     case InstructionType.Call:

@@ -60,8 +60,9 @@ namespace Lang
         public int ValueIndex { get; set; }
         public IAst Source { get; set; }
 
-        // Used for Jump, Call, GetPointer, and GetStructPointer
+        // Used for Call, GetPointer, GetStructPointer, and debug locations
         public int Index { get; set; }
+        public uint Offset { get; set; }
         public bool GetFirstPointer { get; set; }
         public string String { get; set; }
 

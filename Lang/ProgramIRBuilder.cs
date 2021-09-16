@@ -1823,12 +1823,11 @@ namespace Lang
             return EmitGetPointer(function, allocation, index, type, getFirstPointer);
         }
 
-        // TODO For index value, calculate the size of the element
         private InstructionValue EmitGetPointer(FunctionIR function, InstructionValue pointer, InstructionValue index, IType type, bool getFirstPointer = false)
         {
             var instruction = new Instruction
             {
-                Type = InstructionType.GetPointer, Value1 = pointer,
+                Type = InstructionType.GetPointer, Offset = type.Size, Value1 = pointer,
                 Value2 = index, GetFirstPointer = getFirstPointer
             };
             return AddInstruction(function, instruction, type);
@@ -1840,7 +1839,6 @@ namespace Lang
             return EmitGetStructPointer(function, allocation, structDef, fieldIndex, field);
         }
 
-        // TODO Add the offset size
         private InstructionValue EmitGetStructPointer(FunctionIR function, InstructionValue value, StructAst structDef, int fieldIndex, StructFieldAst field = null)
         {
             if (field == null)
@@ -1848,7 +1846,7 @@ namespace Lang
                  field = structDef.Fields[fieldIndex];
             }
 
-            var instruction = new Instruction {Type = InstructionType.GetStructPointer, Index = fieldIndex, Value1 = value};
+            var instruction = new Instruction {Type = InstructionType.GetStructPointer, Index = fieldIndex, Offset = field.Offset, Value1 = value};
             return AddInstruction(function, instruction, field.Type);
         }
 
