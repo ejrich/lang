@@ -323,14 +323,14 @@ namespace Lang.Parsing
                         currentToken.Type = TokenType.GreaterThanEqual;
                         return true;
                     }
-                    return false;
+                    return ChangeTypeIfSame(currentToken, type, TokenType.ShiftRight);
                 case TokenType.LessThan:
                     if (type == TokenType.Equals)
                     {
                         currentToken.Type = TokenType.LessThanEqual;
                         return true;
                     }
-                    return false;
+                    return ChangeTypeIfSame(currentToken, type, TokenType.ShiftLeft);
                 case TokenType.Ampersand:
                     return ChangeTypeIfSame(currentToken, type, TokenType.And);
                 case TokenType.Pipe:
@@ -355,6 +355,20 @@ namespace Lang.Parsing
                     return ChangeTypeIfSame(currentToken, type, TokenType.Decrement);
                 case TokenType.Period:
                     return ChangeTypeIfSame(currentToken, type, TokenType.Range);
+                case TokenType.ShiftLeft:
+                    if (type == TokenType.LessThan)
+                    {
+                        currentToken.Type = TokenType.RotateLeft;
+                        return true;
+                    }
+                    return false;
+                case TokenType.ShiftRight:
+                    if (type == TokenType.GreaterThan)
+                    {
+                        currentToken.Type = TokenType.RotateRight;
+                        return true;
+                    }
+                    return false;
                 default:
                     return false;
             }

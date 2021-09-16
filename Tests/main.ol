@@ -89,7 +89,7 @@ int run_command(u8* command) {
     while fgets(buffer.data, 50, handle) != null {}
 
     status := pclose(handle);
-    return (status & 0xFF00) / 256;
+    return (status & 0xFF00) >> 8;
 }
 
 // #run main();

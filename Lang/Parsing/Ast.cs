@@ -339,6 +339,10 @@ namespace Lang.Parsing
         NotEqual, // !=
         GreaterThanEqual, // >=
         LessThanEqual, // <=
+        ShiftLeft, // <<
+        ShiftRight, // >>
+        RotateLeft, // <<<
+        RotateRight, // >>>
         Add = '+',
         Subtract = '-',
         Multiply = '*',

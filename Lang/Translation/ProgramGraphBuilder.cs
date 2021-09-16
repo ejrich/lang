@@ -2465,7 +2465,28 @@ namespace Lang.Translation
                             else if (!(type == Type.Boolean || type == Type.Int))
                             {
                                 // If the type can't be determined, default to int
-                                expression.Type = new TypeDefinition {Name = "s32"};
+                                expression.Type = new TypeDefinition {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
+                            }
+                        }
+                        break;
+                    case Operator.ShiftLeft:
+                    case Operator.ShiftRight:
+                    case Operator.RotateLeft:
+                    case Operator.RotateRight:
+                        if (type != Type.Int || nextType != Type.Int)
+                        {
+                            AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                            if (type != Type.Int)
+                            {
+                                if (nextType == Type.Int)
+                                {
+                                    expression.Type = nextExpressionType;
+                                }
+                                else
+                                {
+                                    // If the type can't be determined, default to int
+                                    expression.Type = new TypeDefinition {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
+                                }
                             }
                         }
                         break;
