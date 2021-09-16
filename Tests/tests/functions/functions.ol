@@ -66,6 +66,7 @@ polymorphic_functions() {
 
 T bar<T>(T a, int b) {
     // TODO Add content
+    return a;
 }
 
 baz<T, U>(List<T> list, U* b) {
