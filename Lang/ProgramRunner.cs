@@ -605,6 +605,12 @@ namespace Lang
 
         private ValueType ExecuteScope(ScopeAst scope, IDictionary<string, ValueType> variables, out bool returned)
         {
+            if (!scope.Children.Any())
+            {
+                returned = false;
+                return null;
+            }
+
             var scopeVariables = new Dictionary<string, ValueType>(variables);
 
             return ExecuteAsts(scope.Children, scopeVariables, out returned);
