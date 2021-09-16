@@ -59,9 +59,10 @@ namespace Lang
 
         public static void Free()
         {
-            #if DEBUG
+            /* #if DEBUG
             Console.WriteLine($"{_memoryBlocks.Count} memory blocks, {_openPointers.Count} open pointers");
-            #endif
+            #endif */
+
             foreach (var pointer in _openPointers)
             {
                 Marshal.FreeHGlobal(pointer);
