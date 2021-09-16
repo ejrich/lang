@@ -124,12 +124,7 @@ namespace Lang
             var function = CreateAst<FunctionAst>(enumerator.Current);
 
             // 1a. Check if the return type is void
-            if (enumerator.Peek()?.Type == TokenType.OpenParen)
-            {
-                function.ReturnTypeDefinition = CreateAst<TypeDefinition>(enumerator.Current);
-                function.ReturnTypeDefinition.Name = "void"; // TODO Don't set the type definition
-            }
-            else
+            if (enumerator.Peek()?.Type != TokenType.OpenParen)
             {
                 function.ReturnTypeDefinition = ParseType(enumerator);
                 enumerator.MoveNext();
@@ -165,8 +160,7 @@ namespace Lang
                                 function.Generics.Add(generic.Name);
                             }
                         }
-                        function.ReturnTypeDefinition.Name = "void"; // TODO Don't set the type definition
-                        function.ReturnTypeDefinition.Generics.Clear();
+                        function.ReturnTypeDefinition = null;
                     }
                     break;
                 case null:
@@ -238,12 +232,15 @@ namespace Lang
             }
 
             // 3. Search for generics in the function return type
-            for (var i = 0; i < function.Generics.Count; i++)
+            if (function.ReturnTypeDefinition != null)
             {
-                var generic = function.Generics[i];
-                if (SearchForGeneric(generic, i, function.ReturnTypeDefinition))
+                for (var i = 0; i < function.Generics.Count; i++)
                 {
-                    function.Flags |= FunctionFlags.ReturnTypeHasGenerics;
+                    var generic = function.Generics[i];
+                    if (SearchForGeneric(generic, i, function.ReturnTypeDefinition))
+                    {
+                        function.Flags |= FunctionFlags.ReturnTypeHasGenerics;
+                    }
                 }
             }
 
