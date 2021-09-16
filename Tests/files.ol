@@ -1,11 +1,13 @@
 struct DIR {}
 
+D_NAME_LENGTH := 256; #const
+
 struct dirent {
     d_ino: u64;
     d_off: u64;
     d_reclen: u16;
     d_type: FileType;
-    d_name: CArray<u8>[256];
+    d_name: CArray<u8>[D_NAME_LENGTH];
 }
 
 enum FileType : u8 {

@@ -120,7 +120,7 @@ namespace Lang
                 {
                     var instruction = function.Instructions[i++];
 
-                    var text = $"{i}\t{instruction.Type} ";
+                    var text = $"\t{instruction.Type} ";
                     switch (instruction.Type)
                     {
                         case InstructionType.Jump:
@@ -988,6 +988,10 @@ namespace Lang
                             return EmitLoad(function, unary.Type, value);
                         case UnaryOperator.Reference:
                             value = EmitGetReference(function, unary.Value, scope);
+                            if (value.Type.TypeKind == TypeKind.CArray)
+                            {
+                                return EmitInstruction(InstructionType.PointerCast, function, unary.Type, value, new InstructionValue {ValueType = InstructionValueType.Type, Type = unary.Type});
+                            }
                             return new InstructionValue {ValueType = value.ValueType, ValueIndex = value.ValueIndex, Type = unary.Type};
                     }
                     break;

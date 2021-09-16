@@ -35,7 +35,7 @@ int main() {
 string get_file_name(dirent* file) {
     name: string = { data = &file.d_name; }
 
-    each i in 0..file.d_name.length - 1 {
+    each i in 0..D_NAME_LENGTH {
         if file.d_name[i] != 0 then name.length++;
         else then return name;
     }
@@ -54,7 +54,7 @@ string format_string(string format, Params<string> args) {
         char := format[format_index];
         if char == '%' {
             arg := args[arg_index++];
-            each i in 0..arg.length - 1 {
+            each i in 0..arg.length {
                 str[str.length++] = arg[i];
             }
         }
