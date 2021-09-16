@@ -718,20 +718,7 @@ namespace Lang.Backend.LLVM
                 case "bool":
                     return LLVMApi.ConstInt(type, constant.Value == "true" ? 1 : 0, false);
                 case "string":
-                    var stringStruct = LLVMApi.BuildAlloca(_builder, type, "tmpstring");
-                    var stringLength = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (ulong)constant.Value.Length, false);
-                    var lengthPointer = LLVMApi.BuildStructGEP(_builder, stringStruct, 0, "lengthptr");
-                    LLVMApi.BuildStore(_builder, stringLength, lengthPointer);
-
-                    var stringPointer = LLVMApi.BuildAlloca(_builder, LLVMTypeRef.ArrayType(LLVMTypeRef.Int8Type(), (uint)constant.Value.Length + 1), "stringptr");
-                    var constantString = LLVMApi.ConstString(constant.Value, (uint)constant.Value.Length, false);
-                    LLVMApi.BuildStore(_builder, constantString, stringPointer);
-                    var data = LLVMApi.BuildBitCast(_builder, stringPointer, LLVMTypeRef.PointerType(LLVMTypeRef.Int8Type(), 0), "data");
-
-                    var dataPointer = LLVMApi.BuildStructGEP(_builder, stringStruct, 1, "dataptr");
-                    LLVMApi.BuildStore(_builder, data, dataPointer);
-
-                    return LLVMApi.BuildLoad(_builder, stringStruct, "tmpstr");
+                    return LLVMApi.BuildGlobalStringPtr(_builder, constant.Value, "str");
                 default:
                     return LLVMApi.ConstInt(LLVMApi.Int32Type(), 0, true);
             }
@@ -1075,7 +1062,7 @@ namespace Lang.Backend.LLVM
                     "bool" => LLVMTypeRef.Int1Type(),
                     "void" => LLVMTypeRef.VoidType(),
                     "List" => GetListType(typeDef),
-                    "string" => LLVMApi.GetTypeByName(_module, "string"),
+                    "string" => LLVMTypeRef.PointerType(LLVMTypeRef.Int8Type(), 0), // LLVMApi.GetTypeByName(_module, "string"),
                     _ => LLVMApi.GetTypeByName(_module, typeDef.Name)
                 }
             };
