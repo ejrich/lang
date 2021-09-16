@@ -3113,10 +3113,11 @@ namespace Lang
                 {
                     if (TypeEquals(expression.TypeDefinition, nextExpressionType, true))
                     {
-                        var resultType = VerifyOperatorOverloadType(expression.TypeDefinition, op, currentFunction, expression.Children[i], out _);
-                        if (resultType != null)
+                        var overload = VerifyOperatorOverloadType(expression.TypeDefinition, op, currentFunction, expression.Children[i]);
+                        if (overload != null)
                         {
-                            expression.TypeDefinition = resultType;
+                            expression.OperatorOverloads[i] = overload;
+                            expression.TypeDefinition = overload.ReturnTypeDefinition;
                         }
                     }
                     else
@@ -3314,8 +3315,8 @@ namespace Lang
                 case TypeKind.Struct:
                     index.CallsOverload = true;
                     overloaded = true;
-                    elementType = VerifyOperatorOverloadType(typeDef, Operator.Subscript, currentFunction, index, out var overload);
-                    index.Overload = overload;
+                    index.Overload = VerifyOperatorOverloadType(typeDef, Operator.Subscript, currentFunction, index);
+                    elementType = index.Overload.ReturnTypeDefinition;
                     break;
                 case TypeKind.Array:
                 case TypeKind.CArray:
@@ -3347,15 +3348,15 @@ namespace Lang
             return elementType;
         }
 
-        private TypeDefinition VerifyOperatorOverloadType(TypeDefinition type, Operator op, IFunction currentFunction, IAst ast, out OperatorOverloadAst overload)
+        private OperatorOverloadAst VerifyOperatorOverloadType(TypeDefinition type, Operator op, IFunction currentFunction, IAst ast)
         {
-            if (_programGraph.OperatorOverloads.TryGetValue(type.GenericName, out var overloads) && overloads.TryGetValue(op, out overload))
+            if (_programGraph.OperatorOverloads.TryGetValue(type.GenericName, out var overloads) && overloads.TryGetValue(op, out var overload))
             {
                 if (!overload.Verified && overload != currentFunction)
                 {
                     VerifyOperatorOverload(overload);
                 }
-                return overload.ReturnTypeDefinition; // TODO Switch with ReturnType
+                return overload;
             }
             else if (_polymorphicOperatorOverloads.TryGetValue(type.Name, out var polymorphicOverloads) && polymorphicOverloads.TryGetValue(op, out var polymorphicOverload))
             {
@@ -3377,13 +3378,11 @@ namespace Lang
                 });
 
                 VerifyOperatorOverload(polymorphedOverload);
-                overload = polymorphedOverload;
-                return polymorphedOverload.ReturnTypeDefinition; // TODO Switch with ReturnType
+                return polymorphedOverload;
             }
             else
             {
                 AddError($"Type '{PrintTypeDefinition(type)}' does not contain an overload for operator '{PrintOperator(op)}'", ast);
-                overload = null;
                 return null;
             }
         }
