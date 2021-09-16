@@ -35,6 +35,7 @@ namespace Lang.Parsing
         In,
         Range,
         NumberRange, // Ignored by parser
+        VarArgs, // Ignored by parser
         OpenParen = '(',
         CloseParen = ')',
         OpenBracket = '[',
@@ -57,6 +58,7 @@ namespace Lang.Parsing
         LessThan = '<',
         GreaterThan = '>',
         Comma = ',',
-        Period = '.'
+        Period = '.',
+        Pound = '#'
     }
 }

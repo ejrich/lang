@@ -24,6 +24,7 @@ namespace Lang.Parsing
         public int Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
+        public bool Extern { get; set; }
         public TypeDefinition ReturnType { get; set; }
         public List<Argument> Arguments { get; } = new();
         public List<IAst> Children { get; } = new();

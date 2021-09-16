@@ -49,8 +49,9 @@ namespace Lang
                 {
                     if (currentFile != parseError.FileIndex)
                     {
+                        if (currentFile != Int32.MinValue) Console.WriteLine();
                         currentFile = parseError.FileIndex;
-                        Console.WriteLine($"\nFailed to parse file: \"{project.BuildFiles[currentFile].Replace(project.Path, string.Empty)}\":");
+                        Console.WriteLine($"Failed to parse file: \"{project.BuildFiles[currentFile].Replace(project.Path, string.Empty)}\":");
                     }
                     Console.WriteLine($"\t{parseError.Error} at line {parseError.Token.Line}:{parseError.Token.Column}");
                 }

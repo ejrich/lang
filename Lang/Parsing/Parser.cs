@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Reflection;
 
 namespace Lang.Parsing
 {
@@ -83,12 +81,7 @@ namespace Lang.Parsing
             // 1. Load file tokens
             var tokens = _lexer.LoadFileTokens(file, fileIndex, out errors);
 
-            // 2. Parse tokens into ASTs
-            return ParseTokens(tokens, errors);
-        }
-        private static List<IAst> ParseTokens(List<Token> tokens, List<ParseError> errors)
-        {
-            // Iterate through tokens, tracking different ASTs
+            // 2. Iterate through tokens, tracking different ASTs
             var syntaxTrees = new List<IAst>();
             var enumerator = new TokenEnumerator(tokens);
             while (enumerator.MoveNext())
@@ -118,8 +111,18 @@ namespace Lang.Parsing
         {
             // 1. Determine return type and name of the function
             var function = CreateAst<FunctionAst>(enumerator.Current);
-            function.ReturnType = ParseType(enumerator, errors);
-            enumerator.MoveNext();
+
+            // 1a. Check if the return type is void
+            if (enumerator.Peek()?.Type == TokenType.OpenParen)
+            {
+                function.ReturnType = CreateAst<TypeDefinition>(enumerator.Current);
+                function.ReturnType.Name = "void";
+            }
+            else
+            {
+                function.ReturnType = ParseType(enumerator, errors);
+                enumerator.MoveNext();
+            }
             function.Name = enumerator.Current?.Value;
 
             // 2. Find open paren to start parsing arguments
@@ -152,6 +155,7 @@ namespace Lang.Parsing
                 switch (token.Type)
                 {
                     case TokenType.Token:
+                    case TokenType.VarArgs:
                         if (commaRequiredBeforeNextArgument)
                         {
                             errors.Add(new ParseError
@@ -162,7 +166,7 @@ namespace Lang.Parsing
                         else if (currentArgument == null)
                         {
                             currentArgument = CreateAst<Argument>(token);
-                            currentArgument.Type = ParseType(enumerator, errors);
+                            currentArgument.Type = ParseType(enumerator, errors, true);
                         }
                         else
                         {
@@ -193,8 +197,35 @@ namespace Lang.Parsing
                 });
             }
 
-            // 4. Find open brace to start parsing body
             enumerator.MoveNext();
+            // 4. Handle compiler directives
+            if (enumerator.Current?.Type == TokenType.Pound)
+            {
+                enumerator.MoveNext();
+                switch (enumerator.Current?.Value)
+                {
+                    case "extern":
+                        function.Extern = true;
+                        return function;
+                    case null:
+                        errors.Add(new ParseError
+                        {
+                            Error = "Expected compiler directive value",
+                            Token = enumerator.Last
+                        });
+                        return function;
+                    default:
+                        errors.Add(new ParseError
+                        {
+                            Error = $"Unexpected compiler directive '{enumerator.Current.Value}'",
+                            Token = enumerator.Current
+                        });
+                        break;
+                }
+                enumerator.MoveNext();
+            }
+
+            // 5. Find open brace to start parsing body
             if (enumerator.Current?.Type != TokenType.OpenBrace)
             {
                 // Add an error to the function AST and continue until open paren
@@ -208,7 +239,7 @@ namespace Lang.Parsing
                     enumerator.MoveNext();
             }
 
-            // 5. Parse function body
+            // 6. Parse function body
             var closed = false;
             while (enumerator.MoveNext())
             {
@@ -374,7 +405,7 @@ namespace Lang.Parsing
                     switch (nextToken?.Type)
                     {
                         case TokenType.OpenParen:
-                            return ParseCall(enumerator, errors);
+                            return ParseCall(enumerator, errors, true);
                         case TokenType.OpenBracket:
                             return ParseIndexExpression(enumerator, errors);
                         case TokenType.Colon:
@@ -1151,7 +1182,7 @@ namespace Lang.Parsing
             }
         }
 
-        private static CallAst ParseCall(TokenEnumerator enumerator, List<ParseError> errors)
+        private static CallAst ParseCall(TokenEnumerator enumerator, List<ParseError> errors, bool requiresSemicolon = false)
         {
             var callAst = CreateAst<CallAst>(enumerator.Current);
             callAst.Function = enumerator.Current.Value;
@@ -1178,6 +1209,18 @@ namespace Lang.Parsing
                     
                     if (enumerator.Current?.Type == TokenType.CloseParen)
                     {
+                        if (requiresSemicolon)
+                        {
+                            enumerator.MoveNext();
+                            if (enumerator.Current?.Type != TokenType.SemiColon)
+                            {
+                                errors.Add(new ParseError
+                                {
+                                    Error = "Expected to end line with ';'", Token = enumerator.Current ?? enumerator.Last
+                                });
+                            }
+                        }
+
                         // At this point, the call is complete, so return
                         return callAst;
                     }
@@ -1288,10 +1331,22 @@ namespace Lang.Parsing
         }
 
 
-        private static TypeDefinition ParseType(TokenEnumerator enumerator, List<ParseError> errors)
+        private static TypeDefinition ParseType(TokenEnumerator enumerator, List<ParseError> errors, bool argument = false)
         {
             var typeDefinition = CreateAst<TypeDefinition>(enumerator.Current);
             typeDefinition.Name = enumerator.Current.Value;
+
+            if (enumerator.Current.Type == TokenType.VarArgs)
+            {
+                if (argument)
+                {
+                    return typeDefinition;
+                }
+                errors.Add(new ParseError
+                {
+                    Error = "Variable args type can only be used as an argument type", Token = enumerator.Current
+                });
+            }
 
             // Determine whether to parse a generic type, otherwise return
             if (enumerator.Peek()?.Type == TokenType.LessThan)

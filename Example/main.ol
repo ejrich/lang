@@ -140,8 +140,8 @@ string string_test() {
     return "something";
 }
 
-void print(string format, ... args) {
-    
+print(string format, ... args) {
+    printf(format.data, args);
 }
 
-void printf(u8* format, ... args) #extern
+printf(u8* format, ... args) #extern
