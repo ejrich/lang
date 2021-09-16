@@ -7,6 +7,7 @@ namespace Lang.Translation
     {
         StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, TypeKind typeKind, int typeIndex, params TypeDefinition[] genericTypes);
         FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, int typeIndex, TypeDefinition[] genericTypes);
+        OperatorOverloadAst CreatePolymorphedOperatorOverload(OperatorOverloadAst baseOverload, TypeDefinition[] genericTypes);
     }
 
     public class Polymorpher : IPolymorpher
@@ -61,6 +62,24 @@ namespace Lang.Translation
             CopyAsts(function.Children, baseFunction.Children, genericTypes, baseFunction.Generics);
 
             return function;
+        }
+
+        public OperatorOverloadAst CreatePolymorphedOperatorOverload(OperatorOverloadAst baseOverload, TypeDefinition[] genericTypes)
+        {
+            var overload = CopyAst(baseOverload);
+            overload.Operator = baseOverload.Operator;
+            overload.Type = CopyType(baseOverload.Type, genericTypes);
+            overload.HasDirectives = baseOverload.HasDirectives;
+            overload.ReturnType = baseOverload.ReturnTypeHasGenerics ? CopyType(baseOverload.ReturnType, genericTypes) : baseOverload.ReturnType;
+
+            foreach (var argument in baseOverload.Arguments)
+            {
+                overload.Arguments.Add(CopyDeclaration(argument, genericTypes, baseOverload.Generics));
+            }
+
+            CopyAsts(overload.Children, baseOverload.Children, genericTypes, baseOverload.Generics);
+
+            return overload;
         }
 
         private TypeDefinition CopyType(TypeDefinition type, TypeDefinition[] genericTypes)

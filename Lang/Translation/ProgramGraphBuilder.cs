@@ -2496,6 +2496,16 @@ namespace Lang.Translation
                             }
                             expression.Type = overload.ReturnType;
                         }
+                        else if (_polymorphicOperatorOverloads.TryGetValue(expression.Type.Name, out var polymorphicOverloads) && polymorphicOverloads.TryGetValue(op, out var polymorphicOverload))
+                        {
+                            var polymorphedOverload = _polymorpher.CreatePolymorphedOperatorOverload(polymorphicOverload, expression.Type.Generics.ToArray());
+                            if (overloads == null)
+                            {
+                                _programGraph.OperatorOverloads[expression.Type.GenericName] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
+                            }
+                            overloads[op] = polymorphedOverload;
+                            VerifyOperatorOverload(polymorphedOverload);
+                        }
                         else
                         {
                             AddError($"Type '{PrintTypeDefinition(expression.Type)}' does not contain an overload for operator '{PrintOperator(op)}'", expression.Children[i]);
