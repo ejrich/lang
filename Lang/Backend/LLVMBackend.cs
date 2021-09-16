@@ -22,6 +22,8 @@ namespace Lang.Backend
         private LLVMValueRef _stackPointer;
         private bool _stackPointerExists;
         private bool _stackSaved;
+        private LLVMTypeRef _stringType;
+        private LLVMTypeRef _u8PointerType;
 
         private readonly Queue<LLVMValueRef> _allocationQueue = new();
         private readonly LLVMValueRef _zeroInt = LLVM.ConstInt(LLVMTypeRef.Int32Type(), 0, false);
@@ -155,6 +157,8 @@ namespace Lang.Backend
                     LLVM.StructSetBody(structs[name], fields, false);
                 }
             }
+            _stringType = LLVM.GetTypeByName(_module, "string");
+            _u8PointerType = LLVMTypeRef.PointerType(LLVMTypeRef.Int8Type(), 0);
 
             // 2. Declare variables
             var globals = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>();
@@ -1455,7 +1459,7 @@ namespace Lang.Backend
             var stringGlobal = LLVM.AddGlobal(_module, stringValue.TypeOf(), "str");
             SetPrivateConstant(stringGlobal);
             LLVM.SetInitializer(stringGlobal, stringValue);
-            var stringPointer = LLVM.ConstBitCast(stringGlobal, LLVMTypeRef.PointerType(LLVMTypeRef.Int8Type(), 0));
+            var stringPointer = LLVM.ConstBitCast(stringGlobal, _u8PointerType);
 
             if (getStringPointer)
             {
@@ -1463,7 +1467,7 @@ namespace Lang.Backend
             }
 
             var length = LLVM.ConstInt(LLVMTypeRef.Int32Type(), (uint)value.Length, false);
-            return LLVM.ConstStruct(new [] {length, stringPointer}, false);
+            return LLVM.ConstNamedStruct(_stringType, new [] {length, stringPointer});
         }
 
         private (TypeDefinition type, LLVMValueRef value) BuildStructField(StructFieldRefAst structField, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, out bool loaded, out bool constant)
