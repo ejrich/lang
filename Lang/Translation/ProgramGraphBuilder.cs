@@ -300,7 +300,57 @@ namespace Lang.Translation
             }
             if (valueType != null)
             {
-                if (!TypeEquals(variableTypeDefinition, valueType))
+                // 3a. Verify the operator is valid
+                if (assignment.Operator != Operator.None)
+                {
+                    var type = VerifyType(variableTypeDefinition, errors);
+                    var nextType = VerifyType(valueType, errors);
+                    switch (assignment.Operator)
+                    {
+                        // Both need to be bool and returns bool
+                        case Operator.And:
+                        case Operator.Or:
+                            if (type != Type.Boolean || nextType != Type.Boolean)
+                            {
+                                errors.Add(CreateError($"Operator {PrintOperator(assignment.Operator)} not applicable to types " +
+                                    $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value));
+                            }
+                            break;
+                        // Invalid assignment operators
+                        case Operator.Equality:
+                        case Operator.GreaterThan:
+                        case Operator.LessThan:
+                        case Operator.GreaterThanEqual:
+                        case Operator.LessThanEqual:
+                            errors.Add(CreateError($"Invalid operator '{PrintOperator(assignment.Operator)}' in assignment", assignment));
+                            break;
+                        // Requires same types and returns more precise type
+                        case Operator.Add:
+                        case Operator.Subtract:
+                        case Operator.Multiply:
+                        case Operator.Divide:
+                        case Operator.Modulus:
+                            if (!(type == Type.Int && nextType == Type.Int) &&
+                                !(type == Type.Float && (nextType == Type.Float || nextType == Type.Int)))
+                            {
+                                errors.Add(CreateError($"Operator {PrintOperator(assignment.Operator)} not applicable to types " +
+                                    $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value));
+                            }
+                            break;
+                        // Requires both integer or bool types and returns more same type
+                        case Operator.BitwiseAnd:
+                        case Operator.BitwiseOr:
+                        case Operator.Xor:
+                            if (!(type == Type.Boolean && nextType == Type.Boolean) &&
+                                !(type == Type.Int && nextType == Type.Int))
+                            {
+                                errors.Add(CreateError($"Operator {PrintOperator(assignment.Operator)} not applicable to types " +
+                                    $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value));
+                            }
+                            break;
+                    }
+                }
+                else if (!TypeEquals(variableTypeDefinition, valueType))
                 {
                     errors.Add(CreateError($"Expected assignment value to be type '{PrintTypeDefinition(variableTypeDefinition)}'", assignment.Value));
                 }

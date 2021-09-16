@@ -515,6 +515,18 @@ namespace Lang.Backend.LLVM
             switch (op)
             {
                 // TODO Get value type to determine correct instruction to use
+                case Operator.And:
+                    return LLVMApi.BuildAnd(_builder, lhs, rhs, "tmpand");
+                case Operator.Or:
+                    return LLVMApi.BuildOr(_builder, lhs, rhs, "tmpor");
+                case Operator.Equality:
+                    return LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntEQ, lhs, rhs, "tmpeq");
+                case Operator.NotEqual:
+                    return LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntNE, lhs, rhs, "tmpne");
+                case Operator.GreaterThanEqual:
+                    return LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntSGE, lhs, rhs, "tmpgte");
+                case Operator.LessThanEqual:
+                    return LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntSLE, lhs, rhs, "tmplte");
                 case Operator.Add:
                     return LLVMApi.BuildAdd(_builder, lhs, rhs, "tmpadd");
                 case Operator.Subtract:
@@ -523,33 +535,22 @@ namespace Lang.Backend.LLVM
                     return LLVMApi.BuildMul(_builder, lhs, rhs, "tmpmul");
                 case Operator.Divide:
                     return LLVMApi.BuildSDiv(_builder, lhs, rhs, "tmpdiv");
-                case Operator.Equality:
-                    return LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntEQ, lhs, rhs, "tmpeq");
+                case Operator.GreaterThan:
+                    return LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntSGT, lhs, rhs, "tmpgt");
                 case Operator.LessThan:
                     return LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntSLT, lhs, rhs, "tmplt");
-                // TODO Implement more operators
-                case Operator.And:
-                    break;
-                case Operator.Or:
-                    break;
-                case Operator.NotEqual:
-                    break;
-                case Operator.GreaterThanEqual:
-                    break;
-                case Operator.LessThanEqual:
-                    break;
-                case Operator.GreaterThan:
-                    break;
                 case Operator.BitwiseOr:
-                    break;
+                    return LLVMApi.BuildOr(_builder, lhs, rhs, "tmpbor");
                 case Operator.BitwiseAnd:
-                    break;
+                    return LLVMApi.BuildAnd(_builder, lhs, rhs, "tmpband");
                 case Operator.Xor:
-                    break;
+                    return LLVMApi.BuildXor(_builder, lhs, rhs, "tmpxor");
                 case Operator.Modulus:
-                    break;
+                    return LLVMApi.BuildSRem(_builder, lhs, rhs, "tmpmod");
+                default:
+                    // Should never reach this branch
+                    return new LLVMValueRef();
             }
-            throw new NotImplementedException(op.ToString());
         }
 
         private static LLVMTypeRef ConvertTypeDefinition(TypeDefinition typeDef)
