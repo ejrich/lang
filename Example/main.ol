@@ -6,13 +6,13 @@ int Main(List<string> args) {
     //hello := "This is an \"escaped\" string literal";
     a := 4.2;
     a++;
-    baz := foo();// + bar(3 + 1, "Hello", 1.2);
+    baz := foo() + bar(3 + 1);//, "Hello", 1.2);
     b := 6 * (4 - 1);
     c := 2;
     d := false;
     //d := a + 1 == b + 2 && (1 + b) == 2 || b > 3 + 4 * c - 1;
     e := !d;
-    return 0;
+    return baz;
 }
 
 int foo() {
@@ -20,14 +20,14 @@ int foo() {
     a++;
     ++a;
     a += 1;
-    b := --a;
+    b := --a + 1;
     while a < 10 {
         a = a + 1;
     }
     return a;
 }
 
-int bar(int a, string b, float c) {
+int bar(int a) {//, string b, float c) {
     if a == 4 then return a;
     else if a == 5 {
         return 9;
