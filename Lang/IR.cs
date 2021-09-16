@@ -59,11 +59,12 @@ namespace Lang
     {
         public InstructionType Type { get; set; }
         public int ValueIndex { get; set; }
+        public IAst Source { get; set; }
 
         // Used for Jump, Call, GetPointer, and GetStructPointer
-        public int? Index { get; set; }
+        public int Index { get; set; }
         public bool GetFirstPointer { get; set; }
-        public string CallFunction { get; set; }
+        public string String { get; set; }
 
         public InstructionValue Value1 { get; set; }
         public InstructionValue Value2 { get; set; }
@@ -163,7 +164,10 @@ namespace Lang
         ShiftRight,
         ShiftLeft,
         RotateRight,
-        RotateLeft
+        RotateLeft,
+        DebugSetLocation,
+        DebugDeclareParameter,
+        DebugDeclareVariable
     }
 
     public enum InstructionValueType

@@ -601,6 +601,7 @@ namespace Lang.Backend
                 basicBlocks[block.Index] = functionPointer.AppendBasicBlock(block.Index.ToString());
             }
             LLVM.PositionBuilderAtEnd(_builder, basicBlocks[0]);
+            _builder.CurrentDebugLocation = null;
 
             // Allocate the function stack
             var allocations = new LLVMValueRef[function.Allocations.Count];
@@ -638,14 +639,14 @@ namespace Lang.Backend
                     {
                         case InstructionType.Jump:
                         {
-                            _builder.BuildBr(basicBlocks[instruction.Index.Value]);
+                            _builder.BuildBr(basicBlocks[instruction.Index]);
                             breakToNextBlock = false;
                             break;
                         }
                         case InstructionType.ConditionalJump:
                         {
                             var condition = GetValue(instruction.Value1, values, allocations, functionPointer);
-                            _builder.BuildCondBr(condition, basicBlocks[instruction.Index.Value], basicBlocks[blockIndex + 1]);
+                            _builder.BuildCondBr(condition, basicBlocks[instruction.Index], basicBlocks[blockIndex + 1]);
                             breakToNextBlock = false;
                             break;
                         }
@@ -698,7 +699,7 @@ namespace Lang.Backend
                         }
                         case InstructionType.Call:
                         {
-                            var callFunction = GetOrCreateFunctionDefinition(instruction.CallFunction);
+                            var callFunction = GetOrCreateFunctionDefinition(instruction.String);
                             var arguments = new LLVMValueRef[instruction.Value1.Values.Length];
                             for (var i = 0; i < instruction.Value1.Values.Length; i++)
                             {

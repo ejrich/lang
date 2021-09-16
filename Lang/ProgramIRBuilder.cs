@@ -51,12 +51,26 @@ namespace Lang
 
                 var entryBlock = AddBasicBlock(functionIR);
 
-                for (var i = 0; i < function.Arguments.Count; i++)
+                if (BuildSettings.Release)
                 {
-                    var argument = function.Arguments[i];
-                    var allocationIndex = AddAllocation(functionIR, argument);
+                    for (var i = 0; i < function.Arguments.Count; i++)
+                    {
+                        var argument = function.Arguments[i];
+                        var allocationIndex = AddAllocation(functionIR, argument);
 
-                    EmitStore(functionIR, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i});
+                        EmitStore(functionIR, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i});
+                    }
+                }
+                else
+                {
+                    for (var i = 0; i < function.Arguments.Count; i++)
+                    {
+                        var argument = function.Arguments[i];
+                        var allocationIndex = AddAllocation(functionIR, argument);
+
+                        EmitStore(functionIR, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i});
+                        functionIR.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareParameter, Index = i});
+                    }
                 }
 
                 EmitScope(functionIR, entryBlock, function.Body, function.ReturnType);
@@ -114,10 +128,10 @@ namespace Lang
                     switch (instruction.Type)
                     {
                         case InstructionType.Jump:
-                            text += instruction.Index.Value.ToString();
+                            text += instruction.Index.ToString();
                             break;
                         case InstructionType.ConditionalJump:
-                            text += $"{instruction.Index.Value} {PrintInstructionValue(instruction.Value1)}";
+                            text += $"{instruction.Index} {PrintInstructionValue(instruction.Value1)}";
                             break;
                         case InstructionType.Return:
                         case InstructionType.ReturnVoid:
@@ -127,10 +141,10 @@ namespace Lang
                             text += $"{PrintInstructionValue(instruction.Value1)}, {PrintInstructionValue(instruction.Value2)}";
                             break;
                         case InstructionType.GetStructPointer:
-                            text += $"{PrintInstructionValue(instruction.Value1)} {instruction.Index.Value} => v{instruction.ValueIndex}";
+                            text += $"{PrintInstructionValue(instruction.Value1)} {instruction.Index} => v{instruction.ValueIndex}";
                             break;
                         case InstructionType.Call:
-                            text += $"{instruction.CallFunction} {PrintInstructionValue(instruction.Value1)} => v{instruction.ValueIndex}";
+                            text += $"{instruction.String} {PrintInstructionValue(instruction.Value1)} => v{instruction.ValueIndex}";
                             break;
                         case InstructionType.Load:
                         case InstructionType.IsNull:
@@ -139,6 +153,10 @@ namespace Lang
                         case InstructionType.IntegerNegate:
                         case InstructionType.FloatNegate:
                             text += $"{PrintInstructionValue(instruction.Value1)} => v{instruction.ValueIndex}";
+                            break;
+                        case InstructionType.DebugSetLocation:
+                        case InstructionType.DebugDeclareParameter:
+                        case InstructionType.DebugDeclareVariable:
                             break;
                         default:
                             text += $"{PrintInstructionValue(instruction.Value1)}, {PrintInstructionValue(instruction.Value2)} => v{instruction.ValueIndex}";
@@ -363,6 +381,11 @@ namespace Lang
         {
             foreach (var ast in scope.Children)
             {
+                if (!BuildSettings.Release)
+                {
+                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugSetLocation, Source = ast});
+                }
+
                 switch (ast)
                 {
                     case ReturnAst returnAst:
@@ -419,6 +442,11 @@ namespace Lang
             else
             {
                 var allocationIndex = AddAllocation(function, declaration);
+
+                if (!BuildSettings.Release)
+                {
+                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, Index = allocationIndex, String = declaration.Name, Source = declaration});
+                }
 
                 if (declaration.Value != null)
                 {
@@ -1671,7 +1699,7 @@ namespace Lang
         {
             var callInstruction = new Instruction
             {
-                Type = InstructionType.Call, CallFunction = name,
+                Type = InstructionType.Call, String = name,
                 Value1 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Values = arguments}
             };
             return AddInstruction(function, callInstruction, returnType);
