@@ -14,14 +14,14 @@ namespace Lang.Translation
     public class ProgramGraphBuilder : IProgramGraphBuilder
     {
         private readonly Dictionary<string, FunctionAst> _functions = new();
-        private readonly Dictionary<string, StructAst> _structs = new();
+        private readonly Dictionary<string, IAst> _types = new();
         private readonly Dictionary<string, StructAst> _polymorphicStructs = new();
-        private readonly Dictionary<string, EnumAst> _enums = new();
         private FunctionAst _currentFunction;
 
         public ProgramGraph CreateProgramGraph(ParseResult parseResult, out List<TranslationError> errors)
         {
             errors = new List<TranslationError>();
+            var graph = new ProgramGraph();
 
             // 1. Verify enum definitions
             foreach (var enumAst in parseResult.Enums)
@@ -32,7 +32,7 @@ namespace Lang.Translation
             // 2. First load the struct definitions
             foreach (var structAst in parseResult.Structs)
             {
-                if (_structs.ContainsKey(structAst.Name))
+                if (_types.ContainsKey(structAst.Name))
                 {
                     errors.Add(CreateError($"Multiple definitions of struct '{structAst.Name}'", structAst));
                 }
@@ -42,16 +42,9 @@ namespace Lang.Translation
                 }
                 else
                 {
-                    _structs.Add(structAst.Name, structAst);
+                    _types.Add(structAst.Name, structAst);
                 }
             }
-            var graph = new ProgramGraph
-            {
-                Data = new Data
-                {
-                    Enums = _enums.Values.ToList()
-                }
-            };
 
             // 3. Verify struct bodies
             foreach (var structAst in parseResult.Structs)
@@ -106,7 +99,7 @@ namespace Lang.Translation
                 }
             }
 
-            graph.Data.Structs = _structs.Values.ToList();
+            graph.Data.Types = _types.Values.ToList();
 
             return graph;
         }
@@ -114,7 +107,7 @@ namespace Lang.Translation
         private void VerifyEnum(EnumAst enumAst, List<TranslationError> errors)
         {
             // 1. Verify enum has not already been defined
-            if (!_enums.TryAdd(enumAst.Name, enumAst))
+            if (!_types.TryAdd(enumAst.Name, enumAst))
             {
                 errors.Add(CreateError($"Multiple definitions of enum '{enumAst.Name}'", enumAst));
             }
@@ -130,7 +123,7 @@ namespace Lang.Translation
                 {
                     errors.Add(CreateError($"Enum '{enumAst.Name}' already contains value '{value.Name}'", value));
                 }
-                
+
                 // 2b. Check if the value has been previously used
                 if (value.Defined)
                 {
@@ -1053,11 +1046,17 @@ namespace Lang.Translation
             // 1. Load the struct definition in typeDefinition
             var genericName = structType.GenericName;
             structField.StructName = genericName;
-            if (!_structs.TryGetValue(genericName, out var structDefinition))
+            if (!_types.TryGetValue(genericName, out var typeDefinition))
             {
                 errors.Add(CreateError($"Struct '{PrintTypeDefinition(structType)}' not defined", structField));
                 return null;
             }
+            if (typeDefinition is not StructAst)
+            {
+                errors.Add(CreateError($"Type '{PrintTypeDefinition(structType)}' is not a struct", structField));
+                return null;
+            }
+            var structDefinition = (StructAst) typeDefinition;
 
             // 2. If the type of the field is other, recurse and return
             var value = structField.Value;
@@ -1292,7 +1291,7 @@ namespace Lang.Translation
                     if (typeDef.Generics.Any())
                     {
                         var genericName = typeDef.GenericName;
-                        if (_structs.ContainsKey(genericName))
+                        if (_types.ContainsKey(genericName))
                         {
                             return Type.Struct;
                         }
@@ -1304,7 +1303,11 @@ namespace Lang.Translation
                         CreatePolymorphedStruct(structDef, genericName, typeDef.Generics.ToArray());
                         return Type.Struct;
                     }
-                    return _structs.ContainsKey(typeDef.Name) ? Type.Struct : Type.Error;
+                    if (!_types.TryGetValue(typeDef.Name, out var type))
+                    {
+                        return Type.Error;
+                    }
+                    return type is StructAst ? Type.Struct : Type.Enum;
             }
         }
 
@@ -1318,7 +1321,7 @@ namespace Lang.Translation
             }
 
             var genericName = typeDef.GenericName;
-            if (_structs.ContainsKey(genericName))
+            if (_types.ContainsKey(genericName))
             {
                 return true;
             }
@@ -1350,7 +1353,7 @@ namespace Lang.Translation
                 }
             }
 
-            _structs.Add(name, polyStruct);
+            _types.Add(name, polyStruct);
         }
         
         private static TypeDefinition CopyType(TypeDefinition type, TypeDefinition[] genericTypes)

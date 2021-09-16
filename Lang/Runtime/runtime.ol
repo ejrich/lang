@@ -6,7 +6,6 @@ struct List<T> {
     T* data;
 }
 
-//* TODO Implement enums to get this working
 struct Any {
     TypeKind type;
     void* data;
@@ -24,9 +23,7 @@ enum TypeKind {
     Enum;
     VarArgs;
     Params;
-    Error;
 }
-
 
 /* @Future Update strings to use this struct
 struct string {
