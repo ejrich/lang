@@ -50,7 +50,7 @@ default_arguments() {
     foo_params(8, 9, 3.1, 2.8, 5.6);
 }
 
-foo(int a, int b = 8, bool c = true) {
+foo(int a, s16 b = 8, bool c = true) {
     printf("a = %d, b = %d, c = %d\n", a, b, c);
 }
 
