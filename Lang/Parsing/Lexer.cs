@@ -21,7 +21,8 @@ namespace Lang.Parsing
             { "false", TokenType.Boolean },
             { "var", TokenType.Var },
             { "if", TokenType.If },
-            { "else", TokenType.Else }
+            { "else", TokenType.Else },
+            { "then", TokenType.Then },
         };
 
         public List<Token> LoadFileTokens(string filePath, out List<ParseError> errors)
@@ -231,6 +232,27 @@ namespace Lang.Parsing
                         default:
                             return false;
                     }
+                case TokenType.Ampersand:
+                    if (type == TokenType.Ampersand)
+                    {
+                        currentToken.Type = TokenType.And;
+                        return true;
+                    }
+                    return false;
+                case TokenType.Pipe:
+                    if (type == TokenType.Pipe)
+                    {
+                        currentToken.Type = TokenType.Or;
+                        return true;
+                    }
+                    return false;
+                case TokenType.Equals:
+                    if (type == TokenType.Equals)
+                    {
+                        currentToken.Type = TokenType.Equality;
+                        return true;
+                    }
+                    return false;
                 // TODO More validation eventually
                 default:
                     return false;

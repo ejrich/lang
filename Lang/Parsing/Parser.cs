@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 
 namespace Lang.Parsing
@@ -212,36 +211,135 @@ namespace Lang.Parsing
                     break;
                 }
 
-                switch (token.Type)
-                {
-                    case TokenType.Return:
-                        function.Children.Add(ParseReturn(enumerator, errors));
-                        break;
-                    case TokenType.Var:
-                        function.Children.Add(ParseDeclaration(enumerator, errors));
-                        break;
-                    case TokenType.If:
-                        function.Children.Add(ParseConditional(enumerator, errors));
-                        break;
-                    case TokenType.Token:
-                        // TODO Handle assignments and other things
-                        break;
-                    default:
-                        errors.Add(new ParseError
-                        {
-                            Error = $"Unexpected token '{token.Value}'",
-                            Token = token
-                        });
-                        break;
-                }
+                var ast = ParseLine(enumerator, errors);
+                if (ast != null)
+                    function.Children.Add(ast);
             }
             return function;
         }
 
-        private static IAst ParseConditional(TokenEnumerator enumerator, List<ParseError> errors)
+        private static IAst ParseLine(TokenEnumerator enumerator, List<ParseError> errors)
         {
-            // TODO Implement me
-            return null;
+            var token = enumerator.Current;
+
+            switch (token.Type)
+            {
+                case TokenType.Return:
+                    return ParseReturn(enumerator, errors);
+                case TokenType.Var:
+                    return ParseDeclaration(enumerator, errors);
+                case TokenType.If:
+                    return ParseConditional(enumerator, errors);
+                case TokenType.Token:
+                    // TODO Handle assignments and other things
+                    return null;
+                default:
+                    errors.Add(new ParseError
+                    {
+                        Error = $"Unexpected token '{token.Value}'",
+                        Token = token
+                    });
+                    return null;
+            }
+        }
+
+        private static ConditionalAst ParseConditional(TokenEnumerator enumerator, List<ParseError> errors)
+        {
+            var conditionalAst = new ConditionalAst();
+
+            // 1. Parse the conditional expression by first iterating over the initial 'if'
+            enumerator.MoveNext();
+            conditionalAst.Condition = ParseExpression(enumerator, errors, TokenType.OpenBrace, TokenType.Then);
+
+            // 2. Determine how many lines to parse
+            switch (enumerator.Current?.Type)
+            {
+                case TokenType.Then:
+                {
+                    // Parse single AST
+                    enumerator.MoveNext();
+                    var ast = ParseLine(enumerator, errors);
+                    if (ast != null)
+                        conditionalAst.Children.Add(ast);
+                    break;
+                }
+                case TokenType.OpenBrace:
+                {
+                    // Parse until close brace
+                    while (enumerator.MoveNext())
+                    {
+                        var token = enumerator.Current;
+
+                        if (token.Type == TokenType.CloseBrace)
+                        {
+                            break;
+                        }
+
+                        var ast = ParseLine(enumerator, errors);
+                        if (ast != null)
+                            conditionalAst.Children.Add(ast);
+                    }
+                    break;
+                }
+                default:
+                    errors.Add(new ParseError
+                    {
+                        Error = $"Unexpected token '{enumerator.Current?.Value}'",
+                        Token = enumerator.Current
+                    });
+                    break;
+            }
+
+            // 3. Parse else block if necessary
+            if (enumerator.Peek().Type == TokenType.Else)
+            {
+                // First clear the else and then determine how to parse else block
+                enumerator.MoveNext();
+                enumerator.MoveNext();
+                switch (enumerator.Current.Type)
+                {
+                    case TokenType.Then:
+                    {
+                        // Parse single AST
+                        enumerator.MoveNext();
+                        var ast = ParseLine(enumerator, errors);
+                        if (ast != null)
+                            conditionalAst.ElseChildren.Add(ast);
+                        break;
+                    }
+                    case TokenType.OpenBrace:
+                    {
+                        // Parse until close brace
+                        while (enumerator.MoveNext())
+                        {
+                            var token = enumerator.Current;
+
+                            if (token.Type == TokenType.CloseBrace)
+                            {
+                                break;
+                            }
+
+                            var ast = ParseLine(enumerator, errors);
+                            if (ast != null)
+                                conditionalAst.ElseChildren.Add(ast);
+                        }
+                        break;
+                    }
+                    case TokenType.If:
+                        // Nest another conditional in else children
+                        conditionalAst.ElseChildren.Add(ParseConditional(enumerator, errors));
+                        break;
+                    default:
+                        errors.Add(new ParseError
+                        {
+                            Error = $"Unexpected token '{enumerator.Current.Value}'",
+                            Token = enumerator.Current
+                        });
+                        break;
+                }
+            }
+
+            return conditionalAst;
         }
 
         private static DeclarationAst ParseDeclaration(TokenEnumerator enumerator, List<ParseError> errors)
@@ -360,8 +458,8 @@ namespace Lang.Parsing
 
                 if (operatorRequired)
                 {
-                    var op = (Operator)token.Value[0];
-                    if (Enum.IsDefined(typeof(Operator), op))
+                    var op = token.ConvertOperator();
+                    if (op != Operator.None)
                     {
                         expression.Operators.Add(op);
                         operatorRequired = false;
