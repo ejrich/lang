@@ -2,6 +2,8 @@ main() {
     // This test will test c interoperability
     // and other functionality such as #c_array types
     c_arrays();
+
+    c_array_structs();
 }
 
 c_arrays() {
@@ -19,6 +21,24 @@ c_arrays() {
     }
 
     each x in array then printf("Array value: %d\n", x);
+}
+
+c_array_structs() {
+    array_struct: ArrayStruct;
+
+    each i in 1..5 {
+        array_struct.array[i - 1] = 5 * i;
+        printf("Struct array value %d = %d\n", i, array_struct.array[i - 1]);
+    }
+
+    each x in array_struct.array then printf("Struct array value: %d\n", x);
+}
+
+array_size := 5; #const
+
+struct ArrayStruct {
+    int something;
+    List<int>[array_size] #c_array array;
 }
 
 // #run main();
