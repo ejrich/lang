@@ -10,7 +10,7 @@ namespace Lang
 
     public class FunctionIR
     {
-        public int StackSize { get; set; }
+        public uint StackSize { get; set; }
         public List<Allocation> Allocations { get; set; }
         public List<BasicBlock> BasicBlocks { get; set; }
     }
@@ -20,7 +20,7 @@ namespace Lang
         public int Index { get; set; }
         public uint Offset { get; set; }
         public uint Size { get; set; }
-        public TypeDefinition Type { get; set; }
+        public IType Type { get; set; }
     }
 
     public class BasicBlock
@@ -32,5 +32,59 @@ namespace Lang
     public class Instruction
     {
         // TODO Implement me
+        public InstructionType Type { get; set; }
+
+        // Used for Load and Store
+        public int AllocationIndex { get; set; }
+
+        public InstructionValue Value1 { get; set; }
+        public InstructionValue Value2 { get; set; }
+    }
+
+    public class InstructionValue
+    {
+        public InstructionValueType Type { get; set; }
+
+        public int ValueIndex { get; set; }
+    }
+
+    public enum InstructionType
+    {
+        None = 0,
+        Jump,
+        Return,
+        Load,
+        Store,
+        Cast,
+        Not,
+        Negate,
+        Add,
+        Subtract,
+        Multiply,
+        Divide,
+        Modulus,
+        And,
+        BitwiseAnd,
+        Or,
+        BitwiseOr,
+        Xor,
+        Equals,
+        NotEquals,
+        GreaterThan,
+        GreaterThanOrEqual,
+        LessThan,
+        LessThanOrEqual,
+        ShiftRight,
+        ShiftLeft,
+        RotateRight,
+        RotateLeft
+    }
+
+    public enum InstructionValueType
+    {
+        None = 0,
+        Argument,
+        Constant,
+        Value // TODO IDK?
     }
 }
