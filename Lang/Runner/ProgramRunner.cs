@@ -117,6 +117,11 @@ namespace Lang.Runner
                 ExecuteDeclaration(variable, programGraph, _globalVariables);
             }
 
+            foreach (var function in programGraph.Functions.Values.Where(_ => _.HasDirectives))
+            {
+                ResolveCompilerDirectives(function.Children, programGraph);
+            }
+
             foreach (var directive in programGraph.Directives)
             {
                 switch (directive.Type)
@@ -126,6 +131,45 @@ namespace Lang.Runner
                         break;
                     case DirectiveType.If:
                         // TODO Evaluate the condition
+                        break;
+                }
+            }
+        }
+
+        private void ResolveCompilerDirectives(List<IAst> asts, ProgramGraph programGraph)
+        {
+            for (int i = 0; i < asts.Count; i++)
+            {
+                var ast = asts[i];
+                switch (ast)
+                {
+                    case ScopeAst:
+                    case WhileAst:
+                    case EachAst:
+                        ResolveCompilerDirectives(ast.Children, programGraph);
+                        break;
+                    case ConditionalAst conditional:
+                        ResolveCompilerDirectives(conditional.Children, programGraph);
+                        ResolveCompilerDirectives(conditional.Else, programGraph);
+                        break;
+                    case CompilerDirectiveAst directive:
+                        switch (directive.Type)
+                        {
+                            case DirectiveType.If:
+                                asts.RemoveAt(i);
+                                var conditional = directive.Value as ConditionalAst;
+                                // TODO Run type checking on children
+                                if (ExecuteCondition(conditional!.Condition, programGraph, _globalVariables))
+                                {
+                                    asts.InsertRange(i, conditional.Children);
+                                }
+                                else if (conditional.Else.Any())
+                                {
+                                    asts.InsertRange(i, conditional.Else);
+                                }
+                                break;
+                        }
+                        i--;
                         break;
                 }
             }
@@ -395,13 +439,12 @@ namespace Lang.Runner
         private bool ExecuteCondition(IAst expression, ProgramGraph programGraph, IDictionary<string, ValueType> variables)
         {
             var valueType = ExecuteExpression(expression, programGraph, variables);
-            var type = valueType.Type;
             var value = valueType.Value;
             return valueType.Type.PrimitiveType switch
             {
                 IntegerType => (int)value != 0,
                 FloatType => (float)value != 0f,
-                _ when type.Name == "*" => GetPointer(value) != IntPtr.Zero,
+                _ when valueType.Type.Name == "*" => GetPointer(value) != IntPtr.Zero,
                 _ => (bool)value
             };
         }
