@@ -333,7 +333,6 @@ namespace Lang.Runner
                 Marshal.FreeHGlobal(oldPointer);
 
                 // Set the variable
-                var variable = programGraph.Types["List.*.TypeInfo"];
                 var pointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoListType));
                 Marshal.StructureToPtr(typeTable, pointer, false);
                 typeTableVariable.Value = pointer;
