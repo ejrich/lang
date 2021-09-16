@@ -154,24 +154,10 @@ namespace Lang.Backend.LLVM
             SetPrivateConstant(typeTable);
             var typeInfoType = structs["TypeInfo"];
 
-            var types = new LLVMValueRef[programGraph.Types.Count + 12];
-            var i = 0;
-            types[i++] = CreateTypeInfo("void", TypeKind.Void, typeInfoType);
-            types[i++] = CreateTypeInfo("bool", TypeKind.Boolean, typeInfoType);
-            types[i++] = CreateTypeInfo("s8", TypeKind.Integer, typeInfoType);
-            types[i++] = CreateTypeInfo("u8", TypeKind.Integer, typeInfoType);
-            types[i++] = CreateTypeInfo("s16", TypeKind.Integer, typeInfoType);
-            types[i++] = CreateTypeInfo("u16", TypeKind.Integer, typeInfoType);
-            types[i++] = CreateTypeInfo("s32", TypeKind.Integer, typeInfoType);
-            types[i++] = CreateTypeInfo("u32", TypeKind.Integer, typeInfoType);
-            types[i++] = CreateTypeInfo("s64", TypeKind.Integer, typeInfoType);
-            types[i++] = CreateTypeInfo("u64", TypeKind.Integer, typeInfoType);
-            types[i++] = CreateTypeInfo("float", TypeKind.Float, typeInfoType);
-            types[i++] = CreateTypeInfo("float64", TypeKind.Float, typeInfoType);
+            var types = new LLVMValueRef[programGraph.Types.Count];
             foreach (var (name, type) in programGraph.Types)
             {
-                var typeKind = name == "string" ? TypeKind.String : name.StartsWith("List") ? TypeKind.List : type is StructAst ? TypeKind.Struct : TypeKind.Enum;
-                types[i++] = CreateTypeInfo(name, typeKind, typeInfoType);
+                types[type.TypeIndex] = CreateTypeInfo(name, type.TypeKind, typeInfoType);
             }
 
             var typeArray = LLVMApi.ConstArray(LLVMApi.PointerType(typeInfoType, 0), types);
@@ -195,7 +181,7 @@ namespace Lang.Backend.LLVM
             SetPrivateConstant(typeNameString);
             LLVMApi.SetInitializer(typeNameString, typeName);
 
-            var typeKind = GetTypeKind(type);
+            var typeKind = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (uint)type, false);
             LLVMApi.SetInitializer(typeInfo, LLVMApi.ConstStruct(new [] {typeNameString, typeKind}, false));
 
             return typeInfo;
@@ -1525,28 +1511,6 @@ namespace Lang.Backend.LLVM
                     _ => GetStructType(type)
                 }
             };
-        }
-
-        private LLVMValueRef GetTypeKind(TypeDefinition type)
-        {
-            return type.PrimitiveType switch
-            {
-                IntegerType integerType => GetTypeKind(TypeKind.Integer),
-                FloatType floatType => GetTypeKind(TypeKind.Float),
-                _ => type.Name switch
-                {
-                    "bool" => GetTypeKind(TypeKind.Boolean),
-                    "void" => GetTypeKind(TypeKind.Void),
-                    "List" => GetTypeKind(TypeKind.List),
-                    "string" => GetTypeKind(TypeKind.String),
-                    _ => _types[type.Name] is EnumAst ? GetTypeKind(TypeKind.Enum) : GetTypeKind(TypeKind.Struct)
-                }
-            };
-        }
-
-        private LLVMValueRef GetTypeKind(TypeKind typeKind)
-        {
-            return LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (uint)typeKind, false);
         }
 
         private LLVMTypeRef GetListType(TypeDefinition type)

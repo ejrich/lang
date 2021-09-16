@@ -11,6 +11,12 @@ namespace Lang.Parsing
         List<IAst> Children { get; }
     }
 
+    public interface IType
+    {
+        int TypeIndex { get; set; }
+        TypeKind TypeKind { get; set; }
+    }
+
     public class ScopeAst : IAst
     {
         public int FileIndex { get; set; }
@@ -39,13 +45,14 @@ namespace Lang.Parsing
         public List<IAst> Children { get; } = new();
     }
 
-    public class StructAst : IAst
+    public class StructAst : IAst, IType
     {
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
         public int TypeIndex { get; set; }
+        public TypeKind TypeKind { get; set; }
         public List<string> Generics { get; } = new();
         public List<StructFieldAst> Fields { get; } = new();
         public List<IAst> Children => null;
@@ -77,13 +84,14 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
-    public class EnumAst : IAst
+    public class EnumAst : IAst, IType
     {
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
         public int TypeIndex { get; set; }
+        public TypeKind TypeKind { get; set; } = TypeKind.Enum;
         public List<EnumValueAst> Values { get; } = new();
         public List<IAst> Children => null;
     }
@@ -108,13 +116,14 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
-    public class PrimitiveAst : IAst
+    public class PrimitiveAst : IAst, IType
     {
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
         public int TypeIndex { get; set; }
+        public TypeKind TypeKind { get; set; }
         public IPrimitive Primitive { get; set; }
         public List<IAst> Children => null;
     }
