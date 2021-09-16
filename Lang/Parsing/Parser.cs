@@ -7,7 +7,9 @@ namespace Lang.Parsing
     public class ParseResult
     {
         public bool Success => !Errors.Any();
-        public List<IAst> SyntaxTrees { get; } = new();
+        public List<FunctionAst> Functions { get; } = new();
+        public List<StructAst> Structs { get; } = new();
+        public List<DeclarationAst> GlobalVariables { get; } = new();
         public List<ParseError> Errors { get; } = new();
     }
 
@@ -68,8 +70,22 @@ namespace Lang.Parsing
                 }
                 else if (parseResult.Success)
                 {
-                    syntaxTrees.ForEach(ast => ast.FileIndex = fileIndex);
-                    parseResult.SyntaxTrees.AddRange(syntaxTrees);
+                    foreach (var ast in syntaxTrees)
+                    {
+                        ast.FileIndex = fileIndex;
+                        switch (ast)
+                        {
+                            case FunctionAst function:
+                                parseResult.Functions.Add(function);
+                                break;
+                            case StructAst structAst:
+                                parseResult.Structs.Add(structAst);
+                                break;
+                            case DeclarationAst globalVariable:
+                                parseResult.GlobalVariables.Add(globalVariable);
+                                break;
+                        }
+                    }
                 }
             }
 
