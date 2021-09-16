@@ -37,7 +37,7 @@ namespace Lang.Backend.LLVM
             // 4. Write Function definitions
             foreach (var function in programGraph.Functions)
             {
-                WriteFunctionDefinition(function.Name, function.Arguments, function.ReturnType);
+                WriteFunctionDefinition(function.Name, function.Arguments, function.ReturnType, function.Varargs);
             }
 
             // 5. Write Function bodies
@@ -86,30 +86,22 @@ namespace Lang.Backend.LLVM
             // TODO Implement me
         }
 
-        private LLVMValueRef WriteFunctionDefinition(string name, List<Argument> arguments, TypeDefinition returnType)
+        private LLVMValueRef WriteFunctionDefinition(string name, List<Argument> arguments, TypeDefinition returnType, bool varargs = false)
         {
             _functionTypes.Add(name, returnType);
-            var varargs = false;
-            var argumentTypes = new List<LLVMTypeRef>();
+            var argumentCount = varargs ? arguments.Count - 1 : arguments.Count;
+            var argumentTypes = new LLVMTypeRef[argumentCount];
 
             // 1. Determine argument types and varargs
-            foreach (var argument in arguments)
+            for (var i = 0; i < argumentCount; i++)
             {
-                if (argument.Type.Name == "...")
-                {
-                    varargs = true;
-                }
-                else
-                {
-                    argumentTypes.Add(ConvertTypeDefinition(argument.Type));
-                }
+                argumentTypes[i] = ConvertTypeDefinition(arguments[i].Type);
             }
 
             // 2. Declare function
             var function = LLVMApi.AddFunction(_module, name, LLVMApi.FunctionType(ConvertTypeDefinition(returnType), argumentTypes.ToArray(), varargs));
 
             // 3. Set argument names
-            var argumentCount = varargs ? arguments.Count - 1 : arguments.Count;
             for (var i = 0; i < argumentCount; i++)
             {
                 var argument = LLVMApi.GetParam(function, (uint) i);

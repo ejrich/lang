@@ -160,9 +160,21 @@ namespace Lang.Translation
                 // 1b. Check for errored or undefined field types
                 var type = VerifyType(argument.Type, errors);
 
-                if (type == Type.Error)
+                if (type == Type.VarArgs)
+                {
+                    if (function.Varargs)
+                    {
+                        errors.Add(CreateError($"Function '{function.Name}' cannot have multiple varargs", argument.Type));
+                    }
+                    function.Varargs = true;
+                }
+                else if (type == Type.Error)
                 {
                     errors.Add(CreateError($"Type '{PrintTypeDefinition(argument.Type)}' of argument '{argument.Name}' in function '{function.Name}' is not defined", argument.Type));
+                }
+                else if (function.Varargs)
+                {
+                    errors.Add(CreateError($"Cannot declare argument '{argument.Name}' following varargs", argument));
                 }
             }
             
@@ -658,6 +670,7 @@ namespace Lang.Translation
                         // Handle varargs functions
                         if (function.Arguments.Count > 0 && function.Arguments[^1].Type.Name == "...")
                         {
+                            // TODO Handle typed varargs
                             for (var i = 0; i < function.Arguments.Count - 1; i++)
                             {
                                 var functionType = function.Arguments[i].Type;
@@ -755,7 +768,6 @@ namespace Lang.Translation
                 // 3. Verify the operator and expression types are compatible and convert the expression type if necessary
                 var type = VerifyType(expression.Type, errors);
                 var nextType = VerifyType(nextExpressionType, errors);
-                // TODO Handle pointer math
                 switch (op)
                 {
                     // Both need to be bool and returns bool
@@ -1109,7 +1121,7 @@ namespace Lang.Translation
                 case "...":
                     if (typeDef.Generics.Count == 1)
                     {
-                        return VerifyType(typeDef.Generics[0], errors) == Type.Error ? Type.Error : Type.Pointer;
+                        return VerifyType(typeDef.Generics[0], errors) == Type.Error ? Type.Error : Type.VarArgs;
                     }
                     else if (typeDef.Generics.Count > 1)
                     {
