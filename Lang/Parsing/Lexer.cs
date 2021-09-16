@@ -13,8 +13,8 @@ namespace Lang.Parsing
 
     public class Lexer : ILexer
     {
-        private static readonly Regex EscapableCharacters = new(@"['""\\abfnrtv]");
-        private static readonly IDictionary<string, TokenType> ReservedTokens = new Dictionary<string, TokenType>
+        private readonly Regex _escapableCharacters = new(@"['""\\abfnrtv]");
+        private  readonly IDictionary<string, TokenType> _reservedTokens = new Dictionary<string, TokenType>
         {
             { "return", TokenType.Return },
             { "true", TokenType.Boolean },
@@ -33,7 +33,7 @@ namespace Lang.Parsing
             return GetTokens(fileContents, filePath, errors).ToList();
         }
 
-        private static IEnumerable<Token> GetTokens(string fileContents, string filePath, List<ParseError> errors)
+        private IEnumerable<Token> GetTokens(string fileContents, string filePath, List<ParseError> errors)
         {
             var lexerStatus = new LexerStatus();
 
@@ -89,7 +89,7 @@ namespace Lang.Parsing
                     }
                     else if (literalEscapeToken)
                     {
-                        if (!EscapableCharacters.IsMatch(character.ToString()))
+                        if (!_escapableCharacters.IsMatch(character.ToString()))
                         {
                             currentToken.Error = true;
                         }
@@ -161,12 +161,12 @@ namespace Lang.Parsing
             if (currentToken != null) yield return currentToken;
         }
 
-        private static void CheckForReservedTokensAndErrors(Token token, List<ParseError> errors, char character = default)
+        private void CheckForReservedTokensAndErrors(Token token, List<ParseError> errors, char character = default)
         {
             // Check tokens for reserved keywords
             if (token.Type == TokenType.Token)
             {
-                if (ReservedTokens.TryGetValue(token.Value, out var type))
+                if (_reservedTokens.TryGetValue(token.Value, out var type))
                 {
                     token.Type = type;
                 }
