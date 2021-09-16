@@ -5,6 +5,7 @@ using Lang.Backend;
 using Lang.Parsing;
 using Lang.Project;
 using Lang.Translation;
+using Microsoft.VisualBasic.CompilerServices;
 
 namespace Lang
 {
@@ -53,8 +54,9 @@ namespace Lang
                     Console.WriteLine($"Failed to parse file: \"{failedParse.File}\":\n");
                     foreach (var parseError in failedParse.Errors)
                     {
-                        Console.WriteLine($"\t{parseError.Error} at line {parseError.Token.Line}:{parseError.Token.Column}\n");
+                        Console.WriteLine($"\t{parseError.Error} at line {parseError.Token.Line}:{parseError.Token.Column}");
                     }
+                    Console.WriteLine();
                 }
                 Environment.Exit(ErrorCodes.ParsingError);
             }
@@ -63,6 +65,16 @@ namespace Lang
             stopwatch.Restart();
             var programGraph = _graphBuilder.CreateProgramGraph(parseResults, out var errors);
             var graphTime = stopwatch.Elapsed;
+
+            if (errors.Any())
+            {
+                Console.WriteLine($"{errors.Count} compilation errors:\n");
+                foreach (var error in errors)
+                {
+                    Console.WriteLine($"\t{error.File}: {error.Error} at line {error.Line}:{error.Column}");
+                }
+                Environment.Exit(ErrorCodes.CompilationError);
+            }
 
             // 4. Generate translated code
             stopwatch.Restart();
