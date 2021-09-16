@@ -1,2 +1,5 @@
 #name
 basic
+
+#linker
+dynamic
