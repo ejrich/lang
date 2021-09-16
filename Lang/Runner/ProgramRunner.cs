@@ -274,21 +274,30 @@ namespace Lang.Runner
             var listType = _types[typeDef.GenericName];
             var genericType = GetTypeFromDefinition(typeDef.Generics[0]);
 
-            var list = Activator.CreateInstance(listType);
-            var dataField = listType.GetField("data");
             if (typeDef.Count != null)
             {
-                var count = (int)ExecuteExpression(typeDef.Count, programGraph, variables).Value;
-                var countField = listType.GetField("length");
-                countField!.SetValue(list, count);
-                var array = Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * count);
-                dataField!.SetValue(list, array);
+                var length = (int)ExecuteExpression(typeDef.Count, programGraph, variables).Value;
+                return InitializeConstList(listType, genericType, length);
             }
-            else
-            {
-                var array = Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * 10);
-                dataField!.SetValue(list, array);
-            }
+
+            var list = Activator.CreateInstance(listType);
+            var dataField = listType.GetField("data");
+            var array = Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * 10);
+            dataField!.SetValue(list, array);
+
+            return list;
+        }
+
+        private static object InitializeConstList(Type listType, Type genericType, int length)
+        {
+            var list = Activator.CreateInstance(listType);
+            var dataField = listType.GetField("data");
+
+            var countField = listType.GetField("length");
+            countField!.SetValue(list, length);
+            var array = Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * length);
+            dataField!.SetValue(list, array);
+
             return list;
         }
 
@@ -587,6 +596,7 @@ namespace Lang.Runner
                     }
                     break;
                 case UnaryAst unary:
+                {
                     var valueType = ExecuteExpression(unary.Value, programGraph, variables);
                     switch (unary.Operator)
                     {
@@ -626,28 +636,75 @@ namespace Lang.Runner
                         }
                     }
                     break;
+                }
                 case CallAst call:
                     var function = programGraph.Functions[call.Function];
                     if (call.Params)
                     {
-                        // TODO Handle params
-                    }
-
-                    var arguments = call.Arguments.Select(arg => ExecuteExpression(arg, programGraph, variables).Value).ToArray();
-                    if (function.Extern)
-                    {
-                        if (function.Varargs)
+                        var arguments = new object[function.Arguments.Count];
+                        for (var i = 0; i < function.Arguments.Count - 1; i++)
                         {
-                            // TODO Create overloads for varargs functions
+                            var value = ExecuteExpression(call.Arguments[i], programGraph, variables).Value;
+                            arguments[i] = value;
                         }
 
-                        var functionDecl = _library.GetMethod(call.Function);
-                        var returnValue = functionDecl!.Invoke(_functionObject, arguments);
-                        return new ValueType {Type = function.ReturnType, Value = returnValue};
+                        var elementType = function.Arguments[^1].Type.Generics[0];
+                        var paramsType = GetTypeFromDefinition(elementType);
+                        var listType = _types[$"List.{elementType.GenericName}"];
+                        var paramsList = InitializeConstList(listType, paramsType, call.Arguments.Count - function.Arguments.Count + 1);
+
+                        var dataField = paramsList.GetType().GetField("data");
+                        var data = dataField!.GetValue(paramsList);
+                        var dataPointer = GetPointer(data!);
+
+                        var paramsIndex = 0;
+                        for (var i = function.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
+                        {
+                            var value = ExecuteExpression(call.Arguments[i], programGraph, variables).Value;
+
+                            var valuePointer = IntPtr.Add(dataPointer, Marshal.SizeOf(paramsType) * paramsIndex);
+                            Marshal.StructureToPtr(value, valuePointer, false);
+                        }
+
+                        arguments[function.Arguments.Count - 1] = paramsList;
+
+                        return CallFunction(call.Function, function, programGraph, arguments);
+                    }
+                    else if (function.Varargs)
+                    {
+                        var arguments = new object[call.Arguments.Count];
+                        for (var i = 0; i < function.Arguments.Count - 1; i++)
+                        {
+                            var value = ExecuteExpression(call.Arguments[i], programGraph, variables).Value;
+                            arguments[i] = value;
+                        }
+
+                        // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
+                        // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
+                        for (var i = function.Arguments.Count - 1; i < call.Arguments.Count; i++)
+                        {
+                            var valueType = ExecuteExpression(call.Arguments[i], programGraph, variables);
+                            if (valueType.Type.Name == "float")
+                            {
+                                arguments[i] = Convert.ToDouble(valueType.Value);
+                            }
+                            else
+                            {
+                                arguments[i] = valueType.Value;
+                            }
+                        }
+
+                        return CallFunction(call.Function, function, programGraph, arguments);
                     }
                     else
                     {
-                        return CallFunction(function, programGraph, arguments);
+                        var arguments = new object[call.Arguments.Count];
+                        for (var i = 0; i < call.Arguments.Count; i++)
+                        {
+                            var value = ExecuteExpression(call.Arguments[i], programGraph, variables).Value;
+                            arguments[i] = value;
+                        }
+                        return CallFunction(call.Function, function, programGraph, arguments);
                     }
                 case ExpressionAst expression:
                     var firstValue = ExecuteExpression(expression.Children[0], programGraph, variables);
@@ -726,8 +783,20 @@ namespace Lang.Runner
             return (IntPtr)value;
         }
 
-        private ValueType CallFunction(FunctionAst function, ProgramGraph programGraph, object[] arguments)
+        private ValueType CallFunction(string functionName, FunctionAst function, ProgramGraph programGraph, object[] arguments)
         {
+            if (function.Extern)
+            {
+                if (function.Varargs)
+                {
+                    // TODO Create overloads for varargs functions
+                }
+
+                var functionDecl = _library.GetMethod(functionName);
+                var returnValue = functionDecl!.Invoke(_functionObject, arguments);
+                return new ValueType {Type = function.ReturnType, Value = returnValue};
+            }
+
             var variables = new Dictionary<string, ValueType>(_globalVariables);
 
             for (var i = 0; i < function.Arguments.Count; i++)
@@ -745,7 +814,6 @@ namespace Lang.Runner
                     return value;
                 }
             }
-
             return null;
         }
 
