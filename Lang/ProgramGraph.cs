@@ -7,8 +7,8 @@ namespace Lang
     {
         public Data Data { get; } = new();
         public List<FunctionAst> Functions { get; } = new();
-        public FunctionAst Main { get; set; }
         public FunctionAst Start { get; set; }
+        public List<IAst> Directives { get; } = new();
     }
 
     public class Data
