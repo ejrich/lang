@@ -674,19 +674,7 @@ namespace Lang.Translation
         private bool VerifyConditional(ConditionalAst conditional, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             // 1. Verify the condition expression
-            var conditionalType = VerifyExpression(conditional.Condition, localVariables, errors);
-            switch (VerifyType(conditionalType, errors))
-            {
-                case Type.Int:
-                case Type.Float:
-                case Type.Boolean:
-                case Type.Pointer:
-                    // Valid types
-                    break;
-                default:
-                    errors.Add(CreateError($"Expected condition to be int, float, or bool, but got '{PrintTypeDefinition(conditionalType)}'", conditional.Condition));
-                    break;
-            }
+            VerifyCondition(conditional.Condition, localVariables, errors);
 
             // 2. Verify the conditional scope
             var ifReturned = VerifyScope(conditional.Children, localVariables, errors);
@@ -704,7 +692,15 @@ namespace Lang.Translation
         private bool VerifyWhile(WhileAst whileAst, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             // 1. Verify the condition expression
-            var conditionalType = VerifyExpression(whileAst.Condition, localVariables, errors);
+            VerifyCondition(whileAst.Condition, localVariables, errors);
+
+            // 2. Verify the scope of the while block
+            return VerifyScope(whileAst.Children, localVariables, errors);
+        }
+
+        private void VerifyCondition(IAst ast, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        {
+            var conditionalType = VerifyExpression(ast, localVariables, errors);
             switch (VerifyType(conditionalType, errors))
             {
                 case Type.Int:
@@ -714,12 +710,9 @@ namespace Lang.Translation
                     // Valid types
                     break;
                 default:
-                    errors.Add(CreateError($"Expected condition to be bool, int, float, or pointer, but got '{PrintTypeDefinition(conditionalType)}'", whileAst.Condition));
+                    errors.Add(CreateError($"Expected condition to be bool, int, float, or pointer, but got '{PrintTypeDefinition(conditionalType)}'", ast));
                     break;
             }
-
-            // 2. Verify the scope of the while block
-            return VerifyScope(whileAst.Children, localVariables, errors);
         }
 
         private bool VerifyEach(EachAst each, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
