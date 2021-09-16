@@ -154,7 +154,7 @@ namespace Lang.Backend.LLVM
             SetPrivateConstant(typeTable);
             var typeInfoType = structs["TypeInfo"];
 
-            var types = new LLVMValueRef[programGraph.Types.Count + 13];
+            var types = new LLVMValueRef[programGraph.Types.Count + 12];
             var i = 0;
             types[i++] = CreateTypeInfo("void", TypeKind.Void, typeInfoType);
             types[i++] = CreateTypeInfo("bool", TypeKind.Boolean, typeInfoType);
