@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 namespace Lang.Parsing
@@ -1753,35 +1754,94 @@ namespace Lang.Parsing
                     typeDefinition.Name = "string";
                     return typeDefinition;
                 case TokenType.Number:
-                    if (int.TryParse(token.Value, out _))
+                    if (token.Flags == TokenFlags.None)
                     {
-                        typeDefinition.Name = "int";
-                        typeDefinition.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
-                        return typeDefinition;
-                    }
-                    else if (long.TryParse(token.Value, out _))
-                    {
-                        typeDefinition.Name = "s64";
-                        typeDefinition.PrimitiveType = new IntegerType {Bytes = 8, Signed = true};
-                        return typeDefinition;
-                    }
-                    else if (ulong.TryParse(token.Value, out _))
-                    {
-                        typeDefinition.Name = "u64";
-                        typeDefinition.PrimitiveType = new IntegerType {Bytes = 8, Signed = false};
-                        return typeDefinition;
-                    }
-                    else if (float.TryParse(token.Value, out _))
-                    {
-                        typeDefinition.Name = "float";
-                        typeDefinition.PrimitiveType = new FloatType {Bytes = 4};
-                        return typeDefinition;
-                    }
-                    else
-                    {
-                        errors.Add(new ParseError {Error = $"Unable to determine type of token '{token.Value}'", Token = token});
+                        if (int.TryParse(token.Value, out _))
+                        {
+                            typeDefinition.Name = "s32";
+                            typeDefinition.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
+                            return typeDefinition;
+                        }
+
+                        if (long.TryParse(token.Value, out _))
+                        {
+                            typeDefinition.Name = "s64";
+                            typeDefinition.PrimitiveType = new IntegerType {Bytes = 8, Signed = true};
+                            return typeDefinition;
+                        }
+
+                        if (ulong.TryParse(token.Value, out _))
+                        {
+                            typeDefinition.Name = "u64";
+                            typeDefinition.PrimitiveType = new IntegerType {Bytes = 8, Signed = false};
+                            return typeDefinition;
+                        }
+
+                        errors.Add(new ParseError
+                        {
+                            Error = $"Invalid integer '{token.Value}', must be 64 bits or less", Token = token
+                        });
                         return null;
                     }
+
+                    if (token.Flags.HasFlag(TokenFlags.Float))
+                    {
+                        if (float.TryParse(token.Value, out _))
+                        {
+                            typeDefinition.Name = "float";
+                            typeDefinition.PrimitiveType = new FloatType {Bytes = 4};
+                            return typeDefinition;
+                        }
+
+                        if (double.TryParse(token.Value, out _))
+                        {
+                            typeDefinition.Name = "float64";
+                            typeDefinition.PrimitiveType = new FloatType {Bytes = 8};
+                            return typeDefinition;
+                        }
+
+                        errors.Add(new ParseError
+                        {
+                            Error = $"Invalid floating point number '{token.Value}', must be single or double precision",
+                            Token = token
+                        });
+                        return null;
+                    }
+
+                    if (token.Flags.HasFlag(TokenFlags.HexNumber))
+                    {
+                        if (token.Value.Length == 2)
+                        {
+                            errors.Add(new ParseError {Error = $"Invalid number '{token.Value}'", Token = token});
+                            return null;
+                        }
+
+                        var value = token.Value.Substring(2);
+                        if (value.Length <= 8)
+                        {
+                            if (uint.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var result))
+                            {
+                                token.Value = result.ToString();
+                                typeDefinition.Name = "u32";
+                                typeDefinition.PrimitiveType = new IntegerType {Bytes = 4};
+                                return typeDefinition;
+                            }
+                        }
+                        else if (value.Length <= 16)
+                        {
+                            if (ulong.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var result))
+                            {
+                                token.Value = result.ToString();
+                                typeDefinition.Name = "u64";
+                                typeDefinition.PrimitiveType = new IntegerType {Bytes = 8};
+                                return typeDefinition;
+                            }
+                        }
+                        errors.Add(new ParseError {Error = $"Invalid integer '{token.Value}'", Token = token});
+                        return null;
+                    }
+                    errors.Add(new ParseError {Error = $"Unable to determine type of token '{token.Value}'", Token = token});
+                    return null;
                 case TokenType.Boolean:
                     typeDefinition.Name = "bool";
                     return typeDefinition;

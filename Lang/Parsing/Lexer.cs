@@ -179,7 +179,7 @@ namespace Lang.Parsing
                 // Get token from character, determine to emit value
                 var tokenType = GetTokenType(character);
 
-                if (ContinueToken(currentToken, tokenType, lexerStatus))
+                if (ContinueToken(currentToken, tokenType, character, lexerStatus))
                 {
                     currentToken!.Value += character;
                 }
@@ -251,7 +251,7 @@ namespace Lang.Parsing
             return Enum.IsDefined(typeof(TokenType), token) ? token : TokenType.Token;
         }
 
-        private static bool ContinueToken(Token currentToken, TokenType type, LexerStatus lexerStatus)
+        private static bool ContinueToken(Token currentToken, TokenType type, char character, LexerStatus lexerStatus)
         {
             if (currentToken == null) return false;
 
@@ -265,19 +265,30 @@ namespace Lang.Parsing
                         case TokenType.Number:
                             return true;
                         case TokenType.Period:
-                            if (currentToken.Value.Contains('.'))
+                            if (currentToken.Flags.HasFlag(TokenFlags.Float))
                             {
                                 // Handle number ranges
                                 if (currentToken.Value[^1] == '.')
                                 {
+                                    currentToken.Flags &= ~TokenFlags.Float;
                                     currentToken.Type = TokenType.NumberRange;
                                     return true;
                                 }
                                 currentToken.Error = true;
                                 return false;
                             }
+                            currentToken.Flags |= TokenFlags.Float;
                             return true;
                         case TokenType.Token:
+                            if (currentToken.Value == "0" && character == 'x')
+                            {
+                                currentToken.Flags |= TokenFlags.HexNumber;
+                                return true;
+                            }
+                            if (currentToken.Flags.HasFlag(TokenFlags.HexNumber))
+                            {
+                                return true;
+                            }
                             currentToken.Error = true;
                             return false;
                         default:
