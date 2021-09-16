@@ -1,7 +1,17 @@
 main() {
+    basics();
+
     string_compare();
 
     string_indexing();
+}
+
+basics() {
+    a := "Hello sailor!";
+    b := "Hello world!"; #const
+
+    printf("a: length = %d, value = %s\n", a.length, a);
+    printf("b: length = %d, value = %s\n", b.length, b);
 }
 
 string_compare() {
@@ -19,14 +29,13 @@ string_compare() {
 
 string_indexing() {
     a := "Hello world!";
+    a[2] = 'e'; // TODO Fix this
 
-    a[2] = 'e';
-
-    printf("%s\n", a);
+    printf("%s %c\n", a, a[2]);
     assert(a == "Heelo world!");
 
     b: StringStruct = {foo = 12; bar = "Hey what's up";}
-    b.bar[2] = 'e';
+    b.bar[2] = 'e'; // TODO Fix this
 
     printf("%s\n", b.bar);
     assert(b.bar == "Hee what's up");
