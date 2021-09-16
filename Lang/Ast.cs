@@ -221,8 +221,8 @@ namespace Lang
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
-        public string Function { get; set; }
-        public bool Params { get; set; }
+        public string FunctionName { get; set; }
+        public FunctionAst Function { get; set; }
         public int FunctionIndex { get; set; }
         public int VarargsIndex { get; set; }
         public List<TypeDefinition> Generics { get; set; }
