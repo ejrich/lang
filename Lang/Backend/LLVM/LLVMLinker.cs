@@ -84,7 +84,7 @@ namespace Lang.Backend.LLVM
                 return "-static";
             }
 
-            var linker = libDirectory.GetFiles("ld-linux*.so*").FirstOrDefault();
+            var linker = libDirectory.GetFiles("ld-linux-x86-64.so*").FirstOrDefault();
             if (linker == null)
             {
                 Console.WriteLine($"Cannot find linker in directory '{libDirectory.FullName}'");
