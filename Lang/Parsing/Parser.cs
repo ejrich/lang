@@ -1027,8 +1027,24 @@ namespace Lang.Parsing
                 return null;
             }
 
-            // 5. Parse expression, constant, or another token as the value
-            declaration.Value = ParseExpression(enumerator, errors);
+            // 5. Parse expression, constant, or object initialization as the value
+            if (enumerator.Current.Type == TokenType.OpenBrace)
+            {
+                while (enumerator.MoveNext())
+                {
+                    if (enumerator.Current.Type == TokenType.CloseBrace)
+                    {
+                        break;
+                    }
+
+                    var assignment = ParseAssignment(enumerator, errors);
+                    declaration.Assignments.Add(assignment);
+                }
+            }
+            else
+            {
+                declaration.Value = ParseExpression(enumerator, errors);
+            }
 
             return declaration;
         }
