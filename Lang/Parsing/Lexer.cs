@@ -40,21 +40,13 @@ namespace Lang.Parsing
                 {
                     if (_multiLineComment)
                     {
-                        if (character == '*')
+                        if (closingMultiLineComment && character == '/')
                         {
-                            closingMultiLineComment = true;
-                        }
-                        else if (closingMultiLineComment && character == '/')
-                        {
-                            closingMultiLineComment = false;
                             _multiLineComment = false;
                             _readingComment = false;
                             currentToken = null;
                         }
-                        else
-                        {
-                            closingMultiLineComment = false;
-                        }
+                        closingMultiLineComment = character == '*';
                     }
                     else if (character == '\n')
                     {
