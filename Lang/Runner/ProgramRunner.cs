@@ -281,21 +281,13 @@ namespace Lang.Runner
                 var count = (int)ExecuteExpression(typeDef.Count, programGraph, variables).Value;
                 var countField = listType.GetField("length");
                 countField!.SetValue(list, count);
-                var array = Array.CreateInstance(genericType, count);
-                unsafe
-                {
-                    var arrayRef = __makeref(array);
-                    dataField!.SetValue(list, (IntPtr)(&arrayRef));
-                }
+                var array = Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * count);
+                dataField!.SetValue(list, array);
             }
             else
             {
-                var array = Array.CreateInstance(genericType, 100);
-                unsafe
-                {
-                    var arrayRef = __makeref(array);
-                    dataField!.SetValue(list, (IntPtr)(&arrayRef));
-                }
+                var array = Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * 10);
+                dataField!.SetValue(list, array);
             }
             return list;
         }
@@ -339,20 +331,19 @@ namespace Lang.Runner
                     field!.SetValue(fieldObject, expression.Value);
                     break;
                 }
-                case IndexAst index:
-                    switch (index.Variable)
+                case IndexAst indexAst:
+                    var index = (int)ExecuteExpression(indexAst.Index, programGraph, variables).Value;
+
+                    var indexVariable = ExecuteExpression(indexAst.Variable, programGraph, variables);
+                    var dataField = indexVariable.Value.GetType().GetField("data");
+                    var type = GetTypeFromDefinition(indexVariable.Type.Generics[0]);
+                    unsafe
                     {
-                        // TODO Implement me
-                        case VariableAst variableAst:
-                        {
-                            var variable = variables[variableAst.Name];
-                            break;
-                        }
-                        case StructFieldRefAst structField:
-                        {
-                            var variable = variables[structField.Name];
-                            break;
-                        }
+                        var data = dataField!.GetValue(indexVariable.Value);
+                        var dataPointer = Pointer.Unbox(data!);
+
+                        var valuePointer = IntPtr.Add((IntPtr)dataPointer, Marshal.SizeOf(type) * index);
+                        Marshal.StructureToPtr(expression.Value, valuePointer, false);
                     }
                     break;
             }
@@ -415,22 +406,24 @@ namespace Lang.Runner
             {
                 // TODO Implement me
             }
-
-            var rangeBegin = ExecuteExpression(each.RangeBegin, programGraph, variables);
-            var rangeEnd = ExecuteExpression(each.RangeEnd, programGraph, variables);
-            var iterationVariable = new ValueType {Type = rangeBegin.Type, Value = rangeBegin.Value};
-            eachVariables.Add(each.IterationVariable, iterationVariable);
-
-            while ((bool)RunExpression(iterationVariable, rangeEnd, Operator.LessThanEqual, iterationVariable.Type))
+            else
             {
-                var value = ExecuteAsts(each.Children, programGraph, eachVariables, out returned);
+                var rangeBegin = ExecuteExpression(each.RangeBegin, programGraph, variables);
+                var rangeEnd = ExecuteExpression(each.RangeEnd, programGraph, variables);
+                var iterationVariable = new ValueType {Type = rangeBegin.Type, Value = rangeBegin.Value};
+                eachVariables.Add(each.IterationVariable, iterationVariable);
 
-                if (returned)
+                while ((bool)RunExpression(iterationVariable, rangeEnd, Operator.LessThanEqual, iterationVariable.Type))
                 {
-                    return value;
-                }
+                    var value = ExecuteAsts(each.Children, programGraph, eachVariables, out returned);
 
-                iterationVariable.Value = (int)iterationVariable.Value + 1;
+                    if (returned)
+                    {
+                        return value;
+                    }
+
+                    iterationVariable.Value = (int)iterationVariable.Value + 1;
+                }
             }
 
             returned = false;
@@ -459,8 +452,7 @@ namespace Lang.Runner
             switch (ast)
             {
                 case ConstantAst constant:
-                    var type = constant.Type;
-                    return new ValueType {Type = type, Value = GetConstant(type, constant.Value)};
+                    return new ValueType {Type = constant.Type, Value = GetConstant(constant.Type, constant.Value)};
                 case NullAst:
                     return new ValueType();
                 case StructFieldRefAst structField:
@@ -539,16 +531,37 @@ namespace Lang.Runner
 
                             return new ValueType {Type = fieldType, Value = changeByOne.Prefix ? newValue : previousValue};
                         }
-                        case IndexAst index:
-                            // TODO Implement me
-                            switch (index.Variable)
+                        case IndexAst indexAst:
+                            var index = (int)ExecuteExpression(indexAst.Index, programGraph, variables).Value;
+
+                            var indexVariable = ExecuteExpression(indexAst.Variable, programGraph, variables);
+                            var elementType = indexVariable.Type.Generics[0];
+                            var type = GetTypeFromDefinition(elementType);
+                            var dataField = indexVariable.Value.GetType().GetField("data");
+                            unsafe
                             {
-                                case VariableAst indexVariable:
-                                    break;
-                                case StructFieldRefAst indexStructField:
-                                    break;
+                                var data = dataField!.GetValue(indexVariable.Value);
+                                var dataPointer = Pointer.Unbox(data!);
+
+                                var valuePointer = IntPtr.Add((IntPtr)dataPointer, Marshal.SizeOf(type) * index);
+                                var previousValue = Marshal.PtrToStructure(valuePointer, type);
+                                object newValue;
+
+                                if (elementType.PrimitiveType is IntegerType)
+                                {
+                                    var value = (int)previousValue!;
+                                    newValue = changeByOne.Positive ? value + 1 : value - 1;
+                                    Marshal.StructureToPtr(newValue, valuePointer, false);
+                                }
+                                else
+                                {
+                                    var value = (float)previousValue!;
+                                    newValue = changeByOne.Positive ? value + 1 : value - 1;
+                                    Marshal.StructureToPtr(newValue, valuePointer, false);
+                                }
+
+                                return new ValueType {Type = elementType, Value = changeByOne.Prefix ? newValue : previousValue};
                             }
-                            return null;
                     }
                     break;
                 case UnaryAst unary:
@@ -616,9 +629,23 @@ namespace Lang.Runner
                         expressionValue.Type = nextType;
                     }
                     return expressionValue;
-                case IndexAst index:
-                    // return VerifyIndexType(index, localVariables, errors, out _);
-                    break;
+                case IndexAst indexAst:
+                {
+                    var index = (int)ExecuteExpression(indexAst.Index, programGraph, variables).Value;
+
+                    var variable = ExecuteExpression(indexAst.Variable, programGraph, variables);
+                    var dataField = variable.Value.GetType().GetField("data");
+                    var elementType = variable.Type.Generics[0];
+                    var type = GetTypeFromDefinition(elementType);
+                    unsafe
+                    {
+                        var data = dataField!.GetValue(variable.Value);
+                        var dataPointer = Pointer.Unbox(data!);
+
+                        var valuePointer = IntPtr.Add((IntPtr)dataPointer, Marshal.SizeOf(type) * index);
+                        return new ValueType {Type = elementType, Value = Marshal.PtrToStructure(valuePointer, type)};
+                    }
+                }
             }
 
             return null;
