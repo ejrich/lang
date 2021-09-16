@@ -14,6 +14,9 @@ namespace Lang
         void EmitDeclaration(FunctionIR function, DeclarationAst declaration, ScopeAst scope);
         void EmitAssignment(FunctionIR function, AssignmentAst assignment, ScopeAst scope);
         void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, ScopeAst scope, BasicBlock block = null);
+        BasicBlock EmitConditional(FunctionIR function, ConditionalAst conditional, ScopeAst scope);
+        BasicBlock EmitWhile(FunctionIR function, WhileAst whileAst, ScopeAst scope);
+        BasicBlock EmitEach(FunctionIR function, EachAst each, ScopeAst scope);
         InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block = null, bool useRawString = false);
     }
 
@@ -532,6 +535,30 @@ namespace Lang
             }
 
             block.Instructions.Add(instruction);
+        }
+
+        public BasicBlock EmitConditional(FunctionIR function, ConditionalAst conditional, ScopeAst scope)
+        {
+            // TODO Implement me
+            // Run the condition expression in the current basic block and then jump to the following
+            return null;
+        }
+
+        public BasicBlock EmitWhile(FunctionIR function, WhileAst whileAst, ScopeAst scope)
+        {
+            // TODO Implement me
+            // Create a block for the condition expression and then jump to the following
+            // Return the while body block
+            return null;
+        }
+
+        public BasicBlock EmitEach(FunctionIR function, EachAst each, ScopeAst scope)
+        {
+            // TODO Implement me
+            // Initialize the loop in the current basic block
+            // Create a basic block for the condition
+            // Return the body block
+            return null;
         }
 
         public InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block = null, bool useRawString = false)

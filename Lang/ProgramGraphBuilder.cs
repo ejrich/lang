@@ -2013,6 +2013,11 @@ namespace Lang
             // 1. Verify the condition expression
             VerifyCondition(conditional.Condition, currentFunction, scope);
 
+            if (functionIR != null && !_programGraph.Errors.Any())
+            {
+                var block = _irBuilder.EmitConditional(functionIR, conditional, scope);
+            }
+
             // 2. Verify the conditional scope
             var ifReturned = VerifyScope(conditional.IfBlock, currentFunction, scope, functionIR);
 
@@ -2030,6 +2035,11 @@ namespace Lang
         {
             // 1. Verify the condition expression
             VerifyCondition(whileAst.Condition, currentFunction, scope);
+
+            if (functionIR != null && !_programGraph.Errors.Any())
+            {
+                var block = _irBuilder.EmitWhile(functionIR, whileAst, scope);
+            }
 
             // 2. Verify the scope of the while block
             return VerifyScope(whileAst.Body, currentFunction, scope, functionIR);
@@ -2103,6 +2113,11 @@ namespace Lang
                 }
                 var iterType = new DeclarationAst {Name = each.IterationVariable, TypeDefinition = _s32Type, Type = TypeTable.Types["s32"]};
                 each.Body.Identifiers.TryAdd(each.IterationVariable, iterType);
+            }
+
+            if (functionIR != null && !_programGraph.Errors.Any())
+            {
+                var block = _irBuilder.EmitEach(functionIR, each, scope);
             }
 
             // 2. Verify the scope of the each block
