@@ -522,11 +522,13 @@ namespace Lang.Backend
             LLVMMetadataRef debugBlock = null;
             LLVMMetadataRef file = null;
             LLVMMetadataRef expression = null;
+            Stack<LLVMMetadataRef> debugBlockStack = null;
             if (_emitDebug)
             {
                 debugBlock = _debugFunctions[function.Index];
                 file = _debugFiles[function.Source.FileIndex];
                 expression = LLVM.DIBuilderCreateExpression(_debugBuilder, null, UIntPtr.Zero);
+                debugBlockStack = new();
             }
 
             // Write the instructions
@@ -1026,6 +1028,17 @@ namespace Lang.Backend
                         {
                             var location = LLVM.DIBuilderCreateDebugLocation(_context, instruction.Source.Line, instruction.Source.Column, debugBlock, null);
                             LLVM.SetCurrentDebugLocation2(_builder, location);
+                            break;
+                        }
+                        case InstructionType.DebugPushLexicalBlock:
+                        {
+                            debugBlockStack.Push(debugBlock);
+                            debugBlock = LLVM.DIBuilderCreateLexicalBlock(_debugBuilder, debugBlock, file, instruction.Source.Line, instruction.Source.Column);
+                            break;
+                        }
+                        case InstructionType.DebugPopLexicalBlock:
+                        {
+                            debugBlock = debugBlockStack.Pop();
                             break;
                         }
                         case InstructionType.DebugDeclareParameter:
