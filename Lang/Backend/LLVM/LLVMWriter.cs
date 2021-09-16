@@ -64,9 +64,20 @@ namespace Lang.Backend.LLVM
 
         private void WriteData(Data data)
         {
-            // TODO Implement me
             // 1. Declare structs
+            var structs = new LLVMTypeRef[data.Structs.Count];
+            for (var i = 0; i < data.Structs.Count; i++)
+            {
+                structs[i] = LLVMApi.StructCreateNamed(LLVMApi.GetModuleContext(_module), data.Structs[i].Name);
+            }
+            for (var i = 0; i < data.Structs.Count; i++)
+            {
+                var fields = data.Structs[i].Fields.Select(field => ConvertTypeDefinition(field.Type)).ToArray();
+                LLVMApi.StructSetBody(structs[i], fields, false);
+            }
+
             // 2. Declare variables
+            // TODO Implement me
         }
 
         private LLVMValueRef WriteFunctionDefinition(string name, List<Argument> arguments, TypeDefinition returnType)
@@ -658,14 +669,16 @@ namespace Lang.Backend.LLVM
             };
         }
 
-        private static LLVMTypeRef ConvertTypeDefinition(TypeDefinition typeDef)
+        private LLVMTypeRef ConvertTypeDefinition(TypeDefinition typeDef)
         {
             return typeDef.Name switch
             {
                 "int" => LLVMTypeRef.Int32Type(),
                 "float" => LLVMTypeRef.FloatType(),
                 "bool" => LLVMTypeRef.Int1Type(),
-                _ => LLVMTypeRef.DoubleType() // TODO Implement more types
+                "List" => LLVMTypeRef.DoubleType(),
+                _ => LLVMApi.GetTypeByName(_module, typeDef.Name)
+                // _ => LLVMTypeRef.DoubleType() // TODO Implement more types
             };
         }
     }
