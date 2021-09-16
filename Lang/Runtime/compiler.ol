@@ -16,3 +16,5 @@ enum BuildEnv {
 
 os: OS;
 build_env: BuildEnv;
+
+add_dependency(string library) #compiler

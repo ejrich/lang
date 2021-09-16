@@ -25,17 +25,17 @@ namespace Lang.Backend.LLVM
         private readonly Dictionary<string, IAst> _types = new();
         private readonly Queue<LLVMValueRef> _allocationQueue = new();
 
-        public string WriteFile(ProgramGraph programGraph, string projectName, string projectPath, BuildSettings buildSettings)
+        public string WriteFile(string projectPath, ProgramGraph programGraph, BuildSettings buildSettings)
         {
             // 1. Initialize the LLVM module and builder
-            InitLLVM(projectName, buildSettings.Release);
+            InitLLVM(programGraph.Name, buildSettings.Release);
 
             // 2. Verify obj directory exists
             var objectPath = Path.Combine(projectPath, ObjectDirectory);
             if (!Directory.Exists(objectPath))
                 Directory.CreateDirectory(objectPath);
 
-            var objectFile = Path.Combine(objectPath, $"{projectName}.o");
+            var objectFile = Path.Combine(objectPath, $"{programGraph.Name}.o");
 
             // 3. Write Data section
             var globals = WriteData(programGraph);
@@ -44,6 +44,8 @@ namespace Lang.Backend.LLVM
             _functions = programGraph.Functions;
             foreach (var (name, function) in programGraph.Functions)
             {
+                if (function.Compiler) continue;
+
                 if (name == "main")
                 {
                     function.Name = "__main";
@@ -58,7 +60,7 @@ namespace Lang.Backend.LLVM
             // 5. Write Function bodies
             foreach (var (_, functionAst) in programGraph.Functions)
             {
-                if (functionAst.Extern) continue;
+                if (functionAst.Extern || functionAst.Compiler) continue;
 
                 _currentFunction = functionAst;
                 var function = LLVMApi.GetNamedFunction(_module, functionAst.Name);

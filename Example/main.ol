@@ -59,6 +59,8 @@ int main(List<string> args) {
 
     compiler_directives();
 
+    open_window();
+
     return 0;
 }
 
@@ -275,6 +277,13 @@ default_args(int val = 5) {
     printf("Value = %d\n", val);
 }
 
+open_window() {
+    #if os == OS.Linux {
+        XOpenDisplay("Hello");
+        printf("Opening X11 window\n");
+    }
+}
+
 int SDL_Init(u32 flags) #extern "SDL2"
 SDL_CreateWindow(string title, int x, int y, int w, int h, u32 flags) #extern "SDL2"
 u32 sleep(u32 seconds) #extern "libc"
@@ -283,7 +292,10 @@ u32 sleep(u32 seconds) #extern "libc"
     args: List<string>[1];
     args[0] = "Hello world";
     main(args);
-    XOpenDisplay("Hello");
+
+    if os == OS.Linux {
+        add_dependency("X11");
+    }
 }
 
 compiler_directives() {

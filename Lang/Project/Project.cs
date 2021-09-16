@@ -2,13 +2,14 @@ using System.Collections.Generic;
 
 namespace Lang.Project
 {
-    public class Project
+    public class ProjectFile
     {
-        public string Name { get; init; }
-        public string Path { get; init; }
-        public Linker Linker { get; init; }
-        public List<string> BuildFiles { get; init; }
-        public List<string> Dependencies { get; init; }
+        public string Name { get; set; }
+        public string Path { get; set; }
+        public Linker Linker { get; set; }
+        public List<string> SourceFiles { get; set; }
+        public List<string> Dependencies { get; } = new();
+        public List<string> Packages { get; } = new();
     }
 
     public enum ProjectFileSection
@@ -24,13 +25,5 @@ namespace Lang.Project
     {
         Static,
         Dynamic
-    }
-
-    public class ProjectFile
-    {
-        public string Name { get; set; }
-        public Linker Linker { get; set; }
-        public List<string> Dependencies { get; } = new();
-        public List<string> Packages { get; } = new();
     }
 }
