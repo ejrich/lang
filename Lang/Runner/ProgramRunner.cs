@@ -39,7 +39,6 @@ namespace Lang.Runner
             public object Value { get; set; }
         }
 
-        // TODO Make sure to not init if there are errors
         public void Init(ProgramGraph programGraph)
         {
             _programGraph = programGraph;
