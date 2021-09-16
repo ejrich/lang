@@ -888,6 +888,33 @@ namespace Lang.Translation
             return false;
         }
 
+        private bool VerifyCompilerDirective(CompilerDirectiveAst directive, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        {
+            switch (directive.Value)
+            {
+                case ConditionalAst conditional:
+                    if (EvaluateCompileTimeExpression(conditional.Condition, errors))
+                    {
+                        
+                    }
+                    else if (conditional.Else != null)
+                    {
+                        return VerifyAst(conditional.Else, localVariables, errors);
+                    }
+                    break;
+                default:
+                    errors.Add(CreateError("Compiler directive not supported", directive.Value));
+                    break;
+            }
+
+            return false;
+        }
+
+        private bool EvaluateCompileTimeExpression(IAst ast, List<TranslationError> errors)
+        {
+            return false;
+        }
+
         private TypeDefinition VerifyExpression(IAst ast, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             // 1. Verify the expression value
