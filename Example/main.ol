@@ -45,6 +45,10 @@ int Main(List<string> args) {
     default_args(8);
     default_args();
 
+    sdl := SDL_Init(32);
+    SDL_CreateWindow("Hello world", 805240832, 805240832, 400, 300, 0);
+    sleep(10);
+
     return 0;
 }
 
@@ -240,3 +244,7 @@ null_test(int* value_ptr) {
 default_args(int val = 5) {
     printf("Value = %d\n", val);
 }
+
+int SDL_Init(u32 flags) #extern
+SDL_CreateWindow(string title, int x, int y, int w, int h, u32 flags) #extern
+u32 sleep(u32 seconds) #extern
