@@ -213,10 +213,7 @@ namespace Lang
                             return null;
                         }
 
-                        var loadInstruction = new Instruction {Type = InstructionType.Load, AllocationIndex = declaration.AllocationIndex};
-                        var loadValue = new InstructionValue {ValueIndex = block.Instructions.Count};
-                        block.Instructions.Add(loadInstruction);
-                        return loadValue;
+                        return EmitLoad(declaration.AllocationIndex, block);
                     }
                     else if (identifierAst is IType type)
                     {
@@ -332,93 +329,88 @@ namespace Lang
                     block.Instructions.Add(callInstruction);
                     return callValue;
                 case ChangeByOneAst changeByOne:
-                // {
-                //     var constant = false;
-                //     var (variableType, pointer) = changeByOne.Value switch
-                //     {
-                //         IdentifierAst identifier => localVariables[identifier.Name],
-                //         StructFieldRefAst structField => BuildStructField(structField, localVariables, out _, out constant),
-                //         IndexAst index => GetIndexPointer(index, localVariables, out _),
-                //         // @Cleanup This branch should never be hit
-                //         _ => (null, new LLVMValueRef())
-                //     };
+                    // var constant = false;
+                    // var (variableType, pointer) = changeByOne.Value switch
+                    // {
+                    //     IdentifierAst identifier => localVariables[identifier.Name],
+                    //     StructFieldRefAst structField => BuildStructField(structField, localVariables, out _, out constant),
+                    //     IndexAst index => GetIndexPointer(index, localVariables, out _),
+                    //     // @Cleanup This branch should never be hit
+                    //     _ => (null, new LLVMValueRef())
+                    // };
 
-                //     var value = constant ? pointer : _builder.BuildLoad(pointer, "tmpvalue");
-                //     if (variableType.TypeKind == TypeKind.Pointer)
-                //     {
-                //         variableType = variableType.Generics[0];
-                //     }
-                //     var type = ConvertTypeDefinition(variableType);
+                    // var value = constant ? pointer : _builder.BuildLoad(pointer, "tmpvalue");
+                    // if (variableType.TypeKind == TypeKind.Pointer)
+                    // {
+                    //     variableType = variableType.Generics[0];
+                    // }
+                    // var type = ConvertTypeDefinition(variableType);
 
-                //     LLVMValueRef newValue;
-                //     if (variableType.PrimitiveType is IntegerType)
-                //     {
-                //         newValue = changeByOne.Positive
-                //             ? _builder.BuildAdd(value, LLVMValueRef.CreateConstInt(type, 1, false), "inc")
-                //             : _builder.BuildSub(value, LLVMValueRef.CreateConstInt(type, 1, false), "dec");
-                //     }
-                //     else
-                //     {
-                //         newValue = changeByOne.Positive
-                //             ? _builder.BuildFAdd(value, LLVM.ConstReal(type, 1), "incf")
-                //             : _builder.BuildFSub(value, LLVM.ConstReal(type, 1), "decf");
-                //     }
+                    // LLVMValueRef newValue;
+                    // if (variableType.PrimitiveType is IntegerType)
+                    // {
+                    //     newValue = changeByOne.Positive
+                    //         ? _builder.BuildAdd(value, LLVMValueRef.CreateConstInt(type, 1, false), "inc")
+                    //         : _builder.BuildSub(value, LLVMValueRef.CreateConstInt(type, 1, false), "dec");
+                    // }
+                    // else
+                    // {
+                    //     newValue = changeByOne.Positive
+                    //         ? _builder.BuildFAdd(value, LLVM.ConstReal(type, 1), "incf")
+                    //         : _builder.BuildFSub(value, LLVM.ConstReal(type, 1), "decf");
+                    // }
 
-                //     if (!constant) // Values are either readonly or constants, so don't store
-                //     {
-                //         LLVM.BuildStore(_builder, newValue, pointer);
-                //     }
-                //     return changeByOne.Prefix ? (variableType, newValue) : (variableType, value);
-                // }
-                // case UnaryAst unary:
-                // {
-                //     if (unary.Operator == UnaryOperator.Reference)
-                //     {
-                //         var (valueType, pointer) = unary.Value switch
-                //         {
-                //             IdentifierAst identifier => localVariables[identifier.Name],
-                //             StructFieldRefAst structField => BuildStructField(structField, localVariables, out _, out _),
-                //             IndexAst index => GetIndexPointer(index, localVariables, out _),
-                //             // @Cleanup this branch should not be hit
-                //             _ => (null, new LLVMValueRef())
-                //         };
-                //         var pointerType = new TypeDefinition {Name = "*", TypeKind = TypeKind.Pointer};
-                //         if (valueType.CArray)
-                //         {
-                //             pointerType.Generics.Add(valueType.Generics[0]);
-                //         }
-                //         else
-                //         {
-                //             pointerType.Generics.Add(valueType);
-                //         }
-                //         return (pointerType, pointer);
-                //     }
+                    // if (!constant) // Values are either readonly or constants, so don't store
+                    // {
+                    //     LLVM.BuildStore(_builder, newValue, pointer);
+                    // }
+                    // return changeByOne.Prefix ? (variableType, newValue) : (variableType, value);
+                case UnaryAst unary:
+                    // if (unary.Operator == UnaryOperator.Reference)
+                    // {
+                    //     var (valueType, pointer) = unary.Value switch
+                    //     {
+                    //         IdentifierAst identifier => localVariables[identifier.Name],
+                    //         StructFieldRefAst structField => BuildStructField(structField, localVariables, out _, out _),
+                    //         IndexAst index => GetIndexPointer(index, localVariables, out _),
+                    //         // @Cleanup this branch should not be hit
+                    //         _ => (null, new LLVMValueRef())
+                    //     };
+                    //     var pointerType = new TypeDefinition {Name = "*", TypeKind = TypeKind.Pointer};
+                    //     if (valueType.CArray)
+                    //     {
+                    //         pointerType.Generics.Add(valueType.Generics[0]);
+                    //     }
+                    //     else
+                    //     {
+                    //         pointerType.Generics.Add(valueType);
+                    //     }
+                    //     return (pointerType, pointer);
+                    // }
 
-                //     var (type, value) = WriteExpression(unary.Value, localVariables);
-                //     return unary.Operator switch
-                //     {
-                //         UnaryOperator.Not => (type, _builder.BuildNot(value, "not")),
-                //         UnaryOperator.Negate => type.PrimitiveType switch
-                //         {
-                //             IntegerType => (type, _builder.BuildNeg(value, "neg")),
-                //             FloatType => (type, _builder.BuildFNeg(value, "fneg")),
-                //             // @Cleanup This branch should not be hit
-                //             _ => (null, new LLVMValueRef())
-                //         },
-                //         UnaryOperator.Dereference => (type.Generics[0], _builder.BuildLoad(value, "tmpderef")),
-                //         // @Cleanup This branch should not be hit
-                //         _ => (null, new LLVMValueRef())
-                //     };
-                // }
+                    // var (type, value) = WriteExpression(unary.Value, localVariables);
+                    // return unary.Operator switch
+                    // {
+                    //     UnaryOperator.Not => (type, _builder.BuildNot(value, "not")),
+                    //     UnaryOperator.Negate => type.PrimitiveType switch
+                    //     {
+                    //         IntegerType => (type, _builder.BuildNeg(value, "neg")),
+                    //         FloatType => (type, _builder.BuildFNeg(value, "fneg")),
+                    //         // @Cleanup This branch should not be hit
+                    //         _ => (null, new LLVMValueRef())
+                    //     },
+                    //     UnaryOperator.Dereference => (type.Generics[0], _builder.BuildLoad(value, "tmpderef")),
+                    //     // @Cleanup This branch should not be hit
+                    //     _ => (null, new LLVMValueRef())
+                    // };
+                    break;
                 case IndexAst index:
-                // {
-                //     var (elementType, elementValue) = GetIndexPointer(index, localVariables, out var loaded);
-                //     if (!loaded)
-                //     {
-                //         elementValue = _builder .BuildLoad(elementValue, "tmpindex");
-                //     }
-                //     return (elementType, elementValue);
-                // }
+                    var indexPointer = EmitGetIndexPointer(function, index, scope, block, out var loaded);
+                    if (!loaded)
+                    {
+                        // elementValue = _builder.BuildLoad(elementValue, "tmpindex");
+                    }
+                    return null;
                 case ExpressionAst expression:
                     // var expressionValue = WriteExpression(expression.Children[0], localVariables);
                     // for (var i = 1; i < expression.Children.Count; i++)
@@ -445,6 +437,14 @@ namespace Lang
                     return new InstructionValue {ValueIndex = valueIndex, Type = cast.TargetType};
             }
             return null;
+        }
+
+        private InstructionValue EmitLoad(int allocationIndex, BasicBlock block)
+        {
+            var loadInstruction = new Instruction {Type = InstructionType.Load, AllocationIndex = allocationIndex};
+            var loadValue = new InstructionValue {ValueIndex = block.Instructions.Count};
+            block.Instructions.Add(loadInstruction);
+            return loadValue;
         }
 
         private InstructionValue EmitGetStructPointer(FunctionIR function, StructFieldRefAst structField, ScopeAst scope, BasicBlock block)
@@ -555,6 +555,62 @@ namespace Lang
                 }
             }
 
+            return null;
+        }
+
+        private InstructionValue EmitGetIndexPointer(FunctionIR function, IndexAst index, ScopeAst scope, BasicBlock block, out bool loaded, TypeDefinition type = null, InstructionValue variable = null)
+        {
+            // 1. Get the variable pointer
+            if (type == null)
+            {
+                GetScopeIdentifier(scope, index.Name, out var identifier);
+                var declaration = (DeclarationAst) identifier;
+                type = declaration.Type;
+            }
+
+            // 2. Determine the index
+            var indexValue = EmitIR(function, index.Index, scope, block);
+
+            // 3. Call the overload if needed
+            if (index.CallsOverload)
+            {
+                // TODO Implement me
+                // var overloadName = GetOperatorOverloadName(type, Operator.Subscript);
+                // var overload = _module.GetNamedFunction(overloadName);
+                // var overloadDef = _programGraph.OperatorOverloads[type.GenericName][Operator.Subscript];
+
+                // loaded = true;
+                // return (overloadDef.ReturnType, _builder.BuildCall(overload, new []{_builder.BuildLoad(variable, index.Name), indexValue}, string.Empty));
+            }
+
+            // 4. Build the pointer with the first index of 0
+            TypeDefinition elementType;
+            if (type.TypeKind == TypeKind.String)
+            {
+                // _stringStruct ??= (StructAst)_programGraph.Types["string"];
+                // elementType = _stringStruct.Fields[1].Type.Generics[0];
+                elementType = new TypeDefinition {Name = "u8", TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Bytes = 1}};
+            }
+            else
+            {
+                elementType = type.Generics[0];
+            }
+            if (type.TypeKind == TypeKind.Pointer)
+            {
+                // var dataPointer = _builder.BuildLoad(variable, "dataptr");
+                // indexPointer = _builder.BuildGEP(dataPointer, new []{indexValue}, "indexptr");
+            }
+            else if (type.CArray)
+            {
+                // indexPointer = _builder.BuildGEP(variable, new []{_zeroInt, indexValue}, "dataptr");
+            }
+            else
+            {
+                // var arrayData = _builder.BuildStructGEP(variable, 1, "arraydata");
+                // var dataPointer = _builder.BuildLoad(arrayData, "dataptr");
+                // indexPointer = _builder.BuildGEP(dataPointer, new [] {indexValue}, "indexptr");
+            }
+            loaded = false;
             return null;
         }
 
