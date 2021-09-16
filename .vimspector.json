@@ -1,6 +1,6 @@
 {
   "configurations": {
-    "launch - Example": {
+    "launch - Compile Example": {
       "adapter": "netcoredbg",
       "configuration": {
         "request": "launch",
@@ -10,7 +10,7 @@
         "cwd": "${workspaceRoot}"
       }
     },
-    "Launch - Debug": {
+    "Launch - Debug Example": {
       "adapter": "vscode-cpptools",
       "configuration": {
         "request": "launch",

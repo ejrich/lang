@@ -132,9 +132,17 @@ namespace Lang.Backend
             {
                 _emitDebug = true;
                 _debugBuilder = _module.CreateDIBuilder();
-                var compileUnitFile = _debugBuilder.CreateFile($"{project.Name}.ll", objectPath);
-                _debugCompilationUnit = _debugBuilder.CreateCompileUnit(LLVMDWARFSourceLanguage.LLVMDWARFSourceLanguageC, compileUnitFile, "ol", 0, string.Empty, 0, string.Empty, LLVMDWARFEmissionKind.LLVMDWARFEmissionNone, 0, 0, 0, string.Empty, string.Empty);
                 _debugFiles = project.SourceFiles.Select(file => _debugBuilder.CreateFile(Path.GetFileName(file), Path.GetDirectoryName(file))).ToList();
+                _debugCompilationUnit = _debugBuilder.CreateCompileUnit(LLVMDWARFSourceLanguage.LLVMDWARFSourceLanguageC, _debugFiles[0], "ol", 0, string.Empty, 0, string.Empty, LLVMDWARFEmissionKind.LLVMDWARFEmissionFull, 0, 0, 0, string.Empty, string.Empty);
+
+                using var dwarfVersionString = new MarshaledString("Dwarf Version");
+                var dwarfVersion = LLVM.ValueAsMetadata(LLVM.ConstInt(LLVM.Int32Type(), 4, 0));
+                LLVM.AddModuleFlag(_module, LLVMModuleFlagBehavior.LLVMModuleFlagBehaviorWarning, dwarfVersionString.Value, (UIntPtr)dwarfVersionString.Length, dwarfVersion);
+
+                using var debugInfoString = new MarshaledString("Debug Info Version");
+                var debugInfo = LLVM.ValueAsMetadata(LLVM.ConstInt(LLVM.Int32Type(), LLVM.DebugMetadataVersion(), 0));
+                LLVM.AddModuleFlag(_module, LLVMModuleFlagBehavior.LLVMModuleFlagBehaviorWarning, debugInfoString.Value, (UIntPtr)debugInfoString.Length, debugInfo);
+
                 _debugTypes = new Dictionary<string, LLVMMetadataRef>();
                 _debugFunctions = new Dictionary<string, LLVMMetadataRef>();
             }
@@ -228,6 +236,17 @@ namespace Lang.Backend
                     {
                         LLVM.SetInitializer(global, GetConstZero(type));
                     }
+
+                    if (_emitDebug)
+                    {
+                        using var name = new MarshaledString(globalVariable.Name);
+
+                        var file = _debugFiles[globalVariable.FileIndex];
+                        var debugType = GetDebugType(globalVariable.Type);
+                        var globalDebug = LLVM.DIBuilderCreateGlobalVariableExpression(_debugBuilder, _debugCompilationUnit, name.Value, (UIntPtr)name.Length, null, (UIntPtr)0, file, globalVariable.Line, debugType, 0, null, null, 0);
+                        // TODO Assign to global
+                    }
+
                     globals.Add(globalVariable.Name, (globalVariable.Type, global));
                 }
             }
@@ -476,9 +495,10 @@ namespace Lang.Backend
 
                     var debugType = GetDebugType(arg.Type);
                     var debugVariable = LLVM.DIBuilderCreateParameterVariable(_debugBuilder, block, argName.Value, (UIntPtr)argName.Length, (uint)i+1, file, arg.Line, debugType, 0, LLVMDIFlags.LLVMDIFlagZero);
+                    var expression = LLVM.DIBuilderCreateExpression(_debugBuilder, null, (UIntPtr)0);
                     var location = LLVM.DIBuilderCreateDebugLocation(_context, arg.Line, arg.Column, block, null);
 
-                    LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, variable, debugVariable, LLVM.DIBuilderCreateExpression(_debugBuilder, null, (UIntPtr)0), location, entryBlock);
+                    LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, variable, debugVariable, expression, location, entryBlock);
                 }
             }
             else
@@ -1126,6 +1146,12 @@ namespace Lang.Backend
         private bool WriteEach(EachAst each, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function, LLVMMetadataRef block)
         {
             var eachVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>(localVariables);
+            if (_emitDebug)
+            {
+                var file = _debugFiles[each.FileIndex];
+                block = LLVM.DIBuilderCreateLexicalBlock(_debugBuilder, block, file, each.Line, each.Column);
+                LLVM.SetCurrentDebugLocation2(_builder, LLVM.DIBuilderCreateDebugLocation(_context, each.Line, each.Column, block, null));
+            }
 
             // 1. Initialize each values
             var indexVariable = _allocationQueue.Dequeue();
@@ -1157,7 +1183,7 @@ namespace Lang.Backend
             // 2. Initialize the first variable in the loop and the compare target
             if (each.Iteration != null)
             {
-                LLVM.BuildStore(_builder, GetConstZero(LLVM.Int32Type()), indexVariable);
+                LLVM.BuildStore(_builder, _zeroInt, indexVariable);
 
                 switch (iterationType!.Name)
                 {
@@ -1184,6 +1210,18 @@ namespace Lang.Backend
             {
                 // Begin the loop at the beginning of the range
                 var (type, value) = WriteExpression(each.RangeBegin, localVariables);
+                if (_emitDebug)
+                {
+                    using var name = new MarshaledString(each.IterationVariable);
+
+                    var file = _debugFiles[each.FileIndex];
+                    var debugVariable = LLVM.DIBuilderCreateAutoVariable(_debugBuilder, block, name.Value, (UIntPtr)name.Length, file, each.Line, GetDebugType(type), 0, LLVMDIFlags.LLVMDIFlagZero, 0);
+                    var expression = LLVM.DIBuilderCreateExpression(_debugBuilder, null, (UIntPtr)0);
+                    var location = LLVM.GetCurrentDebugLocation2(_builder);
+
+                    LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, indexVariable, debugVariable, expression, location, _builder.InsertBlock);
+                }
+
                 LLVM.BuildStore(_builder, value, indexVariable);
                 eachVariables.Add(each.IterationVariable, (type, indexVariable));
 
@@ -1208,6 +1246,18 @@ namespace Lang.Backend
                         var pointerIndices = iterationType.CArray ? new []{_zeroInt, indexValue} : new []{indexValue};
                         var iterationVariable = _builder.BuildGEP(listData, pointerIndices, each.IterationVariable);
                         eachVariables.TryAdd(each.IterationVariable, (each.IteratorType, iterationVariable));
+
+                        if (_emitDebug)
+                        {
+                            using var name = new MarshaledString(each.IterationVariable);
+
+                            var file = _debugFiles[each.FileIndex];
+                            var debugVariable = LLVM.DIBuilderCreateAutoVariable(_debugBuilder, block, name.Value, (UIntPtr)name.Length, file, each.Line, GetDebugType(each.IteratorType), 0, LLVMDIFlags.LLVMDIFlagZero, 0);
+                            var expression = LLVM.DIBuilderCreateExpression(_debugBuilder, null, (UIntPtr)0);
+                            var location = LLVM.GetCurrentDebugLocation2(_builder);
+
+                            LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, iterationVariable, debugVariable, expression, location, _builder.InsertBlock);
+                        }
                         break;
                 }
             }
@@ -1218,11 +1268,6 @@ namespace Lang.Backend
 
             // 5. Write out each loop body
             LLVM.PositionBuilderAtEnd(_builder, eachBody);
-            if (_emitDebug)
-            {
-                var file = _debugFiles[each.FileIndex];
-                block = LLVM.DIBuilderCreateLexicalBlock(_debugBuilder, block, file, each.Line, each.Column);
-            }
             foreach (var ast in each.Children)
             {
                 if (WriteFunctionLine(ast, eachVariables, function, block))
