@@ -66,6 +66,7 @@ namespace Lang
         public bool Extern { get; set; }
         public string ExternLib { get; set; }
         public bool Compiler { get; set; }
+        public bool PrintIR { get; set; }
         public bool Varargs { get; set; }
         public bool Params { get; set; }
         public IType ParamsElementType { get; set; }

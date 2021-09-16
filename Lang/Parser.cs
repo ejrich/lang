@@ -475,6 +475,9 @@ namespace Lang
                     case "compiler":
                         function.Compiler = true;
                         return function;
+                    case "print_ir":
+                        function.PrintIR = true;
+                        break;
                     case null:
                         errors.Add(new ParseError
                         {
