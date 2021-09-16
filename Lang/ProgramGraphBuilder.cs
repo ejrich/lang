@@ -2141,6 +2141,7 @@ namespace Lang
                         int.TryParse(constant.Value, out count);
                     }
                     VerifyType(constant.TypeDefinition);
+                    constant.Type = TypeTable.GetType(constant.TypeDefinition);
                     return constant.TypeDefinition;
                 case NullAst:
                     isConstant = true;
@@ -2196,6 +2197,7 @@ namespace Lang
             {
                 case ConstantAst constant:
                     VerifyType(constant.TypeDefinition);
+                    constant.Type = TypeTable.GetType(constant.TypeDefinition);
                     return constant.TypeDefinition;
                 case NullAst:
                     return null;
@@ -2384,6 +2386,7 @@ namespace Lang
         {
             constant.TypeDefinition.Name = typeDef.Name;
             constant.TypeDefinition.PrimitiveType = typeDef.PrimitiveType;
+            constant.Type = TypeTable.GetType(typeDef);
 
             var type = constant.TypeDefinition;
             switch (type.PrimitiveType)

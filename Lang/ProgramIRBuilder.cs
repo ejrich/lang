@@ -725,7 +725,7 @@ namespace Lang
         private InstructionValue GetConstant(ConstantAst constant, bool useRawString = false)
         {
             var value = new InstructionValue {ValueType = InstructionValueType.Constant, Type = constant.Type};
-            switch (constant.TypeDefinition.TypeKind)
+            switch (constant.Type.TypeKind)
             {
                 case TypeKind.Boolean:
                     value.ConstantValue = new Constant {Boolean = constant.Value == "true"};
@@ -921,11 +921,10 @@ namespace Lang
                 for (; i < argumentCount; i++)
                 {
                     var argument = EmitIR(function, call.Arguments[i], scope, block, true);
-                    // TODO Make this work
-                    // if (argument.Type.TypeKind == TypeKind.Float && argument.Type.Size == 4)
-                    // {
-                    //     argument = EmitCastValue(block, argument, _float64Type);
-                    // }
+                    if (argument.Type?.TypeKind == TypeKind.Float && argument.Type.Size == 4)
+                    {
+                        argument = EmitCastValue(block, argument, _float64Type);
+                    }
                     arguments[i] = argument;
                 }
             }
