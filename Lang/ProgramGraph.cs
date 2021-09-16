@@ -13,6 +13,6 @@ namespace Lang
     public class Data
     {
         public List<DeclarationAst> Variables { get; } = new();
-        public List<StructAst> Structs { get; init; }
+        public List<StructAst> Structs { get; set; }
     }
 }

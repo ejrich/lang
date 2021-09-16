@@ -481,28 +481,39 @@ namespace Lang.Parsing
             }
 
             // 5. Mark field types as generic if necessary
-            foreach (var generic in structAst.Generics)
+            for (var i = 0; i < structAst.Generics.Count; i++)
             {
+                var generic = structAst.Generics[i];
                 foreach (var field in structAst.Fields)
                 {
-                    SearchForGeneric(generic, field.Type);
+                    if (SearchForGeneric(generic, i, field.Type))
+                    {
+                        field.HasGeneric = true;
+                    }
                 }
             }
 
             return structAst;
         }
 
-        private static void SearchForGeneric(string generic, TypeDefinition type)
+        private static bool SearchForGeneric(string generic, int index, TypeDefinition type)
         {
             if (type.Name == generic)
             {
                 type.IsGeneric = true;
+                type.GenericIndex = index;
+                return true;
             }
 
+            var hasGeneric = false;
             foreach (var typeGeneric in type.Generics)
             {
-                SearchForGeneric(generic, typeGeneric);
+                if (SearchForGeneric(generic, index, typeGeneric))
+                {
+                    hasGeneric = true;
+                }
             }
+            return hasGeneric;
         }
 
         private static IAst ParseLine(TokenEnumerator enumerator, List<ParseError> errors)
@@ -1459,11 +1470,35 @@ namespace Lang.Parsing
             return index;
         }
 
+        private static readonly HashSet<string> IntegerTypes = new()
+        {
+            "int", "u64", "s64", "u32", "s32", "u16", "s16", "u8", "s8"
+        };
+
+        public static readonly HashSet<string> FloatTypes = new() {"float", "float64"};
 
         private static TypeDefinition ParseType(TokenEnumerator enumerator, List<ParseError> errors, bool argument = false)
         {
             var typeDefinition = CreateAst<TypeDefinition>(enumerator.Current);
             typeDefinition.Name = enumerator.Current.Value;
+
+            // Set the primitive type if necessary
+            if (IntegerTypes.Contains(typeDefinition.Name))
+            {
+                if (typeDefinition.Name == "int")
+                {
+                    typeDefinition.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
+                }
+                else
+                {
+                    var bytes = ushort.Parse(typeDefinition.Name[1..]) / 8;
+                    typeDefinition.PrimitiveType = new IntegerType {Bytes = (ushort) bytes, Signed = typeDefinition.Name[0] == 's'};
+                }
+            }
+            else if (FloatTypes.Contains(typeDefinition.Name))
+            {
+                typeDefinition.PrimitiveType = new FloatType {Bytes = typeDefinition.Name == "float" ? 4 : 8};
+            }
 
             if (enumerator.Current.Type == TokenType.VarArgs)
             {

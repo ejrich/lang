@@ -48,6 +48,7 @@ namespace Lang.Parsing
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
+        public bool HasGeneric { get; set; }
         public TypeDefinition Type { get; set; }
         public string Name { get; set; }
         public ConstantAst DefaultValue { get; set; }
@@ -217,6 +218,7 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public string Name { get; set; }
         public bool IsGeneric { get; set; }
+        public int GenericIndex { get; set; }
         public IPrimitive PrimitiveType { get; set; }
         public List<TypeDefinition> Generics { get; } = new();
         public IAst Count { get; set; }
