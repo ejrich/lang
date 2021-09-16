@@ -657,14 +657,15 @@ namespace Lang.Backend.LLVM
 
             // 2. Check condition of while loop and break if condition is not met
             LLVMApi.PositionBuilderAtEnd(_builder, whileCondition);
-            var (_, conditionExpression) = WriteExpression(whileAst.Condition, localVariables);
-            var condition = conditionExpression.TypeOf().TypeKind switch
+            var (type, conditionExpression) = WriteExpression(whileAst.Condition, localVariables);
+            var condition = type.PrimitiveType switch
             {
-                LLVMTypeKind.LLVMIntegerTypeKind => LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntEQ,
+                IntegerType => LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntEQ,
                     conditionExpression, LLVMApi.ConstInt(conditionExpression.TypeOf(), 1, false), "whilecond"),
-                LLVMTypeKind.LLVMFloatTypeKind => LLVMApi.BuildFCmp(_builder, LLVMRealPredicate.LLVMRealOEQ,
+                FloatType => LLVMApi.BuildFCmp(_builder, LLVMRealPredicate.LLVMRealOEQ,
                     conditionExpression, LLVMApi.ConstReal(conditionExpression.TypeOf(), 1), "whilecond"),
-                _ => new LLVMValueRef()
+                _ when type.Name == "*" => LLVMApi.BuildIsNotNull(_builder, conditionExpression, "whilecond"),
+                _ => conditionExpression
             };
             var whileBody = LLVMApi.AppendBasicBlock(function, "whilebody");
             var afterWhile = LLVMApi.AppendBasicBlock(function, "afterwhile");
@@ -1037,6 +1038,10 @@ namespace Lang.Backend.LLVM
 
         private (TypeDefinition type, LLVMValueRef value) BuildStructField(StructFieldRefAst structField, LLVMValueRef variable)
         {
+            if (structField.IsPointer)
+            {
+                variable = LLVMApi.BuildLoad(_builder, variable, "pointerval");
+            }
             var value = structField.Value;
             var field = LLVMApi.BuildStructGEP(_builder, variable, (uint)structField.ValueIndex, value.Name);
 
