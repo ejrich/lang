@@ -24,15 +24,15 @@ int __start(int argc, string* argv) {
 
     each i in 1..argc-1 then args[i] = *(argv + i);
 
-    return Main(args);
+    return main(args);
 
     /* @Future Add compile time execution to write the correct return
-    #if function(Main).return == Type.Void {
-        Main(args);
+    #if function(main).return == Type.Void {
+        main(args);
         return 0;
     }
     else {
-        #if function(Main).arguments.length == 0 then return Main();
-        else then return Main(args);
+        #if function(main).arguments.length == 0 then return main();
+        else then return main(args);
     }*/
 }
