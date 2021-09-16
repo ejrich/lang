@@ -34,8 +34,6 @@ int Main(List<string> args) {
     state := current_state(7);
     printf("Current state - %d\n", state);
 
-    //print("Hello World\n", true, 1, 3.14);
-
     return 0;
 }
 
@@ -221,8 +219,4 @@ State current_state(int a) {
     if a > 5 then return State.Running;
     else if a == 5 then return State.Starting;
     return State.Stopped;
-}
-
-void print(string format, Params args) {
-    printf(format);
 }

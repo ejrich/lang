@@ -1316,24 +1316,13 @@ namespace Lang.Translation
                     return Type.VarArgs;
                 case "Params":
                 {
-                    if (typeDef.Generics.Count == 1)
+                    if (typeDef.Generics.Count != 1)
                     {
-                        typeDef.Name = "List";
-                        return VerifyList(typeDef, errors) ? Type.Params : Type.Error; 
-                    }
-                    if (typeDef.Generics.Count > 1)
-                    {
-                        errors.Add(CreateError($"Params type should have 0 or 1 generic type, but got {typeDef.Generics.Count}", typeDef));
+                        errors.Add(CreateError($"Params type should have 1 generic type, but got {typeDef.Generics.Count}", typeDef));
                         return Type.Error;
                     }
-
-                    // Create List.Any type if necessary
-                    if (!_types.ContainsKey("List.Any"))
-                    {
-                        var structDef = _polymorphicStructs["List"];
-                        CreatePolymorphedStruct(structDef, "List.Any", new TypeDefinition {Name = "Any"});
-                    }
-                    return Type.Params;
+                    typeDef.Name = "List";
+                    return VerifyList(typeDef, errors) ? Type.Params : Type.Error; 
                 }
                 default:
                     if (typeDef.Generics.Any())
