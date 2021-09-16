@@ -126,7 +126,8 @@ bool run_test(string test_dir) {
 command_buffer: void*;
 
 int run_command(string command) {
-    handle := popen(command, "r"); if handle == null {
+    handle := popen(command, "r");
+    if handle == null {
         printf(" -- Test Failed: Unable to run '%s'\n", command);
         return -1;
     }

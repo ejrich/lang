@@ -66,7 +66,16 @@ namespace Lang
                     entryBlock.Instructions.Add(storeInstruction);
                 }
 
-                EmitScope(functionIR, entryBlock, function.Body, function.ReturnType);
+                var finalBlock = EmitScope(functionIR, entryBlock, function.Body, function.ReturnType);
+
+                if (function.ReturnVoidAtEnd)
+                {
+                    finalBlock.Instructions.Add(new Instruction {Type = InstructionType.Return});
+                }
+
+                #if DEBUG
+                PrintFunction(function.Name, functionIR);
+                #endif
             }
         }
 
@@ -88,6 +97,19 @@ namespace Lang
             Program.Functions[functionName] = functionIR;
 
             EmitScope(functionIR, entryBlock, overload.Body, overload.ReturnType);
+        }
+
+        private void PrintFunction(string name, FunctionIR function)
+        {
+            Console.WriteLine($"\nIR for function '{name}'");
+            foreach (var block in function.BasicBlocks)
+            {
+                Console.WriteLine($"\n--------------- Basic Block {block.Index + 1} ---------------\n");
+                foreach (var instruction in block.Instructions)
+                {
+                    Console.WriteLine($"\t{instruction.Type}");
+                }
+            }
         }
 
         public void EmitGlobalVariable(DeclarationAst declaration, ScopeAst scope)
@@ -282,7 +304,7 @@ namespace Lang
                         block = EmitConditional(function, block, conditional, scope, returnType);
                         break;
                     case WhileAst whileAst:
-                        block = EmitWhile(function, whileAst, scope, returnType);
+                        block = EmitWhile(function, block, whileAst, scope, returnType);
                         break;
                     case EachAst each:
                         block = EmitEach(function, block, each, scope, returnType);
@@ -588,7 +610,7 @@ namespace Lang
                 return elseBlock;
             }
 
-            var afterBlock = AddBasicBlock(function);
+            var afterBlock = elseBlock.Instructions.Any() ? AddBasicBlock(function) : elseBlock;
 
             // For when the the if block does not return, a jump to the after block is required
             if (!conditional.IfReturns)
@@ -599,10 +621,10 @@ namespace Lang
             return afterBlock;
         }
 
-        private BasicBlock EmitWhile(FunctionIR function, WhileAst whileAst, ScopeAst scope, IType returnType)
+        private BasicBlock EmitWhile(FunctionIR function, BasicBlock block, WhileAst whileAst, ScopeAst scope, IType returnType)
         {
             // Create a block for the condition expression and then jump to the following
-            var conditionBlock = AddBasicBlock(function);
+            var conditionBlock = block.Instructions.Any() ? AddBasicBlock(function) : block;
             var condition = EmitConditionExpression(function, whileAst.Condition, scope, conditionBlock);
 
             var whileBodyBlock = AddBasicBlock(function);
@@ -694,9 +716,9 @@ namespace Lang
             }
 
             var eachBodyBlock = AddBasicBlock(function);
-            EmitScope(function, eachBodyBlock, each.Body, returnType);
+            eachBodyBlock = EmitScope(function, eachBodyBlock, each.Body, returnType);
 
-            var eachIncrementBlock = AddBasicBlock(function);
+            var eachIncrementBlock = eachBodyBlock.Instructions.Any() ? AddBasicBlock(function) : eachBodyBlock;
             var nextValue = EmitInstruction(InstructionType.IntegerAdd, eachIncrementBlock, _s32Type, indexValue, GetConstantInteger(1));
             EmitStore(eachIncrementBlock, indexVariable, nextValue);
             EmitInstruction(InstructionType.Jump, eachIncrementBlock, null, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = conditionBlock.Index});
