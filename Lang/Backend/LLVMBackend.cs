@@ -877,6 +877,10 @@ namespace Lang.Backend
             {
                 // Initialize arrays
                 case TypeKind.Array:
+                    if (declaration.ArrayValues != null)
+                    {
+                        // TODO Implement me
+                    }
                     if (declaration.Type.CArray) return;
                     var elementType = declaration.Type.Generics[0];
                     if (declaration.Type.ConstCount != null)
