@@ -898,40 +898,35 @@ namespace Lang
                 {
                     AddError("Extern function cannot have a body", function);
                 }
-                function.Verified = true;
-                return;
             }
-            else if (function.Compiler)
+            else if (!function.Compiler)
             {
-                function.Verified = true;
-                return;
-            }
-
-            // 3. Resolve the compiler directives in the function
-            if (function.HasDirectives)
-            {
-                ResolveCompilerDirectives(function.Body.Children, function);
-            }
-
-            // 4. Loop through function body and verify all ASTs
-            var returned = VerifyScope(function.Body, function, _globalScope, false);
-
-            // 5. Verify the main function doesn't call the compiler
-            if (function.Name == "main" && function.CallsCompiler)
-            {
-                AddError("The main function cannot call the compiler", function);
-            }
-
-            // 6. Verify the function returns on all paths
-            if (!returned)
-            {
-                if (returnType != TypeKind.Void)
+                // 3. Resolve the compiler directives in the function
+                if (function.HasDirectives)
                 {
-                    AddError($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnTypeDefinition)}' on all paths", function);
+                    ResolveCompilerDirectives(function.Body.Children, function);
                 }
-                else
+
+                // 4. Loop through function body and verify all ASTs
+                var returned = VerifyScope(function.Body, function, _globalScope, false);
+
+                // 5. Verify the main function doesn't call the compiler
+                if (function.Name == "main" && function.CallsCompiler)
                 {
-                    function.ReturnVoidAtEnd = true;
+                    AddError("The main function cannot call the compiler", function);
+                }
+
+                // 6. Verify the function returns on all paths
+                if (!returned)
+                {
+                    if (returnType != TypeKind.Void)
+                    {
+                        AddError($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnTypeDefinition)}' on all paths", function);
+                    }
+                    else
+                    {
+                        function.ReturnVoidAtEnd = true;
+                    }
                 }
             }
             function.Verified = true;

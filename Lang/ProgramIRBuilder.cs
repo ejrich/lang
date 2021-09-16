@@ -34,6 +34,10 @@ namespace Lang
 
             var functionIR = new FunctionIR {Varargs = function.Varargs, Arguments = new IType[function.Varargs ? function.Arguments.Count - 1 : function.Arguments.Count], ReturnType = function.ReturnType};
 
+            #if DEBUG
+            functionIR.Name = functionName;
+            #endif
+
             for (var i = 0; i < functionIR.Arguments.Length; i++)
             {
                 functionIR.Arguments[i] = function.Arguments[i].Type;
@@ -68,7 +72,7 @@ namespace Lang
 
                 if (function.ReturnVoidAtEnd)
                 {
-                    functionIR.Instructions.Add(new Instruction {Type = InstructionType.Return});
+                    functionIR.Instructions.Add(new Instruction {Type = InstructionType.ReturnVoid});
                 }
 
                 if (function.PrintIR)
@@ -123,23 +127,31 @@ namespace Lang
                             text += instruction.Index.Value.ToString();
                             break;
                         case InstructionType.ConditionalJump:
-                        case InstructionType.GetStructPointer:
                             text += $"{instruction.Index.Value} {PrintInstructionValue(instruction.Value1)}";
                             break;
+                        case InstructionType.Return:
+                        case InstructionType.ReturnVoid:
+                            text += $"{PrintInstructionValue(instruction.Value1)}";
+                            break;
+                        case InstructionType.Store:
+                            text += $"{PrintInstructionValue(instruction.Value1)}, {PrintInstructionValue(instruction.Value2)}";
+                            break;
+                        case InstructionType.GetStructPointer:
+                            text += $"{PrintInstructionValue(instruction.Value1)} {instruction.Index.Value} => v{instruction.ValueIndex}";
+                            break;
                         case InstructionType.Call:
-                            text += $"{instruction.CallFunction} {PrintInstructionValue(instruction.Value1)}";
+                            text += $"{instruction.CallFunction} {PrintInstructionValue(instruction.Value1)} => v{instruction.ValueIndex}";
                             break;
                         case InstructionType.Load:
-                        case InstructionType.Return:
                         case InstructionType.IsNull:
                         case InstructionType.IsNotNull:
                         case InstructionType.Not:
                         case InstructionType.IntegerNegate:
                         case InstructionType.FloatNegate:
-                            text += PrintInstructionValue(instruction.Value1);
+                            text += $"{PrintInstructionValue(instruction.Value1)} => v{instruction.ValueIndex}";
                             break;
                         default:
-                            text += $"{PrintInstructionValue(instruction.Value1)}, {PrintInstructionValue(instruction.Value2)}";
+                            text += $"{PrintInstructionValue(instruction.Value1)}, {PrintInstructionValue(instruction.Value2)} => v{instruction.ValueIndex}";
                             break;
                     }
                     Console.WriteLine(text);
@@ -1699,8 +1711,9 @@ namespace Lang
             }
             #endif */
 
-            instruction.ValueIndex = function.ValueCount++;
-            var value = new InstructionValue {ValueIndex = function.Instructions.Count, Type = type};
+            var valueIndex = function.ValueCount++;
+            instruction.ValueIndex = valueIndex;
+            var value = new InstructionValue {ValueIndex = valueIndex, Type = type};
             function.Instructions.Add(instruction);
             return value;
         }

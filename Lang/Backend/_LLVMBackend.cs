@@ -250,10 +250,10 @@ namespace Lang.Backend
                     LLVM.SetInitializer(typeFieldArrayGlobal, typeFieldArray);
 
                     fields = LLVMValueRef.CreateConstNamedStruct(typeFieldArrayType, new LLVMValueRef[]
-                            {
-                            LLVM.ConstInt(LLVM.Int32Type(), (ulong)structAst.Fields.Count, 0),
-                            typeFieldArrayGlobal
-                            });
+                    {
+                        LLVM.ConstInt(LLVM.Int32Type(), (ulong)structAst.Fields.Count, 0),
+                        typeFieldArrayGlobal
+                    });
                 }
                 else
                 {
@@ -281,10 +281,10 @@ namespace Lang.Backend
                     LLVM.SetInitializer(enumValuesArrayGlobal, enumValuesArray);
 
                     enumValues = LLVMValueRef.CreateConstNamedStruct(enumValueArrayType, new LLVMValueRef[]
-                            {
-                            LLVM.ConstInt(LLVM.Int32Type(), (ulong)enumAst.Values.Count, 0),
-                            enumValuesArrayGlobal
-                            });
+                    {
+                        LLVM.ConstInt(LLVM.Int32Type(), (ulong)enumAst.Values.Count, 0),
+                        enumValuesArrayGlobal
+                    });
                 }
                 else
                 {
@@ -307,8 +307,8 @@ namespace Lang.Backend
                         var argumentTypeInfo = argument.TypeDefinition.Name switch
                         {
                             "Type" => typePointers["s32"].typeInfo,
-                                "Params" => typePointers[$"Array.{argument.TypeDefinition.Generics[0].GenericName}"].typeInfo,
-                                _ => typePointers[argument.TypeDefinition.GenericName].typeInfo
+                            "Params" => typePointers[$"Array.{argument.TypeDefinition.Generics[0].GenericName}"].typeInfo,
+                            _ => typePointers[argument.TypeDefinition.GenericName].typeInfo
                         };
 
                         var argumentValue = LLVMValueRef.CreateConstNamedStruct(argumentType, new LLVMValueRef[] {argNameString, argumentTypeInfo});
@@ -322,10 +322,10 @@ namespace Lang.Backend
                     LLVM.SetInitializer(argumentArrayGlobal, argumentArray);
 
                     arguments = LLVMValueRef.CreateConstNamedStruct(argumentArrayType, new LLVMValueRef[]
-                            {
-                            LLVM.ConstInt(LLVM.Int32Type(), (ulong)function.Arguments.Count, 0),
-                            argumentArrayGlobal
-                            });
+                    {
+                        LLVM.ConstInt(LLVM.Int32Type(), (ulong)function.Arguments.Count, 0),
+                        argumentArrayGlobal
+                    });
                 }
                 else
                 {
@@ -529,6 +529,8 @@ namespace Lang.Backend
                         }
                         case InstructionType.ConditionalJump:
                         {
+                            var condition = GetValue(instruction.Value1, values, allocations, functionPointer);
+                            _builder.BuildCondBr(condition, basicBlocks[instruction.Index.Value], basicBlocks[blockIndex + 1]);
                             breakToNextBlock = false;
                             break;
                         }
