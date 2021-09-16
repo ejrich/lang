@@ -34,7 +34,7 @@ namespace Lang
     {
         void Init();
         void InitExternFunction(FunctionAst function);
-        void InitVarargsFunction(FunctionAst function, TypeDefinition[] types);
+        void InitVarargsFunction(FunctionAst function, IType[] types);
         void RunProgram(FunctionIR function, IAst source);
         bool ExecuteCondition(FunctionIR function, IAst source);
     }
@@ -66,13 +66,13 @@ namespace Lang
             for (var i = 0; i < function.Arguments.Count; i++)
             {
                 var argument = function.Arguments[i];
-                functionTypes[i] = GetType(argument.TypeDefinition);
+                functionTypes[i] = GetType(argument.Type);
             }
 
             CreateFunction(function.Name, function.ExternLib, functionTypes);
         }
 
-        public void InitVarargsFunction(FunctionAst function, TypeDefinition[] types)
+        public void InitVarargsFunction(FunctionAst function, IType[] types)
         {
             var functionTypes = new Type[types.Length];
 
@@ -84,16 +84,15 @@ namespace Lang
             CreateFunction(function.Name, function.ExternLib, functionTypes);
         }
 
-        // TODO Update this to use IType
-        private Type GetType(TypeDefinition type)
+        private Type GetType(IType type)
         {
-            switch (type.TypeKind)
+            switch (type?.TypeKind)
             {
                 case TypeKind.Boolean:
                     return typeof(bool);
                 case TypeKind.Integer:
                 case TypeKind.Enum:
-                    switch (type.PrimitiveType.Bytes)
+                    switch (type.Size)
                     {
                         case 1:
                             return typeof(byte);
@@ -105,7 +104,7 @@ namespace Lang
                             return typeof(uint);
                     }
                 case TypeKind.Float:
-                    if (type.PrimitiveType.Bytes == 4)
+                    if (type.Size == 4)
                     {
                         return typeof(float);
                     }
