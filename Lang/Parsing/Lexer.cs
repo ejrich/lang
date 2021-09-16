@@ -22,7 +22,7 @@ namespace Lang.Parsing
             {'n', '\n'},
             {'r', '\r'},
             {'t', '\t'},
-            {'v', '\v'},
+            {'v', '\v'}
         };
 
         private readonly IDictionary<string, TokenType> _reservedTokens = new Dictionary<string, TokenType>
@@ -36,7 +36,7 @@ namespace Lang.Parsing
             {"while", TokenType.While},
             {"each", TokenType.Each},
             {"in", TokenType.In},
-            {"struct", TokenType.Struct},
+            {"struct", TokenType.Struct}
         };
 
         public List<Token> LoadFileTokens(string filePath, int fileIndex, out List<ParseError> errors)
