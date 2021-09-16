@@ -40,6 +40,13 @@ namespace Lang.Parsing
                 return Current != null;
             }
 
+            public bool Move(int steps)
+            {
+                _index += steps;
+                Current = _tokens.Count > _index ? _tokens[_index] : null;
+                return Current != null;
+            }
+
             public Token Peek(int steps = 0)
             {
                 return _tokens.Count > _index + steps ? _tokens[_index + steps] : null;
@@ -1354,12 +1361,15 @@ namespace Lang.Parsing
                             });
                             return null;
                         case TokenType.LessThan:
-                            // TODO Try to parse types
-                        default:
-                            var identifier = CreateAst<IdentifierAst>(token);
-                            identifier.Name = token.Value;
-                            return identifier;
+                            if (TryParseType(enumerator, errors))
+                            {
+                                return ParseType(enumerator, errors);
+                            }
+                            break;
                     }
+                    var identifier = CreateAst<IdentifierAst>(token);
+                    identifier.Name = token.Value;
+                    return identifier;
                 case TokenType.Increment:
                 case TokenType.Decrement:
                     var positive = token.Type == TokenType.Increment;
@@ -1878,6 +1888,71 @@ namespace Lang.Parsing
             }
 
             return typeDefinition;
+        }
+
+        private static bool TryParseType(TokenEnumerator enumerator, List<ParseError> errors, int peekCount = 0)
+        {
+            // Determine whether to parse a generic type, otherwise return
+            if (enumerator.Peek(peekCount)?.Type == TokenType.LessThan)
+            {
+                // Clear the '<' before entering loop
+                peekCount++;
+                var hasGenerics = false;
+                var commaRequiredBeforeNextType = false;
+                while (enumerator.Peek(peekCount) != null)
+                {
+                    var token = enumerator.Peek(peekCount++);
+
+                    if (token.Type == TokenType.GreaterThan)
+                    {
+                        if (!commaRequiredBeforeNextType && hasGenerics)
+                        {
+                            return false;
+                        }
+                        break;
+                    }
+
+                    if (!commaRequiredBeforeNextType)
+                    {
+                        switch (token.Type)
+                        {
+                            case TokenType.Token:
+                                if (!TryParseType(enumerator, errors, peekCount))
+                                {
+                                    return false;
+                                }
+                                hasGenerics = true;
+                                commaRequiredBeforeNextType = true;
+                                break;
+                            default:
+                                return false;
+                        }
+                    }
+                    else
+                    {
+                        switch (token.Type)
+                        {
+                            case TokenType.Comma:
+                                commaRequiredBeforeNextType = false;
+                                break;
+                            default:
+                                return false;
+                        }
+                    }
+                }
+
+                if (!hasGenerics)
+                {
+                    return false;
+                }
+            }
+
+            while (enumerator.Peek()?.Type == TokenType.Asterisk)
+            {
+                peekCount++;
+            }
+
+            return true;
         }
 
         private static TypeDefinition InferType(Token token, List<ParseError> errors)

@@ -177,7 +177,6 @@ namespace Lang.Backend.LLVM
                 LLVMValueRef fields;
                 if (type is StructAst structAst)
                 {
-                    // TODO Set this
                     var typeFields = new LLVMValueRef[structAst.Fields.Count];
 
                     for (var i = 0; i < structAst.Fields.Count; i++)
