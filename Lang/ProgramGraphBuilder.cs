@@ -1308,10 +1308,17 @@ namespace Lang
                 }
             }
 
-            if (functionIR != null && !_programGraph.Errors.Any())
+            if (!_programGraph.Errors.Any())
             {
                 var type = _programGraph.Types[declaration.Type.GenericName];
-                _irBuilder.EmitDeclaration(functionIR, declaration, type, scope);
+                if (functionIR != null)
+                {
+                    _irBuilder.EmitDeclaration(functionIR, declaration, type, scope);
+                }
+                else
+                {
+                    _irBuilder.EmitGlobalVariable(declaration, type, scope);
+                }
             }
 
             scope.Identifiers.TryAdd(declaration.Name, declaration);
