@@ -513,7 +513,7 @@ namespace Lang.Backend.LLVM
             }
         }
 
-        private void InitializeConstList(LLVMValueRef list, int length, TypeDefinition listType = null)
+        private void InitializeConstList(LLVMValueRef list, int length, TypeDefinition listType)
         {
             // 1. Set the count field
             var countValue = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (ulong)length, false);
@@ -821,8 +821,9 @@ namespace Lang.Backend.LLVM
                         }
 
                         // Rollup the rest of the arguments into a list
+                        var paramsType = functionDef.Arguments[^1].Type;
                         var paramsPointer = _allocationQueue.Dequeue();
-                        InitializeConstList(paramsPointer, call.Arguments.Count - functionDef.Arguments.Count + 1);
+                        InitializeConstList(paramsPointer, call.Arguments.Count - functionDef.Arguments.Count + 1, paramsType.Generics.FirstOrDefault());
 
                         var listData = LLVMApi.BuildStructGEP(_builder, paramsPointer, 1, "listdata");
                         var dataPointer = LLVMApi.BuildLoad(_builder, listData, "dataptr");
