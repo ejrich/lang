@@ -91,15 +91,16 @@ namespace Lang
                     }
                     case InstructionType.ConditionalJump:
                     {
-                        // var condition = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // instructionPointer = instruction.Value2.JumpBlock.Location;
+                        var condition = GetValue(instruction.Value1, registers, stackPointer);
+                        if (condition.Bool)
+                        {
+                            instructionPointer = instruction.Value2.JumpBlock.Location;
+                        }
                         break;
                     }
                     case InstructionType.Return:
                     {
-                        // var value = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // _builder.BuildRet(value);
-                        return new Register();
+                        return GetValue(instruction.Value1, registers, stackPointer);
                     }
                     case InstructionType.ReturnVoid:
                     {
@@ -207,9 +208,9 @@ namespace Lang
                     }
                     case InstructionType.AllocateArray:
                     {
-                        // var length = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var elementType = _types[instruction.Value2.Type.TypeIndex];
-                        // values[instruction.ValueIndex] = _builder.BuildArrayAlloca(elementType, length);
+                        var length = GetValue(instruction.Value1, registers, stackPointer);
+                        var arrayPointer = Marshal.AllocHGlobal((int)instruction.Value2.Type.Size * length.Integer);
+                        registers[instruction.ValueIndex] = new Register {Pointer = arrayPointer};
                         break;
                     }
                     case InstructionType.IsNull:
@@ -235,14 +236,24 @@ namespace Lang
                     }
                     case InstructionType.IntegerNegate:
                     {
+                        // TODO Implement me
                         // var value = GetValue(instruction.Value1, values, allocations, functionPointer);
                         // values[instruction.ValueIndex] = _builder.BuildNeg(value);
                         break;
                     }
                     case InstructionType.FloatNegate:
                     {
-                        // var value = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildFNeg(value);
+                        var value = GetValue(instruction.Value1, registers, stackPointer);
+                        var register = new Register();
+                        if (instruction.Value1.Type.Size == 4)
+                        {
+                            register.Float = -value.Float;
+                        }
+                        else
+                        {
+                            register.Double = -value.Double;
+                        }
+                        registers[instruction.ValueIndex] = register;
                         break;
                     }
                     case InstructionType.And:
@@ -263,155 +274,175 @@ namespace Lang
                     }
                     case InstructionType.BitwiseAnd:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildAnd(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var bitwiseAnd = lhs.ULong & rhs.ULong;
+                        registers[instruction.ValueIndex] = new Register {ULong = bitwiseAnd};
                         break;
                     }
                     case InstructionType.BitwiseOr:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildOr(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var bitwiseOr = lhs.ULong | rhs.ULong;
+                        registers[instruction.ValueIndex] = new Register {ULong = bitwiseOr};
                         break;
                     }
                     case InstructionType.Xor:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildXor(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var xor = lhs.ULong ^ rhs.ULong;
+                        registers[instruction.ValueIndex] = new Register {ULong = xor};
                         break;
                     }
                     case InstructionType.PointerEquals:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // var diff = _builder.BuildPtrDiff(lhs, rhs);
-                        // values[instruction.ValueIndex] = _builder.BuildICmp(LLVMIntPredicate.LLVMIntEQ, diff, LLVMValueRef.CreateConstInt(LLVM.TypeOf(diff), 0, false));
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var equals = lhs.Pointer == rhs.Pointer;
+                        registers[instruction.ValueIndex] = new Register {Bool = equals};
                         break;
                     }
                     case InstructionType.IntegerEquals:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildICmp(LLVMIntPredicate.LLVMIntEQ, lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var equals = lhs.Long == rhs.Long;
+                        registers[instruction.ValueIndex] = new Register {Bool = equals};
                         break;
                     }
                     case InstructionType.FloatEquals:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildFCmp(LLVMRealPredicate.LLVMRealOEQ, lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var equals = instruction.Value1.Type.Size == 4 ? lhs.Float == rhs.Float : lhs.Double == rhs.Double;
+                        registers[instruction.ValueIndex] = new Register {Bool = equals};
                         break;
                     }
                     case InstructionType.PointerNotEquals:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // var diff = _builder.BuildPtrDiff(lhs, rhs);
-                        // values[instruction.ValueIndex] = _builder.BuildICmp(LLVMIntPredicate.LLVMIntNE, diff, LLVMValueRef.CreateConstInt(LLVM.TypeOf(diff), 0, false));
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var notEquals = lhs.Pointer != rhs.Pointer;
+                        registers[instruction.ValueIndex] = new Register {Bool = notEquals};
                         break;
                     }
                     case InstructionType.IntegerNotEquals:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildICmp(LLVMIntPredicate.LLVMIntNE, lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var notEquals = lhs.Long != rhs.Long;
+                        registers[instruction.ValueIndex] = new Register {Bool = notEquals};
                         break;
                     }
                     case InstructionType.FloatNotEquals:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildFCmp(LLVMRealPredicate.LLVMRealONE, lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var equals = instruction.Value1.Type.Size == 4 ? lhs.Float != rhs.Float : lhs.Double != rhs.Double;
+                        registers[instruction.ValueIndex] = new Register {Bool = equals};
                         break;
                     }
                     case InstructionType.IntegerGreaterThan:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildICmp(LLVMIntPredicate.LLVMIntSGT, lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var greaterThan = lhs.Long > rhs.Long;
+                        registers[instruction.ValueIndex] = new Register {Bool = greaterThan};
                         break;
                     }
                     case InstructionType.UnsignedIntegerGreaterThan:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildICmp(LLVMIntPredicate.LLVMIntUGT, lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var greaterThan = lhs.ULong > rhs.ULong;
+                        registers[instruction.ValueIndex] = new Register {Bool = greaterThan};
                         break;
                     }
                     case InstructionType.FloatGreaterThan:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildFCmp(LLVMRealPredicate.LLVMRealOGT, lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var greaterThan = instruction.Value1.Type.Size == 4 ? lhs.Float > rhs.Float : lhs.Double > rhs.Double;
+                        registers[instruction.ValueIndex] = new Register {Bool = greaterThan};
                         break;
                     }
                     case InstructionType.IntegerGreaterThanOrEqual:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildICmp(LLVMIntPredicate.LLVMIntSGE, lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var greaterThanOrEqual = lhs.Long >= rhs.Long;
+                        registers[instruction.ValueIndex] = new Register {Bool = greaterThanOrEqual};
                         break;
                     }
                     case InstructionType.UnsignedIntegerGreaterThanOrEqual:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildICmp(LLVMIntPredicate.LLVMIntUGE, lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var greaterThanOrEqual = lhs.ULong >= rhs.ULong;
+                        registers[instruction.ValueIndex] = new Register {Bool = greaterThanOrEqual};
                         break;
                     }
                     case InstructionType.FloatGreaterThanOrEqual:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildFCmp(LLVMRealPredicate.LLVMRealOGE, lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var greaterThanOrEqual = instruction.Value1.Type.Size == 4 ? lhs.Float >= rhs.Float : lhs.Double >= rhs.Double;
+                        registers[instruction.ValueIndex] = new Register {Bool = greaterThanOrEqual};
                         break;
                     }
                     case InstructionType.IntegerLessThan:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildICmp(LLVMIntPredicate.LLVMIntSLT, lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var lessThan = lhs.Long < rhs.Long;
+                        registers[instruction.ValueIndex] = new Register {Bool = lessThan};
                         break;
                     }
                     case InstructionType.UnsignedIntegerLessThan:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildICmp(LLVMIntPredicate.LLVMIntULT, lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var lessThan = lhs.ULong < rhs.ULong;
+                        registers[instruction.ValueIndex] = new Register {Bool = lessThan};
                         break;
                     }
                     case InstructionType.FloatLessThan:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildFCmp(LLVMRealPredicate.LLVMRealOLT, lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var lessThan = instruction.Value1.Type.Size == 4 ? lhs.Float < rhs.Float : lhs.Double < rhs.Double;
+                        registers[instruction.ValueIndex] = new Register {Bool = lessThan};
                         break;
                     }
                     case InstructionType.IntegerLessThanOrEqual:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildICmp(LLVMIntPredicate.LLVMIntSLE, lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var lessThanOrEqual = lhs.Long <= rhs.Long;
+                        registers[instruction.ValueIndex] = new Register {Bool = lessThanOrEqual};
                         break;
                     }
                     case InstructionType.UnsignedIntegerLessThanOrEqual:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildICmp(LLVMIntPredicate.LLVMIntULE, lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var lessThanOrEqual = lhs.ULong <= rhs.ULong;
+                        registers[instruction.ValueIndex] = new Register {Bool = lessThanOrEqual};
                         break;
                     }
                     case InstructionType.FloatLessThanOrEqual:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildFCmp(LLVMRealPredicate.LLVMRealOLE, lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var lessThanOrEqual = instruction.Value1.Type.Size == 4 ? lhs.Float <= rhs.Float : lhs.Double <= rhs.Double;
+                        registers[instruction.ValueIndex] = new Register {Bool = lessThanOrEqual};
                         break;
                     }
                     case InstructionType.PointerAdd:
                     {
+                        // TODO Implement me
                         // var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
                         // var index = GetValue(instruction.Value2, values, allocations, functionPointer);
                         // values[instruction.ValueIndex] = _builder.BuildGEP(pointer, new []{index});
@@ -419,138 +450,188 @@ namespace Lang
                     }
                     case InstructionType.IntegerAdd:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildAdd(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var add = lhs.Long + rhs.Long;
+                        registers[instruction.ValueIndex] = new Register {Long = add};
                         break;
                     }
                     case InstructionType.FloatAdd:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildFAdd(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var register = new Register();
+                        if (instruction.Value1.Type.Size == 4)
+                        {
+                            register.Float = lhs.Float + rhs.Float;
+                        }
+                        else
+                        {
+                            register.Double = lhs.Double + rhs.Double;
+                        }
+                        registers[instruction.ValueIndex] = register;
                         break;
                     }
                     case InstructionType.PointerSubtract:
                     {
-                        // var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var index = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // index = _builder.BuildNeg(index);
-                        // values[instruction.ValueIndex] = _builder.BuildGEP(pointer, new []{index});
                         break;
                     }
                     case InstructionType.IntegerSubtract:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildSub(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var subtract = lhs.Long - rhs.Long;
+                        registers[instruction.ValueIndex] = new Register {Long = subtract};
                         break;
                     }
                     case InstructionType.FloatSubtract:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildFSub(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var register = new Register();
+                        if (instruction.Value1.Type.Size == 4)
+                        {
+                            register.Float = lhs.Float + rhs.Float;
+                        }
+                        else
+                        {
+                            register.Double = lhs.Double + rhs.Double;
+                        }
+                        registers[instruction.ValueIndex] = register;
                         break;
                     }
                     case InstructionType.IntegerMultiply:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildMul(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var multiply = lhs.Long * rhs.Long;
+                        registers[instruction.ValueIndex] = new Register {Long = multiply};
                         break;
                     }
                     case InstructionType.FloatMultiply:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildFMul(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var register = new Register();
+                        if (instruction.Value1.Type.Size == 4)
+                        {
+                            register.Float = lhs.Float * rhs.Float;
+                        }
+                        else
+                        {
+                            register.Double = lhs.Double * rhs.Double;
+                        }
+                        registers[instruction.ValueIndex] = register;
                         break;
                     }
                     case InstructionType.IntegerDivide:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildSDiv(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var divide = lhs.Long / rhs.Long;
+                        registers[instruction.ValueIndex] = new Register {Long = divide};
                         break;
                     }
                     case InstructionType.UnsignedIntegerDivide:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildUDiv(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var divide = lhs.ULong / rhs.ULong;
+                        registers[instruction.ValueIndex] = new Register {ULong = divide};
                         break;
                     }
                     case InstructionType.FloatDivide:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildFDiv(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var register = new Register();
+                        if (instruction.Value1.Type.Size == 4)
+                        {
+                            register.Float = lhs.Float / rhs.Float;
+                        }
+                        else
+                        {
+                            register.Double = lhs.Double / rhs.Double;
+                        }
+                        registers[instruction.ValueIndex] = register;
                         break;
                     }
                     case InstructionType.IntegerModulus:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildSRem(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var modulus = lhs.Long % rhs.Long;
+                        registers[instruction.ValueIndex] = new Register {Long = modulus};
                         break;
                     }
                     case InstructionType.UnsignedIntegerModulus:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildURem(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var modulus = lhs.ULong % rhs.ULong;
+                        registers[instruction.ValueIndex] = new Register {ULong = modulus};
                         break;
                     }
                     case InstructionType.FloatModulus:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildFRem(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var register = new Register();
+                        if (instruction.Value1.Type.Size == 4)
+                        {
+                            register.Float = lhs.Float % rhs.Float;
+                        }
+                        else
+                        {
+                            register.Double = lhs.Double % rhs.Double;
+                        }
+                        registers[instruction.ValueIndex] = register;
                         break;
                     }
                     case InstructionType.ShiftRight:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildAShr(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var shift = lhs.ULong >> rhs.Integer;
+                        registers[instruction.ValueIndex] = new Register {ULong = shift};
                         break;
                     }
                     case InstructionType.ShiftLeft:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildShl(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var shift = lhs.ULong << rhs.Integer;
+                        registers[instruction.ValueIndex] = new Register {ULong = shift};
                         break;
                     }
                     case InstructionType.RotateRight:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // var result = _builder.BuildAShr(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var shift = lhs.ULong >> rhs.Integer;
+                        registers[instruction.ValueIndex] = new Register {ULong = shift};
 
-                        // var type = instruction.Value1.Type;
-                        // var maskSize = LLVMValueRef.CreateConstInt(_types[type.TypeIndex], type.Size * 8, false);
-                        // var maskShift = _builder.BuildSub(maskSize, rhs);
+                        var maskSize = (int)instruction.Value1.Type.Size * 8;
+                        var maskShift = maskSize - rhs.Integer;
+                        var mask = lhs.ULong << maskShift;
 
-                        // var mask = _builder.BuildShl(lhs, maskShift);
-
-                        // values[instruction.ValueIndex] = result.IsUndef ? mask : _builder.BuildOr(result, mask);
+                        var result = shift | mask;
+                        registers[instruction.ValueIndex] = new Register {ULong = result};
                         break;
                     }
                     case InstructionType.RotateLeft:
                     {
-                        // var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // var result = _builder.BuildShl(lhs, rhs);
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var shift = lhs.ULong << rhs.Integer;
+                        registers[instruction.ValueIndex] = new Register {ULong = shift};
 
-                        // var type = instruction.Value1.Type;
-                        // var maskSize = LLVMValueRef.CreateConstInt(_types[type.TypeIndex], type.Size * 8, false);
-                        // var maskShift = _builder.BuildSub(maskSize, rhs);
+                        var maskSize = (int)instruction.Value1.Type.Size * 8;
+                        var maskShift = maskSize - rhs.Integer;
+                        var mask = lhs.ULong >> maskShift;
 
-                        // var mask = _builder.BuildAShr(lhs, maskShift);
-
-                        // values[instruction.ValueIndex] = result.IsUndef ? mask : _builder.BuildOr(result, mask);
+                        var result = shift | mask;
+                        registers[instruction.ValueIndex] = new Register {ULong = result};
                         break;
                     }
                 }
