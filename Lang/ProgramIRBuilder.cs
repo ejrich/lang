@@ -631,7 +631,7 @@ namespace Lang
             int index;
             if (declaration.Type is ArrayType arrayType)
             {
-                index = AddAllocation(function, arrayType.ElementType, true, declaration.TypeDefinition.ConstCount.Value);
+                index = AddAllocation(function, arrayType.ElementType, true, arrayType.Length);
             }
             else
             {
@@ -686,7 +686,7 @@ namespace Lang
             for (var i = 0; i < arrayValues.Count; i++)
             {
                 var index = GetConstantInteger(i);
-                var pointer = EmitGetPointer(function, arrayPointer, index, elementType, getFirstPointer: true);
+                var pointer = EmitGetPointer(function, arrayPointer, index, elementType, true);
 
                 var value = EmitIR(function, arrayValues[i], scope);
                 EmitStore(function, pointer, EmitCastValue(function, value, elementType));
@@ -923,7 +923,6 @@ namespace Lang
             var indexVariable = AddAllocation(function, _s32Type);
             InstructionValue compareTarget;
             InstructionValue arrayData = null;
-            var cArrayIteration = false;
 
             if (each.Iteration != null)
             {
@@ -942,9 +941,9 @@ namespace Lang
                 // Load the array data and set the compareTarget to the array count
                 if (iteration.Type.TypeKind == TypeKind.CArray)
                 {
-                    cArrayIteration = true;
                     arrayData = iteration;
-                    compareTarget = GetConstantInteger(each.CArrayLength);
+                    var arrayType = (ArrayType)iteration.Type;
+                    compareTarget = GetConstantInteger(arrayType.Length);
                 }
                 else
                 {
@@ -981,7 +980,7 @@ namespace Lang
             var condition = EmitInstruction(InstructionType.IntegerGreaterThanOrEqual, function, _boolType, indexValue, compareTarget);
             if (each.Iteration != null)
             {
-                var iterationVariable = EmitGetPointer(function, arrayData, indexValue, each.IterationVariable.Type, cArrayIteration);
+                var iterationVariable = EmitGetPointer(function, arrayData, indexValue, each.IterationVariable.Type);
                 each.IterationVariable.Pointer = iterationVariable;
 
                 if (!BuildSettings.Release)
@@ -1839,15 +1838,22 @@ namespace Lang
             };
         }
 
-        private InstructionValue EmitLoad(FunctionIR function, IType type, InstructionValue value)
-        {
-            var loadInstruction = new Instruction {Type = InstructionType.Load, Value1 = value};
-            return AddInstruction(function, loadInstruction, type);
-        }
-
         private InstructionValue EmitLoad(FunctionIR function, IType type, int allocationIndex, bool global = false)
         {
-            var loadInstruction = new Instruction {Type = InstructionType.Load, Value1 = AllocationValue(allocationIndex, type, global)};
+            var allocationValue = AllocationValue(allocationIndex, type, global);
+            return EmitLoad(function, type, allocationValue);
+        }
+
+        private InstructionValue EmitLoad(FunctionIR function, IType type, InstructionValue value)
+        {
+            // Loading C arrays is not required, only the pointer is needed
+            if (type.TypeKind == TypeKind.CArray)
+            {
+                var arrayType = (ArrayType)type;
+                var castInstruction = new Instruction {Type = InstructionType.CArrayPointerCast, Value1 = value, Value2 = new InstructionValue {ValueType = InstructionValueType.Type, Type = arrayType.ElementType}};
+                return AddInstruction(function, castInstruction, type);
+            }
+            var loadInstruction = new Instruction {Type = InstructionType.Load, Value1 = value};
             return AddInstruction(function, loadInstruction, type);
         }
 
