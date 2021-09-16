@@ -294,7 +294,75 @@ namespace Lang.Parsing
                     break;
             }
 
-            // 2. Parse over the open brace
+            // 2. Parse struct generics
+            if (enumerator.Peek()?.Type == TokenType.LessThan)
+            {
+                // Clear the '<' before entering loop
+                enumerator.MoveNext();
+                var commaRequiredBeforeNextType = false;
+                while (enumerator.MoveNext())
+                {
+                    var token = enumerator.Current;
+
+                    if (token.Type == TokenType.GreaterThan)
+                    {
+                        if (!commaRequiredBeforeNextType)
+                        {
+                            errors.Add(new ParseError
+                            {
+                                Error = "Unexpected comma in struct generics",
+                                Token = new Token {Type = TokenType.Comma, Line = token.Line}
+                            });
+                        }
+
+                        break;
+                    }
+
+                    if (!commaRequiredBeforeNextType)
+                    {
+                        switch (token.Type)
+                        {
+                            case TokenType.Token:
+                                structAst.Generics.Add(token.Value);
+                                commaRequiredBeforeNextType = true;
+                                break;
+                            default:
+                                errors.Add(new ParseError
+                                {
+                                    Error = $"Unexpected token '{token.Value}' in struct generics", Token = token
+                                });
+                                commaRequiredBeforeNextType = true;
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        switch (token.Type)
+                        {
+                            case TokenType.Comma:
+                                commaRequiredBeforeNextType = false;
+                                break;
+                            default:
+                                errors.Add(new ParseError
+                                {
+                                    Error = $"Unexpected token '{token.Value}' in struct definition", Token = token
+                                });
+                                commaRequiredBeforeNextType = false;
+                                break;
+                        }
+                    }
+                }
+
+                if (!structAst.Generics.Any())
+                {
+                    errors.Add(new ParseError
+                    {
+                        Error = "Expected struct to contain generics", Token = enumerator.Current ?? enumerator.Last
+                    });
+                }
+            }
+
+            // 3. Parse over the open brace
             enumerator.MoveNext();
             if (enumerator.Current?.Type != TokenType.OpenBrace)
             {
@@ -306,7 +374,7 @@ namespace Lang.Parsing
                     enumerator.MoveNext();
             }
 
-            // 3. Iterate through fields
+            // 4. Iterate through fields
             StructFieldAst currentField = null;
             var parsingFieldDefault = false;
             while (enumerator.MoveNext())

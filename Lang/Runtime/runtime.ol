@@ -1,9 +1,9 @@
 // Runtime library with types and main function
 
 // Runtime structs
-struct List {
+struct List<T> {
     int length;
-    int* data; // TODO Make this polymorphic
+    T* data;
 }
 
 /* @Future Update strings to use this struct
