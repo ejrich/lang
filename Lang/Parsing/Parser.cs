@@ -1403,6 +1403,8 @@ namespace Lang.Parsing
                         errors.Add(new ParseError {Error = $"Expected token to follow '{token.Value}'", Token = token});
                         return null;
                     }
+                case TokenType.Cast:
+                    return ParseCast(enumerator, errors);
                 default:
                     errors.Add(new ParseError
                     {
@@ -2034,6 +2036,46 @@ namespace Lang.Parsing
                     errors.Add(new ParseError {Error = $"Unable to determine type of token '{token.Value}'", Token = token});
                     return null;
             }
+        }
+
+        private static CastAst ParseCast(TokenEnumerator enumerator, List<ParseError> errors)
+        {
+            var castAst = CreateAst<CastAst>(enumerator.Current);
+
+            // 1. Try to get the open paren to begin the cast
+            enumerator.MoveNext();
+            if (enumerator.Current?.Type != TokenType.OpenParen)
+            {
+                errors.Add(new ParseError {Error = "Expected '(' after cast", Token = enumerator.Current ?? enumerator.Last});
+                return null;
+            }
+
+            // 2. Get the target type
+            if (!enumerator.MoveNext())
+            {
+                errors.Add(new ParseError {Error = "Expected to get the target type for the cast", Token = enumerator.Last});
+                return null;
+            }
+            castAst.TargetType = ParseType(enumerator, errors);
+
+            // 3. Expect to get a comma
+            enumerator.MoveNext();
+            if (enumerator.Current?.Type != TokenType.Comma)
+            {
+                errors.Add(new ParseError {Error = "Expected ',' after type in cast", Token = enumerator.Current ?? enumerator.Last});
+                return null;
+            }
+
+
+            // 4. Get the value expression
+            if (!enumerator.MoveNext())
+            {
+                errors.Add(new ParseError {Error = "Expected to get the value for the cast", Token = enumerator.Last});
+                return null;
+            }
+            castAst.Value = ParseExpression(enumerator, errors, null, TokenType.CloseParen);
+
+            return castAst;
         }
 
         private static T CreateAst<T>(Token token) where T : IAst, new()
