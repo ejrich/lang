@@ -101,9 +101,10 @@ namespace Lang
                             }
                             else
                             {
-                                structAst.TypeIndex = _programGraph.TypeCount++;
+                                structAst.TypeIndex = _programGraph.TypeCount++; // TODO Remove
                                 structAst.TypeKind = structAst.Name == "string" ? TypeKind.String : TypeKind.Struct;
-                                _programGraph.Types.Add(structAst.Name, structAst);
+                                _programGraph.Types.Add(structAst.Name, structAst); // TODO Remove
+                                TypeTable.Add(structAst.Name, structAst);
                             }
 
                             _globalScope.Identifiers[structAst.Name] = structAst;
@@ -261,16 +262,18 @@ namespace Lang
                 Size = primitive?.Bytes ?? size, Primitive = primitive
             };
             _globalScope.Identifiers.Add(name, primitiveAst);
-            _programGraph.Types.Add(name, primitiveAst);
+            _programGraph.Types.Add(name, primitiveAst); // TODO Remove
+            TypeTable.Add(name, primitiveAst);
         }
 
         private void VerifyEnum(EnumAst enumAst)
         {
             // 1. Verify enum has not already been defined
-            if (!_programGraph.Types.TryAdd(enumAst.Name, enumAst))
+            if (!_programGraph.Types.TryAdd(enumAst.Name, enumAst)) // TODO Change to TypeTable
             {
                 AddError($"Multiple definitions of enum '{enumAst.Name}'", enumAst);
             }
+            TypeTable.Add(enumAst.Name, enumAst);
             enumAst.TypeIndex = _programGraph.TypeCount++;
             _globalScope.Identifiers.Add(enumAst.Name, enumAst);
 
@@ -609,9 +612,7 @@ namespace Lang
                 // 3b. Check for errored or undefined field types
                 var type = VerifyType(argument.TypeDefinition, argument: true);
                 // TODO Make this better, roll into VerifyType
-                var argumentTypeName = type == TypeKind.Params ? $"Array.{argument.TypeDefinition.Generics[0].GenericName}" : argument.TypeDefinition.GenericName;
-                _programGraph.Types.TryGetValue(argumentTypeName, out var argumentType);
-                argument.Type = argumentType;
+                argument.Type = TypeTable.GetType(argument.TypeDefinition);
 
                 switch (type)
                 {
@@ -825,8 +826,7 @@ namespace Lang
                 }
 
                 // TODO Make this better, roll into VerifyType
-                _programGraph.Types.TryGetValue(argument.TypeDefinition.GenericName, out var argumentType);
-                argument.Type = argumentType;
+                argument.Type = TypeTable.GetType(argument.TypeDefinition);
             }
 
             // 3. Load the overload into the dictionary
@@ -887,7 +887,7 @@ namespace Lang
                 }
             }
             var returnType = VerifyType(function.ReturnType);
-            var functionIR = _irBuilder.AddFunction(function, _programGraph.Types);
+            var functionIR = _irBuilder.AddFunction(function);
 
             // 2. For extern functions, simply verify there is no body and return
             if (function.Extern)
@@ -955,7 +955,7 @@ namespace Lang
             }
 
             // 3. Loop through body and verify all ASTs
-            var functionIR = _irBuilder.AddOperatorOverload(overload, _programGraph.Types);
+            var functionIR = _irBuilder.AddOperatorOverload(overload);
             var returned = VerifyScope(overload.Body, overload, _globalScope, functionIR);
 
             // 4. Verify the body returns on all paths
@@ -2730,9 +2730,10 @@ namespace Lang
                             VerifyType(arg.TypeDefinition, argument: true);
 
                             // TODO Make this better, roll into VerifyType
-                            var argumentTypeName = arg.TypeDefinition.TypeKind == TypeKind.Params ? $"Array.{arg.TypeDefinition.Generics[0].GenericName}" : arg.TypeDefinition.GenericName;
-                            _programGraph.Types.TryGetValue(argumentTypeName, out var argumentType);
-                            arg.Type = argumentType;
+                            if (arg.Type == null)
+                            {
+                                arg.Type = TypeTable.GetType(arg.TypeDefinition);
+                            }
                         });
 
                         _programGraph.Functions[genericName] = new List<FunctionAst>{polymorphedFunction};
@@ -3121,8 +3122,18 @@ namespace Lang
                     _programGraph.OperatorOverloads[type.GenericName] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
                 }
                 overloads[op] = polymorphedOverload;
+                VerifyType(polymorphedOverload.ReturnType);
+                polymorphedOverload.Arguments.ForEach(arg => {
+                    VerifyType(arg.TypeDefinition, argument: true);
+
+                    // TODO Make this better, roll into VerifyType
+                    if (arg.Type == null)
+                    {
+                        arg.Type = TypeTable.GetType(arg.TypeDefinition);
+                    }
+                });
+
                 VerifyOperatorOverload(polymorphedOverload);
-                VerifyType(polymorphicOverload.ReturnType);
                 return polymorphedOverload.ReturnType;
             }
             else
@@ -3308,7 +3319,8 @@ namespace Lang
                         else
                         {
                             var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeIndex = _programGraph.TypeCount++, TypeKind = TypeKind.Pointer, Size = 8, PointerType = type};
-                            _programGraph.Types.Add(typeDef.GenericName, pointer);
+                            _programGraph.Types.Add(typeDef.GenericName, pointer); // TODO Remove
+                            TypeTable.Add(typeDef.GenericName, pointer);
                             typeDef.TypeKind = TypeKind.Pointer;
                         }
                     }
@@ -3403,8 +3415,9 @@ namespace Lang
                             else
                             {
                                 var polyStruct = _polymorpher.CreatePolymorphedStruct(structDef, PrintTypeDefinition(typeDef), TypeKind.Struct, _programGraph.TypeCount++, generics);
-                                _programGraph.Types.Add(genericName, polyStruct);
+                                _programGraph.Types.Add(genericName, polyStruct); // TODO Remove
                                 VerifyStruct(polyStruct);
+                                TypeTable.Add(genericName, polyStruct);
                                 typeDef.TypeKind = TypeKind.Struct;
                             }
                         }
@@ -3462,8 +3475,9 @@ namespace Lang
             }
 
             var arrayStruct = _polymorpher.CreatePolymorphedStruct(structDef, $"Array<{PrintTypeDefinition(elementType)}>", TypeKind.Array, _programGraph.TypeCount++, elementType);
-            _programGraph.Types.Add(genericName, arrayStruct);
+            _programGraph.Types.Add(genericName, arrayStruct); // TODO Remove
             VerifyStruct(arrayStruct);
+            TypeTable.Add(genericName, arrayStruct);
             return true;
         }
 

@@ -6,8 +6,8 @@ namespace Lang
     public interface IProgramIRBuilder
     {
         ProgramIR Program { get; }
-        FunctionIR AddFunction(FunctionAst function, Dictionary<string, IType> types);
-        FunctionIR AddOperatorOverload(OperatorOverloadAst overload, Dictionary<string, IType> types);
+        FunctionIR AddFunction(FunctionAst function);
+        FunctionIR AddOperatorOverload(OperatorOverloadAst overload);
         void EmitGlobalVariable(DeclarationAst declaration, ScopeAst scope);
         void EmitDeclaration(FunctionIR function, DeclarationAst declaration, ScopeAst scope);
         void EmitAssignment(FunctionIR function, AssignmentAst assignment, ScopeAst scope);
@@ -21,7 +21,7 @@ namespace Lang
 
         public ProgramIR Program { get; } = new();
 
-        public FunctionIR AddFunction(FunctionAst function, Dictionary<string, IType> types)
+        public FunctionIR AddFunction(FunctionAst function)
         {
             var functionName = GetFunctionName(function);
 
@@ -37,18 +37,15 @@ namespace Lang
                 for (var i = 0; i < function.Arguments.Count; i++)
                 {
                     var argument = function.Arguments[i];
-                    if (types.TryGetValue(argument.TypeDefinition.GenericName, out var type))
-                    {
-                        var allocationIndex = functionIR.Allocations.Count;
-                        AddAllocation(functionIR, argument, allocationIndex);
+                    var allocationIndex = functionIR.Allocations.Count;
+                    AddAllocation(functionIR, argument, allocationIndex);
 
-                        var storeInstruction = new Instruction
-                        {
-                            Type = InstructionType.Store, Index = allocationIndex,
-                            Value1 = new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i}
-                        };
-                        entryBlock.Instructions.Add(storeInstruction);
-                    }
+                    var storeInstruction = new Instruction
+                    {
+                        Type = InstructionType.Store, Index = allocationIndex,
+                        Value1 = new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i}
+                    };
+                    entryBlock.Instructions.Add(storeInstruction);
                 }
             }
 
@@ -64,7 +61,7 @@ namespace Lang
             return functionIR;
         }
 
-        public FunctionIR AddOperatorOverload(OperatorOverloadAst overload, Dictionary<string, IType> types)
+        public FunctionIR AddOperatorOverload(OperatorOverloadAst overload)
         {
             var functionName = GetOperatorOverloadName(overload.Type, overload.Operator);
 
@@ -74,13 +71,10 @@ namespace Lang
             for (var i = 0; i < overload.Arguments.Count; i++)
             {
                 var argument = overload.Arguments[i];
-                if (types.TryGetValue(argument.TypeDefinition.GenericName, out var type))
-                {
-                    var allocationIndex = functionIR.Allocations.Count;
-                    AddAllocation(functionIR, argument, allocationIndex);
+                var allocationIndex = functionIR.Allocations.Count;
+                AddAllocation(functionIR, argument, allocationIndex);
 
-                    EmitStore(entryBlock, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i});
-                }
+                EmitStore(entryBlock, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i});
             }
 
             Program.Functions[functionName] = functionIR;
