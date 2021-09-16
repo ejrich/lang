@@ -2693,6 +2693,7 @@ namespace Lang.Translation
                 case Type.Struct:
                 case Type.String:
                     index.CallsOverload = true;
+                    index.OverloadType = typeDef;
                     elementType = VerifyOperatorOverloadType(typeDef, Operator.Subscript, currentFunction, index);
                     break;
                 case Type.List:
