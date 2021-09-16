@@ -23,6 +23,7 @@ int Main(List<string> args) {
     str := string_test();
     printf("%s - Hello world %d, %d, %d\n", str, 1, 2, b);
     sum_test();
+    //overflow_test();
     return ptr;
 }
 
@@ -167,4 +168,12 @@ int sum2(Params<int> args) {
     sum := 0;
     each i in args then sum += i;
     return sum;
+}
+
+void overflow_test() {
+    each i in 1..1000000 {
+        a := i * 9;
+        printf("%d\n", a);
+    }
+    a := 4;
 }
