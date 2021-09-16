@@ -3,19 +3,19 @@ int Main(List<string> args) {
     /*
         Multi line comment
     */
-    var hello = "This is an \"escaped\" string literal";
-    var a = 4.2;
-    var baz = foo() + bar(3 + 1, "Hello", 1.2);
-    var b = 6 * (4 - 1);
+    hello := "This is an \"escaped\" string literal";
+    a := 4.2;
+    baz := foo() + bar(3 + 1, "Hello", 1.2);
+    b := 6 * (4 - 1);
     return 0;
 }
 
 int foo() {
-    var a = 0;
+    a := 0;
     a++;
     ++a;
     a += 1;
-    var b = --a + 1;
+    b := --a + 1;
     while a < 10 {
         a = a + 1;
     }
@@ -31,16 +31,16 @@ int bar(int a, string b, float c) {
 }
 
 int baz() {
-    var a = 1;
+    a := 1;
     each i in 1..10 {
         a = a + i;
     }
     return a;
 }
 
-int fib(int n) {
+int factorial(int n) {
     if n == 1 then return 1;
-    return n * fib(n - 1);
+    return n * factorial(n - 1);
 }
 
 struct MyStruct {
@@ -54,8 +54,8 @@ struct OtherStruct {
 }
 
 MyStruct create() {
-    var s1 = MyStruct;
-    var s2 = OtherStruct;
+    s1: MyStruct;
+    s2: OtherStruct;
     s2.something = 8;
     s1.field = 1;
     s1.subValue.something = s2.something;
