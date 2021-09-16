@@ -19,7 +19,8 @@ int Main(List<string> args) {
     prim := primitives();
     list := create_list(4);
     ptr := pointers();
-    return *ptr;
+    str := string_test();
+    return str.length;
 }
 
 bool test(int a) {
@@ -133,4 +134,8 @@ int* pointers() {
     d := &a + 1;
     c := *b;
     return b;
+}
+
+string string_test() {
+    return "something";
 }
