@@ -1313,10 +1313,21 @@ namespace Lang
                     {
                         case IdentifierAst identifier:
                             refType = GetVariable(identifier.Name, identifier, scopeIdentifiers, true);
+                            if (refType == null) return null;
+                            if (refType.Constant)
+                            {
+                                AddError($"Cannot reassign value of constant variable '{identifier.Name}'", identifier);
+                                return null;
+                            }
                             break;
                         case IndexAst index:
                             var variableType = GetVariable(index.Name, index, scopeIdentifiers);
                             if (variableType == null) return null;
+                            if (variableType.Constant)
+                            {
+                                AddError($"Cannot reassign value of constant variable '{index.Name}'", index);
+                                return null;
+                            }
                             refType = VerifyIndex(index, variableType, currentFunction, scopeIdentifiers, out var overloaded);
                             if (refType != null && overloaded && refType.TypeKind != TypeKind.Pointer)
                             {
@@ -1715,33 +1726,31 @@ namespace Lang
                 case StructFieldRefAst structField:
                     return VerifyStructFieldRef(structField, currentFunction, scopeIdentifiers);
                 case IdentifierAst identifierAst:
+                    if (!scopeIdentifiers.TryGetValue(identifierAst.Name, out var identifier))
                     {
-                        if (!scopeIdentifiers.TryGetValue(identifierAst.Name, out var identifier))
+                        if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functions))
                         {
-                            if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functions))
+                            if (functions.Count > 1)
                             {
-                                if (functions.Count > 1)
-                                {
-                                    AddError($"Cannot determine type for function '{identifierAst.Name}' that has multiple overloads", identifierAst);
-                                    return null;
-                                }
-                                return new TypeDefinition {Name = "Type", TypeIndex = functions[0].TypeIndex};
-                            }
-                            AddError($"Identifier '{identifierAst.Name}' not defined", identifierAst);
-                        }
-                        switch (identifier)
-                        {
-                            case DeclarationAst declaration:
-                                return declaration.Type;
-                            case IType type:
-                                if (type is StructAst structAst && structAst.Generics.Any())
-                                {
-                                    AddError($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
-                                }
-                                return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
-                            default:
+                                AddError($"Cannot determine type for function '{identifierAst.Name}' that has multiple overloads", identifierAst);
                                 return null;
+                            }
+                            return new TypeDefinition {Name = "Type", TypeIndex = functions[0].TypeIndex};
                         }
+                        AddError($"Identifier '{identifierAst.Name}' not defined", identifierAst);
+                    }
+                    switch (identifier)
+                    {
+                        case DeclarationAst declaration:
+                            return declaration.Type;
+                        case IType type:
+                            if (type is StructAst structAst && structAst.Generics.Any())
+                            {
+                                AddError($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
+                            }
+                            return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
+                        default:
+                            return null;
                     }
                 case ChangeByOneAst changeByOne:
                     var op = changeByOne.Positive ? "increment" : "decrement";
@@ -1767,7 +1776,6 @@ namespace Lang
                             return null;
                     }
                 case UnaryAst unary:
-                {
                     if (unary.Operator == UnaryOperator.Reference)
                     {
                         var referenceType = GetReference(unary.Value, currentFunction, scopeIdentifiers, out var hasPointer, true);
@@ -1835,7 +1843,6 @@ namespace Lang
                                 return null;
                         }
                     }
-                }
                 case CallAst call:
                     return VerifyCall(call, currentFunction, scopeIdentifiers);
                 case ExpressionAst expression:

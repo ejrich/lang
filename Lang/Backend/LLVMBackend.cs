@@ -153,7 +153,7 @@ namespace Lang.Backend
             var globals = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>();
             foreach (var globalVariable in _programGraph.Variables)
             {
-                if (globalVariable.Constant)
+                if (globalVariable.Constant && globalVariable.Type.TypeKind != TypeKind.String)
                 {
                     var (_, constant) = WriteExpression(globalVariable.Value, null);
                     globals.Add(globalVariable.Name, (globalVariable.Type, constant));
@@ -165,7 +165,7 @@ namespace Lang.Backend
                     LLVM.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
                     if (globalVariable.Value != null)
                     {
-                        LLVM.SetInitializer(global, BuildConstant(type, globalVariable.Value as ConstantAst));
+                        LLVM.SetInitializer(global, WriteExpression(globalVariable.Value, null).value);
                     }
                     else if (type.TypeKind != LLVMTypeKind.LLVMStructTypeKind && type.TypeKind != LLVMTypeKind.LLVMArrayTypeKind)
                     {
@@ -207,7 +207,7 @@ namespace Lang.Backend
             var argumentType = LLVM.GetTypeByName(_module, "ArgumentType");
             foreach (var (_, (type, typeInfo)) in typePointers)
             {
-                var typeNameString = BuildString(type.Name);
+                var typeNameString = BuildGlobalString(type.Name);
 
                 var typeKind = LLVM.ConstInt(LLVMTypeRef.Int32Type(), (uint)type.TypeKind, false);
                 var typeSize = LLVM.ConstInt(LLVMTypeRef.Int32Type(), type.Size, false);
@@ -221,7 +221,7 @@ namespace Lang.Backend
                     {
                         var field = structAst.Fields[i];
 
-                        var fieldNameString = BuildString(field.Name);
+                        var fieldNameString = BuildGlobalString(field.Name);
                         var fieldOffset = LLVM.ConstInt(LLVMTypeRef.Int32Type(), field.Offset, false);
 
                         var typeField = LLVM.ConstStruct(new [] {fieldNameString, fieldOffset, typePointers[field.Type.GenericName].typeInfo}, false);
@@ -254,7 +254,7 @@ namespace Lang.Backend
                     {
                         var value = enumAst.Values[i];
 
-                        var enumValueNameString = BuildString(value.Name);
+                        var enumValueNameString = BuildGlobalString(value.Name);
                         var enumValue = LLVM.ConstInt(LLVMTypeRef.Int32Type(), (uint)value.Value, false);
 
                         enumValueRefs[i] = LLVM.ConstStruct(new [] {enumValueNameString, enumValue}, false);
@@ -288,7 +288,7 @@ namespace Lang.Backend
                     {
                         var argument = function.Arguments[i];
 
-                        var argNameString = BuildString(argument.Name);
+                        var argNameString = BuildGlobalString(argument.Name);
                         var argumentTypeInfo = argument.Type.Name switch
                         {
                             "Type" => typePointers["s32"].typeInfo,
@@ -330,6 +330,18 @@ namespace Lang.Backend
             LLVM.SetInitializer(typeTable, LLVM.ConstStruct(new [] {typeCount, typeArrayGlobal}, false));
 
             return globals;
+        }
+
+        private LLVMValueRef BuildGlobalString(string value)
+        {
+            var stringValue = LLVM.ConstString(value, (uint)value.Length, false);
+            var stringGlobal = LLVM.AddGlobal(_module, stringValue.TypeOf(), "str");
+            SetPrivateConstant(stringGlobal);
+            LLVM.SetInitializer(stringGlobal, stringValue);
+            var stringPointer = LLVM.ConstBitCast(stringGlobal, _u8PointerType);
+
+            var length = LLVM.ConstInt(LLVMTypeRef.Int32Type(), (uint)value.Length, false);
+            return LLVM.ConstNamedStruct(_stringType, new [] {length, stringPointer});
         }
 
         private void SetPrivateConstant(LLVMValueRef variable)
@@ -465,7 +477,6 @@ namespace Lang.Backend
                     BuildCallAllocations(call);
                     break;
                 case DeclarationAst declaration:
-                    // TODO Add back in constant strings
                     if (declaration.Constant && declaration.Type.TypeKind != TypeKind.String) break;
 
                     var type = ConvertTypeDefinition(declaration.Type);
@@ -493,7 +504,7 @@ namespace Lang.Backend
                     }
                     else if (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind)
                     {
-                        BuildStructAllocations(declaration.Type.GenericName);
+                        BuildStructAllocations(declaration.Type.GenericName, declaration.Assignments);
                     }
                     break;
                 case AssignmentAst assignment:
@@ -621,12 +632,17 @@ namespace Lang.Backend
             }
         }
 
-        private void BuildStructAllocations(string name)
+        private void BuildStructAllocations(string name, List<AssignmentAst> values = null)
         {
+            var assignments = values?.ToDictionary(_ => (_.Reference as IdentifierAst)!.Name);
             var structDef = _programGraph.Types[name] as StructAst;
             foreach (var field in structDef!.Fields)
             {
-                if (field.Type.Name == "List")
+                if (assignments != null && assignments.TryGetValue(field.Name, out var assignment))
+                {
+                    BuildAllocations(assignment.Value);
+                }
+                else if (field.Type.Name == "List")
                 {
                     if (field.Type.CArray) continue;
                     var listType = field.Type.Generics[0];
@@ -636,12 +652,11 @@ namespace Lang.Backend
                     var arrayType = LLVMTypeRef.ArrayType(targetType, uint.Parse(count.Value));
                     var listData = LLVM.BuildAlloca(_builder, arrayType, "listdata");
                     _allocationQueue.Enqueue(listData);
-                    continue;
                 }
-
-                if (ConvertTypeDefinition(field.Type).TypeKind != LLVMTypeKind.LLVMStructTypeKind) continue;
-
-                BuildStructAllocations(field.Type.GenericName);
+                else if (ConvertTypeDefinition(field.Type).TypeKind == LLVMTypeKind.LLVMStructTypeKind)
+                {
+                    BuildStructAllocations(field.Type.GenericName);
+                }
             }
         }
 
@@ -698,12 +713,18 @@ namespace Lang.Backend
             // 1. Declare variable on the stack
             var type = ConvertTypeDefinition(declaration.Type);
 
-            // TODO Add back in constant strings
-            if (declaration.Constant && declaration.Type.TypeKind != TypeKind.String)
+            if (declaration.Constant)
             {
-                var (_, constant) = WriteExpression(declaration.Value, localVariables);
+                var (_, value) = WriteExpression(declaration.Value, localVariables);
 
-                localVariables.Add(declaration.Name, (declaration.Type, constant));
+                if (declaration.Type.TypeKind == TypeKind.String)
+                {
+                    var stringVariable = _allocationQueue.Dequeue();
+                    LLVM.BuildStore(_builder, value, stringVariable);
+                    value = stringVariable;
+                }
+
+                localVariables.Add(declaration.Name, (declaration.Type, value));
                 return;
             }
 
@@ -753,8 +774,7 @@ namespace Lang.Backend
             }
         }
 
-        private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable,
-            IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, List<AssignmentAst> values = null)
+        private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, List<AssignmentAst> values = null)
         {
             var assignments = values?.ToDictionary(_ => (_.Reference as IdentifierAst)!.Name);
             var structDef = _programGraph.Types[typeDef.GenericName] as StructAst;
@@ -1142,7 +1162,6 @@ namespace Lang.Backend
                     }
                     else if (type.TypeKind == TypeKind.String)
                     {
-                        // TODO Get the string from the constant string dictionary
                         if (getStringPointer)
                         {
                             value = LLVM.BuildStructGEP(_builder, value, 1, "stringdata");
@@ -1365,7 +1384,7 @@ namespace Lang.Backend
 
         private string GetFunctionName(string name, int functionIndex, int functionCount)
         {
-            return functionCount == 1 ? name : $"{name}_{functionIndex}";
+            return functionCount == 1 ? name : $"{name}.{functionIndex}";
         }
 
         private string GetOperatorOverloadName(TypeDefinition type, Operator op)

@@ -412,7 +412,7 @@ namespace Lang
                 CastValue(ExecuteExpression(declaration.Value, variables).Value, declaration.Type);
 
             var variable = new ValueType {Type = declaration.Type};
-            if (declaration.Type.Constant || declaration.Type.CArray)
+            if (declaration.Type.CArray)
             {
                 variable.Value = value;
             }
@@ -779,7 +779,7 @@ namespace Lang
                         return new ValueType {Type = _intTypeDefinition, Value = type.TypeIndex};
                     }
 
-                    var value = variable.Type.Constant || variable.Type.CArray ? variable.Value : PointerToTargetType(GetPointer(variable.Value), variable.Type);
+                    var value = variable.Type.CArray ? variable.Value : PointerToTargetType(GetPointer(variable.Value), variable.Type);
                     return new ValueType {Type = variable.Type, Value = value};
                 }
                 case ChangeByOneAst changeByOne:
