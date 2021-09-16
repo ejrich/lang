@@ -125,18 +125,26 @@ namespace Lang.Backend.LLVM
             var globals = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>();
             foreach (var globalVariable in programGraph.Variables)
             {
-                var type = ConvertTypeDefinition(globalVariable.Type);
-                var global = LLVMApi.AddGlobal(_module, type, globalVariable.Name);
-                LLVMApi.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
-                if (globalVariable.Value != null)
+                if (globalVariable.Constant)
                 {
-                    LLVMApi.SetInitializer(global, BuildConstant(type, globalVariable.Value as ConstantAst));
+                    var (_, constant) = WriteExpression(globalVariable.Value, null);
+                    globals.Add(globalVariable.Name, (globalVariable.Type, constant));
                 }
-                else if (type.TypeKind != LLVMTypeKind.LLVMStructTypeKind && type.TypeKind != LLVMTypeKind.LLVMArrayTypeKind)
+                else
                 {
-                    LLVMApi.SetInitializer(global, GetConstZero(type));
+                    var type = ConvertTypeDefinition(globalVariable.Type);
+                    var global = LLVMApi.AddGlobal(_module, type, globalVariable.Name);
+                    LLVMApi.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
+                    if (globalVariable.Value != null)
+                    {
+                        LLVMApi.SetInitializer(global, BuildConstant(type, globalVariable.Value as ConstantAst));
+                    }
+                    else if (type.TypeKind != LLVMTypeKind.LLVMStructTypeKind && type.TypeKind != LLVMTypeKind.LLVMArrayTypeKind)
+                    {
+                        LLVMApi.SetInitializer(global, GetConstZero(type));
+                    }
+                    globals.Add(globalVariable.Name, (globalVariable.Type, global));
                 }
-                globals.Add(globalVariable.Name, (globalVariable.Type, global));
             }
 
             return globals;
@@ -210,14 +218,14 @@ namespace Lang.Backend.LLVM
                     break;
                 }
             }
-            
+
             // 6. Write returns for void functions
             if (!returned && functionAst.ReturnType.Name == "void")
             {
                 BuildStackRestore();
                 LLVMApi.BuildRetVoid(_builder);
             }
-            _stackPointerExists = false; 
+            _stackPointerExists = false;
             _stackSaved = false;
 
             // 7. Verify the function
@@ -288,6 +296,8 @@ namespace Lang.Backend.LLVM
                     break;
                 }
                 case DeclarationAst declaration:
+                    if (declaration.Constant) break;
+
                     var type = ConvertTypeDefinition(declaration.Type);
                     var variable = LLVMApi.BuildAlloca(_builder, type, declaration.Name);
                     _allocationQueue.Enqueue(variable);
@@ -436,6 +446,15 @@ namespace Lang.Backend.LLVM
         {
             // 1. Declare variable on the stack
             var type = ConvertTypeDefinition(declaration.Type);
+
+            if (declaration.Constant)
+            {
+                var (_, constant) = WriteExpression(declaration.Value, localVariables);
+
+                localVariables.Add(declaration.Name, (declaration.Type, constant));
+                return;
+            }
+
             var variable = _allocationQueue.Dequeue();
             localVariables.Add(declaration.Name, (declaration.Type, variable));
 
@@ -839,7 +858,11 @@ namespace Lang.Backend.LLVM
                 case VariableAst variable:
                 {
                     var (type, value) = localVariables[variable.Name];
-                    return (type, LLVMApi.BuildLoad(_builder, value, variable.Name));
+                    if (!type.Constant)
+                    {
+                        value = LLVMApi.BuildLoad(_builder, value, variable.Name);
+                    }
+                    return (type, value);
                 }
                 case StructFieldRefAst structField:
                 {
@@ -1114,7 +1137,7 @@ namespace Lang.Backend.LLVM
         private LLVMValueRef BuildExpression((TypeDefinition type, LLVMValueRef value) lhs,
             (TypeDefinition type, LLVMValueRef value) rhs, Operator op, TypeDefinition targetType)
         {
-            // 1. Handle pointer math 
+            // 1. Handle pointer math
             if (lhs.type.Name == "*")
             {
                 return BuildPointerOperation(lhs.value, rhs.value, op);
@@ -1133,7 +1156,7 @@ namespace Lang.Backend.LLVM
                     return LLVMApi.BuildOr(_builder, lhs.value, rhs.value, "tmpor");
             }
 
-            // 3. Handle compares, since the lhs and rhs should not be cast to the target type 
+            // 3. Handle compares, since the lhs and rhs should not be cast to the target type
             switch (op)
             {
                 case Operator.Equality:
