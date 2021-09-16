@@ -8,6 +8,7 @@ namespace Lang
         public Data Data { get; init; }
         public List<FunctionAst> Functions { get; } = new();
         public FunctionAst Main { get; set; }
+        public FunctionAst Start { get; set; }
     }
 
     public class Data
