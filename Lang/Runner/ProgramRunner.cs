@@ -326,7 +326,7 @@ namespace Lang.Runner
         private object InitializeStruct(Type type, StructAst structAst,
             IDictionary<string, ValueType> variables, List<AssignmentAst> values = null)
         {
-            var assignments = values?.ToDictionary(_ => (_.Variable as IdentifierAst)!.Name);
+            var assignments = values?.ToDictionary(_ => (_.Reference as IdentifierAst)!.Name);
             var instance = Activator.CreateInstance(type);
             foreach (var field in structAst.Fields)
             {
@@ -423,12 +423,12 @@ namespace Lang.Runner
             var expression = ExecuteExpression(assignment.Value, variables);
             if (assignment.Operator != Operator.None)
             {
-                var lhs = ExecuteExpression(assignment.Variable, variables);
+                var lhs = ExecuteExpression(assignment.Reference, variables);
                 expression.Value = RunExpression(lhs, expression, assignment.Operator, lhs.Type);
                 expression.Type = lhs.Type;
             }
 
-            switch (assignment.Variable)
+            switch (assignment.Reference)
             {
                 case IdentifierAst identifier:
                 {
