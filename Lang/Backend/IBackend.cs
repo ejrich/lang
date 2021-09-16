@@ -1,5 +1,3 @@
-using Lang.Project;
-
 namespace Lang.Backend
 {
     public interface IBackend

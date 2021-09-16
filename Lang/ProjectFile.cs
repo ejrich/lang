@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Lang.Project
+namespace Lang
 {
     public class ProjectFile
     {
@@ -10,15 +10,6 @@ namespace Lang.Project
         public List<string> SourceFiles { get; set; }
         public List<string> Dependencies { get; } = new();
         public List<string> Packages { get; } = new();
-    }
-
-    public enum ProjectFileSection
-    {
-        None,
-        Name,
-        Dependencies,
-        Packages,
-        Linker
     }
 
     public enum Linker
