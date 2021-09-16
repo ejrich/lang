@@ -73,7 +73,7 @@ namespace Lang
                     }
                 }
 
-                EmitScope(functionIR, entryBlock, function.Body, function.ReturnType);
+                EmitScopeChildren(functionIR, entryBlock, function.Body, function.ReturnType);
 
                 if (function.ReturnVoidAtEnd)
                 {
@@ -107,7 +107,7 @@ namespace Lang
 
             Program.Functions[overload.Name] = functionIR;
 
-            EmitScope(functionIR, entryBlock, overload.Body, overload.ReturnType);
+            EmitScopeChildren(functionIR, entryBlock, overload.Body, overload.ReturnType);
         }
 
         private void PrintFunction(string name, FunctionIR function)
@@ -378,6 +378,21 @@ namespace Lang
         }
 
         private BasicBlock EmitScope(FunctionIR function, BasicBlock block, ScopeAst scope, IType returnType)
+        {
+            if (!BuildSettings.Release)
+            {
+                function.Instructions.Add(new Instruction {Type = InstructionType.DebugPushLexicalBlock, Source = scope});
+                block = EmitScopeChildren(function, block, scope, returnType);
+                function.Instructions.Add(new Instruction {Type = InstructionType.DebugPopLexicalBlock});
+                return block;
+            }
+            else
+            {
+                return EmitScopeChildren(function, block, scope, returnType);
+            }
+        }
+
+        private BasicBlock EmitScopeChildren(FunctionIR function, BasicBlock block, ScopeAst scope, IType returnType)
         {
             foreach (var ast in scope.Children)
             {
@@ -797,6 +812,12 @@ namespace Lang
 
         private BasicBlock EmitEach(FunctionIR function, BasicBlock block, EachAst each, ScopeAst scope, IType returnType)
         {
+            if (!BuildSettings.Release)
+            {
+                function.Instructions.Add(new Instruction {Type = InstructionType.DebugPushLexicalBlock, Source = each.Body});
+                function.Instructions.Add(new Instruction {Type = InstructionType.DebugSetLocation, Source = each});
+            }
+
             var indexVariable = AddAllocation(function, _s32Type);
             InstructionValue compareTarget;
             InstructionValue arrayData = null;
@@ -870,7 +891,7 @@ namespace Lang
             function.Instructions.Add(conditionJump);
 
             var eachBodyBlock = AddBasicBlock(function);
-            eachBodyBlock = EmitScope(function, eachBodyBlock, each.Body, returnType);
+            eachBodyBlock = EmitScopeChildren(function, eachBodyBlock, each.Body, returnType);
 
             var eachIncrementBlock = eachBodyBlock.Location < function.Instructions.Count ? AddBasicBlock(function) : eachBodyBlock;
             var nextValue = EmitInstruction(InstructionType.IntegerAdd, function, _s32Type, indexValue, GetConstantInteger(1));
@@ -880,6 +901,11 @@ namespace Lang
 
             var afterBlock = AddBasicBlock(function);
             conditionJump.Index = afterBlock.Index;
+
+            if (!BuildSettings.Release)
+            {
+                function.Instructions.Add(new Instruction {Type = InstructionType.DebugPopLexicalBlock});
+            }
 
             return afterBlock;
         }
