@@ -373,7 +373,10 @@ namespace Lang.Translation
                 {
                     errors.Add(CreateError($"Expected range to end with an int, but got '{PrintTypeDefinition(beginType)}'", each.RangeEnd));
                 }
-                eachVariables.Add(each.IterationVariable, new TypeDefinition {Name = "int"});
+                if (!eachVariables.TryAdd(each.IterationVariable, new TypeDefinition {Name = "int"}))
+                {
+                    errors.Add(CreateError($"Iteration variable '{each.IterationVariable}' already exists in scope", each));
+                };
             }
 
             // 2. Verify the scope of the each block
@@ -483,19 +486,27 @@ namespace Lang.Translation
         {
             // 1. Get the type of the initial child
             var expressionType = VerifyExpression(expression.Children[0], localVariables, errors);
-            var operatorPrecedence = int.MinValue;
             for (var i = 1; i < expression.Children.Count; i++)
             {
                 // 2. Get the next operator and expression type
                 var op = expression.Operators[i - 1];
-                var nextType = VerifyExpression(expression.Children[i], localVariables, errors);
+                var nextExpressionType = VerifyExpression(expression.Children[i], localVariables, errors);
+                if (nextExpressionType == null) return null;
+
+                // 3. Verify the operator and expression types are compatible and convert the expression type if necessary
+                var type = VerifyType(expressionType, errors);
+                var nextType = VerifyType(nextExpressionType, errors);
                 switch (op)
                 {
                     // TODO Implement branches
                     // Both need to be bool and returns bool
                     case Operator.And:
                     case Operator.Or:
-                    case Operator.Xor:
+                        if (type != Type.Boolean || nextType != Type.Boolean)
+                        {
+                            errors.Add(CreateError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expressionType)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]));
+                            expressionType = new TypeDefinition {Name = "bool"};
+                        }
                         break;
                     // Requires same types and returns bool
                     case Operator.Equality:
@@ -503,6 +514,12 @@ namespace Lang.Translation
                     case Operator.LessThan:
                     case Operator.GreaterThanEqual:
                     case Operator.LessThanEqual:
+                        if (!(type == Type.Int || type == Type.Float) &&
+                            !(nextType == Type.Int || nextType == Type.Float))
+                        {
+                            errors.Add(CreateError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expressionType)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]));
+                        }
+                        expressionType = new TypeDefinition {Name = "bool"};
                         break;
                     // Requires same types and returns more precise type
                     case Operator.Add:
@@ -510,23 +527,46 @@ namespace Lang.Translation
                     case Operator.Multiply:
                     case Operator.Divide:
                     case Operator.Modulus:
+                        if ((type == Type.Int || type == Type.Float) ||
+                            (nextType == Type.Int || nextType == Type.Float))
+                        {
+                            if (nextType == Type.Float)
+                            {
+                                expressionType = nextExpressionType;
+                            }
+                        }
+                        else
+                        {
+                            errors.Add(CreateError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expressionType)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]));
+                        }
                         break;
-                    // Requires integer types and returns more precise type
+                    // Requires both integer or bool types and returns more same type
                     case Operator.BitwiseAnd:
                     case Operator.BitwiseOr:
+                    case Operator.Xor:
+                        if (type == Type.Boolean && nextType == Type.Boolean)
+                        {
+                            expressionType = new TypeDefinition {Name = "bool"};
+                        }
+                        else if (type == Type.Int && nextType == Type.Int)
+                        {
+                            expressionType = new TypeDefinition {Name = "int"};
+                        }
+                        else
+                        {
+                            errors.Add(CreateError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expressionType)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]));
+                            if (nextType == Type.Boolean || nextType == Type.Int)
+                            {
+                                expressionType = nextExpressionType;
+                            }
+                            else if (!(type == Type.Boolean || type == Type.Int))
+                            {
+                                // If the type can't be determined, default to int
+                                expressionType = new TypeDefinition {Name = "int"};
+                            }
+                        }
                         break;
                 }
-                if (nextType == null) return null;
-
-                // 3. Verify the operator and expression types are compatible
-                if (!TypeEquals(expressionType, nextType))
-                {
-                    errors.Add(CreateError($"Type mismatch between '{PrintTypeDefinition(expressionType)}' and '{PrintTypeDefinition(nextType)}'", expression.Children[i]));
-                    return null;
-                }
-
-                // 4. Convert the expression type if necessary
-                // 5. Create subexpressions to enforce operator precedence if necessary
             }
             return expressionType;
         }
@@ -627,6 +667,22 @@ namespace Lang.Translation
                 sb.Append($"<{string.Join(", ", type.Generics.Select(PrintTypeDefinition))}>");
             }
             return sb.ToString();
+        }
+
+        private static string PrintOperator(Operator op)
+        {
+            return op switch
+            {
+                Operator.And => "&&",
+                Operator.Or => "||",
+                Operator.Equality => "==",
+                Operator.NotEqual => "!=",
+                Operator.Increment => "++",
+                Operator.Decrement => "--",
+                Operator.GreaterThanEqual => ">=",
+                Operator.LessThanEqual => "<=",
+                _ => ((char)op).ToString()
+            };
         }
 
         private static TranslationError CreateError(string error, IAst ast)
