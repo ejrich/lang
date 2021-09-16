@@ -9,14 +9,14 @@ namespace Lang
     {
         public string Name { get; set; }
         public string Path { get; set; }
-        public Linker Linker { get; set; }
+        public LinkerType Linker { get; set; }
         public List<string> SourceFiles { get; set; }
         public HashSet<string> Dependencies { get; } = new();
         public List<string> Packages { get; } = new();
         public List<string> Exclude { get; } = new();
     }
 
-    public enum Linker
+    public enum LinkerType
     {
         Static,
         Dynamic
@@ -119,7 +119,7 @@ namespace Lang
                             projectFile.Packages.Add(line);
                             break;
                         case ProjectFileSection.Linker:
-                            projectFile.Linker = (Linker) Enum.Parse(typeof(Linker), line, true);
+                            projectFile.Linker = (LinkerType) Enum.Parse(typeof(LinkerType), line, true);
                             break;
                         case ProjectFileSection.Exclude:
                             projectFile.Exclude.Add(Path.Combine(projectFile.Path, line));

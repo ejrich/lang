@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -11,13 +10,11 @@ namespace Lang.Backend
     public class LLVMBackend : IBackend
     {
         private const string ObjectDirectory = "obj";
-        private const string BinaryDirectory = "bin";
 
         private ProgramGraph _programGraph;
         private LLVMModuleRef _module;
         private LLVMBuilderRef _builder;
         private LLVMPassManagerRef _passManager;
-        private string _objectFile;
         private IFunction _currentFunction;
         private LLVMValueRef _stackPointer;
         private bool _stackPointerExists;
@@ -29,32 +26,16 @@ namespace Lang.Backend
         private readonly LLVMValueRef _zeroInt = LLVM.ConstInt(LLVMTypeRef.Int32Type(), 0, false);
         private readonly TypeDefinition _intTypeDefinition = new() {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
 
-        public void Build(ProjectFile project, ProgramGraph programGraph, BuildSettings buildSettings)
+        public string Build(ProjectFile project, ProgramGraph programGraph, BuildSettings buildSettings)
         {
             _programGraph = programGraph;
-            // 1. Build the object file
-            BuildObjectFile(project, buildSettings);
-
-            // 2. Link and create the executable
-            Link(project, buildSettings);
-        }
-
-        public void BuildObjectFile(ProjectFile project, BuildSettings buildSettings)
-        {
             // 1. Initialize the LLVM module and builder
             InitLLVM(project.Name, buildSettings.Release);
 
-            // 2. Verify obj directory exists
-            var objectPath = Path.Combine(project.Path, ObjectDirectory);
-            if (!Directory.Exists(objectPath))
-                Directory.CreateDirectory(objectPath);
-
-            _objectFile = Path.Combine(objectPath, $"{project.Name}.o");
-
-            // 3. Write Data section
+            // 2. Write Data section
             var globals = WriteData();
 
-            // 4. Write Function and Operator overload definitions
+            // 3. Write Function and Operator overload definitions
             foreach (var (name, functions) in _programGraph.Functions)
             {
                 for (var i = 0; i < functions.Count; i++)
@@ -88,7 +69,7 @@ namespace Lang.Backend
                 }
             }
 
-            // 5. Write Function and Operator overload bodies
+            // 4. Write Function and Operator overload bodies
             foreach (var (name, functions) in _programGraph.Functions)
             {
                 for (var i = 0; i < functions.Count; i++)
@@ -116,8 +97,16 @@ namespace Lang.Backend
                 }
             }
 
+            // 5. Verify obj directory exists
+            var objectPath = Path.Combine(project.Path, ObjectDirectory);
+            if (!Directory.Exists(objectPath))
+                Directory.CreateDirectory(objectPath);
+
             // 6. Compile to object file
-            Compile(_objectFile, buildSettings.OutputAssembly);
+            var objectFile = Path.Combine(objectPath, $"{project.Name}.o");
+            Compile(objectFile, buildSettings.OutputAssembly);
+
+            return objectFile;
         }
 
         private void InitLLVM(string projectName, bool optimize)
@@ -2062,132 +2051,6 @@ namespace Lang.Backend
             }
 
             return LLVM.GetTypeByName(_module, type.GenericName);
-        }
-
-        //
-        // Linker functions
-        //
-        public void Link(ProjectFile project, BuildSettings buildSettings)
-        {
-            // 1. Verify bin directory exists
-            var binaryPath = Path.Combine(project.Path, BinaryDirectory);
-            if (!Directory.Exists(binaryPath))
-                Directory.CreateDirectory(binaryPath);
-
-            // 2. Determine lib directories
-            var libDirectory = DetermineLibDirectory();
-            var linker = DetermineLinker(project.Linker, libDirectory);
-            var gccDirectory = DetermineGCCDirectory(libDirectory);
-            var defaultObjects = DefaultObjects(libDirectory);
-
-            // 3. Run the linker
-            var executableFile = Path.Combine(binaryPath, project.Name);
-            var dependencyList = string.Join(' ', _programGraph.Dependencies.Select(d => $"-l{d}"));
-            var buildProcess = new Process
-            {
-                StartInfo =
-                {
-                    FileName = "ld",
-                    Arguments = $"{linker} -o {executableFile} {_objectFile} {defaultObjects} " +
-                                $"-L{gccDirectory} --start-group {dependencyList} -lgcc -lgcc_eh -lc --end-group"
-                }
-            };
-            buildProcess.Start();
-            buildProcess.WaitForExit();
-            if (buildProcess.ExitCode != 0)
-            {
-                Console.WriteLine("Unable to link executable, please see output");
-                Environment.Exit(ErrorCodes.LinkError);
-            }
-        }
-
-        private static DirectoryInfo DetermineLibDirectory()
-        {
-            return new("/usr/lib");
-        }
-
-        private readonly string[] _crtObjects = {
-            "crt1.o", "crti.o", "crtn.o"
-        };
-
-        private string DefaultObjects(DirectoryInfo libDirectory)
-        {
-            var files = libDirectory.GetFiles();
-            if (_crtObjects.All(o => files.Any(f => f.Name == o)))
-            {
-                return string.Join(' ', _crtObjects.Select(o => Path.Combine(libDirectory.FullName, o)));
-            }
-
-            var platformDirectory = libDirectory.GetDirectories("x86_64*gnu").FirstOrDefault();
-            if (platformDirectory == null)
-            {
-                Console.WriteLine($"Cannot find x86_64 libs in directory '{libDirectory.FullName}'");
-                Environment.Exit(ErrorCodes.LinkError);
-            }
-            files = platformDirectory.GetFiles();
-            if (_crtObjects.All(o => files.Any(f => f.Name == o)))
-            {
-                return string.Join(' ', _crtObjects.Select(o => Path.Combine(platformDirectory.FullName, o)));
-            }
-
-            Console.WriteLine($"Unable to locate crt object files, valid locations are {libDirectory.FullName} or {platformDirectory.FullName}");
-            Environment.Exit(ErrorCodes.LinkError);
-            return null;
-        }
-
-        private static string DetermineLinker(Linker linkerType, DirectoryInfo libDirectory)
-        {
-            if (linkerType == Linker.Static)
-            {
-                return "-static";
-            }
-
-            const string linkerPattern = "ld-linux-x86-64.so*";
-            var linker = libDirectory.GetFiles(linkerPattern).FirstOrDefault();
-            if (linker == null)
-            {
-                var platformDirectory = libDirectory.GetDirectories("x86_64*gnu").FirstOrDefault();
-                if (platformDirectory == null)
-                {
-                    Console.WriteLine($"Cannot find x86_64 libs in directory '{platformDirectory.FullName}'");
-                    Environment.Exit(ErrorCodes.LinkError);
-                }
-
-                linker = platformDirectory.GetFiles(linkerPattern).FirstOrDefault();
-
-                if (linker == null)
-                {
-                    Console.WriteLine($"Cannot find linker in directory '{libDirectory.FullName}'");
-                    Environment.Exit(ErrorCodes.LinkError);
-                }
-            }
-
-            return $"-dynamic-linker {linker.FullName}";
-        }
-
-        private static string DetermineGCCDirectory(DirectoryInfo libDirectory)
-        {
-            var gccDirectory = libDirectory.GetDirectories("gcc").FirstOrDefault();
-            if (gccDirectory == null)
-            {
-                Console.WriteLine($"Cannot find gcc in directory '{libDirectory.FullName}'");
-                Environment.Exit(ErrorCodes.LinkError);
-            }
-
-            var platformDirectory = gccDirectory.GetDirectories("x86_64*gnu").FirstOrDefault();
-            if (platformDirectory == null)
-            {
-                Console.WriteLine($"Cannot find x86_64 libs in directory '{gccDirectory.FullName}'");
-                Environment.Exit(ErrorCodes.LinkError);
-            }
-
-            var versionDirectory = platformDirectory.GetDirectories().FirstOrDefault();
-            if (versionDirectory == null)
-            {
-                Console.WriteLine($"Cannot find any versions of gcc directory {platformDirectory.FullName}'");
-                Environment.Exit(ErrorCodes.LinkError);
-            }
-            return versionDirectory.FullName;
         }
     }
 }
