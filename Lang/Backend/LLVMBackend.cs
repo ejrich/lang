@@ -31,13 +31,13 @@ namespace Lang.Backend
         {
             _programGraph = programGraph;
             // 1. Build the object file
-            WriteFile(project, buildSettings);
+            BuildObjectFile(project, buildSettings);
 
             // 2. Link and create the executable
             Link(project, buildSettings);
         }
 
-        public void WriteFile(ProjectFile project, BuildSettings buildSettings)
+        public void BuildObjectFile(ProjectFile project, BuildSettings buildSettings)
         {
             // 1. Initialize the LLVM module and builder
             InitLLVM(project.Name, buildSettings.Release);
