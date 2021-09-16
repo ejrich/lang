@@ -416,7 +416,7 @@ namespace Lang.Runner
         {
             var value = declaration.Value == null ?
                 GetUninitializedValue(declaration.Type, variables, declaration.Assignments) :
-                ExecuteExpression(declaration.Value, variables).Value;
+                CastValue(ExecuteExpression(declaration.Value, variables).Value, declaration.Type);
 
             variables[declaration.Name] = new ValueType {Type = declaration.Type, Value = value};
         }
