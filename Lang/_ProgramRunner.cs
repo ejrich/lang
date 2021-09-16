@@ -109,14 +109,21 @@ namespace Lang
                     case InstructionType.Load:
                     {
                         // TODO Implement me
-                        // var value = GetValue(instruction.Value1, values, allocations, functionPointer);
+                        var pointer = GetValue(instruction.Value1, registers, stackPointer);
                         // values[instruction.ValueIndex] = _builder.BuildLoad(value);
                         break;
                     }
                     case InstructionType.Store:
                     {
                         // TODO Implement me
-                        // var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
+                        var pointer = GetValue(instruction.Value1, registers, stackPointer);
+                        switch (instruction.Value2.ValueType)
+                        {
+                            case InstructionValueType.Value:
+                            case InstructionValueType.Argument:
+                            case InstructionValueType.Constant:
+                                break;
+                        }
                         // var value = GetValue(instruction.Value2, values, allocations, functionPointer);
                         // _builder.BuildStore(value, pointer);
                         break;
@@ -910,12 +917,11 @@ namespace Lang
                 case InstructionValueType.Allocation:
                     if (value.Global)
                     {
+                        // TODO Implement me
                         // return _globals[value.ValueIndex];
                     }
+                    // TODO Implement me
                     // return allocations[value.ValueIndex];
-                    break;
-                case InstructionValueType.Argument:
-                    // return functionPointer.GetParam((uint)value.ValueIndex);
                     break;
                 case InstructionValueType.Constant:
                     return GetConstant(value);
