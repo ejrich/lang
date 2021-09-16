@@ -81,6 +81,11 @@ namespace Lang
                             }
                             else
                             {
+                                if (!TypeTable.Add(structAst.Name, structAst))
+                                {
+                                    ErrorReporter.Report($"Multiple definitions of struct '{structAst.Name}'", structAst);
+                                }
+
                                 if (structAst.Name == "string")
                                 {
                                     structAst.TypeKind = TypeKind.String;
@@ -90,11 +95,6 @@ namespace Lang
                                 else
                                 {
                                     structAst.TypeKind = TypeKind.Struct;
-                                }
-                                if (!TypeTable.Add(structAst.Name, structAst))
-                                {
-                                    ErrorReporter.Report($"Multiple definitions of struct '{structAst.Name}'", structAst);
-                                    break;
                                 }
                             }
 
@@ -3553,6 +3553,7 @@ namespace Lang
                                 var type = TypeTable.Types[elementType.GenericName];
                                 var arrayType = new ArrayType {Name = PrintTypeDefinition(typeDef), Size = type.Size, ElementTypeDefinition = elementType, ElementType = type};
                                 TypeTable.Add(typeDef.GenericName, arrayType);
+                                TypeTable.CreateTypeInfo(arrayType);
                             }
                             typeDef.TypeKind = TypeKind.CArray;
                         }
@@ -3600,6 +3601,7 @@ namespace Lang
                             {
                                 var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeKind = TypeKind.Pointer, Size = 8, PointerTypeDefinition = type, PointerType = TypeTable.GetType(type)};
                                 TypeTable.Add(typeDef.GenericName, pointer);
+                                TypeTable.CreateTypeInfo(pointer);
                             }
                             typeDef.TypeKind = TypeKind.Pointer;
                         }

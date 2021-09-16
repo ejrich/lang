@@ -17,7 +17,6 @@ namespace Lang
                 type.TypeIndex = Count++;
                 // Set a temporary value of null before the type data is fully determined
                 TypeInfos.Add(IntPtr.Zero);
-                // CreateTypeInfo(type);
                 return true;
             }
             return false;
