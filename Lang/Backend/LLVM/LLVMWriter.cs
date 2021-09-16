@@ -164,6 +164,7 @@ namespace Lang.Backend.LLVM
                 typePointers[name] = (type, typeInfo);
             }
 
+            var typeFieldType = LLVMApi.GetTypeByName(_module, "TypeField");
             foreach (var (name, (type, typeInfo)) in typePointers)
             {
                 var typeName = LLVMApi.ConstString(name, (uint)name.Length, false);
@@ -173,18 +174,36 @@ namespace Lang.Backend.LLVM
 
                 var typeKind = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (uint)type.TypeKind, false);
 
-                LLVMValueRef typeFields;
+                LLVMValueRef fields;
                 if (type is StructAst structAst)
                 {
                     // TODO Set this
-                    typeFields = LLVMApi.ConstStruct(new [] {LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 0, false)}, false);
+                    var typeFields = new LLVMValueRef[structAst.Fields.Count];
+
+                    for (var i = 0; i < structAst.Fields.Count; i++)
+                    {
+                        //
+                    }
+
+                    var typeFieldArray = LLVMApi.ConstArray(typeInfoType, typeFields);
+                    var typeFieldArrayGlobal = LLVMApi.AddGlobal(_module, typeFieldArray.TypeOf(), "____type_fields");
+
+                    fields = LLVMApi.ConstStruct(new []
+                    {
+                        LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (ulong)structAst.Fields.Count, false),
+                        typeFieldArrayGlobal
+                    }, false);
                 }
                 else
                 {
-                    typeFields = LLVMApi.ConstStruct(new [] {LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 0, false)}, false);
+                    fields = LLVMApi.ConstStruct(new []
+                    {
+                        LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 0, false),
+                        LLVMApi.ConstNull(LLVMTypeRef.PointerType(typeFieldType, 0))
+                    }, false);
                 }
 
-                LLVMApi.SetInitializer(typeInfo, LLVMApi.ConstStruct(new [] {typeNameString, typeKind, typeFields}, false));
+                LLVMApi.SetInitializer(typeInfo, LLVMApi.ConstStruct(new [] {typeNameString, typeKind, fields}, false));
             }
 
             var typeArray = LLVMApi.ConstArray(LLVMApi.PointerType(typeInfoType, 0), types);
