@@ -10,14 +10,23 @@ ARRAY_BLOCK_SIZE := 10; #const
 
 array_insert<T>(Array<T>* array, T value) {
     // Reallocate the array if necessary
-    if (array.length % ARRAY_BLOCK_SIZE == 0) {
+    length := array.length;
+    if (length % ARRAY_BLOCK_SIZE == 0) {
         // @Future add custom allocators
-        new_blocks := array.length / ARRAY_BLOCK_SIZE + 1;
-        new_data := malloc(size_of(T) * new_blocks * ARRAY_BLOCK_SIZE);
-        array.data = cast(s32*, new_data);
+        new_blocks := length / ARRAY_BLOCK_SIZE + 1;
+        element_size := size_of(T);
+
+        new_data := malloc(element_size * new_blocks * ARRAY_BLOCK_SIZE);
+
+        if (length > 0) {
+            memcpy(new_data, array.data, length * element_size);
+            free(array.data);
+        }
+
+        array.data = cast(T*, new_data);
     }
 
-    array.data[array.length] = value;
+    array.data[length] = value;
     array.length++;
 }
 
@@ -108,6 +117,7 @@ printf(string format, ... args) #extern "libc"
 exit(int exit_code) #extern "libc"
 void* malloc(int size) #extern "libc"
 free(void* data) #extern "libc"
+void* memcpy(void* dest, void* src, int length) #extern "libc"
 
 
 // Runtime functions

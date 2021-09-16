@@ -30,6 +30,7 @@ variable_size_arrays() {
     size := 10;
     size++;
     size -= 3;
+
     a: Array<int>[size];
     each arg, i in a then arg = (i + 1) * 6;
 
@@ -44,7 +45,7 @@ variable_size_arrays() {
 
 dynamic_arrays() {
     a: Array<int>;
-    each i in 0..5 {
+    each i in 0..11 {
         array_insert(&a, i * 8);
     }
 
