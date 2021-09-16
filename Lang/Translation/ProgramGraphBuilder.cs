@@ -1070,6 +1070,10 @@ namespace Lang.Translation
                                     {
                                         callError = true;
                                     }
+                                    else if (argument.PrimitiveType != null && call.Arguments[i] is ConstantAst constant)
+                                    {
+                                        VerifyConstant(constant, functionArg.Type, errors);
+                                    }
                                 }
                             }
                         }
@@ -1100,6 +1104,10 @@ namespace Lang.Translation
                                             if (!TypeEquals(paramsType, argument))
                                             {
                                                 callError = true;
+                                            }
+                                            else if (argument.PrimitiveType != null && argumentAst is ConstantAst constant)
+                                            {
+                                                VerifyConstant(constant, paramsType, errors);
                                             }
                                         }
                                     }
