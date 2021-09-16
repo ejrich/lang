@@ -109,6 +109,7 @@ namespace Lang
         Return,
         ReturnVoid,
         Load,
+        LoadPointer,
         Store,
         GetPointer,
         GetStructPointer,
