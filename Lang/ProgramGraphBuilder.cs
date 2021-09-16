@@ -331,6 +331,7 @@ namespace Lang
         {
             // 1. Verify struct fields have valid types
             var fieldNames = new HashSet<string>();
+            structAst.Verifying = true;
             foreach (var structField in structAst.Fields)
             {
                 // 1a. Check if the field has been previously defined
@@ -3737,7 +3738,11 @@ namespace Lang
                     {
                         switch (type)
                         {
-                            case StructAst:
+                            case StructAst structAst:
+                                if (!structAst.Verifying)
+                                {
+                                    VerifyStruct(structAst);
+                                }
                                 typeDef.TypeKind = TypeKind.Struct;
                                 break;
                             case EnumAst enumAst:
