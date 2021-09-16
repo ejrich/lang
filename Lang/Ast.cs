@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -21,16 +22,27 @@ namespace Lang
     public interface IFunction : IAst
     {
         string Name { get; set; }
-        bool Verified { get; set; }
-        bool HasDirectives { get; set; }
-        bool CallsCompiler { get; set; }
-        bool Varargs { get; set; }
+        FunctionFlags Flags { get; set; }
         IType ReturnType { get; set; }
         TypeDefinition ReturnTypeDefinition { get; set; }
-        bool ReturnTypeHasGenerics { get; set; }
         List<string> Generics { get; }
         List<DeclarationAst> Arguments { get; }
         ScopeAst Body { get; set; }
+    }
+
+    [Flags]
+    public enum FunctionFlags
+    {
+        Extern = 0x1,
+        Compiler = 0x2,
+        Varargs = 0x4,
+        Params = 0x8,
+        Verified = 0x10,
+        HasDirectives = 0x20,
+        CallsCompiler = 0x40,
+        ReturnVoidAtEnd = 0x80,
+        ReturnTypeHasGenerics = 0x100,
+        PrintIR = 0x200
     }
 
     public interface IDeclaration : IAst
@@ -65,21 +77,12 @@ namespace Lang
         public int TypeIndex { get; set; }
         public int OverloadIndex { get; set; }
         public TypeKind TypeKind { get; set; } = TypeKind.Function;
+        public FunctionFlags Flags { get; set; }
         public uint Size { get; set; } // Will always be 0
-        public bool Extern { get; set; }
         public string ExternLib { get; set; }
-        public bool Compiler { get; set; }
-        public bool PrintIR { get; set; }
-        public bool Varargs { get; set; }
-        public bool Params { get; set; }
         public IType ParamsElementType { get; set; }
-        public bool Verified { get; set; }
-        public bool HasDirectives { get; set; }
-        public bool CallsCompiler { get; set; }
-        public bool ReturnVoidAtEnd { get; set; }
         public IType ReturnType { get; set; }
         public TypeDefinition ReturnTypeDefinition { get; set; }
-        public bool ReturnTypeHasGenerics { get; set; }
         public List<string> Generics { get; } = new();
         public List<DeclarationAst> Arguments { get; } = new();
         public List<List<TypeDefinition>> VarargsCalls { get; set; }
@@ -390,15 +393,11 @@ namespace Lang
         public uint Line { get; init; }
         public uint Column { get; init; }
         public string Name { get; set; }
+        public FunctionFlags Flags { get; set; }
         public Operator Operator { get; set; }
         public TypeDefinition Type { get; set; }
-        public bool Verified { get; set; }
-        public bool HasDirectives { get; set; }
-        public bool CallsCompiler { get; set; }
-        public bool Varargs { get; set; }
         public IType ReturnType { get; set; }
         public TypeDefinition ReturnTypeDefinition { get; set; }
-        public bool ReturnTypeHasGenerics { get; set; }
         public List<string> Generics { get; } = new();
         public List<DeclarationAst> Arguments { get; } = new();
         public ScopeAst Body { get; set; }
