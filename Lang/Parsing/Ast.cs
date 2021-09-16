@@ -9,6 +9,7 @@ namespace Lang.Parsing
 
     public struct ParseError
     {
+        public string File { get; init; }
         public string Error { get; init; }
         public Token Token { get; init; }
     }

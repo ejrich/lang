@@ -43,26 +43,27 @@ namespace Lang
 
             // 2. Parse source files to tokens
             stopwatch.Restart();
-            var parseResults = _parser.Parse(project.BuildFiles);
+            var parseResult = _parser.Parse(project.BuildFiles);
             var parseTime = stopwatch.Elapsed;
 
-            if (parseResults.Any(_ => !_.Success))
+            if (!parseResult.Success)
             {
-                foreach (var failedParse in parseResults.Where(_ => !_.Success))
+                var currentFile = string.Empty;
+                foreach (var parseError in parseResult.Errors)
                 {
-                    Console.WriteLine($"Failed to parse file: \"{failedParse.File}\":\n");
-                    foreach (var parseError in failedParse.Errors)
+                    if (currentFile != parseError.File)
                     {
-                        Console.WriteLine($"\t{parseError.Error} at line {parseError.Token.Line}:{parseError.Token.Column}");
+                        currentFile = parseError.File;
+                        Console.WriteLine($"\nFailed to parse file: \"{currentFile}\":\n");
                     }
-                    Console.WriteLine();
+                    Console.WriteLine($"\t{parseError.Error} at line {parseError.Token.Line}:{parseError.Token.Column}");
                 }
                 Environment.Exit(ErrorCodes.ParsingError);
             }
 
             // 3. Build program graph
             stopwatch.Restart();
-            var programGraph = _graphBuilder.CreateProgramGraph(parseResults, out var errors);
+            var programGraph = _graphBuilder.CreateProgramGraph(parseResult, out var errors);
             var graphTime = stopwatch.Elapsed;
 
             if (errors.Any())

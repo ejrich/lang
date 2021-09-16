@@ -3,7 +3,7 @@ using System.Linq;
 
 namespace Lang.Parsing
 {
-    public class ParseResult
+    public class FileParseResult
     {
         public string File { get; set; }
         public bool Success => !Errors.Any();
@@ -11,9 +11,16 @@ namespace Lang.Parsing
         public List<ParseError> Errors { get; } = new();
     }
 
+    public class ParseResult
+    {
+        public bool Success { get; set; } = true;
+        public List<IAst> SyntaxTrees { get; } = new();
+        public List<ParseError> Errors { get; } = new();
+    }
+
     public interface IParser
     {
-        List<ParseResult> Parse(List<string> projectFiles);
+        ParseResult Parse(List<string> projectFiles);
     }
 
     public class Parser : IParser
@@ -22,17 +29,33 @@ namespace Lang.Parsing
 
         public Parser(ILexer lexer) => _lexer = lexer;
 
-        public List<ParseResult> Parse(List<string> projectFiles)
+        public ParseResult Parse(List<string> projectFiles)
         {
-            return projectFiles.Select(ParseFile).ToList();
+            var parseResult = new ParseResult();
+
+            foreach (var file in projectFiles)
+            {
+                var fileParseResult = ParseFile(file);
+                if (!fileParseResult.Success)
+                {
+                    parseResult.Errors.AddRange(fileParseResult.Errors);
+                    parseResult.Success = false;
+                }
+                else if (parseResult.Success)
+                {
+                    parseResult.SyntaxTrees.AddRange(fileParseResult.SyntaxTrees);
+                }
+            }
+
+            return parseResult;
         }
 
-        private ParseResult ParseFile(string file)
+        private FileParseResult ParseFile(string file)
         {
             // 1. Load file tokens
             var tokens = _lexer.LoadFileTokens(file);
 
-            var parseResult = new ParseResult {File = file};
+            var parseResult = new FileParseResult {File = file};
 
             // 2. Iterate through tokens, tracking different ASTs
             IEnumerator<Token> enumerator = tokens.GetEnumerator();
@@ -48,7 +71,7 @@ namespace Lang.Parsing
                     default:
                         parseResult.Errors.Add(new ParseError
                         {
-                            Error = $"Unexpected token", Token = enumerator.Current
+                            Error = "Unexpected token", Token = enumerator.Current
                         });
                         break;
                 }
