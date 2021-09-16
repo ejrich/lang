@@ -63,7 +63,7 @@ int main(List<string> args) {
 }
 
 global_a := 7;
-global_b: int;
+global_b: int = 456; #const
 
 set_global(int a) {
     if a > 10 then global_a = a * 90;
@@ -287,6 +287,8 @@ u32 sleep(u32 seconds) #extern "libc"
 }
 
 compiler_directives() {
+    const_value := 7; #const
+    printf("Constant value = %d\n", const_value);
     #if build_env == BuildEnv.Debug then
         printf("Running Debug code\n");
     #if build_env == BuildEnv.Release then

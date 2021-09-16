@@ -44,8 +44,7 @@ namespace Lang.Translation
                         case StructAst structAst:
                             if (_programGraph.Types.ContainsKey(structAst.Name))
                             {
-                                errors.Add(CreateError($"Multiple definitions of struct '{structAst.Name}'",
-                                    structAst));
+                                errors.Add(CreateError($"Multiple definitions of struct '{structAst.Name}'", structAst));
                             }
                             else if (structAst.Generics.Any())
                             {
@@ -73,8 +72,7 @@ namespace Lang.Translation
                             if (globalVariable.Value != null && globalVariable.Value is not ConstantAst)
                             {
                                 errors.Add(CreateError(
-                                    "Global variable must either not be initialized or be initialized to a constant value",
-                                    globalVariable.Value));
+                                    "Global variable must either not be initialized or be initialized to a constant value", globalVariable.Value));
                             }
 
                             VerifyDeclaration(globalVariable, null, _globalVariables, errors);
@@ -690,14 +688,33 @@ namespace Lang.Translation
                 VerifyExpression(declaration.Type.Count, currentFunction, localVariables, errors);
             }
 
+            // 6. Verify constant values
+            if (declaration.Constant)
+            {
+                if (declaration.Value == null || declaration.Value is not ConstantAst)
+                {
+                    errors.Add(CreateError($"Constant variable '{declaration.Name}' should be assigned a constant value", declaration));
+                }
+                if (declaration.Type != null)
+                {
+                    declaration.Type.Constant = true;
+                }
+            }
+
             localVariables.Add(declaration.Name, declaration.Type);
         }
 
         private void VerifyAssignment(AssignmentAst assignment, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
-            // 1. Verify the variable is already defined
+            // 1. Verify the variable is already defined and that it is not a constant
             var variableTypeDefinition = GetVariable(assignment.Variable, currentFunction, localVariables, errors);
             if (variableTypeDefinition == null) return;
+
+            if (variableTypeDefinition.Constant)
+            {
+                var variable = assignment.Variable as VariableAst;
+                errors.Add(CreateError($"Cannot reassign value of constant variable '{variable?.Name}'", assignment));
+            }
 
             // 2. Verify the assignment value
             if (assignment.Value is NullAst nullAst)
@@ -730,7 +747,7 @@ namespace Lang.Translation
                         case Operator.Or:
                             if (type != Type.Boolean || nextType != Type.Boolean)
                             {
-                                errors.Add(CreateError($"Operator {PrintOperator(assignment.Operator)} not applicable to types " +
+                                errors.Add(CreateError($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types " +
                                     $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value));
                             }
                             break;

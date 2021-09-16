@@ -1025,14 +1025,14 @@ namespace Lang.Parsing
             switch (token?.Type)
             {
                 case TokenType.Equals:
-                    // Valid case
+                    ParseDeclarationValue(declaration, enumerator, errors);
                     break;
                 case TokenType.SemiColon:
                     if (declaration.Type == null)
                     {
                         errors.Add(new ParseError {Error = "Expected token declaration to have value", Token = token});
                     }
-                    return declaration;
+                    break;
                 case null:
                     errors.Add(new ParseError {Error = "Expected declaration to have value", Token = enumerator.Last});
                     return declaration;
@@ -1041,17 +1041,37 @@ namespace Lang.Parsing
                     // Parse until there is an equals sign
                     while (enumerator.Current != null && enumerator.Current.Type != TokenType.Equals)
                         enumerator.MoveNext();
+
+                    ParseDeclarationValue(declaration, enumerator, errors);
                     break;
             }
 
-            // 4. Step over '=' sign
+            // 4. Parse compiler directives
+            if (enumerator.Peek()?.Type == TokenType.Pound)
+            {
+                switch (enumerator.Peek(1)?.Value)
+                {
+                    case "const":
+                        declaration.Constant = true;
+                        enumerator.MoveNext();
+                        enumerator.MoveNext();
+                        break;
+                }
+            }
+
+            return declaration;
+        }
+
+        private static void ParseDeclarationValue(DeclarationAst declaration, TokenEnumerator enumerator, List<ParseError> errors)
+        {
+            // 1. Step over '=' sign
             if (!enumerator.MoveNext())
             {
                 errors.Add(new ParseError {Error = "Expected declaration to have a value", Token = enumerator.Last});
-                return null;
+                return;
             }
 
-            // 5. Parse expression, constant, or object initialization as the value
+            // 2. Parse expression, constant, or object initialization as the value
             if (enumerator.Current.Type == TokenType.OpenBrace)
             {
                 while (enumerator.MoveNext())
@@ -1069,19 +1089,6 @@ namespace Lang.Parsing
             {
                 declaration.Value = ParseExpression(enumerator, errors);
             }
-
-            // 6. Parse compiler directives
-            if (enumerator.Peek()?.Type == TokenType.Pound)
-            {
-                switch (enumerator.Peek(1)?.Value)
-                {
-                    case "const":
-                        declaration.Constant = true;
-                        break;
-                }
-            }
-
-            return declaration;
         }
 
         private static AssignmentAst ParseAssignment(TokenEnumerator enumerator, List<ParseError> errors, IAst variable = null)
