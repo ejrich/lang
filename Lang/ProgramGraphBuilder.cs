@@ -650,7 +650,7 @@ namespace Lang
             else
             {
                 var targetType = VerifyType(overload.Type);
-                if (targetType != TypeKind.Error && targetType != TypeKind.Struct)
+                if (targetType != TypeKind.Error && targetType != TypeKind.Struct && targetType != TypeKind.String)
                 {
                     AddError($"Cannot overload operator '{PrintOperator(overload.Operator)}' for type '{PrintTypeDefinition(overload.Type)}'", overload.Type);
                 }
@@ -2576,7 +2576,8 @@ namespace Lang
                 // 3. Verify the operator and expression types are compatible and convert the expression type if necessary
                 var type = VerifyType(expression.Type);
                 var nextType = VerifyType(nextExpressionType);
-                if (type == TypeKind.Struct && nextType == TypeKind.Struct)
+                if ((type == TypeKind.Struct && nextType == TypeKind.Struct) ||
+                    (type == TypeKind.String && nextType == TypeKind.String))
                 {
                     if (TypeEquals(expression.Type, nextExpressionType, true))
                     {
