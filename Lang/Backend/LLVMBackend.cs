@@ -33,13 +33,19 @@ namespace Lang.Backend
         public string Build(ProjectFile project, ProgramGraph programGraph, BuildSettings buildSettings)
         {
             _programGraph = programGraph;
-            // 1. Initialize the LLVM module and builder
-            InitLLVM(project, buildSettings.Release);
 
-            // 2. Write Data section
+            // 1. Verify obj directory exists
+            var objectPath = Path.Combine(project.Path, ObjectDirectory);
+            if (!Directory.Exists(objectPath))
+                Directory.CreateDirectory(objectPath);
+
+            // 2. Initialize the LLVM module and builder
+            InitLLVM(project, buildSettings.Release, objectPath);
+
+            // 3. Write Data section
             var globals = WriteData();
 
-            // 3. Write Function and Operator overload definitions
+            // 4. Write Function and Operator overload definitions
             foreach (var (name, functions) in _programGraph.Functions)
             {
                 for (var i = 0; i < functions.Count; i++)
@@ -73,7 +79,7 @@ namespace Lang.Backend
                 }
             }
 
-            // 4. Write Function and Operator overload bodies
+            // 5. Write Function and Operator overload bodies
             foreach (var (name, functions) in _programGraph.Functions)
             {
                 for (var i = 0; i < functions.Count; i++)
@@ -101,11 +107,6 @@ namespace Lang.Backend
                 }
             }
 
-            // 5. Verify obj directory exists
-            var objectPath = Path.Combine(project.Path, ObjectDirectory);
-            if (!Directory.Exists(objectPath))
-                Directory.CreateDirectory(objectPath);
-
             // 6. Compile to object file
             var objectFile = Path.Combine(objectPath, $"{project.Name}.o");
             Compile(objectFile, buildSettings.OutputAssembly);
@@ -113,7 +114,7 @@ namespace Lang.Backend
             return objectFile;
         }
 
-        private void InitLLVM(ProjectFile project, bool optimize)
+        private void InitLLVM(ProjectFile project, bool optimize, string objectPath)
         {
             _module = LLVM.ModuleCreateWithName(project.Name);
             _builder = LLVM.CreateBuilder();
@@ -133,9 +134,8 @@ namespace Lang.Backend
             {
                 _emitDebug = true;
                 _debugBuilder = LLVM.CreateDIBuilder(_module);
-                _debugCompilationUnit = LLVM.DIBuilderCreateCompileUnit(_debugBuilder, 2, "", "obj", "ol", false, string.Empty, 0, string.Empty, 0, 0, false, false, string.Empty, string.Empty);
-                _debugFiles = project.SourceFiles.Select(file =>
-                    LLVM.DIBuilderCreateFile(_debugBuilder, Path.GetFileName(file), Path.GetDirectoryName(file))).ToList();
+                _debugCompilationUnit = LLVM.DIBuilderCreateCompileUnit(_debugBuilder, 1, $"{project.Name}.ll", objectPath, "ol", false, string.Empty, 0);
+                _debugFiles = project.SourceFiles.Select(file => LLVM.DIBuilderCreateFile(_debugBuilder, Path.GetFileName(file), Path.GetDirectoryName(file))).ToList();
             }
         }
 
