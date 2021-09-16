@@ -79,6 +79,7 @@ namespace Lang.Parsing
     public class AssignmentAst : IAst
     {
         public string Name { get; set; }
+        public Operator Operator { get; set; }
         public IAst Value { get; set; }
         public List<IAst> Children => null;
     }

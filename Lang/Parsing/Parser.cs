@@ -255,6 +255,11 @@ namespace Lang.Parsing
                             return ParseAssignment(enumerator, errors);
                         // TODO Handle other things
                         default:
+                            // Peek again for an '=', this is likely an operator assignment
+                            if (enumerator.Peek(1)?.Type == TokenType.Equals)
+                            {
+                                return ParseAssignment(enumerator, errors);
+                            }
                             return ParseExpression(enumerator, errors);
                     }
                 case TokenType.Increment:
@@ -491,7 +496,7 @@ namespace Lang.Parsing
                         Error = "Expected variable to have name",
                         Token = enumerator.Last
                     });
-                    break;
+                    return declaration;
                 default:
                     errors.Add(new ParseError
                     {
@@ -505,11 +510,14 @@ namespace Lang.Parsing
             enumerator.MoveNext();
             if (enumerator.Current?.Type != TokenType.Equals)
             {
+                var unexpectedToken = enumerator.Current ?? enumerator.Last;
                 errors.Add(new ParseError
                 {
-                    Error = "Expected '=' in declaration'",
-                    Token = enumerator.Current ?? enumerator.Last
+                    Error = $"Unexpected token '{unexpectedToken.Value}' in declaration'",
+                    Token = unexpectedToken
                 });
+                while (enumerator.Current != null && enumerator.Current.Type != TokenType.Equals)
+                    enumerator.MoveNext();
             }
 
             // 3. Parse expression, constant, or another token as the value
@@ -528,13 +536,44 @@ namespace Lang.Parsing
 
             // 2. Expect to get equals sign
             enumerator.MoveNext();
-            if (enumerator.Current?.Type != TokenType.Equals)
+            var token = enumerator.Current;
+            if (token == null)
             {
                 errors.Add(new ParseError
                 {
                     Error = "Expected '=' in declaration'",
-                    Token = enumerator.Current ?? enumerator.Last
+                    Token = enumerator.Last
                 });
+                return assignment;
+            }
+
+            if (token.Type != TokenType.Equals)
+            {
+                var op = token.ConvertOperator();
+                if (op != Operator.None)
+                {
+                    assignment.Operator = op;
+                    if (enumerator.Peek()?.Type == TokenType.Equals)
+                    {
+                        enumerator.MoveNext();
+                    }
+                    else
+                    {
+                        errors.Add(new ParseError
+                        {
+                            Error = "Expected '=' in declaration'",
+                            Token = token
+                        });
+                    }
+                }
+                else
+                {
+                    errors.Add(new ParseError
+                    {
+                        Error = "Expected operator in assignment",
+                        Token = token
+                    });
+                }
             }
 
             // 3. Parse expression, constant, or another token as the value
