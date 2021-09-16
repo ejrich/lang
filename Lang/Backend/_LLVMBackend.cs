@@ -127,7 +127,19 @@ namespace Lang.Backend
                 {
                     if (type is StructAst structAst && structAst.Fields.Any())
                     {
-                        var fields = structAst.Fields.Select(field => _types[field.Type.TypeIndex]).ToArray();
+                        var fields = new LLVMTypeRef[structAst.Fields.Count];
+                        for (var i = 0; i < structAst.Fields.Count; i++)
+                        {
+                            var field = structAst.Fields[i];
+                            if (field.Type.TypeKind == TypeKind.CArray)
+                            {
+                                fields[i] = LLVM.ArrayType(_types[field.ArrayElementType.TypeIndex], field.TypeDefinition.ConstCount.Value);
+                            }
+                            else
+                            {
+                                fields[i] = _types[field.Type.TypeIndex];
+                            }
+                        }
                         structs[name].StructSetBody(fields, false);
                     }
                 }

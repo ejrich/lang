@@ -37,7 +37,7 @@ bool array_remove<T>(Array<T>* array, int index) {
     }
 
     if index <= length - 1 {
-        each i in index..length - 2 {
+        each i in index..length - 1 {
             array.data[i] = array.data[i + 1];
         }
     }
@@ -54,7 +54,7 @@ struct string {
 operator == string(string a, string b) {
     if (a.length != b.length) then return false;
 
-    each i in 0..a.length-1 {
+    each i in 0..a.length {
         if a[i] != b[i] then return false;
     }
 
@@ -140,7 +140,7 @@ int __start(int argc, u8** argv) {
     exit_code := 0;
     args: Array<string>[argc-1];
 
-    each i in 1..argc-1 then args[i-1] = convert_c_string(argv[i]);
+    each i in 1..argc then args[i-1] = convert_c_string(argv[i]);
 
     #assert type_of(main).type == TypeKind.Function;
     #if type_of(main).return_type.type == TypeKind.Void {
