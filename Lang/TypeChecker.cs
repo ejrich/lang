@@ -1372,7 +1372,7 @@ namespace Lang
 
             if (declaration.TypeDefinition != null)
             {
-                declaration.Type = VerifyType(declaration.TypeDefinition, scope, out _, out var isVarargs, out var isParams);
+                declaration.Type = VerifyType(declaration.TypeDefinition, scope, out _, out var isVarargs, out var isParams, initialArrayLength: declaration.ArrayValues?.Count);
                 if (isVarargs || isParams)
                 {
                     ErrorReporter.Report($"Variable '{declaration.Name}' cannot be varargs or Params", declaration.TypeDefinition);
@@ -1385,10 +1385,15 @@ namespace Lang
                 {
                     ErrorReporter.Report($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
                 }
-                else if (declaration.Type.TypeKind == TypeKind.Array || declaration.Type.TypeKind == TypeKind.CArray)
+                else if (declaration.Type.TypeKind == TypeKind.Array)
                 {
-                    var elementType = declaration.TypeDefinition.Generics[0];
-                    declaration.ArrayElementType = TypeTable.GetType(elementType);
+                    var arrayStruct = (StructAst)declaration.Type;
+                    declaration.ArrayElementType = arrayStruct.GenericTypes[0];
+                }
+                else if (declaration.Type.TypeKind == TypeKind.CArray)
+                {
+                    var arrayType = (ArrayType)declaration.Type;
+                    declaration.ArrayElementType = arrayType.ElementType;
                 }
             }
 
@@ -1771,6 +1776,11 @@ namespace Lang
                         {
                             case IdentifierAst identifier:
                                 refType = VerifyStructField(identifier.Name, refType, structFieldRef, i-1, identifier);
+                                if (structFieldRef.IsConstant)
+                                {
+                                    ErrorReporter.Report($"Cannot reassign value of constant field '{identifier.Name}'", identifier);
+                                    return null;
+                                }
                                 break;
                             case IndexAst index:
                                 var fieldType = VerifyStructField(index.Name, refType, structFieldRef, i-1, index);
@@ -2060,7 +2070,6 @@ namespace Lang
                     case TypeKind.CArray:
                         // Same logic as below with special case for constant length
                         var arrayType = (ArrayType)iterationType;
-                        each.CArrayLength = arrayType.Length;
                         each.IterationVariable.Type = arrayType.ElementType;
                         each.Body.Identifiers.TryAdd(each.IterationVariable.Name, each.IterationVariable);
                         break;
@@ -3651,7 +3660,7 @@ namespace Lang
             return VerifyType(type, scope, out _, out _, out _, depth);
         }
 
-        private IType VerifyType(TypeDefinition type, ScopeAst scope, out bool isGeneric, out bool isVarargs, out bool isParams, int depth = 0, bool allowParams = false)
+        private IType VerifyType(TypeDefinition type, ScopeAst scope, out bool isGeneric, out bool isVarargs, out bool isParams, int depth = 0, bool allowParams = false, int? initialArrayLength = null)
         {
             isGeneric = false;
             isVarargs = false;
@@ -3711,11 +3720,19 @@ namespace Lang
                         }
                         else
                         {
-                            var countType = VerifyConstantExpression(type.Count, null, scope, out var isConstant, out var arrayLength);
-                            if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
+                            uint arrayLength;
+                            if (initialArrayLength.HasValue)
                             {
-                                ErrorReporter.Report($"Expected size of C array to be a constant, positive integer", type.Count);
-                                return null;
+                                arrayLength = (uint)initialArrayLength.Value;
+                            }
+                            else
+                            {
+                                var countType = VerifyConstantExpression(type.Count, null, scope, out var isConstant, out arrayLength);
+                                if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
+                                {
+                                    ErrorReporter.Report($"Expected size of C array to be a constant, positive integer", type);
+                                    return null;
+                                }
                             }
 
                             var backendName = $"{type.GenericName}.{arrayLength}";

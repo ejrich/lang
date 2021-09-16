@@ -6,7 +6,7 @@ main() {
     c_array_structs();
 }
 
-c_arrays() {
+c_arrays() #print_ir {
     // Examples include this from the tests project
     // each i in file.d_name then printf("%c", i);
     // each i in 0..255 then printf("%c", file.d_name[i]);
@@ -15,9 +15,9 @@ c_arrays() {
 
     array: CArray<int>[array_size]; // Correct
 
-    array.length = 9; // Essentially a no-op
+    // array.length = 9; // Does not compile due to length being a constant value
     printf("Array size = %d, should be %d. Array pointer = %p\n", array.length, array_size, &array);
-    each i in 0..array_size - 1 {
+    each i in 0..array_size {
         array[i] = 5 * i;
         printf("Array value %d = %d\n", i, array[i]);
     }
@@ -32,10 +32,10 @@ c_arrays() {
 c_array_structs() {
     array_struct: ArrayStruct;
 
-    array_struct.array.length = 90; // Essentially a no-op
+    // array_struct.array.length = 90; // Does not compile due to length being a constant value
     printf("ArrayStruct array size = %d, should be %d. Array pointer = %p, Type size = %d\n", array_struct.array.length, struct_array_size, &array_struct.array, size_of(array_struct));
-    each i in 1..struct_array_size {
-        array_struct.array[i - 1] = 5 * i;
+    each i in 0..struct_array_size {
+        array_struct.array[i] = 5 * i;
         printf("Struct array value %d = %d\n", i, array_struct.array[i - 1]);
     }
 
