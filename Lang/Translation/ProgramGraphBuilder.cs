@@ -1892,16 +1892,17 @@ namespace Lang.Translation
                         AddError($"pointer type should have reference to 1 type, but got {typeDef.Generics.Count}", typeDef);
                         return Type.Error;
                     }
+                    if (_programGraph.Types.ContainsKey(typeDef.GenericName))
+                    {
+                        return Type.Pointer;
+                    }
                     if (VerifyType(typeDef.Generics[0]) == Type.Error)
                     {
                         return Type.Error;
                     }
 
-                    if (!_programGraph.Types.ContainsKey(typeDef.GenericName))
-                    {
-                        var pointer = new PrimitiveAst {Name = typeDef.GenericName, TypeIndex = _typeIndex++, TypeKind = TypeKind.Pointer};
-                        _programGraph.Types.Add(typeDef.GenericName, pointer);
-                    }
+                    var pointer = new PrimitiveAst {Name = typeDef.GenericName, TypeIndex = _typeIndex++, TypeKind = TypeKind.Pointer};
+                    _programGraph.Types.Add(typeDef.GenericName, pointer);
                     return Type.Pointer;
                 case "...":
                     if (hasGenerics)
@@ -2017,7 +2018,7 @@ namespace Lang.Translation
             _programGraph.Types.Add(name, polyStruct);
         }
 
-        private static TypeDefinition CopyType(TypeDefinition type, TypeDefinition[] genericTypes)
+        private TypeDefinition CopyType(TypeDefinition type, TypeDefinition[] genericTypes)
         {
             if (type.IsGeneric)
             {
@@ -2032,6 +2033,7 @@ namespace Lang.Translation
             {
                 copyType.Generics.Add(CopyType(generic, genericTypes));
             }
+            VerifyType(copyType);
 
             return copyType;
         }
