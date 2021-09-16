@@ -157,7 +157,6 @@ namespace Lang
     public enum InstructionValueType
     {
         Value,
-        Block,
         Argument,
         Constant,
         Null,
