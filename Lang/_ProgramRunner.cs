@@ -108,14 +108,57 @@ namespace Lang
                     }
                     case InstructionType.Load:
                     {
-                        // TODO Implement me
                         var pointer = GetValue(instruction.Value1, registers, stackPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildLoad(value);
+                        var register = new Register();
+                        switch (instruction.Value2.Type.TypeKind)
+                        {
+                            case TypeKind.Boolean:
+                                register.Bool = Marshal.PtrToStructure<bool>(pointer.Pointer);
+                                break;
+                            case TypeKind.Integer:
+                            case TypeKind.Enum:
+                                switch (instruction.Value2.Type.Size)
+                                {
+                                    case 1:
+                                        register.Byte = Marshal.PtrToStructure<byte>(pointer.Pointer);
+                                        break;
+                                    case 2:
+                                        register.UShort = Marshal.PtrToStructure<ushort>(pointer.Pointer);
+                                        break;
+                                    case 4:
+                                        register.UInteger = Marshal.PtrToStructure<uint>(pointer.Pointer);
+                                        break;
+                                    case 8:
+                                        register.ULong = Marshal.PtrToStructure<ulong>(pointer.Pointer);
+                                        break;
+                                }
+                                break;
+                            case TypeKind.Float:
+                                if (instruction.Value2.Type.Size == 4)
+                                {
+                                    register.Float = Marshal.PtrToStructure<float>(pointer.Pointer);
+                                }
+                                else
+                                {
+                                    register.Double = Marshal.PtrToStructure<double>(pointer.Pointer);
+                                }
+                                break;
+                            case TypeKind.Pointer:
+                                register.Pointer = Marshal.ReadIntPtr(pointer.Pointer);
+                                break;
+                            case TypeKind.String:
+                            case TypeKind.Array:
+                            case TypeKind.Struct:
+                            case TypeKind.CArray:
+                                // For structs, the pointer is kept in its original state, and any loads will copy the bytes if necessary
+                                register.Pointer = pointer.Pointer;
+                                break;
+                        }
+                        registers[instruction.ValueIndex] = register;
                         break;
                     }
                     case InstructionType.Store:
                     {
-                        // TODO Implement me
                         var pointer = GetValue(instruction.Value1, registers, stackPointer);
                         Register value;
                         switch (instruction.Value2.ValueType)
