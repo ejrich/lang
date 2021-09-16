@@ -1,5 +1,7 @@
 main() {
     function_overloads();
+
+    default_arguments();
 }
 
 function_overloads() {
@@ -17,6 +19,17 @@ function_overloads() {
     printf("Sum of Params = %d\n", sum(4, 41, 544, 244, 42, 14, 23));
 }
 
+default_arguments() {
+    foo(3);
+    foo(7, 10);
+    // foo(7, c = false); // TODO Make this work
+    foo(8, 9, false);
+
+    foo_params(3);
+    foo_params(7, 10);
+    foo_params(8, 9, 3.1, 2.8, 5.6);
+}
+
 int sum(List<int> args) {
     sum := 0;
     each i in args then sum += i;
@@ -27,6 +40,16 @@ int sum(Params<int> args) {
     sum := 0;
     each i in args then sum += i;
     return sum;
+}
+
+foo(int a, int b = 8, bool c = true) {
+    printf("a = %d, b = %d, c = %d\n", a, b, c);
+}
+
+foo_params(int a, int b = 8, Params<float> args) {
+    sum: float;
+    each i in args then sum += i;
+    printf("a = %d, b = %d, sum = %.2f\n", a, b, sum);
 }
 
 #run main();
