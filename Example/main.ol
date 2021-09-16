@@ -18,7 +18,7 @@ int Main(List<string> args) {
     my_struct := create();
     prim := primitives();
     list := create_list(4);
-    return prim;
+    return list[2];
 }
 
 bool test(int a) {
@@ -103,8 +103,8 @@ struct ListStruct {
 
 List<int> create_list(int count) {
     list: List<int>[count];
-    each i in 1..count {
-        list[i] = i;
+    each i in 0..count-1 {
+        list[i] = i * 5;
     }
     a := list[1];
     s: ListStruct;
