@@ -155,9 +155,36 @@ namespace Lang.Backend.LLVM
             var typeInfoType = structs["TypeInfo"];
 
             var types = new LLVMValueRef[programGraph.Types.Count];
+            var typePointers = new Dictionary<string, (IType type, LLVMValueRef typeInfo)>();
             foreach (var (name, type) in programGraph.Types)
             {
-                types[type.TypeIndex] = CreateTypeInfo(name, type.TypeKind, typeInfoType);
+                var typeInfo = LLVMApi.AddGlobal(_module, typeInfoType, "____type_info");
+                SetPrivateConstant(typeInfo);
+                types[type.TypeIndex] = typeInfo;
+                typePointers[name] = (type, typeInfo);
+            }
+
+            foreach (var (name, (type, typeInfo)) in typePointers)
+            {
+                var typeName = LLVMApi.ConstString(name, (uint)name.Length, false);
+                var typeNameString = LLVMApi.AddGlobal(_module, typeName.TypeOf(), "str");
+                SetPrivateConstant(typeNameString);
+                LLVMApi.SetInitializer(typeNameString, typeName);
+
+                var typeKind = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (uint)type.TypeKind, false);
+
+                LLVMValueRef typeFields;
+                if (type is StructAst structAst)
+                {
+                    // TODO Set this
+                    typeFields = LLVMApi.ConstStruct(new [] {LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 0, false)}, false);
+                }
+                else
+                {
+                    typeFields = LLVMApi.ConstStruct(new [] {LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 0, false)}, false);
+                }
+
+                LLVMApi.SetInitializer(typeInfo, LLVMApi.ConstStruct(new [] {typeNameString, typeKind, typeFields}, false));
             }
 
             var typeArray = LLVMApi.ConstArray(LLVMApi.PointerType(typeInfoType, 0), types);
@@ -169,22 +196,6 @@ namespace Lang.Backend.LLVM
             LLVMApi.SetInitializer(typeTable, LLVMApi.ConstStruct(new [] {typeCount, typeArrayGlobal}, false));
 
             return globals;
-        }
-
-        private LLVMValueRef CreateTypeInfo(string name, TypeKind type, LLVMTypeRef typeInfoType)
-        {
-            var typeInfo = LLVMApi.AddGlobal(_module, typeInfoType, "____type_info");
-            SetPrivateConstant(typeInfo);
-
-            var typeName = LLVMApi.ConstString(name, (uint)name.Length, false);
-            var typeNameString = LLVMApi.AddGlobal(_module, typeName.TypeOf(), "str");
-            SetPrivateConstant(typeNameString);
-            LLVMApi.SetInitializer(typeNameString, typeName);
-
-            var typeKind = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (uint)type, false);
-            LLVMApi.SetInitializer(typeInfo, LLVMApi.ConstStruct(new [] {typeNameString, typeKind}, false));
-
-            return typeInfo;
         }
 
         private void SetPrivateConstant(LLVMValueRef variable)

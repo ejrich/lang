@@ -172,7 +172,7 @@ namespace Lang.Runner
                 Marshal.FreeHGlobal(oldDataPointer);
 
                 // Create TypeInfo pointers
-                var newTypeInfos = new Dictionary<string, (IType type, object typeInfo, IntPtr typeInfoPointer)>();
+                var newTypeInfos = new List<(IType type, object typeInfo, IntPtr typeInfoPointer)>();
                 var typeInfoType = _types["TypeInfo"];
                 foreach (var (name, type) in programGraph.Types)
                 {
@@ -186,7 +186,7 @@ namespace Lang.Runner
                         typeKindField.SetValue(typeInfo, type.TypeKind);
 
                         _typeInfoPointers[name] = typeInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoType));
-                        newTypeInfos[name] = (type, typeInfo, typeInfoPointer);
+                        newTypeInfos.Add((type, typeInfo, typeInfoPointer));
                     }
 
                     var listPointer = IntPtr.Add(typeDataPointer, pointerSize * type.TypeIndex);
@@ -199,7 +199,7 @@ namespace Lang.Runner
                     var typeFieldListType = _types["List.TypeField"];
                     var typeFieldType = _types["TypeField"];
                     var typeFieldSize = Marshal.SizeOf(typeFieldType);
-                    foreach (var (name, (type, typeInfo, typeInfoPointer)) in newTypeInfos)
+                    foreach (var (type, typeInfo, typeInfoPointer) in newTypeInfos)
                     {
                         if (type is StructAst structAst)
                         {
