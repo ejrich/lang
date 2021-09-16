@@ -877,7 +877,6 @@ namespace Lang
                 }
             }
             var returnType = VerifyType(function.ReturnTypeDefinition);
-            var functionIR = _irBuilder.AddFunction(function);
 
             // 2. For extern functions, simply verify there is no body and return
             if (function.Extern)
@@ -902,7 +901,7 @@ namespace Lang
             }
 
             // 4. Loop through function body and verify all ASTs
-            var returned = VerifyScope(function.Body, function, _globalScope, functionIR);
+            var returned = VerifyScope(function.Body, function, _globalScope);
 
             // 5. Verify the main function doesn't call the compiler
             if (function.Name == "main" && function.CallsCompiler)
@@ -916,6 +915,11 @@ namespace Lang
                 AddError($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnTypeDefinition)}' on all paths", function);
             }
             function.Verified = true;
+
+            if (!_programGraph.Errors.Any())
+            {
+                _irBuilder.AddFunction(function);
+            }
         }
 
         private void VerifyOperatorOverload(OperatorOverloadAst overload)
@@ -946,8 +950,7 @@ namespace Lang
             }
 
             // 3. Loop through body and verify all ASTs
-            var functionIR = _irBuilder.AddOperatorOverload(overload);
-            var returned = VerifyScope(overload.Body, overload, _globalScope, functionIR);
+            var returned = VerifyScope(overload.Body, overload, _globalScope);
 
             // 4. Verify the body returns on all paths
             if (!returned)
@@ -955,6 +958,11 @@ namespace Lang
                 AddError($"Overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}' does not return type '{PrintTypeDefinition(overload.ReturnTypeDefinition)}' on all paths", overload);
             }
             overload.Verified = true;
+
+            if (!_programGraph.Errors.Any())
+            {
+                _irBuilder.AddOperatorOverload(overload);
+            }
         }
 
         private void ResolveCompilerDirectives(List<IAst> asts, IFunction function)
@@ -1021,7 +1029,7 @@ namespace Lang
             }
         }
 
-        private bool VerifyScope(ScopeAst scope, IFunction currentFunction, ScopeAst parentScope, FunctionIR functionIR)
+        private bool VerifyScope(ScopeAst scope, IFunction currentFunction, ScopeAst parentScope)
         {
             // 1. Set the parent scope
             scope.Parent = parentScope;
@@ -1030,7 +1038,7 @@ namespace Lang
             var returns = false;
             foreach (var ast in scope.Children)
             {
-                if (VerifyAst(ast, currentFunction, scope, functionIR))
+                if (VerifyAst(ast, currentFunction, scope))
                 {
                     returns = true;
                 }
@@ -1038,40 +1046,36 @@ namespace Lang
             return returns;
         }
 
-        private bool VerifyAst(IAst syntaxTree, IFunction currentFunction, ScopeAst scope, FunctionIR functionIR)
+        private bool VerifyAst(IAst syntaxTree, IFunction currentFunction, ScopeAst scope)
         {
             switch (syntaxTree)
             {
                 case ReturnAst returnAst:
-                    VerifyReturnStatement(returnAst, currentFunction, scope, functionIR);
+                    VerifyReturnStatement(returnAst, currentFunction, scope);
                     return true;
                 case DeclarationAst declaration:
-                    VerifyDeclaration(declaration, currentFunction, scope, functionIR);
+                    VerifyDeclaration(declaration, currentFunction, scope);
                     break;
                 case AssignmentAst assignment:
-                    VerifyAssignment(assignment, currentFunction, scope, functionIR);
+                    VerifyAssignment(assignment, currentFunction, scope);
                     break;
                 case ScopeAst newScope:
-                    return VerifyScope(newScope, currentFunction, scope, functionIR);
+                    return VerifyScope(newScope, currentFunction, scope);
                 case ConditionalAst conditional:
-                    return VerifyConditional(conditional, currentFunction, scope, functionIR);
+                    return VerifyConditional(conditional, currentFunction, scope);
                 case WhileAst whileAst:
-                    return VerifyWhile(whileAst, currentFunction, scope, functionIR);
+                    return VerifyWhile(whileAst, currentFunction, scope);
                 case EachAst each:
-                    return VerifyEach(each, currentFunction, scope, functionIR);
+                    return VerifyEach(each, currentFunction, scope);
                 default:
                     VerifyExpression(syntaxTree, currentFunction, scope);
-                    if (functionIR != null && !_programGraph.Errors.Any())
-                    {
-                        _irBuilder.EmitIR(functionIR, syntaxTree, scope);
-                    }
                     break;
             }
 
             return false;
         }
 
-        private void VerifyReturnStatement(ReturnAst returnAst, IFunction currentFunction, ScopeAst scope, FunctionIR functionIR)
+        private void VerifyReturnStatement(ReturnAst returnAst, IFunction currentFunction, ScopeAst scope)
         {
             // 1. Infer the return type of the function
             var returnTypeKind = VerifyType(currentFunction.ReturnTypeDefinition);
@@ -1099,12 +1103,6 @@ namespace Lang
                         AddError($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnTypeDefinition)}', but returned type '{PrintTypeDefinition(returnValueType)}'", returnAst.Value);
                     }
                 }
-            }
-
-            if (functionIR != null && !_programGraph.Errors.Any())
-            {
-                var returnType = TypeTable.GetType(currentFunction.ReturnTypeDefinition);
-                _irBuilder.EmitReturn(functionIR, returnAst, returnType, scope);
             }
         }
 
@@ -1364,7 +1362,7 @@ namespace Lang
             }
         }
 
-        private void VerifyDeclaration(DeclarationAst declaration, IFunction currentFunction, ScopeAst scope, FunctionIR functionIR)
+        private void VerifyDeclaration(DeclarationAst declaration, IFunction currentFunction, ScopeAst scope)
         {
             // 1. Verify the variable is already defined
             if (GetScopeIdentifier(scope, declaration.Name, out _))
@@ -1593,11 +1591,8 @@ namespace Lang
                 }
             }
 
-            if (functionIR != null && !_programGraph.Errors.Any())
-            {
-                declaration.Type = TypeTable.GetType(declaration.TypeDefinition);
-                _irBuilder.EmitDeclaration(functionIR, declaration, scope);
-            }
+            // TODO Move somewhere
+            declaration.Type = TypeTable.GetType(declaration.TypeDefinition);
 
             scope.Identifiers.TryAdd(declaration.Name, declaration);
         }
@@ -1633,7 +1628,7 @@ namespace Lang
             };
         }
 
-        private void VerifyAssignment(AssignmentAst assignment, IFunction currentFunction, ScopeAst scope, FunctionIR functionIR)
+        private void VerifyAssignment(AssignmentAst assignment, IFunction currentFunction, ScopeAst scope)
         {
             // 1. Verify the variable is already defined, that it is not a constant, and the r-value
             var variableTypeDefinition = GetReference(assignment.Reference, currentFunction, scope, out _);
@@ -1732,11 +1727,6 @@ namespace Lang
                 {
                     VerifyConstant(constant, variableTypeDefinition);
                 }
-            }
-
-            if (functionIR != null && !_programGraph.Errors.Any())
-            {
-                _irBuilder.EmitAssignment(functionIR, assignment, scope);
             }
         }
 
@@ -2008,41 +1998,31 @@ namespace Lang
             return field.TypeDefinition;
         }
 
-        private bool VerifyConditional(ConditionalAst conditional, IFunction currentFunction, ScopeAst scope, FunctionIR functionIR)
+        private bool VerifyConditional(ConditionalAst conditional, IFunction currentFunction, ScopeAst scope)
         {
             // 1. Verify the condition expression
             VerifyCondition(conditional.Condition, currentFunction, scope);
 
-            if (functionIR != null && !_programGraph.Errors.Any())
-            {
-                var block = _irBuilder.EmitConditional(functionIR, conditional, scope, functionIR.BasicBlocks[^1]);
-            }
-
             // 2. Verify the conditional scope
-            var ifReturned = VerifyScope(conditional.IfBlock, currentFunction, scope, functionIR);
+            var ifReturned = VerifyScope(conditional.IfBlock, currentFunction, scope);
 
             // 3. Verify the else block if necessary
             if (conditional.ElseBlock != null)
             {
-                var elseReturned = VerifyScope(conditional.ElseBlock, currentFunction, scope, functionIR);
+                var elseReturned = VerifyScope(conditional.ElseBlock, currentFunction, scope);
                 return ifReturned && elseReturned;
             }
 
             return false;
         }
 
-        private bool VerifyWhile(WhileAst whileAst, IFunction currentFunction, ScopeAst scope, FunctionIR functionIR)
+        private bool VerifyWhile(WhileAst whileAst, IFunction currentFunction, ScopeAst scope)
         {
             // 1. Verify the condition expression
             VerifyCondition(whileAst.Condition, currentFunction, scope);
 
-            if (functionIR != null && !_programGraph.Errors.Any())
-            {
-                var block = _irBuilder.EmitWhile(functionIR, whileAst, scope);
-            }
-
             // 2. Verify the scope of the while block
-            return VerifyScope(whileAst.Body, currentFunction, scope, functionIR);
+            return VerifyScope(whileAst.Body, currentFunction, scope);
         }
 
         private bool VerifyCondition(IAst ast, IFunction currentFunction, ScopeAst scope)
@@ -2064,7 +2044,7 @@ namespace Lang
             }
         }
 
-        private bool VerifyEach(EachAst each, IFunction currentFunction, ScopeAst scope, FunctionIR functionIR)
+        private bool VerifyEach(EachAst each, IFunction currentFunction, ScopeAst scope)
         {
             // 1. Verify the iterator or range
             if (GetScopeIdentifier(scope, each.IterationVariable, out _))
@@ -2115,13 +2095,8 @@ namespace Lang
                 each.Body.Identifiers.TryAdd(each.IterationVariable, iterType);
             }
 
-            if (functionIR != null && !_programGraph.Errors.Any())
-            {
-                var block = _irBuilder.EmitEach(functionIR, each, scope);
-            }
-
             // 2. Verify the scope of the each block
-            return VerifyScope(each.Body, currentFunction, scope, functionIR);
+            return VerifyScope(each.Body, currentFunction, scope);
         }
 
         private void VerifyTopLevelDirective(CompilerDirectiveAst directive)
@@ -2130,7 +2105,7 @@ namespace Lang
             {
                 case DirectiveType.Run:
                     // TODO Figure out where to put this IR
-                    VerifyAst(directive.Value, null, _globalScope, null);
+                    VerifyAst(directive.Value, null, _globalScope);
                     if (!_programGraph.Errors.Any())
                     {
                         _programRunner.Init(_programGraph);
