@@ -234,12 +234,21 @@ namespace Lang.Backend.LLVM
             // 4. Initialize lists
             else if (declaration.Type.Name == "List")
             {
-                // TODO Initialize count and reserve memory
-                if (declaration.Type.Count is ConstantAst constantAst)
+                if (declaration.Type.Count is ConstantAst constant)
                 {
-                    var count = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), ulong.Parse(constantAst.Value), false);
+                    InitializeConstList(variable, constant);
+                }
+                else if (declaration.Type.Count != null)
+                {
+                    var (_, count) = WriteExpression(declaration.Type.Count, localVariables);
+
                     var countPointer = LLVMApi.BuildStructGEP(_builder, variable, 0, "countptr");
                     LLVMApi.BuildStore(_builder, count, countPointer);
+
+                    var targetType = LLVMTypeRef.Int32Type();
+                    var listData = LLVMApi.BuildArrayAlloca(_builder, targetType, count, "listdata");
+                    var dataPointer = LLVMApi.BuildStructGEP(_builder, variable, 1, "dataptr");
+                    LLVMApi.BuildStore(_builder, listData, dataPointer);
                 }
             }
             // 5. Initialize struct field default values
@@ -269,12 +278,7 @@ namespace Lang.Backend.LLVM
 
                 if (structField.Type.Name == "List")
                 {
-                    if (structField.Type.Count is ConstantAst constantAst)
-                    {
-                        var count = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), ulong.Parse(constantAst.Value), false);
-                        var countPointer = LLVMApi.BuildStructGEP(_builder, variable, 0, "countptr");
-                        LLVMApi.BuildStore(_builder, count, countPointer);
-                    }
+                    InitializeConstList(field, structField.Type.Count as ConstantAst);
                 }
                 else if (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind)
                 {
@@ -286,6 +290,23 @@ namespace Lang.Backend.LLVM
                     LLVMApi.BuildStore(_builder, defaultValue, field);
                 }
             }
+        }
+
+        private void InitializeConstList(LLVMValueRef list, ConstantAst constant)
+        {
+            // 1. Set the count field
+            var count = ulong.Parse(constant.Value);
+            var countValue = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), ulong.Parse(constant.Value), false);
+            var countPointer = LLVMApi.BuildStructGEP(_builder, list, 0, "countptr");
+            LLVMApi.BuildStore(_builder, countValue, countPointer);
+
+            // 2. Initialize the list data array
+            var targetType = LLVMTypeRef.Int32Type(); // TODO Get this from the type
+            var arrayType = LLVMTypeRef.ArrayType(targetType, (uint)count);
+            var listData = LLVMApi.BuildAlloca(_builder, arrayType, "listdata");
+            var listDataPointer = LLVMApi.BuildBitCast(_builder, listData, LLVMTypeRef.PointerType(targetType, 0), "tmpdata");
+            var dataPointer = LLVMApi.BuildStructGEP(_builder, list, 1, "dataptr");
+            LLVMApi.BuildStore(_builder, listDataPointer, dataPointer);
         }
 
         private static LLVMValueRef GetConstZero(LLVMTypeRef type)
