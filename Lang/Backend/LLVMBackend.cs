@@ -28,6 +28,7 @@ namespace Lang.Backend
         private LLVMMetadataRef _debugCompilationUnit;
         private List<LLVMMetadataRef> _debugFiles;
         private Dictionary<string, LLVMMetadataRef> _debugTypes;
+        private Dictionary<string, LLVMMetadataRef> _debugFunctions;
 
         private readonly Queue<LLVMValueRef> _allocationQueue = new();
         private readonly LLVMValueRef _zeroInt = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), 0, false);
@@ -135,6 +136,7 @@ namespace Lang.Backend
                 _debugCompilationUnit = _debugBuilder.CreateCompileUnit(LLVMDWARFSourceLanguage.LLVMDWARFSourceLanguageC, compileUnitFile, "ol", 0, string.Empty, 0, string.Empty, LLVMDWARFEmissionKind.LLVMDWARFEmissionNone, 0, 0, 0, string.Empty, string.Empty);
                 _debugFiles = project.SourceFiles.Select(file => _debugBuilder.CreateFile(Path.GetFileName(file), Path.GetDirectoryName(file))).ToList();
                 _debugTypes = new Dictionary<string, LLVMMetadataRef>();
+                _debugFunctions = new Dictionary<string, LLVMMetadataRef>();
             }
         }
 
@@ -149,23 +151,23 @@ namespace Lang.Backend
                     switch (type)
                     {
                         case StructAst structAst:
-                        {
                             structs[name] = _context.CreateNamedStruct(name);
 
-                            using var structName = new MarshaledString(structAst.Name);
+                            if (structAst.Fields.Any())
+                            {
+                                using var structName = new MarshaledString(structAst.Name);
 
-                            var file = _debugFiles[structAst.FileIndex];
-                            _debugTypes[name] = LLVM.DIBuilderCreateForwardDecl(_debugBuilder, (uint)DwarfTag.Structure_type, structName.Value, (UIntPtr)structName.Length, file, file, structAst.Line, 0, structAst.Size * 8, 0, null, (UIntPtr)0);
+                                var file = _debugFiles[structAst.FileIndex];
+                                _debugTypes[name] = LLVM.DIBuilderCreateForwardDecl(_debugBuilder, (uint)DwarfTag.Structure_type, structName.Value, (UIntPtr)structName.Length, file, file, structAst.Line, 0, structAst.Size * 8, 0, null, (UIntPtr)0);
+                            }
+                            else
+                            {
+                                CreateDebugStructType(structAst, name);
+                            }
                             break;
-                        }
                         case EnumAst enumAst:
-                        {
-                            using var enumName = new MarshaledString(enumAst.Name);
-
-                            var encoding = enumAst.BaseType.PrimitiveType.Signed ? DwarfTypeEncoding.Signed : DwarfTypeEncoding.Unsigned;
-                            _debugTypes[type.Name] = LLVM.DIBuilderCreateBasicType(_debugBuilder, enumName.Value, (UIntPtr)enumName.Length, (uint)enumAst.BaseType.PrimitiveType.Bytes * 8, (uint)encoding, LLVMDIFlags.LLVMDIFlagZero);
+                            CreateDebugEnumType(enumAst);
                             break;
-                        }
                         case PrimitiveAst primitive:
                             CreateDebugBasicType(primitive, name);
                             break;
@@ -177,6 +179,8 @@ namespace Lang.Backend
                     {
                         var fields = structAst.Fields.Select(field => ConvertTypeDefinition(field.Type)).ToArray();
                         structs[name].StructSetBody(fields, false);
+
+                        CreateDebugStructType(structAst, name);
                     }
                 }
             }
@@ -412,7 +416,7 @@ namespace Lang.Backend
 
                 var file = _debugFiles[functionAst.FileIndex];
                 var functionType = _debugBuilder.CreateSubroutineType(file, debugArgumentTypes, LLVMDIFlags.LLVMDIFlagPrototyped);
-                var debugFunction = _debugBuilder.CreateFunction(file, debugName, name, file, functionAst.Line, functionType, 0, 0, functionAst.Line, 0, 0);
+                _debugFunctions[name] = _debugBuilder.CreateFunction(file, debugName, name, file, functionAst.Line, functionType, 0, 0, functionAst.Line, 0, 0);
             }
             else
             {
@@ -2133,9 +2137,51 @@ namespace Lang.Backend
             };
         }
 
-        private void CreateDebugStructType(StructAst structAst)
+        private void CreateDebugStructType(StructAst structAst, string name)
         {
-            // TODO Implement me
+            using var structName = new MarshaledString(structAst.Name);
+
+            var file = _debugFiles[structAst.FileIndex];
+            var fields = new LLVMMetadataRef[structAst.Fields.Count];
+
+            if (fields.Length > 0)
+            {
+                var structDecl = _debugTypes[name];
+                for (var i = 0; i < fields.Length; i++)
+                {
+                    var structField = structAst.Fields[i];
+                    using var fieldName = new MarshaledString(structField.Name);
+
+                    fields[i] = LLVM.DIBuilderCreateMemberType(_debugBuilder, structDecl, fieldName.Value, (UIntPtr)fieldName.Length, file, structField.Line, structField.Size * 8, 0, structField.Offset * 8, LLVMDIFlags.LLVMDIFlagZero, GetDebugType(structField.Type));
+                }
+            }
+
+            fixed (LLVMMetadataRef* fieldsPointer = fields)
+            {
+                _debugTypes[name] = LLVM.DIBuilderCreateStructType(_debugBuilder, file, structName.Value, (UIntPtr)structName.Length, file, structAst.Line, structAst.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, (LLVMOpaqueMetadata**)fieldsPointer, (uint)fields.Length, 0, null, null, (UIntPtr)0);
+            }
+        }
+
+        private void CreateDebugEnumType(EnumAst enumAst)
+        {
+            using var enumName = new MarshaledString(enumAst.Name);
+
+            var file = _debugFiles[enumAst.FileIndex];
+            var enumValues = new LLVMMetadataRef[enumAst.Values.Count];
+            var isUnsigned = enumAst.BaseType.PrimitiveType.Signed ? 0 : 1;
+
+            for (var i = 0; i < enumValues.Length; i++)
+            {
+                var enumValue = enumAst.Values[i];
+                using var valueName = new MarshaledString(enumValue.Name);
+
+                enumValues[i] = LLVM.DIBuilderCreateEnumerator(_debugBuilder, valueName.Value, (UIntPtr)valueName.Length, enumValue.Value, isUnsigned);
+            }
+
+            fixed (LLVMMetadataRef* enumValuesPointer = enumValues)
+            {
+                _debugTypes[enumAst.Name] = LLVM.DIBuilderCreateEnumerationType(_debugBuilder, file, enumName.Value, (UIntPtr)enumName.Length, file, enumAst.Line, (uint)enumAst.BaseType.PrimitiveType.Bytes * 8, 0, (LLVMOpaqueMetadata**)enumValuesPointer, (uint)enumValues.Length, GetDebugType(enumAst.BaseType));
+            }
         }
 
         private void CreateDebugBasicType(PrimitiveAst type, string typeName)

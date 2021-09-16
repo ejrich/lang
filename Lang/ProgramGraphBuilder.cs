@@ -425,7 +425,8 @@ namespace Lang
                             }
                         }
                         field.Offset = structAst.Size;
-                        structAst.Size += field.Type.CArray ? type.Size * field.Type.ConstCount.Value : type.Size;
+                        field.Size = field.Type.CArray ? type.Size * field.Type.ConstCount.Value : type.Size;
+                        structAst.Size += field.Size;
                     }
                 }
             }
