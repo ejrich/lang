@@ -155,6 +155,7 @@ namespace Lang.Runner
                 }
             }
 
+            // TODO Also store function type infos
             if (_typeCount != programGraph.Types.Count)
             {
                 var typeTable = _globalVariables["__type_table"];

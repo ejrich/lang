@@ -51,6 +51,11 @@ namespace Lang.Backend.LLVM
                     function.Name = "__main";
                     WriteFunctionDefinition("__main", function.Arguments, function.ReturnType, function.Varargs);
                 }
+                else if (name == "__start")
+                {
+                    function.Name = "main";
+                    WriteFunctionDefinition("main", function.Arguments, function.ReturnType, function.Varargs);
+                }
                 else
                 {
                     WriteFunctionDefinition(name, function.Arguments, function.ReturnType, function.Varargs);
@@ -67,13 +72,7 @@ namespace Lang.Backend.LLVM
                 WriteFunction(functionAst, globals, function);
             }
 
-            // 6. Write __start function
-            var start = programGraph.Start;
-            _currentFunction = start;
-            var startFunction = WriteFunctionDefinition("main", start.Arguments, start.ReturnType);
-            WriteFunction(start, globals, startFunction);
-
-            // 7. Compile to object file
+            // 6. Compile to object file
             Compile(objectFile, buildSettings.OutputAssembly);
 
             return objectFile;
@@ -163,6 +162,7 @@ namespace Lang.Backend.LLVM
                 types[type.TypeIndex] = typeInfo;
                 typePointers[name] = (type, typeInfo);
             }
+            // TODO Also store function type infos
 
             var typeFieldType = LLVMApi.GetTypeByName(_module, "TypeField");
             var enumValueType = LLVMApi.GetTypeByName(_module, "EnumValue");
