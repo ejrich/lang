@@ -214,9 +214,10 @@ namespace Lang.Runner
 
                 foreach (var (name, functions) in programGraph.Functions)
                 {
-                    foreach (var function in functions)
+                    for (var i = 0; i < functions.Count; i++)
                     {
-                        if (!_typeInfoPointers.TryGetValue(name, out var typeInfoPointer))
+                        var function = functions[i];
+                        if (!_typeInfoPointers.TryGetValue($"name.{i}", out var typeInfoPointer))
                         {
                             var typeInfo = Activator.CreateInstance(typeInfoType);
 
@@ -225,7 +226,7 @@ namespace Lang.Runner
                             var typeKindField = typeInfoType.GetField("type");
                             typeKindField.SetValue(typeInfo, function.TypeKind);
 
-                            _typeInfoPointers[name] = typeInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoType));
+                            _typeInfoPointers[$"name.{i}"] = typeInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoType));
                             newTypeInfos.Add((function, typeInfo, typeInfoPointer));
                         }
 
