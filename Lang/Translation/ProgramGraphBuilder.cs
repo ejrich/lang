@@ -1448,7 +1448,6 @@ namespace Lang.Translation
                     // Valid types
                     return !_programGraph.Errors.Any();
                 case Type.Error:
-                    AddError($"Expected condition to be bool, int, float, or pointer", ast);
                     return false;
                 default:
                     AddError($"Expected condition to be bool, int, float, or pointer, but got '{PrintTypeDefinition(conditionalType)}'", ast);
