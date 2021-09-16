@@ -128,10 +128,10 @@ namespace Lang
                     switch (instruction.Type)
                     {
                         case InstructionType.Jump:
-                            text += instruction.Index.ToString();
+                            text += instruction.Value1.JumpBlock.Index.ToString();
                             break;
                         case InstructionType.ConditionalJump:
-                            text += $"{instruction.Index} {PrintInstructionValue(instruction.Value1)}";
+                            text += $"{instruction.Value2.JumpBlock.Index} {PrintInstructionValue(instruction.Value1)}";
                             break;
                         case InstructionType.Return:
                         case InstructionType.ReturnVoid:
@@ -155,6 +155,8 @@ namespace Lang
                             text += $"{PrintInstructionValue(instruction.Value1)} => v{instruction.ValueIndex}";
                             break;
                         case InstructionType.DebugSetLocation:
+                        case InstructionType.DebugPushLexicalBlock:
+                        case InstructionType.DebugPopLexicalBlock:
                         case InstructionType.DebugDeclareParameter:
                         case InstructionType.DebugDeclareVariable:
                             break;
@@ -755,7 +757,7 @@ namespace Lang
             var elseBlock = AddBasicBlock(function);
 
             // Jump to the else block, otherwise fall through to the then block
-            conditionJump.Index = elseBlock.Index;
+            conditionJump.Value2 = BasicBlockValue(elseBlock);
 
             returns = false;
             if (conditional.ElseBlock == null)
@@ -775,7 +777,7 @@ namespace Lang
 
             if (!conditional.IfBlock.Returns)
             {
-                jumpToAfter.Index = afterBlock.Index;
+                jumpToAfter.Value1 = BasicBlockValue(afterBlock);
             }
 
             return afterBlock;
@@ -791,11 +793,11 @@ namespace Lang
 
             var whileBodyBlock = AddBasicBlock(function);
             whileBodyBlock = EmitScope(function, whileBodyBlock, whileAst.Body, returnType);
-            var jumpToCondition = new Instruction {Type = InstructionType.Jump, Index = conditionBlock.Index};
+            var jumpToCondition = new Instruction {Type = InstructionType.Jump, Value1 = BasicBlockValue(conditionBlock)};
             function.Instructions.Add(jumpToCondition);
 
             var afterBlock = AddBasicBlock(function);
-            conditionJump.Index = afterBlock.Index;
+            conditionJump.Value2 = BasicBlockValue(afterBlock);
 
             return afterBlock;
         }
@@ -904,11 +906,11 @@ namespace Lang
             var eachIncrementBlock = eachBodyBlock.Location < function.Instructions.Count ? AddBasicBlock(function) : eachBodyBlock;
             var nextValue = EmitInstruction(InstructionType.IntegerAdd, function, _s32Type, indexValue, GetConstantInteger(1));
             EmitStore(function, indexVariable, nextValue);
-            var jumpToCondition = new Instruction {Type = InstructionType.Jump, Index = conditionBlock.Index};
+            var jumpToCondition = new Instruction {Type = InstructionType.Jump, Value1 = BasicBlockValue(conditionBlock)};
             function.Instructions.Add(jumpToCondition);
 
             var afterBlock = AddBasicBlock(function);
-            conditionJump.Index = afterBlock.Index;
+            conditionJump.Value2 = BasicBlockValue(afterBlock);
 
             if (!BuildSettings.Release)
             {
@@ -916,6 +918,11 @@ namespace Lang
             }
 
             return afterBlock;
+        }
+
+        private InstructionValue BasicBlockValue(BasicBlock jumpBlock)
+        {
+            return new InstructionValue {ValueType = InstructionValueType.BasicBlock, JumpBlock = jumpBlock};
         }
 
         private BasicBlock AddBasicBlock(FunctionIR function)
