@@ -1714,22 +1714,20 @@ namespace Lang
             {
                 case TypeKind.Integer:
                 {
-                    var integerType = (PrimitiveAst)targetType;
+                    var targetIntegerType = (PrimitiveAst)targetType;
                     switch (value.Type.TypeKind)
                     {
                         case TypeKind.Integer:
+                            var sourceIntegerType = (PrimitiveAst)value.Type;
+                            castInstruction.Type = GetIntegerCastType(sourceIntegerType, targetIntegerType);
+                            break;
                         case TypeKind.Enum:
-                            if (targetType.Size >= value.Type.Size)
-                            {
-                                castInstruction.Type = integerType.Primitive.Signed ? InstructionType.IntegerExtend : InstructionType.UnsignedIntegerExtend;
-                            }
-                            else
-                            {
-                                castInstruction.Type = InstructionType.IntegerTruncate;
-                            }
+                            var enumType = (EnumAst)value.Type;
+                            sourceIntegerType = (PrimitiveAst)enumType.BaseType;
+                            castInstruction.Type = GetIntegerCastType(sourceIntegerType, targetIntegerType);
                             break;
                         case TypeKind.Float:
-                            castInstruction.Type = integerType.Primitive.Signed ? InstructionType.FloatToIntegerCast: InstructionType.FloatToUnsignedIntegerCast;
+                            castInstruction.Type = targetIntegerType.Primitive.Signed ? InstructionType.FloatToIntegerCast: InstructionType.FloatToUnsignedIntegerCast;
                             break;
                     }
                     break;
@@ -1751,6 +1749,26 @@ namespace Lang
             }
 
             return AddInstruction(function, castInstruction, targetType);
+        }
+
+        private InstructionType GetIntegerCastType(PrimitiveAst sourceType, PrimitiveAst targetType)
+        {
+            if (targetType.Size >= sourceType.Size)
+            {
+                if (targetType.Primitive.Signed)
+                {
+                    return sourceType.Primitive.Signed ? InstructionType.IntegerExtend : InstructionType.UnsignedIntegerToIntegerExtend;
+                }
+                return sourceType.Primitive.Signed ? InstructionType.IntegerToUnsignedIntegerExtend : InstructionType.UnsignedIntegerExtend;
+            }
+            else
+            {
+                if (targetType.Primitive.Signed)
+                {
+                    return sourceType.Primitive.Signed ? InstructionType.IntegerTruncate : InstructionType.UnsignedIntegerToIntegerTruncate;
+                }
+                return sourceType.Primitive.Signed ? InstructionType.IntegerToUnsignedIntegerTruncate : InstructionType.UnsignedIntegerTruncate;
+            }
         }
 
         private InstructionValue GetConstantInteger(int value)
