@@ -53,7 +53,6 @@ namespace Lang
         IType Type { get; set; }
         IType ArrayElementType { get; set; }
         bool HasGenerics { get; set; }
-        bool IsType { get; set; }
         IAst Value { get; set; }
         Dictionary<string, AssignmentAst> Assignments { get; set; }
         List<IAst> ArrayValues { get; set; }
@@ -98,13 +97,17 @@ namespace Lang
         public uint Line { get; init; }
         public uint Column { get; init; }
         public string Name { get; set; }
+        // TODO Implement both
         public string BackendName { get; set; }
+        public string BaseName { get; set; }
         public int TypeIndex { get; set; }
         public TypeKind TypeKind { get; set; }
         public uint Size { get; set; }
         public bool Verified { get; set; }
         public bool Verifying { get; set; }
-        public List<string> Generics { get; } = new();
+        public List<string> Generics { get; set; }
+        // TODO Implement
+        public List<IType> GenericTypes { get; set; }
         public List<StructFieldAst> Fields { get; } = new();
     }
 
@@ -119,7 +122,6 @@ namespace Lang
         public TypeDefinition TypeDefinition { get; set; }
         public IType Type { get; set; }
         public IType ArrayElementType { get; set; }
-        public bool IsType { get; set; }
         public bool HasGenerics { get; set; }
         public IAst Value { get; set; }
         public Dictionary<string, AssignmentAst> Assignments { get; set; }
@@ -286,7 +288,6 @@ namespace Lang
         public TypeDefinition TypeDefinition { get; set; }
         public IType Type { get; set; }
         public IType ArrayElementType { get; set; }
-        public bool IsType { get; set; }
         public bool HasGenerics { get; set; }
         public bool Constant { get; set; }
         public int AllocationIndex { get; set; }
@@ -516,10 +517,11 @@ namespace Lang
         String,
         Pointer,
         Array,
+        CArray,
         Enum,
         Struct,
-        Function,
-        CArray,
+        Type,
+        Function
         // Below not used in the backend
         // VarArgs,
         // Params,
