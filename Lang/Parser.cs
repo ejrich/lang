@@ -1996,17 +1996,36 @@ namespace Lang
                     break;
             }
 
-            // 6. Find open brace to start parsing body
+            // 6. Handle compiler directives
+            if (enumerator.Current?.Type == TokenType.Pound)
+            {
+                enumerator.MoveNext();
+                switch (enumerator.Current?.Value)
+                {
+                    case "print_ir":
+                        overload.Flags |= FunctionFlags.PrintIR;
+                        break;
+                    case null:
+                        ErrorReporter.Report("Expected compiler directive value", enumerator.Last);
+                        return overload;
+                    default:
+                        ErrorReporter.Report($"Unexpected compiler directive '{enumerator.Current.Value}'", enumerator.Current);
+                        break;
+                }
+                enumerator.MoveNext();
+            }
+
+            // 7. Find open brace to start parsing body
             if (enumerator.Current?.Type != TokenType.OpenBrace)
             {
                 // Add an error and continue until open paren
                 var token = enumerator.Current ?? enumerator.Last;
-                ErrorReporter.Report($"Unexpected token '{token.Value}' in function definition", token);
+                ErrorReporter.Report($"Unexpected token '{token.Value}' in operator overload definition", token);
                 while (enumerator.Current != null && enumerator.Current.Type != TokenType.OpenBrace)
                     enumerator.MoveNext();
             }
 
-            // 7. Parse body
+            // 8. Parse body
             overload.Body = ParseScope(enumerator, overload);
 
             return overload;

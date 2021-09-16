@@ -110,6 +110,11 @@ namespace Lang
             Program.Functions[overload.Name] = functionIR;
 
             EmitScopeChildren(functionIR, entryBlock, overload.Body, overload.ReturnType, null, null);
+
+            if (overload.Flags.HasFlag(FunctionFlags.PrintIR))
+            {
+                PrintFunction(overload.Name, functionIR);
+            }
         }
 
         public FunctionIR CreateRunnableFunction(IAst ast, ScopeAst globalScope)
@@ -1590,12 +1595,12 @@ namespace Lang
                 instructionType = op switch
                 {
                     Operator.Add => InstructionType.FloatAdd,
-                        Operator.Subtract => InstructionType.FloatAdd,
-                        Operator.Multiply => InstructionType.FloatAdd,
-                        Operator.Divide => InstructionType.FloatAdd,
-                        Operator.Modulus => InstructionType.FloatModulus,
-                        // @Cleanup this branch should never be hit
-                        _ => InstructionType.FloatAdd
+                    Operator.Subtract => InstructionType.FloatSubtract,
+                    Operator.Multiply => InstructionType.FloatMultiply,
+                    Operator.Divide => InstructionType.FloatDivide,
+                    Operator.Modulus => InstructionType.FloatModulus,
+                    // @Cleanup this branch should never be hit
+                    _ => InstructionType.FloatAdd
                 };
             }
             return EmitInstruction(instructionType, function, type, lhs, rhs);

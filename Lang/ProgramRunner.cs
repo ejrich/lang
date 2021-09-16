@@ -1171,11 +1171,11 @@ namespace Lang
                         var register = new Register();
                         if (instruction.Value1.Type.Size == 4)
                         {
-                            register.Float = lhs.Float + rhs.Float;
+                            register.Float = lhs.Float - rhs.Float;
                         }
                         else
                         {
-                            register.Double = lhs.Double + rhs.Double;
+                            register.Double = lhs.Double - rhs.Double;
                         }
                         registers[instruction.ValueIndex] = register;
                         break;
