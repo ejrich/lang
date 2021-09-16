@@ -1569,37 +1569,22 @@ namespace Lang.Backend
                         value = LLVM.BuildStructGEP(_builder, value, (uint)structField.ValueIndices[i-1], identifier.Name);
                         break;
                     case IndexAst index:
-                        var (_, indexValue) = WriteExpression(index.Index, localVariables);
                         value = LLVM.BuildStructGEP(_builder, value, (uint)structField.ValueIndices[i-1], index.Name);
+                        (type, value) = GetListPointer(index, localVariables, out _, type, value);
 
                         if (index.CallsOverload)
                         {
-                            var overloadName = GetOperatorOverloadName(type, Operator.Subscript);
-                            var overload = LLVM.GetNamedFunction(_module, overloadName);
-                            var overloadDef = _programGraph.OperatorOverloads[type.GenericName][Operator.Subscript];
-
                             skipPointer = true;
-                            type = overloadDef.ReturnType;
-                            value = LLVM.BuildLoad(_builder, value, "value");
-                            var callValue = LLVM.BuildCall(_builder, overload, new []{value, indexValue}, string.Empty);
                             if (i < structField.Pointers.Length && !structField.Pointers[i])
                             {
-                                value = _allocationQueue.Dequeue();
-                                LLVM.BuildStore(_builder, callValue, value);
+                                var pointer = _allocationQueue.Dequeue();
+                                LLVM.BuildStore(_builder, value, pointer);
+                                value = pointer;
                             }
-                            else
-                            {
-                                value = callValue;
-                            }
-
-                            if (i == structField.Pointers.Length)
+                            else if (i == structField.Pointers.Length)
                             {
                                 loaded = true;
                             }
-                        }
-                        else
-                        {
-                            (type, value) = GetListPointer(index, localVariables, out _, type, value);
                         }
                         break;
                 }
