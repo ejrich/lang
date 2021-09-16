@@ -261,11 +261,6 @@ namespace Lang.Backend.LLVM
                 case EachAst each:
                     var indexVariable = LLVMApi.BuildAlloca(_builder, LLVMTypeRef.Int32Type(), each.IterationVariable);
                     _allocationQueue.Enqueue(indexVariable);
-                    if (each.Iteration != null)
-                    {
-                        var iterationVariable = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(each.IteratorType), each.IterationVariable);
-                        _allocationQueue.Enqueue(iterationVariable);
-                    }
 
                     foreach (var childAst in each.Children)
                     {
@@ -603,7 +598,6 @@ namespace Lang.Backend.LLVM
 
             // 1. Initialize each values
             var indexVariable = _allocationQueue.Dequeue();
-            var iterationVariable = new LLVMValueRef();
             var listData = new LLVMValueRef();
             var compareTarget = new LLVMValueRef();
             var (iterationType, iterationValue) = each.Iteration switch
@@ -623,15 +617,9 @@ namespace Lang.Backend.LLVM
                 {
                     case "List":
                     case "Params": // TODO Add 'Any' type case
-                        iterationVariable = _allocationQueue.Dequeue();
-
-                        // Get the first element of the List
+                        // Load the List data
                         var dataPointer = LLVMApi.BuildStructGEP(_builder, iterationValue, 1, "dataptr");
                         listData = LLVMApi.BuildLoad(_builder, dataPointer, "data");
-                        var first = LLVMApi.BuildLoad(_builder, listData, "first");
-
-                        LLVMApi.BuildStore(_builder, first, iterationVariable);
-                        eachVariables.TryAdd(each.IterationVariable, (each.IteratorType, iterationVariable));
 
                         // Set the compareTarget to the list count
                         var lengthPointer= LLVMApi.BuildStructGEP(_builder, iterationValue, 0, "lengthptr");
@@ -659,6 +647,17 @@ namespace Lang.Backend.LLVM
             var indexValue = LLVMApi.BuildLoad(_builder, indexVariable, "curr");
             var condition = LLVMApi.BuildICmp(_builder, each.Iteration == null ? LLVMIntPredicate.LLVMIntSLE : LLVMIntPredicate.LLVMIntSLT,
                 indexValue, compareTarget, "listcmp");
+            if (each.Iteration != null)
+            {
+                switch (iterationType.Name)
+                {
+                    case "List":
+                    case "Params":
+                        var iterationVariable = LLVMApi.BuildGEP(_builder, listData, new []{indexValue}, each.IterationVariable);
+                        eachVariables.TryAdd(each.IterationVariable, (each.IteratorType, iterationVariable));
+                        break;
+                }
+            }
 
             var eachBody = LLVMApi.AppendBasicBlock(function, "eachbody");
             var afterEach = LLVMApi.AppendBasicBlock(function, "aftereach");
@@ -679,18 +678,6 @@ namespace Lang.Backend.LLVM
             // 6. Increment and/or move the iteration variable
             var nextValue = LLVMApi.BuildAdd(_builder, indexValue, LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 1, false), "inc");
             LLVMApi.BuildStore(_builder, nextValue, indexVariable);
-            if (each.Iteration != null)
-            {
-                switch (iterationType.Name)
-                {
-                    case "List":
-                    case "Params":
-                        var nextPointer = LLVMApi.BuildGEP(_builder, listData, new []{nextValue}, "nextptr");
-                        var nextVariable = LLVMApi.BuildLoad(_builder, nextPointer, "nextvar");
-                        LLVMApi.BuildStore(_builder, nextVariable, iterationVariable);
-                        break;
-                }
-            }
 
             // 7. Write jump to the loop
             LLVMApi.BuildBr(_builder, eachCondition);
