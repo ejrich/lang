@@ -296,7 +296,6 @@ lists() {
 
 open_window() {
     #if os == OS.Linux {
-        // @Robustness This should be able to run, I'll have my own build server someday hopefully
         XOpenDisplay("Hello");
         printf("Opening X11 window\n");
     }
