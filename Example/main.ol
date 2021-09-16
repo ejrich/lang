@@ -354,5 +354,6 @@ type_casts() {
     a: u64 = 0xFFFFFFFFFFFF0000;
     b := cast(s32, a);
     c := cast(float64, a);
-    printf("a = %llu, b = %d, c = %f\n", a, b, c);
+    d := cast(u8, State.Running);
+    printf("a = %llu, b = %d, c = %f, d = %d\n", a, b, c, d);
 }
