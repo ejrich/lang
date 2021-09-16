@@ -18,8 +18,7 @@ namespace Lang.Runner
     public class ProgramRunner : IProgramRunner
     {
         private ModuleBuilder _moduleBuilder;
-        private Type _library;
-        private object _functionObject;
+        private readonly Dictionary<string, List<MethodInfo>> _functions = new();
         private readonly Dictionary<string, ValueType> _globalVariables = new();
         private readonly Dictionary<string, Type> _types = new();
 
@@ -36,10 +35,8 @@ namespace Lang.Runner
             {
                 var assemblyName = new AssemblyName("Runner");
                 var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
-                _moduleBuilder = assemblyBuilder.DefineDynamicModule("ExternFunctions");
+                _moduleBuilder = assemblyBuilder.DefineDynamicModule("Runner");
             }
-            // TODO Delete previous functions type
-            var typeBuilder = _moduleBuilder.DefineType("Functions", TypeAttributes.Class | TypeAttributes.Public);
 
             var temporaryStructs = new Dictionary<string, TypeBuilder>();
             foreach (var (_, type) in programGraph.Types)
@@ -47,7 +44,7 @@ namespace Lang.Runner
                 switch (type)
                 {
                     case EnumAst enumAst:
-                        if (enumAst.Registered) break;
+                        if (_types.ContainsKey(enumAst.Name)) break;
                         var enumBuilder = _moduleBuilder.DefineEnum(enumAst.Name, TypeAttributes.Public, typeof(int));
                         foreach (var value in enumAst.Values)
                         {
@@ -56,7 +53,7 @@ namespace Lang.Runner
                         _types[enumAst.Name] = enumBuilder.CreateTypeInfo();
                         break;
                     case StructAst structAst:
-                        if (structAst.Registered) break;
+                        if (_types.ContainsKey(structAst.Name)) break;
                         var structBuilder = _moduleBuilder.DefineType(structAst.Name, TypeAttributes.Public | TypeAttributes.SequentialLayout);
                         temporaryStructs[structAst.Name] = structBuilder;
                         break;
@@ -103,22 +100,25 @@ namespace Lang.Runner
             {
                 var returnType = GetTypeFromDefinition(function.ReturnType);
 
+                if (!_functions.TryGetValue(function.Name, out var functions))
+                    _functions[function.Name] = functions = new List<MethodInfo>();
+
                 if (function.Varargs)
                 {
-                    foreach (var callTypes in function.VarargsCalls)
+                    for (var i = functions.Count; i < function.VarargsCalls.Count; i++)
                     {
+                        var callTypes = function.VarargsCalls[i];
                         var varargs = callTypes.Select(arg => GetTypeFromDefinition(arg, cCall: true)).ToArray();
-                        CreateFunction(typeBuilder, function.Name, function.ExternLib, returnType, varargs);
+                        CreateFunction(function.Name, function.ExternLib, returnType, varargs, functions);
                     }
                     continue;
                 }
-
-                var args = function.Arguments.Select(arg => GetTypeFromDefinition(arg.Type, cCall: true)).ToArray();
-                CreateFunction(typeBuilder, function.Name, function.ExternLib, returnType, args);
+                else
+                {
+                    var args = function.Arguments.Select(arg => GetTypeFromDefinition(arg.Type, cCall: true)).ToArray();
+                    CreateFunction(function.Name, function.ExternLib, returnType, args, functions);
+                }
             }
-
-            _library = typeBuilder.CreateType();
-            _functionObject = Activator.CreateInstance(_library!);
 
             foreach (var variable in programGraph.Variables)
             {
@@ -144,6 +144,15 @@ namespace Lang.Runner
                         break;
                 }
             }
+        }
+
+        private void CreateFunction(string name, string library, Type returnType, Type[] args, List<MethodInfo> functions)
+        {
+            var method = _moduleBuilder.DefineGlobalMethod(name, MethodAttributes.Public | MethodAttributes.Static, returnType, args);
+            var caBuilder = new CustomAttributeBuilder(typeof(DllImportAttribute).GetConstructor(new []{typeof(string)}), new []{library});
+            method.SetCustomAttribute(caBuilder);
+
+            functions.Add(method);
         }
 
         private void ResolveCompilerDirectives(List<IAst> asts, ProgramGraph programGraph)
@@ -870,15 +879,17 @@ namespace Lang.Runner
                 var args = arguments.Select(GetCArg).ToArray();
                 if (function.Varargs)
                 {
-                    var functionDecl = _library.GetMethod(functionName, argumentTypes!);
-                    var returnValue = functionDecl!.Invoke(_functionObject, args);
-                    return new ValueType {Type = function.ReturnType, Value = returnValue};
+                    // TODO Fix me
+                    /* var functionDecl = _library.GetMethod(functionName, argumentTypes!); */
+                    /* var returnValue = functionDecl!.Invoke(_functionObject, args); */
+                    /* return new ValueType {Type = function.ReturnType, Value = returnValue}; */
                 }
                 else
                 {
-                    var functionDecl = _library.GetMethod(functionName);
-                    var returnValue = functionDecl!.Invoke(_functionObject, args);
-                    return new ValueType {Type = function.ReturnType, Value = returnValue};
+                    // TODO Fix me
+                    /* var functionDecl = _library.GetMethod(functionName); */
+                    /* var returnValue = functionDecl!.Invoke(_functionObject, args); */
+                    /* return new ValueType {Type = function.ReturnType, Value = returnValue}; */
                 }
             }
 
@@ -1353,13 +1364,6 @@ namespace Lang.Runner
                 // @Cleanup This branch should never be hit
                 _ => null
             };
-        }
-
-        private static void CreateFunction(TypeBuilder typeBuilder, string name, string library, Type returnType, params Type[] args)
-        {
-            var method = typeBuilder.DefineMethod(name, MethodAttributes.Public | MethodAttributes.Static, returnType, args);
-            var caBuilder = new CustomAttributeBuilder(typeof(DllImportAttribute).GetConstructor(new []{typeof(string)}), new []{library});
-            method.SetCustomAttribute(caBuilder);
         }
 
         private Type GetTypeFromDefinition(TypeDefinition typeDef, string parentName = null, Type parentType = null, bool cCall = false)

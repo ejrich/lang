@@ -45,7 +45,6 @@ namespace Lang.Parsing
         public string Name { get; set; }
         public List<string> Generics { get; } = new();
         public List<StructFieldAst> Fields { get; } = new();
-        public bool Registered { get; set; }
         public List<IAst> Children => null;
     }
 
@@ -82,7 +81,6 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public string Name { get; set; }
         public List<EnumValueAst> Values { get; } = new();
-        public bool Registered { get; set; }
         public List<IAst> Children => null;
     }
 
