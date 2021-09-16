@@ -24,8 +24,8 @@ int main(Array<string> args) { //#print_ir {
 
     prim := primitives();
     array := create_array(4);
-    // ptr := pointers();
-    // printf("Pointer = %p, Value = %d\n", ptr, *ptr);
+    ptr := pointers();
+    printf("Pointer = %p, Value = %d\n", ptr, *ptr);
     str := string_test();
     printf("%s - Hello world %d, %d, %d\n", str, 1, 2, b);
     sum_test();

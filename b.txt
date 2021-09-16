@@ -3,15 +3,15 @@ Arg 0: "Hello world" -- length = 11
 my_struct: field = 1, something = 0.000000, subvalue.something = -1073741824, subvalue.foo = 13
 call_field = 4.200000
 9.90, 2.00, 3.00, 4.00, 5.00, 6.00,
-
-
-
+Value 1 = 9
+Value 2 = 8
+Pointer = 0x55ba3a6bea38, Value = 6
 something - Hello world 1, 2, 18
 Sum of Array  = 912
 Sum of Params = 912
-Initial array values 25088, (nil)
+Initial array values -951522249, 0x7f
 Initial PolyStruct values 587202560, 0.00
-Initial MyStruct values 59, 0.00, {-2147483648, 0}
+Initial MyStruct values 108, 0.00, {0, 85}
 'global_a' = -1862270976
 'global_b' = 456
 87, 3.141590
@@ -29,10 +29,38 @@ Value 1 = 2
 Value 2 = 5
 Value 3 = 10
 Value 4 = 15
-Value 5 = -504
+Value 5 = -1033864144
 Constant value = 7
 Running Debug code
 Opening X11 window
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 a = 18446744073709486080, b = -65536, c = 0.000000, d = -32
 Value = 1
 Value = 2
