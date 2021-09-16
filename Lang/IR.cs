@@ -32,6 +32,8 @@ namespace Lang
     {
         public string Name { get; set; }
         public int Index { get; set; }
+        public int? FileIndex { get; set; }
+        public uint Line { get; set; }
         public uint Size { get; set; }
         public bool Array { get; set; }
         public uint ArrayLength { get; set; }
