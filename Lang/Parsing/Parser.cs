@@ -861,7 +861,6 @@ namespace Lang.Parsing
                                         // At this point, the call is complete, so return
                                         return callAst;
                                     }
-
                                     // Don't have to set commaRequired to false since ParseExpression has gone over it
                                     break;
                             }
@@ -894,11 +893,9 @@ namespace Lang.Parsing
                                         // At this point, the call is complete, so return
                                         return callAst;
                                     }
-
                                     // Don't have to set commaRequired to false since ParseExpression has gone over it
                                     break;
                             }
-
                             break;
                         default:
                             errors.Add(new ParseError
@@ -956,7 +953,6 @@ namespace Lang.Parsing
                             });
                             break;
                     }
-
                     enumerator.MoveNext();
                     break;
                 case TokenType.OpenParen:
@@ -971,7 +967,6 @@ namespace Lang.Parsing
                             Error = $"Unexpected token in '{token.Value}' in return statement", Token = token
                         });
                     }
-
                     break;
                 case null:
                     errors.Add(new ParseError {Error = "Return does not have value", Token = token ?? enumerator.Last});
