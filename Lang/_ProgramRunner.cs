@@ -108,12 +108,14 @@ namespace Lang
                     }
                     case InstructionType.Load:
                     {
+                        // TODO Implement me
                         // var value = GetValue(instruction.Value1, values, allocations, functionPointer);
                         // values[instruction.ValueIndex] = _builder.BuildLoad(value);
                         break;
                     }
                     case InstructionType.Store:
                     {
+                        // TODO Implement me
                         // var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
                         // var value = GetValue(instruction.Value2, values, allocations, functionPointer);
                         // _builder.BuildStore(value, pointer);
@@ -121,6 +123,7 @@ namespace Lang
                     }
                     case InstructionType.GetPointer:
                     {
+                        // TODO Implement me
                         // var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
                         // var index = GetValue(instruction.Value2, values, allocations, functionPointer);
                         // values[instruction.ValueIndex] = _builder.BuildGEP(pointer, instruction.GetFirstPointer ? new []{_zeroInt, index} : new []{index});
@@ -128,12 +131,14 @@ namespace Lang
                     }
                     case InstructionType.GetStructPointer:
                     {
+                        // TODO Implement me
                         // var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
                         // values[instruction.ValueIndex] = _builder.BuildStructGEP(pointer, (uint)instruction.Index);
                         break;
                     }
                     case InstructionType.Call:
                     {
+                        // TODO Implement me
                         // var callFunction = GetOrCreateFunctionDefinition(instruction.String);
                         // var arguments = new LLVMValueRef[instruction.Value1.Values.Length];
                         // for (var i = 0; i < instruction.Value1.Values.Length; i++)
@@ -144,24 +149,173 @@ namespace Lang
                         break;
                     }
                     case InstructionType.IntegerExtend:
+                    case InstructionType.IntegerTruncate:
                     {
-                        // var value = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var targetType = _types[instruction.Value2.Type.TypeIndex];
-                        // values[instruction.ValueIndex] = _builder.BuildSExtOrBitCast(value, targetType);
+                        var value = GetValue(instruction.Value1, registers, stackPointer);
+                        var register = new Register();
+                        switch (instruction.Value2.Type.Size)
+                        {
+                            case 1:
+                                register.SByte = instruction.Value1.Type.Size switch
+                                {
+                                    1 => value.SByte,
+                                    2 => (sbyte)value.Short,
+                                    4 => (sbyte)value.Integer,
+                                    8 => (sbyte)value.Long,
+                                    _ => (sbyte)value.Integer,
+                                };
+                                break;
+                            case 2:
+                                register.Short = instruction.Value1.Type.Size switch
+                                {
+                                    1 => (short)value.SByte,
+                                    2 => value.Short,
+                                    4 => (short)value.Integer,
+                                    8 => (short)value.Long,
+                                    _ => (short)value.Integer,
+                                };
+                                break;
+                            case 4:
+                                register.Integer = instruction.Value1.Type.Size switch
+                                {
+                                    1 => (int)value.SByte,
+                                    2 => (int)value.Short,
+                                    8 => (int)value.Long,
+                                    _ => value.Integer,
+                                };
+                                break;
+                            case 8:
+                                register.Long = instruction.Value1.Type.Size switch
+                                {
+                                    1 => (long)value.SByte,
+                                    2 => (long)value.Short,
+                                    4 => (long)value.Integer,
+                                    8 => value.Long,
+                                    _ => (long)value.Integer,
+                                };
+                                break;
+                            default:
+                                register.Integer = instruction.Value1.Type.Size switch
+                                {
+                                    1 => (int)value.SByte,
+                                    2 => (int)value.Short,
+                                    8 => (int)value.Long,
+                                    _ => value.Integer,
+                                };
+                                break;
+                        }
+                        registers[instruction.ValueIndex] = register;
+                        break;
+                    }
+                    case InstructionType.UnsignedIntegerToIntegerExtend:
+                    case InstructionType.UnsignedIntegerToIntegerTruncate:
+                    {
+                        var value = GetValue(instruction.Value1, registers, stackPointer);
+                        var register = new Register();
+                        switch (instruction.Value2.Type.Size)
+                        {
+                            case 1:
+                                register.SByte = (sbyte)value.ULong;
+                                break;
+                            case 2:
+                                register.Short = (short)value.ULong;
+                                break;
+                            case 4:
+                                register.Integer = (int)value.ULong;
+                                break;
+                            case 8:
+                                register.Long = (long)value.ULong;
+                                break;
+                            default:
+                                register.Integer = (int)value.ULong;
+                                break;
+                        }
+                        registers[instruction.ValueIndex] = register;
                         break;
                     }
                     case InstructionType.UnsignedIntegerExtend:
+                    case InstructionType.UnsignedIntegerTruncate:
                     {
-                        // var value = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var targetType = _types[instruction.Value2.Type.TypeIndex];
-                        // values[instruction.ValueIndex] = _builder.BuildZExtOrBitCast(value, targetType);
+                        var value = GetValue(instruction.Value1, registers, stackPointer);
+                        var register = new Register();
+                        switch (instruction.Value2.Type.Size)
+                        {
+                            case 1:
+                                register.Byte = (byte)value.ULong;
+                                break;
+                            case 2:
+                                register.UShort = (ushort)value.ULong;
+                                break;
+                            case 4:
+                                register.UInteger = (uint)value.ULong;
+                                break;
+                            case 8:
+                                register.ULong = value.ULong;
+                                break;
+                            default:
+                                register.UInteger = (uint)value.ULong;
+                                break;
+                        }
+                        registers[instruction.ValueIndex] = register;
                         break;
                     }
-                    case InstructionType.IntegerTruncate:
+                    case InstructionType.IntegerToUnsignedIntegerExtend:
+                    case InstructionType.IntegerToUnsignedIntegerTruncate:
                     {
-                        // var value = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var targetType = _types[instruction.Value2.Type.TypeIndex];
-                        // values[instruction.ValueIndex] = _builder.BuildTrunc(value, targetType);
+                        var value = GetValue(instruction.Value1, registers, stackPointer);
+                        var register = new Register();
+                        switch (instruction.Value2.Type.Size)
+                        {
+                            case 1:
+                                register.Byte = instruction.Value1.Type.Size switch
+                                {
+                                    1 => (byte)value.SByte,
+                                    2 => (byte)value.Short,
+                                    4 => (byte)value.Integer,
+                                    8 => (byte)value.Long,
+                                    _ => (byte)value.Integer,
+                                };
+                                break;
+                            case 2:
+                                register.UShort = instruction.Value1.Type.Size switch
+                                {
+                                    1 => (ushort)value.SByte,
+                                    2 => (ushort)value.Short,
+                                    4 => (ushort)value.Integer,
+                                    8 => (ushort)value.Long,
+                                    _ => (ushort)value.Integer,
+                                };
+                                break;
+                            case 4:
+                                register.UInteger = instruction.Value1.Type.Size switch
+                                {
+                                    1 => (uint)value.SByte,
+                                    2 => (uint)value.Short,
+                                    8 => (uint)value.Long,
+                                    _ => (uint)value.Integer,
+                                };
+                                break;
+                            case 8:
+                                register.ULong = instruction.Value1.Type.Size switch
+                                {
+                                    1 => (ulong)value.SByte,
+                                    2 => (ulong)value.Short,
+                                    4 => (ulong)value.Integer,
+                                    8 => (ulong)value.Long,
+                                    _ => (ulong)value.Integer,
+                                };
+                                break;
+                            default:
+                                register.UInteger = instruction.Value1.Type.Size switch
+                                {
+                                    1 => (uint)value.SByte,
+                                    2 => (uint)value.Short,
+                                    8 => (uint)value.Long,
+                                    _ => (uint)value.Integer,
+                                };
+                                break;
+                        }
+                        registers[instruction.ValueIndex] = register;
                         break;
                     }
                     case InstructionType.IntegerToFloatCast:
@@ -225,9 +379,51 @@ namespace Lang
                     }
                     case InstructionType.FloatToIntegerCast:
                     {
-                        // var value = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var targetType = _types[instruction.Value2.Type.TypeIndex];
-                        // values[instruction.ValueIndex] = _builder.BuildFPToSI(value, targetType);
+                        var value = GetValue(instruction.Value1, registers, stackPointer);
+                        var register = new Register();
+                        if (instruction.Value1.Type.Size == 4)
+                        {
+                            switch (instruction.Value2.Type.Size)
+                            {
+                                case 1:
+                                    register.SByte = (sbyte)value.Float;
+                                    break;
+                                case 2:
+                                    register.Short = (short)value.Float;
+                                    break;
+                                case 4:
+                                    register.Integer = (int)value.Float;
+                                    break;
+                                case 8:
+                                    register.Long = (long)value.Float;
+                                    break;
+                                default:
+                                    register.Integer = (int)value.Float;
+                                    break;
+                            };
+                        }
+                        else
+                        {
+                            switch (instruction.Value2.Type.Size)
+                            {
+                                case 1:
+                                    register.SByte = (sbyte)value.Double;
+                                    break;
+                                case 2:
+                                    register.Short = (short)value.Double;
+                                    break;
+                                case 4:
+                                    register.Integer = (int)value.Double;
+                                    break;
+                                case 8:
+                                    register.Long = (long)value.Double;
+                                    break;
+                                default:
+                                    register.Integer = (int)value.Double;
+                                    break;
+                            };
+                        }
+                        registers[instruction.ValueIndex] = register;
                         break;
                     }
                     case InstructionType.FloatToUnsignedIntegerCast:
@@ -281,9 +477,27 @@ namespace Lang
                     }
                     case InstructionType.IntegerNegate:
                     {
-                        // TODO Implement me
-                        // var value = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildNeg(value);
+                        var value = GetValue(instruction.Value1, registers, stackPointer);
+                        var register = new Register();
+                        switch (instruction.Value1.Type.Size)
+                        {
+                            case 1:
+                                register.SByte = (sbyte)-value.SByte;
+                                break;
+                            case 2:
+                                register.Short = (short)-value.Short;
+                                break;
+                            case 4:
+                                register.Integer = -value.Integer;
+                                break;
+                            case 8:
+                                register.Long = -value.Long;
+                                break;
+                            default:
+                                register.Integer = -value.Integer;
+                                break;
+                        };
+                        registers[instruction.ValueIndex] = register;
                         break;
                     }
                     case InstructionType.FloatNegate:
@@ -487,10 +701,10 @@ namespace Lang
                     }
                     case InstructionType.PointerAdd:
                     {
-                        // TODO Implement me
-                        // var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        // var index = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        // values[instruction.ValueIndex] = _builder.BuildGEP(pointer, new []{index});
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var pointerAdd = lhs.Pointer + rhs.Integer; // TODO Get the pointer offset
+                        registers[instruction.ValueIndex] = new Register {Pointer = pointerAdd};
                         break;
                     }
                     case InstructionType.IntegerAdd:
@@ -519,6 +733,10 @@ namespace Lang
                     }
                     case InstructionType.PointerSubtract:
                     {
+                        var lhs = GetValue(instruction.Value1, registers, stackPointer);
+                        var rhs = GetValue(instruction.Value2, registers, stackPointer);
+                        var pointerSubtract = lhs.Pointer - rhs.Integer; // TODO Get the pointer offset
+                        registers[instruction.ValueIndex] = new Register {Pointer = pointerSubtract};
                         break;
                     }
                     case InstructionType.IntegerSubtract:

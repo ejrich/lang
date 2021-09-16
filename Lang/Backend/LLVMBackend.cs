@@ -608,6 +608,7 @@ namespace Lang.Backend
                             break;
                         }
                         case InstructionType.IntegerExtend:
+                        case InstructionType.UnsignedIntegerToIntegerExtend:
                         {
                             var value = GetValue(instruction.Value1, values, allocations, functionPointer);
                             var targetType = _types[instruction.Value2.Type.TypeIndex];
@@ -615,6 +616,7 @@ namespace Lang.Backend
                             break;
                         }
                         case InstructionType.UnsignedIntegerExtend:
+                        case InstructionType.IntegerToUnsignedIntegerExtend:
                         {
                             var value = GetValue(instruction.Value1, values, allocations, functionPointer);
                             var targetType = _types[instruction.Value2.Type.TypeIndex];
@@ -622,6 +624,9 @@ namespace Lang.Backend
                             break;
                         }
                         case InstructionType.IntegerTruncate:
+                        case InstructionType.UnsignedIntegerToIntegerTruncate:
+                        case InstructionType.UnsignedIntegerTruncate:
+                        case InstructionType.IntegerToUnsignedIntegerTruncate:
                         {
                             var value = GetValue(instruction.Value1, values, allocations, functionPointer);
                             var targetType = _types[instruction.Value2.Type.TypeIndex];
