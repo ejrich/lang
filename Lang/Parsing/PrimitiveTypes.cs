@@ -20,7 +20,7 @@ namespace Lang.Parsing
 
     public class EnumType : IPrimitive
     {
-        public byte Bytes => 4;
-        public bool Signed => true;
+        public byte Bytes { get; init; }
+        public bool Signed { get; init; }
     }
 }

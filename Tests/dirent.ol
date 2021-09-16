@@ -4,11 +4,11 @@ struct dirent {
     u64 d_ino;
     u64 d_off;
     u16 d_reclen;
-    u8 d_type;
+    FileType d_type;
     List<u8>[256] #c_array d_name;
 }
 
-enum DirType {
+enum FileType : u8 {
     DT_UNKNOWN = 0;
     DT_FIFO = 1;
     DT_CHR = 2;

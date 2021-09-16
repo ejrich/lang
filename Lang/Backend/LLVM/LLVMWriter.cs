@@ -1746,15 +1746,9 @@ namespace Lang.Backend.LLVM
 
             return type.PrimitiveType switch
             {
-                IntegerType integerType => integerType.Bytes switch
-                {
-                    1 => LLVMTypeRef.Int8Type(),
-                    2 => LLVMTypeRef.Int16Type(),
-                    4 => LLVMTypeRef.Int32Type(),
-                    8 => LLVMTypeRef.Int64Type(),
-                    _ => LLVMTypeRef.Int32Type()
-                },
+                IntegerType integerType => GetIntegerType(integerType),
                 FloatType floatType => floatType.Bytes == 8 ? LLVMApi.DoubleType() : LLVMTypeRef.FloatType(),
+                EnumType enumType => GetIntegerType(enumType),
                 _ => type.Name switch
                 {
                     "bool" => LLVMTypeRef.Int1Type(),
@@ -1765,6 +1759,18 @@ namespace Lang.Backend.LLVM
                     "Type" => LLVMTypeRef.Int32Type(),
                     _ => GetStructType(type)
                 }
+            };
+        }
+
+        private LLVMTypeRef GetIntegerType(IPrimitive primitive)
+        {
+            return primitive.Bytes switch
+            {
+                1 => LLVMTypeRef.Int8Type(),
+                2 => LLVMTypeRef.Int16Type(),
+                4 => LLVMTypeRef.Int32Type(),
+                8 => LLVMTypeRef.Int64Type(),
+                _ => LLVMTypeRef.Int32Type()
             };
         }
 

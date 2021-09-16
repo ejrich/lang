@@ -222,9 +222,28 @@ namespace Lang.Translation
             enumAst.TypeIndex = _typeIndex++;
             _globalIdentifiers.Add(enumAst.Name, enumAst);
 
+            if (enumAst.BaseType == null)
+            {
+                enumAst.BaseType = new TypeDefinition {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
+            }
+            else
+            {
+                var baseType = VerifyType(enumAst.BaseType);
+                if (baseType != Type.Int && baseType != Type.Error)
+                {
+                    AddError($"Base type of enum must be an integer, but got '{PrintTypeDefinition(enumAst.BaseType)}'", enumAst.BaseType);
+                    enumAst.BaseType.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
+                }
+            }
+
             // 2. Verify enums don't have repeated values
             var valueNames = new HashSet<string>();
             var values = new HashSet<int>();
+
+            var primitive = enumAst.BaseType.PrimitiveType;
+            var lowestAllowedValue = primitive.Signed ? -Math.Pow(2, 4 * primitive.Bytes - 1) : 0;
+            var largestAllowedValue = primitive.Signed ? Math.Pow(2, 4 * primitive.Bytes - 1) - 1 : Math.Pow(2, 4 * primitive.Bytes) - 1;
+
             var largestValue = -1;
             foreach (var value in enumAst.Values)
             {
@@ -250,6 +269,12 @@ namespace Lang.Translation
                 else
                 {
                     value.Value = ++largestValue;
+                }
+
+                // 2d. Verify the value is in the range of the enum
+                if (value.Value < lowestAllowedValue || value.Value > largestAllowedValue)
+                {
+                    AddError($"Enum value '{enumAst.Name}.{value.Name}' value '{value.Value}' is out of range", value);
                 }
             }
         }
@@ -297,7 +322,7 @@ namespace Lang.Translation
                                     var enumType = VerifyEnumValue(enumAst, structFieldRef);
                                     if (enumType != null && !TypeEquals(structField.Type, enumType))
                                     {
-                                            invalid = true;
+                                        invalid = true;
                                         AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(enumType)}'", structFieldRef);
                                     }
                                 }
@@ -1811,7 +1836,8 @@ namespace Lang.Translation
                 return null;
             }
 
-            return new TypeDefinition {Name = enumAst.Name, PrimitiveType = new EnumType()};
+            var primitive = enumAst.BaseType.PrimitiveType;
+            return new TypeDefinition {Name = enumAst.Name, PrimitiveType = new EnumType {Bytes = primitive.Bytes, Signed = primitive.Signed}};
         }
 
         private TypeDefinition VerifyIndexType(IndexAst index, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
@@ -2102,13 +2128,17 @@ namespace Lang.Translation
                         return Type.Error;
                     }
 
-                    if (type is StructAst)
+                    switch (type)
                     {
-                        return Type.Struct;
+                        case StructAst:
+                            return Type.Struct;
+                        case EnumAst enumAst:
+                            var primitive = enumAst.BaseType.PrimitiveType;
+                            typeDef.PrimitiveType ??= new EnumType {Bytes = primitive.Bytes, Signed = primitive.Signed};
+                            return Type.Enum;
+                        default:
+                            return Type.Error;
                     }
-
-                    typeDef.PrimitiveType ??= new EnumType();
-                    return Type.Enum;
             }
         }
 

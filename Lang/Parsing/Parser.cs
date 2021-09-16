@@ -562,6 +562,13 @@ namespace Lang.Parsing
 
             // 2. Parse over the open brace
             enumerator.MoveNext();
+            if (enumerator.Current?.Type == TokenType.Colon)
+            {
+                enumerator.MoveNext();
+                enumAst.BaseType = ParseType(enumerator, errors);
+                enumerator.MoveNext();
+            }
+
             if (enumerator.Current?.Type != TokenType.OpenBrace)
             {
                 errors.Add(new ParseError
