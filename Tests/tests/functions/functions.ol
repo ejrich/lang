@@ -124,7 +124,4 @@ foobar<T, U>(PolyStruct<T> c, Params<U> args) {
     }
 }
 
-foobar<T, U>(PolyStruct<T> c, Params<List<U>> args) { // TODO Fix the parsing for this
-}
-
 #run main();

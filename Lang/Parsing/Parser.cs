@@ -51,6 +51,11 @@ namespace Lang.Parsing
                 return _tokens.Count > _index + steps ? _tokens[_index + steps] : null;
             }
 
+            public void Insert(Token token)
+            {
+                _tokens.Insert(_index, token);
+            }
+
             public Token Last => _tokens[^1];
         }
 
@@ -2287,6 +2292,30 @@ namespace Lang.Parsing
                             });
                         }
 
+                        break;
+                    }
+                    else if (token.Type == TokenType.ShiftRight)
+                    {
+                        // Split the token and insert a greater than after the current token
+                        token.Value = ">";
+                        var newToken = new Token
+                        {
+                            Type = TokenType.GreaterThan, Value = ">",
+                            FileIndex = token.FileIndex, Line = token.Line, Column = token.Column + 1
+                        };
+                        enumerator.Insert(newToken);
+                        break;
+                    }
+                    else if (token.Type == TokenType.RotateRight)
+                    {
+                        // Split the token and insert a shift right after the current token
+                        token.Value = ">";
+                        var newToken = new Token
+                        {
+                            Type = TokenType.ShiftRight, Value = ">>",
+                            FileIndex = token.FileIndex, Line = token.Line, Column = token.Column + 1
+                        };
+                        enumerator.Insert(newToken);
                         break;
                     }
 
