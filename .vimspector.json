@@ -6,7 +6,7 @@
         "request": "launch",
         "program": "${workspaceRoot}/Lang/bin/Debug/net5.0/Lang.dll",
         "args": ["${workspaceRoot}/Example/Example.olproj"],
-        "stopAtEntry": true,
+        "stopAtEntry": false,
         "cwd": "${workspaceRoot}"
       }
     }
