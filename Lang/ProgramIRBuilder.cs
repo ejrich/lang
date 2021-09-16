@@ -8,8 +8,8 @@ namespace Lang
         ProgramIR Program { get; }
         FunctionIR AddFunction(FunctionAst function, Dictionary<string, IType> types);
         FunctionIR AddOperatorOverload(OperatorOverloadAst overload, Dictionary<string, IType> types);
-        void EmitGlobalVariable(DeclarationAst declaration, IType type, ScopeAst scope);
-        void EmitDeclaration(FunctionIR function, DeclarationAst declaration, IType type, ScopeAst scope);
+        void EmitGlobalVariable(DeclarationAst declaration, ScopeAst scope);
+        void EmitDeclaration(FunctionIR function, DeclarationAst declaration, ScopeAst scope);
         void EmitAssignment(FunctionIR function, AssignmentAst assignment, ScopeAst scope);
         void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, ScopeAst scope, BasicBlock block = null);
         InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block = null);
@@ -37,10 +37,10 @@ namespace Lang
                 for (var i = 0; i < function.Arguments.Count; i++)
                 {
                     var argument = function.Arguments[i];
-                    if (types.TryGetValue(argument.Type.GenericName, out var type))
+                    if (types.TryGetValue(argument.TypeDefinition.GenericName, out var type))
                     {
                         var allocationIndex = functionIR.Allocations.Count;
-                        AddAllocation(functionIR, argument, type, allocationIndex);
+                        AddAllocation(functionIR, argument, allocationIndex);
 
                         var storeInstruction = new Instruction
                         {
@@ -74,10 +74,10 @@ namespace Lang
             for (var i = 0; i < overload.Arguments.Count; i++)
             {
                 var argument = overload.Arguments[i];
-                if (types.TryGetValue(argument.Type.GenericName, out var type))
+                if (types.TryGetValue(argument.TypeDefinition.GenericName, out var type))
                 {
                     var allocationIndex = functionIR.Allocations.Count;
-                    AddAllocation(functionIR, argument, type, allocationIndex);
+                    AddAllocation(functionIR, argument, allocationIndex);
 
                     EmitStore(entryBlock, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i});
                 }
@@ -88,7 +88,7 @@ namespace Lang
             return functionIR;
         }
 
-        public void EmitGlobalVariable(DeclarationAst declaration, IType type, ScopeAst scope)
+        public void EmitGlobalVariable(DeclarationAst declaration, ScopeAst scope)
         {
             if (declaration.Constant)
             {
@@ -98,7 +98,11 @@ namespace Lang
             {
                 var globalIndex = Program.GlobalVariables.Count;
                 declaration.AllocationIndex = globalIndex;
-                var globalVariable = new GlobalVariable {Name = declaration.Name, Index = globalIndex, Size = type.Size, Type = type};
+                var globalVariable = new GlobalVariable
+                {
+                    Name = declaration.Name, Index = globalIndex,
+                    Size = declaration.Type.Size, Type = declaration.Type
+                };
                 Program.GlobalVariables.Add(globalVariable);
 
                 // TODO Add initialization values
@@ -117,7 +121,7 @@ namespace Lang
             }
         }
 
-        public void EmitDeclaration(FunctionIR function, DeclarationAst declaration, IType type, ScopeAst scope)
+        public void EmitDeclaration(FunctionIR function, DeclarationAst declaration, ScopeAst scope)
         {
             if (declaration.Constant)
             {
@@ -128,7 +132,7 @@ namespace Lang
             else
             {
                 var allocationIndex = function.Allocations.Count;
-                AddAllocation(function, declaration, type, allocationIndex);
+                AddAllocation(function, declaration, allocationIndex);
 
                 // TODO Add initialization values
                 if (declaration.Value != null)
@@ -148,10 +152,10 @@ namespace Lang
             }
         }
 
-        private void AddAllocation(FunctionIR function, DeclarationAst declaration, IType type, int index)
+        private void AddAllocation(FunctionIR function, DeclarationAst declaration, int index)
         {
             declaration.AllocationIndex = index;
-            AddAllocation(function, type, index);
+            AddAllocation(function, declaration.Type, index);
         }
 
         private void AddAllocation(FunctionIR function, IType type, int index)
@@ -466,7 +470,7 @@ namespace Lang
             {
                 case IdentifierAst identifier:
                     var declaration = (DeclarationAst) GetScopeIdentifier(scope, identifier.Name, out var global);
-                    type = declaration.Type;
+                    type = declaration.TypeDefinition;
                     value = EmitGetPointer(block, allocationIndex: declaration.AllocationIndex, global: global);
                     break;
                 case IndexAst index:
@@ -542,7 +546,7 @@ namespace Lang
                 }
 
                 var structDefinition = (StructAst) structField.Types[i-1];
-                type = structDefinition.Fields[structField.ValueIndices[i-1]].Type;
+                type = structDefinition.Fields[structField.ValueIndices[i-1]].TypeDefinition;
 
                 value = EmitGetStructPointer(block, value, structField.ValueIndices[i-1]);
                 switch (structField.Children[i])
@@ -643,7 +647,7 @@ namespace Lang
             if (type == null)
             {
                 var declaration = (DeclarationAst) GetScopeIdentifier(scope, index.Name, out var global);
-                type = declaration.Type;
+                type = declaration.TypeDefinition;
                 variable = EmitGetPointer(block, allocationIndex: declaration.AllocationIndex, global: global);
             }
 

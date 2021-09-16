@@ -73,17 +73,17 @@ namespace Lang
                     for (; index < count; index++)
                     {
                         var field = structAst.Fields[index];
-                        var fieldType = GetTypeFromDefinition(field.Type, temporaryStructs);
+                        var fieldType = GetTypeFromDefinition(field.TypeDefinition, temporaryStructs);
                         if (fieldType == null)
                         {
                             break;
                         }
                         var structField = structBuilder.DefineField(field.Name, fieldType, FieldAttributes.Public);
-                        if (field.Type.CArray)
+                        if (field.TypeDefinition.CArray)
                         {
                             var marshalAsType = typeof(MarshalAsAttribute);
                             var sizeConstField = marshalAsType.GetField("SizeConst");
-                            var size = (int)field.Type.ConstCount.Value;
+                            var size = (int)field.TypeDefinition.ConstCount.Value;
 
                             var caBuilder = new CustomAttributeBuilder(typeof(MarshalAsAttribute).GetConstructor(new []{typeof(UnmanagedType)}), new object[]{UnmanagedType.ByValArray}, new []{sizeConstField}, new object[]{size});
                             structField.SetCustomAttribute(caBuilder);
@@ -132,7 +132,7 @@ namespace Lang
                         if (!functionIndex.Any())
                         {
                             functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
-                            var args = function.Arguments.Select(arg => GetTypeFromDefinition(arg.Type, cCall: true)).ToArray();
+                            var args = function.Arguments.Select(arg => GetTypeFromDefinition(arg.TypeDefinition, cCall: true)).ToArray();
                             CreateFunction(functionTypeBuilder, function.Name, function.ExternLib, returnType, args);
                             functionIndex.Add(_version);
                         }
@@ -263,7 +263,7 @@ namespace Lang
                                     var typeFieldOffset = typeFieldType.GetField("offset");
                                     typeFieldOffset.SetValue(typeField, field.Offset);
                                     var typeFieldInfo = typeFieldType.GetField("type_info");
-                                    var typePointer = _typeInfoPointers[field.Type.GenericName];
+                                    var typePointer = _typeInfoPointers[field.TypeDefinition.GenericName];
                                     typeFieldInfo.SetValue(typeField, typePointer);
 
                                     var arrayPointer = IntPtr.Add(typeFieldsDataPointer, typeFieldSize * i);
@@ -317,11 +317,11 @@ namespace Lang
                                     argumentName.SetValue(argumentValue, GetString(argument.Name));
                                     var argumentTypeField = argumentType.GetField("type_info");
 
-                                    var argumentTypeInfoPointer = argument.Type.TypeKind switch
+                                    var argumentTypeInfoPointer = argument.TypeDefinition.TypeKind switch
                                     {
                                         TypeKind.Type => _typeInfoPointers["s32"],
-                                        TypeKind.Params => _typeInfoPointers[$"Array.{argument.Type.Generics[0].GenericName}"],
-                                        _ => _typeInfoPointers[argument.Type.GenericName]
+                                        TypeKind.Params => _typeInfoPointers[$"Array.{argument.TypeDefinition.Generics[0].GenericName}"],
+                                        _ => _typeInfoPointers[argument.TypeDefinition.GenericName]
                                     };
                                     argumentTypeField.SetValue(argumentValue, argumentTypeInfoPointer);
 
@@ -402,25 +402,25 @@ namespace Lang
             object value;
             if (declaration.Value != null)
             {
-                value = CastValue(ExecuteExpression(declaration.Value, variables).Value, declaration.Type);
+                value = CastValue(ExecuteExpression(declaration.Value, variables).Value, declaration.TypeDefinition);
             }
             else if (declaration.ArrayValues != null)
             {
-                value = InitializeArray(declaration.Type, variables, declaration.ArrayValues);
+                value = InitializeArray(declaration.TypeDefinition, variables, declaration.ArrayValues);
             }
             else
             {
-                value = GetUninitializedValue(declaration.Type, variables, declaration.Assignments);
+                value = GetUninitializedValue(declaration.TypeDefinition, variables, declaration.Assignments);
             }
 
-            var variable = new ValueType {Type = declaration.Type};
-            if (declaration.Type.CArray)
+            var variable = new ValueType {Type = declaration.TypeDefinition};
+            if (declaration.TypeDefinition.CArray)
             {
                 variable.Value = value;
             }
             else
             {
-                var pointer = Marshal.AllocHGlobal(Marshal.SizeOf(GetTypeFromDefinition(declaration.Type)));
+                var pointer = Marshal.AllocHGlobal(Marshal.SizeOf(GetTypeFromDefinition(declaration.TypeDefinition)));
                 Marshal.StructureToPtr(value, pointer, false);
                 variable.Value = pointer;
             }
@@ -474,7 +474,7 @@ namespace Lang
                     if (assignments.TryGetValue(field.Name, out var assignment))
                     {
                         var expression = ExecuteExpression(assignment.Value, variables);
-                        var value = CastValue(expression.Value, field.Type);
+                        var value = CastValue(expression.Value, field.TypeDefinition);
 
                         fieldInstance!.SetValue(instance, value);
                     }
@@ -495,10 +495,10 @@ namespace Lang
                 var value = ExecuteExpression(field.Value, variables);
                 fieldInstance.SetValue(instance, value.Value);
             }
-            else switch (field.Type.TypeKind)
+            else switch (field.TypeDefinition.TypeKind)
             {
                 case TypeKind.Array:
-                    var array = InitializeArray(field.Type, variables, field.ArrayValues, true);
+                    var array = InitializeArray(field.TypeDefinition, variables, field.ArrayValues, true);
                     fieldInstance!.SetValue(instance, array);
                     break;
                 case TypeKind.Pointer:
@@ -506,10 +506,10 @@ namespace Lang
                     break;
                 default:
                 {
-                    if (field.Type.PrimitiveType == null)
+                    if (field.TypeDefinition.PrimitiveType == null)
                     {
-                        var fieldType = _types[field.Type.GenericName];
-                        var fieldTypeDef = _programGraph.Types[field.Type.GenericName];
+                        var fieldType = _types[field.TypeDefinition.GenericName];
+                        var fieldTypeDef = _programGraph.Types[field.TypeDefinition.GenericName];
                         if (fieldTypeDef is StructAst fieldStructAst)
                         {
                             var value = InitializeStruct(fieldType, fieldStructAst, variables, field.Assignments);
@@ -1161,7 +1161,7 @@ namespace Lang
                 var field = structDefinition.Fields[structField.ValueIndices[i-1]];
                 var structType = GetTypeFromDefinition(type);
                 var offset = (int)Marshal.OffsetOf(structType, field.Name);
-                type = field.Type;
+                type = field.TypeDefinition;
 
                 switch (structField.Children[i])
                 {
@@ -1226,7 +1226,7 @@ namespace Lang
                     arguments[i] = value;
                 }
 
-                var elementType = function.Arguments[^1].Type.Generics[0];
+                var elementType = function.Arguments[^1].TypeDefinition.Generics[0];
                 var paramsType = GetTypeFromDefinition(elementType);
                 var arrayType = _types[$"Array.{elementType.GenericName}"];
                 var paramsArray = Activator.CreateInstance(arrayType);
@@ -1321,7 +1321,7 @@ namespace Lang
             if (indexTypeDef.TypeKind == TypeKind.String)
             {
                 _stringStruct ??= (StructAst)_programGraph.Types["string"];
-                elementTypeDef = _stringStruct.Fields[1].Type.Generics[0];
+                elementTypeDef = _stringStruct.Fields[1].TypeDefinition.Generics[0];
             }
             else
             {
@@ -1420,9 +1420,9 @@ namespace Lang
             for (var i = 0; i < function.Arguments.Count; i++)
             {
                 var arg = function.Arguments[i];
-                var pointer = Marshal.AllocHGlobal(Marshal.SizeOf(GetTypeFromDefinition(arg.Type)));
+                var pointer = Marshal.AllocHGlobal(Marshal.SizeOf(GetTypeFromDefinition(arg.TypeDefinition)));
                 Marshal.StructureToPtr(arguments[i], pointer, false);
-                variables[arg.Name] = new ValueType {Type = arg.Type, Value = pointer};
+                variables[arg.Name] = new ValueType {Type = arg.TypeDefinition, Value = pointer};
             }
 
             return ExecuteAsts(function.Body.Children, variables, out _);

@@ -188,7 +188,7 @@ namespace Lang.Backend
                 {
                     if (type is StructAst structAst && structAst.Fields.Any())
                     {
-                        var fields = structAst.Fields.Select(field => ConvertTypeDefinition(field.Type)).ToArray();
+                        var fields = structAst.Fields.Select(field => ConvertTypeDefinition(field.TypeDefinition)).ToArray();
                         structs[name].StructSetBody(fields, false);
 
                         CreateDebugStructType(structAst, name);
@@ -208,7 +208,7 @@ namespace Lang.Backend
                 {
                     if (type is StructAst structAst && structAst.Fields.Any())
                     {
-                        var fields = structAst.Fields.Select(field => ConvertTypeDefinition(field.Type)).ToArray();
+                        var fields = structAst.Fields.Select(field => ConvertTypeDefinition(field.TypeDefinition)).ToArray();
                         structs[name].StructSetBody(fields, false);
                     }
                 }
@@ -220,14 +220,14 @@ namespace Lang.Backend
             var globals = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>();
             foreach (var globalVariable in _programGraph.Variables)
             {
-                if (globalVariable.Constant && globalVariable.Type.TypeKind != TypeKind.String)
+                if (globalVariable.Constant && globalVariable.TypeDefinition.TypeKind != TypeKind.String)
                 {
                     var (_, constant) = WriteExpression(globalVariable.Value, null);
-                    globals.Add(globalVariable.Name, (globalVariable.Type, constant));
+                    globals.Add(globalVariable.Name, (globalVariable.TypeDefinition, constant));
                 }
                 else
                 {
-                    var typeDef = globalVariable.Type;
+                    var typeDef = globalVariable.TypeDefinition;
                     var type = ConvertTypeDefinition(typeDef);
                     var global = _module.AddGlobal(type, globalVariable.Name);
                     LLVM.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
@@ -249,12 +249,12 @@ namespace Lang.Backend
                         using var name = new MarshaledString(globalVariable.Name);
 
                         var file = _debugFiles[globalVariable.FileIndex];
-                        var debugType = GetDebugType(globalVariable.Type);
+                        var debugType = GetDebugType(globalVariable.TypeDefinition);
                         var globalDebug = LLVM.DIBuilderCreateGlobalVariableExpression(_debugBuilder, _debugCompilationUnit, name.Value, (UIntPtr)name.Length, null, (UIntPtr)0, file, globalVariable.Line, debugType, 0, null, null, 0);
                         LLVM.GlobalSetMetadata(global, 0, globalDebug);
                     }
 
-                    globals.Add(globalVariable.Name, (globalVariable.Type, global));
+                    globals.Add(globalVariable.Name, (globalVariable.TypeDefinition, global));
                 }
             }
 
@@ -310,7 +310,7 @@ namespace Lang.Backend
                         var fieldNameString = BuildString(field.Name);
                         var fieldOffset = LLVM.ConstInt(LLVM.Int32Type(), field.Offset, 0);
 
-                        var typeField = LLVMValueRef.CreateConstNamedStruct(typeFieldType, new LLVMValueRef[] {fieldNameString, fieldOffset, typePointers[field.Type.GenericName].typeInfo});
+                        var typeField = LLVMValueRef.CreateConstNamedStruct(typeFieldType, new LLVMValueRef[] {fieldNameString, fieldOffset, typePointers[field.TypeDefinition.GenericName].typeInfo});
 
                         typeFields[i] = typeField;
                     }
@@ -375,11 +375,11 @@ namespace Lang.Backend
                         var argument = function.Arguments[i];
 
                         var argNameString = BuildString(argument.Name);
-                        var argumentTypeInfo = argument.Type.Name switch
+                        var argumentTypeInfo = argument.TypeDefinition.Name switch
                         {
                             "Type" => typePointers["s32"].typeInfo,
-                            "Params" => typePointers[$"Array.{argument.Type.Generics[0].GenericName}"].typeInfo,
-                            _ => typePointers[argument.Type.GenericName].typeInfo
+                            "Params" => typePointers[$"Array.{argument.TypeDefinition.Generics[0].GenericName}"].typeInfo,
+                            _ => typePointers[argument.TypeDefinition.GenericName].typeInfo
                         };
 
                         var argumentValue = LLVMValueRef.CreateConstNamedStruct(argumentType, new LLVMValueRef[] {argNameString, argumentTypeInfo});
@@ -439,7 +439,7 @@ namespace Lang.Backend
 
                 for (var i = 0; i < argumentCount; i++)
                 {
-                    var argumentType = functionAst.Arguments[i].Type;
+                    var argumentType = functionAst.Arguments[i].TypeDefinition;
                     argumentTypes[i] = ConvertTypeDefinition(argumentType);
                     debugArgumentTypes[i + 1] = GetDebugType(argumentType);
                 }
@@ -457,7 +457,7 @@ namespace Lang.Backend
                 // Get the argument types and declare the function
                 for (var i = 0; i < argumentCount; i++)
                 {
-                    argumentTypes[i] = ConvertTypeDefinition(functionAst.Arguments[i].Type, externFunction);
+                    argumentTypes[i] = ConvertTypeDefinition(functionAst.Arguments[i].TypeDefinition, externFunction);
                 }
                 _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(functionAst.ReturnType), argumentTypes, varargs));
             }
@@ -479,8 +479,8 @@ namespace Lang.Backend
             for (var i = 0; i < argumentCount; i++)
             {
                 var arg = functionAst.Arguments[i];
-                var allocation = _builder.BuildAlloca(ConvertTypeDefinition(arg.Type), arg.Name);
-                localVariables[arg.Name] = (arg.Type, allocation);
+                var allocation = _builder.BuildAlloca(ConvertTypeDefinition(arg.TypeDefinition), arg.Name);
+                localVariables[arg.Name] = (arg.TypeDefinition, allocation);
             }
 
             // 3. Build allocations at the beginning of the function
@@ -507,7 +507,7 @@ namespace Lang.Backend
 
                     using var argName = new MarshaledString(arg.Name);
 
-                    var debugType = GetDebugType(arg.Type);
+                    var debugType = GetDebugType(arg.TypeDefinition);
                     var debugVariable = LLVM.DIBuilderCreateParameterVariable(_debugBuilder, block, argName.Value, (UIntPtr)argName.Length, (uint)i+1, file, arg.Line, debugType, 0, LLVMDIFlags.LLVMDIFlagZero);
                     var expression = LLVM.DIBuilderCreateExpression(_debugBuilder, null, (UIntPtr)0);
                     var location = LLVM.DIBuilderCreateDebugLocation(_context, arg.Line, arg.Column, block, null);
@@ -602,9 +602,9 @@ namespace Lang.Backend
                     BuildCallAllocations(call);
                     break;
                 case DeclarationAst declaration:
-                    if (declaration.Constant && declaration.Type.TypeKind != TypeKind.String) break;
+                    if (declaration.Constant && declaration.TypeDefinition.TypeKind != TypeKind.String) break;
 
-                    var type = ConvertTypeDefinition(declaration.Type);
+                    var type = ConvertTypeDefinition(declaration.TypeDefinition);
                     var variable = _builder.BuildAlloca(type, declaration.Name);
                     _allocationQueue.Enqueue(variable);
 
@@ -612,24 +612,24 @@ namespace Lang.Backend
                     {
                         BuildAllocations(declaration.Value);
                     }
-                    else if (declaration.Type.TypeKind == TypeKind.Array && !declaration.Type.CArray)
+                    else if (declaration.TypeDefinition.TypeKind == TypeKind.Array && !declaration.TypeDefinition.CArray)
                     {
-                        if (declaration.Type.ConstCount != null)
+                        if (declaration.TypeDefinition.ConstCount != null)
                         {
-                            var elementType = declaration.Type.Generics[0];
+                            var elementType = declaration.TypeDefinition.Generics[0];
                             var targetType = ConvertTypeDefinition(elementType);
-                            var arrayType = LLVM.ArrayType(targetType, declaration.Type.ConstCount.Value);
+                            var arrayType = LLVM.ArrayType(targetType, declaration.TypeDefinition.ConstCount.Value);
                             var arrayData = _builder.BuildAlloca(arrayType, "arraydata");
                             _allocationQueue.Enqueue(arrayData);
                         }
-                        else if (declaration.Type.Count != null)
+                        else if (declaration.TypeDefinition.Count != null)
                         {
                             BuildStackPointer();
                         }
                     }
-                    else if (declaration.Type.TypeKind == TypeKind.Struct)
+                    else if (declaration.TypeDefinition.TypeKind == TypeKind.Struct)
                     {
-                        BuildStructAllocations(declaration.Type.GenericName, declaration.Assignments);
+                        BuildStructAllocations(declaration.TypeDefinition.GenericName, declaration.Assignments);
                     }
                     break;
                 case AssignmentAst assignment:
@@ -740,7 +740,7 @@ namespace Lang.Backend
             {
                 var functionDef = call.Function;
 
-                var paramsTypeDef = functionDef.Arguments[^1].Type;
+                var paramsTypeDef = functionDef.Arguments[^1].TypeDefinition;
                 var paramsType = ConvertTypeDefinition(paramsTypeDef);
 
                 var paramsVariable = _builder.BuildAlloca(paramsType, "params");
@@ -786,19 +786,19 @@ namespace Lang.Backend
 
         private void BuildFieldAllocations(StructFieldAst field)
         {
-            if (field.Type.TypeKind == TypeKind.Array && !field.Type.CArray && field.Type.ConstCount != null)
+            if (field.TypeDefinition.TypeKind == TypeKind.Array && !field.TypeDefinition.CArray && field.TypeDefinition.ConstCount != null)
             {
-                var elementType = field.Type.Generics[0];
+                var elementType = field.TypeDefinition.Generics[0];
                 var targetType = ConvertTypeDefinition(elementType);
 
-                var count = field.Type.ConstCount.Value;
+                var count = field.TypeDefinition.ConstCount.Value;
                 var arrayType = LLVM.ArrayType(targetType, count);
                 var arrayData = _builder.BuildAlloca(arrayType, "arraydata");
                 _allocationQueue.Enqueue(arrayData);
             }
-            else if (field.Type.TypeKind == TypeKind.Struct)
+            else if (field.TypeDefinition.TypeKind == TypeKind.Struct)
             {
-                BuildStructAllocations(field.Type.GenericName);
+                BuildStructAllocations(field.TypeDefinition.GenericName);
             }
         }
 
@@ -862,59 +862,59 @@ namespace Lang.Backend
             {
                 var (_, value) = WriteExpression(declaration.Value, localVariables);
 
-                if (declaration.Type.TypeKind == TypeKind.String)
+                if (declaration.TypeDefinition.TypeKind == TypeKind.String)
                 {
                     var stringVariable = _allocationQueue.Dequeue();
                     LLVM.BuildStore(_builder, value, stringVariable);
                     value = stringVariable;
                 }
 
-                localVariables.Add(declaration.Name, (declaration.Type, value));
+                localVariables.Add(declaration.Name, (declaration.TypeDefinition, value));
                 return;
             }
 
             var variable = _allocationQueue.Dequeue();
-            localVariables.Add(declaration.Name, (declaration.Type, variable));
+            localVariables.Add(declaration.Name, (declaration.TypeDefinition, variable));
             if (_emitDebug)
             {
-                DeclareDebugVariable(declaration.Name, declaration.Type, declaration, variable, block);
+                DeclareDebugVariable(declaration.Name, declaration.TypeDefinition, declaration, variable, block);
             }
 
             // 2. Set value if it exists
             if (declaration.Value != null)
             {
                 var expression = WriteExpression(declaration.Value, localVariables);
-                var value = CastValue(expression, declaration.Type);
+                var value = CastValue(expression, declaration.TypeDefinition);
 
                 LLVM.BuildStore(_builder, value, variable);
                 return;
             }
 
-            switch (declaration.Type.TypeKind)
+            switch (declaration.TypeDefinition.TypeKind)
             {
                 // Initialize arrays
                 case TypeKind.Array:
-                    var elementType = declaration.Type.Generics[0];
-                    if (declaration.Type.CArray)
+                    var elementType = declaration.TypeDefinition.Generics[0];
+                    if (declaration.TypeDefinition.CArray)
                     {
                         if (declaration.ArrayValues != null)
                         {
                             InitializeArrayValues(variable, elementType, declaration.ArrayValues, localVariables);
                         }
                     }
-                    else if (declaration.Type.ConstCount != null)
+                    else if (declaration.TypeDefinition.ConstCount != null)
                     {
-                        var arrayPointer = InitializeConstArray(variable, declaration.Type.ConstCount.Value, elementType);
+                        var arrayPointer = InitializeConstArray(variable, declaration.TypeDefinition.ConstCount.Value, elementType);
 
                         if (declaration.ArrayValues != null)
                         {
                             InitializeArrayValues(arrayPointer, elementType, declaration.ArrayValues, localVariables);
                         }
                     }
-                    else if (declaration.Type.Count != null)
+                    else if (declaration.TypeDefinition.Count != null)
                     {
                         BuildStackSave();
-                        var (_, count) = WriteExpression(declaration.Type.Count, localVariables);
+                        var (_, count) = WriteExpression(declaration.TypeDefinition.Count, localVariables);
 
                         var countPointer = _builder.BuildStructGEP(variable, 0, "countptr");
                         LLVM.BuildStore(_builder, count, countPointer);
@@ -933,16 +933,16 @@ namespace Lang.Backend
                 // Initialize struct field default values
                 case TypeKind.Struct:
                 case TypeKind.String:
-                    InitializeStruct(declaration.Type, variable, localVariables, declaration.Assignments);
+                    InitializeStruct(declaration.TypeDefinition, variable, localVariables, declaration.Assignments);
                     break;
                 // Initialize pointers to null
                 case TypeKind.Pointer:
-                    var nullValue = LLVM.ConstNull(ConvertTypeDefinition(declaration.Type));
+                    var nullValue = LLVM.ConstNull(ConvertTypeDefinition(declaration.TypeDefinition));
                     LLVM.BuildStore(_builder, nullValue, variable);
                     break;
                 // Or initialize to 0
                 default:
-                    var zero = GetConstZero(ConvertTypeDefinition(declaration.Type));
+                    var zero = GetConstZero(ConvertTypeDefinition(declaration.TypeDefinition));
                     LLVM.BuildStore(_builder, zero, variable);
                     break;
             }
@@ -986,7 +986,7 @@ namespace Lang.Backend
                     if (assignments.TryGetValue(field.Name, out var assignment))
                     {
                         var expression = WriteExpression(assignment.Value, localVariables);
-                        var value = CastValue(expression, field.Type);
+                        var value = CastValue(expression, field.TypeDefinition);
 
                         LLVM.BuildStore(_builder, value, fieldPointer);
                     }
@@ -1000,20 +1000,20 @@ namespace Lang.Backend
 
         private void InitializeField(StructFieldAst field, LLVMValueRef fieldPointer, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
         {
-            switch (field.Type.TypeKind)
+            switch (field.TypeDefinition.TypeKind)
             {
                 case TypeKind.Array:
-                    var elementType = field.Type.Generics[0];
-                    if (field.Type.CArray)
+                    var elementType = field.TypeDefinition.Generics[0];
+                    if (field.TypeDefinition.CArray)
                     {
                         if (field.ArrayValues != null)
                         {
                             InitializeArrayValues(fieldPointer, elementType, field.ArrayValues, localVariables);
                         }
                     }
-                    else if (field.Type.ConstCount != null)
+                    else if (field.TypeDefinition.ConstCount != null)
                     {
-                        var arrayPointer = InitializeConstArray(fieldPointer, field.Type.ConstCount.Value, elementType);
+                        var arrayPointer = InitializeConstArray(fieldPointer, field.TypeDefinition.ConstCount.Value, elementType);
 
                         if (field.ArrayValues != null)
                         {
@@ -1027,11 +1027,11 @@ namespace Lang.Backend
                     }
                     break;
                 case TypeKind.Pointer:
-                    var type = ConvertTypeDefinition(field.Type);
+                    var type = ConvertTypeDefinition(field.TypeDefinition);
                     LLVM.BuildStore(_builder, LLVM.ConstNull(type), fieldPointer);
                     break;
                 case TypeKind.Struct:
-                    InitializeStruct(field.Type, fieldPointer, localVariables, field.Assignments);
+                    InitializeStruct(field.TypeDefinition, fieldPointer, localVariables, field.Assignments);
                     break;
                 default:
                     LLVMValueRef value;
@@ -1041,7 +1041,7 @@ namespace Lang.Backend
                     }
                     else
                     {
-                        var fieldType = ConvertTypeDefinition(field.Type);
+                        var fieldType = ConvertTypeDefinition(field.TypeDefinition);
                         value = GetConstZero(fieldType);
                     }
                     LLVM.BuildStore(_builder, value, fieldPointer);
@@ -1454,11 +1454,11 @@ namespace Lang.Backend
                         for (var i = 0; i < functionDef.Arguments.Count - 1; i++)
                         {
                             var value = WriteExpression(call.Arguments[i], localVariables);
-                            callArguments[i] = CastValue(value, functionDef.Arguments[i].Type);
+                            callArguments[i] = CastValue(value, functionDef.Arguments[i].TypeDefinition);
                         }
 
                         // Rollup the rest of the arguments into an array
-                        var paramsType = functionDef.Arguments[^1].Type.Generics[0];
+                        var paramsType = functionDef.Arguments[^1].TypeDefinition.Generics[0];
                         var paramsPointer = _allocationQueue.Dequeue();
                         InitializeConstArray(paramsPointer, (uint)(call.Arguments.Count - functionDef.Arguments.Count + 1), paramsType);
 
@@ -1483,7 +1483,7 @@ namespace Lang.Backend
                         for (var i = 0; i < functionDef.Arguments.Count - 1; i++)
                         {
                             var value = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
-                            callArguments[i] = CastValue(value, functionDef.Arguments[i].Type);
+                            callArguments[i] = CastValue(value, functionDef.Arguments[i].TypeDefinition);
                         }
 
                         // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
@@ -1506,7 +1506,7 @@ namespace Lang.Backend
                         for (var i = 0; i < call.Arguments.Count; i++)
                         {
                             var value = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
-                            callArguments[i] = CastValue(value, functionDef.Arguments[i].Type);
+                            callArguments[i] = CastValue(value, functionDef.Arguments[i].TypeDefinition);
                         }
                         return (functionDef.ReturnType, _builder.BuildCall(function, callArguments, string.Empty));
                     }
@@ -1815,7 +1815,7 @@ namespace Lang.Backend
                 }
 
                 var structDefinition = (StructAst) structField.Types[i-1];
-                type = structDefinition.Fields[structField.ValueIndices[i-1]].Type;
+                type = structDefinition.Fields[structField.ValueIndices[i-1]].TypeDefinition;
 
                 switch (structField.Children[i])
                 {
@@ -1876,7 +1876,7 @@ namespace Lang.Backend
             if (type.TypeKind == TypeKind.String)
             {
                 _stringStruct ??= (StructAst)_programGraph.Types["string"];
-                elementType = _stringStruct.Fields[1].Type.Generics[0];
+                elementType = _stringStruct.Fields[1].TypeDefinition.Generics[0];
             }
             else
             {
@@ -2344,7 +2344,7 @@ namespace Lang.Backend
                     var structField = structAst.Fields[i];
                     using var fieldName = new MarshaledString(structField.Name);
 
-                    fields[i] = LLVM.DIBuilderCreateMemberType(_debugBuilder, structDecl, fieldName.Value, (UIntPtr)fieldName.Length, file, structField.Line, structField.Size * 8, 0, structField.Offset * 8, LLVMDIFlags.LLVMDIFlagZero, GetDebugType(structField.Type));
+                    fields[i] = LLVM.DIBuilderCreateMemberType(_debugBuilder, structDecl, fieldName.Value, (UIntPtr)fieldName.Length, file, structField.Line, structField.Size * 8, 0, structField.Offset * 8, LLVMDIFlags.LLVMDIFlagZero, GetDebugType(structField.TypeDefinition));
                 }
             }
 
