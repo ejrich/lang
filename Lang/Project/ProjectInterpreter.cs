@@ -54,6 +54,12 @@ namespace Lang.Project
 
         private static string GetProjectPathInDirectory(string directory)
         {
+            if (!Directory.Exists(directory))
+            {
+                Console.WriteLine($"Path \"{directory}\" does not exist");
+                Environment.Exit(ErrorCodes.ProjectFileNotFound);
+            }
+
             // 1. Search for an project file in the current directory
             var projectPath = Directory.EnumerateFiles(directory, ProjectFilePattern)
                 .FirstOrDefault();
