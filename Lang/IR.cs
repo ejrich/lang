@@ -3,12 +3,12 @@ using System.Runtime.InteropServices;
 
 namespace Lang
 {
-    public class ProgramIR
+    public static class Program
     {
-        public FunctionIR EntryPoint { get; set; }
-        public Dictionary<string, FunctionIR> Functions { get; } = new();
-        public Dictionary<string, InstructionValue> Constants { get; } = new();
-        public List<GlobalVariable> GlobalVariables { get; } = new();
+        public static FunctionIR EntryPoint { get; set; }
+        public static Dictionary<string, FunctionIR> Functions { get; } = new();
+        public static Dictionary<string, InstructionValue> Constants { get; } = new();
+        public static List<GlobalVariable> GlobalVariables { get; } = new();
     }
 
     public class FunctionIR

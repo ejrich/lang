@@ -6,7 +6,6 @@ namespace Lang
 {
     public interface IProgramIRBuilder
     {
-        ProgramIR Program { get; }
         void Init();
         void AddFunction(FunctionAst function);
         void AddOperatorOverload(OperatorOverloadAst overload);
@@ -20,8 +19,6 @@ namespace Lang
         private IType _s32Type;
         private IType _float64Type;
         private StructAst _stringStruct;
-
-        public ProgramIR Program { get; } = new();
 
         public void Init()
         {
