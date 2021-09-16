@@ -160,6 +160,12 @@ namespace Lang
 
             var method = _functionTypeBuilder.DefineMethod(name, MethodAttributes.Public | MethodAttributes.Static, typeof(Register), args);
             var caBuilder = new CustomAttributeBuilder(typeof(DllImportAttribute).GetConstructor(new []{typeof(string)}), new []{library});
+
+            /* @Future Uncomment this for when shipping on Windows
+            var dllImport = typeof(DllImportAttribute);
+            var callingConvention = dllImport.GetField("CallingConvention");
+            var caBuilder = new CustomAttributeBuilder(dllImport.GetConstructor(new []{typeof(string)}), new []{library}, new []{callingConvention}, new object[]{CallingConvention.Cdecl});
+            */
             method.SetCustomAttribute(caBuilder);
         }
 
@@ -440,7 +446,18 @@ namespace Lang
                             var args = new object[instruction.Value1.Values.Length];
                             for (var i = 0; i < args.Length; i++)
                             {
+                                // TODO Switch back to old varargs calls implementation
                                 args[i] = GetValue(instruction.Value1.Values[i], registers, stackPointer, function, arguments);
+                                // var argument = instruction.Value1.Values[i];
+                                // var value = GetValue(argument, registers, stackPointer, function, arguments);
+
+                                // args[i] = argument.Type.TypeKind switch
+                                // {
+                                //     TypeKind.Boolean => value.Bool,
+                                //     TypeKind.Integer or TypeKind.Enum => value.UInteger,
+                                //     TypeKind.Float => argument.Type.Size == 4 ? value.Float : value.Double,
+                                //     _ => value.Pointer
+                                // };
                             }
 
                             var functionDecl = _externFunctions[instruction.String][args.Length];
