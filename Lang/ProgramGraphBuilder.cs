@@ -1021,7 +1021,7 @@ namespace Lang
                         {
                             if (!TypeEquals(field.Type, valueType))
                             {
-                                AddError($"Expected field value to be type '{PrintTypeDefinition(field.Type)}', but got '{PrintTypeDefinition(valueType)}'", field.Type);
+                                AddError($"Expected field value to be type '{PrintTypeDefinition(field.Type)}', but got '{PrintTypeDefinition(valueType)}'", assignment.Value);
                             }
                             else if (field.Type.PrimitiveType != null && assignment.Value is ConstantAst constant)
                             {
@@ -1875,6 +1875,12 @@ namespace Lang
                         case TypeKind.Integer:
                         case TypeKind.Float:
                             if (valueType != null && valueType.PrimitiveType == null)
+                            {
+                                AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetType)}'", cast.Value);
+                            }
+                            break;
+                        case TypeKind.Pointer:
+                            if (valueType != null && valueType.Name != "*")
                             {
                                 AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetType)}'", cast.Value);
                             }
@@ -2880,39 +2886,54 @@ namespace Lang
             }
         }
 
-        private static bool TypeEquals(TypeDefinition a, TypeDefinition b, bool checkPrimitives = false)
+        private static bool TypeEquals(TypeDefinition a, TypeDefinition b, bool checkPrimitives = false, int depth = 0)
         {
+            if (a == null || b == null) return false;
+
             // Check by primitive type
-            switch (a?.PrimitiveType)
+            switch (a.PrimitiveType)
             {
                 case IntegerType aInt:
-                    if (b?.PrimitiveType is IntegerType bInt)
+                    if (b.PrimitiveType is IntegerType bInt)
                     {
                         if (!checkPrimitives) return true;
                         return aInt.Bytes == bInt.Bytes && aInt.Signed == bInt.Signed;
                     }
                     return false;
                 case FloatType aFloat:
-                    if (b?.PrimitiveType is FloatType bFloat)
+                    if (b.PrimitiveType is FloatType bFloat)
                     {
                         if (!checkPrimitives) return true;
                         return aFloat.Bytes == bFloat.Bytes;
                     }
                     return false;
                 case null:
-                    if (b?.PrimitiveType != null) return false;
+                    if (b.PrimitiveType != null) return false;
                     break;
             }
 
             // Check by name
-            if (a?.Name != b?.Name) return false;
-            if (a?.Generics.Count != b?.Generics.Count) return false;
-            for (var i = 0; i < a?.Generics.Count; i++)
+            if (a.Name != b.Name) return false;
+            if (a.Generics.Count != b.Generics.Count) return false;
+
+            // Check all generics are equal
+            if (a.Name == "*")
             {
-                var ai = a.Generics[i];
-                var bi = b.Generics[i];
-                if (!TypeEquals(ai, bi, checkPrimitives)) return false;
+                var ai = a.Generics[0];
+                var bi = b.Generics[0];
+                if (depth == 0 && (ai.Name == "void" || bi.Name == "void")) return true;
+                if (!TypeEquals(ai, bi, true, depth + 1)) return false;
             }
+            else
+            {
+                for (var i = 0; i < a.Generics.Count; i++)
+                {
+                    var ai = a.Generics[i];
+                    var bi = b.Generics[i];
+                    if (!TypeEquals(ai, bi, checkPrimitives, depth + 1)) return false;
+                }
+            }
+
             return true;
         }
 
@@ -3024,6 +3045,7 @@ namespace Lang
                     else if (_programGraph.Types.ContainsKey(typeDef.GenericName))
                     {
                         typeDef.TypeKind = TypeKind.Pointer;
+                        VerifyType(typeDef.Generics[0], depth + 1);
                     }
                     else
                     {

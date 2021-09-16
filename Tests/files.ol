@@ -24,9 +24,6 @@ DIR* opendir(string dirname) #extern "libc"
 int closedir(DIR* dir) #extern "libc"
 dirent* readdir(DIR* dir) #extern "libc"
 
-u8* malloc(int size) #extern "libc"
-free(u8* data) #extern "libc"
-
 struct FILE {}
 
 FILE* popen(string command, string type) #extern "libc"
