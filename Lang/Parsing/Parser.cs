@@ -1991,10 +1991,18 @@ namespace Lang.Parsing
             }
 
             // 1. Determine the operator
-            overload.Operator = ConvertOperator(enumerator.Current);
-            if (overload.Operator == Operator.None)
+            if (enumerator.Current.Type == TokenType.OpenBracket && enumerator.Peek()?.Type == TokenType.CloseBracket)
             {
-                errors.Add(new ParseError {Error = $"Expected an operator to be be specified, but got '{enumerator.Current.Value}'", Token = enumerator.Current});
+                overload.Operator = Operator.Subscript;
+                enumerator.MoveNext();
+            }
+            else
+            {
+                overload.Operator = ConvertOperator(enumerator.Current);
+                if (overload.Operator == Operator.None)
+                {
+                    errors.Add(new ParseError {Error = $"Expected an operator to be be specified, but got '{enumerator.Current.Value}'", Token = enumerator.Current});
+                }
             }
             if (!enumerator.MoveNext())
             {
@@ -2062,31 +2070,7 @@ namespace Lang.Parsing
                 return null;
             }
 
-            // 3. Set the return type based on the operator
-            switch (overload.Operator)
-            {
-                case Operator.And:
-                case Operator.Or:
-                case Operator.Equality:
-                case Operator.NotEqual:
-                case Operator.GreaterThanEqual:
-                case Operator.LessThanEqual:
-                case Operator.GreaterThan:
-                case Operator.LessThan:
-                case Operator.Xor:
-                    overload.ReturnType = new TypeDefinition {Name = "bool"};
-                    break;
-                default:
-                    overload.ReturnType = overload.Type;
-                    overload.ReturnTypeHasGenerics = overload.Generics.Any();
-                    for (var i = 0; i < overload.Generics.Count; i++)
-                    {
-                        SearchForGeneric(overload.Generics[i], i, overload.ReturnType);
-                    }
-                    break;
-            }
-
-            // 4. Find open paren to start parsing arguments
+            // 3. Find open paren to start parsing arguments
             if (enumerator.Current?.Type != TokenType.OpenParen)
             {
                 // Add an error to the function AST and continue until open paren
@@ -2100,7 +2084,7 @@ namespace Lang.Parsing
                     enumerator.MoveNext();
             }
 
-            // 5. Get the arguments for the operator overload
+            // 4. Get the arguments for the operator overload
             var commaRequiredBeforeNextArgument = false;
             DeclarationAst currentArgument = null;
             while (enumerator.MoveNext())
@@ -2185,8 +2169,56 @@ namespace Lang.Parsing
                 });
             }
 
-            // 6. Find open brace to start parsing body
+            // 5. Set the return type based on the operator
             enumerator.MoveNext();
+            switch (overload.Operator)
+            {
+                case Operator.And:
+                case Operator.Or:
+                case Operator.Equality:
+                case Operator.NotEqual:
+                case Operator.GreaterThanEqual:
+                case Operator.LessThanEqual:
+                case Operator.GreaterThan:
+                case Operator.LessThan:
+                case Operator.Xor:
+                    overload.ReturnType = new TypeDefinition {Name = "bool"};
+                    break;
+                case Operator.Subscript:
+                    if (enumerator.Current?.Type != TokenType.Colon)
+                    {
+                        errors.Add(new ParseError
+                        {
+                            Error = $"Unexpected to define return type for subscript", Token = enumerator.Current
+                        });
+                    }
+                    else
+                    {
+                        if (enumerator.MoveNext())
+                        {
+                            overload.ReturnType = ParseType(enumerator, errors);
+                            for (var i = 0; i < overload.Generics.Count; i++)
+                            {
+                                if (SearchForGeneric(overload.Generics[i], i, overload.ReturnType))
+                                {
+                                    overload.ReturnTypeHasGenerics = true;
+                                }
+                            }
+                            enumerator.MoveNext();
+                        }
+                    }
+                    break;
+                default:
+                    overload.ReturnType = overload.Type;
+                    overload.ReturnTypeHasGenerics = overload.Generics.Any();
+                    for (var i = 0; i < overload.Generics.Count; i++)
+                    {
+                        SearchForGeneric(overload.Generics[i], i, overload.ReturnType);
+                    }
+                    break;
+            }
+
+            // 6. Find open brace to start parsing body
             if (enumerator.Current?.Type != TokenType.OpenBrace)
             {
                 // Add an error and continue until open paren
