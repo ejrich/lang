@@ -52,9 +52,6 @@ namespace Lang.Backend.LLVM
             WriteMainFunction(programGraph.Main);
 
             // 7. Compile to object file
-            #if DEBUG
-            LLVMApi.PrintModuleToFile(_module, Path.Combine(objectPath, $"{projectName}.ll"), out _);
-            #endif
             Compile(objectFile);
 
             return objectFile;
@@ -204,14 +201,17 @@ namespace Lang.Backend.LLVM
                 LLVMCodeGenOptLevel.LLVMCodeGenLevelNone, LLVMRelocMode.LLVMRelocDefault, LLVMCodeModel.LLVMCodeModelDefault);
             LLVMApi.SetDataLayout(_module, Marshal.PtrToStringAnsi(LLVMApi.CreateTargetDataLayout(targetMachine).Pointer));
 
-            var file = Marshal.StringToCoTaskMemAnsi(objectFile);
-            LLVMApi.TargetMachineEmitToFile(targetMachine, _module, file, LLVMCodeGenFileType.LLVMObjectFile, out _);
-
             #if DEBUG
+            var llvmIrFile = objectFile[..^1] + "ll";
+            LLVMApi.PrintModuleToFile(_module, llvmIrFile, out _);
+
             var assemblyFile = objectFile[..^1] + "s";
             var assemblyFilePtr = Marshal.StringToCoTaskMemAnsi(assemblyFile);
             LLVMApi.TargetMachineEmitToFile(targetMachine, _module, assemblyFilePtr, LLVMCodeGenFileType.LLVMAssemblyFile, out _);
             #endif
+
+            var file = Marshal.StringToCoTaskMemAnsi(objectFile);
+            LLVMApi.TargetMachineEmitToFile(targetMachine, _module, file, LLVMCodeGenFileType.LLVMObjectFile, out _);
         }
 
         private bool WriteFunctionLine(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)
