@@ -165,6 +165,7 @@ namespace Lang.Backend.LLVM
             }
 
             var typeFieldType = LLVMApi.GetTypeByName(_module, "TypeField");
+            var enumValueType = LLVMApi.GetTypeByName(_module, "EnumValue");
             foreach (var (_, (type, typeInfo)) in typePointers)
             {
                 var typeName = LLVMApi.ConstString(type.Name, (uint)type.Name.Length, false);
@@ -214,7 +215,46 @@ namespace Lang.Backend.LLVM
                     }, false);
                 }
 
-                LLVMApi.SetInitializer(typeInfo, LLVMApi.ConstStruct(new [] {typeNameString, typeKind, typeSize, fields}, false));
+                LLVMValueRef enumValues;
+                if (type is EnumAst enumAst)
+                {
+                    var enumValueRefs = new LLVMValueRef[enumAst.Values.Count];
+
+                    for (var i = 0; i < enumAst.Values.Count; i++)
+                    {
+                        var value = enumAst.Values[i];
+
+                        var enumValueName = LLVMApi.ConstString(value.Name, (uint)value.Name.Length, false);
+                        var enumValueNameString = LLVMApi.AddGlobal(_module, typeName.TypeOf(), "str");
+                        SetPrivateConstant(enumValueNameString);
+                        LLVMApi.SetInitializer(enumValueNameString, enumValueName);
+
+                        var enumValue = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (uint)value.Value, false);
+
+                        enumValueRefs[i] = LLVMApi.ConstStruct(new [] {enumValueNameString, enumValue}, false);
+                    }
+
+                    var enumValuesArray = LLVMApi.ConstArray(typeInfoType, enumValueRefs);
+                    var enumValuesArrayGlobal = LLVMApi.AddGlobal(_module, enumValuesArray.TypeOf(), "____enum_values");
+                    SetPrivateConstant(enumValuesArrayGlobal);
+                    LLVMApi.SetInitializer(enumValuesArrayGlobal, enumValuesArray);
+
+                    enumValues = LLVMApi.ConstStruct(new []
+                    {
+                        LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (ulong)enumAst.Values.Count, false),
+                        enumValuesArrayGlobal
+                    }, false);
+                }
+                else
+                {
+                    enumValues = LLVMApi.ConstStruct(new []
+                    {
+                        LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 0, false),
+                        LLVMApi.ConstNull(LLVMTypeRef.PointerType(enumValueType, 0))
+                    }, false);
+                }
+
+                LLVMApi.SetInitializer(typeInfo, LLVMApi.ConstStruct(new [] {typeNameString, typeKind, typeSize, fields, enumValues}, false));
             }
 
             var typeArray = LLVMApi.ConstArray(LLVMApi.PointerType(typeInfoType, 0), types);
