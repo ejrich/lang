@@ -90,7 +90,7 @@ namespace Lang
             }
 
             // 4. Build program graph
-            var programGraph = _graphBuilder.CreateProgramGraph(asts);
+            _graphBuilder.CreateProgramGraph(asts);
             var frontEndTime = stopwatch.Elapsed;
 
             if (ErrorReporter.Errors.Any())
@@ -112,7 +112,7 @@ namespace Lang
 
             // 5. Build program
             stopwatch.Restart();
-            var objectFile = _backend.Build(programGraph, sourceFiles);
+            var objectFile = _backend.Build(sourceFiles);
             stopwatch.Stop();
             var buildTime = stopwatch.Elapsed;
 
