@@ -113,8 +113,11 @@ operator ^ Vector3(Vector3 a, Vector3 b) {
 }
 
 generic_overloads() {
+    a: PolyStruct<int, float> = { a = 5; b = 1.5; }
+    b: PolyStruct<int, float> = { a = 5; b = 1.5; }
 
-
+    add := a + b;
+    printf("Polymorphic Add: a = %d, b = %.2f\n", add.a, add.b);
 }
 
 struct PolyStruct<T, U> {

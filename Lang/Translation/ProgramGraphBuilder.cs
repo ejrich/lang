@@ -20,6 +20,7 @@ namespace Lang.Translation
         private BuildSettings _buildSettings;
         private readonly Dictionary<string, StructAst> _polymorphicStructs = new();
         private readonly Dictionary<string, List<FunctionAst>> _polymorphicFunctions = new();
+        private readonly Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads = new();
         private readonly Dictionary<string, IAst> _globalIdentifiers = new();
 
         public ProgramGraphBuilder(IPolymorpher polymorpher, IProgramRunner programRunner)
@@ -616,10 +617,27 @@ namespace Lang.Translation
         private void VerifyOperatorOverloadDefinition(OperatorOverloadAst overload)
         {
             // 1. Verify the operator type exists and is a struct
-            var targetType = VerifyType(overload.Type);
-            if (targetType != Type.Error && targetType != Type.Struct)
+            if (overload.Generics.Any())
             {
-                AddError($"Cannot overload operator '{PrintOperator(overload.Operator)}' for type '{PrintTypeDefinition(overload.Type)}'", overload.Type);
+                if (_polymorphicStructs.TryGetValue(overload.Type.Name, out var structDef))
+                {
+                    if (structDef.Generics.Count != overload.Generics.Count)
+                    {
+                        AddError($"Expected type '{overload.Type.Name}' to have {structDef.Generics.Count} generic(s), but got {overload.Generics.Count}", overload.Type);
+                    }
+                }
+                else
+                {
+                    AddError($"No polymorphic structs of type '{overload.Type.Name}'", overload.Type);
+                }
+            }
+            else
+            {
+                var targetType = VerifyType(overload.Type);
+                if (targetType != Type.Error && targetType != Type.Struct)
+                {
+                    AddError($"Cannot overload operator '{PrintOperator(overload.Operator)}' for type '{PrintTypeDefinition(overload.Type)}'", overload.Type);
+                }
             }
 
             // 2. Verify the argument types
@@ -646,16 +664,15 @@ namespace Lang.Translation
             // 3. Load the overload into the dictionary
             if (overload.Generics.Any())
             {
-                // TODO Implement me
-                // if (!_polymorphicFunctions.TryGetValue(overload.Name, out var functions))
-                // {
-                //     _polymorphicFunctions[overload.Name] = functions = new List<FunctionAst>();
-                // }
-                // if (functions.Any() && OverloadExistsForFunction(overload, functions))
-                // {
-                //     AddError($"Function '{overload.Name}' has multiple overloads with arguments ({string.Join(", ", overload.Arguments.Select(arg => PrintTypeDefinition(arg.Type)))})", overload);
-                // }
-                // functions.Add(overload);
+                if (!_polymorphicOperatorOverloads.TryGetValue(overload.Type.Name, out var overloads))
+                {
+                    _polymorphicOperatorOverloads[overload.Type.Name] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
+                }
+                if (overloads.ContainsKey(overload.Operator))
+                {
+                    AddError($"Multiple definitions of overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}'", overload);
+                }
+                overloads[overload.Operator] = overload;
             }
             else
             {
