@@ -12,6 +12,18 @@ namespace Lang.Parsing
 
     public class Lexer : ILexer
     {
+        private readonly IDictionary<char, char> _escapableCharacters = new Dictionary<char, char>
+        {
+            { '\'', '\'' },
+            { '"', '"' },
+            { '\\', '\\' },
+            { '0', '\0' },
+            { 'b', '\b' },
+            { 'n', '\n' },
+            { 'r', '\r' },
+            { 't', '\t' }
+        };
+
         public List<Token> LoadFileTokens(string filePath)
         {
             var fileContents = File.ReadAllText(filePath);
@@ -25,6 +37,7 @@ namespace Lang.Parsing
 
             Token currentToken = null;
             var closingMultiLineComment = false;
+            var literalEscapeToken = false;
             var line = 1;
             var column = 0;
             foreach (var character in fileContents)
@@ -35,6 +48,8 @@ namespace Lang.Parsing
                     line++;
                     column = 0;
                 }
+
+                // Skip through comments
                 if (lexerStatus.ReadingComment)
                 {
                     if (lexerStatus.MultiLineComment)
@@ -54,6 +69,46 @@ namespace Lang.Parsing
                         currentToken = null;
                     }
 
+                    continue;
+                }
+
+                // Interpret string literals
+                if (currentToken?.Type == TokenType.Quote)
+                {
+                    currentToken.Type = TokenType.Literal;
+                    currentToken.Value = string.Empty;
+                }
+                if (currentToken?.Type == TokenType.Literal)
+                {
+                    if (character == '\\' && !literalEscapeToken)
+                    {
+                        literalEscapeToken = true;
+                    }
+                    else if (literalEscapeToken)
+                    {
+                        if (_escapableCharacters.TryGetValue(character, out var escapeChar))
+                        {
+                            currentToken.Value += escapeChar;
+                            literalEscapeToken = false;
+                        }
+                        else
+                        {
+                            // TODO Communicate an error
+                        }
+                    }
+                    else
+                    {
+                        if (character == '"')
+                        {
+                            yield return currentToken;
+                            currentToken = null;
+                            literalEscapeToken = false; // Set to false just to be safe
+                        }
+                        else
+                        {
+                            currentToken.Value += character;
+                        }
+                    }
                     continue;
                 }
 
