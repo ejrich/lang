@@ -511,7 +511,7 @@ namespace Lang.Backend.LLVM
                     BuildAllocations(assignment.Value);
                     break;
                 case StructFieldRefAst structField:
-                    for (var i = 0; i < structField.Pointers.Length; i++)
+                    for (var i = 0; i < structField.Children.Count - 1; i++)
                     {
                         switch (structField.Children[i])
                         {
