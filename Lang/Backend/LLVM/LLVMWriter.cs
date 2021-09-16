@@ -645,22 +645,22 @@ namespace Lang.Backend.LLVM
         private (TypeDefinition type, LLVMValueRef value) GetListPointer(IndexAst index,
             IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
         {
-            var variableName = index.Variable switch
+            // 1. Get the variable pointer
+            var (type, variable) = index.Variable switch
             {
-                VariableAst var => var.Name,
-                StructFieldRefAst fieldRef => fieldRef.Name,
-                _ => string.Empty
+                VariableAst var => localVariables[var.Name],
+                StructFieldRefAst structField => BuildStructField(structField, localVariables[structField.Name].value),
+                // @Cleanup This branch should never be hit
+                _ => (null, new LLVMValueRef())
             };
-            var variable = localVariables[variableName];
-            if (index.Variable is StructFieldRefAst structField)
-            {
-                variable = BuildStructField(structField, variable.value);
-            }
 
-            var indexValue = WriteExpression(index.Index, localVariables);
-            var elementType = variable.type.Generics[0];
-            return (elementType, LLVMApi.BuildGEP(_builder, variable.value,
-                new [] {GetConstZero(ConvertTypeDefinition(elementType)), indexValue.value}, "indexptr"));
+            // 2. Determine the index
+            var (_, indexValue) = WriteExpression(index.Index, localVariables);
+
+            // 3. Build the pointer with the first index of 0
+            var elementType = type.Generics[0];
+            return (elementType, LLVMApi.BuildGEP(_builder, variable,
+                new [] {GetConstZero(ConvertTypeDefinition(elementType)), indexValue}, "indexptr"));
         }
 
         private LLVMValueRef BuildExpression((TypeDefinition type, LLVMValueRef value) lhs,
