@@ -83,7 +83,7 @@ namespace Lang
             var sourceFiles = GetSourceFiles(new DirectoryInfo(BuildSettings.Path), excludedFiles).ToList();
 
             // 4. Load runtime and dependency files
-            var libraryDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Runtime");
+            var libraryDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Modules");
             var libraryFiles = GetSourceFiles(new DirectoryInfo(libraryDirectory));
             sourceFiles.AddRange(libraryFiles);
 

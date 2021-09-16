@@ -12,8 +12,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Remove="Runtime\*.ol" />
-    <Content Include="Runtime\*.ol">
+    <None Remove="Modules\*.ol" />
+    <Content Include="Modules\*.ol">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
