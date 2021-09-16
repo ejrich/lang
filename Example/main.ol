@@ -226,9 +226,10 @@ sum_test() {
     sum_list[4] = 42;
     sum_list[5] = 14;
     sum_list[6] = 23;
+    // print_type_info(sum); // Does not compile
 
     printf("Sum of List   = %d\n", sum(sum_list));
-    printf("Sum of Params = %d\n", sum2(4, 41, 544, 244, 42, 14, 23));
+    printf("Sum of Params = %d\n", sum(4, 41, 544, 244, 42, 14, 23));
 }
 
 int sum(List<int> args) {
@@ -237,7 +238,7 @@ int sum(List<int> args) {
     return sum;
 }
 
-int sum2(Params<int> args) {
+int sum(Params<int> args) {
     sum := 0;
     each i in args then sum += i;
     return sum;

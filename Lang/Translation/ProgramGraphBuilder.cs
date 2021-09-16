@@ -501,12 +501,40 @@ namespace Lang.Translation
             }
             if (functions.Any())
             {
-                AddError($"Multiple definitions of function '{function.Name}'", function);
+                if (function.Extern)
+                {
+                    AddError($"Multiple definitions of external function '{function.Name}'", function);
+                }
+                else if (OverloadExistsForFunction(function, functions))
+                {
+                    AddError($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.Type)))})", function);
+                }
             }
-            else
+            functions.Add(function);
+        }
+
+        private bool OverloadExistsForFunction(FunctionAst currentFunction, List<FunctionAst> existingFunctions)
+        {
+            foreach (var existingFunction in existingFunctions)
             {
-                functions.Add(function);
+                if (currentFunction.Arguments.Count == existingFunction.Arguments.Count)
+                {
+                    var match = true;
+                    for (var i = 0; i < currentFunction.Arguments.Count; i++)
+                    {
+                        if (!TypeEquals(currentFunction.Arguments[i].Type, existingFunction.Arguments[i].Type, true))
+                        {
+                            match = false;
+                            break;
+                        }
+                    }
+                    if (match)
+                    {
+                        return true;
+                    }
+                }
             }
+            return false;
         }
 
         private void VerifyFunction(FunctionAst function)
@@ -2086,9 +2114,6 @@ namespace Lang.Translation
                 return Type.Struct;
             }
 
-            var hasGenerics = typeDef.Generics.Any();
-            var hasCount = typeDef.Count != null;
-
             if (typeDef.CArray && typeDef.Name != "List")
             {
                 AddError("Directive #c_array can only be applied to List", typeDef);
@@ -2096,8 +2121,11 @@ namespace Lang.Translation
 
             if (typeDef.Count != null && typeDef.Name != "List")
             {
-                AddError("Count can only be applied to List", typeDef);
+                AddError($"Type '{PrintTypeDefinition(typeDef)}' cannot have a count", typeDef);
+                return Type.Error;
             }
+
+            var hasGenerics = typeDef.Generics.Any();
 
             switch (typeDef.PrimitiveType)
             {
@@ -2107,21 +2135,11 @@ namespace Lang.Translation
                         AddError($"Type '{typeDef.Name}' cannot have generics", typeDef);
                         return Type.Error;
                     }
-                    if (hasCount)
-                    {
-                        AddError($"Type '{typeDef.Name}' cannot have count", typeDef);
-                        return Type.Error;
-                    }
                     return Type.Int;
                 case FloatType:
                     if (hasGenerics)
                     {
                         AddError($"Type '{typeDef.Name}' cannot have generics", typeDef);
-                        return Type.Error;
-                    }
-                    if (hasCount)
-                    {
-                        AddError($"Type '{typeDef.Name}' cannot have count", typeDef);
                         return Type.Error;
                     }
                     return Type.Float;
@@ -2135,21 +2153,11 @@ namespace Lang.Translation
                         AddError("Type 'bool' cannot have generics", typeDef);
                         return Type.Error;
                     }
-                    if (hasCount)
-                    {
-                        AddError($"Type '{typeDef.Name}' cannot have count", typeDef);
-                        return Type.Error;
-                    }
                     return Type.Boolean;
                 case "string":
                     if (hasGenerics)
                     {
                         AddError("Type 'string' cannot have generics", typeDef);
-                        return Type.Error;
-                    }
-                    if (hasCount)
-                    {
-                        AddError($"Type '{typeDef.Name}' cannot have count", typeDef);
                         return Type.Error;
                     }
                     return Type.String;
@@ -2166,11 +2174,6 @@ namespace Lang.Translation
                     if (hasGenerics)
                     {
                         AddError("Type 'void' cannot have generics", typeDef);
-                        return Type.Error;
-                    }
-                    if (hasCount)
-                    {
-                        AddError($"Type '{typeDef.Name}' cannot have count", typeDef);
                         return Type.Error;
                     }
                     return Type.Void;
