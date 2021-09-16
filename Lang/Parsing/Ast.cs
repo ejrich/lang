@@ -57,6 +57,7 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public string Name { get; set; }
         public StructFieldRefAst Value { get; set; }
+        public int ValueIndex { get; set; }
         public List<IAst> Children => null;
     }
 
