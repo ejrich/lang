@@ -16,6 +16,7 @@ c_arrays() {
     array: List<int>[10/*array_size*/] #c_array; // Correct
     // array: List<int>[array_size]; #c_array // Incorrect
 
+    printf("Array size = %d, should be %d\n", array.length, array_size);
     each i in 0..array_size - 1 {
         array[i] = 5 * i;
         printf("Array value %d = %d\n", i, array[i]);
@@ -27,6 +28,7 @@ c_arrays() {
 c_array_structs() {
     array_struct: ArrayStruct;
 
+    printf("ArrayStruct array size = %d, should be %d\n", array_struct.array.length, struct_array_size);
     each i in 1..struct_array_size {
         array_struct.array[i - 1] = 5 * i;
         printf("Struct array value %d = %d\n", i, array_struct.array[i - 1]);

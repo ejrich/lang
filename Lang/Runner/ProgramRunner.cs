@@ -778,7 +778,7 @@ namespace Lang.Runner
                         return new ValueType {Type = new TypeDefinition {Name = enumName}, Value = enumInstance};
                     }
                     var structVariable = ExecuteExpression(structField.Children[0], variables);
-                    return GetStructFieldRef(structField, structVariable.Value, variables);
+                    return GetStructFieldRef(structField, structVariable, variables);
                 }
                 case IdentifierAst identifier:
                     return variables[identifier.Name];
@@ -870,7 +870,7 @@ namespace Lang.Runner
                                 break;
                             case StructFieldRefAst structField when structField.Children[^1] is IndexAst:
                                 var structVariable = ExecuteExpression(structField.Children[0], variables);
-                                var pointerValue = GetStructFieldRef(structField, structVariable.Value, variables, true);
+                                var pointerValue = GetStructFieldRef(structField, structVariable, variables, true);
                                 typeDef = pointerValue.Type;
                                 pointer = pointerValue.Value;
                                 break;
@@ -1070,21 +1070,52 @@ namespace Lang.Runner
             return stringInstance;
         }
 
-        private ValueType GetStructFieldRef(StructFieldRefAst structField, object value, IDictionary<string, ValueType> variables, bool getPointer = false)
+        private ValueType GetStructFieldRef(StructFieldRefAst structField, ValueType valueType, IDictionary<string, ValueType> variables, bool getPointer = false)
         {
-            TypeDefinition fieldType = null;
+            var fieldType = valueType.Type;
+            var value = valueType.Value;
 
             for (var i = 1; i < structField.Children.Count; i++)
             {
                 var structName = structField.TypeNames[i-1];
-                var structDefinition = (StructAst) _programGraph.Types[structName];
-                fieldType = structDefinition.Fields[structField.ValueIndices[i-1]].Type;
 
                 if (structField.Pointers[i-1])
                 {
                     var type = _types[structName];
                     value = Marshal.PtrToStructure(GetPointer(value), type);
+                    fieldType = fieldType.Generics[0];
                 }
+
+                if (fieldType.CArray)
+                {
+                    switch (structField.Children[i])
+                    {
+                        case IdentifierAst identifier:
+                            if (identifier.Name == "length")
+                            {
+                                var typeCount = ExecuteExpression(fieldType.Count, variables);
+                                fieldType = typeCount.Type;
+                                value = typeCount.Value;
+                            }
+                            break;
+                        case IndexAst index:
+                            var (_, _, listPointer) = GetListPointer(index, variables, value, fieldType);
+                            fieldType = fieldType.Generics[0];
+                            if (getPointer && i == structField.Children.Count - 1)
+                            {
+                                value = listPointer;
+                            }
+                            else
+                            {
+                                value = PointerToTargetType(listPointer, fieldType);
+                            }
+                            break;
+                    }
+                    continue;
+                }
+
+                var structDefinition = (StructAst) _programGraph.Types[structName];
+                fieldType = structDefinition.Fields[structField.ValueIndices[i-1]].Type;
 
                 switch (structField.Children[i])
                 {
