@@ -48,10 +48,15 @@ int main(List<string> args) {
 
     sdl_video := 0x20;
     x := 0xfeABD4;
-    sdl := SDL_Init(sdl_video);
-    SDL_CreateWindow("Hello world", 805240832, 805240832, 400, 300, 0);
-    sleep(5);
+    //sdl := SDL_Init(sdl_video);
+    //SDL_CreateWindow("Hello world", 805240832, 805240832, 400, 300, 0);
+    //sleep(5);
 
+    z := 1;
+    each i in create_list(5) {
+        printf("Value %d = %d\n", z++, i);
+    }
+    
     return 0;
 }
 
@@ -275,6 +280,8 @@ u32 sleep(u32 seconds) #extern "libc"
 #run {
     default_args(87);
     //set_global(99);
+    node: Node;
+    printf("%d\n", node.value);
     global_a = 3;
     if global_a then
         printf("%d\n", global_a);

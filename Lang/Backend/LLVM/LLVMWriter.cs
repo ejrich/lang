@@ -322,6 +322,15 @@ namespace Lang.Backend.LLVM
                     var indexVariable = LLVMApi.BuildAlloca(_builder, LLVMTypeRef.Int32Type(), each.IterationVariable);
                     _allocationQueue.Enqueue(indexVariable);
 
+                    switch (each.Iteration)
+                    {
+                        case CallAst call:
+                            var function = _functions[call.Function];
+                            var iterationValue = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(function.ReturnType), "iterval");
+                            _allocationQueue.Enqueue(iterationValue);
+                            break;
+                    }
+
                     return BuildAllocations(each.Children);
                 case ExpressionAst:
                     BuildAllocations(ast.Children);
