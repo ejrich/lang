@@ -44,9 +44,7 @@ string format_string(string format, Params<string> args) {
     if format.length == 0 then return "";
 
     // @Cleanup This is not good, figure out a better way to do this
-    buffer := malloc(100);
-
-    str: string = {data = buffer;}
+    str: string = {data = malloc(100);}
     arg_index := 0;
     format_index := 0;
 
@@ -55,20 +53,17 @@ string format_string(string format, Params<string> args) {
         if char == 37 { // TODO Have a character syntax
             arg := args[arg_index++];
             each i in 0..arg.length - 1 {
-                pointer := buffer + str.length++;
-                *pointer = arg[i]; // TODO Add indexing for pointers
+                str[str.length++] = arg[i];
             }
         }
         else {
-            pointer := buffer + str.length++;
-            *pointer = char;
+            str[str.length++] = char;
         }
 
         format_index++;
     }
 
-    end := buffer + str.length;
-    *end = 0;
+    str[str.length] = 0;
 
     return str;
 }
@@ -140,4 +135,4 @@ int run_command(string command) {
     return (status & 0xFF00) >> 8;
 }
 
-#run main();
+// #run main();

@@ -2795,6 +2795,7 @@ namespace Lang
                     break;
                 case TypeKind.List:
                 case TypeKind.Params:
+                case TypeKind.Pointer:
                     elementType = typeDef.Generics.FirstOrDefault();
                     if (elementType == null)
                     {

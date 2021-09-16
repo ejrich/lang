@@ -1248,7 +1248,11 @@ namespace Lang
             }
             var elementType = GetTypeFromDefinition(elementTypeDef);
 
-            if (!listTypeDef.CArray)
+            if (listTypeDef.TypeKind == TypeKind.Pointer)
+            {
+                pointer = Marshal.ReadIntPtr(pointer);
+            }
+            else if (!listTypeDef.CArray)
             {
                 var listObject = PointerToTargetType(pointer, listTypeDef);
                 var dataField = listObject.GetType().GetField("data");
