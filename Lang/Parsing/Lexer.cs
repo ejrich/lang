@@ -12,6 +12,9 @@ namespace Lang.Parsing
 
     public class Lexer : ILexer
     {
+        private bool _readingComment;
+        private bool _multiLineComment;
+
         public List<Token> LoadFileTokens(string path)
         {
             var fileContents = File.ReadAllText(path);
@@ -27,11 +30,20 @@ namespace Lang.Parsing
             #endif
         }
 
-        private static IEnumerable<Token> GetTokens(string fileContents)
+        private IEnumerable<Token> GetTokens(string fileContents)
         {
             Token currentToken = null;
             foreach (var character in fileContents)
             {
+                if (_readingComment)
+                {
+                    if (character == '\n')
+                    {
+                        _readingComment = false;
+                        currentToken = null;
+                    }
+                    continue;
+                }
                 if (IgnoreChar(character))
                 {
                     if (currentToken != null)
@@ -75,16 +87,33 @@ namespace Lang.Parsing
             return Enum.IsDefined(typeof(TokenType), token) ? token : TokenType.Token;
         }
 
-        private static bool ContinueToken(Token currentToken, TokenType type)
+        private bool ContinueToken(Token currentToken, TokenType type)
         {
             if (currentToken == null) return false;
 
-            return currentToken.Type switch
+            switch (currentToken.Type)
             {
-                TokenType.Token => type == TokenType.Token,
+                case TokenType.Token:
+                    return type == TokenType.Token;
+                case TokenType.Divide:
+                    if (currentToken.Type != TokenType.Divide)
+                        return false;
+
+                    currentToken.Type = TokenType.Comment;
+                    _readingComment = true;
+                    return true;
+                case TokenType.Multiply:
+                    if (currentToken.Type != TokenType.Divide)
+                        return false;
+
+                    currentToken.Type = TokenType.Comment;
+                    _readingComment = true;
+                    _multiLineComment = true;
+                    return true;
                 // TODO More validation eventually
-                _ => false
-            };
+                default:
+                    return false;
+            }
         }
     }
 }
