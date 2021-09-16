@@ -280,8 +280,9 @@ u32 sleep(u32 seconds) #extern "libc"
         printf("Global variable = %d\n", global_a);
     my_struct: MyStruct;
     my_struct.subValue.something = 8;
-    state: State;
     printf("Struct field value = %d\n", my_struct.subValue.something);
+    state := State.Running;
+    printf("State = %d\n", state);
 }
 
 /*

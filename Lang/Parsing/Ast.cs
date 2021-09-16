@@ -270,7 +270,17 @@ namespace Lang.Parsing
         public List<TypeDefinition> Generics { get; } = new();
         public IAst Count { get; set; }
         public List<IAst> Children => null;
-        public string GenericName => Generics.Aggregate(Name, (current, generic) => current + $".{generic.GenericName}");
+
+        private string _genericName;
+        public string GenericName
+        {
+            get
+            {
+                if (_genericName == null)
+                    return _genericName = Generics.Aggregate(Name, (current, generic) => current + $".{generic.GenericName}");
+                return _genericName;
+            }
+        }
     }
 
     public enum Operator
