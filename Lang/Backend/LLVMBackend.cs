@@ -60,8 +60,8 @@ namespace Lang.Backend
                     var functionName = name switch
                     {
                         "main" => "__main",
-                        "__start" => "main",
-                        _ => GetFunctionName(name, i, functions.Count)
+                            "__start" => "main",
+                            _ => GetFunctionName(name, i, functions.Count)
                     };
                     WriteFunctionDefinition(functionName, function, name, function.Varargs, function.Extern);
                 }
@@ -424,9 +424,9 @@ namespace Lang.Backend
             var argumentCount = varargs ? functionAst.Arguments.Count - 1 : functionAst.Arguments.Count;
             var argumentTypes = new LLVMTypeRef[argumentCount];
 
-            // 1. Get the argument types and create debug symbols
             if (_emitDebug && !externFunction)
             {
+                // Get the argument types and create debug symbols
                 var debugArgumentTypes = new LLVMMetadataRef[argumentCount + 1];
                 debugArgumentTypes[0] = GetDebugType(functionAst.ReturnType);
 
@@ -439,18 +439,21 @@ namespace Lang.Backend
 
                 var file = _debugFiles[functionAst.FileIndex];
                 var functionType = _debugBuilder.CreateSubroutineType(file, debugArgumentTypes, LLVMDIFlags.LLVMDIFlagZero);
-                _debugFunctions[name] = _debugBuilder.CreateFunction(file, debugName, name, file, functionAst.Line, functionType, 0, 1, functionAst.Line, LLVMDIFlags.LLVMDIFlagPrototyped, 0);
+                var debugFunction = _debugFunctions[name] = _debugBuilder.CreateFunction(file, debugName, name, file, functionAst.Line, functionType, 0, 1, functionAst.Line, LLVMDIFlags.LLVMDIFlagPrototyped, 0);
+
+                // Declare the function
+                var function = _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(functionAst.ReturnType), argumentTypes.ToArray(), varargs));
+                LLVM.SetSubprogram(function, debugFunction);
             }
             else
             {
+                // Get the argument types and declare the function
                 for (var i = 0; i < argumentCount; i++)
                 {
                     argumentTypes[i] = ConvertTypeDefinition(functionAst.Arguments[i].Type, externFunction);
                 }
+                _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(functionAst.ReturnType), argumentTypes.ToArray(), varargs));
             }
-
-            // 2. Declare function
-            var function = _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(functionAst.ReturnType), argumentTypes.ToArray(), varargs));
         }
 
         private void WriteFunction(IFunction functionAst, int argumentCount, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> globals, LLVMValueRef function, string functionName)
@@ -462,6 +465,10 @@ namespace Lang.Backend
             var localVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>(globals);
 
             // 2. Allocate arguments on the stack
+            if (_emitDebug)
+            {
+                _builder.CurrentDebugLocation = null;
+            }
             for (var i = 0; i < argumentCount; i++)
             {
                 var arg = functionAst.Arguments[i];
