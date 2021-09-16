@@ -1123,6 +1123,9 @@ namespace Lang.Backend
                     _builder.BuildBr(basicBlocks[blockIndex]);
                 }
             }
+
+            // Optimize the function if release build
+            LLVM.RunFunctionPassManager(_passManager, functionPointer);
         }
 
         private LLVMValueRef GetValue(InstructionValue value, LLVMValueRef[] values, LLVMValueRef[] allocations, LLVMValueRef functionPointer)
