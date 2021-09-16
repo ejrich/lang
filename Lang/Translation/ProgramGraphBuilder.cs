@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Lang.Parsing;
 using Type = Lang.Parsing.Type;
 
@@ -13,48 +14,57 @@ namespace Lang.Translation
 
     public class ProgramGraphBuilder : IProgramGraphBuilder
     {
-        private readonly IDictionary<string, FunctionAst> _functions = new Dictionary<string, FunctionAst>();
-        private readonly IDictionary<string, StructAst> _structs = new Dictionary<string, StructAst>();
-        private readonly List<CallAst> _undefinedCalls = new();
-        private readonly List<string> _undefinedTypes = new();
+        private readonly Dictionary<string, FunctionAst> _functions = new();
+        private readonly Dictionary<string, StructAst> _structs = new();
 
         public ProgramGraph CreateProgramGraph(ParseResult parseResult, out List<TranslationError> errors)
         {
             errors = new List<TranslationError>();
-            var graph = new ProgramGraph();
 
+            // 1. First load the user defined structs
+            var definedStructs = new HashSet<string>();
+            var structs = parseResult.SyntaxTrees.Where(ast => ast is StructAst).Cast<StructAst>().ToList();
+            foreach (var structAst in structs)
+            {
+                if (!definedStructs.Add(structAst.Name))
+                {
+                    errors.Add(new TranslationError {Error = $"Multiple definitions of struct '{structAst.Name}'"});
+                }
+            }
+            // 2. Verify struct bodies
+            foreach (var structAst in structs)
+            {
+                VerifyStruct(structAst, definedStructs, errors);
+            }
+
+            // 3. Load and verify function return types and arguments
+            foreach (var function in parseResult.SyntaxTrees.Where(ast => ast is FunctionAst).Cast<FunctionAst>())
+            {
+                VerifyFunctionDefinition(function, errors);
+            }
+
+            var graph = new ProgramGraph
+            {
+                Data = new Data
+                {
+                    Structs = _structs.Values.ToList()
+                }
+            };
+            // 4. Verify function bodies
             foreach (var syntaxTree in parseResult.SyntaxTrees)
             {
                 switch (syntaxTree)
                 {
                     case FunctionAst function:
                         var main = function.Name.Equals("main", StringComparison.OrdinalIgnoreCase);
-                        var functionErrors = VerifyFunction(function, main);
-                        if (functionErrors.Any())
+                        VerifyFunction(function, main, errors);
+                        if (main)
                         {
-                            errors.AddRange(functionErrors);
+                            graph.Main = function;
                         }
                         else
                         {
-                            if (main)
-                            {
-                                graph.Main = function;
-                            }
-                            else
-                            {
-                                _functions.Add(function.Name, function);
-                            }
-                        }
-                        break;
-                    case StructAst structAst:
-                        var structErrors = VerifyStruct(structAst);
-                        if (structErrors.Any())
-                        {
-                            errors.AddRange(structErrors);
-                        }
-                        else
-                        {
-                            _structs.Add(structAst.Name, structAst);
+                            graph.Functions.Add(function);
                         }
                         break;
                     // TODO Handle more type of ASTs
@@ -66,20 +76,18 @@ namespace Lang.Translation
             return graph;
         }
 
-        private List<TranslationError> VerifyFunction(FunctionAst function, bool main)
+        private void VerifyFunction(FunctionAst function, bool main, List<TranslationError> errors)
         {
-            var translationErrors = new List<TranslationError>();
-
             var localVariables = new Dictionary<string, TypeDefinition>();
 
             if (main)
             {
-                var type = InferType(function.ReturnType, translationErrors);
+                var type = InferType(function.ReturnType, errors);
                 if (!(type == Type.Void || type == Type.Int))
                 {
-                    translationErrors.Add(new TranslationError
+                    errors.Add(new TranslationError
                     {
-                        Error = "The main function should be of type 'int' or 'void'"
+                        Error = "The main function should return type 'int' or 'void'"
                     });
                 }
             }
@@ -89,61 +97,101 @@ namespace Lang.Translation
                 switch (syntaxTree)
                 {
                     case ReturnAst returnAst:
-                        VerifyReturnStatement(returnAst, localVariables, function.ReturnType, translationErrors);
+                        VerifyReturnStatement(returnAst, localVariables, function.ReturnType, errors);
                         break;
                     case DeclarationAst declaration:
-                        VerifyDeclaration(declaration, localVariables, translationErrors);
+                        VerifyDeclaration(declaration, localVariables, errors);
                         break;
                     case AssignmentAst assignment:
-                        VerifyAssignment(assignment, localVariables, translationErrors);
+                        VerifyAssignment(assignment, localVariables, errors);
                         break;
                     // TODO Handle more syntax trees
+                    // default:
+                    //     errors.Add(new TranslationError {Error = $"Unexpected syntax tree '{syntaxTree}'"});
+                    //     break;
                 }
             }
-
-            return translationErrors;
         }
 
-        private List<TranslationError> VerifyStruct(StructAst structAst)
+        private void VerifyFunctionDefinition(FunctionAst function, List<TranslationError> errors)
         {
-            var translationErrors = new List<TranslationError>();
-
-            // 1. Verify the struct hasn't been defined previously
-            if (_structs.ContainsKey(structAst.Name))
+            // 1. Verify the return type of the function is valid
+            var returnType = InferType(function.ReturnType, errors);
+            if (returnType == Type.Error || (returnType == Type.Other && !_structs.ContainsKey(function.ReturnType.Name)))
             {
-                translationErrors.Add(new TranslationError {Error = $"Previously defined struct '{structAst.Name}'"});
+                errors.Add(new TranslationError
+                {
+                    Error = $"Return type '{function.ReturnType.Name}' of function '{function.Name}' is not defined"
+                });
             }
 
-            // 2. Verify struct fields have valid types
+            // 2. Verify the argument types
+            var argumentNames = new HashSet<string>();
+            foreach (var argument in function.Arguments)
+            {
+                // 1a. Check if the argument has been previously defined
+                if (!argumentNames.Add(argument.Name))
+                {
+                    errors.Add(new TranslationError
+                    {
+                        Error = $"Function '{function.Name}' already contains argument '{argument.Name}'"
+                    });
+                }
+
+                // 1b. Check for errored or undefined field types
+                var type = InferType(argument.Type, errors);
+
+                if (type == Type.Error || (type == Type.Other && !_structs.ContainsKey(argument.Type.Name)))
+                {
+                    errors.Add(new TranslationError
+                    {
+                        Error = $"Type '{PrintTypeDefinition(argument.Type)}' of argument '{argument.Name}' in function '{function.Name}' is not defined"
+                    });
+                }
+            }
+            
+            // 3. Load the function into the dictionary 
+            if (!_functions.TryAdd(function.Name, function))
+            {
+                errors.Add(new TranslationError {Error = $"Multiple definitions of function '{function.Name}'"});
+            }
+        }
+
+        private void VerifyStruct(StructAst structAst, HashSet<string> definedStructs, List<TranslationError> errors)
+        {
+            // 1. Verify struct fields have valid types
             var fieldNames = new HashSet<string>();
             foreach (var structField in structAst.Fields)
             {
-                if (fieldNames.Contains(structField.Name))
+                // 1a. Check if the field has been previously defined
+                if (!fieldNames.Add(structField.Name))
                 {
-                    translationErrors.Add(new TranslationError {Error = $"Struct '{structAst.Name}' already contains field '{structField.Name}'"});
-                }
-                else
-                {
-                    fieldNames.Add(structField.Name);
+                    errors.Add(new TranslationError {Error = $"Struct '{structAst.Name}' already contains field '{structField.Name}'"});
                 }
 
-                var type = InferType(structField.Type, translationErrors);
+                // 1b. Check for errored or undefined field types
+                var type = InferType(structField.Type, errors);
 
-                if (type == Type.Other)
+                if (type == Type.Error || (type == Type.Other && !definedStructs.Contains(structField.Type.Name)))
                 {
-                    // TODO Lookup struct definition
+                    errors.Add(new TranslationError
+                    {
+                        Error = $"Type '{PrintTypeDefinition(structField.Type)}' of field {structAst.Name}.{structField.Name} is not defined"
+                    });
                 }
 
+                // 1c. Check if the default value has the correct type
                 if (structField.DefaultValue != null && type != structField.DefaultValue.Type)
                 {
-                    translationErrors.Add(new TranslationError
+                    errors.Add(new TranslationError
                     {
                         Error = $"Type of field {structAst.Name}.{structField.Name} is '{type}', but default value is type '{structField.DefaultValue.Type}'"
                     });
                 }
             }
 
-            return translationErrors;
+            // 2. Load the struct into the dictionary
+            _structs.TryAdd(structAst.Name, structAst);
         }
 
         private void VerifyReturnStatement(ReturnAst returnAst, IDictionary<string, TypeDefinition> localVariables,
@@ -168,16 +216,16 @@ namespace Lang.Translation
                 case ConstantAst constant:
                     if (constant.Type != returnType)
                     {
-                        errors.Add(new TranslationError {Error = $"Expected to return type '{functionReturnType.Type}', but returned type '{constant.Type}'"});
+                        errors.Add(new TranslationError {Error = $"Expected to return type '{functionReturnType.Name}', but returned type '{constant.Type}'"});
                     }
                     break;
                 case VariableAst variable:
                     if (localVariables.TryGetValue(variable.Name, out var typeDefinition))
                     {
                         var variableType = InferType(typeDefinition, errors);
-                        if (variableType != returnType || (variableType == Type.Other && functionReturnType.Type != typeDefinition.Type))
+                        if (variableType != returnType || (variableType == Type.Other && functionReturnType.Name != typeDefinition.Name))
                         {
-                            errors.Add(new TranslationError {Error = $"Expected to return type '{functionReturnType.Type}', but returned type '{typeDefinition.Type}'"});
+                            errors.Add(new TranslationError {Error = $"Expected to return type '{PrintTypeDefinition(functionReturnType)}', but returned type '{PrintTypeDefinition(typeDefinition)}'"});
                         }
                     }
                     else
@@ -191,7 +239,7 @@ namespace Lang.Translation
                 case ExpressionAst expression:
                     break;
                 case null:
-                    errors.Add(new TranslationError {Error = $"Expected to return type: {functionReturnType.Type}"});
+                    errors.Add(new TranslationError {Error = $"Expected to return type: {functionReturnType.Name}"});
                     break;
             }
         }
@@ -239,7 +287,7 @@ namespace Lang.Translation
             if (declaration.Type == null)
             {
                 // TODO Assign this to the type field on assignment
-                declaration.Type = new TypeDefinition {Type = valueType.ToString()};
+                declaration.Type = new TypeDefinition {Name = valueType.ToString().ToLower()};
             }
             else
             {
@@ -249,7 +297,7 @@ namespace Lang.Translation
                 {
                     if (type != valueType)
                     {
-                        errors.Add(new TranslationError {Error = $"Expected declaration value to be type '{declaration.Type.Type}'"});
+                        errors.Add(new TranslationError {Error = $"Expected declaration value to be type '{PrintTypeDefinition(declaration.Type)}'"});
                     }
                 }
             }
@@ -263,7 +311,8 @@ namespace Lang.Translation
             var variableName = assignment.Variable switch
             {
                 VariableAst variable => variable.Name,
-                StructFieldRefAst fieldRef => fieldRef.Name
+                StructFieldRefAst fieldRef => fieldRef.Name,
+                _ => string.Empty
             };
             if (!localVariables.TryGetValue(variableName, out var variableTypeDefinition))
             {
@@ -301,7 +350,6 @@ namespace Lang.Translation
             }
 
             // 3. Verify the assignment value matches the variable type definition
-            // TODO Implement struct field ref type traversing verification
             var type = InferType(variableTypeDefinition, errors);
             if (assignment.Variable is StructFieldRefAst structField)
             {
@@ -311,7 +359,7 @@ namespace Lang.Translation
             {
                 if (type != valueType)
                 {
-                    errors.Add(new TranslationError {Error = $"Expected assignment value to be type '{variableTypeDefinition.Type}'"});
+                    errors.Add(new TranslationError {Error = $"Expected assignment value to be type '{PrintTypeDefinition(variableTypeDefinition)}'"});
                 }
             }
         }
@@ -320,9 +368,9 @@ namespace Lang.Translation
             List<TranslationError> errors)
         {
             // 1. Load the struct definition in typeDefinition
-            if (!_structs.TryGetValue(structType.Type, out var structDefinition))
+            if (!_structs.TryGetValue(structType.Name, out var structDefinition))
             {
-                errors.Add(new TranslationError());
+                errors.Add(new TranslationError {Error = $"Struct '{structType.Name}' not defined"});
                 return null;
             }
 
@@ -331,7 +379,7 @@ namespace Lang.Translation
             var field = structDefinition.Fields.FirstOrDefault(_ => _.Name == value.Name);
             if (field == null)
             {
-                errors.Add(new TranslationError {Error = $"Struct '{structType.Type}' does not contain field '{value.Name}'"});
+                errors.Add(new TranslationError {Error = $"Struct '{structType.Name}' does not contain field '{value.Name}'"});
                 return null;
             }
 
@@ -340,8 +388,10 @@ namespace Lang.Translation
 
         private static Type InferType(TypeDefinition typeDef, List<TranslationError> errors)
         {
+            if (typeDef == null) return Type.Error;
+
             var hasGenerics = typeDef.Generics.Any();
-            switch (typeDef.Type.ToLower())
+            switch (typeDef.Name)
             {
                 case "int":
                     if (hasGenerics)
@@ -383,6 +433,19 @@ namespace Lang.Translation
                 default:
                     return Type.Other;
             }
+        }
+
+        private static string PrintTypeDefinition(TypeDefinition type)
+        {
+            if (type == null) return string.Empty;
+
+            var sb = new StringBuilder();
+            sb.Append(type.Name);
+            if (type.Generics.Any())
+            {
+                sb.Append($"<{string.Join(", ", type.Generics.Select(PrintTypeDefinition))}>");
+            }
+            return sb.ToString();
         }
     }
 }

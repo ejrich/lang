@@ -128,7 +128,7 @@ namespace Lang.Parsing
 
             // 3. Parse arguments until a close paren
             var commaRequiredBeforeNextArgument = false;
-            Variable currentArgument = null;
+            Argument currentArgument = null;
             while (enumerator.MoveNext())
             {
                 var token = enumerator.Current;
@@ -150,7 +150,7 @@ namespace Lang.Parsing
                         }
                         else if (currentArgument == null)
                         {
-                            currentArgument = new Variable {Type = ParseType(enumerator, errors)};
+                            currentArgument = new Argument {Type = ParseType(enumerator, errors)};
                         }
                         else
                         {
@@ -1022,7 +1022,7 @@ namespace Lang.Parsing
 
         private static TypeDefinition ParseType(TokenEnumerator enumerator, List<ParseError> errors)
         {
-            var typeDefinition = new TypeDefinition {Type = enumerator.Current.Value};
+            var typeDefinition = new TypeDefinition {Name = enumerator.Current.Value};
 
             // Determine whether to parse a generic type, otherwise return
             if (enumerator.Peek()?.Type == TokenType.LessThan)

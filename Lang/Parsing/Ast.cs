@@ -26,7 +26,7 @@ namespace Lang.Parsing
     {
         public string Name { get; set; }
         public TypeDefinition ReturnType { get; init; }
-        public List<Variable> Arguments { get; } = new();
+        public List<Argument> Arguments { get; } = new();
         public List<IAst> Children { get; } = new();
     }
 
@@ -129,7 +129,7 @@ namespace Lang.Parsing
         public List<IAst> Children { get; } = new();
     }
 
-    public class Variable
+    public class Argument
     {
         public TypeDefinition Type { get; init; }
         public string Name { get; set; }
@@ -137,7 +137,7 @@ namespace Lang.Parsing
 
     public class TypeDefinition
     {
-        public string Type { get; init; }
+        public string Name { get; init; }
         public List<TypeDefinition> Generics { get; } = new();
     }
 
