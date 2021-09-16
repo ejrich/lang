@@ -983,7 +983,7 @@ namespace Lang
                 else
                 {
                     var type = VerifyType(declaration.Type);
-                    if (type != TypeKind.Struct)
+                    if (type != TypeKind.Struct && type != TypeKind.String)
                     {
                         AddError($"Can only use object initializer with struct type, got '{PrintTypeDefinition(declaration.Type)}'", declaration.Type);
                         return;
