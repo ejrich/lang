@@ -423,6 +423,7 @@ namespace Lang.Parsing
                                 Error = $"Unexpected token in '{token.Value}' function call '{callAst.Function}'",
                                 Token = token
                             });
+                            break;
                     }
                 }
             }
