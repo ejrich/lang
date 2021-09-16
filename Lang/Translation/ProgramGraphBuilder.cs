@@ -28,7 +28,7 @@ namespace Lang.Translation
             {
                 if (!definedStructs.Add(structAst.Name))
                 {
-                    errors.Add(new TranslationError {Error = $"Multiple definitions of struct '{structAst.Name}'"});
+                    errors.Add(CreateError($"Multiple definitions of struct '{structAst.Name}'", structAst));
                 }
             }
             // 2. Verify struct bodies
@@ -84,7 +84,7 @@ namespace Lang.Translation
                 // 1a. Check if the field has been previously defined
                 if (!fieldNames.Add(structField.Name))
                 {
-                    errors.Add(new TranslationError {Error = $"Struct '{structAst.Name}' already contains field '{structField.Name}'"});
+                    errors.Add(CreateError($"Struct '{structAst.Name}' already contains field '{structField.Name}'", structField));
                 }
 
                 // 1b. Check for errored or undefined field types
@@ -92,10 +92,7 @@ namespace Lang.Translation
 
                 if (type == Type.Error || (type == Type.Other && !definedStructs.Contains(structField.Type.Name)))
                 {
-                    errors.Add(new TranslationError
-                    {
-                        Error = $"Type '{PrintTypeDefinition(structField.Type)}' of field {structAst.Name}.{structField.Name} is not defined"
-                    });
+                    errors.Add(CreateError($"Type '{PrintTypeDefinition(structField.Type)}' of field {structAst.Name}.{structField.Name} is not defined", structField));
                 }
 
                 // 1c. Check if the default value has the correct type
@@ -103,10 +100,7 @@ namespace Lang.Translation
                 {
                     if (!TypeEquals(structField.Type, structField.DefaultValue.Type))
                     {
-                        errors.Add(new TranslationError
-                        {
-                            Error = $"Type of field {structAst.Name}.{structField.Name} is '{type}', but default value is type '{structField.DefaultValue.Type}'"
-                        });
+                        errors.Add(CreateError($"Type of field {structAst.Name}.{structField.Name} is '{type}', but default value is type '{structField.DefaultValue.Type}'", structField.DefaultValue));
                     }
                 }
             }
@@ -121,10 +115,7 @@ namespace Lang.Translation
             var returnType = VerifyType(function.ReturnType, errors);
             if (returnType == Type.Error)
             {
-                errors.Add(new TranslationError
-                {
-                    Error = $"Return type '{function.ReturnType.Name}' of function '{function.Name}' is not defined"
-                });
+                errors.Add(CreateError($"Return type '{function.ReturnType.Name}' of function '{function.Name}' is not defined", function.ReturnType));
             }
 
             // 2. Verify the argument types
@@ -134,10 +125,7 @@ namespace Lang.Translation
                 // 1a. Check if the argument has been previously defined
                 if (!argumentNames.Add(argument.Name))
                 {
-                    errors.Add(new TranslationError
-                    {
-                        Error = $"Function '{function.Name}' already contains argument '{argument.Name}'"
-                    });
+                    errors.Add(CreateError($"Function '{function.Name}' already contains argument '{argument.Name}'", argument));
                 }
 
                 // 1b. Check for errored or undefined field types
@@ -145,17 +133,14 @@ namespace Lang.Translation
 
                 if (type == Type.Error)
                 {
-                    errors.Add(new TranslationError
-                    {
-                        Error = $"Type '{PrintTypeDefinition(argument.Type)}' of argument '{argument.Name}' in function '{function.Name}' is not defined"
-                    });
+                    errors.Add(CreateError($"Type '{PrintTypeDefinition(argument.Type)}' of argument '{argument.Name}' in function '{function.Name}' is not defined", argument.Type));
                 }
             }
             
             // 3. Load the function into the dictionary 
             if (!_functions.TryAdd(function.Name, function))
             {
-                errors.Add(new TranslationError {Error = $"Multiple definitions of function '{function.Name}'"});
+                errors.Add(CreateError($"Multiple definitions of function '{function.Name}'", function));
             }
         }
 
@@ -168,10 +153,7 @@ namespace Lang.Translation
                 var type = VerifyType(function.ReturnType, errors);
                 if (!(type == Type.Void || type == Type.Int))
                 {
-                    errors.Add(new TranslationError
-                    {
-                        Error = "The main function should return type 'int' or 'void'"
-                    });
+                    errors.Add(CreateError("The main function should return type 'int' or 'void'", function));
                 }
             }
 
@@ -229,7 +211,7 @@ namespace Lang.Translation
             {
                 if (returnAst.Value != null)
                 {
-                    errors.Add(new TranslationError {Error = "Function return should be void"});
+                    errors.Add(CreateError("Function return should be void", returnAst));
                 }
                 return;
             }
@@ -238,16 +220,13 @@ namespace Lang.Translation
             var returnValueType = VerifyExpression(returnAst.Value, localVariables, errors);
             if (returnValueType == null)
             {
-                errors.Add(new TranslationError {Error = $"Expected to return type '{functionReturnType.Name}'"});
+                errors.Add(CreateError($"Expected to return type '{functionReturnType.Name}'", returnAst));
             }
             else
             {
                 if (!TypeEquals(functionReturnType, returnValueType))
                 {
-                    errors.Add(new TranslationError
-                    {
-                        Error = $"Expected to return type '{PrintTypeDefinition(functionReturnType)}', but returned type '{PrintTypeDefinition(returnValueType)}'"
-                    });
+                    errors.Add(CreateError($"Expected to return type '{PrintTypeDefinition(functionReturnType)}', but returned type '{PrintTypeDefinition(returnValueType)}'", returnAst.Value));
                 }
             }
         }
@@ -258,7 +237,7 @@ namespace Lang.Translation
             // 1. Verify the variable is already defined
             if (localVariables.ContainsKey(declaration.Name))
             {
-                errors.Add(new TranslationError {Error = $"Variable '{declaration.Name}' already defined"});
+                errors.Add(CreateError($"Variable '{declaration.Name}' already defined", declaration));
                 return;
             }
 
@@ -275,7 +254,7 @@ namespace Lang.Translation
                 var type = VerifyType(declaration.Type, errors);
                 if (type == Type.Error)
                 {
-                    errors.Add(new TranslationError {Error = $"Undefined type in declaration '{PrintTypeDefinition(declaration.Type)}'"});
+                    errors.Add(CreateError($"Undefined type in declaration '{PrintTypeDefinition(declaration.Type)}'", declaration.Type));
                 }
 
                 // Verify the type is correct
@@ -283,7 +262,7 @@ namespace Lang.Translation
                 {
                     if (!TypeEquals(declaration.Type, valueType))
                     {
-                        errors.Add(new TranslationError {Error = $"Expected declaration value to be type '{PrintTypeDefinition(declaration.Type)}'"});
+                        errors.Add(CreateError($"Expected declaration value to be type '{PrintTypeDefinition(declaration.Type)}'", declaration.Type));
                     }
                 }
             }
@@ -302,7 +281,7 @@ namespace Lang.Translation
             };
             if (!localVariables.TryGetValue(variableName, out var variableTypeDefinition))
             {
-                errors.Add(new TranslationError {Error = $"Variable '{variableName}' not defined"});
+                errors.Add(CreateError($"Variable '{variableName}' not defined", assignment));
                 return;
             }
 
@@ -319,7 +298,7 @@ namespace Lang.Translation
             {
                 if (!TypeEquals(variableTypeDefinition, valueType))
                 {
-                    errors.Add(new TranslationError {Error = $"Expected assignment value to be type '{PrintTypeDefinition(variableTypeDefinition)}'"});
+                    errors.Add(CreateError($"Expected assignment value to be type '{PrintTypeDefinition(variableTypeDefinition)}'", assignment.Value));
                 }
             }
         }
@@ -336,7 +315,7 @@ namespace Lang.Translation
                     // Valid types
                     break;
                 default:
-                    errors.Add(new TranslationError {Error = $"Expected condition to be int, float, or bool, but got '{PrintTypeDefinition(conditionalType)}'"});
+                    errors.Add(CreateError($"Expected condition to be int, float, or bool, but got '{PrintTypeDefinition(conditionalType)}'", conditional.Condition));
                     break;
             }
 
@@ -362,7 +341,7 @@ namespace Lang.Translation
                     // Valid types
                     break;
                 default:
-                    errors.Add(new TranslationError {Error = $"Expected condition to be int, float, or bool, but got '{PrintTypeDefinition(conditionalType)}'"});
+                    errors.Add(CreateError($"Expected condition to be int, float, or bool, but got '{PrintTypeDefinition(conditionalType)}'", whileAst.Condition));
                     break;
             }
 
@@ -383,12 +362,12 @@ namespace Lang.Translation
                 var beginType = VerifyExpression(each.RangeBegin, localVariables, errors);
                 if (VerifyType(beginType, errors) != Type.Int)
                 {
-                    errors.Add(new TranslationError {Error = $"Expected range to begin with an int, but got '{PrintTypeDefinition(beginType)}'"});
+                    errors.Add(CreateError($"Expected range to begin with an int, but got '{PrintTypeDefinition(beginType)}'", each.RangeBegin));
                 }
                 var endType = VerifyExpression(each.RangeBegin, localVariables, errors);
                 if (VerifyType(beginType, errors) != Type.Int)
                 {
-                    errors.Add(new TranslationError {Error = $"Expected range to end with an int, but got '{PrintTypeDefinition(beginType)}'"});
+                    errors.Add(CreateError($"Expected range to end with an int, but got '{PrintTypeDefinition(beginType)}'", each.RangeEnd));
                 }
                 eachVariables.Add(each.IterationVariable, new TypeDefinition {Name = "int"});
             }
@@ -408,7 +387,7 @@ namespace Lang.Translation
                 {
                     if (!localVariables.TryGetValue(structField.Name, out var structType))
                     {
-                        errors.Add(new TranslationError {Error = $"Variable '{structField.Name}' not defined"});
+                        errors.Add(CreateError($"Variable '{structField.Name}' not defined", ast));
                         return null;
                     }
                     return VerifyStructFieldRef(structField, structType, errors);
@@ -416,7 +395,7 @@ namespace Lang.Translation
                 case VariableAst variable:
                     if (!localVariables.TryGetValue(variable.Name, out var typeDefinition))
                     {
-                        errors.Add(new TranslationError {Error = $"Variable '{variable.Name}' not defined"});
+                        errors.Add(CreateError( $"Variable '{variable.Name}' not defined", ast));
                     }
                     return typeDefinition;
                 case ChangeByOneAst changeByOne:
@@ -429,12 +408,12 @@ namespace Lang.Translation
                                 var type = VerifyType(variableType, errors);
                                 if (type == Type.Int || type == Type.Float) return variableType;
                                 
-                                errors.Add(new TranslationError {Error = $"Expected to {op} int or float, but got type '{PrintTypeDefinition(variableType)}'"});
+                                errors.Add(CreateError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(variableType)}'", variable));
                                 return null;
                             }
                             else
                             {
-                                errors.Add(new TranslationError {Error = $"Variable '{variable.Name}' not defined"});
+                                errors.Add(CreateError( $"Variable '{variable.Name}' not defined", variable));
                                 return null;
                             }
                         case StructFieldRefAst structField:
@@ -446,16 +425,16 @@ namespace Lang.Translation
                                 var type = VerifyType(fieldType, errors);
                                 if (type == Type.Int || type == Type.Float) return fieldType;
 
-                                errors.Add(new TranslationError {Error = $"Expected to {op} int or float, but got type '{PrintTypeDefinition(fieldType)}'"});
+                                errors.Add(CreateError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(fieldType)}'", structField));
                                 return null;
                             }
                             else
                             {
-                                errors.Add(new TranslationError {Error = $"Variable '{structField.Name}' not defined"});
+                                errors.Add(CreateError( $"Variable '{structField.Name}' not defined", structField));
                                 return null;
                             }
                         default:
-                            errors.Add(new TranslationError {Error = $"Expected to {op} variable"});
+                            errors.Add(CreateError( $"Expected to {op} variable", changeByOne));
                             return null;
                     }
                 case CallAst call:
@@ -464,10 +443,7 @@ namespace Lang.Translation
                         // Verify function arguments
                         if (function.Arguments.Count != call.Arguments.Count)
                         {
-                            errors.Add(new TranslationError
-                            {
-                                Error = $"Call to function '{function.Name}' expected {function.Arguments.Count} arguments, but got {call.Arguments.Count}"
-                            });
+                            errors.Add(CreateError($"Call to function '{function.Name}' expected {function.Arguments.Count} arguments, but got {call.Arguments.Count}", call));
                             return null;
                         }
 
@@ -479,17 +455,14 @@ namespace Lang.Translation
                             {
                                 if (!TypeEquals(functionType, callType))
                                 {
-                                    errors.Add(new TranslationError
-                                    {
-                                        Error = $"Call to function '{function.Name}' expected '{PrintTypeDefinition(functionType)}', but got '{PrintTypeDefinition(callType)}'"
-                                    });
+                                    errors.Add(CreateError($"Call to function '{function.Name}' expected '{PrintTypeDefinition(functionType)}', but got '{PrintTypeDefinition(callType)}'", call.Arguments[i]));
                                 }
                             }
                         }
                     }
                     else
                     {
-                        errors.Add(new TranslationError {Error = $"Call to undefined function '{call.Function}'"});
+                        errors.Add(CreateError($"Call to undefined function '{call.Function}'", call));
                     }
                     return function?.ReturnType;
                 case ExpressionAst expression:
@@ -501,7 +474,7 @@ namespace Lang.Translation
 
                         if (TypeEquals(expressionType, nextType)) continue;
 
-                        errors.Add(new TranslationError {Error = $"Type mismatch between '{PrintTypeDefinition(expressionType)}' and '{PrintTypeDefinition(nextType)}'"});
+                        errors.Add(CreateError($"Type mismatch between '{PrintTypeDefinition(expressionType)}' and '{PrintTypeDefinition(nextType)}'", expression.Children[i]));
                         return null;
                         // TODO Implement type interpretation based on the operators
                     }
@@ -509,7 +482,7 @@ namespace Lang.Translation
                 case null:
                     return null;
                 default:
-                    errors.Add(new TranslationError {Error = $"Unexpected Ast '{ast}'"});
+                    errors.Add(CreateError($"Unexpected Ast '{ast}'", ast));
                     return null;
             }
         }
@@ -520,7 +493,7 @@ namespace Lang.Translation
             // 1. Load the struct definition in typeDefinition
             if (!_structs.TryGetValue(structType.Name, out var structDefinition))
             {
-                errors.Add(new TranslationError {Error = $"Struct '{structType.Name}' not defined"});
+                errors.Add(CreateError( $"Struct '{structType.Name}' not defined", structField));
                 return null;
             }
 
@@ -529,7 +502,7 @@ namespace Lang.Translation
             var field = structDefinition.Fields.FirstOrDefault(_ => _.Name == value.Name);
             if (field == null)
             {
-                errors.Add(new TranslationError {Error = $"Struct '{structType.Name}' does not contain field '{value.Name}'"});
+                errors.Add(CreateError($"Struct '{structType.Name}' does not contain field '{value.Name}'", structField));
                 return null;
             }
 
@@ -559,28 +532,28 @@ namespace Lang.Translation
                 case "int":
                     if (hasGenerics)
                     {
-                        errors.Add(new TranslationError {Error = "int type cannot have generics"});
+                        errors.Add(CreateError( "int type cannot have generics", typeDef));
                         return Type.Error;
                     }
                     return Type.Int;
                 case "float":
                     if (hasGenerics)
                     {
-                        errors.Add(new TranslationError {Error = "float type cannot have generics"});
+                        errors.Add(CreateError( "float type cannot have generics", typeDef));
                         return Type.Error;
                     }
                     return Type.Float;
                 case "bool":
                     if (hasGenerics)
                     {
-                        errors.Add(new TranslationError {Error = "boolean type cannot have generics"});
+                        errors.Add(CreateError( "boolean type cannot have generics", typeDef));
                         return Type.Error;
                     }
                     return Type.Boolean;
                 case "string":
                     if (hasGenerics)
                     {
-                        errors.Add(new TranslationError {Error = "string type cannot have generics"});
+                        errors.Add(CreateError( "string type cannot have generics", typeDef));
                         return Type.Error;
                     }
                     return Type.String;
@@ -589,7 +562,7 @@ namespace Lang.Translation
                 case "void":
                     if (hasGenerics)
                     {
-                        errors.Add(new TranslationError {Error = "void type cannot have generics"});
+                        errors.Add(CreateError( "void type cannot have generics", typeDef));
                         return Type.Error;
                     }
                     return Type.Void;
@@ -610,6 +583,17 @@ namespace Lang.Translation
                 sb.Append($"<{string.Join(", ", type.Generics.Select(PrintTypeDefinition))}>");
             }
             return sb.ToString();
+        }
+
+        private static TranslationError CreateError(string error, IAst ast)
+        {
+            return new()
+            {
+                Error = error,
+                FileIndex = ast.FileIndex,
+                Line = ast.Line,
+                Column = ast.Column
+            };
         }
     }
 }

@@ -4,6 +4,7 @@
     {
         public TokenType Type { get; set; }
         public string Value { get; set; }
+        public int FileIndex { get; init; }
         public int Line { get; init; }
         public int Column { get; set; }
         public bool Error { get; set; }

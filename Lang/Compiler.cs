@@ -48,13 +48,13 @@ namespace Lang
 
             if (!parseResult.Success)
             {
-                var currentFile = string.Empty;
+                var currentFile = Int32.MinValue;
                 foreach (var parseError in parseResult.Errors)
                 {
-                    if (currentFile != parseError.File)
+                    if (currentFile != parseError.FileIndex)
                     {
-                        currentFile = parseError.File;
-                        Console.WriteLine($"\nFailed to parse file: \"{currentFile}\":\n");
+                        currentFile = parseError.FileIndex;
+                        Console.WriteLine($"\nFailed to parse file: \"{project.BuildFiles[currentFile].Replace(project.Path, string.Empty)}\":");
                     }
                     Console.WriteLine($"\t{parseError.Error} at line {parseError.Token.Line}:{parseError.Token.Column}");
                 }
@@ -71,7 +71,7 @@ namespace Lang
                 Console.WriteLine($"{errors.Count} compilation error(s):\n");
                 foreach (var error in errors)
                 {
-                    Console.WriteLine($"\t{error.File}: {error.Error} at line {error.Line}:{error.Column}");
+                    Console.WriteLine($"\t{project.BuildFiles[error.FileIndex].Replace(project.Path, string.Empty)}: {error.Error} at line {error.Line}:{error.Column}");
                 }
                 Environment.Exit(ErrorCodes.CompilationError);
             }

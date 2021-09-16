@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Metadata;
+using System.Runtime.CompilerServices;
 
 namespace Lang.Parsing
 {
@@ -53,19 +55,21 @@ namespace Lang.Parsing
         {
             var parseResult = new ParseResult();
 
-            foreach (var file in projectFiles)
+            for (var fileIndex = 0; fileIndex < projectFiles.Count; fileIndex++)
             {
-                var syntaxTrees = ParseFile(file, out var errors);
+                var file = projectFiles[fileIndex];
+                var syntaxTrees = ParseFile(file, fileIndex, out var errors);
                 if (errors.Any())
                 {
                     foreach (var error in errors)
                     {
-                        error.File = file;
+                        error.FileIndex = fileIndex;
                     }
                     parseResult.Errors.AddRange(errors);
                 }
                 else if (parseResult.Success)
                 {
+                    syntaxTrees.ForEach(ast => ast.FileIndex = fileIndex);
                     parseResult.SyntaxTrees.AddRange(syntaxTrees);
                 }
             }
@@ -73,10 +77,10 @@ namespace Lang.Parsing
             return parseResult;
         }
 
-        private List<IAst> ParseFile(string file, out List<ParseError> errors)
+        private List<IAst> ParseFile(string file, int fileIndex, out List<ParseError> errors)
         {
             // 1. Load file tokens
-            var tokens = _lexer.LoadFileTokens(file, out errors);
+            var tokens = _lexer.LoadFileTokens(file, fileIndex, out errors);
 
             // 2. Iterate through tokens, tracking different ASTs
             var syntaxTrees = new List<IAst>();
@@ -107,7 +111,8 @@ namespace Lang.Parsing
         private static FunctionAst ParseFunction(TokenEnumerator enumerator, List<ParseError> errors)
         {
             // 1. Determine return type and name of the function
-            var function = new FunctionAst {ReturnType = ParseType(enumerator, errors)};
+            var function = CreateAst<FunctionAst>(enumerator.Current);
+            function.ReturnType = ParseType(enumerator, errors);
             enumerator.MoveNext();
             function.Name = enumerator.Current?.Value;
 
@@ -150,7 +155,8 @@ namespace Lang.Parsing
                         }
                         else if (currentArgument == null)
                         {
-                            currentArgument = new Argument {Type = ParseType(enumerator, errors)};
+                            currentArgument = CreateAst<Argument>(token);
+                            currentArgument.Type = ParseType(enumerator, errors);
                         }
                         else
                         {
@@ -226,7 +232,7 @@ namespace Lang.Parsing
 
         private static StructAst ParseStruct(TokenEnumerator enumerator, List<ParseError> errors)
         {
-            var structAst = new StructAst();
+            var structAst = CreateAst<StructAst>(enumerator.Current);
 
             // 1. Determine name of struct
             enumerator.MoveNext();
@@ -276,7 +282,8 @@ namespace Lang.Parsing
                         // First get the type of the field
                         if (currentField == null)
                         {
-                            currentField = new StructFieldAst {Type = ParseType(enumerator, errors)};
+                            currentField = CreateAst<StructFieldAst>(token);
+                            currentField.Type = ParseType(enumerator, errors);
                         }
                         else if (currentField.Name == null)
                         {
@@ -316,7 +323,9 @@ namespace Lang.Parsing
                     case TokenType.Literal:
                         if (currentField != null && parsingFieldDefault)
                         {
-                            var constant = new ConstantAst {Type = InferType(token, errors), Value = token.Value};
+                            var constant = CreateAst<ConstantAst>(token);
+                            constant.Type = InferType(token, errors);
+                            constant.Value = token.Value;
                             currentField.DefaultValue = constant;
                             parsingFieldDefault = false;
                         }
@@ -395,7 +404,7 @@ namespace Lang.Parsing
 
         private static ScopeAst ParseScope(TokenEnumerator enumerator, List<ParseError> errors)
         {
-            var scopeAst = new ScopeAst();
+            var scopeAst = CreateAst<ScopeAst>(enumerator.Current);
 
             var closed = false;
             while (enumerator.MoveNext())
@@ -424,7 +433,7 @@ namespace Lang.Parsing
 
         private static ConditionalAst ParseConditional(TokenEnumerator enumerator, List<ParseError> errors)
         {
-            var conditionalAst = new ConditionalAst();
+            var conditionalAst = CreateAst<ConditionalAst>(enumerator.Current);
 
             // 1. Parse the conditional expression by first iterating over the initial 'if'
             enumerator.MoveNext();
@@ -506,7 +515,7 @@ namespace Lang.Parsing
 
         private static WhileAst ParseWhile(TokenEnumerator enumerator, List<ParseError> errors)
         {
-            var whileAst = new WhileAst();
+            var whileAst = CreateAst<WhileAst>(enumerator.Current);
 
             // 1. Parse the conditional expression by first iterating over the initial 'while'
             enumerator.MoveNext();
@@ -546,7 +555,7 @@ namespace Lang.Parsing
 
         private static EachAst ParseEach(TokenEnumerator enumerator, List<ParseError> errors)
         {
-            var eachAst = new EachAst();
+            var eachAst = CreateAst<EachAst>(enumerator.Current);
 
             // 1. Parse the iteration variable by first iterating over the initial 'each'
             enumerator.MoveNext();
@@ -652,7 +661,8 @@ namespace Lang.Parsing
 
         private static DeclarationAst ParseDeclaration(TokenEnumerator enumerator, List<ParseError> errors)
         {
-            var declaration = new DeclarationAst {Name = enumerator.Current.Value};
+            var declaration = CreateAst<DeclarationAst>(enumerator.Current);
+            declaration.Name = enumerator.Current.Value;
 
             // 1. Expect to get colon
             enumerator.MoveNext();
@@ -715,7 +725,14 @@ namespace Lang.Parsing
         private static AssignmentAst ParseAssignment(TokenEnumerator enumerator, List<ParseError> errors, IAst variable = null)
         {
             // 1. Set the variable
-            var assignment = new AssignmentAst {Variable = variable ?? new VariableAst {Name = enumerator.Current.Value}};
+            var assignment = CreateAst<AssignmentAst>(enumerator.Current);
+            assignment.Variable = variable;
+            if (variable == null)
+            {
+                var variableAst = CreateAst<VariableAst>(enumerator.Current);
+                variableAst.Name = enumerator.Current.Value;
+                assignment.Variable = variableAst;
+            }
 
             // 2. Expect to get equals sign
             if (!enumerator.MoveNext())
@@ -777,18 +794,17 @@ namespace Lang.Parsing
                 case TokenType.Increment:
                 case TokenType.Decrement:
                     enumerator.MoveNext();
-                    var changeByOneAst = new ChangeByOneAst
-                    {
-                        Operator = enumerator.Current.Type == TokenType.Increment ? Operator.Increment : Operator.Decrement,
-                        Variable = structField
-                    };
+                    var changeByOneAst = CreateAst<ChangeByOneAst>(enumerator.Current);
+                    changeByOneAst.Operator = enumerator.Current.Type == TokenType.Increment ? Operator.Increment : Operator.Decrement;
+                    changeByOneAst.Variable = structField;
                     enumerator.MoveNext();
                     if (enumerator.Current?.Type == TokenType.SemiColon)
                     {
                         return changeByOneAst;
                     }
 
-                    var expression = new ExpressionAst {Children = {changeByOneAst}};
+                    var expression = CreateAst<ExpressionAst>(enumerator.Current);
+                    expression.Children.Add(changeByOneAst);
                     return ParseExpression(enumerator, errors, expression);
                 case null:
                     errors.Add(new ParseError {Error = "Expected value", Token = enumerator.Last});
@@ -808,10 +824,8 @@ namespace Lang.Parsing
 
         private static StructFieldRefAst ParseStructField(TokenEnumerator enumerator, List<ParseError> errors)
         {
-            var structField = new StructFieldRefAst
-            {
-                Name = enumerator.Current.Value
-            };
+            var structField = CreateAst<StructFieldRefAst>(enumerator.Current);
+            structField.Name = enumerator.Current.Value;
 
             if (enumerator.Peek()?.Type == TokenType.Period)
             {
@@ -836,7 +850,7 @@ namespace Lang.Parsing
         {
             var operatorRequired = initial != null;
 
-            var expression = initial ?? new ExpressionAst();
+            var expression = initial ?? CreateAst<ExpressionAst>(enumerator.Current);
             if (!endToken.Any())
             {
                 endToken = new[] {TokenType.SemiColon};
@@ -860,10 +874,10 @@ namespace Lang.Parsing
                         {
                             // Create subexpression to hold the operation
                             // This case would be `var b = 4 + a++`, where we have a value before the operator
-                            expression.Children[^1] = new ChangeByOneAst
-                            {
-                                Operator = op, Variable = expression.Children[^1]
-                            };
+                            var changeByOneAst = CreateAst<ChangeByOneAst>(token);
+                            changeByOneAst.Operator = op;
+                            changeByOneAst.Variable = expression.Children[^1];
+                            expression.Children[^1] = changeByOneAst;
                         }
                         else
                         {
@@ -918,7 +932,9 @@ namespace Lang.Parsing
                 case TokenType.Boolean:
                 case TokenType.Literal:
                     // Parse constant
-                    var constant = new ConstantAst {Type = InferType(token, errors), Value = token.Value};
+                    var constant = CreateAst<ConstantAst>(token);
+                    constant.Type = InferType(token, errors);
+                    constant.Value = token.Value;
                     return constant;
                 case TokenType.Token:
                     // Parse variable, call, or expression
@@ -935,19 +951,20 @@ namespace Lang.Parsing
                             });
                             return null;
                         default:
-                            return new VariableAst {Name = token.Value};
+                            var variable = CreateAst<VariableAst>(token);
+                            variable.Name = token.Value;
+                            return variable;
                     }
                 case TokenType.Increment:
                 case TokenType.Decrement:
                     var op = ConvertOperator(token);
                     if (enumerator.MoveNext())
                     {
-                        return new ChangeByOneAst
-                        {
-                            Prefix = true,
-                            Operator = op,
-                            Variable = ParseNextExpressionUnit(enumerator, errors, out operatorRequired)
-                        };
+                        var changeByOneAst = CreateAst<ChangeByOneAst>(enumerator.Current);
+                        changeByOneAst.Prefix = true;
+                        changeByOneAst.Operator = op;
+                        changeByOneAst.Variable = ParseNextExpressionUnit(enumerator, errors, out operatorRequired);
+                        return changeByOneAst;
                     }
                     else
                     {
@@ -977,7 +994,8 @@ namespace Lang.Parsing
 
         private static CallAst ParseCall(TokenEnumerator enumerator, List<ParseError> errors)
         {
-            var callAst = new CallAst {Function = enumerator.Current.Value};
+            var callAst = CreateAst<CallAst>(enumerator.Current);
+            callAst.Function = enumerator.Current.Value;
 
             // This enumeration is the open paren
             enumerator.MoveNext();
@@ -1017,7 +1035,7 @@ namespace Lang.Parsing
 
         private static ReturnAst ParseReturn(TokenEnumerator enumerator, List<ParseError> errors)
         {
-            var returnAst = new ReturnAst();
+            var returnAst = CreateAst<ReturnAst>(enumerator.Current);
 
             if (enumerator.MoveNext())
             {
@@ -1036,7 +1054,8 @@ namespace Lang.Parsing
 
         private static TypeDefinition ParseType(TokenEnumerator enumerator, List<ParseError> errors)
         {
-            var typeDefinition = new TypeDefinition {Name = enumerator.Current.Value};
+            var typeDefinition = CreateAst<TypeDefinition>(enumerator.Current);
+            typeDefinition.Name = enumerator.Current.Value;
 
             // Determine whether to parse a generic type, otherwise return
             if (enumerator.Peek()?.Type == TokenType.LessThan)
@@ -1109,20 +1128,36 @@ namespace Lang.Parsing
             return typeDefinition;
         }
 
+        private static T CreateAst<T>(Token token) where T : IAst, new()
+        {
+            return new()
+            {
+                FileIndex = token.FileIndex,
+                Line = token.Line,
+                Column = token.Column
+            };
+        }
+
         private static TypeDefinition InferType(Token token, List<ParseError> errors)
         {
+            var typeDefinition = CreateAst<TypeDefinition>(token);
             switch (token.Type)
             {
                 case TokenType.Literal:
-                    return new TypeDefinition {Name = "string"};
+                {
+                    typeDefinition.Name = "string";
+                    return typeDefinition;
+                }
                 case TokenType.Number:
                     if (int.TryParse(token.Value, out _))
                     {
-                        return new TypeDefinition {Name = "int"};
+                        typeDefinition.Name = "int";
+                        return typeDefinition;
                     }
                     else if (float.TryParse(token.Value, out _))
                     {
-                        return new TypeDefinition {Name = "float"};
+                        typeDefinition.Name = "float";
+                        return typeDefinition;
                     }
                     else
                     {
@@ -1130,7 +1165,10 @@ namespace Lang.Parsing
                         return null;
                     }
                 case TokenType.Boolean:
-                    return new TypeDefinition {Name = "bool"};
+                {
+                    typeDefinition.Name = "bool";
+                    return typeDefinition;
+                }
                 default:
                     errors.Add(new ParseError {Error = $"Unable to determine type of token '{token.Value}'", Token = token});
                     return null;
