@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
@@ -31,7 +30,7 @@ namespace Lang
         [FieldOffset(4)] public IntPtr Data;
     }
 
-    public interface _IProgramRunner
+    public interface IProgramRunner
     {
         void Init();
         void InitExternFunction(FunctionAst function);
@@ -40,7 +39,7 @@ namespace Lang
         bool ExecuteCondition(FunctionIR function, IAst source);
     }
 
-    public unsafe class _ProgramRunner : _IProgramRunner
+    public unsafe class ProgramRunner : IProgramRunner
     {
         private ModuleBuilder _moduleBuilder;
         private TypeBuilder _functionTypeBuilder;
@@ -54,7 +53,7 @@ namespace Lang
         private uint _globalVariablesSize;
         private IntPtr[] _globals;
 
-        public _ProgramRunner()
+        public ProgramRunner()
         {
             var assemblyName = new AssemblyName("Runner");
             var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
