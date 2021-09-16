@@ -1119,7 +1119,9 @@ namespace Lang
 
         private void VerifyReturnStatement(ReturnAst returnAst, IFunction currentFunction, ScopeAst scope)
         {
-            // 2. Handle void case since it's the easiest to interpret
+            var returnValueType = VerifyExpression(returnAst.Value, currentFunction, scope);
+
+            // Handle void case since it's the easiest to interpret
             if (currentFunction.ReturnType?.TypeKind == TypeKind.Void)
             {
                 if (returnAst.Value != null)
@@ -1129,11 +1131,16 @@ namespace Lang
             }
             else if (currentFunction.ReturnType != null)
             {
-                // 3. Determine if the expression returns the correct value
-                var returnValueType = VerifyExpression(returnAst.Value, currentFunction, scope);
                 if (returnValueType == null)
                 {
-                    ErrorReporter.Report($"Expected to return type '{currentFunction.ReturnType.Name}'", returnAst);
+                    if (returnAst.Value is NullAst nullAst && currentFunction.ReturnType.TypeKind == TypeKind.Pointer)
+                    {
+                        nullAst.TargetType = currentFunction.ReturnType;
+                    }
+                    else
+                    {
+                        ErrorReporter.Report($"Expected to return type '{currentFunction.ReturnType.Name}'", returnAst);
+                    }
                 }
                 else
                 {
