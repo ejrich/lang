@@ -49,6 +49,7 @@ namespace Lang
             if (!function.Extern && !function.Compiler)
             {
                 functionIR.Allocations = new();
+                functionIR.Instructions = new();
                 functionIR.BasicBlocks = new();
 
                 var entryBlock = AddBasicBlock(functionIR);
@@ -58,14 +59,14 @@ namespace Lang
                     var argument = function.Arguments[i];
                     var allocationIndex = AddAllocation(functionIR, argument);
 
-                    EmitStore(entryBlock, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i});
+                    EmitStore(functionIR, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i});
                 }
 
-                var finalBlock = EmitScope(functionIR, entryBlock, function.Body, function.ReturnType);
+                EmitScope(functionIR, entryBlock, function.Body, function.ReturnType);
 
                 if (function.ReturnVoidAtEnd)
                 {
-                    finalBlock.Instructions.Add(new Instruction {Type = InstructionType.Return});
+                    functionIR.Instructions.Add(new Instruction {Type = InstructionType.Return});
                 }
 
                 if (function.PrintIR)
@@ -79,15 +80,15 @@ namespace Lang
         {
             var functionName = GetOperatorOverloadName(overload.Type, overload.Operator);
 
-            var entryBlock = new BasicBlock();
-            var functionIR = new FunctionIR {Allocations = new(), BasicBlocks = new List<BasicBlock>{entryBlock}};
+            var functionIR = new FunctionIR {Allocations = new(), Instructions = new(), BasicBlocks = new()};
+            var entryBlock = AddBasicBlock(functionIR);
 
             for (var i = 0; i < overload.Arguments.Count; i++)
             {
                 var argument = overload.Arguments[i];
                 var allocationIndex = AddAllocation(functionIR, argument);
 
-                EmitStore(entryBlock, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i});
+                EmitStore(functionIR, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i});
             }
 
             Program.Functions[functionName] = functionIR;
@@ -98,11 +99,17 @@ namespace Lang
         private void PrintFunction(string name, FunctionIR function)
         {
             Console.WriteLine($"\nIR for function '{name}'");
-            foreach (var block in function.BasicBlocks)
+
+            var blockIndex = 0;
+            var i = 0;
+            while (blockIndex < function.BasicBlocks.Count)
             {
-                Console.WriteLine($"\n--------------- Basic Block {block.Index} ---------------\n");
-                foreach (var instruction in block.Instructions)
+                var instructionToStopAt = blockIndex < function.BasicBlocks.Count - 1 ? function.BasicBlocks[blockIndex + 1].Location : function.Instructions.Count;
+                Console.WriteLine($"\n--------------- Basic Block {blockIndex} ---------------\n");
+                while (i < instructionToStopAt)
                 {
+                    var instruction = function.Instructions[i++];
+
                     var text = $"\t{instruction.Type} ";
                     switch (instruction.Type)
                     {
@@ -135,6 +142,7 @@ namespace Lang
                     }
                     Console.WriteLine(text);
                 }
+                blockIndex++;
             }
         }
 
@@ -345,7 +353,7 @@ namespace Lang
             return new InstructionValue
             {
                 ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
-                          Values = new [] {GetConstantInteger(length), new InstructionValue {ValueIndex = arrayIndex}}
+                Values = new [] {GetConstantInteger(length), new InstructionValue {ValueIndex = arrayIndex}}
             };
         }
 
@@ -356,13 +364,13 @@ namespace Lang
                 switch (ast)
                 {
                     case ReturnAst returnAst:
-                        EmitReturn(function, block, returnAst, returnType, scope);
+                        EmitReturn(function, returnAst, returnType, scope);
                         break;
                     case DeclarationAst declaration:
-                        EmitDeclaration(function, block, declaration, scope);
+                        EmitDeclaration(function, declaration, scope);
                         break;
                     case AssignmentAst assignment:
-                        EmitAssignment(function, block, assignment, scope);
+                        EmitAssignment(function, assignment, scope);
                         break;
                     case ScopeAst childScope:
                         block = EmitScope(function, block, scope, returnType);
@@ -381,14 +389,14 @@ namespace Lang
                         // TODO Use the break or continue basic block
                         break;
                     default:
-                        EmitIR(function, block, ast, scope);
+                        EmitIR(function, ast, scope);
                         break;
                 }
             }
             return block;
         }
 
-        private void EmitDeclaration(FunctionIR function, BasicBlock block, DeclarationAst declaration, ScopeAst scope)
+        private void EmitDeclaration(FunctionIR function, DeclarationAst declaration, ScopeAst scope)
         {
             if (declaration.Constant)
             {
@@ -402,8 +410,8 @@ namespace Lang
 
                 if (declaration.Value != null)
                 {
-                    var value = EmitIR(function, block, declaration.Value, scope);
-                    EmitStore(block, allocationIndex, EmitCastValue(block, value, declaration.Type));
+                    var value = EmitIR(function, declaration.Value, scope);
+                    EmitStore(function, allocationIndex, EmitCastValue(function, value, declaration.Type));
                     return;
                 }
 
@@ -411,57 +419,57 @@ namespace Lang
                 {
                     // Initialize arrays
                     case TypeKind.Array:
-                        var pointer = EmitGetPointer(block, allocationIndex, declaration.Type);
+                        var pointer = EmitGetPointer(function, allocationIndex, declaration.Type);
                         var arrayStruct = (StructAst)declaration.Type;
                         if (declaration.TypeDefinition.ConstCount != null)
                         {
-                            var arrayPointer = InitializeConstArray(function, block, pointer, arrayStruct, declaration.TypeDefinition.ConstCount.Value, declaration.ArrayElementType);
+                            var arrayPointer = InitializeConstArray(function, pointer, arrayStruct, declaration.TypeDefinition.ConstCount.Value, declaration.ArrayElementType);
 
                             if (declaration.ArrayValues != null)
                             {
-                                InitializeArrayValues(function, block, arrayPointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
+                                InitializeArrayValues(function, arrayPointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
                             }
                         }
                         else if (declaration.TypeDefinition.Count != null)
                         {
                             function.SaveStack = true;
-                            var count = EmitIR(function, block, declaration.TypeDefinition.Count, scope);
-                            var countPointer = EmitGetStructPointer(block, pointer, arrayStruct, 0);
-                            EmitStore(block, countPointer, count);
+                            var count = EmitIR(function, declaration.TypeDefinition.Count, scope);
+                            var countPointer = EmitGetStructPointer(function, pointer, arrayStruct, 0);
+                            EmitStore(function, countPointer, count);
 
                             var elementType = new InstructionValue {ValueType = InstructionValueType.Type, Type = declaration.ArrayElementType};
-                            var arrayData = EmitInstruction(InstructionType.AllocateArray, block, null, count, elementType);
-                            var dataPointer = EmitGetStructPointer(block, pointer, arrayStruct, 0);
-                            EmitStore(block, dataPointer, arrayData);
+                            var arrayData = EmitInstruction(InstructionType.AllocateArray, function, null, count, elementType);
+                            var dataPointer = EmitGetStructPointer(function, pointer, arrayStruct, 0);
+                            EmitStore(function, dataPointer, arrayData);
                         }
                         else
                         {
-                            var lengthPointer = EmitGetStructPointer(block, pointer, arrayStruct, 0);
+                            var lengthPointer = EmitGetStructPointer(function, pointer, arrayStruct, 0);
                             var lengthValue = GetConstantInteger(0);
-                            EmitStore(block, lengthPointer, lengthValue);
+                            EmitStore(function, lengthPointer, lengthValue);
                         }
                         break;
                     case TypeKind.CArray:
-                        var cArrayPointer = EmitGetPointer(block, allocationIndex, declaration.Type);
+                        var cArrayPointer = EmitGetPointer(function, allocationIndex, declaration.Type);
                         if (declaration.ArrayValues != null)
                         {
-                            InitializeArrayValues(function, block, cArrayPointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
+                            InitializeArrayValues(function, cArrayPointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
                         }
                         break;
                         // Initialize struct field default values
                     case TypeKind.Struct:
                     case TypeKind.String:
-                        var structPointer = EmitGetPointer(block, allocationIndex, declaration.Type);
-                        InitializeStruct(function, block, (StructAst)declaration.Type, structPointer, scope, declaration.Assignments);
+                        var structPointer = EmitGetPointer(function, allocationIndex, declaration.Type);
+                        InitializeStruct(function, (StructAst)declaration.Type, structPointer, scope, declaration.Assignments);
                         break;
                         // Initialize pointers to null
                     case TypeKind.Pointer:
-                        EmitStore(block, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Null});
+                        EmitStore(function, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Null});
                         break;
                         // Or initialize to default
                     default:
                         var zero = GetDefaultConstant(declaration.Type);
-                        EmitStore(block, allocationIndex, zero);
+                        EmitStore(function, allocationIndex, zero);
                         break;
                 }
             }
@@ -495,33 +503,33 @@ namespace Lang
             return index;
         }
 
-        private InstructionValue InitializeConstArray(FunctionIR function, BasicBlock block, InstructionValue arrayPointer, StructAst arrayStruct, uint length, IType elementType)
+        private InstructionValue InitializeConstArray(FunctionIR function, InstructionValue arrayPointer, StructAst arrayStruct, uint length, IType elementType)
         {
-            var lengthPointer = EmitGetStructPointer(block, arrayPointer, arrayStruct, 0);
+            var lengthPointer = EmitGetStructPointer(function, arrayPointer, arrayStruct, 0);
             var lengthValue = GetConstantInteger(length);
-            EmitStore(block, lengthPointer, lengthValue);
+            EmitStore(function, lengthPointer, lengthValue);
 
             var dataIndex = AddAllocation(function, elementType, true, length);
-            var arrayDataPointer = EmitGetPointer(block, dataIndex, elementType);
-            var dataPointer = EmitGetStructPointer(block, arrayPointer, arrayStruct, 1);
-            EmitStore(block, dataPointer, arrayDataPointer);
+            var arrayDataPointer = EmitGetPointer(function, dataIndex, elementType);
+            var dataPointer = EmitGetStructPointer(function, arrayPointer, arrayStruct, 1);
+            EmitStore(function, dataPointer, arrayDataPointer);
 
             return arrayDataPointer;
         }
 
-        private void InitializeArrayValues(FunctionIR function, BasicBlock block, InstructionValue arrayPointer, IType elementType, List<IAst> arrayValues, ScopeAst scope)
+        private void InitializeArrayValues(FunctionIR function, InstructionValue arrayPointer, IType elementType, List<IAst> arrayValues, ScopeAst scope)
         {
             for (var i = 0; i < arrayValues.Count; i++)
             {
                 var index = GetConstantInteger(i);
-                var pointer = EmitGetPointer(block, arrayPointer, index, elementType, getFirstPointer: true);
+                var pointer = EmitGetPointer(function, arrayPointer, index, elementType, getFirstPointer: true);
 
-                var value = EmitIR(function, block, arrayValues[i], scope);
-                EmitStore(block, pointer, EmitCastValue(block, value, elementType));
+                var value = EmitIR(function, arrayValues[i], scope);
+                EmitStore(function, pointer, EmitCastValue(function, value, elementType));
             }
         }
 
-        private void InitializeStruct(FunctionIR function, BasicBlock block, StructAst structDef, InstructionValue pointer, ScopeAst scope, Dictionary<string, AssignmentAst> assignments)
+        private void InitializeStruct(FunctionIR function, StructAst structDef, InstructionValue pointer, ScopeAst scope, Dictionary<string, AssignmentAst> assignments)
         {
             if (assignments == null)
             {
@@ -529,9 +537,9 @@ namespace Lang
                 {
                     var field = structDef.Fields[i];
 
-                    var fieldPointer = EmitGetStructPointer(block, pointer, structDef, i, field);
+                    var fieldPointer = EmitGetStructPointer(function, pointer, structDef, i, field);
 
-                    InitializeField(function, block, field, fieldPointer, scope);
+                    InitializeField(function, field, fieldPointer, scope);
                 }
             }
             else
@@ -540,23 +548,23 @@ namespace Lang
                 {
                     var field = structDef.Fields[i];
 
-                    var fieldPointer = EmitGetStructPointer(block, pointer, structDef, i, field);
+                    var fieldPointer = EmitGetStructPointer(function, pointer, structDef, i, field);
 
                     if (assignments.TryGetValue(field.Name, out var assignment))
                     {
-                        var value = EmitIR(function, block, assignment.Value, scope);
+                        var value = EmitIR(function, assignment.Value, scope);
 
-                        EmitStore(block, fieldPointer, EmitCastValue(block, value, field.Type));
+                        EmitStore(function, fieldPointer, EmitCastValue(function, value, field.Type));
                     }
                     else
                     {
-                        InitializeField(function, block, field, fieldPointer, scope);
+                        InitializeField(function, field, fieldPointer, scope);
                     }
                 }
             }
         }
 
-        private void InitializeField(FunctionIR function, BasicBlock block, StructFieldAst field, InstructionValue pointer, ScopeAst scope)
+        private void InitializeField(FunctionIR function, StructFieldAst field, InstructionValue pointer, ScopeAst scope)
         {
             switch (field.Type.TypeKind)
             {
@@ -565,39 +573,39 @@ namespace Lang
                     var arrayStruct = (StructAst)field.Type;
                     if (field.TypeDefinition.ConstCount != null)
                     {
-                        var arrayPointer = InitializeConstArray(function, block, pointer, arrayStruct, field.TypeDefinition.ConstCount.Value, field.ArrayElementType);
+                        var arrayPointer = InitializeConstArray(function, pointer, arrayStruct, field.TypeDefinition.ConstCount.Value, field.ArrayElementType);
 
                         if (field.ArrayValues != null)
                         {
-                            InitializeArrayValues(function, block, arrayPointer, field.ArrayElementType, field.ArrayValues, scope);
+                            InitializeArrayValues(function, arrayPointer, field.ArrayElementType, field.ArrayValues, scope);
                         }
                     }
                     else
                     {
-                        var lengthPointer = EmitGetStructPointer(block, pointer, arrayStruct, 0);
+                        var lengthPointer = EmitGetStructPointer(function, pointer, arrayStruct, 0);
                         var lengthValue = GetConstantInteger(0);
-                        EmitStore(block, lengthPointer, lengthValue);
+                        EmitStore(function, lengthPointer, lengthValue);
                     }
                     break;
                 case TypeKind.CArray:
                     if (field.ArrayValues != null)
                     {
-                        InitializeArrayValues(function, block, pointer, field.ArrayElementType, field.ArrayValues, scope);
+                        InitializeArrayValues(function, pointer, field.ArrayElementType, field.ArrayValues, scope);
                     }
                     break;
                     // Initialize struct field default values
                 case TypeKind.Struct:
                 case TypeKind.String: // TODO String default values
-                    InitializeStruct(function, block, (StructAst)field.Type, pointer, scope, field.Assignments);
+                    InitializeStruct(function, (StructAst)field.Type, pointer, scope, field.Assignments);
                     break;
                     // Initialize pointers to null
                 case TypeKind.Pointer:
-                    EmitStore(block, pointer, new InstructionValue {ValueType = InstructionValueType.Null});
+                    EmitStore(function, pointer, new InstructionValue {ValueType = InstructionValueType.Null});
                     break;
                     // Or initialize to default
                 default:
-                    var defaultValue = field.Value == null ? GetDefaultConstant(field.Type) : EmitIR(function, block, field.Value, scope);
-                    EmitStore(block, pointer, defaultValue);
+                    var defaultValue = field.Value == null ? GetDefaultConstant(field.Type) : EmitIR(function, field.Value, scope);
+                    EmitStore(function, pointer, defaultValue);
                     break;
             }
         }
@@ -628,42 +636,42 @@ namespace Lang
             return value;
         }
 
-        private void EmitAssignment(FunctionIR function, BasicBlock block, AssignmentAst assignment, ScopeAst scope)
+        private void EmitAssignment(FunctionIR function, AssignmentAst assignment, ScopeAst scope)
         {
-            var pointer = EmitGetReference(function, assignment.Reference, scope, block);
+            var pointer = EmitGetReference(function, assignment.Reference, scope);
 
-            var value = EmitIR(function, block, assignment.Value, scope);
+            var value = EmitIR(function, assignment.Value, scope);
             if (assignment.Operator != Operator.None)
             {
-                var previousValue = EmitLoad(block, pointer.Type, pointer);
-                value = EmitExpression(block, previousValue, value, assignment.Operator, pointer.Type);
+                var previousValue = EmitLoad(function, pointer.Type, pointer);
+                value = EmitExpression(function, previousValue, value, assignment.Operator, pointer.Type);
             }
 
-            EmitStore(block, pointer, value);
+            EmitStore(function, pointer, value);
         }
 
-        public void EmitReturn(FunctionIR function, BasicBlock block, ReturnAst returnAst, IType returnType, ScopeAst scope)
+        public void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, ScopeAst scope)
         {
             var instruction = new Instruction {Type = InstructionType.Return};
             if (returnAst.Value != null)
             {
-                instruction.Value1 = EmitIR(function, block, returnAst.Value, scope);
+                instruction.Value1 = EmitIR(function, returnAst.Value, scope);
             }
 
-            block.Instructions.Add(instruction);
+            function.Instructions.Add(instruction);
         }
 
         private BasicBlock EmitConditional(FunctionIR function, BasicBlock block, ConditionalAst conditional, ScopeAst scope, IType returnType)
         {
             // Run the condition expression in the current basic block and then jump to the following
-            var condition = EmitConditionExpression(function, conditional.Condition, scope, block);
+            var condition = EmitConditionExpression(function, conditional.Condition, scope);
 
             var thenBlock = AddBasicBlock(function);
             thenBlock = EmitScope(function, thenBlock, conditional.IfBlock, returnType);
             var elseBlock = AddBasicBlock(function);
 
             // Jump to the else block, otherwise fall through to the then block
-            EmitInstruction(InstructionType.ConditionalJump, block, null, condition, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = elseBlock.Index});
+            EmitInstruction(InstructionType.ConditionalJump, function, null, condition, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = elseBlock.Index});
 
             if (conditional.ElseBlock == null)
             {
@@ -677,12 +685,12 @@ namespace Lang
                 return elseBlock;
             }
 
-            var afterBlock = elseBlock.Instructions.Any() ? AddBasicBlock(function) : elseBlock;
+            var afterBlock = elseBlock.Location < function.Instructions.Count ? AddBasicBlock(function) : elseBlock;
 
             // For when the the if block does not return, a jump to the after block is required
             if (!conditional.IfReturns)
             {
-                EmitInstruction(InstructionType.Jump, thenBlock, null, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = afterBlock.Index});
+                EmitInstruction(InstructionType.Jump, function, null, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = afterBlock.Index});
             }
 
             return afterBlock;
@@ -691,34 +699,34 @@ namespace Lang
         private BasicBlock EmitWhile(FunctionIR function, BasicBlock block, WhileAst whileAst, ScopeAst scope, IType returnType)
         {
             // Create a block for the condition expression and then jump to the following
-            var conditionBlock = block.Instructions.Any() ? AddBasicBlock(function) : block;
-            var condition = EmitConditionExpression(function, whileAst.Condition, scope, conditionBlock);
+            var conditionBlock = block.Location < function.Instructions.Count ? AddBasicBlock(function) : block;
+            var condition = EmitConditionExpression(function, whileAst.Condition, scope);
 
             var whileBodyBlock = AddBasicBlock(function);
             whileBodyBlock = EmitScope(function, whileBodyBlock, whileAst.Body, returnType);
-            EmitInstruction(InstructionType.Jump, whileBodyBlock, null, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = conditionBlock.Index});
+            EmitInstruction(InstructionType.Jump, function, null, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = conditionBlock.Index});
 
             var afterBlock = AddBasicBlock(function);
-            EmitInstruction(InstructionType.ConditionalJump, conditionBlock, null, condition, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = afterBlock.Index});
+            EmitInstruction(InstructionType.ConditionalJump, function, null, condition, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = afterBlock.Index});
 
             return afterBlock;
         }
 
-        private InstructionValue EmitConditionExpression(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block)
+        private InstructionValue EmitConditionExpression(FunctionIR function, IAst ast, ScopeAst scope)
         {
-            var value = EmitIR(function, block, ast, scope);
+            var value = EmitIR(function, ast, scope);
 
             switch (value.Type.TypeKind)
             {
                 case TypeKind.Integer:
-                    return EmitInstruction(InstructionType.IntegerEquals, block, _boolType, value, GetDefaultConstant(value.Type));
+                    return EmitInstruction(InstructionType.IntegerEquals, function, _boolType, value, GetDefaultConstant(value.Type));
                 case TypeKind.Float:
-                    return EmitInstruction(InstructionType.FloatEquals, block, _boolType, value, GetDefaultConstant(value.Type));
+                    return EmitInstruction(InstructionType.FloatEquals, function, _boolType, value, GetDefaultConstant(value.Type));
                 case TypeKind.Pointer:
-                    return EmitInstruction(InstructionType.IsNull, block, _boolType, value);
-                    // Will be type bool
+                    return EmitInstruction(InstructionType.IsNull, function, _boolType, value);
+                // Will be type bool
                 default:
-                    return EmitInstruction(InstructionType.Not, block, _boolType, value);
+                    return EmitInstruction(InstructionType.Not, function, _boolType, value);
             }
         }
 
@@ -735,9 +743,9 @@ namespace Lang
                 {
                     each.IndexVariableVariable.AllocationIndex = indexVariable;
                 }
-                EmitStore(block, indexVariable, GetConstantInteger(0));
+                EmitStore(function, indexVariable, GetConstantInteger(0));
 
-                var iteration = EmitIR(function, block, each.Iteration, scope);
+                var iteration = EmitIR(function, each.Iteration, scope);
 
                 // Load the array data and set the compareTarget to the array count
                 if (iteration.Type.TypeKind == TypeKind.CArray)
@@ -750,60 +758,60 @@ namespace Lang
                 {
                     var arrayDef = (StructAst)iteration.Type;
                     var iterationVariable = AddAllocation(function, arrayDef);
-                    EmitStore(block, iterationVariable, iteration);
-                    var iterationVariablePointer = EmitGetPointer(block, iterationVariable, arrayDef);
+                    EmitStore(function, iterationVariable, iteration);
+                    var iterationVariablePointer = EmitGetPointer(function, iterationVariable, arrayDef);
 
-                    var lengthPointer = EmitGetStructPointer(block, iterationVariablePointer, arrayDef, 0);
-                    compareTarget = EmitLoad(block, _s32Type, lengthPointer);
+                    var lengthPointer = EmitGetStructPointer(function, iterationVariablePointer, arrayDef, 0);
+                    compareTarget = EmitLoad(function, _s32Type, lengthPointer);
 
                     var dataField = arrayDef.Fields[1];
-                    var dataPointer = EmitGetStructPointer(block, iterationVariablePointer, arrayDef, 1, dataField);
-                    arrayData = EmitLoad(block, dataField.Type, dataPointer);
+                    var dataPointer = EmitGetStructPointer(function, iterationVariablePointer, arrayDef, 1, dataField);
+                    arrayData = EmitLoad(function, dataField.Type, dataPointer);
                 }
             }
             else
             {
                 // Begin the loop at the beginning of the range
-                var value = EmitIR(function, block, each.RangeBegin, scope);
+                var value = EmitIR(function, each.RangeBegin, scope);
 
-                EmitStore(block, indexVariable, value);
+                EmitStore(function, indexVariable, value);
                 each.IterationVariableVariable.AllocationIndex = indexVariable;
 
                 // Get the end of the range
-                compareTarget = EmitIR(function, block, each.RangeEnd, scope);
+                compareTarget = EmitIR(function, each.RangeEnd, scope);
             }
 
             var conditionBlock = AddBasicBlock(function);
-            var indexValue = EmitLoad(conditionBlock, _s32Type, indexVariable);
-            var condition = EmitInstruction(InstructionType.IntegerGreaterThanOrEqual, conditionBlock, _boolType, indexValue, compareTarget);
+            var indexValue = EmitLoad(function, _s32Type, indexVariable);
+            var condition = EmitInstruction(InstructionType.IntegerGreaterThanOrEqual, function, _boolType, indexValue, compareTarget);
             if (each.Iteration != null)
             {
-                var iterationVariable = EmitGetPointer(conditionBlock, arrayData, indexValue, each.IterationVariableVariable.Type, cArrayIteration);
+                var iterationVariable = EmitGetPointer(function, arrayData, indexValue, each.IterationVariableVariable.Type, cArrayIteration);
                 each.IterationVariableVariable.Pointer = iterationVariable;
             }
 
             var eachBodyBlock = AddBasicBlock(function);
             eachBodyBlock = EmitScope(function, eachBodyBlock, each.Body, returnType);
 
-            var eachIncrementBlock = eachBodyBlock.Instructions.Any() ? AddBasicBlock(function) : eachBodyBlock;
-            var nextValue = EmitInstruction(InstructionType.IntegerAdd, eachIncrementBlock, _s32Type, indexValue, GetConstantInteger(1));
-            EmitStore(eachIncrementBlock, indexVariable, nextValue);
-            EmitInstruction(InstructionType.Jump, eachIncrementBlock, null, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = conditionBlock.Index});
+            var eachIncrementBlock = eachBodyBlock.Location < function.Instructions.Count ? AddBasicBlock(function) : eachBodyBlock;
+            var nextValue = EmitInstruction(InstructionType.IntegerAdd, function, _s32Type, indexValue, GetConstantInteger(1));
+            EmitStore(function, indexVariable, nextValue);
+            EmitInstruction(InstructionType.Jump, function, null, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = conditionBlock.Index});
 
             var afterBlock = AddBasicBlock(function);
-            EmitInstruction(InstructionType.ConditionalJump, conditionBlock, null, condition, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = afterBlock.Index});
+            EmitInstruction(InstructionType.ConditionalJump, function, null, condition, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = afterBlock.Index});
 
             return afterBlock;
         }
 
         private BasicBlock AddBasicBlock(FunctionIR function)
         {
-            var block = new BasicBlock {Index = function.BasicBlocks.Count};
+            var block = new BasicBlock {Index = function.BasicBlocks.Count, Location = function.Instructions.Count};
             function.BasicBlocks.Add(block);
             return block;
         }
 
-        private InstructionValue EmitIR(FunctionIR function, BasicBlock block, IAst ast, ScopeAst scope, bool useRawString = false)
+        private InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, bool useRawString = false)
         {
             switch (ast)
             {
@@ -823,7 +831,7 @@ namespace Lang
                                 return new InstructionValue
                                 {
                                     ValueType = InstructionValueType.Constant, Type = constantValue.Type,
-                                              ConstantString = constantValue.ConstantString, UseRawString = true
+                                    ConstantString = constantValue.ConstantString, UseRawString = true
                                 };
                             }
                             return constantValue;
@@ -834,11 +842,11 @@ namespace Lang
                             _stringStruct ??= (StructAst) declaration.Type;
                             var dataField = _stringStruct.Fields[1];
 
-                            var stringPointer = EmitGetPointer(block, declaration.AllocationIndex, _stringStruct, global);
-                            var dataPointer = EmitGetStructPointer(block, stringPointer, _stringStruct, 1, dataField);
-                            return EmitLoad(block, dataField.Type, dataPointer);
+                            var stringPointer = EmitGetPointer(function, declaration.AllocationIndex, _stringStruct, global);
+                            var dataPointer = EmitGetStructPointer(function, stringPointer, _stringStruct, 1, dataField);
+                            return EmitLoad(function, dataField.Type, dataPointer);
                         }
-                        return EmitLoad(block, declaration.Type, declaration.AllocationIndex, global);
+                        return EmitLoad(function, declaration.Type, declaration.AllocationIndex, global);
                     }
                     else if (identifier is VariableAst variable)
                     {
@@ -847,16 +855,16 @@ namespace Lang
                             _stringStruct ??= (StructAst) variable.Type;
                             var dataField = _stringStruct.Fields[1];
 
-                            var stringPointer = variable.AllocationIndex.HasValue ? EmitGetPointer(block, variable.AllocationIndex.Value, _stringStruct, global) : variable.Pointer;
+                            var stringPointer = variable.AllocationIndex.HasValue ? EmitGetPointer(function, variable.AllocationIndex.Value, _stringStruct, global) : variable.Pointer;
 
-                            var dataPointer = EmitGetStructPointer(block, stringPointer, _stringStruct, 1, dataField);
-                            return EmitLoad(block, dataField.Type, dataPointer);
+                            var dataPointer = EmitGetStructPointer(function, stringPointer, _stringStruct, 1, dataField);
+                            return EmitLoad(function, dataField.Type, dataPointer);
                         }
                         else if (variable.AllocationIndex.HasValue)
                         {
-                            return EmitLoad(block, variable.Type, variable.AllocationIndex.Value, global);
+                            return EmitLoad(function, variable.Type, variable.AllocationIndex.Value, global);
                         }
-                        return EmitLoad(block, variable.Type, variable.Pointer);
+                        return EmitLoad(function, variable.Type, variable.Pointer);
                     }
                     else if (identifier is IType type)
                     {
@@ -882,7 +890,7 @@ namespace Lang
                     {
                         return GetConstantInteger(structField.ConstantValue);
                     }
-                    var structFieldPointer = EmitGetStructRefPointer(function, structField, scope, block, out var loaded);
+                    var structFieldPointer = EmitGetStructRefPointer(function, structField, scope, out var loaded);
                     if (!loaded)
                     {
                         if (useRawString && structFieldPointer.Type.TypeKind == TypeKind.String)
@@ -890,17 +898,17 @@ namespace Lang
                             _stringStruct ??= (StructAst) TypeTable.Types["string"];
                             var dataField = _stringStruct.Fields[1];
 
-                            var dataPointer = EmitGetStructPointer(block, structFieldPointer, _stringStruct, 1, dataField);
-                            return EmitLoad(block, dataField.Type, dataPointer);
+                            var dataPointer = EmitGetStructPointer(function, structFieldPointer, _stringStruct, 1, dataField);
+                            return EmitLoad(function, dataField.Type, dataPointer);
                         }
-                        return EmitLoad(block, structFieldPointer.Type, structFieldPointer);
+                        return EmitLoad(function, structFieldPointer.Type, structFieldPointer);
                     }
                     return structFieldPointer;
                 case CallAst call:
-                    return EmitCall(function, call, scope, block);
+                    return EmitCall(function, call, scope);
                 case ChangeByOneAst changeByOne:
-                    var pointer = EmitGetReference(function, changeByOne.Value, scope, block);
-                    var previousValue = EmitLoad(block, pointer.Type, pointer);
+                    var pointer = EmitGetReference(function, changeByOne.Value, scope);
+                    var previousValue = EmitLoad(function, pointer.Type, pointer);
 
                     var constOne = new InstructionValue {ValueType = InstructionValueType.Constant, Type = changeByOne.Type};
                     InstructionType instructionType;
@@ -921,8 +929,8 @@ namespace Lang
                             constOne.ConstantValue = new Constant {Double = 1};
                         }
                     }
-                    var newValue = EmitInstruction(instructionType, block, changeByOne.Type, previousValue, constOne);
-                    EmitStore(block, pointer, newValue);
+                    var newValue = EmitInstruction(instructionType, function, changeByOne.Type, previousValue, constOne);
+                    EmitStore(function, pointer, newValue);
 
                     return changeByOne.Prefix ? newValue : previousValue;
                 case UnaryAst unary:
@@ -930,43 +938,43 @@ namespace Lang
                     switch (unary.Operator)
                     {
                         case UnaryOperator.Not:
-                            value = EmitIR(function, block, unary.Value, scope);
-                            return EmitInstruction(InstructionType.Not, block, value.Type, value);
+                            value = EmitIR(function, unary.Value, scope);
+                            return EmitInstruction(InstructionType.Not, function, value.Type, value);
                         case UnaryOperator.Negate:
-                            value = EmitIR(function, block, unary.Value, scope);
+                            value = EmitIR(function, unary.Value, scope);
                             var negate = value.Type.TypeKind == TypeKind.Integer ? InstructionType.IntegerNegate : InstructionType.FloatNegate;
-                            return EmitInstruction(negate, block, value.Type, value);
+                            return EmitInstruction(negate, function, value.Type, value);
                         case UnaryOperator.Dereference:
-                            value = EmitIR(function, block, unary.Value, scope);
-                            return EmitLoad(block, value.Type, value);
+                            value = EmitIR(function, unary.Value, scope);
+                            return EmitLoad(function, value.Type, value);
                         case UnaryOperator.Reference:
-                            return EmitGetReference(function, unary.Value, scope, block);
+                            return EmitGetReference(function, unary.Value, scope);
                     }
                     break;
                 case IndexAst index:
-                    var indexPointer = EmitGetIndexPointer(function, index, scope, block);
+                    var indexPointer = EmitGetIndexPointer(function, index, scope);
 
-                    return index.CallsOverload ? indexPointer : EmitLoad(block, indexPointer.Type, indexPointer);
+                    return index.CallsOverload ? indexPointer : EmitLoad(function, indexPointer.Type, indexPointer);
                 case ExpressionAst expression:
-                    var expressionValue = EmitIR(function, block, expression.Children[0], scope);
+                    var expressionValue = EmitIR(function, expression.Children[0], scope);
                     for (var i = 1; i < expression.Children.Count; i++)
                     {
-                        var rhs = EmitIR(function, block, expression.Children[i], scope);
+                        var rhs = EmitIR(function, expression.Children[i], scope);
                         if (expression.OperatorOverloads.TryGetValue(i, out var overload))
                         {
-                            expressionValue = EmitCall(block, GetOperatorOverloadName(overload.Type, overload.Operator), new []{expressionValue, rhs}, overload.ReturnType);
+                            expressionValue = EmitCall(function, GetOperatorOverloadName(overload.Type, overload.Operator), new []{expressionValue, rhs}, overload.ReturnType);
                         }
                         else
                         {
-                            expressionValue = EmitExpression(block, expressionValue, rhs, expression.Operators[i - 1], expression.ResultingTypes[i - 1]);
+                            expressionValue = EmitExpression(function, expressionValue, rhs, expression.Operators[i - 1], expression.ResultingTypes[i - 1]);
                         }
                     }
                     return expressionValue;
                 case TypeDefinition typeDef:
                     return GetConstantInteger(typeDef.TypeIndex.Value);
                 case CastAst cast:
-                    var castValue = EmitIR(function, block, cast.Value, scope);
-                    return EmitCastValue(block, castValue, cast.TargetType);
+                    var castValue = EmitIR(function, cast.Value, scope);
+                    return EmitCastValue(function, castValue, cast.TargetType);
             }
             return null;
         }
@@ -1055,7 +1063,7 @@ namespace Lang
             return value;
         }
 
-        private InstructionValue EmitGetReference(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block)
+        private InstructionValue EmitGetReference(FunctionIR function, IAst ast, ScopeAst scope)
         {
             switch (ast)
             {
@@ -1064,11 +1072,11 @@ namespace Lang
                     switch (ident)
                     {
                         case DeclarationAst declaration:
-                            return EmitGetPointer(block, declaration.AllocationIndex, declaration.Type, global);
+                            return EmitGetPointer(function, declaration.AllocationIndex, declaration.Type, global);
                         case VariableAst variable:
                             if (variable.AllocationIndex.HasValue)
                             {
-                                return EmitGetPointer(block, variable.AllocationIndex.Value, variable.Type, global);
+                                return EmitGetPointer(function, variable.AllocationIndex.Value, variable.Type, global);
                             }
                             else
                             {
@@ -1077,16 +1085,16 @@ namespace Lang
                     }
                     break;
                 case StructFieldRefAst structField:
-                    return EmitGetStructRefPointer(function, structField, scope, block, out _);
+                    return EmitGetStructRefPointer(function, structField, scope, out _);
                 case IndexAst index:
-                    return EmitGetIndexPointer(function, index, scope, block);
+                    return EmitGetIndexPointer(function, index, scope);
                 case UnaryAst unary:
-                    return EmitIR(function, block, unary.Value, scope);
+                    return EmitIR(function, unary.Value, scope);
             }
             return null;
         }
 
-        private InstructionValue EmitGetStructRefPointer(FunctionIR function, StructFieldRefAst structField, ScopeAst scope, BasicBlock block, out bool loaded)
+        private InstructionValue EmitGetStructRefPointer(FunctionIR function, StructFieldRefAst structField, ScopeAst scope, out bool loaded)
         {
             loaded = false;
             InstructionValue value = null;
@@ -1098,31 +1106,31 @@ namespace Lang
                     switch (ident)
                     {
                         case DeclarationAst declaration:
-                            value = EmitGetPointer(block, declaration.AllocationIndex, declaration.Type, global);
+                            value = EmitGetPointer(function, declaration.AllocationIndex, declaration.Type, global);
                             break;
                         case VariableAst variable:
-                            value = variable.AllocationIndex.HasValue ? EmitGetPointer(block, variable.AllocationIndex.Value, variable.Type, global) : variable.Pointer;
+                            value = variable.AllocationIndex.HasValue ? EmitGetPointer(function, variable.AllocationIndex.Value, variable.Type, global) : variable.Pointer;
                             break;
                     }
                     break;
                 case IndexAst index:
-                    value = EmitGetIndexPointer(function, index, scope, block);
+                    value = EmitGetIndexPointer(function, index, scope);
                     if (index.CallsOverload && !structField.Pointers[0])
                     {
                         var type = structField.Types[0];
                         var allocationIndex = AddAllocation(function, type);
-                        EmitStore(block, allocationIndex, value);
-                        value = EmitGetPointer(block, allocationIndex, type);
+                        EmitStore(function, allocationIndex, value);
+                        value = EmitGetPointer(function, allocationIndex, type);
                     }
                     break;
                 case CallAst call:
-                    value = EmitCall(function, call, scope, block);
+                    value = EmitCall(function, call, scope);
                     if (!structField.Pointers[0])
                     {
                         var type = structField.Types[0];
                         var allocationIndex = AddAllocation(function, type);
-                        EmitStore(block, allocationIndex, value);
-                        value = EmitGetPointer(block, allocationIndex, type);
+                        EmitStore(function, allocationIndex, value);
+                        value = EmitGetPointer(function, allocationIndex, type);
                     }
                     break;
                 default:
@@ -1141,7 +1149,7 @@ namespace Lang
                 {
                     if (!skipPointer)
                     {
-                        value = EmitLoad(block, type, value);
+                        value = EmitLoad(function, type, value);
                     }
                 }
                 skipPointer = false;
@@ -1150,10 +1158,10 @@ namespace Lang
                 {
                     if (structField.Children[i] is IndexAst index)
                     {
-                        var indexValue = EmitIR(function, block, index.Index, scope);
+                        var indexValue = EmitIR(function, index.Index, scope);
                         var arrayType = (ArrayType) type;
                         var elementType = arrayType.ElementType;
-                        value = EmitGetPointer(block, value, indexValue, elementType, true);
+                        value = EmitGetPointer(function, value, indexValue, elementType, true);
                     }
                 }
                 else
@@ -1162,10 +1170,10 @@ namespace Lang
                     var fieldIndex = structField.ValueIndices[i-1];
                     var field = structDefinition.Fields[fieldIndex];
 
-                    value = EmitGetStructPointer(block, value, structDefinition, fieldIndex, field);
+                    value = EmitGetStructPointer(function, value, structDefinition, fieldIndex, field);
                     if (structField.Children[i] is IndexAst index)
                     {
-                        value = EmitGetIndexPointer(function, index, scope, block, field.Type, value);
+                        value = EmitGetIndexPointer(function, index, scope, field.Type, value);
 
                         if (index.CallsOverload)
                         {
@@ -1174,8 +1182,8 @@ namespace Lang
                             {
                                 var nextType = structField.Types[i];
                                 var allocationIndex = AddAllocation(function, nextType);
-                                EmitStore(block, allocationIndex, value);
-                                value = EmitGetPointer(block, allocationIndex, nextType);
+                                EmitStore(function, allocationIndex, value);
+                                value = EmitGetPointer(function, allocationIndex, nextType);
                             }
                             else if (i == structField.Pointers.Length)
                             {
@@ -1189,7 +1197,7 @@ namespace Lang
             return value;
         }
 
-        private InstructionValue EmitCall(FunctionIR function, CallAst call, ScopeAst scope, BasicBlock block)
+        private InstructionValue EmitCall(FunctionIR function, CallAst call, ScopeAst scope)
         {
             var argumentCount = call.Function.Varargs ? call.Arguments.Count : call.Function.Arguments.Count;
             var arguments = new InstructionValue[argumentCount];
@@ -1198,28 +1206,28 @@ namespace Lang
             {
                 for (var i = 0; i < argumentCount - 1; i++)
                 {
-                    var argument = EmitIR(function, block, call.Arguments[i], scope);
-                    arguments[i] = EmitCastValue(block, argument, call.Function.Arguments[i].Type);
+                    var argument = EmitIR(function, call.Arguments[i], scope);
+                    arguments[i] = EmitCastValue(function, argument, call.Function.Arguments[i].Type);
                 }
 
                 // Rollup the rest of the arguments into an array
                 var paramsType = call.Function.Arguments[^1].Type;
                 var elementType = call.Function.ParamsElementType;
                 var paramsAllocationIndex = AddAllocation(function, paramsType);
-                var paramsPointer = EmitGetPointer(block, paramsAllocationIndex, paramsType);
-                var dataPointer = InitializeConstArray(function, block, paramsPointer, (StructAst)paramsType, (uint)(call.Arguments.Count - call.Function.Arguments.Count + 1), elementType);
+                var paramsPointer = EmitGetPointer(function, paramsAllocationIndex, paramsType);
+                var dataPointer = InitializeConstArray(function, paramsPointer, (StructAst)paramsType, (uint)(call.Arguments.Count - call.Function.Arguments.Count + 1), elementType);
 
                 uint paramsIndex = 0;
                 for (var i = call.Function.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
                 {
                     var index = GetConstantInteger(paramsIndex);
-                    var pointer = EmitGetPointer(block, dataPointer, index, elementType, true);
+                    var pointer = EmitGetPointer(function, dataPointer, index, elementType, true);
 
-                    var value = EmitIR(function, block, call.Arguments[i], scope);
-                    EmitStore(block, pointer, EmitCastValue(block, value, elementType));
+                    var value = EmitIR(function, call.Arguments[i], scope);
+                    EmitStore(function, pointer, EmitCastValue(function, value, elementType));
                 }
 
-                var paramsValue = EmitLoad(block, paramsType, paramsAllocationIndex);
+                var paramsValue = EmitLoad(function, paramsType, paramsAllocationIndex);
                 arguments[argumentCount - 1] = paramsValue;
             }
             else if (call.Function.Varargs)
@@ -1227,18 +1235,18 @@ namespace Lang
                 var i = 0;
                 for (; i < call.Function.Arguments.Count - 1; i++)
                 {
-                    var argument = EmitIR(function, block, call.Arguments[i], scope, true);
-                    arguments[i] = EmitCastValue(block, argument, call.Function.Arguments[i].Type);
+                    var argument = EmitIR(function, call.Arguments[i], scope, true);
+                    arguments[i] = EmitCastValue(function, argument, call.Function.Arguments[i].Type);
                 }
 
                 // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
                 // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
                 for (; i < argumentCount; i++)
                 {
-                    var argument = EmitIR(function, block, call.Arguments[i], scope, true);
+                    var argument = EmitIR(function, call.Arguments[i], scope, true);
                     if (argument.Type?.TypeKind == TypeKind.Float && argument.Type.Size == 4)
                     {
-                        argument = EmitCastValue(block, argument, _float64Type);
+                        argument = EmitCastValue(function, argument, _float64Type);
                     }
                     arguments[i] = argument;
                 }
@@ -1247,31 +1255,31 @@ namespace Lang
             {
                 for (var i = 0; i < argumentCount; i++)
                 {
-                    var argument = EmitIR(function, block, call.Arguments[i], scope, call.Function.Extern);
-                    arguments[i] = EmitCastValue(block, argument, call.Function.Arguments[i].Type);
+                    var argument = EmitIR(function, call.Arguments[i], scope, call.Function.Extern);
+                    arguments[i] = EmitCastValue(function, argument, call.Function.Arguments[i].Type);
                 }
             }
 
-            return EmitCall(block, GetFunctionName(call.Function), arguments, call.Function.ReturnType);
+            return EmitCall(function, GetFunctionName(call.Function), arguments, call.Function.ReturnType);
         }
 
-        private InstructionValue EmitGetIndexPointer(FunctionIR function, IndexAst index, ScopeAst scope, BasicBlock block, IType type = null, InstructionValue variable = null)
+        private InstructionValue EmitGetIndexPointer(FunctionIR function, IndexAst index, ScopeAst scope, IType type = null, InstructionValue variable = null)
         {
             if (type == null)
             {
                 var declaration = (DeclarationAst) GetScopeIdentifier(scope, index.Name, out var global);
                 type = declaration.Type;
-                variable = EmitGetPointer(block, declaration.AllocationIndex, type, global);
+                variable = EmitGetPointer(function, declaration.AllocationIndex, type, global);
             }
 
-            var indexValue = EmitIR(function, block, index.Index, scope);
+            var indexValue = EmitIR(function, index.Index, scope);
 
             if (index.CallsOverload)
             {
                 var overloadName = GetOperatorOverloadName(index.Overload.Type, Operator.Subscript);
 
-                var value = EmitLoad(block, type, variable);
-                return EmitCall(block, overloadName, new []{value, indexValue}, index.Overload.ReturnType);
+                var value = EmitLoad(function, type, variable);
+                return EmitCall(function, overloadName, new []{value, indexValue}, index.Overload.ReturnType);
             }
 
             IType elementType;
@@ -1280,15 +1288,15 @@ namespace Lang
                 var pointerType = (PrimitiveAst)type;
                 elementType = pointerType.PointerType;
 
-                var dataPointer = EmitLoad(block, type, variable);
-                return EmitGetPointer(block, dataPointer, indexValue, elementType);
+                var dataPointer = EmitLoad(function, type, variable);
+                return EmitGetPointer(function, dataPointer, indexValue, elementType);
             }
             else if (type.TypeKind == TypeKind.CArray)
             {
                 var arrayType = (ArrayType)type;
                 elementType = arrayType.ElementType;
 
-                return EmitGetPointer(block, variable, indexValue, elementType, true);
+                return EmitGetPointer(function, variable, indexValue, elementType, true);
             }
             else
             {
@@ -1304,61 +1312,61 @@ namespace Lang
                     elementType = pointerType.PointerType;
                 }
 
-                var data = EmitGetStructPointer(block, variable, structAst, 1, dataField);
-                var dataPointer = EmitLoad(block, data.Type, data);
-                return EmitGetPointer(block, dataPointer, indexValue, elementType);
+                var data = EmitGetStructPointer(function, variable, structAst, 1, dataField);
+                var dataPointer = EmitLoad(function, data.Type, data);
+                return EmitGetPointer(function, dataPointer, indexValue, elementType);
             }
         }
 
-        private InstructionValue EmitExpression(BasicBlock block, InstructionValue lhs, InstructionValue rhs, Operator op, IType type)
+        private InstructionValue EmitExpression(FunctionIR function, InstructionValue lhs, InstructionValue rhs, Operator op, IType type)
         {
             // 1. Handle pointer math
             if (lhs.Type?.TypeKind == TypeKind.Pointer)
             {
-                return EmitPointerOperation(block, lhs, rhs, op, type);
+                return EmitPointerOperation(function, lhs, rhs, op, type);
             }
             if (rhs.Type?.TypeKind == TypeKind.Pointer)
             {
-                return EmitPointerOperation(block, rhs, lhs, op, type);
+                return EmitPointerOperation(function, rhs, lhs, op, type);
             }
 
             // 2. Handle compares and shifts, since the lhs and rhs should not be cast to the target type
             switch (op)
             {
                 case Operator.And:
-                    return EmitInstruction(InstructionType.And, block, type, lhs, rhs);
+                    return EmitInstruction(InstructionType.And, function, type, lhs, rhs);
                 case Operator.Or:
-                    return EmitInstruction(InstructionType.Or, block, type, lhs, rhs);
+                    return EmitInstruction(InstructionType.Or, function, type, lhs, rhs);
                 case Operator.ShiftLeft:
-                    return EmitInstruction(InstructionType.ShiftLeft, block, type, lhs, rhs);
+                    return EmitInstruction(InstructionType.ShiftLeft, function, type, lhs, rhs);
                 case Operator.ShiftRight:
-                    return EmitInstruction(InstructionType.ShiftRight, block, type, lhs, rhs);
+                    return EmitInstruction(InstructionType.ShiftRight, function, type, lhs, rhs);
                 case Operator.RotateLeft:
-                    return EmitInstruction(InstructionType.RotateLeft, block, type, lhs, rhs);
+                    return EmitInstruction(InstructionType.RotateLeft, function, type, lhs, rhs);
                 case Operator.RotateRight:
-                    return EmitInstruction(InstructionType.RotateRight, block, type, lhs, rhs);
+                    return EmitInstruction(InstructionType.RotateRight, function, type, lhs, rhs);
                 case Operator.Equality:
                 case Operator.NotEqual:
                 case Operator.GreaterThanEqual:
                 case Operator.LessThanEqual:
                 case Operator.GreaterThan:
                 case Operator.LessThan:
-                    return EmitCompare(block, lhs, rhs, op, type);
+                    return EmitCompare(function, lhs, rhs, op, type);
             }
 
             // 3. Cast lhs and rhs to the target types
-            lhs = EmitCastValue(block, lhs, type);
-            rhs = EmitCastValue(block, rhs, type);
+            lhs = EmitCastValue(function, lhs, type);
+            rhs = EmitCastValue(function, rhs, type);
 
             // 4. Handle the rest of the simple operators
             switch (op)
             {
                 case Operator.BitwiseAnd:
-                    return EmitInstruction(InstructionType.BitwiseAnd, block, type, lhs, rhs);
+                    return EmitInstruction(InstructionType.BitwiseAnd, function, type, lhs, rhs);
                 case Operator.BitwiseOr:
-                    return EmitInstruction(InstructionType.BitwiseOr, block, type, lhs, rhs);
+                    return EmitInstruction(InstructionType.BitwiseOr, function, type, lhs, rhs);
                 case Operator.Xor:
-                    return EmitInstruction(InstructionType.Xor, block, type, lhs, rhs);
+                    return EmitInstruction(InstructionType.Xor, function, type, lhs, rhs);
             }
 
             InstructionType instructionType;
@@ -1389,35 +1397,35 @@ namespace Lang
                         _ => InstructionType.FloatAdd
                 };
             }
-            return EmitInstruction(instructionType, block, type, lhs, rhs);
+            return EmitInstruction(instructionType, function, type, lhs, rhs);
         }
 
-        private InstructionValue EmitPointerOperation(BasicBlock block, InstructionValue lhs, InstructionValue rhs, Operator op, IType type)
+        private InstructionValue EmitPointerOperation(FunctionIR function, InstructionValue lhs, InstructionValue rhs, Operator op, IType type)
         {
             if (op == Operator.Equality)
             {
                 if (rhs.ValueType == InstructionValueType.Null)
                 {
-                    return EmitInstruction(InstructionType.IsNull, block, type, lhs);
+                    return EmitInstruction(InstructionType.IsNull, function, type, lhs);
                 }
-                return EmitInstruction(InstructionType.PointerEquals, block, type, lhs, rhs);
+                return EmitInstruction(InstructionType.PointerEquals, function, type, lhs, rhs);
             }
             if (op == Operator.NotEqual)
             {
                 if (rhs.ValueType == InstructionValueType.Null)
                 {
-                    return EmitInstruction(InstructionType.IsNotNull, block, type, lhs);
+                    return EmitInstruction(InstructionType.IsNotNull, function, type, lhs);
                 }
-                return EmitInstruction(InstructionType.PointerNotEquals, block, type, lhs, rhs);
+                return EmitInstruction(InstructionType.PointerNotEquals, function, type, lhs, rhs);
             }
             if (op == Operator.Subtract)
             {
-                return EmitInstruction(InstructionType.PointerSubtract, block, type, lhs, rhs);
+                return EmitInstruction(InstructionType.PointerSubtract, function, type, lhs, rhs);
             }
-            return EmitInstruction(InstructionType.PointerAdd, block, type, lhs, rhs);
+            return EmitInstruction(InstructionType.PointerAdd, function, type, lhs, rhs);
         }
 
-        private InstructionValue EmitCompare(BasicBlock block, InstructionValue lhs, InstructionValue rhs, Operator op, IType type)
+        private InstructionValue EmitCompare(FunctionIR function, InstructionValue lhs, InstructionValue rhs, Operator op, IType type)
         {
             switch (lhs.Type.TypeKind)
             {
@@ -1427,41 +1435,41 @@ namespace Lang
                         case TypeKind.Integer:
                             if (lhs.Type.Size > rhs.Type.Size)
                             {
-                                rhs = EmitCastValue(block, rhs, lhs.Type);
+                                rhs = EmitCastValue(function, rhs, lhs.Type);
                             }
                             else if (lhs.Type.Size < rhs.Type.Size)
                             {
-                                lhs = EmitCastValue(block, lhs, rhs.Type);
+                                lhs = EmitCastValue(function, lhs, rhs.Type);
                             }
                             var integerType = (PrimitiveAst)lhs.Type;
-                            return EmitInstruction(GetIntCompareInstructionType(op, integerType.Primitive.Signed), block, type, lhs, rhs);
+                            return EmitInstruction(GetIntCompareInstructionType(op, integerType.Primitive.Signed), function, type, lhs, rhs);
                         case TypeKind.Float:
-                            lhs = EmitCastValue(block, lhs, rhs.Type);
-                            return EmitInstruction(GetFloatCompareInstructionType(op), block, type, lhs, rhs);
+                            lhs = EmitCastValue(function, lhs, rhs.Type);
+                            return EmitInstruction(GetFloatCompareInstructionType(op), function, type, lhs, rhs);
                     }
                     break;
                 case TypeKind.Float:
                     switch (rhs.Type.TypeKind)
                     {
                         case TypeKind.Integer:
-                            rhs = EmitCastValue(block, rhs, lhs.Type);
-                            return EmitInstruction(GetFloatCompareInstructionType(op), block, type, lhs, rhs);
+                            rhs = EmitCastValue(function, rhs, lhs.Type);
+                            return EmitInstruction(GetFloatCompareInstructionType(op), function, type, lhs, rhs);
                         case TypeKind.Float:
                             if (lhs.Type.Size > rhs.Type.Size)
                             {
-                                rhs = EmitCastValue(block, rhs, _float64Type);
+                                rhs = EmitCastValue(function, rhs, _float64Type);
                             }
                             else if (lhs.Type.Size < rhs.Type.Size)
                             {
-                                lhs = EmitCastValue(block, lhs, _float64Type);
+                                lhs = EmitCastValue(function, lhs, _float64Type);
                             }
-                            return EmitInstruction(GetFloatCompareInstructionType(op), block, type, lhs, rhs);
+                            return EmitInstruction(GetFloatCompareInstructionType(op), function, type, lhs, rhs);
                     }
                     break;
                 case TypeKind.Enum:
                     var enumAst = (EnumAst)lhs.Type;
                     var baseType = (PrimitiveAst)enumAst.BaseType;
-                    return EmitInstruction(GetIntCompareInstructionType(op, baseType.Primitive.Signed), block, type, lhs, rhs);
+                    return EmitInstruction(GetIntCompareInstructionType(op, baseType.Primitive.Signed), function, type, lhs, rhs);
             }
 
             Console.WriteLine("Unexpected type in compare");
@@ -1499,7 +1507,7 @@ namespace Lang
             };
         }
 
-        private InstructionValue EmitCastValue(BasicBlock block, InstructionValue value, IType type)
+        private InstructionValue EmitCastValue(FunctionIR function, InstructionValue value, IType type)
         {
             if (value.Type == type)
             {
@@ -1509,10 +1517,7 @@ namespace Lang
             // TODO Make this more robust
             var targetType = new InstructionValue {ValueType = InstructionValueType.Type, Type = type};
             var castInstruction = new Instruction {Type = InstructionType.Cast, Value1 = value, Value2 = targetType};
-
-            var valueIndex = block.Instructions.Count;
-            block.Instructions.Add(castInstruction);
-            return new InstructionValue {ValueIndex = valueIndex, Type = type};
+            return AddInstruction(function, castInstruction, type);
         }
 
         private InstructionValue GetConstantInteger(int value)
@@ -1554,37 +1559,37 @@ namespace Lang
             return $"operator.{op}.{type.GenericName}";
         }
 
-        private InstructionValue EmitLoad(BasicBlock block, IType type, InstructionValue value)
+        private InstructionValue EmitLoad(FunctionIR function, IType type, InstructionValue value)
         {
             var loadInstruction = new Instruction {Type = InstructionType.Load, Value1 = value};
-            return AddInstruction(block, loadInstruction, type);
+            return AddInstruction(function, loadInstruction, type);
         }
 
-        private InstructionValue EmitLoad(BasicBlock block, IType type, int allocationIndex, bool global = false)
+        private InstructionValue EmitLoad(FunctionIR function, IType type, int allocationIndex, bool global = false)
         {
             var loadInstruction = new Instruction {Type = InstructionType.LoadAllocation, Index = allocationIndex, Global = global};
-            return AddInstruction(block, loadInstruction, type);
+            return AddInstruction(function, loadInstruction, type);
         }
 
         // TODO For index value, calculate the size of the element
-        private InstructionValue EmitGetPointer(BasicBlock block, InstructionValue pointer, InstructionValue index, IType type, bool getFirstPointer = false)
+        private InstructionValue EmitGetPointer(FunctionIR function, InstructionValue pointer, InstructionValue index, IType type, bool getFirstPointer = false)
         {
             var instruction = new Instruction
             {
                 Type = InstructionType.GetPointer, Value1 = pointer,
                      Value2 = index, GetFirstPointer = getFirstPointer
             };
-            return AddInstruction(block, instruction, type);
+            return AddInstruction(function, instruction, type);
         }
 
-        public InstructionValue EmitGetPointer(BasicBlock block, int allocationIndex, IType type, bool global = false)
+        public InstructionValue EmitGetPointer(FunctionIR function, int allocationIndex, IType type, bool global = false)
         {
             var instruction = new Instruction {Type = InstructionType.GetAllocationPointer, Index = allocationIndex, Global = global};
-            return AddInstruction(block, instruction, type);
+            return AddInstruction(function, instruction, type);
         }
 
         // TODO Add the offset size
-        private InstructionValue EmitGetStructPointer(BasicBlock block, InstructionValue value, StructAst structDef, int fieldIndex, StructFieldAst field = null)
+        private InstructionValue EmitGetStructPointer(FunctionIR function, InstructionValue value, StructAst structDef, int fieldIndex, StructFieldAst field = null)
         {
             if (field == null)
             {
@@ -1592,41 +1597,41 @@ namespace Lang
             }
 
             var instruction = new Instruction {Type = InstructionType.GetStructPointer, Index = fieldIndex, Value1 = value};
-            return AddInstruction(block, instruction, field.Type);
+            return AddInstruction(function, instruction, field.Type);
         }
 
-        private InstructionValue EmitCall(BasicBlock block, string name, InstructionValue[] arguments, IType returnType)
+        private InstructionValue EmitCall(FunctionIR function, string name, InstructionValue[] arguments, IType returnType)
         {
             var callInstruction = new Instruction
             {
                 Type = InstructionType.Call, CallFunction = name,
                 Value1 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Values = arguments}
             };
-            return AddInstruction(block, callInstruction, returnType);
+            return AddInstruction(function, callInstruction, returnType);
         }
 
-        private void EmitStore(BasicBlock block, int allocationIndex, InstructionValue value)
+        private void EmitStore(FunctionIR function, int allocationIndex, InstructionValue value)
         {
             var store = new Instruction {Type = InstructionType.StoreToAllocation, Index = allocationIndex, Value1 = value};
-            block.Instructions.Add(store);
+            function.Instructions.Add(store);
         }
 
-        private void EmitStore(BasicBlock block, InstructionValue pointer, InstructionValue value)
+        private void EmitStore(FunctionIR function, InstructionValue pointer, InstructionValue value)
         {
             var store = new Instruction {Type = InstructionType.Store, Value1 = pointer, Value2 = value};
-            block.Instructions.Add(store);
+            function.Instructions.Add(store);
         }
 
-        private InstructionValue EmitInstruction(InstructionType instructionType, BasicBlock block, IType type, InstructionValue value1, InstructionValue value2 = null)
+        private InstructionValue EmitInstruction(InstructionType instructionType, FunctionIR function, IType type, InstructionValue value1, InstructionValue value2 = null)
         {
             var instruction = new Instruction {Type = instructionType, Value1 = value1, Value2 = value2};
-            return AddInstruction(block, instruction, type);
+            return AddInstruction(function, instruction, type);
         }
 
-        private InstructionValue AddInstruction(BasicBlock block, Instruction instruction, IType type)
+        private InstructionValue AddInstruction(FunctionIR function, Instruction instruction, IType type)
         {
-            var value = new InstructionValue {ValueIndex = block.Instructions.Count, Type = type};
-            block.Instructions.Add(instruction);
+            var value = new InstructionValue {ValueIndex = function.Instructions.Count, Type = type};
+            function.Instructions.Add(instruction);
             return value;
         }
     }

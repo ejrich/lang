@@ -16,6 +16,7 @@ namespace Lang
         public uint StackSize { get; set; }
         public bool SaveStack { get; set; }
         public List<Allocation> Allocations { get; set; }
+        public List<Instruction> Instructions { get; set; }
         public List<BasicBlock> BasicBlocks { get; set; }
         public Dictionary<string, InstructionValue> Constants { get; set; }
     }
@@ -45,7 +46,7 @@ namespace Lang
     public class BasicBlock
     {
         public int Index { get; set; }
-        public List<Instruction> Instructions { get; } = new();
+        public int Location { get; set; }
     }
 
     public class Instruction
