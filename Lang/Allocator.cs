@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace Lang
 {
@@ -71,8 +72,7 @@ namespace Lang
 
         public static IntPtr MakeString(string value, bool useRawString)
         {
-            var s = Marshal.StringToHGlobalAnsi(value);
-            _openPointers.Add(s);
+            var s = AllocateString(value);
 
             if (useRawString)
             {
@@ -88,11 +88,25 @@ namespace Lang
 
         public static String MakeString(string value)
         {
-            var s = Marshal.StringToHGlobalAnsi(value);
-            _openPointers.Add(s);
+            var s = AllocateString(value);
 
             var stringStruct = new String {Length = value.Length, Data = s};
             return stringStruct;
+        }
+
+        public unsafe static IntPtr AllocateString(string value)
+        {
+            var pointer = Allocate(value.Length + 1);
+            var bytePointer = (byte*)pointer;
+
+            var stringBytes = Encoding.ASCII.GetBytes(value);
+            fixed (byte* p = &stringBytes[0])
+            {
+                Buffer.MemoryCopy(p, bytePointer, value.Length, value.Length);
+            }
+            bytePointer[value.Length] = 0;
+
+            return pointer;
         }
     }
 }
