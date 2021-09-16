@@ -19,11 +19,7 @@ struct TypeInfo {
     TypeKind type;
     u32 size;
     List<TypeField> fields;
-}
-
-struct TypeField {
-    string name;
-    TypeInfo* type_info;
+    List<EnumValue> enum_values;
 }
 
 enum TypeKind {
@@ -36,6 +32,16 @@ enum TypeKind {
     List;
     Enum;
     Struct;
+}
+
+struct TypeField {
+    string name;
+    TypeInfo* type_info;
+}
+
+struct EnumValue {
+    string name;
+    int value;
 }
 
 __type_table: List<TypeInfo*>;
