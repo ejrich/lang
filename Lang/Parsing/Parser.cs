@@ -444,6 +444,12 @@ namespace Lang.Parsing
                         {
                             currentField.Name = enumerator.Current.Value;
                         }
+                        else if (parsingFieldDefault)
+                        {
+                            var structField = ParseStructField(enumerator, errors);
+                            currentField.DefaultValue = structField;
+                            parsingFieldDefault = false;
+                        }
                         else
                         {
                             errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}' in struct", Token = token});

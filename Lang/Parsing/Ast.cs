@@ -53,7 +53,7 @@ namespace Lang.Parsing
         public bool HasGeneric { get; set; }
         public string Name { get; set; }
         public TypeDefinition Type { get; set; }
-        public ConstantAst DefaultValue { get; set; }
+        public IAst DefaultValue { get; set; }
         public List<IAst> Children => null;
     }
 
