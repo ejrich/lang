@@ -14,9 +14,6 @@ namespace Lang
 
     public class FunctionIR
     {
-        #if DEBUG
-        public string Name { get; set; }
-        #endif
         public int Index { get; set; }
         public uint StackSize { get; set; }
         public int ValueCount { get; set; }

@@ -558,8 +558,7 @@ namespace Lang.Backend
 
                 var file = _debugFiles[function.Source.FileIndex];
                 var functionType = _debugBuilder.CreateSubroutineType(file, debugArgumentTypes, LLVMDIFlags.LLVMDIFlagZero);
-                // TODO Add debugName?
-                var debugFunction = _debugFunctions[function.Index] = _debugBuilder.CreateFunction(file, name, name, file, function.Source.Line, functionType, 0, 1, function.Source.Line, LLVMDIFlags.LLVMDIFlagPrototyped, 0);
+                var debugFunction = _debugFunctions[function.Index] = _debugBuilder.CreateFunction(file, function.Source.Name, name, file, function.Source.Line, functionType, 0, 1, function.Source.Line, LLVMDIFlags.LLVMDIFlagPrototyped, 0);
 
                 // Declare the function
                 functionPointer = _module.AddFunction(name, LLVMTypeRef.CreateFunction(_types[function.Source.ReturnType.TypeIndex], argumentTypes, varargs));

@@ -20,6 +20,7 @@ namespace Lang
 
     public interface IFunction : IAst
     {
+        string Name { get; set; }
         bool Verified { get; set; }
         bool HasDirectives { get; set; }
         bool CallsCompiler { get; set; }
@@ -387,6 +388,7 @@ namespace Lang
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
+        public string Name { get; set; }
         public Operator Operator { get; set; }
         public TypeDefinition Type { get; set; }
         public bool Verified { get; set; }
