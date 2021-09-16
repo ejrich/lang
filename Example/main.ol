@@ -61,10 +61,8 @@ int main(List<string> args) {
     compiler_directives();
     open_window();
 
-    type_info := type_of(MyStruct);
-    printf("Type Name = %s, Type Kind = %d, Field Count = %d\n", type_info.name, type_info.type, type_info.fields.length);
-    each field in type_info.fields then
-        printf("Field name = %s, Field type name = %s\n", field.name, field.type_info.name);
+    print_type_info(MyStruct);
+    print_type_info(u8);
 
     return 0;
 }
@@ -321,4 +319,11 @@ build() {
 
 #if os == OS.Linux {
     XOpenDisplay(string name) #extern "X11"
+}
+
+print_type_info(Type type) {
+    type_info := type_of(type);
+    printf("Type Name = %s, Type Kind = %d, Field Count = %d\n", type_info.name, type_info.type, type_info.fields.length);
+    each field in type_info.fields then
+        printf("Field name = %s, Field type name = %s\n", field.name, field.type_info.name);
 }

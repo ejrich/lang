@@ -1109,15 +1109,15 @@ namespace Lang.Translation
                         case DeclarationAst declaration:
                             return declaration.Type;
                         case PrimitiveAst primitive:
-                            return new TypeDefinition {Name = "Type", TypeIndex = primitive.TypeIndex, Generics = {new TypeDefinition {Name = primitive.Name}}};
+                            return new TypeDefinition {Name = "Type", TypeIndex = primitive.TypeIndex};
                         case EnumAst enumAst:
-                            return new TypeDefinition {Name = "Type", TypeIndex = enumAst.TypeIndex, Generics = {new TypeDefinition {Name = enumAst.Name}}};
+                            return new TypeDefinition {Name = "Type", TypeIndex = enumAst.TypeIndex};
                         case StructAst structAst:
                             if (structAst.Generics.Any())
                             {
                                 AddError($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
                             }
-                            return new TypeDefinition {Name = "Type", TypeIndex = structAst.TypeIndex, Generics = {new TypeDefinition {Name = structAst.Name}}};
+                            return new TypeDefinition {Name = "Type", TypeIndex = structAst.TypeIndex};
                         default:
                             return null;
                     }
@@ -1306,12 +1306,12 @@ namespace Lang.Translation
                                     {
                                         VerifyConstant(constant, functionArg.Type);
                                     }
-                                    else if (functionArg.Type.Name == "Type")
+                                    else if (argument.TypeIndex.HasValue)
                                     {
                                         var typeIndex = new ConstantAst
                                         {
                                             Type = new TypeDefinition {PrimitiveType = new IntegerType {Signed = true, Bytes = 4}},
-                                            Value = argument.TypeIndex.ToString() // TODO Get the type index
+                                            Value = argument.TypeIndex.ToString()
                                         };
                                         call.Arguments[i] = typeIndex;
                                         arguments[i] = typeIndex.Type;
@@ -1783,7 +1783,6 @@ namespace Lang.Translation
 
             // Check by name
             if (a?.Name != b?.Name) return false;
-            if (a?.Name == "Type") return true;
             if (a?.Generics.Count != b?.Generics.Count) return false;
             for (var i = 0; i < a?.Generics.Count; i++)
             {
