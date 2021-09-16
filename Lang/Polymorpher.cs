@@ -21,12 +21,12 @@ namespace Lang
 
             foreach (var field in baseStruct.Fields)
             {
-                if (field.HasGeneric)
+                if (field.HasGenerics)
                 {
                     var newField = CopyAst(field);
                     newField.Type = CopyType(field.Type, genericTypes);
                     newField.Name = field.Name;
-                    newField.DefaultValue = field.DefaultValue;
+                    newField.Value = field.Value;
                     polyStruct.Fields.Add(newField);
                 }
                 else

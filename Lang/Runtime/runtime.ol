@@ -2,8 +2,8 @@
 
 // Runtime structs
 struct Array<T> {
-    int length;
-    T* data;
+    length: int;
+    data: T*;
 }
 
 ARRAY_BLOCK_SIZE := 10; #const
@@ -47,8 +47,8 @@ bool array_remove<T>(Array<T>* array, int index) {
 }
 
 struct string {
-    int length;
-    u8* data;
+    length: int;
+    data: u8*;
 }
 
 operator == string(string a, string b) {
@@ -75,13 +75,13 @@ string convert_c_string(u8* string_pointer) {
 
 // Runtime type information data
 struct TypeInfo {
-    string name;
-    TypeKind type;
-    u32 size;
-    Array<TypeField> fields;
-    Array<EnumValue> enum_values;
-    TypeInfo* return_type;
-    Array<ArgumentType> arguments;
+    name: string;
+    type: TypeKind;
+    size: u32;
+    fields: Array<TypeField>;
+    enum_values: Array<EnumValue>;
+    return_type: TypeInfo*;
+    arguments: Array<ArgumentType>;
 }
 
 enum TypeKind {
@@ -98,19 +98,19 @@ enum TypeKind {
 }
 
 struct TypeField {
-    string name;
-    u32 offset;
-    TypeInfo* type_info;
+    name: string;
+    offset: u32;
+    type_info: TypeInfo*;
 }
 
 struct EnumValue {
-    string name;
-    int value;
+    name: string;
+    value: int;
 }
 
 struct ArgumentType {
-    string name;
-    TypeInfo* type_info;
+    name: string;
+    type_info: TypeInfo*;
 }
 
 __type_table: Array<TypeInfo*>;

@@ -63,8 +63,8 @@ dynamic_arrays() {
 }
 
 struct DynamicArrayStruct {
-    int foo;
-    Array<int> array;
+    foo: int;
+    array: Array<int>;
 }
 
 array_literals() {

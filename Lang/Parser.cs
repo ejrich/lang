@@ -646,93 +646,14 @@ namespace Lang
             }
 
             // 4. Iterate through fields
-            StructFieldAst currentField = null;
-            var parsingFieldDefault = false;
             while (enumerator.MoveNext())
             {
-                var token = enumerator.Current;
-
-                if (token.Type == TokenType.CloseBrace)
+                if (enumerator.Current.Type == TokenType.CloseBrace)
                 {
                     break;
                 }
 
-                switch (token.Type)
-                {
-                    case TokenType.Identifier:
-                        // First get the type of the field
-                        if (currentField == null)
-                        {
-                            currentField = CreateAst<StructFieldAst>(token);
-                            currentField.Type = ParseType(enumerator, errors);
-                        }
-                        else if (currentField.Name == null)
-                        {
-                            currentField.Name = enumerator.Current.Value;
-                        }
-                        else if (parsingFieldDefault)
-                        {
-                            var structField = ParseExpression(enumerator, errors, null);
-                            currentField.DefaultValue = structField;
-                            structAst.Fields.Add(currentField);
-                            currentField = null;
-                            parsingFieldDefault = false;
-                        }
-                        else
-                        {
-                            errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}' in struct", Token = token});
-                        }
-                        break;
-                    case TokenType.SemiColon:
-                        if (currentField != null)
-                        {
-                            // Catch if the name hasn't been set
-                            if (currentField.Name == null || parsingFieldDefault)
-                            {
-                                errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}' in struct", Token = token});
-                            }
-                            // Add the field to the struct and continue
-                            structAst.Fields.Add(currentField);
-                            currentField = null;
-                            parsingFieldDefault = false;
-                        }
-                        break;
-                    case TokenType.Equals:
-                        if (currentField?.Type != null && currentField.Name != null)
-                        {
-                            parsingFieldDefault = true;
-                        }
-                        else
-                        {
-                            errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}' in struct", Token = token});
-                        }
-                        break;
-                    case TokenType.Number:
-                    case TokenType.Boolean:
-                    case TokenType.Literal:
-                        if (currentField != null && parsingFieldDefault)
-                        {
-                            var constant = CreateAst<ConstantAst>(token);
-                            constant.Type = InferType(token, errors);
-                            constant.Value = token.Value;
-                            currentField.DefaultValue = constant;
-                            parsingFieldDefault = false;
-                        }
-                        else
-                        {
-                            errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}' in struct", Token = token});
-                        }
-                        break;
-                    default:
-                        errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}' in struct", Token = token});
-                        break;
-                }
-            }
-
-            if (currentField != null)
-            {
-                var token = enumerator.Current ?? enumerator.Last;
-                errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}' in struct", Token = token});
+                structAst.Fields.Add(ParseStructField(enumerator, errors));
             }
 
             // 5. Mark field types as generic if necessary
@@ -743,12 +664,67 @@ namespace Lang
                 {
                     if (SearchForGeneric(generic, i, field.Type))
                     {
-                        field.HasGeneric = true;
+                        field.HasGenerics = true;
                     }
                 }
             }
 
             return structAst;
+        }
+
+        private static StructFieldAst ParseStructField(TokenEnumerator enumerator, List<ParseError> errors)
+        {
+            var structField = CreateAst<StructFieldAst>(enumerator.Current);
+            structField.Name = enumerator.Current.Value;
+
+            // 1. Expect to get colon
+            enumerator.MoveNext();
+            if (enumerator.Current?.Type != TokenType.Colon)
+            {
+                var errorToken = enumerator.Current ?? enumerator.Last;
+                errors.Add(new ParseError
+                {
+                    Error = $"Unexpected token in struct field '{errorToken.Value}'",
+                    Token = errorToken
+                });
+                return structField;
+            }
+
+            // 2. Check if type is given
+            if (enumerator.Peek()?.Type == TokenType.Identifier)
+            {
+                enumerator.MoveNext();
+                structField.Type = ParseType(enumerator, errors, null);
+            }
+
+            // 3. Get the value or return
+            enumerator.MoveNext();
+            var token = enumerator.Current;
+            switch (token?.Type)
+            {
+                case TokenType.Equals:
+                    ParseDeclarationValue(structField, enumerator, errors, null);
+                    break;
+                case TokenType.SemiColon:
+                    if (structField.Type == null)
+                    {
+                        errors.Add(new ParseError {Error = "Expected declaration to have value", Token = token});
+                    }
+                    break;
+                case null:
+                    errors.Add(new ParseError {Error = "Expected declaration to have value", Token = enumerator.Last});
+                    return structField;
+                default:
+                    errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}' in declaration", Token = token});
+                    // Parse until there is an equals sign
+                    while (enumerator.Current != null && enumerator.Current.Type != TokenType.Equals)
+                        enumerator.MoveNext();
+
+                    ParseDeclarationValue(structField, enumerator, errors, null);
+                    break;
+            }
+
+            return structField;
         }
 
         private static EnumAst ParseEnum(TokenEnumerator enumerator, List<ParseError> errors)
@@ -1299,7 +1275,7 @@ namespace Lang
             return declaration;
         }
 
-        private static void ParseDeclarationValue(DeclarationAst declaration, TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction)
+        private static void ParseDeclarationValue(IDeclaration declaration, TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction)
         {
             // 1. Step over '=' sign
             if (!enumerator.MoveNext())
