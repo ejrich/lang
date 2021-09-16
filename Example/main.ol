@@ -48,9 +48,9 @@ int main(List<string> args) {
 
     sdl_video := 0x20;
     x := 0xfeABD4;
-    sdl := SDL_Init(sdl_video);
-    SDL_CreateWindow("Hello world", 805240832, 805240832, 400, 300, 0);
-    sleep(5);
+    /* sdl := SDL_Init(sdl_video); */
+    /* SDL_CreateWindow("Hello world", 805240832, 805240832, 400, 300, 0); */
+    /* sleep(5); */
 
     z := 1;
     each i in create_list(5) {
@@ -177,7 +177,7 @@ int* pointers() {
     node: Node = { value = 9; }
     next: Node = { value = 8; }
     node.next = &next;
-    
+
     loop_node := &node;
     i := 1;
     while loop_node {
@@ -259,7 +259,7 @@ struct StateStruct {
 
 State current_state(int a) {
     state: StateStruct;
-    printf("State is %d\n", state.state);   
+    printf("State is %d\n", state.state);
 
     if a > 5 then return State.Running;
     else if a == 5 then return State.Starting;
