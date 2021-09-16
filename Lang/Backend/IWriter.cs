@@ -7,6 +7,8 @@
         /// </summary>
         /// <returns>The path to the translated source file</returns>
         /// <param name="programGraph">Graph of the program</param>
-        string WriteTranslatedFile(ProgramGraph programGraph);
+        /// <param name="projectName">The name of the project</param>
+        /// <param name="projectPath">The path to the project</param>
+        string WriteTranslatedFile(ProgramGraph programGraph, string projectName, string projectPath);
     }
 }

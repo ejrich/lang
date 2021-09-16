@@ -2,7 +2,7 @@
 {
     public class AssemblyWriter : IWriter
     {
-        public string WriteTranslatedFile(ProgramGraph programGraph)
+        public string WriteTranslatedFile(ProgramGraph programGraph, string projectName, string projectPath)
         {
             throw new System.NotImplementedException();
         }

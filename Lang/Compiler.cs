@@ -77,7 +77,7 @@ namespace Lang
 
             // 4. Generate translated code
             stopwatch.Restart();
-            var translatedFile = _writer.WriteTranslatedFile(programGraph);
+            var translatedFile = _writer.WriteTranslatedFile(programGraph, project.Name, project.Path);
             var translationTime = stopwatch.Elapsed;
 
             // 5. Assemble and link binaries

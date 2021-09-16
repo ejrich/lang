@@ -32,11 +32,13 @@ namespace Lang.Project
             var projectFile = LoadProjectFile(projectPath);
 
             // 3. Recurse through the directories and load the files to build
-            var sourceFiles = GetSourceFiles(new DirectoryInfo(Path.GetDirectoryName(Path.GetFullPath(projectPath))));
+            var projectDirectory = Path.GetDirectoryName(Path.GetFullPath(projectPath));
+            var sourceFiles = GetSourceFiles(new DirectoryInfo(projectDirectory));
 
             return new Project
             {
                 Name = projectFile.Name,
+                Path = projectDirectory,
                 BuildFiles = sourceFiles.ToList()
             };
         }
