@@ -89,7 +89,13 @@ namespace Lang.Runner
                         {
                             break;
                         }
-                        structBuilder.DefineField(field.Name, fieldType, FieldAttributes.Public);
+                        var structField = structBuilder.DefineField(field.Name, fieldType, FieldAttributes.Public);
+                        if (field.Type.CArray)
+                        {
+                            var caBuilder = new CustomAttributeBuilder(typeof(MarshalAsAttribute).GetConstructor(new []{typeof(UnmanagedType)}), new object[]{UnmanagedType.ByValArray});
+                            // TODO Look more into this and finish it up
+                            structField.SetCustomAttribute(caBuilder);
+                        }
                     }
 
                     if (index >= count)
@@ -485,22 +491,35 @@ namespace Lang.Runner
             return instance;
         }
 
-        private object InitializeList(TypeDefinition typeDef, IDictionary<string, ValueType> variables)
+        private object InitializeList(TypeDefinition type, IDictionary<string, ValueType> variables)
         {
-            var listType = _types[typeDef.GenericName];
-            var genericType = GetTypeFromDefinition(typeDef.Generics[0]);
+            var listType = _types[type.GenericName];
+            var genericType = GetTypeFromDefinition(type.Generics[0]);
 
-            var list = Activator.CreateInstance(listType);
-            if (typeDef.Count != null)
+            object list;
+            if (type.CArray)
             {
-                var length = (int)ExecuteExpression(typeDef.Count, variables).Value;
-                InitializeConstList(list, listType, genericType, length);
+                var length = 0;
+                if (type.Count != null)
+                {
+                    length = (int)ExecuteExpression(type.Count, variables).Value;
+                }
+                list = Array.CreateInstance(genericType, length);
             }
             else
             {
-                var dataField = listType.GetField("data");
-                var array = Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * 10);
-                dataField!.SetValue(list, array);
+                list = Activator.CreateInstance(listType);
+                if (type.Count != null)
+                {
+                    var length = (int)ExecuteExpression(type.Count, variables).Value;
+                    InitializeConstList(list, listType, genericType, length);
+                }
+                else
+                {
+                    var dataField = listType.GetField("data");
+                    var array = Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * 10);
+                    dataField!.SetValue(list, array);
+                }
             }
 
             return list;
@@ -1023,6 +1042,7 @@ namespace Lang.Runner
 
                 if (structField.Pointers[i-1])
                 {
+                    // TODO Figure this out
                     var type = _types[structName];
                     structVariable = Marshal.PtrToStructure(GetPointer(structVariable), type);
                 }
@@ -1683,8 +1703,9 @@ namespace Lang.Runner
                     }
                     return pointerType.MakePointerType();
                 case "List" when typeDef.CArray:
+                    var elementType = GetTypeFromDefinition(typeDef.Generics[0], temporaryTypes);
+                    return elementType.MakeArrayType();
                     // TODO Implement me and make sure this works
-                    break;
             }
 
             if (_types.TryGetValue(typeDef.GenericName, out var type))
