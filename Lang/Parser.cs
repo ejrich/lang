@@ -2058,35 +2058,22 @@ namespace Lang
             return overload;
         }
 
-        private static readonly HashSet<string> IntegerTypes = new()
-        {
-            "int", "u64", "s64", "u32", "s32", "u16", "s16", "u8", "s8"
-        };
+        // private static readonly HashSet<string> IntegerTypes = new()
+        // {
+        //     "int", "u64", "s64", "u32", "s32", "u16", "s16", "u8", "s8"
+        // };
 
-        private static readonly HashSet<string> FloatTypes = new() {"float", "float64"};
+        // private static readonly HashSet<string> FloatTypes = new() {"float", "float64"};
 
         private static TypeDefinition ParseType(TokenEnumerator enumerator, IFunction currentFunction = null, bool argument = false, int depth = 0)
         {
             var typeDefinition = CreateAst<TypeDefinition>(enumerator.Current);
             typeDefinition.Name = enumerator.Current.Value;
 
-            // Set the primitive type if necessary
-            if (IntegerTypes.Contains(typeDefinition.Name))
+            // Alias int to s32
+            if (typeDefinition.Name == "int")
             {
-                if (typeDefinition.Name == "int")
-                {
-                    typeDefinition.Name = "s32";
-                    typeDefinition.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
-                }
-                else
-                {
-                    var bytes = byte.Parse(typeDefinition.Name[1..]) / 8;
-                    typeDefinition.PrimitiveType = new IntegerType {Bytes = (byte)bytes, Signed = typeDefinition.Name[0] == 's'};
-                }
-            }
-            else if (FloatTypes.Contains(typeDefinition.Name))
-            {
-                typeDefinition.PrimitiveType = new FloatType {Bytes = typeDefinition.Name == "float" ? (byte)4 : (byte)8};
+                typeDefinition.Name = "s32";
             }
 
             if (enumerator.Current.Type == TokenType.VarArgs)
@@ -2212,23 +2199,10 @@ namespace Lang
             typeDefinition = CreateAst<TypeDefinition>(name);
             typeDefinition.Name = name.Value;
 
-            // Set the primitive type if necessary
-            if (IntegerTypes.Contains(typeDefinition.Name))
+            // Alias int to s32
+            if (typeDefinition.Name == "int")
             {
-                if (typeDefinition.Name == "int")
-                {
-                    typeDefinition.Name = "s32";
-                    typeDefinition.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
-                }
-                else
-                {
-                    var bytes = byte.Parse(typeDefinition.Name[1..]) / 8;
-                    typeDefinition.PrimitiveType = new IntegerType {Bytes = (byte)bytes, Signed = typeDefinition.Name[0] == 's'};
-                }
-            }
-            else if (FloatTypes.Contains(typeDefinition.Name))
-            {
-                typeDefinition.PrimitiveType = new FloatType {Bytes = typeDefinition.Name == "float" ? (byte)4 : (byte)8};
+                typeDefinition.Name = "s32";
             }
 
             // Determine whether to parse a generic type, otherwise return

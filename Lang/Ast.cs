@@ -424,7 +424,7 @@ namespace Lang
         // public bool Character { get; set; }
         public int GenericIndex { get; set; }
         public int? TypeIndex { get; set; }
-        public IPrimitive PrimitiveType { get; set; }
+        // public IPrimitive PrimitiveType { get; set; }
         public List<TypeDefinition> Generics { get; } = new();
         public IAst Count { get; set; }
         public uint? ConstCount { get; set; }
@@ -441,29 +441,29 @@ namespace Lang
         }
     }
 
-    public interface IPrimitive
-    {
-        byte Bytes { get; }
-        bool Signed { get; }
-    }
+    // public interface IPrimitive
+    // {
+    //     byte Bytes { get; }
+    //     bool Signed { get; }
+    // }
 
-    public class IntegerType : IPrimitive
-    {
-        public byte Bytes { get; init; }
-        public bool Signed { get; init; }
-    }
+    // public class IntegerType : IPrimitive
+    // {
+    //     public byte Bytes { get; init; }
+    //     public bool Signed { get; init; }
+    // }
 
-    public class FloatType : IPrimitive
-    {
-        public byte Bytes { get; set; }
-        public bool Signed => true;
-    }
+    // public class FloatType : IPrimitive
+    // {
+    //     public byte Bytes { get; set; }
+    //     public bool Signed => true;
+    // }
 
-    public class EnumType : IPrimitive
-    {
-        public byte Bytes { get; init; }
-        public bool Signed { get; init; }
-    }
+    // public class EnumType : IPrimitive
+    // {
+    //     public byte Bytes { get; init; }
+    //     public bool Signed { get; init; }
+    // }
 
     public enum Operator
     {

@@ -164,7 +164,6 @@ namespace Lang
 
             var copyType = CopyAst(type);
             copyType.Name = type.Name;
-            copyType.PrimitiveType = type.PrimitiveType;
             copyType.Count = type.Count;
 
             foreach (var generic in type.Generics)
