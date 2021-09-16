@@ -1248,6 +1248,10 @@ namespace Lang.Runner
                 var dataField = type.GetField("data");
                 return GetPointer(dataField!.GetValue(argument));
             }
+            else if (argument is Pointer)
+            {
+                return GetPointer(argument);
+            }
 
             return argument;
         }
