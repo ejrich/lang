@@ -265,6 +265,8 @@ namespace Lang.Backend.LLVM
                     {
                         case LLVMTypeKind.LLVMIntegerTypeKind:
                             return LLVMValueRef.CreateConstInt(type, ulong.Parse(constant.Value), true);
+                        case LLVMTypeKind.LLVMFloatTypeKind:
+                            return LLVMValueRef.CreateConstRealOfStringAndSize(type, constant.Value, (uint) constant.Value.Length);
                         // TODO Implement more branches
                         default:
                             break;

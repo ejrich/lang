@@ -3,13 +3,13 @@ int Main(List<string> args) {
     /*
         Multi line comment
     */
-    hello := "This is an \"escaped\" string literal";
+    //hello := "This is an \"escaped\" string literal";
     a := 4.2;
-    baz := foo() + bar(3 + 1, "Hello", 1.2);
-    b := 6 * (4 - 1);
+    //baz := foo() + bar(3 + 1, "Hello", 1.2);
+    //b := 6 * (4 - 1);
     c := 2;
-    d := a + 1 == b + 2 && (1 + b) == 2 || b > 3 + 4 * c - 1;
-    e := !d;
+    //d := a + 1 == b + 2 && (1 + b) == 2 || b > 3 + 4 * c - 1;
+    //e := !d;
     return 0;
 }
 
