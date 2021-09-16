@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Lang.Parsing;
-using Type = Lang.Translation.Type;
 
 namespace Lang.Translation
 {
@@ -16,6 +15,7 @@ namespace Lang.Translation
     {
         private readonly Dictionary<string, FunctionAst> _functions = new();
         private readonly Dictionary<string, StructAst> _structs = new();
+        private FunctionAst _currentFunction;
 
         public ProgramGraph CreateProgramGraph(ParseResult parseResult, out List<TranslationError> errors)
         {
@@ -56,6 +56,7 @@ namespace Lang.Translation
                 switch (syntaxTree)
                 {
                     case FunctionAst function:
+                        _currentFunction = function;
                         var main = function.Name.Equals("main", StringComparison.OrdinalIgnoreCase);
                         VerifyFunction(function, main, errors);
                         if (main)
@@ -70,8 +71,6 @@ namespace Lang.Translation
                     // TODO Handle more type of ASTs
                 }
             }
-
-            // TODO Verify undefined calls and types
 
             return graph;
         }
@@ -176,30 +175,46 @@ namespace Lang.Translation
                 }
             }
 
-            foreach (var syntaxTree in function.Children)
+            VerifyScope(function.Children, localVariables, errors);
+        }
+
+        private void VerifyScope(List<IAst> syntaxTrees, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        {
+            var scopeVariables = new Dictionary<string, TypeDefinition>(localVariables);
+            foreach (var syntaxTree in syntaxTrees)
             {
-                switch (syntaxTree)
-                {
-                    case ReturnAst returnAst:
-                        VerifyReturnStatement(returnAst, localVariables, function.ReturnType, errors);
-                        break;
-                    case DeclarationAst declaration:
-                        VerifyDeclaration(declaration, localVariables, errors);
-                        break;
-                    case AssignmentAst assignment:
-                        VerifyAssignment(assignment, localVariables, errors);
-                        break;
-                    // TODO Implement these syntax trees
-                    case ConditionalAst conditional:
-                        break;
-                    case WhileAst whileAst:
-                        break;
-                    case EachAst each:
-                        break;
-                    default:
-                        VerifyExpression(syntaxTree, localVariables, errors);
-                        break;
-                }
+                VerifyAst(syntaxTree, scopeVariables, errors);
+            }
+        }
+
+        private void VerifyAst(IAst syntaxTree, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        {
+            switch (syntaxTree)
+            {
+                case ReturnAst returnAst:
+                    VerifyReturnStatement(returnAst, localVariables, _currentFunction.ReturnType, errors);
+                    break;
+                case DeclarationAst declaration:
+                    VerifyDeclaration(declaration, localVariables, errors);
+                    break;
+                case AssignmentAst assignment:
+                    VerifyAssignment(assignment, localVariables, errors);
+                    break;
+                case ScopeAst scope:
+                    VerifyScope(scope.Children, localVariables, errors);
+                    break;
+                case ConditionalAst conditional:
+                    VerifyConditional(conditional, localVariables, errors);
+                    break;
+                case WhileAst whileAst:
+                    VerifyWhile(whileAst, localVariables, errors);
+                    break;
+                case EachAst each:
+                    VerifyEach(each, localVariables, errors);
+                    break;
+                default:
+                    VerifyExpression(syntaxTree, localVariables, errors);
+                    break;
             }
         }
 
@@ -309,9 +324,82 @@ namespace Lang.Translation
             }
         }
 
+        private void VerifyConditional(ConditionalAst conditional, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        {
+            // 1. Verify the condition expression
+            var conditionalType = VerifyExpression(conditional.Condition, localVariables, errors);
+            switch (VerifyType(conditionalType, errors))
+            {
+                case Type.Int:
+                case Type.Float:
+                case Type.Boolean:
+                    // Valid types
+                    break;
+                default:
+                    errors.Add(new TranslationError {Error = $"Expected condition to be int, float, or bool, but got '{PrintTypeDefinition(conditionalType)}'"});
+                    break;
+            }
+
+            // 2. Verify the conditional scope
+            VerifyScope(conditional.Children, localVariables, errors);
+
+            // 3. Verify the else block if necessary
+            if (conditional.Else != null)
+            {
+                VerifyAst(conditional.Else, localVariables, errors);
+            }
+        }
+
+        private void VerifyWhile(WhileAst whileAst, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        {
+            // 1. Verify the condition expression
+            var conditionalType = VerifyExpression(whileAst.Condition, localVariables, errors);
+            switch (VerifyType(conditionalType, errors))
+            {
+                case Type.Int:
+                case Type.Float:
+                case Type.Boolean:
+                    // Valid types
+                    break;
+                default:
+                    errors.Add(new TranslationError {Error = $"Expected condition to be int, float, or bool, but got '{PrintTypeDefinition(conditionalType)}'"});
+                    break;
+            }
+
+            // 2. Verify the scope of the while block
+            VerifyScope(whileAst.Children, localVariables, errors);
+        }
+
+        private void VerifyEach(EachAst each, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        {
+            var eachVariables = new Dictionary<string, TypeDefinition>(localVariables);
+            // 1. Verify the iterator or range
+            if (each.Iteration != null)
+            {
+                // TODO Implement iterators
+            }
+            else
+            {
+                var beginType = VerifyExpression(each.RangeBegin, localVariables, errors);
+                if (VerifyType(beginType, errors) != Type.Int)
+                {
+                    errors.Add(new TranslationError {Error = $"Expected range to begin with an int, but got '{PrintTypeDefinition(beginType)}'"});
+                }
+                var endType = VerifyExpression(each.RangeBegin, localVariables, errors);
+                if (VerifyType(beginType, errors) != Type.Int)
+                {
+                    errors.Add(new TranslationError {Error = $"Expected range to end with an int, but got '{PrintTypeDefinition(beginType)}'"});
+                }
+                eachVariables.Add(each.IterationVariable, new TypeDefinition {Name = "int"});
+            }
+
+            // 2. Verify the scope of the each block
+            VerifyScope(each.Children, eachVariables, errors);
+        }
+
         private TypeDefinition VerifyExpression(IAst ast, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
-            // 1. Verify the assignment value
+            // 1. Verify the expression value
             switch (ast)
             {
                 case ConstantAst constant:
@@ -422,10 +510,8 @@ namespace Lang.Translation
                     return null;
                 default:
                     errors.Add(new TranslationError {Error = $"Unexpected Ast '{ast}'"});
-                    break;
+                    return null;
             }
-
-            return null;
         }
 
         private TypeDefinition VerifyStructFieldRef(StructFieldRefAst structField, TypeDefinition structType,
