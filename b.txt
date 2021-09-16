@@ -5,20 +5,20 @@ call_field = 4.200000
 9.90, 2.00, 3.00, 4.00, 5.00, 6.00,
 Value 1 = 9
 Value 2 = 8
-Pointer = 0x55ba3a6bea38, Value = 6
+Pointer = 0x55f5a54d4d88, Value = 6
 something - Hello world 1, 2, 18
 Sum of Array  = 912
 Sum of Params = 912
-Initial array values -951522249, 0x7f
+Initial array values 2022842250, 0x7f
 Initial PolyStruct values 587202560, 0.00
-Initial MyStruct values 108, 0.00, {0, 85}
-'global_a' = -1862270976
+Initial MyStruct values 184, 0.00, {-1610612736, 85}
+'global_a' = 1627389952
 'global_b' = 456
 87, 3.141590
 State is 6
 Current state - 6
 The state is Running
-Pointer is null
+Pointer value is 7
 Pointer is null
 Value = 8
 Value = 5
@@ -29,7 +29,7 @@ Value 1 = 2
 Value 2 = 5
 Value 3 = 10
 Value 4 = 15
-Value 5 = -1033864144
+Value 5 = 0
 Constant value = 7
 Running Debug code
 Opening X11 window
