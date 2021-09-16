@@ -9,7 +9,7 @@ int Main(List<string> args) {
     baz := foo() + bar(3 + 1);//, "Hello", 1.2);
     b := 6 * (4 - 1);
     c := 2;
-    d := c + 1 == b + 2 && (1 + b) == 2 || b > 3 + 4 * c - 1;
+    d := a + 1 == b + 2 && (1 + b) == 2 || b > 3 + 4 * c - 1;
     e := !d;
     f := test(3);
     g := test_each();
