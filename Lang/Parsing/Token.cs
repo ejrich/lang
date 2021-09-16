@@ -6,8 +6,6 @@
         public string Value { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
-
-        public override string ToString() => $"{Type} - {Value}, {Line}:{Column}";
     }
 
     public enum TokenType
