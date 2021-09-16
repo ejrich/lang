@@ -1064,9 +1064,11 @@ namespace Lang
                 case ConditionalAst conditional:
                     return VerifyConditional(conditional, currentFunction, scope, canBreak);
                 case WhileAst whileAst:
-                    return VerifyWhile(whileAst, currentFunction, scope);
+                    VerifyWhile(whileAst, currentFunction, scope);
+                    break;
                 case EachAst each:
-                    return VerifyEach(each, currentFunction, scope);
+                    VerifyEach(each, currentFunction, scope);
+                    break;
                 case BreakAst:
                     if (!canBreak)
                     {
@@ -2022,19 +2024,20 @@ namespace Lang
             if (conditional.ElseBlock != null)
             {
                 var elseReturned = VerifyScope(conditional.ElseBlock, currentFunction, scope, canBreak);
-                return ifReturned && elseReturned;
+                conditional.Returns = ifReturned && elseReturned;
+                return conditional.Returns;
             }
 
             return false;
         }
 
-        private bool VerifyWhile(WhileAst whileAst, IFunction currentFunction, ScopeAst scope)
+        private void VerifyWhile(WhileAst whileAst, IFunction currentFunction, ScopeAst scope)
         {
             // 1. Verify the condition expression
             VerifyCondition(whileAst.Condition, currentFunction, scope);
 
             // 2. Verify the scope of the while block
-            return VerifyScope(whileAst.Body, currentFunction, scope, true);
+            VerifyScope(whileAst.Body, currentFunction, scope, true);
         }
 
         private bool VerifyCondition(IAst ast, IFunction currentFunction, ScopeAst scope)
@@ -2056,7 +2059,7 @@ namespace Lang
             }
         }
 
-        private bool VerifyEach(EachAst each, IFunction currentFunction, ScopeAst scope)
+        private void VerifyEach(EachAst each, IFunction currentFunction, ScopeAst scope)
         {
             // 1. Verify the iterator or range
             if (GetScopeIdentifier(scope, each.IterationVariable, out _))
@@ -2066,7 +2069,7 @@ namespace Lang
             if (each.Iteration != null)
             {
                 var variableTypeDefinition = VerifyExpression(each.Iteration, currentFunction, scope);
-                if (variableTypeDefinition == null) return false;
+                if (variableTypeDefinition == null) return;
                 var iterator = new DeclarationAst {Name = each.IterationVariable, TypeDefinition = variableTypeDefinition.Generics.FirstOrDefault()};
 
                 if (each.IndexVariable != null)
@@ -2108,7 +2111,7 @@ namespace Lang
             }
 
             // 2. Verify the scope of the each block
-            return VerifyScope(each.Body, currentFunction, scope, true);
+            VerifyScope(each.Body, currentFunction, scope, true);
         }
 
         private void VerifyTopLevelDirective(CompilerDirectiveAst directive)
