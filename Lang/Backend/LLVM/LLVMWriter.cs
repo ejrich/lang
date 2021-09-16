@@ -90,14 +90,13 @@ namespace Lang.Backend.LLVM
         private IDictionary<string, (TypeDefinition type, LLVMValueRef value)> WriteData(Data data)
         {
             // 1. Declare structs
-            var structs = new LLVMTypeRef[data.Types.Count];
-            for (var i = 0; i < data.Types.Count; i++)
+            var structs = new Dictionary<string, LLVMTypeRef>();
+            foreach (var (name, type) in data.Types)
             {
-                var type = data.Types[i];
                 switch (type)
                 {
                     case StructAst structAst:
-                        structs[i] = LLVMApi.StructCreateNamed(LLVMApi.GetModuleContext(_module), structAst.Name);
+                        structs[name] = LLVMApi.StructCreateNamed(LLVMApi.GetModuleContext(_module), structAst.Name);
                         _types.Add(structAst.Name, structAst);
                         break;
                     case EnumAst enumAst:
@@ -105,13 +104,12 @@ namespace Lang.Backend.LLVM
                         break;
                 }
             }
-            for (var i = 0; i < data.Types.Count; i++)
+            foreach (var (name, type) in data.Types)
             {
-                var type = data.Types[i];
                 if (type is StructAst structAst)
                 {
                     var fields = structAst.Fields.Select(field => ConvertTypeDefinition(field.Type)).ToArray();
-                    LLVMApi.StructSetBody(structs[i], fields, false);
+                    LLVMApi.StructSetBody(structs[name], fields, false);
                 }
             }
 

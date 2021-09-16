@@ -260,8 +260,8 @@ u32 sleep(u32 seconds) #extern "libc"
 #run {
     default_args(87);
     //set_global(99);
-    //global_a = 3;
-    if global_b then
+    global_a = 3;
+    if global_a then
         printf("%d\n", global_a);
 }
 

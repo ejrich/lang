@@ -14,6 +14,6 @@ namespace Lang
     public class Data
     {
         public List<DeclarationAst> Variables { get; } = new();
-        public List<IAst> Types { get; set; }
+        public Dictionary<string, IAst> Types { get; set; }
     }
 }
