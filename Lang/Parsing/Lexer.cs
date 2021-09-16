@@ -139,17 +139,21 @@ namespace Lang.Parsing
         {
             var token = (TokenType)character;
 
+            if (char.IsDigit(character)) return TokenType.Number;
+
             return Enum.IsDefined(typeof(TokenType), token) ? token : TokenType.Token;
         }
 
-        private bool ContinueToken(Token currentToken, TokenType type, LexerStatus lexerStatus)
+        private static bool ContinueToken(Token currentToken, TokenType type, LexerStatus lexerStatus)
         {
             if (currentToken == null) return false;
 
             switch (currentToken.Type)
             {
                 case TokenType.Token:
-                    return type == TokenType.Token;
+                    return type == TokenType.Token || type == TokenType.Number;
+                case TokenType.Number:
+                    return type == TokenType.Number || type == TokenType.Period;
                 case TokenType.Divide:
                     switch (type)
                     {

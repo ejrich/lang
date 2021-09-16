@@ -26,6 +26,7 @@ namespace Lang.Parsing
 
     public class ConstantAst : IAst
     {
+        public Type Type { get; init; }
         public string Value { get; init; }
         public List<IAst> Children => null;
     }
@@ -114,6 +115,35 @@ namespace Lang.Parsing
                     return Type.Void;
                 default:
                     error = new TranslationError {Error = "Unable to determine type"};
+                    return Type.Other;
+            }
+        }
+
+        public static Type InferType(this Token token, out ParseError error)
+        {
+            error = null;
+
+            switch (token.Type)
+            {
+                case TokenType.Literal:
+                    return Type.String;
+                case TokenType.Number:
+                    if (int.TryParse(token.Value, out _))
+                    {
+                        return Type.Int;
+                    }
+                    else if (float.TryParse(token.Value, out _))
+                    {
+                        return Type.Float;
+                    }
+                    else
+                    {
+                        return Type.Other;
+                    }
+                // TODO This isn't right, but works for now
+                case TokenType.Token:
+                    return Type.Other;
+                default:
                     return Type.Other;
             }
         }

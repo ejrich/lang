@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using Lang.Parsing;
 using Type = Lang.Parsing.Type;
@@ -67,7 +66,7 @@ namespace Lang.Translation
             return translationErrors;
         }
 
-        private TranslationError VerifyReturnStatement(ReturnAst returnAst, TypeDefinition functionReturnType)
+        private static TranslationError VerifyReturnStatement(ReturnAst returnAst, TypeDefinition functionReturnType)
         {
             var type = functionReturnType.InferType(out _);
 
@@ -79,35 +78,7 @@ namespace Lang.Translation
             switch (returnAst.Value)
             {
                 case ConstantAst constant:
-                    switch (type)
-                    {
-                        case Type.Int:
-                            if (int.TryParse(constant.Value, out _))
-                            {
-                                return null;
-                            }
-                            else
-                            {
-                                return new TranslationError {Error = "Expected to return type int"};
-                            }
-                        case Type.Float:
-                            if (float.TryParse(constant.Value, out _))
-                            {
-                                return null;
-                            }
-                            else
-                            {
-                                return new TranslationError {Error = "Expected to return type float"};
-                            }
-                        case Type.String:
-                            // TODO Haven't implemented string lexing/parsing yet
-                            break;
-                        case Type.Other:
-                            break;
-                        default:
-                            throw new ArgumentOutOfRangeException();
-                    }
-                    break;
+                    return constant.Type == type ? null : new TranslationError {Error = $"Expected to return type '{constant.Type}'"};
                 // TODO Implement these branches
                 case CallAst call:
                     break;
