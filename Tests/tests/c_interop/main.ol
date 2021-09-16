@@ -19,7 +19,7 @@ c_arrays() {
 
     // array.length = 9; // Does not compile due to length being a constant value
     printf("Array size = %d, should be %d. Array pointer = %p\n", array.length, array_size, &array);
-    each i in 0..array_size {
+    each i in 0..array_size-1 {
         array[i] = 5 * i;
         printf("Array value %d = %d\n", i, array[i]);
     }
@@ -36,7 +36,7 @@ c_array_structs() {
 
     // array_struct.array.length = 90; // Does not compile due to length being a constant value
     printf("ArrayStruct array size = %d, should be %d. Array pointer = %p, Type size = %d\n", array_struct.array.length, struct_array_size, &array_struct.array, size_of(array_struct));
-    each i in 0..struct_array_size {
+    each i in 0..struct_array_size-1 {
         array_struct.array[i] = 5 * i;
         printf("Struct array value %d = %d\n", i, array_struct.array[i - 1]);
     }
@@ -73,7 +73,7 @@ CArray<int>[4] returns_c_array() {
 
 CArray<int>[5] returns_c_array_from_struct() {
     array_struct: ArrayStruct;
-    each i in 0..struct_array_size {
+    each i in 0..struct_array_size-1 {
         array_struct.array[i] = 3 * i;
     }
 

@@ -921,12 +921,14 @@ namespace Lang
             }
 
             var indexVariable = AddAllocation(function, _s32Type);
+            InstructionType compareType;
             InstructionValue compareTarget;
             InstructionValue arrayData = null;
             var cArrayIteration = false;
 
             if (each.Iteration != null)
             {
+                compareType = InstructionType.IntegerGreaterThanOrEqual;
                 if (each.IndexVariable != null)
                 {
                     each.IndexVariable.AllocationIndex = indexVariable;
@@ -963,6 +965,7 @@ namespace Lang
             }
             else
             {
+                compareType = InstructionType.IntegerGreaterThan;
                 // Begin the loop at the beginning of the range
                 var value = EmitIR(function, each.RangeBegin, scope);
 
@@ -979,7 +982,7 @@ namespace Lang
 
             var conditionBlock = AddBasicBlock(function);
             var indexValue = EmitLoad(function, _s32Type, indexVariable);
-            var condition = EmitInstruction(InstructionType.IntegerGreaterThanOrEqual, function, _boolType, indexValue, compareTarget);
+            var condition = EmitInstruction(compareType, function, _boolType, indexValue, compareTarget);
             if (each.Iteration != null)
             {
                 var iterationVariable = EmitGetPointer(function, arrayData, indexValue, each.IterationVariable.Type, cArrayIteration);
