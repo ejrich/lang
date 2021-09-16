@@ -73,107 +73,107 @@ struct Vector3I {
 }
 
 // Numeric operator overloads, these will return the overload type
-operator + Vector3(Vector3 a, Vector3 b) {
+operator + (Vector3 a, Vector3 b) {
     c: Vector3 = { x = a.x + b.x; y = a.y + b.y; z = a.z + b.z; }
     return c;
 }
 
-operator - Vector3(Vector3 a, Vector3 b) {
+operator - (Vector3 a, Vector3 b) {
     c: Vector3 = { x = a.x - b.x; y = a.y - b.y; z = a.z - b.z; }
     return c;
 }
 
-operator * Vector3(Vector3 a, Vector3 b) {
+operator * (Vector3 a, Vector3 b) {
     c: Vector3 = { x = a.x * b.x; y = a.y * b.y; z = a.z * b.z; }
     return c;
 }
 
-operator / Vector3(Vector3 a, Vector3 b) {
+operator / (Vector3 a, Vector3 b) {
     c: Vector3 = { x = a.x / b.x; y = a.y / b.y; z = a.z / b.z; }
     return c;
 }
 
-operator % Vector3(Vector3 a, Vector3 b) {
+operator % (Vector3 a, Vector3 b) {
     c: Vector3 = { x = a.x % b.x; y = a.y % b.y; z = a.z % b.z; }
     return c;
 }
 
-operator | Vector3I(Vector3I a, Vector3I b) {
+operator | (Vector3I a, Vector3I b) {
     c: Vector3I = { x = a.x | b.x; y = a.y | b.y; z = a.z | b.z; }
     return c;
 }
 
-operator & Vector3I(Vector3I a, Vector3I b) {
+operator & (Vector3I a, Vector3I b) {
     c: Vector3I = { x = a.x & b.x; y = a.y & b.y; z = a.z & b.z; }
     return c;
 }
 
-operator >> Vector3I(Vector3I a, Vector3I b) {
+operator >> (Vector3I a, Vector3I b) {
     c: Vector3I = { x = a.x >> b.x; y = a.y >> b.y; z = a.z >> b.z; }
     return c;
 }
 
-operator << Vector3I(Vector3I a, Vector3I b) {
+operator << (Vector3I a, Vector3I b) {
     c: Vector3I = { x = a.x << b.x; y = a.y << b.y; z = a.z << b.z; }
     return c;
 }
 
-operator >>> Vector3I(Vector3I a, Vector3I b) {
+operator >>> (Vector3I a, Vector3I b) {
     c: Vector3I = { x = a.x >>> b.x; y = a.y >>> b.y; z = a.z >>> b.z; }
     return c;
 }
 
-operator <<< Vector3I(Vector3I a, Vector3I b) {
+operator <<< (Vector3I a, Vector3I b) {
     c: Vector3I = { x = a.x <<< b.x; y = a.y <<< b.y; z = a.z <<< b.z; }
     return c;
 }
 
 // Comparison operator overloads, these will return bool
-operator && Vector3(Vector3 a, Vector3 b) {
+operator && (Vector3 a, Vector3 b) {
     a_size := a.x + a.y + a.z;
     b_size := b.x + b.y + b.z;
     return a_size != 0 && b_size != 0;
 }
 
-operator || Vector3(Vector3 a, Vector3 b) {
+operator || (Vector3 a, Vector3 b) {
     a_size := a.x + a.y + a.z;
     b_size := b.x + b.y + b.z;
     return a_size != 0 || b_size != 0;
 }
 
-operator == Vector3(Vector3 a, Vector3 b) {
+operator == (Vector3 a, Vector3 b) {
     return a.x == b.x && a.y == b.y && a.z == b.z;
 }
 
-operator != Vector3(Vector3 a, Vector3 b) {
+operator != (Vector3 a, Vector3 b) {
     return a.x != b.x || a.y != b.y || a.z != b.z;
 }
 
-operator >= Vector3(Vector3 a, Vector3 b) {
+operator >= (Vector3 a, Vector3 b) {
     a_size := a.x + a.y + a.z;
     b_size := b.x + b.y + b.z;
     return a_size >= b_size;
 }
 
-operator <= Vector3(Vector3 a, Vector3 b) {
+operator <= (Vector3 a, Vector3 b) {
     a_size := a.x + a.y + a.z;
     b_size := b.x + b.y + b.z;
     return a_size <= b_size;
 }
 
-operator > Vector3(Vector3 a, Vector3 b) {
+operator > (Vector3 a, Vector3 b) {
     a_size := a.x + a.y + a.z;
     b_size := b.x + b.y + b.z;
     return a_size > b_size;
 }
 
-operator < Vector3(Vector3 a, Vector3 b) {
+operator < (Vector3 a, Vector3 b) {
     a_size := a.x + a.y + a.z;
     b_size := b.x + b.y + b.z;
     return a_size < b_size;
 }
 
-operator ^ Vector3(Vector3 a, Vector3 b) {
+operator ^ (Vector3 a, Vector3 b) {
     a_size := a.x + a.y + a.z;
     b_size := b.x + b.y + b.z;
     return a_size != 0 ^ b_size != 0;
@@ -192,13 +192,13 @@ struct PolyStruct<T, U> {
     b: U;
 }
 
-operator + PolyStruct<T, U>(PolyStruct<T, U> a, PolyStruct<T, U> b) {
+operator + <T, U>(PolyStruct<T, U> a, PolyStruct<T, U> b) {
     #assert type_of(T).type == TypeKind.Integer && type_of(U).type == TypeKind.Float;
     c: PolyStruct<T, U> = { a = a.a + b.a; b = a.b + b.b; }
     return c;
 }
 
-index_overloading() {
+index_overloading() {//#print_ir {
     a: SOAVector3;
     a.x[2] = 9.0;
     a.y[2] = 8.0;
@@ -238,7 +238,7 @@ struct SOAVector3 {
     z: Array<float>[5];
 }
 
-operator [] SOAVector3(SOAVector3 a, int index) : Vector3 {
+operator [] (SOAVector3 a, int index) : Vector3 {
     value: Vector3 = { x = a.x[index]; y = a.y[index]; z = a.z[index]; }
     return value;
 }
@@ -248,7 +248,7 @@ struct ArrayStruct<T> {
     list: Array<T>[10];
 }
 
-operator [] ArrayStruct<T>(ArrayStruct<T> a, int index) : T* {
+operator [] <T>(ArrayStruct<T> a, int index) : T* {
     if index < 0 then return &a.list[0];
     if index >= a.max then return &a.list[a.max - 1];
     return &a.list[index];
