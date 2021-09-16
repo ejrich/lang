@@ -51,6 +51,10 @@ namespace Lang.Parsing
                             _readingComment = false;
                             currentToken = null;
                         }
+                        else
+                        {
+                            closingMultiLineComment = false;
+                        }
                     }
                     else if (character == '\n')
                     {
