@@ -32,7 +32,7 @@ namespace Lang
 
         public void Compile(string[] args)
         {
-            new ProgramRunner().RunProgram();
+            //new ProgramRunner().RunProgram();
             // 1. Load cli args into build settings
             var buildSettings = new BuildSettings();
             foreach (var arg in args)
