@@ -14,6 +14,7 @@ namespace Lang
     public class FunctionIR
     {
         public uint StackSize { get; set; }
+        public int ValueCount { get; set; }
         public bool SaveStack { get; set; }
         public bool Varargs { get; set; }
         public IType[] Arguments { get; set; }
@@ -55,6 +56,7 @@ namespace Lang
     public class Instruction
     {
         public InstructionType Type { get; set; }
+        public int ValueIndex { get; set; }
 
         // Used for Jump, Call, GetPointer, and GetStructPointer
         public int? Index { get; set; }
