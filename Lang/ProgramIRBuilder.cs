@@ -234,7 +234,7 @@ namespace Lang
         private InstructionValue InitializeConstArray(FunctionIR function, BasicBlock block, InstructionValue arrayPointer, StructAst arrayStruct, uint length, IType elementType = null)
         {
             var lengthPointer = EmitGetStructPointer(block, arrayPointer, arrayStruct, 0);
-            var lengthValue = new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new InstructionConstant {Integer = length}};
+            var lengthValue = new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new Constant {Integer = length}};
             EmitStore(block, lengthPointer, lengthValue);
 
             if (elementType == null)
@@ -254,7 +254,7 @@ namespace Lang
         {
             for (var i = 0; i < arrayValues.Count; i++)
             {
-                var index = new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new InstructionConstant {Integer = i}};
+                var index = new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new Constant {Integer = i}};
                 var pointer = EmitGetPointer(block, arrayPointer, index, elementType, getFirstPointer: true);
 
                 var value = EmitIR(function, arrayValues[i], scope, block);
@@ -349,19 +349,19 @@ namespace Lang
             switch (type.TypeKind)
             {
                 case TypeKind.Boolean:
-                    value.ConstantValue = new InstructionConstant {Boolean = false};
+                    value.ConstantValue = new Constant {Boolean = false};
                     break;
                 case TypeKind.Integer:
-                    value.ConstantValue = new InstructionConstant {Integer = 0};
+                    value.ConstantValue = new Constant {Integer = 0};
                     break;
                 case TypeKind.Float:
                     if (type.Size == 4)
                     {
-                        value.ConstantValue = new InstructionConstant {Float = 0};
+                        value.ConstantValue = new Constant {Float = 0};
                     }
                     else
                     {
-                        value.ConstantValue = new InstructionConstant {Double = 0};
+                        value.ConstantValue = new Constant {Double = 0};
                     }
                     break;
             }
@@ -428,7 +428,7 @@ namespace Lang
                         return new InstructionValue
                         {
                             ValueType = InstructionValueType.Constant, Type = _s32Type,
-                            ConstantValue = new InstructionConstant {Integer = type.TypeIndex}
+                            ConstantValue = new Constant {Integer = type.TypeIndex}
                         };
                     }
                     else
@@ -436,7 +436,7 @@ namespace Lang
                         return new InstructionValue
                         {
                             ValueType = InstructionValueType.Constant, Type = _s32Type,
-                            ConstantValue = new InstructionConstant {Integer = TypeTable.Functions[identifierAst.Name][0].TypeIndex}
+                            ConstantValue = new Constant {Integer = TypeTable.Functions[identifierAst.Name][0].TypeIndex}
                         };
                     }
                     // TODO Implement getStringPointer
@@ -461,7 +461,7 @@ namespace Lang
                         return new InstructionValue
                         {
                             ValueType = InstructionValueType.Constant, Type = enumDef.BaseType,
-                            ConstantValue = new InstructionConstant {Integer = enumValue}
+                            ConstantValue = new Constant {Integer = enumValue}
                         };
                     }
                     else if (structField.IsConstant)
@@ -488,15 +488,15 @@ namespace Lang
                     var constOne = new InstructionValue {ValueType = InstructionValueType.Constant, Type = changeByOne.Type};
                     if (changeByOne.Type.TypeKind == TypeKind.Integer)
                     {
-                        constOne.ConstantValue = new InstructionConstant {Integer = 1};
+                        constOne.ConstantValue = new Constant {Integer = 1};
                     }
                     else if (changeByOne.Type.Size == 4)
                     {
-                        constOne.ConstantValue = new InstructionConstant {Float = 1};
+                        constOne.ConstantValue = new Constant {Float = 1};
                     }
                     else
                     {
-                        constOne.ConstantValue = new InstructionConstant {Double = 1};
+                        constOne.ConstantValue = new Constant {Double = 1};
                     }
                     var instructionType = changeByOne.Positive ? InstructionType.Add : InstructionType.Subtract;
                     var newValue = EmitInstruction(instructionType, block, changeByOne.Type, previousValue, constOne);
@@ -539,7 +539,7 @@ namespace Lang
                     return new InstructionValue
                     {
                         ValueType = InstructionValueType.Constant, Type = _s32Type,
-                        ConstantValue = new InstructionConstant {Integer = typeDef.TypeIndex.Value}
+                        ConstantValue = new Constant {Integer = typeDef.TypeIndex.Value}
                     };
                 case CastAst cast:
                     var castValue = EmitIR(function, cast.Value, scope);
@@ -572,7 +572,7 @@ namespace Lang
                         return new InstructionValue
                         {
                             ValueType = InstructionValueType.Constant, Type = _s32Type,
-                            ConstantValue = new InstructionConstant {Integer = (uint)type.TypeIndex}
+                            ConstantValue = new Constant {Integer = (uint)type.TypeIndex}
                         };
                     }
                     else
@@ -580,7 +580,7 @@ namespace Lang
                         return new InstructionValue
                         {
                             ValueType = InstructionValueType.Constant, Type = _s32Type,
-                            ConstantValue = new InstructionConstant {Integer = TypeTable.Functions[identifierAst.Name][0].TypeIndex}
+                            ConstantValue = new Constant {Integer = TypeTable.Functions[identifierAst.Name][0].TypeIndex}
                         };
                     }
                     // TODO Implement getStringPointer
@@ -605,7 +605,7 @@ namespace Lang
                         return new InstructionValue
                         {
                             ValueType = InstructionValueType.Constant, Type = enumDef.BaseType,
-                            ConstantValue = new InstructionConstant {Integer = enumValue}
+                            ConstantValue = new Constant {Integer = enumValue}
                         };
                     }
                     break;
@@ -619,7 +619,7 @@ namespace Lang
             switch (constant.TypeDefinition.TypeKind)
             {
                 case TypeKind.Boolean:
-                    value.ConstantValue = new InstructionConstant {Boolean = constant.Value == "true"};
+                    value.ConstantValue = new Constant {Boolean = constant.Value == "true"};
                     break;
                 case TypeKind.String:
                     value.ConstantString = constant.Value;
@@ -627,25 +627,25 @@ namespace Lang
                 case TypeKind.Integer:
                     if (constant.TypeDefinition.Character)
                     {
-                        value.ConstantValue = new InstructionConstant {UnsignedInteger = (byte)constant.Value[0]};
+                        value.ConstantValue = new Constant {UnsignedInteger = (byte)constant.Value[0]};
                     }
                     else if (constant.TypeDefinition.PrimitiveType.Signed)
                     {
-                        value.ConstantValue = new InstructionConstant {Integer = long.Parse(constant.Value)};
+                        value.ConstantValue = new Constant {Integer = long.Parse(constant.Value)};
                     }
                     else
                     {
-                        value.ConstantValue = new InstructionConstant {UnsignedInteger = ulong.Parse(constant.Value)};
+                        value.ConstantValue = new Constant {UnsignedInteger = ulong.Parse(constant.Value)};
                     }
                     break;
                 case TypeKind.Float:
                     if (constant.TypeDefinition.PrimitiveType.Bytes == 4)
                     {
-                        value.ConstantValue = new InstructionConstant {Float = float.Parse(constant.Value)};
+                        value.ConstantValue = new Constant {Float = float.Parse(constant.Value)};
                     }
                     else
                     {
-                        value.ConstantValue = new InstructionConstant {Double = double.Parse(constant.Value)};
+                        value.ConstantValue = new Constant {Double = double.Parse(constant.Value)};
                     }
                     break;
             }
@@ -787,7 +787,7 @@ namespace Lang
                 uint paramsIndex = 0;
                 for (var i = call.Function.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
                 {
-                    var index = new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new InstructionConstant {Integer = paramsIndex}};
+                    var index = new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new Constant {Integer = paramsIndex}};
                     var pointer = EmitGetPointer(block, dataPointer, index, elementType, true);
 
                     var value = EmitIR(function, call.Arguments[i], scope, block);

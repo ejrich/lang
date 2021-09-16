@@ -67,7 +67,7 @@ namespace Lang
         public IType Type { get; set; }
 
         // For constant values
-        public InstructionConstant ConstantValue { get; set; }
+        public Constant ConstantValue { get; set; }
         public string ConstantString { get; set; }
 
         // For calls
@@ -75,7 +75,7 @@ namespace Lang
     }
 
     [StructLayout(LayoutKind.Explicit)]
-    public struct InstructionConstant
+    public struct Constant
     {
         [FieldOffset(0)] public bool Boolean;
         [FieldOffset(0)] public long Integer;
