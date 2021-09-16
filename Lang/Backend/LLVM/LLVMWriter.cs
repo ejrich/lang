@@ -1039,7 +1039,7 @@ namespace Lang.Backend.LLVM
             switch (constant.Type.Name)
             {
                 case "bool":
-                    return LLVMApi.ConstInt(type, constant.Value == "true" ? 1 : 0, false);
+                    return LLVMApi.ConstInt(type, constant.Value == "true" ? (ulong)1 : 0, false);
                 case "string":
                     return LLVMApi.BuildGlobalStringPtr(_builder, constant.Value, "str");
                 default:
