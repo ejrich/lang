@@ -346,7 +346,7 @@ print_type_info(Type type) {
     type_info := type_of(type);
     printf("Type Name = %s, Type Kind = %d, Type Size = %d, Field Count = %d\n", type_info.name, type_info.type, type_info.size, type_info.fields.length);
     each field in type_info.fields then
-        printf("Field name = %s, Field type name = %s\n", field.name, field.type_info.name);
+        printf("Field name = %s, Field offset = %d, Field type name = %s\n", field.name, field.offset, field.type_info.name);
     each enum_value in type_info.enum_values then
         printf("Enum value name = %s, Value = %d\n", enum_value.name, enum_value.value);
 
