@@ -41,7 +41,7 @@ namespace Lang
 
                         var storeInstruction = new Instruction
                         {
-                            Type = InstructionType.Store, AllocationIndex = allocationIndex,
+                            Type = InstructionType.Store, Index = allocationIndex,
                             Value1 = new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i}
                         };
                         entryBlock.Instructions.Add(storeInstruction);
@@ -63,7 +63,7 @@ namespace Lang
 
         public FunctionIR AddOperatorOverload(OperatorOverloadAst overload, Dictionary<string, IType> types)
         {
-            var functionName = $"operator.{overload.Operator}.{overload.Type.GenericName}";
+            var functionName = GetOperatorOverloadName(overload.Type, overload.Operator);
 
             var entryBlock = new BasicBlock();
             var functionIR = new FunctionIR {Allocations = new(), BasicBlocks = new List<BasicBlock>{entryBlock}};
@@ -78,7 +78,7 @@ namespace Lang
 
                     var storeInstruction = new Instruction
                     {
-                        Type = InstructionType.Store, AllocationIndex = allocationIndex,
+                        Type = InstructionType.Store, Index = allocationIndex,
                         Value1 = new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i}
                     };
                     entryBlock.Instructions.Add(storeInstruction);
@@ -320,14 +320,7 @@ namespace Lang
                         }
                     }
 
-                    var callInstruction = new Instruction
-                    {
-                        Type = InstructionType.Call, CallFunction = GetFunctionName(call.Function),
-                        Value1 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Arguments = arguments}
-                    };
-                    var callValue = new InstructionValue {ValueIndex = block.Instructions.Count, Type = call.Function.ReturnType};
-                    block.Instructions.Add(callInstruction);
-                    return callValue;
+                    return EmitCall(block, GetFunctionName(call.Function), arguments, call.Function.ReturnType);
                 case ChangeByOneAst changeByOne:
                     // var constant = false;
                     // var (variableType, pointer) = changeByOne.Value switch
@@ -406,11 +399,8 @@ namespace Lang
                     break;
                 case IndexAst index:
                     var indexPointer = EmitGetIndexPointer(function, index, scope, block, out var loaded);
-                    if (!loaded)
-                    {
-                        // elementValue = _builder.BuildLoad(elementValue, "tmpindex");
-                    }
-                    return null;
+
+                    return loaded ? indexPointer : EmitLoad(block, value: indexPointer);
                 case ExpressionAst expression:
                     // var expressionValue = WriteExpression(expression.Children[0], localVariables);
                     // for (var i = 1; i < expression.Children.Count; i++)
@@ -441,7 +431,7 @@ namespace Lang
 
         private InstructionValue EmitLoad(BasicBlock block, int? allocationIndex = null, InstructionValue value = null)
         {
-            var loadInstruction = new Instruction {Type = InstructionType.Load, AllocationIndex = allocationIndex, Value1 = value};
+            var loadInstruction = new Instruction {Type = InstructionType.Load, Index = allocationIndex, Value1 = value};
             var loadValue = new InstructionValue {ValueIndex = block.Instructions.Count};
             block.Instructions.Add(loadInstruction);
             return loadValue;
@@ -451,12 +441,33 @@ namespace Lang
         {
             var loadInstruction = new Instruction
             {
-                Type = InstructionType.GetPointer, AllocationIndex = allocationIndex,
+                Type = InstructionType.GetPointer, Index = allocationIndex,
                 Value1 = pointer, Value2 = index, GetFirstPointer = getFirstPointer
             };
             var loadValue = new InstructionValue {ValueIndex = block.Instructions.Count};
             block.Instructions.Add(loadInstruction);
             return loadValue;
+        }
+
+        // TODO Add the offset size
+        private InstructionValue EmitGetStructPointer(BasicBlock block, InstructionValue value, int fieldIndex)
+        {
+            var loadInstruction = new Instruction {Type = InstructionType.GetStructPointer, Index = fieldIndex, Value1 = value};
+            var loadValue = new InstructionValue {ValueIndex = block.Instructions.Count};
+            block.Instructions.Add(loadInstruction);
+            return loadValue;
+        }
+
+        private InstructionValue EmitCall(BasicBlock block, string name, InstructionValue[] arguments, TypeDefinition returnType = null)
+        {
+            var callInstruction = new Instruction
+            {
+                Type = InstructionType.Call, CallFunction = name,
+                Value1 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Arguments = arguments}
+            };
+            var callValue = new InstructionValue {ValueIndex = block.Instructions.Count, Type = returnType};
+            block.Instructions.Add(callInstruction);
+            return callValue;
         }
 
         private InstructionValue EmitGetStructPointer(FunctionIR function, StructFieldRefAst structField, ScopeAst scope, BasicBlock block)
@@ -587,21 +598,18 @@ namespace Lang
             // 3. Call the overload if needed
             if (index.CallsOverload)
             {
-                // TODO Implement me
-                // var overloadName = GetOperatorOverloadName(type, Operator.Subscript);
-                // var overload = _module.GetNamedFunction(overloadName);
-                // var overloadDef = _programGraph.OperatorOverloads[type.GenericName][Operator.Subscript];
+                loaded = true;
+                var overloadName = GetOperatorOverloadName(type, Operator.Subscript);
 
-                // loaded = true;
-                // return (overloadDef.ReturnType, _builder.BuildCall(overload, new []{_builder.BuildLoad(variable, index.Name), indexValue}, string.Empty));
+                var value = EmitLoad(block, value: variable);
+                // TODO Add return type?
+                return EmitCall(block, overloadName, new []{value, indexValue});
             }
 
             // 4. Build the pointer with the first index of 0
             TypeDefinition elementType;
             if (type.TypeKind == TypeKind.String)
             {
-                // _stringStruct ??= (StructAst)_programGraph.Types["string"];
-                // elementType = _stringStruct.Fields[1].Type.Generics[0];
                 elementType = new TypeDefinition {Name = "u8", TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Bytes = 1}};
             }
             else
@@ -622,12 +630,11 @@ namespace Lang
             }
             else
             {
-                // TODO Get struct pointer instruction first
-                // var arrayData = _builder.BuildStructGEP(variable, 1, "arraydata");
-                // var dataPointer = _builder.BuildLoad(arrayData, "dataptr");
-                // indexPointer = _builder.BuildGEP(dataPointer, new [] {indexValue}, "indexptr");
+                var data = EmitGetStructPointer(block, variable, 1);
+                var dataPointer = EmitLoad(block, value: data);
+                // TODO For index value, calculate the size of the element
+                return EmitGetPointer(block, dataPointer, indexValue);
             }
-            return null;
         }
 
         private bool GetScopeIdentifier(ScopeAst scope, string name, out IAst ast)
@@ -650,6 +657,11 @@ namespace Lang
                 "__start" => "main",
                 _ => function.OverloadIndex > 0 ? $"{function.Name}.{function.OverloadIndex}" : function.Name
             };
+        }
+
+        private string GetOperatorOverloadName(TypeDefinition type, Operator op)
+        {
+            return $"operator.{op}.{type.GenericName}";
         }
     }
 }

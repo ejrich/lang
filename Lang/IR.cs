@@ -36,8 +36,8 @@ namespace Lang
         // TODO Implement me
         public InstructionType Type { get; set; }
 
-        // Used for Load and Store
-        public int? AllocationIndex { get; set; }
+        // Used for Load, Store, GetPointer, and GetStructPointer
+        public int? Index { get; set; }
         public bool GetFirstPointer { get; set; }
         public string CallFunction { get; set; }
 
