@@ -237,7 +237,7 @@ namespace Lang.Backend
 
                     var returnType = typeInfos[function.ReturnType.TypeIndex];
 
-                    var argumentCount = function.Varargs ? function.Arguments.Count - 1 : function.Arguments.Count;
+                    var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
                     var argumentValues = new LLVMValueRef[argumentCount];
                     for (var arg = 0; arg < argumentCount; arg++)
                     {
@@ -423,7 +423,7 @@ namespace Lang.Backend
 
         private LLVMValueRef WriteFunctionDefinition(string name, FunctionIR function)
         {
-            var varargs = function.Source.Varargs;
+            var varargs = function.Source.Flags.HasFlag(FunctionFlags.Varargs);
             var sourceArguments = function.Source.Arguments;
             var argumentCount = varargs ? sourceArguments.Count - 1 : sourceArguments.Count;
 

@@ -43,9 +43,8 @@ namespace Lang
         {
             var function = CopyAst(baseFunction);
             function.Name = name;
-            function.HasDirectives = baseFunction.HasDirectives;
-            function.Params = baseFunction.Params;
-            function.ReturnTypeDefinition = baseFunction.ReturnTypeHasGenerics ? CopyType(baseFunction.ReturnTypeDefinition, genericTypes) : baseFunction.ReturnTypeDefinition;
+            function.Flags = baseFunction.Flags;
+            function.ReturnTypeDefinition = baseFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? CopyType(baseFunction.ReturnTypeDefinition, genericTypes) : baseFunction.ReturnTypeDefinition;
 
             foreach (var argument in baseFunction.Arguments)
             {
@@ -59,7 +58,7 @@ namespace Lang
                 }
             }
 
-            if (function.Params)
+            if (function.Flags.HasFlag(FunctionFlags.Params))
             {
                 function.ParamsElementType = TypeTable.GetType(function.Arguments[^1].TypeDefinition.Generics[0]);
             }
@@ -74,8 +73,8 @@ namespace Lang
             var overload = CopyAst(baseOverload);
             overload.Operator = baseOverload.Operator;
             overload.Type = CopyType(baseOverload.Type, genericTypes);
-            overload.HasDirectives = baseOverload.HasDirectives;
-            overload.ReturnTypeDefinition = baseOverload.ReturnTypeHasGenerics ? CopyType(baseOverload.ReturnTypeDefinition, genericTypes) : baseOverload.ReturnTypeDefinition;
+            overload.Flags = baseOverload.Flags;
+            overload.ReturnTypeDefinition = baseOverload.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? CopyType(baseOverload.ReturnTypeDefinition, genericTypes) : baseOverload.ReturnTypeDefinition;
 
             foreach (var argument in baseOverload.Arguments)
             {

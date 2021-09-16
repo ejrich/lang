@@ -212,7 +212,7 @@ namespace Lang
             {
                 foreach (var overload in overloads.Values)
                 {
-                    if (overload.Verified) continue;
+                    if (overload.Flags.HasFlag(FunctionFlags.Verified)) continue;
                     VerifyOperatorOverload(overload);
                 }
             }
@@ -223,7 +223,7 @@ namespace Lang
                 var functions = TypeTable.Functions[name];
                 foreach (var function in functions)
                 {
-                    if (function.Verified) continue;
+                    if (function.Flags.HasFlag(FunctionFlags.Verified)) continue;
                     VerifyFunction(function);
                 }
             }
@@ -617,34 +617,34 @@ namespace Lang
                 switch (type)
                 {
                     case TypeKind.VarArgs:
-                        if (function.Varargs || function.Params)
+                        if (function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params))
                         {
                             ErrorReporter.Report($"Function '{function.Name}' cannot have multiple varargs", argument.TypeDefinition);
                         }
-                        function.Varargs = true;
+                        function.Flags |= FunctionFlags.Varargs;
                         function.VarargsCalls = new List<List<TypeDefinition>>();
                         break;
                     case TypeKind.Params:
-                        if (function.Varargs || function.Params)
+                        if (function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params))
                         {
                             ErrorReporter.Report($"Function '{function.Name}' cannot have multiple varargs", argument.TypeDefinition);
                         }
-                        function.Params = true;
+                        function.Flags |= FunctionFlags.Params;
                         function.ParamsElementType = TypeTable.GetType(argument.TypeDefinition.Generics[0]);
                         break;
                     case TypeKind.Error:
                         ErrorReporter.Report($"Type '{PrintTypeDefinition(argument.TypeDefinition)}' of argument '{argument.Name}' in function '{function.Name}' is not defined", argument.TypeDefinition);
                         break;
                     default:
-                        if (function.Varargs)
+                        if (function.Flags.HasFlag(FunctionFlags.Varargs))
                         {
                             ErrorReporter.Report($"Cannot declare argument '{argument.Name}' following varargs", argument);
                         }
-                        else if (function.Params)
+                        else if (function.Flags.HasFlag(FunctionFlags.Params))
                         {
                             ErrorReporter.Report($"Cannot declare argument '{argument.Name}' following params", argument);
                         }
-                        else if (function.Extern && type == TypeKind.String)
+                        else if (function.Flags.HasFlag(FunctionFlags.Extern) && type == TypeKind.String)
                         {
                             argument.Type = TypeTable.Types["*.u8"];
                         }
@@ -706,7 +706,7 @@ namespace Lang
             // 4. Load the function into the dictionary
             if (function.Generics.Any())
             {
-                if (!function.ReturnTypeHasGenerics && function.Arguments.All(arg => !arg.HasGenerics))
+                if (!function.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) && function.Arguments.All(arg => !arg.HasGenerics))
                 {
                     ErrorReporter.Report($"Function '{function.Name}' has generic(s), but the generic(s) are not used in the argument(s) or the return type", function);
                 }
@@ -727,7 +727,7 @@ namespace Lang
                 var _functions = TypeTable.AddFunction(function.Name, function);
                 if (_functions.Count > 1)
                 {
-                    if (function.Extern)
+                    if (function.Flags.HasFlag(FunctionFlags.Extern))
                     {
                         ErrorReporter.Report($"Multiple definitions of extern function '{function.Name}'", function);
                     }
@@ -890,17 +890,17 @@ namespace Lang
             var returnType = VerifyType(function.ReturnTypeDefinition);
 
             // 2. For extern functions, simply verify there is no body and return
-            if (function.Extern)
+            if (function.Flags.HasFlag(FunctionFlags.Extern))
             {
                 if (function.Body != null)
                 {
                     ErrorReporter.Report("Extern function cannot have a body", function);
                 }
             }
-            else if (!function.Compiler)
+            else if (!function.Flags.HasFlag(FunctionFlags.Compiler))
             {
                 // 3. Resolve the compiler directives in the function
-                if (function.HasDirectives)
+                if (function.Flags.HasFlag(FunctionFlags.HasDirectives))
                 {
                     ResolveCompilerDirectives(function.Body.Children, function);
                 }
@@ -909,7 +909,7 @@ namespace Lang
                 var returned = VerifyScope(function.Body, function, _globalScope, false);
 
                 // 5. Verify the main function doesn't call the compiler
-                if (function.Name == "main" && function.CallsCompiler)
+                if (function.Name == "main" && function.Flags.HasFlag(FunctionFlags.CallsCompiler))
                 {
                     ErrorReporter.Report("The main function cannot call the compiler", function);
                 }
@@ -923,11 +923,11 @@ namespace Lang
                     }
                     else
                     {
-                        function.ReturnVoidAtEnd = true;
+                        function.Flags |= FunctionFlags.ReturnVoidAtEnd;
                     }
                 }
             }
-            function.Verified = true;
+            function.Flags |= FunctionFlags.Verified;
 
             if (!ErrorReporter.Errors.Any())
             {
@@ -957,7 +957,7 @@ namespace Lang
             overload.ReturnType = TypeTable.GetType(overload.ReturnTypeDefinition);
 
             // 2. Resolve the compiler directives in the body
-            if (overload.HasDirectives)
+            if (overload.Flags.HasFlag(FunctionFlags.HasDirectives))
             {
                 ResolveCompilerDirectives(overload.Body.Children, overload);
             }
@@ -970,7 +970,7 @@ namespace Lang
             {
                 ErrorReporter.Report($"Overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}' does not return type '{PrintTypeDefinition(overload.ReturnTypeDefinition)}' on all paths", overload);
             }
-            overload.Verified = true;
+            overload.Flags |= FunctionFlags.Verified;
 
             if (!ErrorReporter.Errors.Any())
             {
@@ -2553,7 +2553,7 @@ namespace Lang
                     if (polymorphicFunctions.Count == 1)
                     {
                         var calledFunction = polymorphicFunctions[0];
-                        return calledFunction.ReturnTypeHasGenerics ? null : calledFunction.ReturnTypeDefinition;
+                        return calledFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? null : calledFunction.ReturnTypeDefinition;
                     }
                 }
                 else if (polymorphicFunctions == null && functions.Count == 1)
@@ -2570,18 +2570,18 @@ namespace Lang
                 return null;
             }
 
-            if (!function.Verified && function != currentFunction)
+            if (!function.Flags.HasFlag(FunctionFlags.Verified) && function != currentFunction)
             {
                 VerifyFunction(function);
             }
 
-            if (currentFunction != null && !currentFunction.CallsCompiler && (function.Compiler || function.CallsCompiler))
+            if (currentFunction != null && !currentFunction.Flags.HasFlag(FunctionFlags.CallsCompiler) && (function.Flags.HasFlag(FunctionFlags.Compiler) || function.Flags.HasFlag(FunctionFlags.CallsCompiler)))
             {
-                currentFunction.CallsCompiler = true;
+                currentFunction.Flags |= FunctionFlags.CallsCompiler;
             }
 
             call.Function = function;
-            var argumentCount = function.Varargs || function.Params ? function.Arguments.Count - 1 : function.Arguments.Count;
+            var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params) ? function.Arguments.Count - 1 : function.Arguments.Count;
 
             // Verify call arguments match the types of the function arguments
             for (var i = 0; i < argumentCount; i++)
@@ -2644,7 +2644,7 @@ namespace Lang
             }
 
             // Verify varargs call arguments
-            if (function.Params)
+            if (function.Flags.HasFlag(FunctionFlags.Params))
             {
                 var paramsType = function.Arguments[argumentCount].TypeDefinition.Generics.FirstOrDefault();
 
@@ -2694,7 +2694,7 @@ namespace Lang
                     }
                 }
             }
-            else if (function.Varargs)
+            else if (function.Flags.HasFlag(FunctionFlags.Varargs))
             {
                 for (var i = 0; i < arguments.Length; i++)
                 {
@@ -2764,7 +2764,7 @@ namespace Lang
                     var function = functions[i];
                     var match = true;
                     var callArgIndex = 0;
-                    var functionArgCount = function.Varargs || function.Params ? function.Arguments.Count - 1 : function.Arguments.Count;
+                    var functionArgCount = function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params) ? function.Arguments.Count - 1 : function.Arguments.Count;
 
                     if (call.SpecifiedArguments != null)
                     {
@@ -2777,7 +2777,7 @@ namespace Lang
                                 var functionArg = function.Arguments[argIndex];
                                 if (functionArg.Name == name)
                                 {
-                                    found = VerifyArgument(argument, specifiedArguments[name], functionArg.TypeDefinition, function.Extern);
+                                    found = VerifyArgument(argument, specifiedArguments[name], functionArg.TypeDefinition, function.Flags.HasFlag(FunctionFlags.Extern));
                                     break;
                                 }
                             }
@@ -2812,7 +2812,7 @@ namespace Lang
                         }
                         else
                         {
-                            if (!VerifyArgument(argumentAst, arguments[callArgIndex], functionArg.TypeDefinition, function.Extern))
+                            if (!VerifyArgument(argumentAst, arguments[callArgIndex], functionArg.TypeDefinition, function.Flags.HasFlag(FunctionFlags.Extern)))
                             {
                                 match = false;
                                 break;
@@ -2821,7 +2821,7 @@ namespace Lang
                         }
                     }
 
-                    if (match && function.Params)
+                    if (match && function.Flags.HasFlag(FunctionFlags.Params))
                     {
                         var paramsType = function.Arguments[^1].TypeDefinition.Generics.FirstOrDefault();
 
@@ -2838,7 +2838,7 @@ namespace Lang
                         }
                     }
 
-                    if (match && (function.Varargs || callArgIndex == call.Arguments.Count))
+                    if (match && (function.Flags.HasFlag(FunctionFlags.Varargs) || callArgIndex == call.Arguments.Count))
                     {
                         call.FunctionIndex = i;
                         return function;
@@ -2859,7 +2859,7 @@ namespace Lang
 
                     var match = true;
                     var callArgIndex = 0;
-                    var functionArgCount = function.Varargs || function.Params ? function.Arguments.Count - 1 : function.Arguments.Count;
+                    var functionArgCount = function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params) ? function.Arguments.Count - 1 : function.Arguments.Count;
                     var genericTypes = new TypeDefinition[function.Generics.Count];
 
                     if (call.SpecifiedArguments != null)
@@ -2935,7 +2935,7 @@ namespace Lang
                         }
                     }
 
-                    if (match && function.Params)
+                    if (match && function.Flags.HasFlag(FunctionFlags.Params))
                     {
                         var paramsArgument = function.Arguments[^1];
                         var paramsType = paramsArgument.TypeDefinition.Generics.FirstOrDefault();
@@ -2994,7 +2994,7 @@ namespace Lang
                         }
                     }
 
-                    if (match && genericTypes.All(t => t != null) && (function.Varargs || callArgIndex == call.Arguments.Count))
+                    if (match && genericTypes.All(t => t != null) && (function.Flags.HasFlag(FunctionFlags.Varargs) || callArgIndex == call.Arguments.Count))
                     {
                         var genericName = $"{function.Name}.{i}.{string.Join('.', genericTypes.Select(t => t.GenericName))}";
                         var name = $"{function.Name}<{string.Join(", ", genericTypes.Select(PrintTypeDefinition))}>";
@@ -3399,7 +3399,7 @@ namespace Lang
         {
             if (_programGraph.OperatorOverloads.TryGetValue(type.GenericName, out var overloads) && overloads.TryGetValue(op, out var overload))
             {
-                if (!overload.Verified && overload != currentFunction)
+                if (!overload.Flags.HasFlag(FunctionFlags.Verified) && overload != currentFunction)
                 {
                     VerifyOperatorOverload(overload);
                 }

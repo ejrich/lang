@@ -45,7 +45,7 @@ namespace Lang
                 Program.Functions[functionName] = functionIR;
             }
 
-            if (!function.Extern && !function.Compiler)
+            if (!function.Flags.HasFlag(FunctionFlags.Extern) && !function.Flags.HasFlag(FunctionFlags.Compiler))
             {
                 functionIR.Allocations = new();
                 functionIR.Instructions = new();
@@ -77,12 +77,12 @@ namespace Lang
 
                 EmitScopeChildren(functionIR, entryBlock, function.Body, function.ReturnType, null, null);
 
-                if (function.ReturnVoidAtEnd)
+                if (function.Flags.HasFlag(FunctionFlags.ReturnVoidAtEnd))
                 {
                     functionIR.Instructions.Add(new Instruction {Type = InstructionType.ReturnVoid});
                 }
 
-                if (function.PrintIR)
+                if (function.Flags.HasFlag(FunctionFlags.PrintIR))
                 {
                     PrintFunction(function.Name, functionIR);
                 }
@@ -1396,10 +1396,10 @@ namespace Lang
 
         private InstructionValue EmitCall(FunctionIR function, CallAst call, ScopeAst scope)
         {
-            var argumentCount = call.Function.Varargs ? call.Arguments.Count : call.Function.Arguments.Count;
+            var argumentCount = call.Function.Flags.HasFlag(FunctionFlags.Varargs) ? call.Arguments.Count : call.Function.Arguments.Count;
             var arguments = new InstructionValue[argumentCount];
 
-            if (call.Function.Params)
+            if (call.Function.Flags.HasFlag(FunctionFlags.Params))
             {
                 for (var i = 0; i < argumentCount - 1; i++)
                 {
@@ -1426,7 +1426,7 @@ namespace Lang
                 var paramsValue = EmitLoad(function, paramsType, paramsAllocationIndex);
                 arguments[argumentCount - 1] = paramsValue;
             }
-            else if (call.Function.Varargs)
+            else if (call.Function.Flags.HasFlag(FunctionFlags.Varargs))
             {
                 var i = 0;
                 for (; i < call.Function.Arguments.Count - 1; i++)
@@ -1451,7 +1451,7 @@ namespace Lang
             {
                 for (var i = 0; i < argumentCount; i++)
                 {
-                    var argument = EmitIR(function, call.Arguments[i], scope, call.Function.Extern);
+                    var argument = EmitIR(function, call.Arguments[i], scope, call.Function.Flags.HasFlag(FunctionFlags.Extern));
                     arguments[i] = EmitCastValue(function, argument, call.Function.Arguments[i].Type);
                 }
             }

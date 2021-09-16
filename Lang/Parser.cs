@@ -243,7 +243,7 @@ namespace Lang
                 var generic = function.Generics[i];
                 if (SearchForGeneric(generic, i, function.ReturnTypeDefinition))
                 {
-                    function.ReturnTypeHasGenerics = true;
+                    function.Flags |= FunctionFlags.ReturnTypeHasGenerics;
                 }
             }
 
@@ -371,7 +371,7 @@ namespace Lang
                 switch (enumerator.Current?.Value)
                 {
                     case "extern":
-                        function.Extern = true;
+                        function.Flags |= FunctionFlags.Extern;
                         if (enumerator.Peek()?.Type != TokenType.Literal)
                         {
                             ErrorReporter.Report("Extern function definition should be followed by the library in use", enumerator.Current);
@@ -383,10 +383,10 @@ namespace Lang
                         }
                         return function;
                     case "compiler":
-                        function.Compiler = true;
+                        function.Flags |= FunctionFlags.Compiler;
                         return function;
                     case "print_ir":
-                        function.PrintIR = true;
+                        function.Flags |= FunctionFlags.PrintIR;
                         break;
                     case null:
                         ErrorReporter.Report("Expected compiler directive value", enumerator.Last);
@@ -1783,13 +1783,13 @@ namespace Lang
                 case "if":
                     directive.Type = DirectiveType.If;
                     directive.Value = ParseConditional(enumerator, currentFunction);
-                    currentFunction.HasDirectives = true;
+                    currentFunction.Flags |= FunctionFlags.HasDirectives;
                     break;
                 case "assert":
                     directive.Type = DirectiveType.Assert;
                     enumerator.MoveNext();
                     directive.Value = ParseExpression(enumerator, currentFunction);
-                    currentFunction.HasDirectives = true;
+                    currentFunction.Flags |= FunctionFlags.HasDirectives;
                     break;
                 default:
                     ErrorReporter.Report($"Unsupported compiler directive '{token.Value}'", token);
@@ -1976,7 +1976,7 @@ namespace Lang
                             {
                                 if (SearchForGeneric(overload.Generics[i], i, overload.ReturnTypeDefinition))
                                 {
-                                    overload.ReturnTypeHasGenerics = true;
+                                    overload.Flags |= FunctionFlags.ReturnTypeHasGenerics;
                                 }
                             }
                             enumerator.MoveNext();
@@ -1985,7 +1985,10 @@ namespace Lang
                     break;
                 default:
                     overload.ReturnTypeDefinition = overload.Type;
-                    overload.ReturnTypeHasGenerics = overload.Generics.Any();
+                    if (overload.Generics.Any())
+                    {
+                        overload.Flags |= FunctionFlags.ReturnTypeHasGenerics;
+                    }
                     for (var i = 0; i < overload.Generics.Count; i++)
                     {
                         SearchForGeneric(overload.Generics[i], i, overload.ReturnTypeDefinition);
