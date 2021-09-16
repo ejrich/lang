@@ -15,6 +15,7 @@ namespace Lang.Backend
         private LLVMContextRef _context;
         private LLVMBuilderRef _builder;
         private LLVMPassManagerRef _passManager;
+        private LLVMCodeGenOptLevel _codeGenLevel;
 
         private LLVMValueRef _stackPointer;
         private LLVMTypeRef _stringType;
@@ -353,6 +354,7 @@ namespace Lang.Backend
                 LLVM.AddCFGSimplificationPass(_passManager);
 
                 LLVM.InitializeFunctionPassManager(_passManager);
+                _codeGenLevel = LLVMCodeGenOptLevel.LLVMCodeGenLevelAggressive;
             }
             else
             {
@@ -1209,7 +1211,7 @@ namespace Lang.Backend
             var defaultTriple = LLVMTargetRef.DefaultTriple;
             _module.Target = defaultTriple;
 
-            var targetMachine = target.CreateTargetMachine(defaultTriple, "generic", string.Empty, LLVMCodeGenOptLevel.LLVMCodeGenLevelAggressive, LLVMRelocMode.LLVMRelocDefault, LLVMCodeModel.LLVMCodeModelDefault);
+            var targetMachine = target.CreateTargetMachine(defaultTriple, "generic", string.Empty, _codeGenLevel, LLVMRelocMode.LLVMRelocDefault, LLVMCodeModel.LLVMCodeModelDefault);
             _module.DataLayout = Marshal.PtrToStringAnsi(targetMachine.CreateTargetDataLayout().Handle);
 
             if (outputIntermediate)
