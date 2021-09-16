@@ -93,6 +93,7 @@ namespace Lang
     {
         None = 0,
         Jump,
+        ConditionalJump,
         Return,
         Load,
         Store,
@@ -152,6 +153,7 @@ namespace Lang
     public enum InstructionValueType
     {
         Value,
+        Block,
         Argument,
         Constant,
         Null,
