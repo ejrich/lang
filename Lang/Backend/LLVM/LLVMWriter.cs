@@ -178,10 +178,8 @@ namespace Lang.Backend.LLVM
                     return WriteConditional(conditional, localVariables, function);
                 case WhileAst whileAst:
                     return WriteWhile(whileAst, localVariables, function);
-                    break;
                 case EachAst each:
                     return WriteEach(each, localVariables, function);
-                    break;
                 default:
                     WriteExpression(ast, localVariables);
                     break;
@@ -471,13 +469,13 @@ namespace Lang.Backend.LLVM
                         LLVMValueRef newValue;
                         if (value.TypeOf().TypeKind == LLVMTypeKind.LLVMIntegerTypeKind)
                         {
-                            newValue = changeByOne.Operator == Operator.Increment
+                            newValue = changeByOne.Positive
                                 ? LLVMApi.BuildAdd(_builder, value, LLVMApi.ConstInt(value.TypeOf(), 1, false), "inc")
                                 : LLVMApi.BuildSub(_builder, value, LLVMApi.ConstInt(value.TypeOf(), 1, false), "dec");
                         }
                         else
                         {
-                            newValue = changeByOne.Operator == Operator.Increment
+                            newValue = changeByOne.Positive
                                 ? LLVMApi.BuildFAdd(_builder, value, LLVMApi.ConstReal(value.TypeOf(), 1), "incf")
                                 : LLVMApi.BuildFSub(_builder, value, LLVMApi.ConstReal(value.TypeOf(), 1), "decf");
                         }
@@ -530,9 +528,28 @@ namespace Lang.Backend.LLVM
                 case Operator.LessThan:
                     return LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntSLT, lhs, rhs, "tmplt");
                 // TODO Implement more operators
-                default:
-                    throw new NotImplementedException(op.ToString());
+                case Operator.And:
+                    break;
+                case Operator.Or:
+                    break;
+                case Operator.NotEqual:
+                    break;
+                case Operator.GreaterThanEqual:
+                    break;
+                case Operator.LessThanEqual:
+                    break;
+                case Operator.GreaterThan:
+                    break;
+                case Operator.BitwiseOr:
+                    break;
+                case Operator.BitwiseAnd:
+                    break;
+                case Operator.Xor:
+                    break;
+                case Operator.Modulus:
+                    break;
             }
+            throw new NotImplementedException(op.ToString());
         }
 
         private static LLVMTypeRef ConvertTypeDefinition(TypeDefinition typeDef)

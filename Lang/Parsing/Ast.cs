@@ -103,7 +103,7 @@ namespace Lang.Parsing
         public int Line { get; init; }
         public int Column { get; init; }
         public bool Prefix { get; set; }
-        public Operator Operator { get; set; }
+        public bool Positive { get; set; }
         public IAst Variable { get; set; }
         public List<IAst> Children => null;
     }
@@ -207,8 +207,6 @@ namespace Lang.Parsing
         Or, // ||
         Equality, // ==
         NotEqual, // !=
-        Increment, // ++
-        Decrement, // --
         GreaterThanEqual, // >=
         LessThanEqual, // <=
         Add = '+',
