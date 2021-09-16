@@ -910,9 +910,16 @@ namespace Lang
             }
 
             // 6. Verify the function returns on all paths
-            if (!returned && returnType != TypeKind.Void)
+            if (!returned)
             {
-                AddError($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnTypeDefinition)}' on all paths", function);
+                if (returnType != TypeKind.Void)
+                {
+                    AddError($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnTypeDefinition)}' on all paths", function);
+                }
+                else
+                {
+                    function.ReturnVoidAtEnd = true;
+                }
             }
             function.Verified = true;
 
