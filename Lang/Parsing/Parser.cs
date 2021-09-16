@@ -3,14 +3,6 @@ using System.Linq;
 
 namespace Lang.Parsing
 {
-    public class FileParseResult
-    {
-        public string File { get; init; }
-        public bool Success => !Errors.Any();
-        public List<IAst> SyntaxTrees { get; } = new();
-        public List<ParseError> Errors { get; } = new();
-    }
-
     public class ParseResult
     {
         public bool Success => !Errors.Any();
@@ -60,34 +52,31 @@ namespace Lang.Parsing
 
             foreach (var file in projectFiles)
             {
-                var fileParseResult = ParseFile(file);
-                if (!fileParseResult.Success)
+                var syntaxTrees = ParseFile(file, out var errors);
+                if (errors.Any())
                 {
-                    foreach (var error in fileParseResult.Errors)
+                    foreach (var error in errors)
                     {
                         error.File = file;
                     }
-                    parseResult.Errors.AddRange(fileParseResult.Errors);
+                    parseResult.Errors.AddRange(errors);
                 }
                 else if (parseResult.Success)
                 {
-                    parseResult.SyntaxTrees.AddRange(fileParseResult.SyntaxTrees);
+                    parseResult.SyntaxTrees.AddRange(syntaxTrees);
                 }
             }
 
             return parseResult;
         }
 
-        private FileParseResult ParseFile(string file)
+        private List<IAst> ParseFile(string file, out List<ParseError> errors)
         {
             // 1. Load file tokens
-            var tokens = _lexer.LoadFileTokens(file, out var errors);
-
-            // 2. Initialize parse result with any lexing errors
-            var parseResult = new FileParseResult {File = file};
-            parseResult.Errors.AddRange(errors);
+            var tokens = _lexer.LoadFileTokens(file, out errors);
 
             // 3. Iterate through tokens, tracking different ASTs
+            var syntaxTrees = new List<IAst>();
             var enumerator = new TokenEnumerator(tokens);
             while (enumerator.MoveNext())
             {
@@ -95,10 +84,10 @@ namespace Lang.Parsing
                 switch (token!.Type)
                 {
                     case TokenType.Token:
-                        parseResult.SyntaxTrees.Add(ParseFunction(enumerator, parseResult));
+                        syntaxTrees.Add(ParseFunction(enumerator, errors));
                         break;
                     default:
-                        parseResult.Errors.Add(new ParseError
+                        errors.Add(new ParseError
                         {
                             Error = $"Unexpected token '{token.Value}'",
                             Token = enumerator.Current
@@ -107,15 +96,15 @@ namespace Lang.Parsing
                 }
             }
 
-            return parseResult;
+            return syntaxTrees;
         }
 
-        private static IAst ParseFunction(TokenEnumerator enumerator, FileParseResult parseResult)
+        private static IAst ParseFunction(TokenEnumerator enumerator, List<ParseError> errors)
         {
             // 1. Determine return type and name of the function
             var function = new FunctionAst
             {
-                ReturnType = ParseType(enumerator, parseResult),
+                ReturnType = ParseType(enumerator, errors),
                 Name = enumerator.Current?.Value
             };
 
@@ -124,7 +113,7 @@ namespace Lang.Parsing
             if (enumerator.Current.Type != TokenType.OpenParen)
             {
                 // Add an error to the function AST and continue until open paren
-                parseResult.Errors.Add(new ParseError
+                errors.Add(new ParseError
                 {
                     Error = "Unexpected token in function definition",
                     Token = enumerator.Current
@@ -144,7 +133,7 @@ namespace Lang.Parsing
                 {
                     if (!commaRequiredBeforeNextArgument && function.Arguments.Any())
                     {
-                        parseResult.Errors.Add(new ParseError
+                        errors.Add(new ParseError
                         {
                             Error = "Unexpected comma in arguments",
                             Token = new Token { Type = TokenType.Comma, Line = token.Line }
@@ -158,7 +147,7 @@ namespace Lang.Parsing
                     case TokenType.Token:
                         if (commaRequiredBeforeNextArgument)
                         {
-                            parseResult.Errors.Add(new ParseError
+                            errors.Add(new ParseError
                             {
                                 Error = "Comma required after declaring an argument",
                                 Token = token
@@ -166,7 +155,7 @@ namespace Lang.Parsing
                         }
                         else if (currentArgument == null)
                         {
-                            currentArgument = new Variable {Type = ParseType(enumerator, parseResult)};
+                            currentArgument = new Variable {Type = ParseType(enumerator, errors)};
                         }
                         else
                         {
@@ -179,7 +168,7 @@ namespace Lang.Parsing
                     case TokenType.Comma:
                         if (!commaRequiredBeforeNextArgument)
                         {
-                            parseResult.Errors.Add(new ParseError
+                            errors.Add(new ParseError
                             {
                                 Error = "Unexpected comma in arguments",
                                 Token = token
@@ -188,7 +177,7 @@ namespace Lang.Parsing
                         commaRequiredBeforeNextArgument = false;
                         break;
                     default:
-                        parseResult.Errors.Add(new ParseError
+                        errors.Add(new ParseError
                         {
                             Error = "Unexpected token in arguments",
                             Token = token
@@ -202,7 +191,7 @@ namespace Lang.Parsing
             if (enumerator.Current.Type != TokenType.OpenBrace)
             {
                 // Add an error to the function AST and continue until open paren
-                parseResult.Errors.Add(new ParseError
+                errors.Add(new ParseError
                 {
                     Error = "Unexpected token in function definition",
                     Token = enumerator.Current
@@ -227,10 +216,10 @@ namespace Lang.Parsing
                         switch (token.Value)
                         {
                             case "return":
-                                function.Children.Add(ParseReturn(enumerator, parseResult));
+                                function.Children.Add(ParseReturn(enumerator, errors));
                                 break;
                             case "var":
-                                function.Children.Add(ParseDeclaration(enumerator, parseResult));
+                                function.Children.Add(ParseDeclaration(enumerator, errors));
                                 break;
                         }
                         // TODO Add more cases
@@ -240,7 +229,7 @@ namespace Lang.Parsing
             return function;
         }
 
-        private static IAst ParseDeclaration(TokenEnumerator enumerator, FileParseResult parseResult)
+        private static IAst ParseDeclaration(TokenEnumerator enumerator, List<ParseError> errors)
         {
             var declaration = new DeclarationAst();
 
@@ -252,14 +241,14 @@ namespace Lang.Parsing
                     declaration.Name = enumerator.Current.Value;
                     break;
                 case TokenType.SemiColon:
-                    parseResult.Errors.Add(new ParseError
+                    errors.Add(new ParseError
                     {
                         Error = $"Unexpected token in declaration '{enumerator.Current.Value}'",
                         Token = enumerator.Current
                     });
                     return declaration;
                 default:
-                    parseResult.Errors.Add(new ParseError
+                    errors.Add(new ParseError
                     {
                         Error = $"Unexpected token in declaration '{enumerator.Current.Value}'",
                         Token = enumerator.Current
@@ -271,7 +260,7 @@ namespace Lang.Parsing
             enumerator.MoveNext();
             if (enumerator.Current.Type != TokenType.Equals)
             {
-                parseResult.Errors.Add(new ParseError
+                errors.Add(new ParseError
                 {
                     Error = $"Expected '=' in declaration'",
                     Token = enumerator.Current
@@ -300,7 +289,7 @@ namespace Lang.Parsing
                     // TODO Handle calls, expressions, or variables
                     break;
                 default:
-                    parseResult.Errors.Add(new ParseError
+                    errors.Add(new ParseError
                     {
                         Error = $"Unexpected token in declaration '{enumerator.Current.Value}'",
                         Token = enumerator.Current
@@ -310,7 +299,7 @@ namespace Lang.Parsing
             return declaration;
         }
 
-        private static TypeDefinition ParseType(TokenEnumerator enumerator, FileParseResult parseResult)
+        private static TypeDefinition ParseType(TokenEnumerator enumerator, List<ParseError> errors)
         {
             var typeDefinition = new TypeDefinition
             {
@@ -330,7 +319,7 @@ namespace Lang.Parsing
                     {
                         if (!commaRequiredBeforeNextType && typeDefinition.Generics.Any())
                         {
-                            parseResult.Errors.Add(new ParseError
+                            errors.Add(new ParseError
                             {
                                 Error = "Unexpected comma in type",
                                 Token = new Token { Type = TokenType.Comma, Line = token.Line }
@@ -348,7 +337,7 @@ namespace Lang.Parsing
                                 commaRequiredBeforeNextType = true;
                                 break;
                             default:
-                                parseResult.Errors.Add(new ParseError
+                                errors.Add(new ParseError
                                 {
                                     Error = "Unexpected token in type definition",
                                     Token = token
@@ -365,7 +354,7 @@ namespace Lang.Parsing
                                 commaRequiredBeforeNextType = false;
                                 break;
                             default:
-                                parseResult.Errors.Add(new ParseError
+                                errors.Add(new ParseError
                                 {
                                     Error = "Unexpected token in type definition",
                                     Token = token
@@ -380,7 +369,7 @@ namespace Lang.Parsing
             return typeDefinition;
         }
 
-        private static IAst ParseReturn(TokenEnumerator enumerator, FileParseResult parseResult)
+        private static IAst ParseReturn(TokenEnumerator enumerator, List<ParseError> errors)
         {
             var returnAst = new ReturnAst();
 
@@ -405,11 +394,11 @@ namespace Lang.Parsing
                             Value = token.Value
                         };
                         if (error != null)
-                            parseResult.Errors.Add(error);
+                            errors.Add(error);
                         // TODO Add support for expressions and calls
                         break;
                     default:
-                        parseResult.Errors.Add(new ParseError
+                        errors.Add(new ParseError
                         {
                             Error = "Unexpected token in return statement",
                             Token = token
