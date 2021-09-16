@@ -1283,21 +1283,30 @@ namespace Lang.Translation
                             {
                                 return valueType;
                             }
-                            AddError($"Expected type 'bool', but got type '{PrintTypeDefinition(valueType)}'", unary.Value);
+                            else if (type != Type.Error)
+                            {
+                                AddError($"Expected type 'bool', but got type '{PrintTypeDefinition(valueType)}'", unary.Value);
+                            }
                             return null;
                         case UnaryOperator.Negate:
                             if (type == Type.Int || type == Type.Float)
                             {
                                 return valueType;
                             }
-                            AddError($"Negation not compatible with type '{PrintTypeDefinition(valueType)}'", unary.Value);
+                            else if (type != Type.Error)
+                            {
+                                AddError($"Negation not compatible with type '{PrintTypeDefinition(valueType)}'", unary.Value);
+                            }
                             return null;
                         case UnaryOperator.Dereference:
                             if (type == Type.Pointer)
                             {
                                 return valueType.Generics[0];
                             }
-                            AddError($"Cannot dereference type '{PrintTypeDefinition(valueType)}'", unary.Value);
+                            else if (type != Type.Error)
+                            {
+                                AddError($"Cannot dereference type '{PrintTypeDefinition(valueType)}'", unary.Value);
+                            }
                             return null;
                         case UnaryOperator.Reference:
                             if (unary.Value is IdentifierAst || unary.Value is StructFieldRefAst || unary.Value is IndexAst || type == Type.Pointer)
@@ -1527,7 +1536,7 @@ namespace Lang.Translation
                 case null:
                     return null;
                 default:
-                    AddError($"Unexpected Ast '{ast}'", ast);
+                    AddError($"Invalid expression", ast);
                     return null;
             }
         }
