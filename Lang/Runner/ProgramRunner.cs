@@ -154,7 +154,18 @@ namespace Lang.Runner
         private (TypeDefinition type, object value) ExecuteWhile(WhileAst whileAst, ProgramGraph programGraph,
             IDictionary<string, (TypeDefinition type, object value)> variables, out bool returned)
         {
-            throw new NotImplementedException();
+            while (ExecuteCondition(whileAst.Condition, programGraph, variables))
+            {
+                var value = ExecuteScope(whileAst.Children, programGraph, variables, out returned);
+
+                if (returned)
+                {
+                    return value;
+                }
+            }
+
+            returned = false;
+            return (null, null);
         }
 
         private bool ExecuteCondition(IAst conditionExpression, ProgramGraph programGraph, 
