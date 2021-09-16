@@ -153,6 +153,11 @@ namespace Lang.Parsing
                 case TokenType.Token:
                     return type == TokenType.Token || type == TokenType.Number;
                 case TokenType.Number:
+                    if (type == TokenType.Token)
+                    {
+                        currentToken.Error = true;
+                        return false;
+                    }
                     return type == TokenType.Number || type == TokenType.Period;
                 case TokenType.Divide:
                     switch (type)
