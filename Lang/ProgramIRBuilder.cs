@@ -226,7 +226,7 @@ namespace Lang
                     return constArray;
                 // Initialize struct field default values
                 case TypeKind.Struct:
-                case TypeKind.String: // TODO String default values
+                case TypeKind.String:
                     return GetConstantStruct((StructAst)field.Type, scope, field.Assignments);
                 // Initialize pointers to null
                 case TypeKind.Pointer:
