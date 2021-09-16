@@ -244,7 +244,7 @@ namespace Lang.Backend
                         var file = _debugFiles[globalVariable.FileIndex];
                         var debugType = GetDebugType(globalVariable.Type);
                         var globalDebug = LLVM.DIBuilderCreateGlobalVariableExpression(_debugBuilder, _debugCompilationUnit, name.Value, (UIntPtr)name.Length, null, (UIntPtr)0, file, globalVariable.Line, debugType, 0, null, null, 0);
-                        // TODO Assign to global
+                        LLVM.GlobalSetMetadata(global, 0, globalDebug);
                     }
 
                     globals.Add(globalVariable.Name, (globalVariable.Type, global));
