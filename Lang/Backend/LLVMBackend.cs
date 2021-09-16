@@ -182,6 +182,13 @@ namespace Lang.Backend
                         case PrimitiveAst primitive:
                             CreateDebugBasicType(primitive, name);
                             break;
+                        case ArrayType arrayType:
+                            using (var typeName = new MarshaledString(type.Name))
+                            {
+                                var pointerType = _debugTypes[arrayType.ElementTypeDefinition.GenericName];
+                                _debugTypes[name] = LLVM.DIBuilderCreatePointerType(_debugBuilder, pointerType, 64, 0, 0, typeName.Value, (UIntPtr)typeName.Length);
+                            }
+                            break;
                     }
                 }
                 foreach (var (name, type) in TypeTable.Types)
@@ -400,11 +407,31 @@ namespace Lang.Backend
                 }
                 else
                 {
-                    returnType = LLVM.ConstNull(LLVM.PointerType(typeFieldType, 0));
+                    returnType = LLVM.ConstNull(LLVM.PointerType(typeInfoType, 0));
                     arguments = LLVMValueRef.CreateConstNamedStruct(argumentArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(argumentType, 0))});
                 }
 
-                LLVM.SetInitializer(typeInfo, LLVMValueRef.CreateConstNamedStruct(typeInfoType, new LLVMValueRef[] {typeNameString, typeKind, typeSize, fields, enumValues, returnType, arguments}));
+                LLVMValueRef pointerType;
+                if (type is PrimitiveAst primitive && primitive.TypeKind == TypeKind.Pointer)
+                {
+                    pointerType = typePointers[primitive.PointerType.GenericName].typeInfo;
+                }
+                else
+                {
+                    pointerType = LLVM.ConstNull(LLVM.PointerType(typeInfoType, 0));
+                }
+
+                LLVMValueRef elementType;
+                if (type is ArrayType arrayType)
+                {
+                    elementType = typePointers[arrayType.ElementTypeDefinition.GenericName].typeInfo;
+                }
+                else
+                {
+                    elementType = LLVM.ConstNull(LLVM.PointerType(typeInfoType, 0));
+                }
+
+                LLVM.SetInitializer(typeInfo, LLVMValueRef.CreateConstNamedStruct(typeInfoType, new LLVMValueRef[] {typeNameString, typeKind, typeSize, fields, enumValues, returnType, arguments, pointerType, elementType}));
             }
 
             var typeArray = LLVMValueRef.CreateConstArray(LLVM.PointerType(typeInfoType, 0), types);
@@ -612,7 +639,7 @@ namespace Lang.Backend
                     {
                         BuildAllocations(declaration.Value);
                     }
-                    else if (declaration.TypeDefinition.TypeKind == TypeKind.Array && !declaration.TypeDefinition.CArray)
+                    else if (declaration.TypeDefinition.TypeKind == TypeKind.Array && declaration.TypeDefinition.TypeKind != TypeKind.CArray)
                     {
                         if (declaration.TypeDefinition.ConstCount != null)
                         {
@@ -786,7 +813,7 @@ namespace Lang.Backend
 
         private void BuildFieldAllocations(StructFieldAst field)
         {
-            if (field.TypeDefinition.TypeKind == TypeKind.Array && !field.TypeDefinition.CArray && field.TypeDefinition.ConstCount != null)
+            if (field.TypeDefinition.TypeKind == TypeKind.Array && field.TypeDefinition.TypeKind != TypeKind.CArray && field.TypeDefinition.ConstCount != null)
             {
                 var elementType = field.TypeDefinition.Generics[0];
                 var targetType = ConvertTypeDefinition(elementType);
@@ -895,14 +922,7 @@ namespace Lang.Backend
                 // Initialize arrays
                 case TypeKind.Array:
                     var elementType = declaration.TypeDefinition.Generics[0];
-                    if (declaration.TypeDefinition.CArray)
-                    {
-                        if (declaration.ArrayValues != null)
-                        {
-                            InitializeArrayValues(variable, elementType, declaration.ArrayValues, localVariables);
-                        }
-                    }
-                    else if (declaration.TypeDefinition.ConstCount != null)
+                    if (declaration.TypeDefinition.ConstCount != null)
                     {
                         var arrayPointer = InitializeConstArray(variable, declaration.TypeDefinition.ConstCount.Value, elementType);
 
@@ -928,6 +948,12 @@ namespace Lang.Backend
                     {
                         var countPointer = _builder.BuildStructGEP(variable, 0, "countptr");
                         LLVM.BuildStore(_builder, _zeroInt, countPointer);
+                    }
+                    break;
+                case TypeKind.CArray:
+                    if (declaration.ArrayValues != null)
+                    {
+                        InitializeArrayValues(variable, declaration.TypeDefinition.Generics[0], declaration.ArrayValues, localVariables);
                     }
                     break;
                 // Initialize struct field default values
@@ -1004,14 +1030,7 @@ namespace Lang.Backend
             {
                 case TypeKind.Array:
                     var elementType = field.TypeDefinition.Generics[0];
-                    if (field.TypeDefinition.CArray)
-                    {
-                        if (field.ArrayValues != null)
-                        {
-                            InitializeArrayValues(fieldPointer, elementType, field.ArrayValues, localVariables);
-                        }
-                    }
-                    else if (field.TypeDefinition.ConstCount != null)
+                    if (field.TypeDefinition.ConstCount != null)
                     {
                         var arrayPointer = InitializeConstArray(fieldPointer, field.TypeDefinition.ConstCount.Value, elementType);
 
@@ -1024,6 +1043,12 @@ namespace Lang.Backend
                     {
                         var countPointer = _builder.BuildStructGEP(fieldPointer, 0, "countptr");
                         LLVM.BuildStore(_builder, _zeroInt, countPointer);
+                    }
+                    break;
+                case TypeKind.CArray:
+                    if (field.ArrayValues != null)
+                    {
+                        InitializeArrayValues(fieldPointer, field.TypeDefinition.Generics[0], field.ArrayValues, localVariables);
                     }
                     break;
                 case TypeKind.Pointer:
@@ -1290,7 +1315,7 @@ namespace Lang.Backend
                 LLVM.BuildStore(_builder, _zeroInt, indexVariable);
 
                 // Load the array data and set the compareTarget to the array count
-                if (iterationType.CArray)
+                if (iterationType.TypeKind == TypeKind.CArray)
                 {
                     arrayData = iterationValue;
                     compareTarget = LLVM.ConstInt(LLVM.Int32Type(), iterationType.ConstCount.Value, 0);
@@ -1330,7 +1355,7 @@ namespace Lang.Backend
             var condition = _builder.BuildICmp(each.Iteration == null ? LLVMIntPredicate.LLVMIntSLE : LLVMIntPredicate.LLVMIntSLT, indexValue, compareTarget, "arraycmp");
             if (each.Iteration != null)
             {
-                var pointerIndices = iterationType.CArray ? new []{_zeroInt, indexValue} : new []{indexValue};
+                var pointerIndices = iterationType.TypeKind == TypeKind.CArray ? new []{_zeroInt, indexValue} : new []{indexValue};
                 var iterationVariable = _builder.BuildGEP(arrayData, pointerIndices, each.IterationVariable);
                 eachVariables.TryAdd(each.IterationVariable, (each.IteratorType, iterationVariable));
 
@@ -1562,9 +1587,10 @@ namespace Lang.Backend
                             _ => (null, new LLVMValueRef())
                         };
                         var pointerType = new TypeDefinition {Name = "*", TypeKind = TypeKind.Pointer};
-                        if (valueType.CArray)
+                        if (valueType.TypeKind == TypeKind.CArray)
                         {
                             pointerType.Generics.Add(valueType.Generics[0]);
+                            pointer = _builder.BuildBitCast(pointer, ConvertTypeDefinition(pointerType), "tmpdata");
                         }
                         else
                         {
@@ -1789,7 +1815,7 @@ namespace Lang.Backend
                 }
                 skipPointer = false;
 
-                if (type.CArray)
+                if (type.TypeKind == TypeKind.CArray)
                 {
                     switch (structField.Children[i])
                     {
@@ -1798,11 +1824,6 @@ namespace Lang.Backend
                             if (identifier.Name == "length")
                             {
                                 (type, value) = WriteExpression(type.Count, localVariables);
-                            }
-                            else
-                            {
-                                type = new TypeDefinition {Name = "*", TypeKind = TypeKind.Pointer, Generics = {type.Generics[0]}};
-                                value = _builder.BuildGEP(value, new []{_zeroInt, _zeroInt}, "dataPtr");
                             }
                             break;
                         case IndexAst index:
@@ -1888,7 +1909,7 @@ namespace Lang.Backend
                 var dataPointer = _builder.BuildLoad(variable, "dataptr");
                 indexPointer = _builder.BuildGEP(dataPointer, new []{indexValue}, "indexptr");
             }
-            else if (type.CArray)
+            else if (type.TypeKind == TypeKind.CArray)
             {
                 indexPointer = _builder.BuildGEP(variable, new []{_zeroInt, indexValue}, "dataptr");
             }
@@ -2275,7 +2296,7 @@ namespace Lang.Backend
                 {
                     TypeKind.Boolean => LLVM.Int1Type(),
                     TypeKind.Void => pointer ? LLVM.Int8Type() : LLVM.VoidType(),
-                    TypeKind.Array or TypeKind.Params => GetArrayType(type),
+                    TypeKind.Array or TypeKind.CArray or TypeKind.Params => GetArrayType(type),
                     TypeKind.String => externFunction ? LLVM.PointerType(LLVM.Int8Type(), 0) : _module.GetTypeByName("string"),
                     TypeKind.Type => LLVM.Int32Type(),
                     _ => GetStructType(type)
@@ -2299,7 +2320,7 @@ namespace Lang.Backend
         {
             var elementTypeDef = type.Generics[0];
 
-            if (type.CArray)
+            if (type.TypeKind == TypeKind.CArray)
             {
                 var elementType = ConvertTypeDefinition(elementTypeDef);
                 return LLVM.ArrayType(elementType, type.ConstCount.Value);
