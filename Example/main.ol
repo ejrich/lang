@@ -53,7 +53,7 @@ int main(List<string> args) {
     //sleep(5);
 
     z := 1;
-    each i in create_list(4) {
+    each i in create_list(5) {
         printf("Value %d = %d\n", z++, i);
     }
 
@@ -157,6 +157,7 @@ List<int> create_list(int count) {
     ++list[0];
 
     manipulate_list_struct();
+
     return list;
 }
 
