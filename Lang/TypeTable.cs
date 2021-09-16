@@ -75,118 +75,101 @@ namespace Lang
         private static void CreateTypeInfo(IType type)
         {
             // Create TypeInfo pointer
-            var typeInfoPointer = Marshal.AllocHGlobal(TypeInfoSize);
-            // TypeInfos[type.TypeIndex] = typeInfoPointer;
+            var typeInfoPointer = Allocator.Allocate(TypeInfoSize);
+            TypeInfos.Add(typeInfoPointer);
+            var typeInfo = new TypeInfo {Name = Allocator.MakeString(type.Name), Type = type.TypeKind, Size = type.Size};
 
-            // var typeNameField = typeInfoType.GetField("name");
-            // typeNameField.SetValue(typeInfo, GetString(type.Name));
-            // var typeKindField = typeInfoType.GetField("type");
-            // typeKindField.SetValue(typeInfo, type.TypeKind);
-            // var typeSizeField = typeInfoType.GetField("size");
-            // typeSizeField.SetValue(typeInfo, type.Size);
+            switch (type)
+            {
+                case StructAst structAst:
+                    // var typeFieldArray = Activator.CreateInstance(typeFieldArrayType);
+                    // InitializeConstArray(typeFieldArray, typeFieldArrayType, typeFieldSize, structAst.Fields.Count);
 
-            // Set fields and enum values on TypeInfo objects
-            // var typeFieldArrayType = _types["Array.TypeField"];
-            // var typeFieldType = _types["TypeField"];
-            // var typeFieldSize = Marshal.SizeOf(typeFieldType);
+                    // var typeFieldsField = typeInfoType.GetField("fields");
+                    // typeFieldsField.SetValue(typeInfo, typeFieldArray);
 
-            // var enumValueArrayType = _types["Array.EnumValue"];
-            // var enumValueType = _types["EnumValue"];
-            // var enumValueSize = Marshal.SizeOf(enumValueType);
+                    // var typeFieldArrayDataField = typeFieldArrayType.GetField("data");
+                    // var typeFieldsDataPointer = GetPointer(typeFieldArrayDataField.GetValue(typeFieldArray));
 
-            // var argumentArrayType = _types["Array.ArgumentType"];
-            // var argumentType = _types["ArgumentType"];
-            // var argumentSize = Marshal.SizeOf(argumentType);
+                    for (var i = 0; i < structAst.Fields.Count; i++)
+                    {
+                        var field = structAst.Fields[i];
+                        // var typeField = Activator.CreateInstance(typeFieldType);
 
-            // switch (type)
-            // {
-            //     case StructAst structAst:
-            //         var typeFieldArray = Activator.CreateInstance(typeFieldArrayType);
-            //         InitializeConstArray(typeFieldArray, typeFieldArrayType, typeFieldSize, structAst.Fields.Count);
+                        // var typeFieldName = typeFieldType.GetField("name");
+                        // typeFieldName.SetValue(typeField, GetString(field.Name));
+                        // var typeFieldOffset = typeFieldType.GetField("offset");
+                        // typeFieldOffset.SetValue(typeField, field.Offset);
+                        // var typeFieldInfo = typeFieldType.GetField("type_info");
+                        // var typePointer = _typeInfoPointers[field.TypeDefinition.GenericName];
+                        // typeFieldInfo.SetValue(typeField, typePointer);
 
-            //         var typeFieldsField = typeInfoType.GetField("fields");
-            //         typeFieldsField.SetValue(typeInfo, typeFieldArray);
+                        // var arrayPointer = IntPtr.Add(typeFieldsDataPointer, typeFieldSize * i);
+                        // Marshal.StructureToPtr(typeField, arrayPointer, false);
+                    }
+                    break;
+                case EnumAst enumAst:
+                    // var enumValueArray = Activator.CreateInstance(enumValueArrayType);
+                    // InitializeConstArray(enumValueArray, enumValueArrayType, enumValueSize, enumAst.Values.Count);
 
-            //         var typeFieldArrayDataField = typeFieldArrayType.GetField("data");
-            //         var typeFieldsDataPointer = GetPointer(typeFieldArrayDataField.GetValue(typeFieldArray));
+                    // var enumValuesField = typeInfoType.GetField("enum_values");
+                    // enumValuesField.SetValue(typeInfo, enumValueArray);
 
-            //         for (var i = 0; i < structAst.Fields.Count; i++)
-            //         {
-            //             var field = structAst.Fields[i];
-            //             var typeField = Activator.CreateInstance(typeFieldType);
+                    // var enumValuesArrayDataField = enumValueArrayType.GetField("data");
+                    // var enumValuesDataPointer = GetPointer(enumValuesArrayDataField.GetValue(enumValueArray));
 
-            //             var typeFieldName = typeFieldType.GetField("name");
-            //             typeFieldName.SetValue(typeField, GetString(field.Name));
-            //             var typeFieldOffset = typeFieldType.GetField("offset");
-            //             typeFieldOffset.SetValue(typeField, field.Offset);
-            //             var typeFieldInfo = typeFieldType.GetField("type_info");
-            //             var typePointer = _typeInfoPointers[field.TypeDefinition.GenericName];
-            //             typeFieldInfo.SetValue(typeField, typePointer);
+                    for (var i = 0; i < enumAst.Values.Count; i++)
+                    {
+                        var value = enumAst.Values[i];
+                        // var enumValue = Activator.CreateInstance(enumValueType);
 
-            //             var arrayPointer = IntPtr.Add(typeFieldsDataPointer, typeFieldSize * i);
-            //             Marshal.StructureToPtr(typeField, arrayPointer, false);
-            //         }
-            //         break;
-            //     case EnumAst enumAst:
-            //         var enumValueArray = Activator.CreateInstance(enumValueArrayType);
-            //         InitializeConstArray(enumValueArray, enumValueArrayType, enumValueSize, enumAst.Values.Count);
+                        // var enumValueName = enumValueType.GetField("name");
+                        // enumValueName.SetValue(enumValue, GetString(value.Name));
+                        // var enumValueValue = enumValueType.GetField("value");
+                        // enumValueValue.SetValue(enumValue, value.Value);
 
-            //         var enumValuesField = typeInfoType.GetField("enum_values");
-            //         enumValuesField.SetValue(typeInfo, enumValueArray);
+                        // var arrayPointer = IntPtr.Add(enumValuesDataPointer, enumValueSize * i);
+                        // Marshal.StructureToPtr(enumValue, arrayPointer, false);
+                    }
+                    break;
+                case FunctionAst function:
+                    // var returnTypeField = typeInfoType.GetField("return_type");
+                    // returnTypeField.SetValue(typeInfo, _typeInfoPointers[function.ReturnTypeDefinition.GenericName]);
 
-            //         var enumValuesArrayDataField = enumValueArrayType.GetField("data");
-            //         var enumValuesDataPointer = GetPointer(enumValuesArrayDataField.GetValue(enumValueArray));
+                    // var argumentArray = Activator.CreateInstance(argumentArrayType);
+                    var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
+                    // InitializeConstArray(argumentArray, argumentArrayType, argumentSize, argumentCount);
 
-            //         for (var i = 0; i < enumAst.Values.Count; i++)
-            //         {
-            //             var value = enumAst.Values[i];
-            //             var enumValue = Activator.CreateInstance(enumValueType);
+                    // var argumentsField = typeInfoType.GetField("arguments");
+                    // argumentsField.SetValue(typeInfo, argumentArray);
 
-            //             var enumValueName = enumValueType.GetField("name");
-            //             enumValueName.SetValue(enumValue, GetString(value.Name));
-            //             var enumValueValue = enumValueType.GetField("value");
-            //             enumValueValue.SetValue(enumValue, value.Value);
+                    // var argumentArrayDataField = argumentArrayType.GetField("data");
+                    // var argumentArrayDataPointer = GetPointer(argumentArrayDataField.GetValue(argumentArray));
 
-            //             var arrayPointer = IntPtr.Add(enumValuesDataPointer, enumValueSize * i);
-            //             Marshal.StructureToPtr(enumValue, arrayPointer, false);
-            //         }
-            //         break;
-            //     case FunctionAst function:
-            //         var returnTypeField = typeInfoType.GetField("return_type");
-            //         returnTypeField.SetValue(typeInfo, _typeInfoPointers[function.ReturnTypeDefinition.GenericName]);
+                    for (var i = 0; i < argumentCount; i++)
+                    {
+                        var argument = function.Arguments[i];
+                        // var argumentValue = Activator.CreateInstance(argumentType);
 
-            //         var argumentArray = Activator.CreateInstance(argumentArrayType);
-            //         var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
-            //         InitializeConstArray(argumentArray, argumentArrayType, argumentSize, argumentCount);
+                        // var argumentName = argumentType.GetField("name");
+                        // argumentName.SetValue(argumentValue, GetString(argument.Name));
+                        // var argumentTypeField = argumentType.GetField("type_info");
 
-            //         var argumentsField = typeInfoType.GetField("arguments");
-            //         argumentsField.SetValue(typeInfo, argumentArray);
+                        // var argumentTypeInfoPointer = argument.TypeDefinition.TypeKind switch
+                        // {
+                        //     TypeKind.Type => _typeInfoPointers["s32"],
+                        //     TypeKind.Params => _typeInfoPointers[$"Array.{argument.TypeDefinition.Generics[0].GenericName}"],
+                        //     _ => _typeInfoPointers[argument.TypeDefinition.GenericName]
+                        // };
+                        // argumentTypeField.SetValue(argumentValue, argumentTypeInfoPointer);
 
-            //         var argumentArrayDataField = argumentArrayType.GetField("data");
-            //         var argumentArrayDataPointer = GetPointer(argumentArrayDataField.GetValue(argumentArray));
+                        // var arrayPointer = IntPtr.Add(argumentArrayDataPointer, argumentSize * i);
+                        // Marshal.StructureToPtr(argumentValue, arrayPointer, false);
+                    }
+                    break;
+            }
 
-            //         for (var i = 0; i < argumentCount; i++)
-            //         {
-            //             var argument = function.Arguments[i];
-            //             var argumentValue = Activator.CreateInstance(argumentType);
-
-            //             var argumentName = argumentType.GetField("name");
-            //             argumentName.SetValue(argumentValue, GetString(argument.Name));
-            //             var argumentTypeField = argumentType.GetField("type_info");
-
-            //             var argumentTypeInfoPointer = argument.TypeDefinition.TypeKind switch
-            //             {
-            //                 TypeKind.Type => _typeInfoPointers["s32"],
-            //                 TypeKind.Params => _typeInfoPointers[$"Array.{argument.TypeDefinition.Generics[0].GenericName}"],
-            //                 _ => _typeInfoPointers[argument.TypeDefinition.GenericName]
-            //             };
-            //             argumentTypeField.SetValue(argumentValue, argumentTypeInfoPointer);
-
-            //             var arrayPointer = IntPtr.Add(argumentArrayDataPointer, argumentSize * i);
-            //             Marshal.StructureToPtr(argumentValue, arrayPointer, false);
-            //         }
-            //         break;
-            // }
+            Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
         }
     }
 }

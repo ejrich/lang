@@ -112,7 +112,7 @@ namespace Lang
                     _globals = newGlobals;
                 }
 
-                var pointer = Marshal.AllocHGlobal((int)(Program.GlobalVariablesSize - _globalVariablesSize));
+                var pointer = Allocator.Allocate(Program.GlobalVariablesSize - _globalVariablesSize);
                 _globalVariablesSize = Program.GlobalVariablesSize;
 
                 for (; i < Program.GlobalVariables.Count; i++)
@@ -217,7 +217,7 @@ namespace Lang
                             }
                             break;
                         case TypeKind.String:
-                            Buffer.MemoryCopy(constant.Pointer.ToPointer(), pointer.ToPointer(), stringLength, stringLength);
+                            Buffer.MemoryCopy(constant.Pointer.ToPointer(), pointer.ToPointer(), Allocator.StringLength, Allocator.StringLength);
                             break;
                     }
                     break;
@@ -284,7 +284,7 @@ namespace Lang
         private Register ExecuteFunction(FunctionIR function, Register[] arguments)
         {
             var instructionPointer = 0;
-            var stackPointer = Marshal.AllocHGlobal((int)function.StackSize);
+            var stackPointer = Allocator.Allocate(function.StackSize);
             var registers = new Register[function.ValueCount];
 
             while (true)
@@ -787,7 +787,7 @@ namespace Lang
                     case InstructionType.AllocateArray:
                     {
                         var length = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
-                        var arrayPointer = Marshal.AllocHGlobal((int)instruction.Value2.Type.Size * length.Integer);
+                        var arrayPointer = Allocator.Allocate(instruction.Value2.Type.Size * length.UInteger);
                         registers[instruction.ValueIndex] = new Register {Pointer = arrayPointer};
                         break;
                     }
@@ -1290,7 +1290,7 @@ namespace Lang
                     }
                     break;
                 case TypeKind.String:
-                    register.Pointer = GetString(value.ConstantString, value.UseRawString);
+                    register.Pointer = Allocator.MakeString(value.ConstantString, value.UseRawString);
                     break;
             }
             return register;
@@ -1338,24 +1338,6 @@ namespace Lang
             }
 
             return register;
-        }
-
-        private const int stringLength = 12;
-
-        private static IntPtr GetString(string value, bool useRawString = false)
-        {
-            if (useRawString)
-            {
-                return Marshal.StringToHGlobalAnsi(value);
-            }
-
-            var stringPointer = Marshal.AllocHGlobal(stringLength);
-
-            Marshal.StructureToPtr(value.Length, stringPointer, false);
-            var s = Marshal.StringToHGlobalAnsi(value);
-            Marshal.StructureToPtr(s, stringPointer + 4, false);
-
-            return stringPointer;
         }
     }
 }
