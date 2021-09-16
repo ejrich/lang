@@ -414,7 +414,7 @@ namespace Lang.Backend
                 LLVMValueRef pointerType;
                 if (type is PrimitiveAst primitive && primitive.TypeKind == TypeKind.Pointer)
                 {
-                    pointerType = typePointers[primitive.PointerType.GenericName].typeInfo;
+                    pointerType = typePointers[primitive.PointerTypeDefinition.GenericName].typeInfo;
                 }
                 else
                 {
@@ -2416,7 +2416,7 @@ namespace Lang.Backend
                     _debugTypes[type.Name] = LLVM.DIBuilderCreateBasicType(_debugBuilder, name.Value, (UIntPtr)name.Length, (uint)type.Primitive.Bytes * 8, (uint)DwarfTypeEncoding.Float, LLVMDIFlags.LLVMDIFlagZero);
                     break;
                 case TypeKind.Pointer:
-                    var pointerType = _debugTypes[type.PointerType.GenericName];
+                    var pointerType = _debugTypes[type.PointerTypeDefinition.GenericName];
                     _debugTypes[typeName] = LLVM.DIBuilderCreatePointerType(_debugBuilder, pointerType, 64, 0, 0, name.Value, (UIntPtr)name.Length);
                     break;
             }
