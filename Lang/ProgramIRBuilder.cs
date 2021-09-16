@@ -73,7 +73,7 @@ namespace Lang
                     }
                 }
 
-                EmitScopeChildren(functionIR, entryBlock, function.Body, function.ReturnType);
+                EmitScopeChildren(functionIR, entryBlock, function.Body, function.ReturnType, null, null);
 
                 if (function.ReturnVoidAtEnd)
                 {
@@ -107,7 +107,7 @@ namespace Lang
 
             Program.Functions[overload.Name] = functionIR;
 
-            EmitScopeChildren(functionIR, entryBlock, overload.Body, overload.ReturnType);
+            EmitScopeChildren(functionIR, entryBlock, overload.Body, overload.ReturnType, null, null);
         }
 
         private void PrintFunction(string name, FunctionIR function)
@@ -159,7 +159,7 @@ namespace Lang
                         case InstructionType.DebugPopLexicalBlock:
                         case InstructionType.DebugDeclareParameter:
                         case InstructionType.DebugDeclareVariable:
-                            break;
+                            continue;
                         default:
                             text += $"{PrintInstructionValue(instruction.Value1)}, {PrintInstructionValue(instruction.Value2)} => v{instruction.ValueIndex}";
                             break;
@@ -387,22 +387,22 @@ namespace Lang
             };
         }
 
-        private BasicBlock EmitScope(FunctionIR function, BasicBlock block, ScopeAst scope, IType returnType)
+        private BasicBlock EmitScope(FunctionIR function, BasicBlock block, ScopeAst scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock)
         {
             if (!BuildSettings.Release)
             {
                 function.Instructions.Add(new Instruction {Type = InstructionType.DebugPushLexicalBlock, Source = scope});
-                block = EmitScopeChildren(function, block, scope, returnType);
+                block = EmitScopeChildren(function, block, scope, returnType, breakBlock, continueBlock);
                 function.Instructions.Add(new Instruction {Type = InstructionType.DebugPopLexicalBlock});
                 return block;
             }
             else
             {
-                return EmitScopeChildren(function, block, scope, returnType);
+                return EmitScopeChildren(function, block, scope, returnType, breakBlock, continueBlock);
             }
         }
 
-        private BasicBlock EmitScopeChildren(FunctionIR function, BasicBlock block, ScopeAst scope, IType returnType)
+        private BasicBlock EmitScopeChildren(FunctionIR function, BasicBlock block, ScopeAst scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock)
         {
             foreach (var ast in scope.Children)
             {
@@ -423,7 +423,7 @@ namespace Lang
                         EmitAssignment(function, assignment, scope);
                         break;
                     case ScopeAst childScope:
-                        block = EmitScope(function, block, childScope, returnType);
+                        block = EmitScope(function, block, childScope, returnType, breakBlock, continueBlock);
                         if (childScope.Returns)
                         {
                             scope.Returns = true;
@@ -431,7 +431,7 @@ namespace Lang
                         }
                         break;
                     case ConditionalAst conditional:
-                        block = EmitConditional(function, block, conditional, scope, returnType, out var returns);
+                        block = EmitConditional(function, block, conditional, scope, returnType, breakBlock, continueBlock, out var returns);
                         if (returns)
                         {
                             scope.Returns = true;
@@ -445,9 +445,15 @@ namespace Lang
                         block = EmitEach(function, block, each, scope, returnType);
                         break;
                     case BreakAst:
+                        var breakJump = new Instruction {Type = InstructionType.Jump, Value1 = BasicBlockValue(breakBlock)};
+                        function.Instructions.Add(breakJump);
+                        scope.Returns = true;
+                        return block;
                     case ContinueAst:
-                        // TODO Use the break or continue basic block
-                        break;
+                        var continueJump = new Instruction {Type = InstructionType.Jump, Value1 = BasicBlockValue(continueBlock)};
+                        function.Instructions.Add(continueJump);
+                        scope.Returns = true;
+                        return block;
                     default:
                         EmitIR(function, ast, scope);
                         break;
@@ -672,7 +678,7 @@ namespace Lang
                     break;
                 // Initialize struct field default values
                 case TypeKind.Struct:
-                case TypeKind.String: // TODO String default values
+                case TypeKind.String:
                     InitializeStruct(function, (StructAst)field.Type, pointer, scope, field.Assignments);
                     break;
                 // Initialize pointers to null
@@ -736,7 +742,7 @@ namespace Lang
             }
         }
 
-        private BasicBlock EmitConditional(FunctionIR function, BasicBlock block, ConditionalAst conditional, ScopeAst scope, IType returnType, out bool returns)
+        private BasicBlock EmitConditional(FunctionIR function, BasicBlock block, ConditionalAst conditional, ScopeAst scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock, out bool returns)
         {
             // Run the condition expression in the current basic block and then jump to the following
             var condition = EmitConditionExpression(function, conditional.Condition, scope);
@@ -744,7 +750,7 @@ namespace Lang
             function.Instructions.Add(conditionJump);
 
             var thenBlock = AddBasicBlock(function);
-            thenBlock = EmitScope(function, thenBlock, conditional.IfBlock, returnType);
+            thenBlock = EmitScope(function, thenBlock, conditional.IfBlock, returnType, breakBlock, continueBlock);
             Instruction jumpToAfter = null;
 
             // For when the the if block does not return and there is an else block, a jump to the after block is required
@@ -765,7 +771,7 @@ namespace Lang
                 return elseBlock;
             }
 
-            elseBlock = EmitScope(function, elseBlock, conditional.ElseBlock, returnType);
+            elseBlock = EmitScope(function, elseBlock, conditional.ElseBlock, returnType, breakBlock, continueBlock);
 
             if (conditional.IfBlock.Returns && conditional.ElseBlock.Returns)
             {
@@ -792,11 +798,12 @@ namespace Lang
             function.Instructions.Add(conditionJump);
 
             var whileBodyBlock = AddBasicBlock(function);
-            whileBodyBlock = EmitScope(function, whileBodyBlock, whileAst.Body, returnType);
+            var afterBlock = new BasicBlock();
+            whileBodyBlock = EmitScope(function, whileBodyBlock, whileAst.Body, returnType, afterBlock, conditionBlock);
             var jumpToCondition = new Instruction {Type = InstructionType.Jump, Value1 = BasicBlockValue(conditionBlock)};
             function.Instructions.Add(jumpToCondition);
 
-            var afterBlock = AddBasicBlock(function);
+            AddBasicBlock(function, afterBlock);
             conditionJump.Value2 = BasicBlockValue(afterBlock);
 
             return afterBlock;
@@ -901,15 +908,17 @@ namespace Lang
             function.Instructions.Add(conditionJump);
 
             var eachBodyBlock = AddBasicBlock(function);
-            eachBodyBlock = EmitScopeChildren(function, eachBodyBlock, each.Body, returnType);
+            var eachIncrementBlock = new BasicBlock();
+            var afterBlock = new BasicBlock();
+            eachBodyBlock = EmitScopeChildren(function, eachBodyBlock, each.Body, returnType, afterBlock, eachIncrementBlock);
 
-            var eachIncrementBlock = eachBodyBlock.Location < function.Instructions.Count ? AddBasicBlock(function) : eachBodyBlock;
+            AddBasicBlock(function, eachIncrementBlock);
             var nextValue = EmitInstruction(InstructionType.IntegerAdd, function, _s32Type, indexValue, GetConstantInteger(1));
             EmitStore(function, indexVariable, nextValue);
             var jumpToCondition = new Instruction {Type = InstructionType.Jump, Value1 = BasicBlockValue(conditionBlock)};
             function.Instructions.Add(jumpToCondition);
 
-            var afterBlock = AddBasicBlock(function);
+            AddBasicBlock(function, afterBlock);
             conditionJump.Value2 = BasicBlockValue(afterBlock);
 
             if (!BuildSettings.Release)
@@ -928,6 +937,14 @@ namespace Lang
         private BasicBlock AddBasicBlock(FunctionIR function)
         {
             var block = new BasicBlock {Index = function.BasicBlocks.Count, Location = function.Instructions.Count};
+            function.BasicBlocks.Add(block);
+            return block;
+        }
+
+        private BasicBlock AddBasicBlock(FunctionIR function, BasicBlock block)
+        {
+            block.Index = function.BasicBlocks.Count;
+            block.Location = function.Instructions.Count;
             function.BasicBlocks.Add(block);
             return block;
         }
