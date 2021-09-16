@@ -1763,6 +1763,7 @@ namespace Lang.Parsing
             {
                 if (typeDefinition.Name == "int")
                 {
+                    typeDefinition.Name = "s32";
                     typeDefinition.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
                 }
                 else
