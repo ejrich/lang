@@ -1121,7 +1121,8 @@ namespace Lang
                     {
                         var lhs = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
                         var rhs = GetValue(instruction.Value2, registers, stackPointer, function, arguments);
-                        var pointerAdd = lhs.Pointer + rhs.Integer; // TODO Get the pointer offset
+                        var pointerType = (PrimitiveAst)instruction.Value1.Type;
+                        var pointerAdd = lhs.Pointer + (rhs.Integer * (int)pointerType.PointerType.Size);
                         registers[instruction.ValueIndex] = new Register {Pointer = pointerAdd};
                         break;
                     }
@@ -1153,7 +1154,8 @@ namespace Lang
                     {
                         var lhs = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
                         var rhs = GetValue(instruction.Value2, registers, stackPointer, function, arguments);
-                        var pointerSubtract = lhs.Pointer - rhs.Integer; // TODO Get the pointer offset
+                        var pointerType = (PrimitiveAst)instruction.Value1.Type;
+                        var pointerSubtract = lhs.Pointer - (rhs.Integer * (int)pointerType.PointerType.Size);
                         registers[instruction.ValueIndex] = new Register {Pointer = pointerSubtract};
                         break;
                     }
