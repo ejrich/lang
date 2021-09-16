@@ -1384,23 +1384,35 @@ namespace Lang.Translation
                                 var argument = arguments[i];
                                 if (argument != null)
                                 {
-                                    if (!TypeEquals(functionArg.Type, argument))
+                                    if (functionArg.Type.Name == "Type")
+                                    {
+                                        var typeIndex = new ConstantAst
+                                        {
+                                            Type = new TypeDefinition {PrimitiveType = new IntegerType {Signed = true, Bytes = 4}},
+                                        };
+                                        if (argument.TypeIndex.HasValue)
+                                        {
+                                            typeIndex.Value = argument.TypeIndex.ToString();
+                                        }
+                                        else if (argument.Name == "Type")
+                                        {
+                                            continue;
+                                        }
+                                        else
+                                        {
+                                            var type = _programGraph.Types[argument.GenericName];
+                                            typeIndex.Value = type.TypeIndex.ToString();
+                                        }
+                                        call.Arguments[i] = typeIndex;
+                                        arguments[i] = typeIndex.Type;
+                                    }
+                                    else if (!TypeEquals(functionArg.Type, argument))
                                     {
                                         callError = true;
                                     }
                                     else if (argument.PrimitiveType != null && call.Arguments[i] is ConstantAst constant)
                                     {
                                         VerifyConstant(constant, functionArg.Type);
-                                    }
-                                    else if (argument.TypeIndex.HasValue)
-                                    {
-                                        var typeIndex = new ConstantAst
-                                        {
-                                            Type = new TypeDefinition {PrimitiveType = new IntegerType {Signed = true, Bytes = 4}},
-                                            Value = argument.TypeIndex.ToString()
-                                        };
-                                        call.Arguments[i] = typeIndex;
-                                        arguments[i] = typeIndex.Type;
                                     }
                                 }
                             }
