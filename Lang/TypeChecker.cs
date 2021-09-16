@@ -3156,11 +3156,11 @@ namespace Lang
                     return false;
                 }
             }
-            else if (argumentType.Name != "Type")
+            else if (argumentType.TypeKind != TypeKind.Type)
             {
                 if (externCall && callType.TypeKind == TypeKind.String)
                 {
-                    if (argumentType.Name != "u8*")
+                    if (argumentType != _rawStringType)
                     {
                         return false;
                     }
@@ -3181,9 +3181,9 @@ namespace Lang
             return true;
         }
 
-        private bool VerifyPolymorphicArgument(IAst argumentAst, IType callType, TypeDefinition argumentType, IType[] genericTypes)
+        private bool VerifyPolymorphicArgument(IAst ast, IType callType, TypeDefinition argumentType, IType[] genericTypes)
         {
-            if (argumentAst is NullAst)
+            if (ast is NullAst)
             {
                 // Return false if the generic types have been determined,
                 // the type cannot be inferred from a null argument if the generics haven't been determined yet
@@ -3215,7 +3215,43 @@ namespace Lang
             }
             else
             {
-                // TODO Implement me
+                if (argumentType.Generics.Any())
+                {
+                    switch (callType.TypeKind)
+                    {
+                        case TypeKind.Pointer:
+                            if (argumentType.Name != "*" || argumentType.Generics.Count != 1)
+                            {
+                                return false;
+                            }
+                            var pointerType = (PrimitiveAst)callType;
+                            return VerifyPolymorphicArgument(pointerType.PointerType, argumentType.Generics[0], genericTypes);
+                        case TypeKind.Array:
+                        case TypeKind.Struct:
+                            var structDef = (StructAst)callType;
+                            if (structDef.GenericTypes == null || argumentType.Generics.Count != structDef.GenericTypes.Length || argumentType.Name != structDef.BaseName)
+                            {
+                                return false;
+                            }
+                            for (var i = 0; i < structDef.GenericTypes.Length; i++)
+                            {
+                                if (!VerifyPolymorphicArgument(structDef.GenericTypes[i], argumentType.Generics[i], genericTypes))
+                                {
+                                    return false;
+                                }
+                            }
+                            break;
+                        // case TypeKind.CArray:
+                        // case TypeKind.Function:
+                        //    break;
+                        default:
+                            return false;
+                    }
+                }
+                else if (callType.Name != argumentType.Name)
+                {
+                    return false;
+                }
                 // if (callType.Name != argumentType.Name || callType.Generics.Count != argumentType.Generics.Count)
                 // {
                 //     return false;
