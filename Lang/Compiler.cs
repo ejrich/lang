@@ -5,7 +5,6 @@ using Lang.Backend;
 using Lang.Parsing;
 using Lang.Project;
 using Lang.Translation;
-using Microsoft.VisualBasic.CompilerServices;
 
 namespace Lang
 {
