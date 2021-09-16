@@ -189,3 +189,13 @@ void overflow_test() {
     }
     a := 4;
 }
+
+struct PolyStruct<T, U> {
+    T field1;
+    U field2;
+}
+
+void poly_test() {
+    a: PolyStruct<int, float>;
+    printf("%d, %f", a.field1, a.field2);
+}
