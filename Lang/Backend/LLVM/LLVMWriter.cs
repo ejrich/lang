@@ -71,7 +71,6 @@ namespace Lang.Backend.LLVM
         {
             var argumentTypes = arguments.Select(arg => ConvertTypeDefinition(arg.Type)).ToArray();
             var function = _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(returnType), argumentTypes));
-            function.Linkage = LLVMLinkage.LLVMExternalLinkage;
 
             for (var i = 0; i < arguments.Count; i++)
             {
@@ -187,7 +186,7 @@ namespace Lang.Backend.LLVM
         private void WriteReturnStatement(ReturnAst returnAst, IDictionary<string, LLVMValueRef> localVariables)
         {
             // 1. Get the return value
-            var returnValue = EvaluateExpression(returnAst.Value, localVariables);
+            var returnValue = WriteExpression(returnAst.Value, localVariables);
 
             // 2. Write expression as return value
             _builder.BuildRet(returnValue);
@@ -201,7 +200,7 @@ namespace Lang.Backend.LLVM
             // 2. Set value if it exists
             if (declaration.Value != null)
             {
-                var expressionValue = EvaluateExpression(declaration.Value, localVariables);
+                var expressionValue = WriteExpression(declaration.Value, localVariables);
                 _builder.BuildStore(expressionValue, allocation);
                 localVariables.Add(declaration.Name, allocation);
             }
@@ -223,7 +222,7 @@ namespace Lang.Backend.LLVM
             var variable = localVariables[variableName];
 
             // 2. Evaluate the expression value
-            var expressionValue = EvaluateExpression(assignment.Value, localVariables);
+            var expressionValue = WriteExpression(assignment.Value, localVariables);
             if (assignment.Operator != Operator.None)
             {
                 // TODO If operator exists, create expression using the existing expression value
@@ -254,12 +253,7 @@ namespace Lang.Backend.LLVM
             // TODO Implement me
         }
 
-        private void WriteExpression(IAst ast, IDictionary<string, LLVMValueRef> localVariables)
-        {
-            // TODO Implement me
-        }
-
-        private LLVMValueRef EvaluateExpression(IAst ast, IDictionary<string, LLVMValueRef> localVariables)
+        private LLVMValueRef WriteExpression(IAst ast, IDictionary<string, LLVMValueRef> localVariables)
         {
             switch (ast)
             {
@@ -268,6 +262,11 @@ namespace Lang.Backend.LLVM
                     switch (type.Kind)
                     {
                         case LLVMTypeKind.LLVMIntegerTypeKind:
+                            // Specific case for parsing booleans
+                            if (type == LLVMTypeRef.Int1)
+                            {
+                                return LLVMValueRef.CreateConstInt(type, constant.Value == "true" ? 1 : 0);
+                            }
                             return LLVMValueRef.CreateConstInt(type, ulong.Parse(constant.Value), true);
                         case LLVMTypeKind.LLVMFloatTypeKind:
                             return LLVMValueRef.CreateConstRealOfStringAndSize(type, constant.Value, (uint) constant.Value.Length);
@@ -278,9 +277,45 @@ namespace Lang.Backend.LLVM
                     break;
                 case VariableAst variable:
                     return _builder.BuildLoad(localVariables[variable.Name]);
-                // TODO Implement more asts
-                default:
+                case StructFieldRefAst structField:
+                    // TODO Implement me
                     break;
+                case CallAst call:
+                    var function = _module.GetNamedFunction(call.Function);
+                    var callArguments = new LLVMValueRef[call.Arguments.Count];
+                    for (var i = 0; i < call.Arguments.Count; i++)
+                    {
+                        var value = WriteExpression(call.Arguments[i], localVariables);
+                        callArguments[i] = value;
+                    }
+                    return _builder.BuildCall(function, callArguments, "callTmp");
+                case ChangeByOneAst changeByOne:
+                    if (changeByOne.Variable is VariableAst changeVariable)
+                    {
+                        var variable = localVariables[changeVariable.Name];
+                        var value = _builder.BuildLoad(variable);
+
+                        // TODO Support for floating point increments/decrements
+                        var newValue = changeByOne.Operator == Operator.Increment
+                            ? _builder.BuildAdd(value, LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, 1), "inc")
+                            : _builder.BuildSub(value, LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, 1), "dec");
+
+                        _builder.BuildStore(newValue, variable);
+                        return changeByOne.Prefix ? newValue : value;
+                    }
+                    else
+                    {
+                        // TODO Implement StructFieldRef writing
+                    }
+                    break;
+                case NotAst not:
+                    var notValue = WriteExpression(not.Value, localVariables);
+                    return _builder.BuildNot(notValue, "not");
+                case ExpressionAst expression:
+                    // TODO Implement expression writing
+                    break;
+                default:
+                    return null;
             }
 
             return LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, 0);
@@ -294,6 +329,8 @@ namespace Lang.Backend.LLVM
                     return LLVMTypeRef.Int32;
                 case "float":
                     return LLVMTypeRef.Float;
+                case "bool":
+                    return LLVMTypeRef.Int1;
                 // TODO Add more type inference
                 default:
                     return LLVMTypeRef.Double;
