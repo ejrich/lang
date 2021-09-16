@@ -303,6 +303,7 @@ namespace Lang.Runner
                 case IndexAst index:
                     switch (index.Variable)
                     {
+                        // TODO Implement me
                         case VariableAst variableAst:
                         {
                             var variable = variables[variableAst.Name];
@@ -410,63 +411,113 @@ namespace Lang.Runner
                     }
                     var structVariable = variables[structField.Name];
                     return GetStructFieldRef(structField, programGraph, structVariable.Value);
-                case VariableAst variable:
-                    return variables[variable.Name];
+                case VariableAst variableAst:
+                    return variables[variableAst.Name];
                 case ChangeByOneAst changeByOne:
-                    // switch (changeByOne.Variable)
-                    // {
-                    //     case VariableAst variable:
-                    //         if (localVariables.TryGetValue(variable.Name, out var variableType))
-                    //         {
-                    //             var type = VerifyType(variableType, errors);
-                    //             if (type == Type.Int || type == Type.Float) return variableType;
-                    //         }
-                    //     case StructFieldRefAst structField:
-                    //         if (localVariables.TryGetValue(structField.Name, out var structType))
-                    //         {
-                    //             var fieldType = VerifyStructFieldRef(structField, structType, errors);
-                    //             if (fieldType == null) return null;
-                    //
-                    //             var type = VerifyType(fieldType, errors);
-                    //             if (type == Type.Int || type == Type.Float) return fieldType;
-                    //         }
-                    //     case IndexAst index:
-                    //         var indexType = VerifyIndexType(index, localVariables, errors, out var variableAst);
-                    //         if (indexType != null)
-                    //         {
-                    //             var type = VerifyType(indexType, errors);
-                    //             if (type == Type.Int || type == Type.Float) return indexType;
-                    //         }
-                    //         return null;
-                    // }
+                    switch (changeByOne.Variable)
+                    {
+                        case VariableAst variableAst:
+                        {
+                            var variable = variables[variableAst.Name];
+
+                            var previousValue = new ValueType {Type = variable.Type, Value = variable.Value};
+
+                            if (variable.Type.PrimitiveType is IntegerType)
+                            {
+                                var value = (int)variable.Value;
+                                variable.Value = changeByOne.Positive ? value + 1 : value - 1;
+                            }
+                            else
+                            {
+                                var value = (float)variable.Value;
+                                variable.Value = changeByOne.Positive ? value + 1 : value - 1;
+                            }
+
+                            return changeByOne.Prefix ? variable : previousValue;
+                        }
+                        case StructFieldRefAst structField:
+                        {
+                            var variable = variables[structField.Name];
+
+                            var fieldObject = variable.Value;
+                            var structFieldValue = structField.Value;
+                            FieldInfo field;
+                            TypeDefinition fieldType;
+                            var structDefinition = (StructAst) programGraph.Data.Types[structField.StructName];
+                            while (true)
+                            {
+                                field = fieldObject!.GetType().GetField(structFieldValue.Name);
+                                if (structFieldValue.Value == null)
+                                {
+                                    fieldType = structDefinition.Fields[structFieldValue.ValueIndex].Type;
+                                    break;
+                                }
+
+                                fieldObject = field!.GetValue(fieldObject);
+                                structDefinition = (StructAst) programGraph.Data.Types[structFieldValue.StructName];
+                                structFieldValue = structFieldValue.Value;
+                            }
+
+                            var previousValue = field!.GetValue(fieldObject);
+                            object newValue;
+
+                            if (fieldType.PrimitiveType is IntegerType)
+                            {
+                                var value = (int)previousValue!;
+                                newValue = changeByOne.Positive ? value + 1 : value - 1;
+                                field.SetValue(fieldObject, newValue);
+                            }
+                            else
+                            {
+                                var value = (float)previousValue!;
+                                newValue = changeByOne.Positive ? value + 1 : value - 1;
+                                field.SetValue(fieldObject, newValue);
+                            }
+
+                            return new ValueType {Type = fieldType, Value = changeByOne.Prefix ? newValue : previousValue};
+                        }
+                        case IndexAst index:
+                            // TODO Implement me
+                            switch (index.Variable)
+                            {
+                                case VariableAst indexVariable:
+                                    break;
+                                case StructFieldRefAst indexStructField:
+                                    break;
+                            }
+                            return null;
+                    }
+                    break;
                 case UnaryAst unary:
-                    // var valueType = VerifyExpression(unary.Value, localVariables, errors);
-                    // var type = VerifyType(valueType, errors);
-                    // switch (unary.Operator)
-                    // {
-                    //     case UnaryOperator.Not:
-                    //         if (type == Type.Boolean)
-                    //         {
-                    //             return valueType;
-                    //         }
-                    //     case UnaryOperator.Negate:
-                    //         if (type == Type.Int || type == Type.Float)
-                    //         {
-                    //             return valueType;
-                    //         }
-                    //     case UnaryOperator.Dereference:
-                    //         if (type == Type.Pointer)
-                    //         {
-                    //             return valueType.Generics[0];
-                    //         }
-                    //     case UnaryOperator.Reference:
-                    //         if (unary.Value is VariableAst || unary.Value is StructFieldRefAst || unary.Value is IndexAst || type == Type.Pointer)
-                    //         {
-                    //             var pointerType = new TypeDefinition {Name = "*"};
-                    //             pointerType.Generics.Add(valueType);
-                    //             return pointerType;
-                    //         }
-                    // }
+                    var valueType = ExecuteExpression(unary.Value, programGraph, variables);
+                    switch (unary.Operator)
+                    {
+                        case UnaryOperator.Not:
+                            var value = (bool)valueType.Value;
+                            return new ValueType {Type = valueType.Type, Value = !value};
+                        case UnaryOperator.Negate:
+                            if (valueType.Type.PrimitiveType is IntegerType)
+                            {
+                                var intValue = (int)valueType.Value;
+                                return new ValueType {Type = valueType.Type, Value = -intValue};
+                            }
+                            else
+                            {
+                                var floatValue = (float)valueType.Value;
+                                return new ValueType {Type = valueType.Type, Value = -floatValue};
+                            }
+                        // TODO Implement pointers
+                        case UnaryOperator.Dereference:
+                            // return valueType.Generics[0];
+                        case UnaryOperator.Reference:
+                            // if (unary.Value is VariableAst || unary.Value is StructFieldRefAst || unary.Value is IndexAst || type == Type.Pointer)
+                            // {
+                            //     var pointerType = new TypeDefinition {Name = "*"};
+                            //     pointerType.Generics.Add(valueType);
+                            //     return pointerType;
+                            // }
+                            break;
+                    }
                     break;
                 case CallAst call:
                     var function = programGraph.Functions[call.Function];
@@ -507,6 +558,7 @@ namespace Lang.Runner
             {
                 IntegerType => int.Parse(value),
                 FloatType => float.Parse(value),
+                _ when type.Name == "bool" => value == "true",
                 _ => value
             };
             return result;
@@ -559,7 +611,7 @@ namespace Lang.Runner
             return null;
         }
 
-        private object CastValue(ValueType expression, TypeDefinition fieldType)
+        private object CastValue(ValueType expression, TypeDefinition targetType)
         {
             // TODO Implement me
             return expression.Value;
@@ -602,6 +654,8 @@ namespace Lang.Runner
 
             switch (typeDef.Name)
             {
+                case "bool":
+                    return typeof(bool);
                 case "string":
                     return typeof(string);
                 case "*":
