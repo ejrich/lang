@@ -33,13 +33,18 @@ namespace Lang.Project
 
             // 3. Recurse through the directories and load the files to build
             var projectDirectory = Path.GetDirectoryName(Path.GetFullPath(projectPath));
-            var sourceFiles = GetSourceFiles(new DirectoryInfo(projectDirectory));
+            var sourceFiles = GetSourceFiles(new DirectoryInfo(projectDirectory)).ToList();
+
+            // 4. Load runtime and dependency files
+            var libraryDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Runtime");
+            var libraryFiles = GetSourceFiles(new DirectoryInfo(libraryDirectory));
+            sourceFiles.AddRange(libraryFiles);
 
             return new Project
             {
                 Name = projectFile.Name,
                 Path = projectDirectory,
-                BuildFiles = sourceFiles.ToList()
+                BuildFiles = sourceFiles
             };
         }
 
