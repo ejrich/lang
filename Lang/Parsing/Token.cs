@@ -35,6 +35,7 @@ namespace Lang.Parsing
         In,
         Range,
         Enum,
+        Null,
         NumberRange, // Ignored by parser
         VarArgs, // Ignored by parser
         OpenParen = '(',

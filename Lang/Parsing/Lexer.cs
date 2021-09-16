@@ -38,6 +38,7 @@ namespace Lang.Parsing
             {"in", TokenType.In},
             {"struct", TokenType.Struct},
             {"enum", TokenType.Enum},
+            {"null", TokenType.Null}
         };
 
         public List<Token> LoadFileTokens(string filePath, int fileIndex, out List<ParseError> errors)

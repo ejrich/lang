@@ -109,6 +109,15 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
+    public class NullAst : IAst
+    {
+        public int FileIndex { get; set; }
+        public int Line { get; init; }
+        public int Column { get; init; }
+        public TypeDefinition TargetType { get; set; }
+        public List<IAst> Children => null;
+    }
+
     public class VariableAst : IAst
     {
         public int FileIndex { get; set; }

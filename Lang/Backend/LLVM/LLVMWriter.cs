@@ -482,7 +482,7 @@ namespace Lang.Backend.LLVM
             {
                 var structField = structDef.Fields[i];
                 var type = ConvertTypeDefinition(structField.Type);
-                if (type.TypeKind == LLVMTypeKind.LLVMArrayTypeKind || type.TypeKind == LLVMTypeKind.LLVMPointerTypeKind)
+                if (type.TypeKind == LLVMTypeKind.LLVMArrayTypeKind)
                     continue;
 
                 var field = LLVMApi.BuildStructGEP(_builder, variable, (uint) i, structField.Name);
@@ -492,14 +492,18 @@ namespace Lang.Backend.LLVM
                     var count = (ConstantAst)structField.Type.Count;
                     InitializeConstList(field, int.Parse(count.Value), structField.Type.Generics[0]);
                 }
-                else if (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind)
+                else switch (type.TypeKind)
                 {
-                    InitializeStruct(structField.Type, field);
-                }
-                else
-                {
-                    var defaultValue = structField.DefaultValue == null ? GetConstZero(type) : BuildConstant(type, structField.DefaultValue);
-                    LLVMApi.BuildStore(_builder, defaultValue, field);
+                    case LLVMTypeKind.LLVMPointerTypeKind:
+                        LLVMApi.BuildStore(_builder, LLVMApi.ConstNull(type), field);
+                        break;
+                    case LLVMTypeKind.LLVMStructTypeKind:
+                        InitializeStruct(structField.Type, field);
+                        break;
+                    default:
+                        var defaultValue = structField.DefaultValue == null ? GetConstZero(type) : BuildConstant(type, structField.DefaultValue);
+                        LLVMApi.BuildStore(_builder, defaultValue, field);
+                        break;
                 }
             }
         }
@@ -576,19 +580,20 @@ namespace Lang.Backend.LLVM
         private bool WriteConditional(ConditionalAst conditional, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)
         {
             // 1. Write out the condition
-            var (_, conditionExpression) = WriteExpression(conditional.Condition, localVariables);
+            var (type, conditionExpression) = WriteExpression(conditional.Condition, localVariables);
 
             // 2. Write out the condition jump and blocks
-            var condition = conditionExpression.TypeOf().TypeKind switch
+            var condition = type.PrimitiveType switch
             {
-                LLVMTypeKind.LLVMIntegerTypeKind => LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntNE,
+                IntegerType => LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntNE,
                     conditionExpression, LLVMApi.ConstInt(conditionExpression.TypeOf(), 0, false), "ifcond"),
-                LLVMTypeKind.LLVMFloatTypeKind => LLVMApi.BuildFCmp(_builder, LLVMRealPredicate.LLVMRealONE,
+                FloatType => LLVMApi.BuildFCmp(_builder, LLVMRealPredicate.LLVMRealONE,
                     conditionExpression, LLVMApi.ConstReal(conditionExpression.TypeOf(), 0), "ifcond"),
-                _ => new LLVMValueRef()
+                _ => conditionExpression
             };
             var thenBlock = LLVMApi.AppendBasicBlock(function, "then");
             var elseBlock = LLVMApi.AppendBasicBlock(function, "else");
+            var endBlock = new LLVMBasicBlockRef();
             LLVMApi.BuildCondBr(_builder, condition, thenBlock, elseBlock);
 
             // 3. Write out if body
@@ -604,18 +609,24 @@ namespace Lang.Backend.LLVM
             }
             if (!ifReturned)
             {
-                LLVMApi.BuildBr(_builder, elseBlock);
+                if (conditional.Else == null)
+                {
+                    LLVMApi.BuildBr(_builder, elseBlock);
+                    LLVMApi.PositionBuilderAtEnd(_builder, elseBlock);
+                    return false;
+                }
+                endBlock = LLVMApi.AppendBasicBlock(function, "ifcont");
+                LLVMApi.BuildBr(_builder, endBlock);
             }
 
             LLVMApi.PositionBuilderAtEnd(_builder, elseBlock);
-            
+
             if (conditional.Else == null)
             {
                 return false;
             }
 
             // 4. Write out the else if necessary
-            LLVMApi.PositionBuilderAtEnd(_builder, elseBlock);
             var elseReturned = WriteFunctionLine(conditional.Else, localVariables, function);
 
             // 5. Return if both branches return
@@ -625,7 +636,10 @@ namespace Lang.Backend.LLVM
             }
 
             // 6. Jump to end block if necessary and position builder at end block
-            var endBlock = LLVMApi.AppendBasicBlock(function, "ifcont");
+            if (ifReturned)
+            {
+                endBlock = LLVMApi.AppendBasicBlock(function, "ifcont");
+            }
             if (!elseReturned)
             {
                 LLVMApi.BuildBr(_builder, endBlock);
@@ -780,6 +794,11 @@ namespace Lang.Backend.LLVM
                 {
                     var type = ConvertTypeDefinition(constant.Type);
                     return (constant.Type, BuildConstant(type, constant));
+                }
+                case NullAst nullAst:
+                {
+                    var type = ConvertTypeDefinition(nullAst.TargetType);
+                    return (nullAst.TargetType, LLVMApi.ConstNull(type));
                 }
                 case VariableAst variable:
                 {
@@ -1106,13 +1125,31 @@ namespace Lang.Backend.LLVM
             return BuildBinaryOperation(targetType, lhs.value, rhs.value, op, signed);
         }
 
-        private LLVMValueRef BuildPointerOperation(LLVMValueRef pointer, LLVMValueRef offset, Operator op)
+        private LLVMValueRef BuildPointerOperation(LLVMValueRef lhs, LLVMValueRef rhs, Operator op)
         {
+            if (op == Operator.Equality)
+            {
+                if (rhs.IsNull())
+                {
+                    return LLVMApi.BuildIsNull(_builder, lhs, "isnull");
+                }
+                var diff = LLVMApi.BuildPtrDiff(_builder, lhs, rhs, "ptrdiff");
+                return LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntEQ, diff, LLVMApi.ConstInt(diff.TypeOf(), 0, false), "ptreq");
+            }
+            if (op == Operator.NotEqual)
+            {
+                if (rhs.IsNull())
+                {
+                    return LLVMApi.BuildIsNotNull(_builder, lhs, "notnull");
+                }
+                var diff = LLVMApi.BuildPtrDiff(_builder, lhs, rhs, "ptrdiff");
+                return LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntNE, diff, LLVMApi.ConstInt(diff.TypeOf(), 0, false), "ptreq");
+            }
             if (op == Operator.Subtract)
             {
-                offset = LLVMApi.BuildNeg(_builder, offset, "tmpneg");
+                rhs = LLVMApi.BuildNeg(_builder, rhs, "tmpneg");
             }
-            return LLVMApi.BuildGEP(_builder, pointer, new []{offset}, "tmpptr");
+            return LLVMApi.BuildGEP(_builder, lhs, new []{rhs}, "tmpptr");
         }
 
         private LLVMValueRef BuildCompare((TypeDefinition type, LLVMValueRef value) lhs,
