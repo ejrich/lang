@@ -17,7 +17,7 @@ namespace Lang.Parsing
     public class ConstantAst : IAst
     {
         public string Value { get; set; }
-        public List<IAst> Children { get; } = null;
+        public List<IAst> Children => null;
     }
 
     public class ReturnAst : IAst
@@ -27,7 +27,13 @@ namespace Lang.Parsing
 
     public class Variable
     {
-        public string Type { get; set; }
+        public TypeDefinition Type { get; set; }
         public string Name { get; set; }
+    }
+
+    public class TypeDefinition
+    {
+        public string Type { get; set; }
+        public List<string> Generics { get; set; } = new();
     }
 }
