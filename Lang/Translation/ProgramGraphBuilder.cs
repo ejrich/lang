@@ -1219,7 +1219,7 @@ namespace Lang.Translation
                         case IdentifierAst identifier:
                             if (!scopeIdentifiers.TryGetValue(identifier.Name, out var value))
                             {
-                                AddError($"Identifier '{identifier}' not defined", ast);
+                                AddError($"Identifier '{identifier.Name}' not defined", ast);
                                 return null;
                             }
                             switch (value)
