@@ -911,7 +911,7 @@ namespace Lang
                     case InstructionType.PointerCast:
                     {
                         // This instruction is mostly for LLVM, so this is pretty much a no-op
-                        registers[instruction.ValueIndex] = GetValue(instruction.Value1, registers);
+                        registers[instruction.ValueIndex] = GetPointerValue(instruction.Value1, registers, stackPointer, function);
                         break;
                     }
                     case InstructionType.AllocateArray:

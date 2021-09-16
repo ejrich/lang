@@ -1,4 +1,4 @@
-int main(Array<string> args) #print_ir {
+int main(Array<string> args) { //#print_ir {
     // Return positive exit code
     /*
         Multi line comment
@@ -321,6 +321,7 @@ u32 sleep(u32 seconds) #extern "libc"
 
 #run {
     args: Array<string> = ["Hello world"]
+    printf("Hello world\n");
     main(args);
 
     build();
