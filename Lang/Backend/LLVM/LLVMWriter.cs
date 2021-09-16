@@ -224,6 +224,10 @@ namespace Lang.Backend.LLVM
 
             // 2. Evaluate the expression value
             var expressionValue = EvaluateExpression(assignment.Value, localVariables);
+            if (assignment.Operator != Operator.None)
+            {
+                // TODO If operator exists, create expression using the existing expression value
+            }
 
             // 3. Reallocate the value of the variable
             // TODO Set struct fields
