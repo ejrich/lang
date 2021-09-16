@@ -452,7 +452,7 @@ namespace Lang.Translation
                 case VariableAst variable:
                     if (!localVariables.TryGetValue(variable.Name, out var typeDefinition))
                     {
-                        errors.Add(CreateError( $"Variable '{variable.Name}' not defined", ast));
+                        errors.Add(CreateError($"Variable '{variable.Name}' not defined", ast));
                     }
                     return typeDefinition;
                 case ChangeByOneAst changeByOne:
@@ -470,7 +470,7 @@ namespace Lang.Translation
                             }
                             else
                             {
-                                errors.Add(CreateError( $"Variable '{variable.Name}' not defined", variable));
+                                errors.Add(CreateError($"Variable '{variable.Name}' not defined", variable));
                                 return null;
                             }
                         case StructFieldRefAst structField:
@@ -488,12 +488,12 @@ namespace Lang.Translation
                             }
                             else
                             {
-                                errors.Add(CreateError( $"Variable '{structField.Name}' not defined", structField));
+                                errors.Add(CreateError($"Variable '{structField.Name}' not defined", structField));
                                 return null;
                             }
                         default:
                             var operand = changeByOne.Positive ? "increment" : "decrement";
-                            errors.Add(CreateError( $"Expected to {operand} variable", changeByOne));
+                            errors.Add(CreateError($"Expected to {operand} variable", changeByOne));
                             return null;
                     }
                 case NotAst not:
@@ -634,7 +634,7 @@ namespace Lang.Translation
             // 1. Load the struct definition in typeDefinition
             if (!_structs.TryGetValue(structType.Name, out var structDefinition))
             {
-                errors.Add(CreateError( $"Struct '{structType.Name}' not defined", structField));
+                errors.Add(CreateError($"Struct '{structType.Name}' not defined", structField));
                 return null;
             }
 
@@ -680,30 +680,47 @@ namespace Lang.Translation
             switch (typeDef.Name)
             {
                 case "int":
+                case "u64":
+                case "s64":
+                case "u32":
+                case "s32":
+                case "u16":
+                case "s16":
+                case "u8":
+                case "s8":
                     if (hasGenerics)
                     {
-                        errors.Add(CreateError( "int type cannot have generics", typeDef));
+                        errors.Add(CreateError($"Type '{typeDef.Name}' cannot have generics", typeDef));
                         return Type.Error;
                     }
-                    return Type.Int;
+                    return VerifyIntegerType(typeDef);
                 case "float":
                     if (hasGenerics)
                     {
-                        errors.Add(CreateError( "float type cannot have generics", typeDef));
+                        errors.Add(CreateError("Type 'float' cannot have generics", typeDef));
                         return Type.Error;
                     }
+                    typeDef.PrimitiveType = new FloatType {Bytes = 4};
+                    return Type.Float;
+                case "float64":
+                    if (hasGenerics)
+                    {
+                        errors.Add(CreateError("Type 'float64' cannot have generics", typeDef));
+                        return Type.Error;
+                    }
+                    typeDef.PrimitiveType = new FloatType {Bytes = 8};
                     return Type.Float;
                 case "bool":
                     if (hasGenerics)
                     {
-                        errors.Add(CreateError( "boolean type cannot have generics", typeDef));
+                        errors.Add(CreateError("boolean type cannot have generics", typeDef));
                         return Type.Error;
                     }
                     return Type.Boolean;
                 case "string":
                     if (hasGenerics)
                     {
-                        errors.Add(CreateError( "string type cannot have generics", typeDef));
+                        errors.Add(CreateError("string type cannot have generics", typeDef));
                         return Type.Error;
                     }
                     return Type.String;
@@ -712,7 +729,7 @@ namespace Lang.Translation
                 case "void":
                     if (hasGenerics)
                     {
-                        errors.Add(CreateError( "void type cannot have generics", typeDef));
+                        errors.Add(CreateError("void type cannot have generics", typeDef));
                         return Type.Error;
                     }
                     return Type.Void;
@@ -720,6 +737,21 @@ namespace Lang.Translation
                     if (!verifyStruct) return Type.Other;
                     return _structs.ContainsKey(typeDef.Name) ? Type.Other : Type.Error;
             }
+        }
+
+        private static Type VerifyIntegerType(TypeDefinition typeDef)
+        {
+            if (typeDef.Name == "int")
+            {
+                typeDef.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
+            }
+            else
+            {
+                var bytes = ushort.Parse(typeDef.Name[1..]) / 8;
+                typeDef.PrimitiveType = new IntegerType {Bytes = (ushort) bytes, Signed = typeDef.Name[0] == 's'};
+            }
+
+            return Type.Int;
         }
 
         private static string PrintTypeDefinition(TypeDefinition type)
