@@ -9,6 +9,8 @@ namespace Lang
         void Init();
         void AddFunction(FunctionAst function);
         void AddOperatorOverload(OperatorOverloadAst overload);
+        FunctionIR CreateRunnableFunction(IAst ast, ScopeAst globalScope);
+        FunctionIR CreateRunnableCondition(IAst ast, ScopeAst globalScope);
         void EmitGlobalVariable(DeclarationAst declaration, ScopeAst scope);
     }
 
@@ -108,6 +110,74 @@ namespace Lang
             Program.Functions[overload.Name] = functionIR;
 
             EmitScopeChildren(functionIR, entryBlock, overload.Body, overload.ReturnType, null, null);
+        }
+
+        public FunctionIR CreateRunnableFunction(IAst ast, ScopeAst globalScope)
+        {
+            var function = new FunctionIR {Allocations = new(), Instructions = new(), BasicBlocks = new()};
+            var entryBlock = AddBasicBlock(function);
+
+            var returns = false;
+            switch (ast)
+            {
+                case ReturnAst returnAst:
+                    EmitReturn(function, returnAst, null, globalScope);
+                    returns = true;
+                    break;
+                case DeclarationAst declaration:
+                    EmitDeclaration(function, declaration, globalScope);
+                    break;
+                case AssignmentAst assignment:
+                    EmitAssignment(function, assignment, globalScope);
+                    break;
+                case ScopeAst childScope:
+                    EmitScopeChildren(function, entryBlock, childScope, null, null, null);
+                    returns = childScope.Returns;
+                    break;
+                case ConditionalAst conditional:
+                    EmitConditional(function, entryBlock, conditional, globalScope, null, null, null, out returns);
+                    break;
+                case WhileAst whileAst:
+                    EmitWhile(function, entryBlock, whileAst, globalScope, null);
+                    break;
+                case EachAst each:
+                    EmitEach(function, entryBlock, each, globalScope, null);
+                    break;
+                default:
+                    EmitIR(function, ast, globalScope);
+                    break;
+            }
+
+            if (!returns)
+            {
+                function.Instructions.Add(new Instruction {Type = InstructionType.ReturnVoid});
+            }
+
+            return function;
+        }
+
+        public FunctionIR CreateRunnableCondition(IAst ast, ScopeAst globalScope)
+        {
+            var function = new FunctionIR {Allocations = new(), Instructions = new(), BasicBlocks = new()};
+            var entryBlock = AddBasicBlock(function);
+
+            var value = EmitIR(function, ast, globalScope);
+
+            // This logic is the opposite of EmitConditionExpression because for runnable conditions the returned value
+            // should be true if the result of the expression is truthy.
+            // For condition expressions in regular functions, the result is notted to jump to the else block
+            var returnValue = value.Type.TypeKind switch
+            {
+                TypeKind.Integer => EmitInstruction(InstructionType.IntegerNotEquals, function, _boolType, value, GetDefaultConstant(value.Type)),
+                TypeKind.Float => EmitInstruction(InstructionType.FloatNotEquals, function, _boolType, value, GetDefaultConstant(value.Type)),
+                TypeKind.Pointer => EmitInstruction(InstructionType.IsNotNull, function, _boolType, value),
+                // Will be type bool
+                _ => value
+            };
+
+            function.Instructions.Add(new Instruction {Type = InstructionType.Return, Value1 = returnValue});
+
+            return function;
         }
 
         private void PrintFunction(string name, FunctionIR function)
@@ -415,6 +485,7 @@ namespace Lang
                 {
                     case ReturnAst returnAst:
                         EmitReturn(function, returnAst, returnType, scope);
+                        scope.Returns = true;
                         return block;
                     case DeclarationAst declaration:
                         EmitDeclaration(function, declaration, scope);
@@ -728,8 +799,6 @@ namespace Lang
 
         public void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, ScopeAst scope)
         {
-            scope.Returns = true;
-
             if (returnAst.Value == null)
             {
                 var instruction = new Instruction {Type = InstructionType.ReturnVoid};
