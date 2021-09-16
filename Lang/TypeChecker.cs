@@ -22,10 +22,13 @@ namespace Lang
         private readonly Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads = new();
         private readonly ScopeAst _globalScope = new();
 
+        private IType _voidType;
         private IType _boolType;
         private IType _u8Type;
         private PrimitiveAst _s32Type;
         private IType _float64Type;
+        private IType _stringType;
+        private IType _rawStringType;
 
         public TypeChecker(IPolymorpher polymorpher, IProgramIRBuilder irBuilder, IProgramRunner runner)
         {
@@ -40,7 +43,7 @@ namespace Lang
             bool verifyAdditional;
 
             // Add primitive types to global identifiers
-            AddPrimitive("void", TypeKind.Void, 1);
+            _voidType = AddPrimitive("void", TypeKind.Void, 1);
             _boolType = AddPrimitive("bool", TypeKind.Boolean, 1);
             AddPrimitive("s8", TypeKind.Integer, 1, true);
             _u8Type = AddPrimitive("u8", TypeKind.Integer, 1);
@@ -271,16 +274,16 @@ namespace Lang
             }
             else
             {
-                var baseType = VerifyType(enumAst.BaseTypeDefinition);
-                if (baseType != TypeKind.Integer && baseType != TypeKind.Error)
+                var baseType = VerifyType(enumAst.BaseTypeDefinition, out _, out _, out _);
+                if (baseType?.TypeKind != TypeKind.Integer)
                 {
                     ErrorReporter.Report($"Base type of enum must be an integer, but got '{PrintTypeDefinition(enumAst.BaseTypeDefinition)}'", enumAst.BaseTypeDefinition);
-                    // enumAst.BaseTypeDefinition.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
                     enumAst.BaseType = _s32Type;
+                    enumAst.Size = 4;
                 }
                 else
                 {
-                    enumAst.BaseType = (PrimitiveAst)TypeTable.GetType(enumAst.BaseTypeDefinition);
+                    enumAst.BaseType = (PrimitiveAst)baseType;
                     enumAst.Size = enumAst.BaseType.Size;
                 }
             }
@@ -289,9 +292,8 @@ namespace Lang
             var valueNames = new HashSet<string>();
             var values = new HashSet<int>();
 
-            var baseType = enumAst.BaseType;
-            var lowestAllowedValue = baseType.Signed ? -Math.Pow(2, 4 * baseType.Size - 1) : 0;
-            var largestAllowedValue = baseType.Signed ? Math.Pow(2, 4 * baseType.Size - 1) - 1 : Math.Pow(2, 4 * baseType.Size) - 1;
+            var lowestAllowedValue = enumAst.BaseType.Signed ? -Math.Pow(2, 4 * enumAst.Size - 1) : 0;
+            var largestAllowedValue = enumAst.BaseType.Signed ? Math.Pow(2, 4 * enumAst.Size - 1) - 1 : Math.Pow(2, 4 * enumAst.Size) - 1;
 
             var largestValue = -1;
             foreach (var value in enumAst.Values)
@@ -347,20 +349,23 @@ namespace Lang
 
                 if (structField.TypeDefinition != null)
                 {
-                    var type = VerifyType(structField.TypeDefinition);
+                    fieldType = VerifyType(structField.TypeDefinition, out var isGeneric, out var isVarargs, out var isParams);
 
-                    if (type == TypeKind.Error)
+                    if (isVarargs || isParams)
+                    {
+                        ErrorReporter.Report($"Struct field '{structAst.Name}.{structField.Name}' cannot be varargs or Params", structField.TypeDefinition);
+                    }
+                    else if (fieldType == null)
                     {
                         ErrorReporter.Report($"Undefined type '{PrintTypeDefinition(structField.TypeDefinition)}' in struct field '{structAst.Name}.{structField.Name}'", structField.TypeDefinition);
                     }
-                    else if (type == TypeKind.Void)
+                    else if (fieldType.TypeKind == TypeKind.Void)
                     {
                         ErrorReporter.Report($"Struct field '{structAst.Name}.{structField.Name}' cannot be assigned type 'void'", structField.TypeDefinition);
                     }
                     else
                     {
-                        fieldType = TypeTable.GetType(structField.TypeDefinition);
-                        if (type == TypeKind.Array || type == TypeKind.CArray)
+                        if (fieldType.TypeKind == TypeKind.Array || fieldType.TypeKind == TypeKind.CArray)
                         {
                             var elementType = structField.TypeDefinition.Generics[0];
                             structField.ArrayElementType = TypeTable.GetType(elementType);
@@ -371,12 +376,12 @@ namespace Lang
                     {
                         if (structField.Value is NullAst nullAst)
                         {
-                            if (type != TypeKind.Pointer)
+                            if (fieldType != null && fieldType.TypeKind != TypeKind.Pointer)
                             {
                                 ErrorReporter.Report("Cannot assign null to non-pointer type", structField.Value);
                             }
 
-                            nullAst.TargetTypeDefinition = structField.TypeDefinition;
+                            // nullAst.TargetTypeDefinition = structField.TypeDefinition;
                             nullAst.TargetType = structField.Type;
                         }
                         else
@@ -403,7 +408,7 @@ namespace Lang
                     }
                     else if (structField.Assignments != null)
                     {
-                        if (type != TypeKind.Struct && type != TypeKind.String)
+                        if (fieldType != null && fieldType.TypeKind != TypeKind.Struct && fieldType.TypeKind != TypeKind.String)
                         {
                             ErrorReporter.Report($"Can only use object initializer with struct type, got '{PrintTypeDefinition(structField.TypeDefinition)}'", structField.TypeDefinition);
                         }
@@ -411,7 +416,7 @@ namespace Lang
                         else if (fieldType != null && fieldType != structAst)
                         {
                             var structDef = fieldType as StructAst;
-                            if (!structDef.Verified)
+                            if (structDef != null && !structDef.Verified)
                             {
                                 VerifyStruct(structDef);
                             }
@@ -449,14 +454,14 @@ namespace Lang
                     }
                     else if (structField.ArrayValues != null)
                     {
-                        if (type != TypeKind.Error && type != TypeKind.Array && type != TypeKind.CArray)
+                        if (fieldType != null && fieldType.TypeKind != TypeKind.Array && fieldType.TypeKind != TypeKind.CArray)
                         {
                             ErrorReporter.Report($"Cannot use array initializer to declare non-array type '{PrintTypeDefinition(structField.TypeDefinition)}'", structField.TypeDefinition);
                         }
                         else
                         {
                             structField.TypeDefinition.ConstCount = (uint)structField.ArrayValues.Count;
-                            var elementType = structField.TypeDefinition.Generics[0];
+                            var elementType = structField.TypeDefinition.Generics[0]; // TODO Change to structField.ArrayElementType
                             foreach (var value in structField.ArrayValues)
                             {
                                 var valueType = VerifyConstantExpression(value, null, _globalScope, out var isConstant, out _);
@@ -480,7 +485,7 @@ namespace Lang
                     }
 
                     // Check type count
-                    if (type == TypeKind.CArray && structField.TypeDefinition.Count == null && structField.TypeDefinition.ConstCount == null)
+                    if (fieldType.TypeKind == TypeKind.CArray && structField.TypeDefinition.Count == null && structField.TypeDefinition.ConstCount == null)
                     {
                         ErrorReporter.Report($"C array of field '{structAst.Name}.{structField.Name}' must be initialized with a constant size", structField.TypeDefinition);
                     }
@@ -541,7 +546,7 @@ namespace Lang
                 }
 
                 // Check for circular dependencies
-                if (structAst.Name == structField.TypeDefinition.Name)
+                if (structAst == fieldType)
                 {
                     ErrorReporter.Report($"Struct '{structAst.Name}' contains circular reference in field '{structField.Name}'", structField);
                 }
@@ -570,12 +575,16 @@ namespace Lang
         private void VerifyFunctionDefinition(FunctionAst function, HashSet<string> functionNames, bool main)
         {
             // 1. Verify the return type of the function is valid
-            var returnType = VerifyType(function.ReturnTypeDefinition);
-            if (returnType == TypeKind.Error)
+            function.ReturnType = VerifyType(function.ReturnTypeDefinition, out var isGeneric, out var isVarargs, out var isParams);
+            if (isVarargs || isParams)
             {
-                ErrorReporter.Report($"Return type '{function.ReturnTypeDefinition.Name}' of function '{function.Name}' is not defined", function.ReturnTypeDefinition);
+                ErrorReporter.Report($"Return type of function '{function.Name}' cannot be varargs or Params", function.ReturnTypeDefinition);
             }
-            else if (returnType == TypeKind.CArray && function.ReturnTypeDefinition.Count == null)
+            else if (function.ReturnType == null && !isGeneric)
+            {
+                ErrorReporter.Report($"Return type '{PrintTypeDefinition(function.ReturnTypeDefinition)}' of function '{function.Name}' is not defined", function.ReturnTypeDefinition);
+            }
+            else if (function.ReturnType.TypeKind == TypeKind.CArray && function.ReturnTypeDefinition.Count == null)
             {
                 ErrorReporter.Report($"C array for function '{function.Name}' must have a constant size", function.ReturnTypeDefinition);
             }
@@ -602,7 +611,6 @@ namespace Lang
                     }
                 }
             }
-            function.ReturnType = TypeTable.GetType(function.ReturnTypeDefinition);
 
             // 2. Verify the argument types
             var argumentNames = new HashSet<string>();
@@ -615,45 +623,44 @@ namespace Lang
                 }
 
                 // 3b. Check for errored or undefined field types
-                var type = VerifyType(argument.TypeDefinition, argument: true);
-                // TODO Make this better, roll into VerifyType
-                argument.Type = TypeTable.GetType(argument.TypeDefinition);
+                argument.Type = VerifyType(argument.TypeDefinition, out isGeneric, out isVarargs, out isParams, allowParams: true);
 
-                switch (type)
+                if (isVarargs)
                 {
-                    case TypeKind.VarArgs:
-                        if (function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params))
-                        {
-                            ErrorReporter.Report($"Function '{function.Name}' cannot have multiple varargs", argument.TypeDefinition);
-                        }
-                        function.Flags |= FunctionFlags.Varargs;
-                        function.VarargsCallTypes = new List<IType[]>();
-                        break;
-                    case TypeKind.Params:
-                        if (function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params))
-                        {
-                            ErrorReporter.Report($"Function '{function.Name}' cannot have multiple varargs", argument.TypeDefinition);
-                        }
-                        function.Flags |= FunctionFlags.Params;
-                        function.ParamsElementType = TypeTable.GetType(argument.TypeDefinition.Generics[0]);
-                        break;
-                    case TypeKind.Error:
-                        ErrorReporter.Report($"Type '{PrintTypeDefinition(argument.TypeDefinition)}' of argument '{argument.Name}' in function '{function.Name}' is not defined", argument.TypeDefinition);
-                        break;
-                    default:
-                        if (function.Flags.HasFlag(FunctionFlags.Varargs))
-                        {
-                            ErrorReporter.Report($"Cannot declare argument '{argument.Name}' following varargs", argument);
-                        }
-                        else if (function.Flags.HasFlag(FunctionFlags.Params))
-                        {
-                            ErrorReporter.Report($"Cannot declare argument '{argument.Name}' following params", argument);
-                        }
-                        else if (function.Flags.HasFlag(FunctionFlags.Extern) && type == TypeKind.String)
-                        {
-                            argument.Type = TypeTable.Types["*.u8"];
-                        }
-                        break;
+                    if (function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params))
+                    {
+                        ErrorReporter.Report($"Function '{function.Name}' cannot have multiple varargs", argument.TypeDefinition);
+                    }
+                    function.Flags |= FunctionFlags.Varargs;
+                    function.VarargsCallTypes = new List<IType[]>();
+                }
+                else if (isParams)
+                {
+                    if (function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params))
+                    {
+                        ErrorReporter.Report($"Function '{function.Name}' cannot have multiple varargs", argument.TypeDefinition);
+                    }
+                    function.Flags |= FunctionFlags.Params;
+                    function.ParamsElementType = TypeTable.GetType(argument.TypeDefinition.Generics[0]);
+                }
+                else if (argument.Type == null && !isGeneric)
+                {
+                    ErrorReporter.Report($"Type '{PrintTypeDefinition(argument.TypeDefinition)}' of argument '{argument.Name}' in function '{function.Name}' is not defined", argument.TypeDefinition);
+                }
+                else
+                {
+                    if (function.Flags.HasFlag(FunctionFlags.Varargs))
+                    {
+                        ErrorReporter.Report($"Cannot declare argument '{argument.Name}' following varargs", argument);
+                    }
+                    else if (function.Flags.HasFlag(FunctionFlags.Params))
+                    {
+                        ErrorReporter.Report($"Cannot declare argument '{argument.Name}' following params", argument);
+                    }
+                    else if (function.Flags.HasFlag(FunctionFlags.Extern) && argument.Type?.TypeKind == TypeKind.String)
+                    {
+                        argument.Type = _rawStringType ??= TypeTable.Types["*.u8"];
+                    }
                 }
 
                 // 3c. Check for default arguments
@@ -672,16 +679,17 @@ namespace Lang
                             ErrorReporter.Report($"Expected default value of argument '{argument.Name}' in function '{function.Name}' to be a constant value", argument.Value);
 
                         }
-                        else if (type != TypeKind.Error && !TypeEquals(argument.TypeDefinition, defaultType))
+                        else if (argument.Type != null && !TypeEquals(argument.TypeDefinition, defaultType))
                         {
-                            ErrorReporter.Report($"Type of argument '{argument.Name}' in function '{function.Name}' is '{PrintTypeDefinition(argument.TypeDefinition)}', but default value is type '{PrintTypeDefinition(defaultType)}'", argument.Value);
+                            ErrorReporter.Report($"Type of argument '{argument.Name}' in function '{function.Name}' is '{argument.Type.Name}', but default value is type '{defaultType.Name}'", argument.Value);
                         }
                         else if (argument.TypeDefinition.PrimitiveType != null && argument.Value is ConstantAst constant)
                         {
                             VerifyConstant(constant, argument.TypeDefinition);
                         }
                     }
-                    else if (isConstant && type != TypeKind.Pointer && type != TypeKind.Error)
+                    // TODO Not sure what this covers, make sure to test
+                    else if (isConstant && argument.Type?.TypeKind != TypeKind.Pointer)
                     {
                         ErrorReporter.Report($"Type of argument '{argument.Name}' in function '{function.Name}' is '{PrintTypeDefinition(argument.TypeDefinition)}', but default value is 'null'", argument.Value);
                     }
@@ -691,13 +699,14 @@ namespace Lang
             // 3. Verify main function return type and arguments
             if (main)
             {
-                if (returnType != TypeKind.Void && returnType != TypeKind.Integer)
+                if (function.ReturnType?.TypeKind != TypeKind.Void && function.ReturnType?.TypeKind != TypeKind.Integer)
                 {
                     ErrorReporter.Report("The main function should return type 'int' or 'void'", function);
                 }
 
+                // TODO Make main only be type 'void main()'
                 var argument = function.Arguments.FirstOrDefault();
-                if (argument != null && !(function.Arguments.Count == 1 && argument.TypeDefinition.TypeKind == TypeKind.Array && argument.TypeDefinition.Generics.FirstOrDefault()?.TypeKind == TypeKind.String))
+                if (argument != null && !(function.Arguments.Count == 1 && argument.Type?.TypeKind == TypeKind.Array && argument.TypeDefinition.Generics.FirstOrDefault()?.TypeKind == TypeKind.String))
                 {
                     ErrorReporter.Report("The main function should either have 0 arguments or 'Array<string>' argument", function);
                 }
@@ -789,16 +798,24 @@ namespace Lang
             }
             else
             {
-                var targetType = VerifyType(overload.Type);
-                switch (targetType)
+                // var targetType = VerifyType(overload.Type);
+                var targetType = VerifyType(overload.Type, out var isGeneric, out var isVarargs, out var isParams);
+                if (isVarargs || isParams)
                 {
-                    case TypeKind.Error:
-                    case TypeKind.Struct:
-                    case TypeKind.String when overload.Operator != Operator.Subscript:
-                        break;
-                    default:
-                        ErrorReporter.Report($"Cannot overload operator '{PrintOperator(overload.Operator)}' for type '{PrintTypeDefinition(overload.Type)}'", overload.Type);
-                        break;
+                    ErrorReporter.Report($"Cannot overload operator '{PrintOperator(overload.Operator)}' for type '{PrintTypeDefinition(overload.Type)}'", overload.Type);
+                }
+                else
+                {
+                    switch (targetType?.TypeKind)
+                    {
+                        case TypeKind.Struct:
+                        case TypeKind.String when overload.Operator != Operator.Subscript:
+                        case null:
+                            break;
+                        default:
+                            ErrorReporter.Report($"Cannot overload operator '{PrintOperator(overload.Operator)}' for type '{PrintTypeDefinition(overload.Type)}'", overload.Type);
+                            break;
+                    }
                 }
             }
 
@@ -892,7 +909,6 @@ namespace Lang
                     function.Body.Identifiers[argument.Name] = argument;
                 }
             }
-            var returnType = VerifyType(function.ReturnTypeDefinition);
 
             // 2. For extern functions, simply verify there is no body and return
             if (function.Flags.HasFlag(FunctionFlags.Extern))
@@ -926,7 +942,7 @@ namespace Lang
                 // 6. Verify the function returns on all paths
                 if (!returned)
                 {
-                    if (returnType != TypeKind.Void)
+                    if (function.ReturnType?.TypeKind != TypeKind.Void)
                     {
                         ErrorReporter.Report($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnTypeDefinition)}' on all paths", function);
                     }
@@ -962,8 +978,8 @@ namespace Lang
                     overload.Body.Identifiers[argument.Name] = argument;
                 }
             }
-            var returnType = VerifyType(overload.ReturnTypeDefinition);
-            overload.ReturnType = TypeTable.GetType(overload.ReturnTypeDefinition);
+            // var returnType = VerifyType(overload.ReturnTypeDefinition);
+            overload.ReturnType = VerifyType(overload.ReturnTypeDefinition, out _, out _, out _);
 
             // 2. Resolve the compiler directives in the body
             if (overload.Flags.HasFlag(FunctionFlags.HasDirectives))
@@ -1108,7 +1124,7 @@ namespace Lang
                     }
                     break;
                 default:
-                    VerifyExpression(syntaxTree, currentFunction, scope);
+                    VerifyExpression(syntaxTree, currentFunction, scope, out _);
                     break;
             }
 
@@ -1117,11 +1133,8 @@ namespace Lang
 
         private void VerifyReturnStatement(ReturnAst returnAst, IFunction currentFunction, ScopeAst scope)
         {
-            // 1. Infer the return type of the function
-            var returnTypeKind = VerifyType(currentFunction.ReturnTypeDefinition);
-
             // 2. Handle void case since it's the easiest to interpret
-            if (returnTypeKind == TypeKind.Void)
+            if (currentFunction.ReturnType?.TypeKind == TypeKind.Void)
             {
                 if (returnAst.Value != null)
                 {
@@ -1131,7 +1144,7 @@ namespace Lang
             else
             {
                 // 3. Determine if the expression returns the correct value
-                var returnValueType = VerifyExpression(returnAst.Value, currentFunction, scope);
+                var returnValueType = VerifyExpression(returnAst.Value, currentFunction, scope, out _);
                 if (returnValueType == null)
                 {
                     ErrorReporter.Report($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnTypeDefinition)}'", returnAst);
@@ -1140,7 +1153,7 @@ namespace Lang
                 {
                     if (!TypeEquals(currentFunction.ReturnTypeDefinition, returnValueType))
                     {
-                        ErrorReporter.Report($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnTypeDefinition)}', but returned type '{PrintTypeDefinition(returnValueType)}'", returnAst.Value);
+                        ErrorReporter.Report($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnTypeDefinition)}', but returned type '{returnValueType.Name}'", returnAst.Value);
                     }
                 }
             }
@@ -1155,6 +1168,23 @@ namespace Lang
                 return;
             }
 
+            if (declaration.TypeDefinition != null)
+            {
+                declaration.Type = VerifyType(declaration.TypeDefinition, out _, out var isVarargs, out var isParams);
+                if (isVarargs || isParams)
+                {
+                    ErrorReporter.Report($"Variable '{declaration.Name}' cannot be varargs or Params", declaration.TypeDefinition);
+                }
+                else if (declaration.Type == null)
+                {
+                    ErrorReporter.Report($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                }
+                else if (declaration.Type.TypeKind == TypeKind.Void)
+                {
+                    ErrorReporter.Report($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
+                }
+            }
+
             // 2. Verify the null values
             if (declaration.Value is NullAst nullAst)
             {
@@ -1165,17 +1195,11 @@ namespace Lang
                 }
                 else
                 {
-                    var type = VerifyType(declaration.TypeDefinition);
-                    if (type == TypeKind.Error)
-                    {
-                        ErrorReporter.Report($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
-                    }
-                    else if (type != TypeKind.Pointer)
+                    if (declaration.Type != null && declaration.Type.TypeKind != TypeKind.Pointer)
                     {
                         ErrorReporter.Report("Cannot assign null to non-pointer type", declaration.Value);
                     }
 
-                    nullAst.TargetTypeDefinition = declaration.TypeDefinition;
                     nullAst.TargetType = declaration.Type;
                 }
             }
@@ -1193,15 +1217,14 @@ namespace Lang
                 }
                 else
                 {
-                    var type = VerifyType(declaration.TypeDefinition);
-                    if (type != TypeKind.Struct && type != TypeKind.String)
+                    if (declaration.Type == null || (declaration.Type.TypeKind != TypeKind.Struct && declaration.Type.TypeKind != TypeKind.String))
                     {
                         ErrorReporter.Report($"Can only use object initializer with struct type, got '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
                         return;
                     }
 
-                    var structDef = TypeTable.Types[declaration.TypeDefinition.GenericName] as StructAst;
-                    var fields = structDef!.Fields.ToDictionary(_ => _.Name);
+                    var structDef = declaration.Type as StructAst;
+                    var fields = structDef.Fields.ToDictionary(_ => _.Name);
                     foreach (var (name, assignment) in declaration.Assignments)
                     {
                         if (!fields.TryGetValue(name, out var field))
@@ -1219,7 +1242,7 @@ namespace Lang
                         {
                             if (!TypeEquals(field.TypeDefinition, valueType))
                             {
-                                ErrorReporter.Report($"Expected field value to be type '{PrintTypeDefinition(field.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                                ErrorReporter.Report($"Expected field value to be type '{PrintTypeDefinition(field.TypeDefinition)}', but got '{valueType.Name}'", assignment.Value);
                             }
                             else if (!isConstant)
                             {
@@ -1242,8 +1265,7 @@ namespace Lang
                 }
                 else
                 {
-                    var type = VerifyType(declaration.TypeDefinition);
-                    if (type != TypeKind.Error && type != TypeKind.Array && type != TypeKind.CArray)
+                    if (declaration.Type == null || (declaration.Type.TypeKind != TypeKind.Array && declaration.Type.TypeKind != TypeKind.CArray))
                     {
                         ErrorReporter.Report($"Cannot use array initializer to declare non-array type '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
                     }
@@ -1274,7 +1296,7 @@ namespace Lang
                     }
                 }
             }
-            // 6. Verify the declaration type
+            // 6. Verify compiler constants
             else
             {
                 switch (declaration.Name)
@@ -1287,24 +1309,13 @@ namespace Lang
                         declaration.Value = GetBuildEnv();
                         VerifyGlobalVariableValue(declaration);
                         break;
-                    default:
-                        var type = VerifyType(declaration.TypeDefinition);
-                        if (type == TypeKind.Error)
-                        {
-                            ErrorReporter.Report($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
-                        }
-                        else if (type == TypeKind.Void)
-                        {
-                            ErrorReporter.Report($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
-                        }
-                        break;
                 }
             }
 
             // 7. Verify the type definition count if necessary
-            if (declaration.TypeDefinition != null)
+            if (declaration.Type != null)
             {
-                if (declaration.TypeDefinition.TypeKind == TypeKind.CArray && declaration.TypeDefinition.Count == null && declaration.TypeDefinition.ConstCount == null)
+                if (declaration.Type.TypeKind == TypeKind.CArray && declaration.TypeDefinition.Count == null && declaration.TypeDefinition.ConstCount == null)
                 {
                     ErrorReporter.Report($"Length of C array variable '{declaration.Name}' must be initialized to a constant integer", declaration.TypeDefinition);
                 }
@@ -1318,7 +1329,7 @@ namespace Lang
                         {
                             ErrorReporter.Report($"Length of C array variable '{declaration.Name}' must be initialized with a constant size", declaration.TypeDefinition.Count);
                         }
-                        else if (countType.PrimitiveType is not IntegerType)
+                        else if (countType.TypeKind != TypeKind.Integer)
                         {
                             ErrorReporter.Report($"Expected count of variable '{declaration.Name}' to be an integer", declaration.TypeDefinition.Count);
                         }
@@ -1344,15 +1355,14 @@ namespace Lang
                 {
                     ErrorReporter.Report($"Constant variable '{declaration.Name}' should be assigned a constant value", declaration);
                 }
-                else if (declaration.TypeDefinition != null)
-                {
-                    declaration.TypeDefinition.Constant = true;
-                }
+                // else if (declaration.TypeDefinition != null)
+                // {
+                //     declaration.TypeDefinition.Constant = true;
+                // }
             }
 
             if (!ErrorReporter.Errors.Any())
             {
-                declaration.Type = TypeTable.GetType(declaration.TypeDefinition);
                 _irBuilder.EmitGlobalVariable(declaration, _globalScope);
             }
 
@@ -1370,30 +1380,20 @@ namespace Lang
             // Verify the assignment value matches the type definition if it has been defined
             if (declaration.TypeDefinition == null)
             {
-                if (VerifyType(valueType) == TypeKind.Void)
+                if (valueType?.TypeKind == TypeKind.Void)
                 {
                     ErrorReporter.Report($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.Value);
                 }
-                declaration.TypeDefinition = valueType;
+                declaration.Type = valueType;
             }
             else
             {
-                var type = VerifyType(declaration.TypeDefinition);
-                if (type == TypeKind.Error)
-                {
-                    ErrorReporter.Report($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
-                }
-                else if (type == TypeKind.Void)
-                {
-                    ErrorReporter.Report($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
-                }
-
                 // Verify the type is correct
                 if (valueType != null)
                 {
                     if (!TypeEquals(declaration.TypeDefinition, valueType))
                     {
-                        ErrorReporter.Report($"Expected declaration value to be type '{PrintTypeDefinition(declaration.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", declaration.TypeDefinition);
+                        ErrorReporter.Report($"Expected declaration value to be type '{declaration.Name}', but got '{valueType.Name}'", declaration.Value);
                     }
                     else if (declaration.TypeDefinition.PrimitiveType != null && declaration.Value is ConstantAst constant)
                     {
@@ -1412,6 +1412,28 @@ namespace Lang
                 return;
             }
 
+            if (declaration.TypeDefinition != null)
+            {
+                declaration.Type = VerifyType(declaration.TypeDefinition, out _, out var isVarargs, out var isParams);
+                if (isVarargs || isParams)
+                {
+                    ErrorReporter.Report($"Variable '{declaration.Name}' cannot be varargs or Params", declaration.TypeDefinition);
+                }
+                else if (declaration.Type == null)
+                {
+                    ErrorReporter.Report($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                }
+                else if (declaration.Type.TypeKind == TypeKind.Void)
+                {
+                    ErrorReporter.Report($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
+                }
+                else if (declaration.Type.TypeKind == TypeKind.Array || declaration.Type.TypeKind == TypeKind.CArray)
+                {
+                    var elementType = declaration.TypeDefinition.Generics[0];
+                    declaration.ArrayElementType = TypeTable.GetType(elementType);
+                }
+            }
+
             // 2. Verify the null values
             if (declaration.Value is NullAst nullAst)
             {
@@ -1422,52 +1444,36 @@ namespace Lang
                 }
                 else
                 {
-                    var type = VerifyType(declaration.TypeDefinition);
-                    if (type == TypeKind.Error)
-                    {
-                        ErrorReporter.Report($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
-                    }
-                    else if (type != TypeKind.Pointer)
+                    if (declaration.Type != null && declaration.Type.TypeKind != TypeKind.Pointer)
                     {
                         ErrorReporter.Report("Cannot assign null to non-pointer type", declaration.Value);
                     }
 
-                    nullAst.TargetTypeDefinition = declaration.TypeDefinition;
                     nullAst.TargetType = declaration.Type;
                 }
             }
             // 3. Verify declaration values
             else if (declaration.Value != null)
             {
-                var valueType = VerifyExpression(declaration.Value, currentFunction, scope);
+                var valueType = VerifyExpression(declaration.Value, currentFunction, scope, out _);
 
                 // Verify the assignment value matches the type definition if it has been defined
-                if (declaration.TypeDefinition == null)
+                if (declaration.Type == null)
                 {
-                    if (VerifyType(valueType) == TypeKind.Void)
+                    if (valueType?.TypeKind == TypeKind.Void)
                     {
                         ErrorReporter.Report($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.Value);
                     }
-                    declaration.TypeDefinition = valueType;
+                    declaration.Type = valueType;
                 }
                 else
                 {
-                    var type = VerifyType(declaration.TypeDefinition);
-                    if (type == TypeKind.Error)
-                    {
-                        ErrorReporter.Report($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
-                    }
-                    else if (type == TypeKind.Void)
-                    {
-                        ErrorReporter.Report($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
-                    }
-
                     // Verify the type is correct
                     if (valueType != null)
                     {
                         if (!TypeEquals(declaration.TypeDefinition, valueType))
                         {
-                            ErrorReporter.Report($"Expected declaration value to be type '{PrintTypeDefinition(declaration.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", declaration.TypeDefinition);
+                            ErrorReporter.Report($"Expected declaration value to be type '{declaration.Type}', but got '{valueType.Name}'", declaration.TypeDefinition);
                         }
                         else if (declaration.TypeDefinition.PrimitiveType != null && declaration.Value is ConstantAst constant)
                         {
@@ -1485,8 +1491,7 @@ namespace Lang
                 }
                 else
                 {
-                    var type = VerifyType(declaration.TypeDefinition);
-                    if (type != TypeKind.Struct && type != TypeKind.String)
+                    if (declaration.Type == null || (declaration.Type.TypeKind != TypeKind.Struct && declaration.Type.TypeKind != TypeKind.String))
                     {
                         ErrorReporter.Report($"Can only use object initializer with struct type, got '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
                         return;
@@ -1506,12 +1511,12 @@ namespace Lang
                             ErrorReporter.Report("Cannot have operator assignments in object initializers", assignment.Reference);
                         }
 
-                        var valueType = VerifyExpression(assignment.Value, currentFunction, scope);
+                        var valueType = VerifyExpression(assignment.Value, currentFunction, scope, out _);
                         if (valueType != null && field != null)
                         {
                             if (!TypeEquals(field.TypeDefinition, valueType))
                             {
-                                ErrorReporter.Report($"Expected field value to be type '{PrintTypeDefinition(field.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                                ErrorReporter.Report($"Expected field value to be type '{PrintTypeDefinition(field.TypeDefinition)}', but got '{valueType.Name}'", assignment.Value);
                             }
                             else if (field.TypeDefinition.PrimitiveType != null && assignment.Value is ConstantAst constant)
                             {
@@ -1530,8 +1535,7 @@ namespace Lang
                 }
                 else
                 {
-                    var type = VerifyType(declaration.TypeDefinition);
-                    if (type != TypeKind.Error && type != TypeKind.Array && type != TypeKind.CArray)
+                    if (declaration.Type == null || (declaration.Type.TypeKind != TypeKind.Array && declaration.Type.TypeKind != TypeKind.CArray))
                     {
                         ErrorReporter.Report($"Cannot use array initializer to declare non-array type '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
                     }
@@ -1542,12 +1546,12 @@ namespace Lang
                         declaration.ArrayElementType = TypeTable.GetType(elementType);
                         foreach (var value in declaration.ArrayValues)
                         {
-                            var valueType = VerifyExpression(value, currentFunction, scope);
+                            var valueType = VerifyExpression(value, currentFunction, scope, out _);
                             if (valueType != null)
                             {
                                 if (!TypeEquals(elementType, valueType))
                                 {
-                                    ErrorReporter.Report($"Expected array value to be type '{PrintTypeDefinition(elementType)}', but got '{PrintTypeDefinition(valueType)}'", value);
+                                    ErrorReporter.Report($"Expected array value to be type '{PrintTypeDefinition(elementType)}', but got '{valueType.Name}'", value);
                                 }
                                 else if (elementType.PrimitiveType != null && value is ConstantAst constant)
                                 {
@@ -1558,26 +1562,8 @@ namespace Lang
                     }
                 }
             }
-            // 6. Verify the declaration type
-            else
-            {
-                var type = VerifyType(declaration.TypeDefinition);
-                if (type == TypeKind.Error)
-                {
-                    ErrorReporter.Report($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
-                }
-                else if (type == TypeKind.Void)
-                {
-                    ErrorReporter.Report($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
-                }
-                else if (type == TypeKind.Array || type == TypeKind.CArray)
-                {
-                    var elementType = declaration.TypeDefinition.Generics[0];
-                    declaration.ArrayElementType = TypeTable.GetType(elementType);
-                }
-            }
 
-            // 7. Verify the type definition count if necessary
+            // 6. Verify the type definition count if necessary
             if (declaration.TypeDefinition != null)
             {
                 if (declaration.TypeDefinition.TypeKind == TypeKind.CArray && declaration.TypeDefinition.Count == null && declaration.TypeDefinition.ConstCount == null)
@@ -1613,30 +1599,18 @@ namespace Lang
                 }
             }
 
-            // 8. Verify constant values
+            // 7. Verify constant values
             if (declaration.Constant)
             {
                 switch (declaration.Value)
                 {
                     case ConstantAst constant:
-                        constant.TypeDefinition.Constant = true;
-                        break;
                     case StructFieldRefAst structField when structField.IsEnum:
                         break;
                     default:
                         ErrorReporter.Report($"Constant variable '{declaration.Name}' should be assigned a constant value", declaration);
                         break;
                 }
-                if (declaration.TypeDefinition != null)
-                {
-                    declaration.TypeDefinition.Constant = true;
-                }
-            }
-
-            // TODO Move somewhere
-            if (declaration.TypeDefinition != null)
-            {
-                declaration.Type = TypeTable.GetType(declaration.TypeDefinition);
             }
 
             scope.Identifiers.TryAdd(declaration.Name, declaration);
@@ -1676,17 +1650,10 @@ namespace Lang
         private void VerifyAssignment(AssignmentAst assignment, IFunction currentFunction, ScopeAst scope)
         {
             // 1. Verify the variable is already defined, that it is not a constant, and the r-value
-            var variableTypeDefinition = GetReference(assignment.Reference, currentFunction, scope, out _);
-            var valueType = VerifyExpression(assignment.Value, currentFunction, scope);
+            var variableType = GetReference(assignment.Reference, currentFunction, scope, out _);
+            var valueType = VerifyExpression(assignment.Value, currentFunction, scope, out _);
 
-            if (variableTypeDefinition == null) return;
-
-            if (variableTypeDefinition.Constant)
-            {
-                var variable = assignment.Reference as IdentifierAst;
-                ErrorReporter.Report($"Cannot reassign value of constant variable '{variable?.Name}'", assignment);
-                return;
-            }
+            if (variableType == null) return;
 
             // 2. Verify the assignment value
             if (assignment.Value is NullAst nullAst)
@@ -1695,12 +1662,11 @@ namespace Lang
                 {
                     ErrorReporter.Report("Cannot assign null value with operator assignment", assignment.Value);
                 }
-                if (variableTypeDefinition.Name != "*")
+                if (variableType.TypeKind != TypeKind.Pointer)
                 {
                     ErrorReporter.Report("Cannot assign null to non-pointer type", assignment.Value);
                 }
-                nullAst.TargetTypeDefinition = variableTypeDefinition;
-                nullAst.TargetType = TypeTable.GetType(variableTypeDefinition);
+                nullAst.TargetType = variableType;
                 return;
             }
 
@@ -1710,8 +1676,8 @@ namespace Lang
                 // 3a. Verify the operator is valid
                 if (assignment.Operator != Operator.None)
                 {
-                    var lhs = VerifyType(variableTypeDefinition);
-                    var rhs = VerifyType(valueType);
+                    var lhs = variableType.TypeKind;
+                    var rhs = valueType.TypeKind;
                     switch (assignment.Operator)
                     {
                         // Both need to be bool and returns bool
@@ -1719,7 +1685,7 @@ namespace Lang
                         case Operator.Or:
                             if (lhs != TypeKind.Boolean || rhs != TypeKind.Boolean)
                             {
-                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
                             }
                             break;
                         // Invalid assignment operators
@@ -1739,7 +1705,7 @@ namespace Lang
                             if (!(lhs == TypeKind.Integer && rhs == TypeKind.Integer) &&
                                 !(lhs == TypeKind.Float && (rhs == TypeKind.Float || rhs == TypeKind.Integer)))
                             {
-                                ErrorReporter.Report($"Operator {PrintOperator(assignment.Operator)} not applicable to types '{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
                             }
                             break;
                         // Requires both integer or bool types and returns more same type
@@ -1749,8 +1715,7 @@ namespace Lang
                             if (!(lhs == TypeKind.Boolean && rhs == TypeKind.Boolean) &&
                                 !(lhs == TypeKind.Integer && rhs == TypeKind.Integer))
                             {
-                                ErrorReporter.Report($"Operator {PrintOperator(assignment.Operator)} not applicable to types " +
-                                        $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
                             }
                             break;
                         // Requires both to be integers
@@ -1760,18 +1725,18 @@ namespace Lang
                         case Operator.RotateRight:
                             if (lhs != TypeKind.Integer || rhs != TypeKind.Integer)
                             {
-                                ErrorReporter.Report($"Operator {PrintOperator(assignment.Operator)} not applicable to types '{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
                             }
                             break;
                     }
                 }
-                else if (!TypeEquals(variableTypeDefinition, valueType))
+                else if (!TypeEquals(variableType, valueType))
                 {
-                    ErrorReporter.Report($"Expected assignment value to be type '{PrintTypeDefinition(variableTypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                    ErrorReporter.Report($"Expected assignment value to be type '{PrintTypeDefinition(variableType)}', but got '{PrintTypeDefinition(valueType)}'", assignment.Value);
                 }
-                else if (variableTypeDefinition.PrimitiveType != null && assignment.Value is ConstantAst constant)
+                else if (assignment.Value is ConstantAst constant)
                 {
-                    VerifyConstant(constant, variableTypeDefinition);
+                    VerifyConstant(constant, variableType);
                 }
             }
         }
@@ -1886,7 +1851,7 @@ namespace Lang
                                     }
                                     else
                                     {
-                                        ErrorReporter.Report($"Overload [] for type '{PrintTypeDefinition(fieldType)}' must be a pointer to be able to set the value", index);
+                                        ErrorReporter.Report($"Overload [] for type '{fieldType.Name}' must be a pointer to be able to set the value", index);
                                         return null;
                                     }
                                 }
@@ -1995,7 +1960,7 @@ namespace Lang
                     }
                     break;
                 default:
-                    refType = VerifyExpression(structField.Children[0], currentFunction, scope);
+                    refType = VerifyExpression(structField.Children[0], currentFunction, scope, out _);
                     break;
             }
             if (refType == null)
@@ -2114,8 +2079,8 @@ namespace Lang
 
         private bool VerifyCondition(IAst ast, IFunction currentFunction, ScopeAst scope)
         {
-            var conditionalType = VerifyExpression(ast, currentFunction, scope);
-            switch (VerifyType(conditionalType))
+            var conditionalType = VerifyExpression(ast, currentFunction, scope, out _);
+            switch (conditionalType?.TypeKind)
             {
                 case TypeKind.Integer:
                 case TypeKind.Float:
@@ -2123,10 +2088,10 @@ namespace Lang
                 case TypeKind.Pointer:
                     // Valid types
                     return !ErrorReporter.Errors.Any();
-                case TypeKind.Error:
+                case null:
                     return false;
                 default:
-                    ErrorReporter.Report($"Expected condition to be bool, int, float, or pointer, but got '{PrintTypeDefinition(conditionalType)}'", ast);
+                    ErrorReporter.Report($"Expected condition to be bool, int, float, or pointer, but got '{conditionalType.TypeKind}'", ast);
                     return false;
             }
         }
@@ -2140,53 +2105,49 @@ namespace Lang
             };
             if (each.Iteration != null)
             {
-                var iterationTypeDefinition = VerifyExpression(each.Iteration, currentFunction, scope);
-                if (iterationTypeDefinition == null) return;
-                each.IterationVariable.TypeDefinition = iterationTypeDefinition.Generics.FirstOrDefault();
+                var iterationType = VerifyExpression(each.Iteration, currentFunction, scope, out _);
+                if (iterationType == null) return;
+                each.IterationVariable.TypeDefinition = iterationType.Generics.FirstOrDefault();
 
                 if (each.IndexVariable != null)
                 {
-                    each.IndexVariable.TypeDefinition = _s32Type;
-                    each.IndexVariable.Type = TypeTable.Types["s32"];
+                    each.IndexVariable.Type = _s32Type;
                     each.Body.Identifiers.TryAdd(each.IndexVariable.Name, each.IndexVariable);
                 }
 
-                switch (iterationTypeDefinition.TypeKind)
+                switch (iterationType.TypeKind)
                 {
                     case TypeKind.CArray:
-                        each.CArrayLength = iterationTypeDefinition.ConstCount.Value;
+                        each.CArrayLength = iterationType.ConstCount.Value;
                         // Same logic as below with special case for constant length
-                        each.IteratorType = each.IterationVariable.TypeDefinition;
                         each.IterationVariable.Type = TypeTable.GetType(each.IterationVariable.TypeDefinition);
                         each.Body.Identifiers.TryAdd(each.IterationVariable.Name, each.IterationVariable);
                         break;
                     case TypeKind.Array:
                     case TypeKind.Params:
-                        each.IteratorType = each.IterationVariable.TypeDefinition;
                         each.IterationVariable.Type = TypeTable.GetType(each.IterationVariable.TypeDefinition);
                         each.Body.Identifiers.TryAdd(each.IterationVariable.Name, each.IterationVariable);
                         break;
                     default:
-                        ErrorReporter.Report($"Type {PrintTypeDefinition(iterationTypeDefinition)} cannot be used as an iterator", each.Iteration);
+                        ErrorReporter.Report($"Type {iterationType.Name} cannot be used as an iterator", each.Iteration);
                         break;
                 }
             }
             else
             {
-                var begin = VerifyExpression(each.RangeBegin, currentFunction, scope);
-                var beginType = VerifyType(begin);
-                if (beginType != TypeKind.Integer && beginType != TypeKind.Error)
+                var beginType = VerifyExpression(each.RangeBegin, currentFunction, scope, out _);
+                if (beginType != null && beginType.TypeKind != TypeKind.Integer)
                 {
-                    ErrorReporter.Report($"Expected range to begin with 'int', but got '{PrintTypeDefinition(begin)}'", each.RangeBegin);
+                    ErrorReporter.Report($"Expected range to begin with 'int', but got '{beginType.Name}'", each.RangeBegin);
                 }
-                var end = VerifyExpression(each.RangeEnd, currentFunction, scope);
-                var endType = VerifyType(end);
-                if (endType != TypeKind.Integer && endType != TypeKind.Error)
+
+                var endType = VerifyExpression(each.RangeEnd, currentFunction, scope, out _);
+                if (endType != null && endType.TypeKind != TypeKind.Integer)
                 {
-                    ErrorReporter.Report($"Expected range to end with 'int', but got '{PrintTypeDefinition(end)}'", each.RangeEnd);
+                    ErrorReporter.Report($"Expected range to end with 'int', but got '{endType.Name}'", each.RangeEnd);
                 }
-                each.IterationVariable.TypeDefinition = _s32Type;
-                each.IterationVariable.Type = TypeTable.Types["s32"];
+
+                each.IterationVariable.Type = _s32Type;
                 each.Body.Identifiers.TryAdd(each.IterationVariable.Name, each.IterationVariable);
             }
 
@@ -2227,7 +2188,7 @@ namespace Lang
                     {
                         int.TryParse(constant.Value, out count);
                     }
-                    VerifyType(constant.TypeDefinition);
+                    // VerifyType(constant.TypeDefinition);
                     constant.Type = TypeTable.GetType(constant.TypeDefinition);
                     // return constant.TypeDefinition;
                     return constant.Type;
@@ -2278,7 +2239,7 @@ namespace Lang
                             return null;
                     }
                 default:
-                    return VerifyExpression(ast, currentFunction, scope);
+                    return VerifyExpression(ast, currentFunction, scope, out _);
             }
         }
 
@@ -2290,7 +2251,7 @@ namespace Lang
             switch (ast)
             {
                 case ConstantAst constant:
-                    VerifyType(constant.TypeDefinition);
+                    // VerifyType(constant.TypeDefinition);
                     constant.Type = TypeTable.GetType(constant.TypeDefinition);
                     // return constant.TypeDefinition;
                     return constant.Type;
@@ -2367,14 +2328,13 @@ namespace Lang
                             return null;
                         }
 
-                        var type = VerifyType(referenceType);
-                        if (type == TypeKind.Error)
+                        if (referenceType == null)
                         {
                             return null;
                         }
 
-                        // TODO Get this figured out
-                        var pointerType = new TypeDefinition {Name = "*", TypeKind = TypeKind.Pointer};
+                        // TODO Get this figured out, translate from VerifyType
+                        var pointerType = new TypeDefinition {Name = "*"};
                         if (type == TypeKind.CArray)
                         {
                             pointerType.Generics.Add(referenceType.Generics[0]);
@@ -2441,11 +2401,8 @@ namespace Lang
                     return VerifyIndexType(index, currentFunction, scope);
                 case TypeDefinition typeDef:
                 {
-                    if (VerifyType(typeDef) == TypeKind.Error)
-                    {
-                        return null;
-                    }
-                    if (!TypeTable.Types.TryGetValue(typeDef.GenericName, out var type))
+                    var type = VerifyType(typeDef, out _, out _, out _);
+                    if (type == null)
                     {
                         return null;
                     }
@@ -2455,9 +2412,9 @@ namespace Lang
                 }
                 case CastAst cast:
                 {
-                    var targetType = VerifyType(cast.TargetTypeDefinition);
+                    cast.TargetType = VerifyType(cast.TargetTypeDefinition, out _, out _, out _);
                     var valueType = VerifyExpression(cast.Value, currentFunction, scope, out _);
-                    switch (targetType)
+                    switch (cast.TargetType?.TypeKind)
                     {
                         case TypeKind.Integer:
                         case TypeKind.Float:
@@ -2472,23 +2429,20 @@ namespace Lang
                                     ErrorReporter.Report($"Unable to cast type '{valueType.Name}' to '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast.Value);
                                     break;
                             }
-
-                            cast.TargetType = TypeTable.GetType(cast.TargetTypeDefinition);
                             break;
                         case TypeKind.Pointer:
                             if (valueType?.TypeKind != TypeKind.Pointer)
                             {
                                 ErrorReporter.Report($"Unable to cast type '{valueType.Name}' to '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast.Value);
                             }
-                            cast.TargetType = TypeTable.GetType(cast.TargetTypeDefinition);
                             break;
-                        case TypeKind.Error:
+                        case null:
                             // Don't need to report additional errors
                             return null;
                         default:
                             if (valueType != null)
                             {
-                                ErrorReporter.Report($"Unable to cast type '{valueType.Name}' to '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast);
+                                ErrorReporter.Report($"Unable to cast type '{valueType.Name}' to '{cast.TargetType.Name}'", cast);
                             }
                             break;
                     }
@@ -2570,7 +2524,7 @@ namespace Lang
                 return null;
             }
 
-            var primitive = enumAst.BaseTypeDefinition.PrimitiveType;
+            // var primitive = enumAst.BaseTypeDefinition.PrimitiveType;
             // return new TypeDefinition {Name = enumAst.Name, TypeKind = TypeKind.Enum, PrimitiveType = new EnumType {Bytes = primitive.Bytes, Signed = primitive.Signed}};
             return enumAst;
         }
@@ -2585,7 +2539,7 @@ namespace Lang
             for (var i = 0; i < call.Arguments.Count; i++)
             {
                 var argument = call.Arguments[i];
-                var argumentType = VerifyExpression(argument, currentFunction, scope);
+                var argumentType = VerifyExpression(argument, currentFunction, scope, out _);
                 if (argumentType == null && argument is not NullAst)
                 {
                     argumentsError = true;
@@ -2599,7 +2553,7 @@ namespace Lang
             {
                 foreach (var (name, argument) in call.SpecifiedArguments)
                 {
-                    var argumentType = VerifyExpression(argument, currentFunction, scope);
+                    var argumentType = VerifyExpression(argument, currentFunction, scope, out _);
                     if (argumentType == null && argument is not NullAst)
                     {
                         argumentsError = true;
@@ -2612,7 +2566,8 @@ namespace Lang
             {
                 foreach (var generic in call.Generics)
                 {
-                    if (VerifyType(generic) == TypeKind.Error)
+                    var genericType = VerifyType(generic, out _, out _, out _);
+                    if (genericType == null)
                     {
                         ErrorReporter.Report($"Undefined generic type '{PrintTypeDefinition(generic)}'", generic);
                         argumentsError = true;
@@ -2689,7 +2644,6 @@ namespace Lang
                 }
                 else if (argumentAst is NullAst nullAst)
                 {
-                    nullAst.TargetTypeDefinition = functionArg.TypeDefinition;
                     nullAst.TargetType = functionArg.Type;
                 }
                 else
@@ -2698,12 +2652,9 @@ namespace Lang
                     if (argument != null)
                     {
                         // TODO Figure this out, maybe add flag like IsType
-                        if (functionArg.TypeDefinition.TypeKind == TypeKind.Type)
+                        if (functionArg.Type.TypeKind == TypeKind.Type)
                         {
-                            var typeIndex = new ConstantAst
-                            {
-                                TypeDefinition = new TypeDefinition {TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Signed = true, Bytes = 4}}, Type = TypeTable.Types["s32"]
-                            };
+                            var typeIndex = new ConstantAst {Type = _s32Type};
                             if (argument.TypeIndex.HasValue)
                             {
                                 typeIndex.Value = argument.TypeIndex.ToString();
@@ -2740,7 +2691,6 @@ namespace Lang
                         var argumentAst = call.Arguments[i];
                         if (argumentAst is NullAst nullAst)
                         {
-                            nullAst.TargetTypeDefinition = paramsType;
                             nullAst.TargetType = function.ParamsElementType;
                         }
                         else
@@ -2750,10 +2700,7 @@ namespace Lang
                             {
                                 if (paramsType.TypeKind == TypeKind.Type)
                                 {
-                                    var typeIndex = new ConstantAst
-                                    {
-                                        TypeDefinition = new TypeDefinition {TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Signed = true, Bytes = 4}}, Type = TypeTable.Types["s32"]
-                                    };
+                                    var typeIndex = new ConstantAst {Type = _s32Type};
                                     if (argument.TypeIndex.HasValue)
                                     {
                                         typeIndex.Value = argument.TypeIndex.ToString();
@@ -3564,7 +3511,213 @@ namespace Lang
             return true;
         }
 
-        private TypeKind VerifyType(TypeDefinition typeDef, int depth = 0, bool argument = false)
+        // TODO Add isType out argument?
+        private IType VerifyType(TypeDefinition type, out bool isGeneric, out bool isVarargs, out bool isParams, int depth = 0, bool allowParams = false)
+        {
+            isGeneric = false;
+            isVarargs = false;
+            isParams = false;
+            if (type == null) return null;
+
+            if (type.IsGeneric)
+            {
+                if (type.Generics.Any())
+                {
+                    ErrorReporter.Report("Generic type cannot have additional generic types", type);
+                }
+                isGeneric = true;
+                return null;
+            }
+
+            if (type.Count != null && type.Name != "Array" && type.Name != "CArray")
+            {
+                ErrorReporter.Report($"Type '{PrintTypeDefinition(type)}' cannot have a count", type);
+                return null;
+            }
+
+            var hasGenerics = type.Generics.Any();
+
+            switch (type.Name)
+            {
+                case "bool":
+                    if (hasGenerics)
+                    {
+                        ErrorReporter.Report("Type 'bool' cannot have generics", type);
+                    }
+                    return _boolType;
+                case "string":
+                    if (hasGenerics)
+                    {
+                        ErrorReporter.Report("Type 'string' cannot have generics", type);
+                    }
+                    return _stringType ??= TypeTable.Types["string"];
+                case "Array":
+                    if (type.Generics.Count != 1)
+                    {
+                        ErrorReporter.Report($"Type 'Array' should have 1 generic type, but got {type.Generics.Count}", type);
+                    }
+                    return VerifyArray(type, depth, true, out isGeneric);
+                case "CArray":
+                    if (type.Generics.Count != 1)
+                    {
+                        ErrorReporter.Report($"Type 'CArray' should have 1 generic type, but got {type.Generics.Count}", type);
+                        return null;
+                    }
+                    else
+                    {
+                        var elementTypeDef = type.Generics[0];
+                        var elementType = VerifyType(elementTypeDef, out isGeneric, out _, out _, depth + 1, allowParams);
+                        if (elementType == null || isGeneric)
+                        {
+                            return null;
+                        }
+                        else
+                        {
+                            if (!TypeTable.Types.TryGetValue(type.GenericName, out var arrayType))
+                            {
+                                arrayType = new ArrayType {Name = PrintTypeDefinition(type), Size = elementType.Size, ElementType = elementType};
+                                TypeTable.Add(type.GenericName, arrayType);
+                                TypeTable.CreateTypeInfo(arrayType);
+                            }
+                            return arrayType;
+                        }
+                    }
+                case "void":
+                    if (hasGenerics)
+                    {
+                        ErrorReporter.Report("Type 'void' cannot have generics", type);
+                    }
+                    return _voidType;
+                case "*":
+                    if (type.Generics.Count != 1)
+                    {
+                        ErrorReporter.Report($"pointer type should have reference to 1 type, but got {type.Generics.Count}", type);
+                        return null;
+                    }
+                    else if (TypeTable.Types.TryGetValue(type.GenericName, out var pointerType))
+                    {
+                        return pointerType;
+                    }
+                    else
+                    {
+                        var typeDef = type.Generics[0];
+                        var pointedToType = VerifyType(typeDef, out isGeneric, out _, out _, depth + 1, allowParams);
+                        if (pointedToType == null || isGeneric)
+                        {
+                            return null;
+                        }
+                        else
+                        {
+                            // There are some cases where the pointed to type is a struct that contains a field for the pointer type
+                            // To account for this, the type table needs to be checked for again for the type
+                            if (!TypeTable.Types.TryGetValue(type.GenericName, out pointerType))
+                            {
+                                pointerType = new PrimitiveAst {Name = PrintTypeDefinition(type), TypeKind = TypeKind.Pointer, Size = 8, PointerType = pointedToType};
+                                TypeTable.Add(type.GenericName, pointerType);
+                                TypeTable.CreateTypeInfo(pointerType);
+                            }
+                            return pointerType;
+                        }
+                    }
+                case "...":
+                    if (hasGenerics)
+                    {
+                        ErrorReporter.Report("Type 'varargs' cannot have generics", type);
+                    }
+                    isVarargs = true;
+                    return null;
+                case "Params":
+                    isParams = true;
+                    if (!allowParams)
+                    {
+                        return null;
+                    }
+                    if (depth != 0)
+                    {
+                        ErrorReporter.Report($"Params can only be declared as a top level type, such as 'Params<int>'", type);
+                        return null;
+                    }
+                    if (type.Generics.Count != 1)
+                    {
+                        ErrorReporter.Report($"Type 'Params' should have 1 generic type, but got {type.Generics.Count}", type);
+                        return null;
+                    }
+                    return VerifyArray(type, depth, true, out isGeneric);
+                case "Type":
+                    if (hasGenerics)
+                    {
+                        ErrorReporter.Report("Type 'Type' cannot have generics", type);
+                    }
+                    return _s32Type;
+                default:
+                    if (hasGenerics)
+                    {
+                        var genericName = type.GenericName;
+                        if (TypeTable.Types.TryGetValue(genericName, out var structType))
+                        {
+                            return structType;
+                        }
+                        else
+                        {
+                            var generics = type.Generics.ToArray();
+                            var error = false;
+                            foreach (var generic in generics)
+                            {
+                                var genericType = VerifyType(generic, out var hasGeneric, out _, out _, depth + 1, allowParams);
+                                if (genericType == null)
+                                {
+                                    error = true;
+                                }
+                                else if (hasGeneric)
+                                {
+                                    isGeneric = true;
+                                }
+                            }
+                            if (!_polymorphicStructs.TryGetValue(type.Name, out var structDef))
+                            {
+                                ErrorReporter.Report($"No polymorphic structs of type '{type.Name}'", type);
+                                return null;
+                            }
+                            else if (structDef.Generics.Count != type.Generics.Count)
+                            {
+                                ErrorReporter.Report($"Expected type '{type.Name}' to have {structDef.Generics.Count} generic(s), but got {type.Generics.Count}", type);
+                                return null;
+                            }
+                            else if (error || isGeneric)
+                            {
+                                return null;
+                            }
+                            else
+                            {
+                                var polyStruct = _polymorpher.CreatePolymorphedStruct(structDef, PrintTypeDefinition(type), TypeKind.Struct, generics);
+                                TypeTable.Add(genericName, polyStruct);
+                                VerifyStruct(polyStruct);
+                                return polyStruct;
+                            }
+                        }
+                    }
+                    else if (TypeTable.Types.TryGetValue(type.Name, out var typeValue))
+                    {
+                        switch (typeValue)
+                        {
+                            case StructAst structAst:
+                                if (!structAst.Verifying)
+                                {
+                                    VerifyStruct(structAst);
+                                }
+                                type.TypeKind = TypeKind.Struct;
+                                break;
+                            case EnumAst enumAst:
+                                return enumAst;
+                            default:
+                                return null;
+                        }
+                    }
+                    return null;
+            }
+        }
+
+        /*private TypeKind VerifyType(TypeDefinition typeDef, int depth = 0, bool argument = false)
         {
             if (typeDef == null) return TypeKind.Error;
             if (typeDef.TypeKind != null) return typeDef.TypeKind.Value;
@@ -3850,9 +4003,36 @@ namespace Lang
                     break;
             }
             return typeDef.TypeKind.Value;
+        }*/
+
+        private IType VerifyArray(TypeDefinition typeDef, int depth, bool argument, out bool isGeneric)
+        {
+            isGeneric = false;
+            var elementTypeDef = typeDef.Generics[0];
+            var elementType = argument ? VerifyArgumentType(elementTypeDef, out isGeneric, out _, out _, depth + 1) : VerifyType(elementTypeDef, depth + 1);
+            if (elementType == null || isGeneric)
+            {
+                return null;
+            }
+
+            var genericName = $"Array.{elementTypeDef.GenericName}";
+            if (TypeTable.Types.TryGetValue(genericName, out var arrayType))
+            {
+                return arrayType;
+            }
+            if (!_polymorphicStructs.TryGetValue("Array", out var structDef))
+            {
+                ErrorReporter.Report($"No polymorphic structs with name '{typeDef.Name}'", typeDef);
+                return null;
+            }
+
+            var arrayStruct = _polymorpher.CreatePolymorphedStruct(structDef, $"Array<{PrintTypeDefinition(elementTypeDef)}>", TypeKind.Array, elementTypeDef);
+            TypeTable.Add(genericName, arrayStruct);
+            VerifyStruct(arrayStruct);
+            return arrayStruct;
         }
 
-        private bool VerifyArray(TypeDefinition typeDef, int depth, bool argument, out bool hasGenerics)
+        /*private bool VerifyArray(TypeDefinition typeDef, int depth, bool argument, out bool hasGenerics)
         {
             hasGenerics = false;
             var elementType = typeDef.Generics[0];
@@ -3882,7 +4062,7 @@ namespace Lang
             TypeTable.Add(genericName, arrayStruct);
             VerifyStruct(arrayStruct);
             return true;
-        }
+        }*/
 
         private static string PrintTypeDefinition(TypeDefinition type)
         {

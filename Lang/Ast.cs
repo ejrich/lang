@@ -207,7 +207,7 @@ namespace Lang
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
-        public TypeDefinition TargetTypeDefinition { get; set; }
+        // public TypeDefinition TargetTypeDefinition { get; set; }
         public IType TargetType { get; set; }
     }
 
@@ -321,7 +321,7 @@ namespace Lang
         public VariableAst IterationVariable { get; set; }
         public VariableAst IndexVariable { get; set; }
         public IAst Iteration { get; set; }
-        public TypeDefinition IteratorType { get; set; }
+        // public TypeDefinition IteratorType { get; set; }
         public uint CArrayLength { get; set; }
         public IAst RangeBegin { get; set; }
         public IAst RangeEnd { get; set; }
@@ -334,7 +334,7 @@ namespace Lang
         public uint Line { get; init; }
         public uint Column { get; init; }
         public string Name { get; set; }
-        public TypeDefinition TypeDefinition { get; set; } // TODO Remove
+        // public TypeDefinition TypeDefinition { get; set; } // TODO Remove
         public IType Type { get; set; }
         public int? AllocationIndex { get; set; }
         public InstructionValue Pointer { get; set; }
@@ -406,10 +406,10 @@ namespace Lang
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
-        public TypeKind? TypeKind { get; set; }
+        // public TypeKind? TypeKind { get; set; }
         public string Name { get; set; }
         public bool IsGeneric { get; set; }
-        public bool Constant { get; set; }
+        // public bool Constant { get; set; }
         public bool Character { get; set; }
         public int GenericIndex { get; set; }
         public int? TypeIndex { get; set; }
