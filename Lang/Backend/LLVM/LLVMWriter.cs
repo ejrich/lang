@@ -465,7 +465,7 @@ namespace Lang.Backend.LLVM
             // 4. Initialize struct field default values
             else if (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind)
             {
-                InitializeStruct(declaration.Type, variable);
+                InitializeStruct(declaration.Type, variable, localVariables, declaration.Assignments);
             }
             // 5. Or initialize to 0
             else if (type.TypeKind != LLVMTypeKind.LLVMArrayTypeKind)
@@ -475,8 +475,10 @@ namespace Lang.Backend.LLVM
             }
         }
 
-        private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable)
+        private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable,
+            IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables = null, List<AssignmentAst> values = null)
         {
+            var assignments = values == null ? new Dictionary<string, AssignmentAst>() : values.ToDictionary(_ => (_.Variable as VariableAst)!.Name);
             var structDef = _types[typeDef.GenericName] as StructAst;
             for (var i = 0; i < structDef!.Fields.Count; i++)
             {
@@ -487,7 +489,14 @@ namespace Lang.Backend.LLVM
 
                 var field = LLVMApi.BuildStructGEP(_builder, variable, (uint) i, structField.Name);
 
-                if (structField.Type.Name == "List")
+                if (assignments.TryGetValue(structField.Name, out var assignment))
+                {
+                    var expression = WriteExpression(assignment.Value, localVariables);
+                    var value = CastValue(expression, structField.Type);
+
+                    LLVMApi.BuildStore(_builder, value, field);
+                }
+                else if (structField.Type.Name == "List")
                 {
                     var count = (ConstantAst)structField.Type.Count;
                     InitializeConstList(field, int.Parse(count.Value), structField.Type.Generics[0]);

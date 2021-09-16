@@ -427,7 +427,7 @@ namespace Lang.Translation
                 return;
             }
 
-            // 2. Verify the assignment value
+            // 2. Verify the null values
             if (declaration.Value is NullAst nullAst)
             {
                 // 2a. Verify null can be assigned
@@ -450,11 +450,63 @@ namespace Lang.Translation
                     nullAst.TargetType = declaration.Type;
                 }
             }
+            // 3. Verify object initializers
+            else if (declaration.Assignments.Any())
+            {
+                if (declaration.Type == null)
+                {
+                    errors.Add(CreateError("Struct literals are not yet supported", declaration));
+                }
+                else
+                {
+                    var type = VerifyType(declaration.Type, errors);
+                    if (type != Type.Struct)
+                    {
+                        errors.Add(CreateError($"Can only use object initializer with struct type, got '{PrintTypeDefinition(declaration.Type)}'", declaration.Type));
+                        return;
+                    }
+
+                    var structDef = _types[declaration.Type.GenericName] as StructAst;
+                    var fields = structDef!.Fields.ToDictionary(_ => _.Name);
+                    foreach (var assignment in declaration.Assignments)
+                    {
+                        StructFieldAst field = null;
+                        if (assignment.Variable is not VariableAst variableAst)
+                        {
+                            errors.Add(CreateError("Expected to get field in object initializer", assignment.Variable));
+                        }
+                        else if (!fields.TryGetValue(variableAst.Name, out field))
+                        {
+                            errors.Add(CreateError($"Field '{variableAst.Name}' not present in struct '{PrintTypeDefinition(declaration.Type)}'", assignment.Variable));
+                        }
+
+                        if (assignment.Operator != Operator.None)
+                        {
+                            errors.Add(CreateError("Cannot have operator assignments in object initializers", assignment.Variable));
+                        }
+
+                        var valueType = VerifyExpression(assignment.Value, localVariables, errors);
+                        if (valueType != null && field != null)
+                        {
+                            if (!TypeEquals(field.Type, valueType))
+                            {
+                                errors.Add(CreateError($"Expected field value to be type '{PrintTypeDefinition(field.Type)}', " +
+                                    $"but got '{PrintTypeDefinition(valueType)}'", field.Type));
+                            }
+                            else if (field.Type.PrimitiveType != null && assignment.Value is ConstantAst constant)
+                            {
+                                VerifyConstant(constant, field.Type, errors);
+                            }
+                        }
+                    }
+                }
+            }
+            // 4. Verify declaration values
             else
             {
                 var valueType = VerifyExpression(declaration.Value, localVariables, errors);
 
-                // 2b. Verify the assignment value matches the type definition if it has been defined
+                // 4a. Verify the assignment value matches the type definition if it has been defined
                 if (declaration.Type == null)
                 {
                     declaration.Type = valueType;
@@ -477,9 +529,7 @@ namespace Lang.Translation
                         }
                         else if (declaration.Type.PrimitiveType != null && declaration.Value is ConstantAst constant)
                         {
-                            constant.Type.Name = declaration.Type.Name;
-                            constant.Type.PrimitiveType = declaration.Type.PrimitiveType;
-                            VerifyConstant(constant, errors);
+                            VerifyConstant(constant, declaration.Type, errors);
                         }
                     }
                 }
@@ -569,9 +619,7 @@ namespace Lang.Translation
                 }
                 else if (variableTypeDefinition.PrimitiveType != null && assignment.Value is ConstantAst constant)
                 {
-                    constant.Type.Name = variableTypeDefinition.Name;
-                    constant.Type.PrimitiveType = variableTypeDefinition.PrimitiveType;
-                    VerifyConstant(constant, errors);
+                    VerifyConstant(constant, variableTypeDefinition, errors);
                 }
             }
         }
@@ -961,8 +1009,11 @@ namespace Lang.Translation
             }
         }
 
-        private static void VerifyConstant(ConstantAst constant, List<TranslationError> errors)
+        private static void VerifyConstant(ConstantAst constant, TypeDefinition typeDef, List<TranslationError> errors)
         {
+            constant.Type.Name = typeDef.Name;
+            constant.Type.PrimitiveType = typeDef.PrimitiveType;
+
             var type = constant.Type;
             switch (type.PrimitiveType)
             {

@@ -161,10 +161,8 @@ struct Node {
 }
 
 int* pointers() {
-    node: Node;
-    node.value = 9;
-    next: Node;
-    next.value = 8;
+    node: Node = { value = 9; }
+    next: Node = { value = 8; }
     node.next = &next;
     
     loop_node := &node;
