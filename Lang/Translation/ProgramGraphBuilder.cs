@@ -1966,7 +1966,7 @@ namespace Lang.Translation
                             return Type.Error;
                         }
                         if (error) return Type.Error;
-                        CreatePolymorphedStruct(structDef, genericName, TypeKind.Struct, generics);
+                        CreatePolymorphedStruct(structDef, PrintTypeDefinition(typeDef), genericName, TypeKind.Struct, generics);
                         return Type.Struct;
                     }
                     if (!_programGraph.Types.TryGetValue(typeDef.Name, out var type))
@@ -2004,11 +2004,11 @@ namespace Lang.Translation
                 return false;
             }
 
-            CreatePolymorphedStruct(structDef, genericName, TypeKind.List, listType);
+            CreatePolymorphedStruct(structDef, $"List<{PrintTypeDefinition(listType)}>", genericName, TypeKind.List, listType);
             return true;
         }
 
-        private void CreatePolymorphedStruct(StructAst structAst, string name, TypeKind typeKind, params TypeDefinition[] genericTypes)
+        private void CreatePolymorphedStruct(StructAst structAst, string name, string genericName, TypeKind typeKind, params TypeDefinition[] genericTypes)
         {
             var polyStruct = new StructAst {Name = name, TypeIndex = _typeIndex++, TypeKind = typeKind};
             foreach (var field in structAst.Fields)
@@ -2026,7 +2026,7 @@ namespace Lang.Translation
                 }
             }
 
-            _programGraph.Types.Add(name, polyStruct);
+            _programGraph.Types.Add(genericName, polyStruct);
         }
 
         private TypeDefinition CopyType(TypeDefinition type, TypeDefinition[] genericTypes)

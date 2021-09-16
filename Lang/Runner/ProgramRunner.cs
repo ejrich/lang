@@ -51,7 +51,7 @@ namespace Lang.Runner
             }
 
             var temporaryStructs = new Dictionary<string, TypeBuilder>();
-            foreach (var (_, type) in programGraph.Types)
+            foreach (var (name, type) in programGraph.Types)
             {
                 switch (type)
                 {
@@ -65,9 +65,9 @@ namespace Lang.Runner
                         _types[enumAst.Name] = enumBuilder.CreateTypeInfo();
                         break;
                     case StructAst structAst:
-                        if (_types.ContainsKey(structAst.Name)) break;
-                        var structBuilder = _moduleBuilder.DefineType(structAst.Name, TypeAttributes.Public | TypeAttributes.SequentialLayout);
-                        temporaryStructs[structAst.Name] = structBuilder;
+                        if (_types.ContainsKey(name)) break;
+                        var structBuilder = _moduleBuilder.DefineType(name, TypeAttributes.Public | TypeAttributes.SequentialLayout);
+                        temporaryStructs[name] = structBuilder;
                         break;
                 }
             }
@@ -181,7 +181,7 @@ namespace Lang.Runner
                         var typeInfo = Activator.CreateInstance(typeInfoType);
 
                         var typeNameField = typeInfoType.GetField("name");
-                        typeNameField.SetValue(typeInfo, GetString(name));
+                        typeNameField.SetValue(typeInfo, GetString(type.Name));
                         var typeKindField = typeInfoType.GetField("type");
                         typeKindField.SetValue(typeInfo, type.TypeKind);
 
