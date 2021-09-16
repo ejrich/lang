@@ -1241,18 +1241,17 @@ namespace Lang.Backend.LLVM
                     }
                 case ChangeByOneAst changeByOne:
                 {
-                    var loaded = false;
                     var constant = false;
                     var (variableType, pointer) = changeByOne.Value switch
                     {
                         IdentifierAst identifier => localVariables[identifier.Name],
-                        StructFieldRefAst structField => BuildStructField(structField, localVariables, out loaded, out constant),
+                        StructFieldRefAst structField => BuildStructField(structField, localVariables, out _, out constant),
                         IndexAst index => GetListPointer(index, localVariables, out _),
                         // @Cleanup This branch should never be hit
                         _ => (null, new LLVMValueRef())
                     };
 
-                    var value = loaded || constant ? pointer : LLVMApi.BuildLoad(_builder, pointer, "tmpvalue");
+                    var value = constant ? pointer : LLVMApi.BuildLoad(_builder, pointer, "tmpvalue");
                     if (variableType.Type == Lang.Translation.Type.Pointer)
                     {
                         variableType = variableType.Generics[0];
