@@ -38,7 +38,7 @@ namespace Lang.Backend.LLVM
             var objectFile = Path.Combine(objectPath, $"{projectName}.o");
 
             // 3. Write Data section
-            var globals = WriteData(programGraph.Data);
+            var globals = WriteData(programGraph);
 
             // 4. Write Function definitions
             _functions = programGraph.Functions;
@@ -95,11 +95,11 @@ namespace Lang.Backend.LLVM
             }
         }
 
-        private IDictionary<string, (TypeDefinition type, LLVMValueRef value)> WriteData(Data data)
+        private IDictionary<string, (TypeDefinition type, LLVMValueRef value)> WriteData(ProgramGraph programGraph)
         {
             // 1. Declare structs
             var structs = new Dictionary<string, LLVMTypeRef>();
-            foreach (var (name, type) in data.Types)
+            foreach (var (name, type) in programGraph.Types)
             {
                 switch (type)
                 {
@@ -112,7 +112,7 @@ namespace Lang.Backend.LLVM
                         break;
                 }
             }
-            foreach (var (name, type) in data.Types)
+            foreach (var (name, type) in programGraph.Types)
             {
                 if (type is StructAst structAst)
                 {
@@ -123,7 +123,7 @@ namespace Lang.Backend.LLVM
 
             // 2. Declare variables
             var globals = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>();
-            foreach (var globalVariable in data.Variables)
+            foreach (var globalVariable in programGraph.Variables)
             {
                 var type = ConvertTypeDefinition(globalVariable.Type);
                 var global = LLVMApi.AddGlobal(_module, type, globalVariable.Name);
