@@ -162,7 +162,7 @@ namespace Lang.Translation
 
         private void VerifyFunction(FunctionAst function, bool main, List<TranslationError> errors)
         {
-            var localVariables = new Dictionary<string, TypeDefinition>();
+            var localVariables = function.Arguments.ToDictionary(arg=> arg.Name, arg => arg.Type);
 
             if (main)
             {
@@ -404,9 +404,20 @@ namespace Lang.Translation
                         errors.Add(new TranslationError {Error = $"Call to undefined function '{call.Function}'"});
                     }
                     return function?.ReturnType;
-                // TODO Implement these branches
                 case ExpressionAst expression:
-                    break;
+                    var expressionType = VerifyExpression(expression.Children[0], localVariables, errors);
+                    for (var i = 1; i < expression.Children.Count; i++)
+                    {
+                        var nextType = VerifyExpression(expression.Children[i], localVariables, errors);
+                        if (nextType == null) return null;
+
+                        if (TypeEquals(expressionType, nextType)) continue;
+
+                        errors.Add(new TranslationError {Error = $"Type mismatch between '{PrintTypeDefinition(expressionType)}' and '{PrintTypeDefinition(nextType)}'"});
+                        return null;
+                        // TODO Implement type interpretation based on the operators
+                    }
+                    return expressionType;
                 case null:
                     return null;
                 default:
