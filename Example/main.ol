@@ -28,6 +28,8 @@ int Main(List<string> args) {
     set_global(8);
     printf("'global_a' = %d\n", global_a);
     printf("'global_b' = %d\n", global_b);
+
+    poly_test();
     return 0;
 }
 
@@ -196,6 +198,8 @@ struct PolyStruct<T, U> {
 }
 
 void poly_test() {
-    a: PolyStruct<int, float>;
-    printf("%d, %f", a.field1, a.field2);
+    a: PolyStruct<int, float64>;
+    a.field1 = 87;
+    a.field2 = 3.14159;
+    printf("%d, %f\n", a.field1, a.field2);
 }
