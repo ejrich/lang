@@ -195,7 +195,11 @@ index_overloading() {
 
     b: ListStruct<int>;
     b[8] = 7;
-    printf("Integer value: b[8] = %d\n", *b[8]);
+    b[8] += 7;
+    b[5] = 5;
+    b[5]--;
+    // j := &b[7]; // Does not compile, pointer unknown
+    printf("Integer values: b[5] = %d, b[8] = %d\n", *b[5], *b[8]);
 
     c: NestedStruct;
     initial_vector: Vector3 = { x = 1.0; y = 2.0; z = 3.0; }

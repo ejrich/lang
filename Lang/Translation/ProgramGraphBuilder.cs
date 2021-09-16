@@ -1155,7 +1155,7 @@ namespace Lang.Translation
         private void VerifyAssignment(AssignmentAst assignment, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Verify the variable is already defined and that it is not a constant
-            var variableTypeDefinition = GetReference(assignment.Reference, currentFunction, scopeIdentifiers);
+            var variableTypeDefinition = GetReference(assignment.Reference, currentFunction, scopeIdentifiers, out _);
             if (variableTypeDefinition == null) return;
 
             if (variableTypeDefinition.Constant)
@@ -1255,8 +1255,9 @@ namespace Lang.Translation
             }
         }
 
-        private TypeDefinition GetReference(IAst ast, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private TypeDefinition GetReference(IAst ast, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers, out bool hasPointer)
         {
+            hasPointer = true;
             switch (ast)
             {
                 case IdentifierAst identifier:
@@ -1273,6 +1274,7 @@ namespace Lang.Translation
                             AddError($"Overload [] for type '{PrintTypeDefinition(variableType)}' must be a pointer to be able to set the value", index);
                             return null;
                         }
+                        hasPointer = false;
                         return type.Generics[0];
                     }
                     return type;
@@ -1325,6 +1327,7 @@ namespace Lang.Translation
                                     {
                                         if (i == structFieldRef.Children.Count - 1)
                                         {
+                                            hasPointer = false;
                                             refType = refType.Generics[0];
                                         }
                                     }
@@ -1701,7 +1704,7 @@ namespace Lang.Translation
                         case IdentifierAst:
                         case StructFieldRefAst:
                         case IndexAst:
-                            var expressionType = VerifyExpression(changeByOne.Value, currentFunction, scopeIdentifiers);
+                            var expressionType = GetReference(changeByOne.Value, currentFunction, scopeIdentifiers, out _);
                             if (expressionType != null)
                             {
                                 var type = VerifyType(expressionType);
@@ -1718,6 +1721,34 @@ namespace Lang.Translation
                             return null;
                     }
                 case UnaryAst unary:
+                {
+                    if (unary.Operator == UnaryOperator.Reference)
+                    {
+                        var referenceType = GetReference(unary.Value, currentFunction, scopeIdentifiers, out var hasPointer);
+                        if (!hasPointer)
+                        {
+                            AddError("Unable to get reference of unary value", unary.Value);
+                            return null;
+                        }
+
+                        var type = VerifyType(referenceType);
+                        if (type == Type.Error)
+                        {
+                            return null;
+                        }
+
+                        var pointerType = new TypeDefinition {Name = "*"};
+                        if (referenceType.CArray)
+                        {
+                            pointerType.Generics.Add(referenceType.Generics[0]);
+                        }
+                        else
+                        {
+                            pointerType.Generics.Add(referenceType);
+                        }
+                        return pointerType;
+                    }
+                    else
                     {
                         var valueType = VerifyExpression(unary.Value, currentFunction, scopeIdentifiers);
                         var type = VerifyType(valueType);
@@ -1753,31 +1784,12 @@ namespace Lang.Translation
                                     AddError($"Cannot dereference type '{PrintTypeDefinition(valueType)}'", unary.Value);
                                 }
                                 return null;
-                            case UnaryOperator.Reference:
-                                if (unary.Value is IdentifierAst || unary.Value is StructFieldRefAst || unary.Value is IndexAst || type == Type.Pointer)
-                                {
-                                    if (type == Type.Error)
-                                    {
-                                        return null;
-                                    }
-                                    var pointerType = new TypeDefinition {Name = "*"};
-                                    if (valueType.CArray)
-                                    {
-                                        pointerType.Generics.Add(valueType.Generics[0]);
-                                    }
-                                    else
-                                    {
-                                        pointerType.Generics.Add(valueType);
-                                    }
-                                    return pointerType;
-                                }
-                                AddError("Can only reference variables, structs, or struct fields", unary.Value);
-                                return null;
                             default:
                                 AddError($"Unexpected unary operator '{unary.Operator}'", unary.Value);
                                 return null;
                         }
                     }
+                }
                 case CallAst call:
                     return VerifyCall(call, currentFunction, scopeIdentifiers);
                 case ExpressionAst expression:
