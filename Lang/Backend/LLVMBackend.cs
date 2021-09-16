@@ -764,7 +764,7 @@ namespace Lang.Backend
                     WriteReturnStatement(returnAst, localVariables);
                     return true;
                 case DeclarationAst declaration:
-                    WriteDeclaration(declaration, localVariables, function, block);
+                    WriteDeclaration(declaration, localVariables, block);
                     break;
                 case AssignmentAst assignment:
                     WriteAssignment(assignment, localVariables);
@@ -804,7 +804,7 @@ namespace Lang.Backend
             LLVM.BuildRet(_builder, returnValue);
         }
 
-        private void WriteDeclaration(DeclarationAst declaration, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function, LLVMMetadataRef block)
+        private void WriteDeclaration(DeclarationAst declaration, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMMetadataRef block)
         {
             // 1. Declare variable on the stack
             var type = ConvertTypeDefinition(declaration.Type);
@@ -831,12 +831,11 @@ namespace Lang.Backend
                 using var name = new MarshaledString(declaration.Name);
 
                 var file = _debugFiles[declaration.FileIndex];
-                var debugType = GetDebugType(declaration.Type);
-                var debugVariable = LLVM.DIBuilderCreateAutoVariable(_debugBuilder, block, name.Value, (UIntPtr)name.Length, file, declaration.Line, debugType, 0, LLVMDIFlags.LLVMDIFlagZero, 0);
-                var location = LLVM.GetCurrentDebugLocation2(_builder);
+                var debugVariable = LLVM.DIBuilderCreateAutoVariable(_debugBuilder, block, name.Value, (UIntPtr)name.Length, file, declaration.Line, GetDebugType(declaration.Type), 0, LLVMDIFlags.LLVMDIFlagZero, 0);
                 var expression = LLVM.DIBuilderCreateExpression(_debugBuilder, null, (UIntPtr)0);
-                // TODO Pass the current basic block as a parameter and update in WriteFunctionLine
-                LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, variable, debugVariable, expression, location, function.EntryBasicBlock);
+                var location = LLVM.GetCurrentDebugLocation2(_builder);
+
+                LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, variable, debugVariable, expression, location, _builder.InsertBlock);
             }
 
             // 2. Set value if it exists
@@ -2214,7 +2213,6 @@ namespace Lang.Backend
 
                     fields[i] = LLVM.DIBuilderCreateMemberType(_debugBuilder, structDecl, fieldName.Value, (UIntPtr)fieldName.Length, file, structField.Line, structField.Size * 8, 0, structField.Offset * 8, LLVMDIFlags.LLVMDIFlagZero, GetDebugType(structField.Type));
                 }
-                LLVM.DisposeTemporaryMDNode(structDecl);
             }
 
             fixed (LLVMMetadataRef* fieldsPointer = fields)
