@@ -2,6 +2,8 @@ main() {
     operator_overloading();
 
     generic_overloads();
+
+    index_overloading();
 }
 
 operator_overloading() {
@@ -178,6 +180,27 @@ operator + PolyStruct<T, U>(PolyStruct<T, U> a, PolyStruct<T, U> b) {
     #assert type_of(T).type == TypeKind.Integer && type_of(U).type == TypeKind.Float;
     c: PolyStruct<T, U> = { a = a.a + b.a; b = a.b + b.b; }
     return c;
+}
+
+index_overloading() {
+    a: SOAVector3;
+    a.x[2] = 9.0;
+    a.y[2] = 8.0;
+    a.z[2] = 7.0;
+
+    vector := a[2];
+    printf("Vector values: x = %.2f, y = %.2f, z = %.2f\n", vector.x, vector.y, vector.z);
+}
+
+struct SOAVector3 {
+    List<float>[5] x;
+    List<float>[5] y;
+    List<float>[5] z;
+}
+
+operator [] SOAVector3(SOAVector3 a, int index) : Vector3 {
+    value: Vector3 = { x = a.x[index]; y = a.y[index]; z = a.z[index]; }
+    return value;
 }
 
 

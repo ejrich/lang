@@ -1120,6 +1120,12 @@ namespace Lang.Runner
                     return expressionValue;
                 case IndexAst indexAst:
                 {
+                    if (indexAst.CallsOverload)
+                    {
+                        var index = (int)ExecuteExpression(indexAst.Index, variables).Value;
+                        var variable = variables[indexAst.Name];
+                        return HandleOverloadedOperator(variable.Type, Operator.Subscript, variable.Value, index);
+                    }
                     var (typeDef, elementType, pointer) = GetListPointer(indexAst, variables);
                     return new ValueType {Type = typeDef, Value = PointerToTargetType(pointer, typeDef, elementType)};
                 }
@@ -1443,7 +1449,7 @@ namespace Lang.Runner
                     }
                     else
                     {
-                        return HandleOverloadedOperator(lhs.Type, op, lhs.Value, rhs.Value);
+                        return HandleOverloadedOperator(lhs.Type, op, lhs.Value, rhs.Value).Value;
                     }
                 case Operator.Equality:
                 case Operator.NotEqual:
@@ -1465,7 +1471,7 @@ namespace Lang.Runner
             // 3. Handle overloaded operators
             if (lhs.Type.PrimitiveType == null && lhs.Type.Name != "bool")
             {
-                return HandleOverloadedOperator(lhs.Type, op, lhs.Value, rhs.Value);
+                return HandleOverloadedOperator(lhs.Type, op, lhs.Value, rhs.Value).Value;
             }
 
             // 4. Cast lhs and rhs to the target types
@@ -1733,7 +1739,7 @@ namespace Lang.Runner
                     return IntegerOperations(lhsValue, rhsValue, op);
                 }
                 default:
-                    return HandleOverloadedOperator(lhs.Type, op, lhs.Value, rhs.Value);
+                    return HandleOverloadedOperator(lhs.Type, op, lhs.Value, rhs.Value).Value;
             }
 
             // @Cleanup this should not be hit
@@ -1834,7 +1840,7 @@ namespace Lang.Runner
                 }
             }
 
-            return HandleOverloadedOperator(lhs.Type, op, lhs.Value, rhs.Value);
+            return HandleOverloadedOperator(lhs.Type, op, lhs.Value, rhs.Value).Value;
         }
 
         private object PerformOperation(TypeDefinition targetType, object lhsValue, object rhsValue, Operator op)
@@ -1872,14 +1878,14 @@ namespace Lang.Runner
                         return CastValue(result, targetType);
                     }
                 default:
-                    return HandleOverloadedOperator(targetType, op, lhsValue, rhsValue);
+                    return HandleOverloadedOperator(targetType, op, lhsValue, rhsValue).Value;
             }
         }
 
-        private object HandleOverloadedOperator(TypeDefinition type, Operator op, object lhs, object rhs)
+        private ValueType HandleOverloadedOperator(TypeDefinition type, Operator op, object lhs, object rhs)
         {
             var operatorOverload = _programGraph.OperatorOverloads[type.GenericName][op];
-            return ExecuteFunction(operatorOverload, new []{lhs, rhs}).Value;
+            return ExecuteFunction(operatorOverload, new []{lhs, rhs});
         }
 
         private static object CastValue(object value, TypeDefinition targetType)

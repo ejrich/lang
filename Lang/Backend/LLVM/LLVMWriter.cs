@@ -839,7 +839,7 @@ namespace Lang.Backend.LLVM
             {
                 IdentifierAst identifier => localVariables[identifier.Name],
                 StructFieldRefAst structField => BuildStructField(structField, localVariables, out loaded),
-                IndexAst index => GetListPointer(index, localVariables),
+                IndexAst index => GetListPointer(index, localVariables, out _),
                 // @Cleanup This branch should never be hit
                 _ => (null, new LLVMValueRef())
             };
@@ -1001,7 +1001,7 @@ namespace Lang.Backend.LLVM
                     (iterationType, iterationValue) = BuildStructField(structField, localVariables, out _);
                     break;
                 case IndexAst index:
-                    (iterationType, iterationValue) = GetListPointer(index, localVariables);
+                    (iterationType, iterationValue) = GetListPointer(index, localVariables, out _);
                     break;
                 case null:
                     break;
@@ -1226,7 +1226,7 @@ namespace Lang.Backend.LLVM
                     {
                         IdentifierAst identifier => localVariables[identifier.Name],
                         StructFieldRefAst structField => BuildStructField(structField, localVariables, out loaded),
-                        IndexAst index => GetListPointer(index, localVariables),
+                        IndexAst index => GetListPointer(index, localVariables, out _),
                         // @Cleanup This branch should never be hit
                         _ => (null, new LLVMValueRef())
                     };
@@ -1262,7 +1262,7 @@ namespace Lang.Backend.LLVM
                         {
                             IdentifierAst identifier => localVariables[identifier.Name],
                             StructFieldRefAst structField => BuildStructField(structField, localVariables, out _),
-                            IndexAst index => GetListPointer(index, localVariables),
+                            IndexAst index => GetListPointer(index, localVariables, out _),
                             // @Cleanup this branch should not be hit
                             _ => (null, new LLVMValueRef())
                         };
@@ -1296,8 +1296,12 @@ namespace Lang.Backend.LLVM
                 }
                 case IndexAst index:
                 {
-                    var (elementType, elementValue) = GetListPointer(index, localVariables);
-                    return (elementType, LLVMApi.BuildLoad(_builder, elementValue, "tmpindex"));
+                    var (elementType, elementValue) = GetListPointer(index, localVariables, out var load);
+                    if (load)
+                    {
+                        elementValue = LLVMApi.BuildLoad(_builder, elementValue, "tmpindex");
+                    }
+                    return (elementType, elementValue);
                 }
                 case ExpressionAst expression:
                     var expressionValue = WriteExpression(expression.Children[0], localVariables);
@@ -1424,7 +1428,7 @@ namespace Lang.Backend.LLVM
                     (type, value) = localVariables[identifier.Name];
                     break;
                 case IndexAst index:
-                    (type, value) = GetListPointer(index, localVariables);
+                    (type, value) = GetListPointer(index, localVariables, out _);
                     break;
                 case CallAst call:
                     var (callType, callValue) = WriteExpression(call, localVariables);
@@ -1510,7 +1514,7 @@ namespace Lang.Backend.LLVM
             return (type, value);
         }
 
-        private (TypeDefinition type, LLVMValueRef value) GetListPointer(IndexAst index, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
+        private (TypeDefinition type, LLVMValueRef value) GetListPointer(IndexAst index, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, out bool load)
         {
             // 1. Get the variable pointer
             var (type, variable) = localVariables[index.Name];
@@ -1518,7 +1522,18 @@ namespace Lang.Backend.LLVM
             // 2. Determine the index
             var (_, indexValue) = WriteExpression(index.Index, localVariables);
 
-            // 3. Build the pointer with the first index of 0
+            // 3. Call the overload if needed
+            if (index.CallsOverload)
+            {
+                var overloadName = GetOperatorOverloadName(type, Operator.Subscript);
+                var overload = LLVMApi.GetNamedFunction(_module, overloadName);
+                var overloadDef = _programGraph.OperatorOverloads[type.GenericName][Operator.Subscript];
+
+                load = false;
+                return (overloadDef.ReturnType, LLVMApi.BuildCall(_builder, overload, new []{LLVMApi.BuildLoad(_builder, variable, index.Name), indexValue}, string.Empty));
+            }
+
+            // 4. Build the pointer with the first index of 0
             var elementType = type.Generics[0];
             LLVMValueRef listPointer;
             if (type.CArray)
@@ -1531,6 +1546,7 @@ namespace Lang.Backend.LLVM
                 var dataPointer = LLVMApi.BuildLoad(_builder, listData, "dataptr");
                 listPointer = LLVMApi.BuildGEP(_builder, dataPointer, new [] {indexValue}, "indexptr");
             }
+            load = true;
             return (elementType, listPointer);
         }
 
