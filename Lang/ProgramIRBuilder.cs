@@ -1707,7 +1707,7 @@ namespace Lang
 
         private InstructionValue EmitCastValue(FunctionIR function, InstructionValue value, IType targetType)
         {
-            if (value.Type == targetType)
+            if (value.Type == targetType || value.UseRawString)
             {
                 return value;
             }
@@ -1748,7 +1748,6 @@ namespace Lang
                     }
                     break;
                 case TypeKind.Pointer:
-                    // TODO This is getting called for printfs, NOT GOOD
                     castInstruction.Type = InstructionType.PointerCast;
                     break;
             }
