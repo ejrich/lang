@@ -1495,6 +1495,11 @@ namespace Lang
                     VerifyConstant(constant, variableTypeDefinition);
                 }
             }
+
+            if (functionIR != null && !_programGraph.Errors.Any())
+            {
+                _irBuilder.EmitAssignment(functionIR, assignment, scope);
+            }
         }
 
         private TypeDefinition GetReference(IAst ast, IFunction currentFunction, ScopeAst scope, out bool hasPointer, bool fromUnaryReference = false)
