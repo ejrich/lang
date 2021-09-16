@@ -538,13 +538,7 @@ namespace Lang
                     var arrayPointer = Marshal.AllocHGlobal(elementSize * (int)type.ConstCount.Value);
                     if (arrayValues != null)
                     {
-                        for (var i = 0; i < arrayValues.Count; i++)
-                        {
-                            var value = ExecuteExpression(arrayValues[i], variables);
-
-                            var pointer = IntPtr.Add(arrayPointer, elementSize * i);
-                            Marshal.StructureToPtr(CastValue(value.Value, elementTypeDef), pointer, false);
-                        }
+                        InitializeArrayValues(arrayPointer, elementSize, elementTypeDef, arrayValues, variables);
                     }
 
                     return arrayPointer;
@@ -559,13 +553,7 @@ namespace Lang
 
                     if (arrayValues != null)
                     {
-                        for (var i = 0; i < arrayValues.Count; i++)
-                        {
-                            var value = ExecuteExpression(arrayValues[i], variables);
-
-                            var pointer = IntPtr.Add(arrayPointer, elementSize * i);
-                            Marshal.StructureToPtr(CastValue(value.Value, elementTypeDef), pointer, false);
-                        }
+                        InitializeArrayValues(arrayPointer, elementSize, elementTypeDef, arrayValues, variables);
                     }
                 }
                 else if (type.Count != null)
@@ -586,6 +574,17 @@ namespace Lang
             var arrayPointer = Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * length);
             dataField!.SetValue(array, arrayPointer);
             return arrayPointer;
+        }
+
+        private void InitializeArrayValues(IntPtr arrayPointer, int elementSize, TypeDefinition elementType, List<IAst> arrayValues, IDictionary<string, ValueType> variables)
+        {
+            for (var i = 0; i < arrayValues.Count; i++)
+            {
+                var value = ExecuteExpression(arrayValues[i], variables);
+
+                var pointer = IntPtr.Add(arrayPointer, elementSize * i);
+                Marshal.StructureToPtr(CastValue(value.Value, elementType), pointer, false);
+            }
         }
 
         private void ExecuteAssignment(AssignmentAst assignment, IDictionary<string, ValueType> variables)
