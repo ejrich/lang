@@ -42,13 +42,16 @@ int Main(List<string> args) {
     null_test(&test_int);
     null_test(null);
 
+    default_args(8);
+    default_args();
+
     return 0;
 }
 
 global_a := 7;
 global_b: int;
 
-void set_global(int a) {
+set_global(int a) {
     if a > 10 then global_a = a * 90;
 }
 
@@ -196,7 +199,7 @@ int sum2(Params<int> args) {
     return sum;
 }
 
-void overflow_test() {
+overflow_test() {
     each i in 1..1000000 {
         a := i * 9;
         //printf("%d\n", a);
@@ -209,7 +212,7 @@ struct PolyStruct<T, U> {
     U field2;
 }
 
-void poly_test() {
+poly_test() {
     a: PolyStruct<int, float>;
     a.field1 = 87;
     a.field2 = 3.14159;
@@ -229,7 +232,11 @@ State current_state(int a) {
     return State.Stopped;
 }
 
-void null_test(int* value_ptr) {
+null_test(int* value_ptr) {
     if value_ptr == null then printf("Pointer is null\n");
     else then printf("Pointer value is %d\n", *value_ptr);
+}
+
+default_args(int val = 5) {
+    printf("Value = %d\n", val);
 }

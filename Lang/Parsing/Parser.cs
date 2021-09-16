@@ -177,6 +177,10 @@ namespace Lang.Parsing
 
                 if (token.Type == TokenType.CloseParen)
                 {
+                    if (commaRequiredBeforeNextArgument)
+                    {
+                        function.Arguments.Add(currentArgument);
+                    }
                     break;
                 }
 
@@ -199,17 +203,31 @@ namespace Lang.Parsing
                         else
                         {
                             currentArgument.Name = token.Value;
-                            function.Arguments.Add(currentArgument);
-                            currentArgument = null;
                             commaRequiredBeforeNextArgument = true;
                         }
                         break;
                     case TokenType.Comma:
-                        if (!commaRequiredBeforeNextArgument)
+                        if (commaRequiredBeforeNextArgument)
+                        {
+                            function.Arguments.Add(currentArgument);
+                            currentArgument = null;
+                        }
+                        else
                         {
                             errors.Add(new ParseError {Error = "Unexpected comma in arguments", Token = token});
                         }
                         commaRequiredBeforeNextArgument = false;
+                        break;
+                    case TokenType.Equals:
+                        if (commaRequiredBeforeNextArgument)
+                        {
+                            enumerator.MoveNext();
+                            currentArgument.DefaultValue = ParseNextExpressionUnit(enumerator, errors, out _);
+                        }
+                        else
+                        {
+                            errors.Add(new ParseError {Error = "Unexpected comma in arguments", Token = token});
+                        }
                         break;
                     default:
                         errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}' in arguments", Token = token});

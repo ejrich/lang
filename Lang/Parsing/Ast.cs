@@ -50,8 +50,8 @@ namespace Lang.Parsing
         public int Line { get; init; }
         public int Column { get; init; }
         public bool HasGeneric { get; set; }
-        public TypeDefinition Type { get; set; }
         public string Name { get; set; }
+        public TypeDefinition Type { get; set; }
         public ConstantAst DefaultValue { get; set; }
         public List<IAst> Children => null;
     }
@@ -239,8 +239,9 @@ namespace Lang.Parsing
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
-        public TypeDefinition Type { get; set; }
         public string Name { get; set; }
+        public TypeDefinition Type { get; set; }
+        public IAst DefaultValue { get; set; }
         public List<IAst> Children => null;
     }
 

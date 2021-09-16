@@ -255,6 +255,29 @@ namespace Lang.Translation
                         }
                         break;
                 }
+
+                if (argument.DefaultValue != null)
+                {
+                    switch (argument.DefaultValue)
+                    {
+                        case ConstantAst constantAst:
+                            if (!TypeEquals(argument.Type, constantAst.Type))
+                            {
+                                errors.Add(CreateError($"Default function argument expected type '{PrintTypeDefinition(argument.Type)}', but got '{PrintTypeDefinition(constantAst.Type)}'", argument.DefaultValue));
+                            }
+                            break;
+                        case NullAst nullAst:
+                            if (type != Type.Pointer)
+                            {
+                                errors.Add(CreateError("Default function argument can only be null for pointers", argument.DefaultValue));
+                            }
+                            nullAst.TargetType = argument.Type;
+                            break;
+                        default:
+                            errors.Add(CreateError("Default function argument should be a constant or null", argument.DefaultValue));
+                            break;
+                    }
+                }
             }
             
             // 3. Load the function into the dictionary 
