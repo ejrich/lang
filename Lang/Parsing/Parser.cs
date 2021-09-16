@@ -3,6 +3,11 @@ using System.Collections.Generic;
 
 namespace Lang.Parsing
 {
+    public class ParseResult
+    {
+        // TODO Implement various fields
+    }
+
     public interface IParser
     {
         ParseResult Parse(List<string> projectFiles);
@@ -33,6 +38,10 @@ namespace Lang.Parsing
 
             // 2. Iterate through tokens, tracking function definitions
             var function = new FunctionAst();
+            var parsingArgs = false;
+            var parsingBody = false;
+            Variable argument = null;
+            ReturnAst returnAst = null;
             foreach (var token in tokens)
             {
                 switch (token.Type)
@@ -42,15 +51,44 @@ namespace Lang.Parsing
                             function.ReturnType = token.Value;
                         else if (function.Name == null)
                             function.Name = token.Value;
+                        else if (parsingArgs)
+                        {
+                            if (argument == null)
+                                argument = new Variable { Type = token.Value };
+                            else
+                            {
+                                argument.Name = token.Value;
+                                function.Arguments.Add(argument);
+                                argument = null;
+                            }
+                        }
+                        else if (parsingBody)
+                        {
+                            if (token.Value == "return")
+                            {
+                                returnAst = new ReturnAst();
+                            }
+                            else if (returnAst != null)
+                            {
+                                returnAst.Children.Add(new ConstantAst { Value = token.Value });
+                                function.Children.Add(returnAst);
+                                returnAst = null;
+                            }
+                        }
                         break;
                     case TokenType.OpenParen:
+                        parsingArgs = true;
                         break;
                     case TokenType.CloseParen:
+                        parsingArgs = false;
                         break;
                     case TokenType.OpenBrace:
+                        parsingBody = true;
                         break;
                     case TokenType.CloseBrace:
+                        parsingBody = false;
                         break;
+                    // TODO Below not used right now, will be once the function example is expanded upon
                     case TokenType.Not:
                         break;
                     case TokenType.And:
@@ -83,6 +121,7 @@ namespace Lang.Parsing
                         break;
                 }
             }
+            Console.WriteLine($"{function.Name} {function.ReturnType}");
         }
     }
 }
