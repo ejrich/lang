@@ -51,7 +51,7 @@ struct string {
     data: u8*;
 }
 
-operator == string(string a, string b) {
+operator == (string a, string b) {
     if (a.length != b.length) then return false;
 
     each i in 0..a.length {
@@ -61,7 +61,7 @@ operator == string(string a, string b) {
     return true;
 }
 
-operator != string(string a, string b) {
+operator != (string a, string b) {
     return !(a == b);
 }
 

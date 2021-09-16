@@ -1,0 +1,22 @@
+Front-end time: 0.12582 seconds
+LLVM build time: 0.0748121 seconds
+Linking time: 0.0669254 seconds
+Add: x = 3.00, y = 3.00, z = 3.00
+Subtract: x = -1.00, y = -1.00, z = -1.00
+Multiply: x = 2.00, y = 2.00, z = 2.00
+Divide: x = 0.50, y = 0.50, z = 0.50
+Modulus: x = 1.00, y = 1.00, z = 1.00
+Bitwise bitwise_or: x = 3, y = 3, z = 3
+Bitwise and: x = 0, y = 0, z = 0
+Shift right: x = 0, y = 0, z = 0
+Shift left: x = 4, y = 4, z = 4
+Rotate right: x = 1073741824, y = 1073741824, z = 1073741824
+Rotate left: x = 4, y = 4, z = 4
+And: 1, Or: 1, Xor: 1, Equals: 1, Not Equals: 1
+Greater than or equal: 1, Less than or equal: 1, Greater than: 1, Less than: 1
+Polymorphic Add: a = 10, b = 3.00
+Vector values: x = 9.00, y = 8.00, z = 7.00
+Vector value: x = 5.00
+Integer values: b[5] = 4, b[8] = 14
+Inner list vector values: x = 2.00, y = 1.50, z = 3.00
+Inner list float value: d.inner_list[1] = nan
