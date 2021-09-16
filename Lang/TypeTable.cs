@@ -33,34 +33,41 @@ namespace Lang
             functions.Add(function);
 
             // Add function to type infos
-            var typeInfo = new TypeInfo {Name = Allocator.MakeString(function.Name), Type = TypeKind.Function};
-            typeInfo.ReturnType = TypeInfos[function.ReturnType.TypeIndex];
-
-            var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
-            if (argumentCount > 0)
+            if (ErrorReporter.Errors.Count == 0)
             {
-                typeInfo.Arguments.Length = argumentCount;
-                var arguments = new ArgumentType[argumentCount];
+                var typeInfo = new TypeInfo {Name = Allocator.MakeString(function.Name), Type = TypeKind.Function};
+                typeInfo.ReturnType = TypeInfos[function.ReturnType.TypeIndex];
 
-                for (var i = 0; i < argumentCount; i++)
+                var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
+                if (argumentCount > 0)
                 {
-                    var argument = function.Arguments[i];
-                    var argumentType = new ArgumentType {Name = Allocator.MakeString(argument.Name), TypeInfo = TypeInfos[argument.Type.TypeIndex]};
-                    arguments[i] = argumentType;
+                    typeInfo.Arguments.Length = argumentCount;
+                    var arguments = new ArgumentType[argumentCount];
+
+                    for (var i = 0; i < argumentCount; i++)
+                    {
+                        var argument = function.Arguments[i];
+                        var argumentType = new ArgumentType {Name = Allocator.MakeString(argument.Name), TypeInfo = TypeInfos[argument.Type.TypeIndex]};
+                        arguments[i] = argumentType;
+                    }
+
+                    var argumentTypesArraySize = argumentCount * ArgumentTypeSize;
+                    var argumentTypesPointer = Allocator.Allocate(argumentTypesArraySize);
+                    fixed (ArgumentType* pointer = &arguments[0])
+                    {
+                        Buffer.MemoryCopy(pointer, argumentTypesPointer.ToPointer(), argumentTypesArraySize, argumentTypesArraySize);
+                    }
+                    typeInfo.Arguments.Data = argumentTypesPointer;
                 }
 
-                var argumentTypesArraySize = argumentCount * ArgumentTypeSize;
-                var argumentTypesPointer = Allocator.Allocate(argumentTypesArraySize);
-                fixed (ArgumentType* pointer = &arguments[0])
-                {
-                    Buffer.MemoryCopy(pointer, argumentTypesPointer.ToPointer(), argumentTypesArraySize, argumentTypesArraySize);
-                }
-                typeInfo.Arguments.Data = argumentTypesPointer;
+                var typeInfoPointer = Allocator.Allocate(TypeInfoSize);
+                TypeInfos.Add(typeInfoPointer);
+                Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
             }
-
-            var typeInfoPointer = Allocator.Allocate(TypeInfoSize);
-            TypeInfos.Add(typeInfoPointer);
-            Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
+            else
+            {
+                TypeInfos.Add(IntPtr.Zero);
+            }
 
             return functions;
         }
