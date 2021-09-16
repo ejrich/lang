@@ -940,22 +940,22 @@ namespace Lang.Translation
                     var type = GetVariable(index.Name, index, scopeIdentifiers);
                     return type != null ? VerifyIndex(index, type, currentFunction, scopeIdentifiers) : null;
                 case StructFieldRefAst structFieldRef:
-                    TypeDefinition expressionType;
+                    TypeDefinition refType;
                     switch (structFieldRef.Children[0])
                     {
                         case IdentifierAst identifier:
-                            expressionType = GetVariable(identifier.Name, identifier, scopeIdentifiers, true);
+                            refType = GetVariable(identifier.Name, identifier, scopeIdentifiers, true);
                             break;
                         case IndexAst index:
                             var variableType = GetVariable(index.Name, index, scopeIdentifiers);
                             if (variableType == null) return null;
-                            expressionType = VerifyIndex(index, variableType, currentFunction, scopeIdentifiers);
+                            refType = VerifyIndex(index, variableType, currentFunction, scopeIdentifiers);
                             break;
                         default:
                             AddError("Expected to have a reference to a variable, field, or pointer", structFieldRef.Children[0]);
                             return null;
                     }
-                    if (expressionType == null)
+                    if (refType == null)
                     {
                         return null;
                     }
@@ -965,24 +965,24 @@ namespace Lang.Translation
                         switch (structFieldRef.Children[i])
                         {
                             case IdentifierAst identifier:
-                                expressionType = VerifyStructField(identifier.Name, expressionType, identifier);
+                                refType = VerifyStructField(identifier.Name, refType, identifier);
                                 break;
                             case IndexAst index:
-                                var fieldType = VerifyStructField(index.Name, expressionType, index);
+                                var fieldType = VerifyStructField(index.Name, refType, index);
                                 if (fieldType == null) return null;
-                                expressionType = VerifyIndex(index, fieldType, currentFunction, scopeIdentifiers);
+                                refType = VerifyIndex(index, fieldType, currentFunction, scopeIdentifiers);
                                 break;
                             default:
                                 AddError("Expected to have a reference to a variable, field, or pointer", structFieldRef.Children[i]);
                                 return null;
                         }
-                        if (expressionType == null)
+                        if (refType == null)
                         {
                             return null;
                         }
                     }
 
-                    return expressionType;
+                    return refType;
                 default:
                     AddError("Expected to have a reference to a variable, field, or pointer", ast);
                     return null;
@@ -1011,12 +1011,12 @@ namespace Lang.Translation
         private TypeDefinition VerifyStructField(string fieldName, TypeDefinition structType, IAst ast)
         {
             // 1. Load the struct definition in typeDefinition
-            var genericName = structType.GenericName;
             if (structType.Name == "*")
             {
-                genericName = structType.Generics[0].GenericName;
+                structType = structType.Generics[0];
                 // structField.IsPointer = true;
             }
+            var genericName = structType.GenericName;
             // structField.StructName = genericName;
             if (!_programGraph.Types.TryGetValue(genericName, out var typeDefinition))
             {
@@ -1178,8 +1178,41 @@ namespace Lang.Translation
                 case NullAst:
                     return null;
                 case StructFieldRefAst structField:
-                    // TODO Implement me
-                    return null;
+                    TypeDefinition refType;
+                    switch (structField.Children[0])
+                    {
+                        case IdentifierAst identifier:
+                            // TODO Implement below to get the value
+                            refType = new TypeDefinition();
+                            break;
+                        // TODO have some exclusionary cases
+                        default:
+                            refType = VerifyExpression(structField.Children[0], currentFunction, scopeIdentifiers);
+                            break;
+                    }
+
+                    for (var i = 1; i < structField.Children.Count; i++)
+                    {
+                        switch (structField.Children[i])
+                        {
+                            case IdentifierAst identifier:
+                                refType = VerifyStructField(identifier.Name, refType, identifier);
+                                break;
+                            case IndexAst index:
+                                var fieldType = VerifyStructField(index.Name, refType, index);
+                                if (fieldType == null) return null;
+                                refType = VerifyIndex(index, fieldType, currentFunction, scopeIdentifiers);
+                                break;
+                            default:
+                                AddError("Expected to have a reference to a variable, field, or pointer", structField.Children[i]);
+                                return null;
+                        }
+                        if (refType == null)
+                        {
+                            return null;
+                        }
+                    }
+                    return refType;
                 // {
                 //     if (!scopeIdentifiers.TryGetValue(structField.Value, out var identifier))
                 //     {
@@ -1222,68 +1255,26 @@ namespace Lang.Translation
                     }
                 }
                 case ChangeByOneAst changeByOne:
+                    var op = changeByOne.Positive ? "increment" : "decrement";
                     switch (changeByOne.Variable)
                     {
-                        // TODO use VerifyExpression to clean this up
-                        case IdentifierAst identifierAst:
-                            if (scopeIdentifiers.TryGetValue(identifierAst.Name, out var identifier))
+                        case IdentifierAst:
+                        case StructFieldRefAst:
+                        case IndexAst:
+                            var expressionType = VerifyExpression(changeByOne.Variable, currentFunction, scopeIdentifiers);
+                            if (expressionType != null)
                             {
-                                if (identifier is not DeclarationAst declaration)
+                                var type = VerifyType(expressionType);
+                                if (type != Type.Int && type != Type.Float)
                                 {
-                                    AddError($"Identifier '{identifierAst.Name}' is not a variable", identifierAst);
+                                    AddError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(expressionType)}'", changeByOne.Variable);
                                     return null;
                                 }
-
-                                var type = VerifyType(declaration.Type);
-                                if (type == Type.Int || type == Type.Float) return declaration.Type;
-
-                                var op = changeByOne.Positive ? "increment" : "decrement";
-                                AddError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(declaration.Type)}'", identifierAst);
-                                return null;
                             }
-                            else
-                            {
-                                AddError($"Variable '{identifierAst.Name}' not defined", identifierAst);
-                                return null;
-                            }
-                        // case StructFieldRefAst structField:
-                        //     if (scopeIdentifiers.TryGetValue(structField.Value, out var structIdentifier))
-                        //     {
-                        //         if (structIdentifier is not DeclarationAst declaration)
-                        //         {
-                        //             AddError($"Identifier '{structField.Value}' is not a variable", structField);
-                        //             return null;
-                        //         }
 
-                        //         var fieldType = VerifyStructFieldRef(structField, declaration.Type);
-                        //         if (fieldType == null) return null;
-
-                        //         var type = VerifyType(fieldType);
-                        //         if (type == Type.Int || type == Type.Float) return fieldType;
-
-                        //         var op = changeByOne.Positive ? "increment" : "decrement";
-                        //         AddError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(fieldType)}'", structField);
-                        //         return null;
-                        //     }
-                        //     else
-                        //     {
-                        //         AddError($"Variable '{structField.Value}' not defined", structField);
-                        //         return null;
-                        //     }
-                        case IndexAst index:
-                            var indexType = VerifyIndexType(index, currentFunction, scopeIdentifiers);
-                            if (indexType != null)
-                            {
-                                var type = VerifyType(indexType);
-                                if (type == Type.Int || type == Type.Float) return indexType;
-
-                                var op = changeByOne.Positive ? "increment" : "decrement";
-                                AddError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(indexType)}'", index);
-                            }
-                            return null;
+                            return expressionType;
                         default:
-                            var operand = changeByOne.Positive ? "increment" : "decrement";
-                            AddError($"Expected to {operand} variable", changeByOne);
+                            AddError($"Expected to {op} variable", changeByOne);
                             return null;
                     }
                 case UnaryAst unary:
@@ -1314,7 +1305,7 @@ namespace Lang.Translation
                             AddError($"Cannot dereference type '{PrintTypeDefinition(valueType)}'", unary.Value);
                             return null;
                         case UnaryOperator.Reference:
-                            if (unary.Value is IdentifierAst || /*unary.Value is StructFieldRefAst ||*/ unary.Value is IndexAst || type == Type.Pointer)
+                            if (unary.Value is IdentifierAst || unary.Value is StructFieldRefAst || unary.Value is IndexAst || type == Type.Pointer)
                             {
                                 var pointerType = new TypeDefinition {Name = "*"};
                                 pointerType.Generics.Add(valueType);
