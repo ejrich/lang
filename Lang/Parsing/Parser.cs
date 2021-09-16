@@ -915,9 +915,16 @@ namespace Lang.Parsing
                 {
                     Error = "Value required after operator", Token = enumerator.Current ?? enumerator.Last
                 });
+                return expression;
             }
 
-            return expression.Children.Count == 1 ? expression.Children.First() : expression;
+            if (expression.Children.Count == 1)
+            {
+                return expression.Children.First();
+            }
+
+            SetOperatorPrecedence(expression);
+            return expression;
         }
 
         private static IAst ParseNextExpressionUnit(TokenEnumerator enumerator, List<ParseError> errors,
@@ -989,6 +996,111 @@ namespace Lang.Parsing
                     });
                     operatorRequired = false;
                     return null;
+            }
+        }
+
+        private static void SetOperatorPrecedence(ExpressionAst expression)
+        {
+            // 1. Set the initial operator precedence
+            var operatorPrecedence = GetOperatorPrecedence(expression.Operators[0]);
+            for (var i = 1; i < expression.Operators.Count; i++)
+            {
+                // 2. Get the next operator
+                var precedence = GetOperatorPrecedence(expression.Operators[i]);
+
+                // 3. Create subexpressions to enforce operator precedence if necessary
+                if (precedence > operatorPrecedence)
+                {
+                    var subExpression = CreateSubExpression(expression, precedence, i, out var end);
+                    expression.Children[i] = subExpression;
+                    expression.Children.RemoveRange(i + 1, end - i);
+                    expression.Operators.RemoveRange(i, end - i);
+
+                    if (i >= expression.Operators.Count) return;
+                    operatorPrecedence = GetOperatorPrecedence(expression.Operators[i]);
+                }
+                else
+                {
+                    operatorPrecedence = precedence;
+                }
+            }
+        }
+
+        private static ExpressionAst CreateSubExpression(ExpressionAst expression, int parentPrecedence, int i, out int end)
+        {
+            var subExpression = new ExpressionAst
+            {
+                FileIndex = expression.Children[i].FileIndex,
+                Line = expression.Children[i].Line,
+                Column = expression.Children[i].Column
+            };
+
+            subExpression.Children.Add(expression.Children[i]);
+            subExpression.Operators.Add(expression.Operators[i]);
+            for (++i; i < expression.Operators.Count; i++)
+            {
+                // 1. Get the next operator
+                var precedence = GetOperatorPrecedence(expression.Operators[i]);
+
+                // 2. Create subexpressions to enforce operator precedence if necessary
+                if (precedence > parentPrecedence)
+                {
+                    subExpression.Children.Add(CreateSubExpression(expression, precedence, i, out i));
+                    if (i == expression.Operators.Count)
+                    {
+                        end = i;
+                        return subExpression;
+                    }
+
+                    subExpression.Operators.Add(expression.Operators[i]);
+                }
+                else if (precedence < parentPrecedence)
+                {
+                    subExpression.Children.Add(expression.Children[i]);
+                    end = i;
+                    return subExpression;
+                }
+                else
+                {
+                    subExpression.Children.Add(expression.Children[i]);
+                    subExpression.Operators.Add(expression.Operators[i]);
+                }
+            }
+
+            subExpression.Children.Add(expression.Children[^1]);
+            end = i;
+            return subExpression;
+        }
+
+        private static int GetOperatorPrecedence(Operator op)
+        {
+            switch (op)
+            {
+                // Boolean comparisons
+                case Operator.And:
+                case Operator.Or:
+                case Operator.BitwiseAnd:
+                case Operator.BitwiseOr:
+                case Operator.Xor:
+                    return 0;
+                // Value comparisons
+                case Operator.Equality:
+                case Operator.GreaterThan:
+                case Operator.LessThan:
+                case Operator.GreaterThanEqual:
+                case Operator.LessThanEqual:
+                    return 5;
+                // First order operators
+                case Operator.Add:
+                case Operator.Subtract:
+                    return 10;
+                // Second order operators
+                case Operator.Multiply:
+                case Operator.Divide:
+                case Operator.Modulus:
+                    return 20;
+                default:
+                    return 0;
             }
         }
 
@@ -1128,16 +1240,6 @@ namespace Lang.Parsing
             return typeDefinition;
         }
 
-        private static T CreateAst<T>(Token token) where T : IAst, new()
-        {
-            return new()
-            {
-                FileIndex = token.FileIndex,
-                Line = token.Line,
-                Column = token.Column
-            };
-        }
-
         private static TypeDefinition InferType(Token token, List<ParseError> errors)
         {
             var typeDefinition = CreateAst<TypeDefinition>(token);
@@ -1173,6 +1275,16 @@ namespace Lang.Parsing
                     errors.Add(new ParseError {Error = $"Unable to determine type of token '{token.Value}'", Token = token});
                     return null;
             }
+        }
+
+        private static T CreateAst<T>(Token token) where T : IAst, new()
+        {
+            return new()
+            {
+                FileIndex = token.FileIndex,
+                Line = token.Line,
+                Column = token.Column
+            };
         }
 
         private static Operator ConvertOperator(Token token)
