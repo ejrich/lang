@@ -26,6 +26,31 @@ namespace Lang.Parsing
     public class Parser : IParser
     {
         private readonly ILexer _lexer;
+        
+        private class TokenEnumerator
+        {
+            private readonly List<Token> _tokens;
+            private int _index;
+
+            public TokenEnumerator(List<Token> tokens)
+            {
+                _tokens = tokens;
+            }
+
+            public Token Current { get; private set; }
+
+            public bool MoveNext()
+            {
+                Current = _tokens.Count > _index ? _tokens[_index] : null;
+                _index++;
+                return Current != null;
+            }
+
+            public Token Peek(int steps = 0)
+            {
+                return _tokens.Count > _index + steps ? _tokens[_index + steps] : null;
+            }
+        }
 
         public Parser(ILexer lexer) => _lexer = lexer;
 
@@ -70,14 +95,14 @@ namespace Lang.Parsing
             }
 
             // 3. Iterate through tokens, tracking different ASTs
-            IEnumerator<Token> enumerator = tokens.GetEnumerator();
+            var enumerator = new TokenEnumerator(tokens);
             while (enumerator.MoveNext())
             {
                 var token = enumerator.Current!;
                 switch (token!.Type)
                 {
                     case TokenType.Token:
-                        parseResult.SyntaxTrees.Add(ParseFunction(ref enumerator, parseResult));
+                        parseResult.SyntaxTrees.Add(ParseFunction(enumerator, parseResult));
                         break;
                     default:
                         parseResult.Errors.Add(new ParseError
@@ -92,12 +117,12 @@ namespace Lang.Parsing
             return parseResult;
         }
 
-        private static IAst ParseFunction(ref IEnumerator<Token> enumerator, FileParseResult parseResult)
+        private static IAst ParseFunction(TokenEnumerator enumerator, FileParseResult parseResult)
         {
             // 1. Determine return type and name of the function
             var function = new FunctionAst
             {
-                ReturnType = ParseType(ref enumerator, parseResult),
+                ReturnType = ParseType(enumerator, parseResult),
                 Name = enumerator.Current?.Value
             };
 
@@ -148,7 +173,7 @@ namespace Lang.Parsing
                         }
                         else if (currentArgument == null)
                         {
-                            currentArgument = new Variable {Type = ParseType(ref enumerator, parseResult)};
+                            currentArgument = new Variable {Type = ParseType(enumerator, parseResult)};
                         }
                         else
                         {
@@ -208,7 +233,7 @@ namespace Lang.Parsing
                     case TokenType.Token:
                         if (token.Value == "return")
                         {
-                            function.Children.Add(ParseReturn(ref enumerator, parseResult));
+                            function.Children.Add(ParseReturn(enumerator, parseResult));
                         }
                         // TODO Add more cases
                         break;
@@ -217,7 +242,7 @@ namespace Lang.Parsing
             return function;
         }
 
-        private static TypeDefinition ParseType(ref IEnumerator<Token> enumerator, FileParseResult parseResult)
+        private static TypeDefinition ParseType(TokenEnumerator enumerator, FileParseResult parseResult)
         {
             var typeDefinition = new TypeDefinition
             {
@@ -287,7 +312,7 @@ namespace Lang.Parsing
             return typeDefinition;
         }
 
-        private static IAst ParseReturn(ref IEnumerator<Token> enumerator, FileParseResult parseResult)
+        private static IAst ParseReturn(TokenEnumerator enumerator, FileParseResult parseResult)
         {
             var returnAst = new ReturnAst();
 
