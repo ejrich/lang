@@ -1576,9 +1576,13 @@ namespace Lang.Translation
                     return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
                 }
                 case CastAst cast:
-                    // TODO Type checking
+                {
+                    var targetType = VerifyType(cast.TargetType);
+                    var valueType = VerifyExpression(cast.Value, currentFunction, scopeIdentifiers);
+                    // TODO Make sure types are compatible
 
                     return cast.TargetType;
+                }
                 case null:
                     return null;
                 default:

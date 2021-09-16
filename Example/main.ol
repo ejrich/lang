@@ -353,5 +353,6 @@ print_type_info(Type type) {
 type_casts() {
     a: u64 = 0xFFFFFFFFFFFFFFFF;
     b := cast(s32, a);
-    printf("a = %llu, b = %d\n", a, b);
+    c := cast(float64, a);
+    printf("a = %llu, b = %d, c = %f\n", a, b, c);
 }
