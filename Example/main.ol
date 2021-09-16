@@ -275,23 +275,14 @@ default_args(int val = 5) {
     printf("Value = %d\n", val);
 }
 
-int SDL_Init(u32 flags) #extern "SDL2"
-SDL_CreateWindow(string title, int x, int y, int w, int h, u32 flags) #extern "SDL2"
-u32 sleep(u32 seconds) #extern "libc"
-
-#run {
-    args: List<string>[1];
-    args[0] = "Hello world";
-    main(args);
-}
+int SDL_Init(u32 flags) #extern
+SDL_CreateWindow(string title, int x, int y, int w, int h, u32 flags) #extern
+u32 sleep(u32 seconds) #extern
 
 compiler_directives() {
-    #if true then
-        printf("Hello world\n");
-    else then
-        printf("Hello wrong branch\n");
-}
-
-#if true /*os == OS.Linux*/ {
-    XOpenDisplay(string name) #extern "X"
+    #if true {
+        printf("Hello world");
+    } else {
+        printf("Hello wrong branch");
+    }
 }

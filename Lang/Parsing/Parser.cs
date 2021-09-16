@@ -86,7 +86,33 @@ namespace Lang.Parsing
             var enumerator = new TokenEnumerator(tokens);
             while (enumerator.MoveNext())
             {
-                syntaxTrees.Add(ParseTopLevelAst(enumerator, errors));
+                var token = enumerator.Current!;
+                switch (token!.Type)
+                {
+                    case TokenType.Token:
+                        if (enumerator.Peek()?.Type == TokenType.Colon)
+                        {
+                            syntaxTrees.Add(ParseDeclaration(enumerator, errors));
+                            break;
+                        }
+                        syntaxTrees.Add(ParseFunction(enumerator, errors));
+                        break;
+                    case TokenType.Struct:
+                        syntaxTrees.Add(ParseStruct(enumerator, errors));
+                        break;
+                    case TokenType.Enum:
+                        syntaxTrees.Add(ParseEnum(enumerator, errors));
+                        break;
+                    case TokenType.Pound:
+                        // TODO Add this
+                        break;
+                    default:
+                        errors.Add(new ParseError
+                        {
+                            Error = $"Unexpected token '{token.Value}'", Token = enumerator.Current
+                        });
+                        break;
+                }
             }
 
             return syntaxTrees;
@@ -1628,6 +1654,23 @@ namespace Lang.Parsing
                         return index;
                     }
             }
+        }
+
+        private static IAst ParseCompilerDirective(TokenEnumerator enumerator, List<ParseError> errors)
+        {
+            var directive = CreateAst<CompilerDirectiveAst>(enumerator.Current);
+
+            if (!enumerator.MoveNext())
+            {
+                errors.Add(new ParseError { Error = "Expected compiler directive to have a value", Token = enumerator.Last});
+                return null;
+            }
+
+            var ast = ParseLine(enumerator, errors);
+            if (ast != null)
+                directive.Children.Add(ast);
+
+            return directive;
         }
 
         private static IndexAst ParseIndex(TokenEnumerator enumerator, List<ParseError> errors, IAst variable)

@@ -245,9 +245,7 @@ namespace Lang.Parsing
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
-        public DirectiveType Type { get; set; }
-        public IAst Value { get; set; }
-        public List<IAst> Children => null;
+        public List<IAst> Children { get; } = new();
     }
 
     public class Argument : IAst
