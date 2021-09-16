@@ -121,6 +121,14 @@ namespace Lang
                             _programGraph.Variables.Add(globalVariable);
                             parseResult.SyntaxTrees.RemoveAt(i--);
                             break;
+                    }
+                }
+
+                // 3. Verify function return types/arguments
+                for (var i = 0; i < parseResult.SyntaxTrees.Count; i++)
+                {
+                    switch (parseResult.SyntaxTrees[i])
+                    {
                         case FunctionAst function:
                             var main = function.Name == "main";
                             if (main)
@@ -143,7 +151,7 @@ namespace Lang
                     }
                 }
 
-                // 3. Verify struct bodies
+                // 4. Verify struct bodies
                 for (var i = 0; i < parseResult.SyntaxTrees.Count; i++)
                 {
                     switch (parseResult.SyntaxTrees[i])
@@ -158,7 +166,7 @@ namespace Lang
                     }
                 }
 
-                // 4. Verify and run top-level static ifs
+                // 5. Verify and run top-level static ifs
                 verifyAdditional = false;
                 var additionalAsts = new List<IAst>();
                 for (int i = 0; i < parseResult.SyntaxTrees.Count; i++)
@@ -206,7 +214,7 @@ namespace Lang
                 }
             } while (verifyAdditional);
 
-            // 5. Verify operator overload bodies
+            // 6. Verify operator overload bodies
             foreach (var overloads in _programGraph.OperatorOverloads.Values)
             {
                 foreach (var overload in overloads.Values)
@@ -216,7 +224,7 @@ namespace Lang
                 }
             }
 
-            // 6. Verify function bodies
+            // 7. Verify function bodies
             foreach (var name in functionNames)
             {
                 var functions = TypeTable.Functions[name];
@@ -227,7 +235,7 @@ namespace Lang
                 }
             }
 
-            // 7. Execute any other compiler directives
+            // 8. Execute any other compiler directives
             foreach (var ast in parseResult.SyntaxTrees)
             {
                 switch (ast)
