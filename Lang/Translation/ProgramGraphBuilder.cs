@@ -642,8 +642,12 @@ namespace Lang.Translation
                             // For integer operations, use the larger size and convert to signed if one type is signed
                             if (type == Type.Int && nextType == Type.Int)
                             {
-                                var currentIntegerType = (IntegerType)expression.Type.PrimitiveType;
-                                var nextIntegerType = (IntegerType)nextExpressionType.PrimitiveType;
+                                var currentIntegerType = expression.Type.PrimitiveType;
+                                var nextIntegerType = nextExpressionType.PrimitiveType;
+                                if (currentIntegerType.Bytes == nextIntegerType.Bytes &&
+                                    currentIntegerType.Signed == nextIntegerType.Signed)
+                                    break;
+
                                 var integerType = new IntegerType
                                 {
                                     Bytes = currentIntegerType.Bytes > nextIntegerType.Bytes ? currentIntegerType.Bytes : nextIntegerType.Bytes,
