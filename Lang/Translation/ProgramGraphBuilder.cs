@@ -298,7 +298,6 @@ namespace Lang.Translation
                             {
                                 if (fieldType is EnumAst enumAst)
                                 {
-                                    structFieldRef.ValueIndices = new int[1];
                                     var enumType = VerifyEnumValue(enumAst, structFieldRef);
                                     if (enumType != null && !TypeEquals(structField.Type, enumType))
                                     {
@@ -1172,7 +1171,6 @@ namespace Lang.Translation
                     return null;
                 case StructFieldRefAst structField:
                     TypeDefinition refType;
-                    structField.ValueIndices = new int[structField.Children.Count - 1];
                     switch (structField.Children[0])
                     {
                         case IdentifierAst identifier:
@@ -1203,6 +1201,7 @@ namespace Lang.Translation
                     }
                     structField.Pointers = new bool[structField.Children.Count - 1];
                     structField.StructNames = new string[structField.Children.Count - 1];
+                    structField.ValueIndices = new int[structField.Children.Count - 1];
 
                     for (var i = 1; i < structField.Children.Count; i++)
                     {
@@ -1713,11 +1712,12 @@ namespace Lang.Translation
         private TypeDefinition VerifyEnumValue(EnumAst enumAst, StructFieldRefAst structField)
         {
             structField.IsEnum = true;
+            structField.StructNames = new [] {enumAst.Name};
 
             if (structField.Children.Count > 2)
             {
-            AddError("Cannot get a value of an enum value", structField.Children[2]);
-            return null;
+                AddError("Cannot get a value of an enum value", structField.Children[2]);
+                return null;
             }
 
             if (structField.Children[1] is not IdentifierAst value)
@@ -1731,7 +1731,7 @@ namespace Lang.Translation
             {
                 if (enumAst.Values[i].Name == value.Name)
                 {
-                    structField.ValueIndices[0] = i;
+                    structField.ValueIndices = new [] {i};
                     enumValue = enumAst.Values[i];
                     break;
                 }
