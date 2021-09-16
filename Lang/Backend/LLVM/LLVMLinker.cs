@@ -83,7 +83,9 @@ namespace Lang.Backend.LLVM
             {
                 return "-static";
             }
-            var linker = libDirectory.GetFiles("ld*.so").FirstOrDefault();
+
+            const string linkerPattern = "ld-linux*.so*";
+            var linker = libDirectory.GetFiles(linkerPattern).FirstOrDefault();
             if (linker == null)
             {
                 var platformDirectory = libDirectory.GetDirectories("x86_64*gnu").FirstOrDefault();
@@ -92,7 +94,7 @@ namespace Lang.Backend.LLVM
                     Console.WriteLine($"Cannot find x86_64 libs in directory '{libDirectory.FullName}'");
                     Environment.Exit(ErrorCodes.LinkError);
                 }
-                linker = libDirectory.GetFiles("ld*.so").FirstOrDefault();
+                linker = libDirectory.GetFiles(linkerPattern).FirstOrDefault();
 
                 if (linker == null)
                 {
