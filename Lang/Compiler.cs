@@ -4,7 +4,6 @@ using System.Linq;
 using Lang.Backend;
 using Lang.Parsing;
 using Lang.Project;
-using Lang.Runner;
 using Lang.Translation;
 
 namespace Lang
@@ -19,16 +18,13 @@ namespace Lang
         private readonly IProjectInterpreter _projectInterpreter;
         private readonly IParser _parser;
         private readonly IProgramGraphBuilder _graphBuilder;
-        private readonly IProgramRunner _programRunner;
         private readonly IBackend _backend;
 
-        public Compiler(IProjectInterpreter projectInterpreter, IParser parser, IProgramGraphBuilder graphBuilder,
-            IProgramRunner programRunner, IBackend backend)
+        public Compiler(IProjectInterpreter projectInterpreter, IParser parser, IProgramGraphBuilder graphBuilder, IBackend backend)
         {
             _projectInterpreter = projectInterpreter;
             _parser = parser;
             _graphBuilder = graphBuilder;
-            _programRunner = programRunner;
             _backend = backend;
         }
 
@@ -52,7 +48,6 @@ namespace Lang
                         break;
                 }
             }
-            _programRunner.BuildSettings = buildSettings;
 
             var stopwatch = new Stopwatch();
             stopwatch.Start();
@@ -83,7 +78,7 @@ namespace Lang
 
             // 4. Build program graph
             stopwatch.Restart();
-            var programGraph = _graphBuilder.CreateProgramGraph(parseResult, out var errors);
+            var programGraph = _graphBuilder.CreateProgramGraph(parseResult, buildSettings, out var errors);
             var graphTime = stopwatch.Elapsed;
 
             if (errors.Any())
@@ -96,23 +91,16 @@ namespace Lang
                 Environment.Exit(ErrorCodes.CompilationError);
             }
 
-            // 5. Run any compile-time programs
-            stopwatch.Restart();
-            _programRunner.RunProgram(programGraph);
-            stopwatch.Stop();
-            var runTime = stopwatch.Elapsed;
-
-            // 6. Build program and link binaries
+            // 5. Build program and link binaries
             stopwatch.Restart();
             _backend.Build(programGraph, project, buildSettings);
             stopwatch.Stop();
             var buildTime = stopwatch.Elapsed;
 
-            // 7. Log statistics
+            // 6. Log statistics
             Console.WriteLine($"Project time: {projectTime.TotalSeconds} seconds\n" +
                               $"Lexing/Parsing time: {parseTime.TotalSeconds} seconds\n" +
                               $"Project Graph time: {graphTime.TotalSeconds} seconds\n" +
-                              $"Program run time: {runTime.TotalSeconds} seconds\n" +
                               $"Building time: {buildTime.TotalSeconds} seconds");
         }
     }
