@@ -106,8 +106,8 @@ namespace Lang.Backend.LLVM
                 switch (type)
                 {
                     case StructAst structAst:
-                        structs[name] = LLVMApi.StructCreateNamed(LLVMApi.GetModuleContext(_module), structAst.Name);
-                        _types.Add(structAst.Name, structAst);
+                        structs[name] = LLVMApi.StructCreateNamed(LLVMApi.GetModuleContext(_module), name);
+                        _types.Add(name, structAst);
                         break;
                     case EnumAst enumAst:
                         _types.Add(enumAst.Name, enumAst);
@@ -165,9 +165,9 @@ namespace Lang.Backend.LLVM
             }
 
             var typeFieldType = LLVMApi.GetTypeByName(_module, "TypeField");
-            foreach (var (name, (type, typeInfo)) in typePointers)
+            foreach (var (_, (type, typeInfo)) in typePointers)
             {
-                var typeName = LLVMApi.ConstString(name, (uint)name.Length, false);
+                var typeName = LLVMApi.ConstString(type.Name, (uint)type.Name.Length, false);
                 var typeNameString = LLVMApi.AddGlobal(_module, typeName.TypeOf(), "str");
                 SetPrivateConstant(typeNameString);
                 LLVMApi.SetInitializer(typeNameString, typeName);

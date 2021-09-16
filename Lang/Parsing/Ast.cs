@@ -13,6 +13,7 @@ namespace Lang.Parsing
 
     public interface IType
     {
+        string Name { get; set; }
         int TypeIndex { get; set; }
         TypeKind TypeKind { get; set; }
     }
