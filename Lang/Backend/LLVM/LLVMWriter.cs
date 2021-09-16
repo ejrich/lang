@@ -1575,15 +1575,15 @@ namespace Lang.Backend.LLVM
                     return BuildRotate(lhs, rhs, true);
             }
 
-            // 3. Cast lhs and rhs to the target types
-            lhs.value = CastValue(lhs, targetType);
-            rhs.value = CastValue(rhs, targetType);
-
-            // 4. Handle overloaded operators
-            if (lhs.type.PrimitiveType == null)
+            // 3. Handle overloaded operators
+            if (lhs.type.PrimitiveType == null && lhs.type.Name != "bool")
             {
                 return BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, op);
             }
+
+            // 4. Cast lhs and rhs to the target types
+            lhs.value = CastValue(lhs, targetType);
+            rhs.value = CastValue(rhs, targetType);
 
             // 5. Handle the rest of the simple operators
             switch (op)

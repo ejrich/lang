@@ -380,8 +380,7 @@ namespace Lang.Parsing
         BitwiseOr = '|',
         BitwiseAnd = '&',
         Xor = '^',
-        Modulus = '%',
-        Dot = '.'
+        Modulus = '%'
     }
 
     public enum UnaryOperator
