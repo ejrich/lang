@@ -18,7 +18,6 @@ namespace Lang.Translation
         private readonly ProgramGraph _programGraph = new();
         private readonly Dictionary<string, StructAst> _polymorphicStructs = new();
         private readonly Dictionary<string, TypeDefinition> _globalVariables = new();
-        private FunctionAst _currentFunction;
 
         public ProgramGraphBuilder(IProgramRunner programRunner)
         {
@@ -78,7 +77,7 @@ namespace Lang.Translation
                                     globalVariable.Value));
                             }
 
-                            VerifyDeclaration(globalVariable, _globalVariables, errors);
+                            VerifyDeclaration(globalVariable, null, _globalVariables, errors);
                             _programGraph.Variables.Add(globalVariable);
                             parseResult.SyntaxTrees.RemoveAt(i--);
                             break;
@@ -117,7 +116,7 @@ namespace Lang.Translation
                                 // TODO Implement me
                                 var conditional = directive.Value as ConditionalAst;
                                 // 1. Verify condition
-                                if (VerifyCondition(conditional.Condition, _globalVariables, errors))
+                                if (VerifyCondition(conditional.Condition, null, _globalVariables, errors))
                                 {
                                     // 2. Init program runner
                                     _programRunner.Init(_programGraph);
@@ -166,7 +165,7 @@ namespace Lang.Translation
             if (!mainDefined)
             {
                 // @Cleanup allow errors to be reported without having a file/line/column
-                errors.Add(CreateError("'main' function of the program is not defined", _currentFunction));
+                errors.Add(new TranslationError { Error = "'main' function of the program is not defined" });
             }
 
             return _programGraph;
@@ -404,7 +403,6 @@ namespace Lang.Translation
                 // Arguments with the same name as a global variable will be used instead of the global
                 localVariables[argument.Name] = argument.Type;
             }
-            _currentFunction = function;
             var returnType = VerifyType(function.ReturnType, errors);
 
             // 2. For extern functions, simply verify there is no body and return
@@ -419,7 +417,7 @@ namespace Lang.Translation
             }
 
             // 3. Loop through function body and verify all ASTs
-            var returned = VerifyAsts(function.Children, localVariables, errors);
+            var returned = VerifyAsts(function.Children, function, localVariables, errors);
 
             // 4. Verify the function returns on all paths
             if (!returned && returnType != Type.Void)
@@ -429,12 +427,12 @@ namespace Lang.Translation
             function.Verified = true;
         }
 
-        private bool VerifyAsts(List<IAst> asts, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        private bool VerifyAsts(List<IAst> asts, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             var returns = false;
             foreach (var ast in asts)
             {
-                if (VerifyAst(ast, localVariables, errors))
+                if (VerifyAst(ast, currentFunction, localVariables, errors))
                 {
                     returns = true;
                 }
@@ -442,51 +440,51 @@ namespace Lang.Translation
             return returns;
         }
 
-        private bool VerifyScope(List<IAst> syntaxTrees, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        private bool VerifyScope(List<IAst> syntaxTrees, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             // 1. Create scope variables
             var scopeVariables = new Dictionary<string, TypeDefinition>(localVariables);
 
             // 2. Verify function lines
-            return VerifyAsts(syntaxTrees, scopeVariables, errors);
+            return VerifyAsts(syntaxTrees, currentFunction, scopeVariables, errors);
         }
 
-        private bool VerifyAst(IAst syntaxTree, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        private bool VerifyAst(IAst syntaxTree, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             switch (syntaxTree)
             {
                 case ReturnAst returnAst:
-                    VerifyReturnStatement(returnAst, localVariables, _currentFunction.ReturnType, errors);
+                    VerifyReturnStatement(returnAst, currentFunction, localVariables, errors);
                     return true;
                 case DeclarationAst declaration:
-                    VerifyDeclaration(declaration, localVariables, errors);
+                    VerifyDeclaration(declaration, currentFunction, localVariables, errors);
                     break;
                 case AssignmentAst assignment:
-                    VerifyAssignment(assignment, localVariables, errors);
+                    VerifyAssignment(assignment, currentFunction, localVariables, errors);
                     break;
                 case ScopeAst scope:
-                    return VerifyScope(scope.Children, localVariables, errors);
+                    return VerifyScope(scope.Children, currentFunction, localVariables, errors);
                 case ConditionalAst conditional:
-                    return VerifyConditional(conditional, localVariables, errors);
+                    return VerifyConditional(conditional, currentFunction, localVariables, errors);
                 case WhileAst whileAst:
-                    return VerifyWhile(whileAst, localVariables, errors);
+                    return VerifyWhile(whileAst, currentFunction, localVariables, errors);
                 case EachAst each:
-                    return VerifyEach(each, localVariables, errors);
+                    return VerifyEach(each, currentFunction, localVariables, errors);
                 case CompilerDirectiveAst directive:
-                    return VerifyCompilerDirective(directive, localVariables, errors);
+                    return VerifyCompilerDirective(directive, currentFunction, localVariables, errors);
                 default:
-                    VerifyExpression(syntaxTree, localVariables, errors);
+                    VerifyExpression(syntaxTree, currentFunction, localVariables, errors);
                     break;
             }
 
             return false;
         }
 
-        private void VerifyReturnStatement(ReturnAst returnAst, IDictionary<string, TypeDefinition> localVariables,
-            TypeDefinition functionReturnType, List<TranslationError> errors)
+        private void VerifyReturnStatement(ReturnAst returnAst, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables,
+            List<TranslationError> errors)
         {
             // 1. Infer the return type of the function
-            var returnType = VerifyType(functionReturnType, errors);
+            var returnType = VerifyType(currentFunction.ReturnType, errors);
 
             // 2. Handle void case since it's the easiest to interpret
             if (returnType == Type.Void)
@@ -499,21 +497,21 @@ namespace Lang.Translation
             }
 
             // 3. Determine if the expression returns the correct value
-            var returnValueType = VerifyExpression(returnAst.Value, localVariables, errors);
+            var returnValueType = VerifyExpression(returnAst.Value, currentFunction, localVariables, errors);
             if (returnValueType == null)
             {
-                errors.Add(CreateError($"Expected to return type '{functionReturnType.Name}'", returnAst));
+                errors.Add(CreateError($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnType)}'", returnAst));
             }
             else
             {
-                if (!TypeEquals(functionReturnType, returnValueType))
+                if (!TypeEquals(currentFunction.ReturnType, returnValueType))
                 {
-                    errors.Add(CreateError($"Expected to return type '{PrintTypeDefinition(functionReturnType)}', but returned type '{PrintTypeDefinition(returnValueType)}'", returnAst.Value));
+                    errors.Add(CreateError($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnType)}', but returned type '{PrintTypeDefinition(returnValueType)}'", returnAst.Value));
                 }
             }
         }
 
-        private void VerifyDeclaration(DeclarationAst declaration, IDictionary<string, TypeDefinition> localVariables,
+        private void VerifyDeclaration(DeclarationAst declaration, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables,
             List<TranslationError> errors)
         {
             // 1. Verify the variable is already defined
@@ -581,7 +579,7 @@ namespace Lang.Translation
                             errors.Add(CreateError("Cannot have operator assignments in object initializers", assignment.Variable));
                         }
 
-                        var valueType = VerifyExpression(assignment.Value, localVariables, errors);
+                        var valueType = VerifyExpression(assignment.Value, currentFunction, localVariables, errors);
                         if (valueType != null && field != null)
                         {
                             if (!TypeEquals(field.Type, valueType))
@@ -600,7 +598,7 @@ namespace Lang.Translation
             // 4. Verify declaration values
             else
             {
-                var valueType = VerifyExpression(declaration.Value, localVariables, errors);
+                var valueType = VerifyExpression(declaration.Value, currentFunction, localVariables, errors);
 
                 // 4a. Verify the assignment value matches the type definition if it has been defined
                 if (declaration.Type == null)
@@ -643,16 +641,16 @@ namespace Lang.Translation
             // 5. Verify the type definition count if necessary
             if (declaration.Type?.Count != null)
             {
-                VerifyExpression(declaration.Type.Count, localVariables, errors);
+                VerifyExpression(declaration.Type.Count, currentFunction, localVariables, errors);
             }
 
             localVariables.Add(declaration.Name, declaration.Type);
         }
 
-        private void VerifyAssignment(AssignmentAst assignment, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        private void VerifyAssignment(AssignmentAst assignment, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             // 1. Verify the variable is already defined
-            var variableTypeDefinition = GetVariable(assignment.Variable, localVariables, errors);
+            var variableTypeDefinition = GetVariable(assignment.Variable, currentFunction, localVariables, errors);
             if (variableTypeDefinition == null) return;
 
             // 2. Verify the assignment value
@@ -669,7 +667,7 @@ namespace Lang.Translation
                 nullAst.TargetType = variableTypeDefinition;
                 return;
             }
-            var valueType = VerifyExpression(assignment.Value, localVariables, errors);
+            var valueType = VerifyExpression(assignment.Value, currentFunction, localVariables, errors);
 
             // 3. Verify the assignment value matches the variable type definition
             if (valueType != null)
@@ -735,7 +733,7 @@ namespace Lang.Translation
             }
         }
 
-        private TypeDefinition GetVariable(IAst ast, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        private TypeDefinition GetVariable(IAst ast, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             // 2. Get the variable name
             var variableName = ast switch
@@ -769,43 +767,43 @@ namespace Lang.Translation
                     variableTypeDefinition = VerifyStructFieldRef(indexStructField, variableTypeDefinition, errors);
                     if (variableTypeDefinition == null) return null;
                 }
-                variableTypeDefinition = VerifyIndex(index, variableTypeDefinition, localVariables, errors);
+                variableTypeDefinition = VerifyIndex(index, variableTypeDefinition, currentFunction, localVariables, errors);
                 if (variableTypeDefinition == null) return null;
             }
 
             return variableTypeDefinition;
         }
 
-        private bool VerifyConditional(ConditionalAst conditional, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        private bool VerifyConditional(ConditionalAst conditional, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             // 1. Verify the condition expression
-            VerifyCondition(conditional.Condition, localVariables, errors);
+            VerifyCondition(conditional.Condition, currentFunction, localVariables, errors);
 
             // 2. Verify the conditional scope
-            var ifReturned = VerifyScope(conditional.Children, localVariables, errors);
+            var ifReturned = VerifyScope(conditional.Children, currentFunction, localVariables, errors);
 
             // 3. Verify the else block if necessary
             if (conditional.Else.Any())
             {
-                var elseReturned = VerifyScope(conditional.Else, localVariables, errors);
+                var elseReturned = VerifyScope(conditional.Else, currentFunction, localVariables, errors);
                 return ifReturned && elseReturned;
             }
 
             return false;
         }
 
-        private bool VerifyWhile(WhileAst whileAst, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        private bool VerifyWhile(WhileAst whileAst, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             // 1. Verify the condition expression
-            VerifyCondition(whileAst.Condition, localVariables, errors);
+            VerifyCondition(whileAst.Condition, currentFunction, localVariables, errors);
 
             // 2. Verify the scope of the while block
-            return VerifyScope(whileAst.Children, localVariables, errors);
+            return VerifyScope(whileAst.Children, currentFunction, localVariables, errors);
         }
 
-        private bool VerifyCondition(IAst ast, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        private bool VerifyCondition(IAst ast, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
-            var conditionalType = VerifyExpression(ast, localVariables, errors);
+            var conditionalType = VerifyExpression(ast, currentFunction, localVariables, errors);
             switch (VerifyType(conditionalType, errors))
             {
                 case Type.Int:
@@ -820,7 +818,7 @@ namespace Lang.Translation
             }
         }
 
-        private bool VerifyEach(EachAst each, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        private bool VerifyEach(EachAst each, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             var eachVariables = new Dictionary<string, TypeDefinition>(localVariables);
             // 1. Verify the iterator or range
@@ -830,7 +828,7 @@ namespace Lang.Translation
             };
             if (each.Iteration != null)
             {
-                var variableTypeDefinition = VerifyExpression(each.Iteration, localVariables, errors);
+                var variableTypeDefinition = VerifyExpression(each.Iteration, currentFunction, localVariables, errors);
                 if (variableTypeDefinition == null) return false;
                 var iteratorType = variableTypeDefinition.Generics.FirstOrDefault();
 
@@ -851,12 +849,12 @@ namespace Lang.Translation
             }
             else
             {
-                var beginType = VerifyExpression(each.RangeBegin, localVariables, errors);
+                var beginType = VerifyExpression(each.RangeBegin, currentFunction, localVariables, errors);
                 if (VerifyType(beginType, errors) != Type.Int)
                 {
                     errors.Add(CreateError($"Expected range to begin with 'int', but got '{PrintTypeDefinition(beginType)}'", each.RangeBegin));
                 }
-                var endType = VerifyExpression(each.RangeEnd, localVariables, errors);
+                var endType = VerifyExpression(each.RangeEnd, currentFunction, localVariables, errors);
                 if (VerifyType(endType, errors) != Type.Int)
                 {
                     errors.Add(CreateError($"Expected range to end with 'int', but got '{PrintTypeDefinition(endType)}'", each.RangeEnd));
@@ -869,7 +867,7 @@ namespace Lang.Translation
             }
 
             // 2. Verify the scope of the each block
-            return VerifyAsts(each.Children, eachVariables, errors);
+            return VerifyAsts(each.Children, currentFunction, eachVariables, errors);
         }
 
         private void VerifyTopLevelDirective(CompilerDirectiveAst directive, List<TranslationError> errors)
@@ -877,7 +875,7 @@ namespace Lang.Translation
             switch (directive.Type)
             {
                 case DirectiveType.Run:
-                    VerifyAst(directive.Value, _globalVariables, errors);
+                    VerifyAst(directive.Value, null, _globalVariables, errors);
                     break;
                 // case DirectiveType.If:
                 //     var conditional = directive.Value as ConditionalAst;
@@ -889,14 +887,14 @@ namespace Lang.Translation
             }
         }
 
-        private bool VerifyCompilerDirective(CompilerDirectiveAst directive, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        private bool VerifyCompilerDirective(CompilerDirectiveAst directive, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
-            _currentFunction.HasDirectives = true;
+            currentFunction.HasDirectives = true;
             switch (directive.Type)
             {
                 case DirectiveType.If:
                     var conditional = directive.Value as ConditionalAst;
-                    VerifyExpression(conditional!.Condition, localVariables, errors);
+                    VerifyExpression(conditional!.Condition, currentFunction, localVariables, errors);
                     break;
                 default:
                     errors.Add(CreateError("Compiler directive not supported", directive.Value));
@@ -906,7 +904,7 @@ namespace Lang.Translation
             return false;
         }
 
-        private TypeDefinition VerifyExpression(IAst ast, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        private TypeDefinition VerifyExpression(IAst ast, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             // 1. Verify the expression value
             switch (ast)
@@ -976,7 +974,7 @@ namespace Lang.Translation
                                 return null;
                             }
                         case IndexAst index:
-                            var indexType = VerifyIndexType(index, localVariables, errors, out var variableAst);
+                            var indexType = VerifyIndexType(index, currentFunction, localVariables, errors, out var variableAst);
                             if (indexType != null)
                             {
                                 var type = VerifyType(indexType, errors);
@@ -993,7 +991,7 @@ namespace Lang.Translation
                     }
                 case UnaryAst unary:
                 {
-                    var valueType = VerifyExpression(unary.Value, localVariables, errors);
+                    var valueType = VerifyExpression(unary.Value, currentFunction, localVariables, errors);
                     var type = VerifyType(valueType, errors);
                     switch (unary.Operator)
                     {
@@ -1038,10 +1036,15 @@ namespace Lang.Translation
                         errors.Add(CreateError($"Call to undefined function '{call.Function}'", call));
                     }
 
-                    var arguments = call.Arguments.Select(arg => VerifyExpression(arg, localVariables, errors)).ToList();
+                    var arguments = call.Arguments.Select(arg => VerifyExpression(arg, currentFunction, localVariables, errors)).ToList();
 
                     if (function != null)
                     {
+                        if (!function.Verified && function != currentFunction)
+                        {
+                            VerifyFunction(function, errors);
+                        }
+
                         call.Params = function.Params;
                         var argumentCount = function.Varargs || function.Params ? function.Arguments.Count - 1 : function.Arguments.Count;
                         var callArgumentCount = arguments.Count;
@@ -1193,9 +1196,9 @@ namespace Lang.Translation
                     }
                     return function?.ReturnType;
                 case ExpressionAst expression:
-                    return VerifyExpressionType(expression, localVariables, errors);
+                    return VerifyExpressionType(expression, currentFunction, localVariables, errors);
                 case IndexAst index:
-                    return VerifyIndexType(index, localVariables, errors, out _);
+                    return VerifyIndexType(index, currentFunction, localVariables, errors, out _);
                 case null:
                     return null;
                 default:
@@ -1235,10 +1238,10 @@ namespace Lang.Translation
             }
         }
 
-        private TypeDefinition VerifyExpressionType(ExpressionAst expression, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        private TypeDefinition VerifyExpressionType(ExpressionAst expression, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             // 1. Get the type of the initial child
-            expression.Type = VerifyExpression(expression.Children[0], localVariables, errors);
+            expression.Type = VerifyExpression(expression.Children[0], currentFunction, localVariables, errors);
             for (var i = 1; i < expression.Children.Count; i++)
             {
                 // 2. Get the next operator and expression type
@@ -1257,7 +1260,7 @@ namespace Lang.Translation
                     continue;
                 }
 
-                var nextExpressionType = VerifyExpression(next, localVariables, errors);
+                var nextExpressionType = VerifyExpression(next, currentFunction, localVariables, errors);
                 if (nextExpressionType == null) return null;
 
                 // 3. Verify the operator and expression types are compatible and convert the expression type if necessary
@@ -1471,7 +1474,7 @@ namespace Lang.Translation
             return value.Value == null ? field.Type : VerifyStructFieldRef(value, field.Type, errors);
         }
 
-        private TypeDefinition VerifyIndexType(IndexAst index, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors,
+        private TypeDefinition VerifyIndexType(IndexAst index, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors,
             out IAst variableAst)
         {
             switch (index.Variable)
@@ -1480,7 +1483,7 @@ namespace Lang.Translation
                     variableAst = variable;
                     if (localVariables.TryGetValue(variable.Name, out var variableType))
                     {
-                        return VerifyIndex(index, variableType, localVariables, errors);
+                        return VerifyIndex(index, variableType, currentFunction, localVariables, errors);
                     }
                     else
                     {
@@ -1492,7 +1495,7 @@ namespace Lang.Translation
                     if (localVariables.TryGetValue(structField.Name, out var structType))
                     {
                         var fieldType = VerifyStructFieldRef(structField, structType, errors);
-                        return fieldType == null ? null : VerifyIndex(index, fieldType, localVariables, errors);
+                        return fieldType == null ? null : VerifyIndex(index, fieldType, currentFunction, localVariables, errors);
                     }
                     else
                     {
@@ -1507,7 +1510,7 @@ namespace Lang.Translation
         }
 
 
-        private TypeDefinition VerifyIndex(IndexAst index, TypeDefinition typeDef, IDictionary<string, TypeDefinition> localVariables,
+        private TypeDefinition VerifyIndex(IndexAst index, TypeDefinition typeDef, FunctionAst currentFunction, IDictionary<string, TypeDefinition> localVariables,
             List<TranslationError> errors)
         {
             // 1. Verify the variable is a list
@@ -1526,7 +1529,7 @@ namespace Lang.Translation
             }
 
             // 3. Verify the count expression is an integer
-            var countType = VerifyExpression(index.Index, localVariables, errors);
+            var countType = VerifyExpression(index.Index, currentFunction, localVariables, errors);
             if (VerifyType(countType, errors) != Type.Int)
             {
                 errors.Add(CreateError($"Expected List index to be type 'int', but got '{PrintTypeDefinition(countType)}'", index));

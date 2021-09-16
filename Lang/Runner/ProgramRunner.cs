@@ -17,8 +17,10 @@ namespace Lang.Runner
 
     public class ProgramRunner : IProgramRunner
     {
+        private ModuleBuilder _moduleBuilder;
         private int _version;
-        private readonly Dictionary<string, List<MethodInfo>> _functions = new();
+        private readonly Dictionary<string, List<int>> _functionIndices = new();
+        private readonly List<(Type type, object libraryObject)> _functionLibraries = new();
         private readonly Dictionary<string, ValueType> _globalVariables = new();
         private readonly Dictionary<string, Type> _types = new();
 
@@ -31,9 +33,12 @@ namespace Lang.Runner
         public void Init(ProgramGraph programGraph)
         {
             // Initialize the runner
-            var assemblyName = new AssemblyName($"Runner{_version++}");
-            var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
-            var moduleBuilder = assemblyBuilder.DefineDynamicModule("Runner");
+            if (_moduleBuilder == null)
+            {
+                var assemblyName = new AssemblyName("Runner");
+                var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
+                _moduleBuilder = assemblyBuilder.DefineDynamicModule("Runner");
+            }
 
             var temporaryStructs = new Dictionary<string, TypeBuilder>();
             foreach (var (_, type) in programGraph.Types)
@@ -42,7 +47,7 @@ namespace Lang.Runner
                 {
                     case EnumAst enumAst:
                         if (_types.ContainsKey(enumAst.Name)) break;
-                        var enumBuilder = moduleBuilder.DefineEnum(enumAst.Name, TypeAttributes.Public, typeof(int));
+                        var enumBuilder = _moduleBuilder.DefineEnum(enumAst.Name, TypeAttributes.Public, typeof(int));
                         foreach (var value in enumAst.Values)
                         {
                             enumBuilder.DefineLiteral(value.Name, value.Value);
@@ -51,7 +56,7 @@ namespace Lang.Runner
                         break;
                     case StructAst structAst:
                         if (_types.ContainsKey(structAst.Name)) break;
-                        var structBuilder = moduleBuilder.DefineType(structAst.Name, TypeAttributes.Public | TypeAttributes.SequentialLayout);
+                        var structBuilder = _moduleBuilder.DefineType(structAst.Name, TypeAttributes.Public | TypeAttributes.SequentialLayout);
                         temporaryStructs[structAst.Name] = structBuilder;
                         break;
                 }
@@ -93,36 +98,46 @@ namespace Lang.Runner
                 }
             }
 
+            var functionTypeBuilder = _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
             foreach (var function in programGraph.Functions.Values.Where(_ => _.Extern))
             {
                 var returnType = GetTypeFromDefinition(function.ReturnType);
 
-                if (!_functions.TryGetValue(function.Name, out var functions))
-                    _functions[function.Name] = functions = new List<MethodInfo>();
+                if (!_functionIndices.TryGetValue(function.Name, out var functionIndex))
+                    _functionIndices[function.Name] = functionIndex = new List<int>();
 
                 if (function.Varargs)
                 {
-                    for (var i = functions.Count; i < function.VarargsCalls.Count; i++)
+                    for (var i = functionIndex.Count; i < function.VarargsCalls.Count; i++)
                     {
                         var callTypes = function.VarargsCalls[i];
                         var varargs = callTypes.Select(arg => GetTypeFromDefinition(arg, cCall: true)).ToArray();
-                        CreateFunction(moduleBuilder, function.Name, function.ExternLib, returnType, varargs, functions);
+                        CreateFunction(functionTypeBuilder, function.Name, function.ExternLib, returnType, varargs);
+                        functionIndex.Add(_version);
                     }
                 }
                 else
                 {
-                    if (!functions.Any())
+                    if (!functionIndex.Any())
                     {
                         var args = function.Arguments.Select(arg => GetTypeFromDefinition(arg.Type, cCall: true)).ToArray();
-                        CreateFunction(moduleBuilder, function.Name, function.ExternLib, returnType, args, functions);
+                        CreateFunction(functionTypeBuilder, function.Name, function.ExternLib, returnType, args);
+                        functionIndex.Add(_version);
                     }
                 }
             }
-            moduleBuilder.CreateGlobalFunctions();
+
+            var library = functionTypeBuilder.CreateType();
+            var functionObject = Activator.CreateInstance(library);
+            _functionLibraries.Add((library, functionObject));
+            _version++;
 
             foreach (var variable in programGraph.Variables)
             {
-                ExecuteDeclaration(variable, programGraph, _globalVariables);
+                if (!_globalVariables.ContainsKey(variable.Name))
+                {
+                    ExecuteDeclaration(variable, programGraph, _globalVariables);
+                }
             }
         }
 
@@ -146,13 +161,11 @@ namespace Lang.Runner
             }
         }
 
-        private void CreateFunction(ModuleBuilder moduleBuilder, string name, string library, Type returnType, Type[] args, List<MethodInfo> functions)
+        private void CreateFunction(TypeBuilder typeBuilder, string name, string library, Type returnType, Type[] args)
         {
-            var method = moduleBuilder.DefineGlobalMethod(name, MethodAttributes.Public | MethodAttributes.Static, returnType, args);
+            var method = typeBuilder.DefineMethod(name, MethodAttributes.Public | MethodAttributes.Static, returnType, args);
             var caBuilder = new CustomAttributeBuilder(typeof(DllImportAttribute).GetConstructor(new []{typeof(string)}), new []{library});
             method.SetCustomAttribute(caBuilder);
-
-            functions.Add(method);
         }
 
         private void ResolveCompilerDirectives(List<IAst> asts, ProgramGraph programGraph)
@@ -879,14 +892,18 @@ namespace Lang.Runner
                 var args = arguments.Select(GetCArg).ToArray();
                 if (function.Varargs)
                 {
-                    var functionDecl = _functions[functionName][callIndex];
-                    var returnValue = functionDecl.Invoke(null, args);
+                    var functionIndex = _functionIndices[functionName][callIndex];
+                    var (type, functionObject) = _functionLibraries[functionIndex];
+                    var functionDecl = type.GetMethod(functionName, argumentTypes!);
+                    var returnValue = functionDecl.Invoke(functionObject, args);
                     return new ValueType {Type = function.ReturnType, Value = returnValue};
                 }
                 else
                 {
-                    var functionDecl = _functions[functionName][callIndex];
-                    var returnValue = functionDecl.Invoke(null, args);
+                    var functionIndex = _functionIndices[functionName][callIndex];
+                    var (type, functionObject) = _functionLibraries[functionIndex];
+                    var functionDecl = type.GetMethod(functionName);
+                    var returnValue = functionDecl.Invoke(functionObject, args);
                     return new ValueType {Type = function.ReturnType, Value = returnValue};
                 }
             }
