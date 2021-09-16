@@ -401,7 +401,7 @@ namespace Lang
                                 }
                                 else if (structField.TypeDefinition.PrimitiveType != null && structField.Value is ConstantAst constant)
                                 {
-                                    VerifyConstant(constant, structField.TypeDefinition);
+                                    VerifyConstant(constant, structField.Type);
                                 }
                             }
                         }
@@ -446,7 +446,7 @@ namespace Lang
                                     }
                                     else if (field.TypeDefinition.PrimitiveType != null && assignment.Value is ConstantAst constant)
                                     {
-                                        VerifyConstant(constant, field.TypeDefinition);
+                                        VerifyConstant(constant, field.Type);
                                     }
                                 }
                             }
@@ -685,7 +685,7 @@ namespace Lang
                         }
                         else if (argument.TypeDefinition.PrimitiveType != null && argument.Value is ConstantAst constant)
                         {
-                            VerifyConstant(constant, argument.TypeDefinition);
+                            VerifyConstant(constant, argument.Type);
                         }
                     }
                     // TODO Not sure what this covers, make sure to test
@@ -706,7 +706,7 @@ namespace Lang
 
                 // TODO Make main only be type 'void main()'
                 var argument = function.Arguments.FirstOrDefault();
-                if (argument != null && !(function.Arguments.Count == 1 && argument.Type?.TypeKind == TypeKind.Array && argument.TypeDefinition.Generics.FirstOrDefault()?.TypeKind == TypeKind.String))
+                if (argument != null && !(function.Arguments.Count == 1 && argument.Type?.TypeKind == TypeKind.Array))// && argument.TypeDefinition.Generics.FirstOrDefault()?.TypeKind == TypeKind.String))
                 {
                     ErrorReporter.Report("The main function should either have 0 arguments or 'Array<string>' argument", function);
                 }
@@ -1250,7 +1250,7 @@ namespace Lang
                             }
                             else if (field.TypeDefinition.PrimitiveType != null && assignment.Value is ConstantAst constant)
                             {
-                                VerifyConstant(constant, field.TypeDefinition);
+                                VerifyConstant(constant, field.Type);
                             }
                         }
                     }
@@ -1396,7 +1396,7 @@ namespace Lang
                     }
                     else if (declaration.TypeDefinition.PrimitiveType != null && declaration.Value is ConstantAst constant)
                     {
-                        VerifyConstant(constant, declaration.TypeDefinition);
+                        VerifyConstant(constant, declaration.Type);
                     }
                 }
             }
@@ -1474,9 +1474,9 @@ namespace Lang
                         {
                             ErrorReporter.Report($"Expected declaration value to be type '{declaration.Type}', but got '{valueType.Name}'", declaration.TypeDefinition);
                         }
-                        else if (declaration.TypeDefinition.PrimitiveType != null && declaration.Value is ConstantAst constant)
+                        else if (declaration.Type != null && declaration.Value is ConstantAst constant)
                         {
-                            VerifyConstant(constant, declaration.TypeDefinition);
+                            VerifyConstant(constant, declaration.Type);
                         }
                     }
                 }
@@ -1519,7 +1519,7 @@ namespace Lang
                             }
                             else if (field.TypeDefinition.PrimitiveType != null && assignment.Value is ConstantAst constant)
                             {
-                                VerifyConstant(constant, field.TypeDefinition);
+                                VerifyConstant(constant, field.Type);
                             }
                         }
                     }
@@ -1541,8 +1541,7 @@ namespace Lang
                     else
                     {
                         declaration.TypeDefinition.ConstCount = (uint)declaration.ArrayValues.Count;
-                        var elementType = declaration.TypeDefinition.Generics[0];
-                        declaration.ArrayElementType = TypeTable.GetType(elementType);
+                        var elementType = declaration.ArrayElementType = TypeTable.GetType(declaration.TypeDefinition.Generics[0]);
                         foreach (var value in declaration.ArrayValues)
                         {
                             var valueType = VerifyExpression(value, currentFunction, scope, out _);
@@ -1550,9 +1549,9 @@ namespace Lang
                             {
                                 if (!TypeEquals(elementType, valueType))
                                 {
-                                    ErrorReporter.Report($"Expected array value to be type '{PrintTypeDefinition(elementType)}', but got '{valueType.Name}'", value);
+                                    ErrorReporter.Report($"Expected array value to be type '{elementType.Name}', but got '{valueType.Name}'", value);
                                 }
-                                else if (elementType.PrimitiveType != null && value is ConstantAst constant)
+                                else if (elementType != null && value is ConstantAst constant)
                                 {
                                     VerifyConstant(constant, elementType);
                                 }
@@ -2184,13 +2183,14 @@ namespace Lang
             {
                 case ConstantAst constant:
                     isConstant = true;
-                    if (constant.TypeDefinition.PrimitiveType is IntegerType)
-                    {
-                        int.TryParse(constant.Value, out count);
-                    }
                     // VerifyType(constant.TypeDefinition);
-                    constant.Type = TypeTable.GetType(constant.TypeDefinition);
                     // return constant.TypeDefinition;
+                    constant.Type = TypeTable.Types[constant.TypeName];
+                    if (constant.Type.TypeKind == TypeKind.Integer)
+                    {
+                        // int.TryParse(constant.Value, out count);
+                        count = (int)constant.Value.Integer;
+                    }
                     return constant.Type;
                 case NullAst:
                     isConstant = true;
@@ -2219,11 +2219,12 @@ namespace Lang
                     {
                         case DeclarationAst declaration:
                             isConstant = declaration.Constant;
-                            if (isConstant && declaration.TypeDefinition.PrimitiveType is IntegerType)
+                            if (isConstant && declaration.Type.TypeKind == TypeKind.Integer)
                             {
                                 if (declaration.Value is ConstantAst constValue)
                                 {
-                                    int.TryParse(constValue.Value, out count);
+                                    // int.TryParse(constValue.Value, out count);
+                                    count = (int)constValue.Value.Integer;
                                 }
                             }
                             // return declaration.TypeDefinition;
@@ -2252,9 +2253,8 @@ namespace Lang
             {
                 case ConstantAst constant:
                     // VerifyType(constant.TypeDefinition);
-                    constant.Type = TypeTable.GetType(constant.TypeDefinition);
                     // return constant.TypeDefinition;
-                    return constant.Type;
+                    return constant.Type = TypeTable.Types[constant.TypeName];
                 case NullAst:
                     return null;
                 case StructFieldRefAst structField:
@@ -2457,7 +2457,104 @@ namespace Lang
             }
         }
 
-        private void VerifyConstant(ConstantAst constant, TypeDefinition typeDef)
+        private void VerifyConstant(ConstantAst constant, IType type)
+        {
+            // constant.TypeDefinition.Name = typeDef.Name;
+            // constant.TypeDefinition.PrimitiveType = typeDef.PrimitiveType;
+            // constant.Type = TypeTable.GetType(typeDef);
+
+            if (constant.Type == type) return;
+
+            // var type = constant.TypeDefinition;
+            switch (type.TypeKind)
+            {
+                case TypeKind.Integer:
+                    if (constant.Type.TypeKind == TypeKind.Integer)
+                    {
+                        var currentInt = (PrimitiveAst)constant.Type;
+                        var newInt = (PrimitiveAst)type;
+
+                        if (!newInt.Signed)
+                        {
+                            if (currentInt.Signed && constant.Value.Integer < 0)
+                            {
+                                ErrorReporter.Report($"Unsigned type '{type.Name}' cannot be negative", constant);
+                            }
+                            else
+                            {
+                                var largestAllowedValue = Math.Pow(2, 4 * newInt.Size) - 1;
+                                if (constant.Value.UnsignedInteger > largestAllowedValue)
+                                {
+                                    ErrorReporter.Report($"Value '{constant.Value.UnsignedInteger}' out of range for type '{type.Name}'", constant);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            var lowestAllowedValue = newInt.Signed ? -Math.Pow(2, 4 * newInt.Size - 1) : 0;
+                        }
+                    }
+                    // Convert float to int, shelved for now
+                    /*else if (constant.Type.TypeKind == TypeKind.Float)
+                    {
+                        if (type.Size < constant.Type.Size && (constant.Value.Double > float.MaxValue || constant.Value.Double < float.MinValue))
+                        {
+                            ErrorReporter.Report($"Value '{constant.Value.Double}' out of range for type '{type.Name}'", constant);
+                        }
+                    }*/
+                    else
+                    {
+                        ErrorReporter.Report($"Type '{constant.Type.Name}' cannot be converted to '{type.Name}'", constant);
+                    }
+                    break;
+                case TypeKind.Float:
+                    // Convert int to float
+                    if (constant.Type.TypeKind == TypeKind.Integer)
+                    {
+                    }
+                    else if (constant.Type.TypeKind == TypeKind.Float)
+                    {
+                        if (type.Size < constant.Type.Size && (constant.Value.Double > float.MaxValue || constant.Value.Double < float.MinValue))
+                        {
+                            ErrorReporter.Report($"Value '{constant.Value.Double}' out of range for type '{type.Name}'", constant);
+                        }
+                    }
+                    else
+                    {
+                        ErrorReporter.Report($"Type '{constant.Type.Name}' cannot be converted to '{type.Name}'", constant);
+                    }
+                    break;
+            }
+
+            constant.Type = type;
+            constant.TypeName = type.Name;
+
+            // switch (type.PrimitiveType)
+            // {
+            //     case IntegerType integer when !type.Character:
+            //         if (!integer.Signed && constant.Value[0] == '-')
+            //         {
+            //             ErrorReporter.Report($"Unsigned type '{PrintTypeDefinition(constant.TypeDefinition)}' cannot be negative", constant);
+            //             break;
+            //         }
+
+            //         var success = integer.Bytes switch
+            //         {
+            //             1 => integer.Signed ? sbyte.TryParse(constant.Value, out _) : byte.TryParse(constant.Value, out _),
+            //             2 => integer.Signed ? short.TryParse(constant.Value, out _) : ushort.TryParse(constant.Value, out _),
+            //             4 => integer.Signed ? int.TryParse(constant.Value, out _) : uint.TryParse(constant.Value, out _),
+            //             8 => integer.Signed ? long.TryParse(constant.Value, out _) : ulong.TryParse(constant.Value, out _),
+            //             _ => integer.Signed ? int.TryParse(constant.Value, out _) : uint.TryParse(constant.Value, out _),
+            //         };
+            //         if (!success)
+            //         {
+            //             ErrorReporter.Report($"Value '{constant.Value}' out of range for type '{PrintTypeDefinition(constant.TypeDefinition)}'", constant);
+            //         }
+            //         break;
+            // }
+        }
+
+        /*private void VerifyConstant(ConstantAst constant, TypeDefinition typeDef)
         {
             constant.TypeDefinition.Name = typeDef.Name;
             constant.TypeDefinition.PrimitiveType = typeDef.PrimitiveType;
@@ -2487,7 +2584,7 @@ namespace Lang
                     }
                     break;
             }
-        }
+        }*/
 
         // private TypeDefinition VerifyEnumValue(EnumAst enumAst, StructFieldRefAst structField)
         private IType VerifyEnumValue(EnumAst enumAst, StructFieldRefAst structField)
@@ -2630,7 +2727,7 @@ namespace Lang
                 {
                     if (functionArg.TypeDefinition.PrimitiveType != null && specifiedArgument is ConstantAst constant)
                     {
-                        VerifyConstant(constant, functionArg.TypeDefinition);
+                        VerifyConstant(constant, functionArg.Type);
                     }
 
                     call.Arguments.Insert(i, specifiedArgument);
@@ -3037,8 +3134,8 @@ namespace Lang
 
                     if (match && genericTypes.All(t => t != null) && (function.Flags.HasFlag(FunctionFlags.Varargs) || callArgIndex == call.Arguments.Count))
                     {
-                        var genericName = $"{function.Name}.{i}.{string.Join('.', genericTypes.Select(t => t.GenericName))}";
-                        var name = $"{function.Name}<{string.Join(", ", genericTypes.Select(PrintTypeDefinition))}>";
+                        var genericName = $"{function.Name}.{i}.{string.Join('.', genericTypes.Select(t => t.BackendName))}";
+                        var name = $"{function.Name}<{string.Join(", ", genericTypes.Select(t => t.Name))}>";
                         call.FunctionName = genericName;
 
                         if (TypeTable.Functions.TryGetValue(genericName, out var implementations))
@@ -3202,7 +3299,7 @@ namespace Lang
                 {
                     if (TypeEquals(expression.Type, nextExpressionType, true))
                     {
-                        var overload = VerifyOperatorOverloadType(expression.TypeDefinition, op, currentFunction, expression.Children[i]);
+                        var overload = VerifyOperatorOverloadType(expression.Type, op, currentFunction, expression.Children[i]);
                         if (overload != null)
                         {
                             expression.OperatorOverloads[i] = overload;
@@ -3443,9 +3540,9 @@ namespace Lang
             return elementType;
         }
 
-        private OperatorOverloadAst VerifyOperatorOverloadType(TypeDefinition type, Operator op, IFunction currentFunction, IAst ast)
+        private OperatorOverloadAst VerifyOperatorOverloadType(IType type, Operator op, IFunction currentFunction, IAst ast)
         {
-            if (_operatorOverloads.TryGetValue(type.GenericName, out var overloads) && overloads.TryGetValue(op, out var overload))
+            if (_operatorOverloads.TryGetValue(type.BackendName, out var overloads) && overloads.TryGetValue(op, out var overload))
             {
                 if (!overload.Flags.HasFlag(FunctionFlags.Verified) && overload != currentFunction)
                 {
@@ -3458,7 +3555,7 @@ namespace Lang
                 var polymorphedOverload = _polymorpher.CreatePolymorphedOperatorOverload(polymorphicOverload, type.Generics.ToArray());
                 if (overloads == null)
                 {
-                    _operatorOverloads[type.GenericName] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
+                    _operatorOverloads[type.BackendName] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
                 }
                 overloads[op] = polymorphedOverload;
                 // VerifyType(polymorphedOverload.ReturnTypeDefinition);
@@ -3475,7 +3572,7 @@ namespace Lang
             }
             else
             {
-                ErrorReporter.Report($"Type '{PrintTypeDefinition(type)}' does not contain an overload for operator '{PrintOperator(op)}'", ast);
+                ErrorReporter.Report($"Type '{type.Name}' does not contain an overload for operator '{PrintOperator(op)}'", ast);
                 return null;
             }
         }
@@ -3754,19 +3851,11 @@ namespace Lang
                     }
                     else if (TypeTable.Types.TryGetValue(type.Name, out var typeValue))
                     {
-                        switch (typeValue)
+                        if (typeValue is StructAst structAst && !structAst.Verifying)
                         {
-                            case StructAst structAst:
-                                if (!structAst.Verifying)
-                                {
-                                    VerifyStruct(structAst);
-                                }
-                                break;
-                            case EnumAst enumAst:
-                                return enumAst;
-                            default:
-                                return null;
+                            VerifyStruct(structAst);
                         }
+                        return typeValue;
                     }
                     return null;
             }

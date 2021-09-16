@@ -1274,9 +1274,7 @@ namespace Lang
                     {
                         token.Value = token.Value[1..];
                         expression.Operators.Add(Operator.Subtract);
-                        var constant = CreateAst<ConstantAst>(token);
-                        constant.TypeDefinition = InferType(token);
-                        constant.Value = token.Value;
+                        var constant = ParseConstant(token);
                         expression.Children.Add(constant);
                         continue;
                     }
@@ -1370,10 +1368,7 @@ namespace Lang
                 case TokenType.Literal:
                 case TokenType.Character:
                     // Parse constant
-                    var constant = CreateAst<ConstantAst>(token);
-                    constant.TypeDefinition = InferType(token);
-                    constant.Value = token.Value;
-                    return constant;
+                    return ParseConstant(token);
                 case TokenType.Null:
                     return CreateAst<NullAst>(token);
                 case TokenType.Identifier:
@@ -2302,41 +2297,46 @@ namespace Lang
             return true;
         }
 
-        private static TypeDefinition InferType(Token token)
+        private static ConstantAst ParseConstant(Token token)
         {
-            var typeDefinition = CreateAst<TypeDefinition>(token);
+            var constant = CreateAst<ConstantAst>(token);
             switch (token.Type)
             {
                 case TokenType.Literal:
-                    typeDefinition.Name = "string";
-                    return typeDefinition;
+                    constant.TypeName = "string";
+                    constant.String = token.Value;
+                    return constant;
                 case TokenType.Character:
-                    typeDefinition.Name = "u8";
-                    typeDefinition.Character = true;
-                    typeDefinition.PrimitiveType = new IntegerType {Bytes = 1};
-                    return typeDefinition;
+                    constant.TypeName = "u8";
+                    constant.Value = new Constant {UnsignedInteger = (byte)token.Value[0]};
+                    // typeDefinition.Character = true;
+                    // typeDefinition.PrimitiveType = new IntegerType {Bytes = 1};
+                    return constant;
                 case TokenType.Number:
                     if (token.Flags == TokenFlags.None)
                     {
-                        if (int.TryParse(token.Value, out _))
+                        if (int.TryParse(token.Value, out var s32))
                         {
-                            typeDefinition.Name = "s32";
-                            typeDefinition.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
-                            return typeDefinition;
+                            constant.TypeName = "s32";
+                            constant.Value = new Constant {Integer = s32};
+                            // typeDefinition.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
+                            return constant;
                         }
 
-                        if (long.TryParse(token.Value, out _))
+                        if (long.TryParse(token.Value, out var s64))
                         {
-                            typeDefinition.Name = "s64";
-                            typeDefinition.PrimitiveType = new IntegerType {Bytes = 8, Signed = true};
-                            return typeDefinition;
+                            constant.TypeName = "s64";
+                            constant.Value = new Constant {Integer = s64};
+                            // typeDefinition.PrimitiveType = new IntegerType {Bytes = 8, Signed = true};
+                            return constant;
                         }
 
-                        if (ulong.TryParse(token.Value, out _))
+                        if (ulong.TryParse(token.Value, out var u64))
                         {
-                            typeDefinition.Name = "u64";
-                            typeDefinition.PrimitiveType = new IntegerType {Bytes = 8, Signed = false};
-                            return typeDefinition;
+                            constant.TypeName = "u64";
+                            constant.Value = new Constant {UnsignedInteger = u64};
+                            // typeDefinition.PrimitiveType = new IntegerType {Bytes = 8, Signed = false};
+                            return constant;
                         }
 
                         ErrorReporter.Report($"Invalid integer '{token.Value}', must be 64 bits or less", token);
@@ -2345,18 +2345,20 @@ namespace Lang
 
                     if (token.Flags.HasFlag(TokenFlags.Float))
                     {
-                        if (float.TryParse(token.Value, out _))
+                        if (float.TryParse(token.Value, out var f32))
                         {
-                            typeDefinition.Name = "float";
-                            typeDefinition.PrimitiveType = new FloatType {Bytes = 4};
-                            return typeDefinition;
+                            constant.TypeName = "float";
+                            constant.Value = new Constant {Double = (double)f32};
+                            // typeDefinition.PrimitiveType = new FloatType {Bytes = 4};
+                            return constant;
                         }
 
-                        if (double.TryParse(token.Value, out _))
+                        if (double.TryParse(token.Value, out var f64))
                         {
-                            typeDefinition.Name = "float64";
-                            typeDefinition.PrimitiveType = new FloatType {Bytes = 8};
-                            return typeDefinition;
+                            constant.TypeName = "float64";
+                            constant.Value = new Constant {Double = f64};
+                            // typeDefinition.PrimitiveType = new FloatType {Bytes = 8};
+                            return constant;
                         }
 
                         ErrorReporter.Report($"Invalid floating point number '{token.Value}', must be single or double precision", token);
@@ -2374,22 +2376,22 @@ namespace Lang
                         var value = token.Value.Substring(2);
                         if (value.Length <= 8)
                         {
-                            if (uint.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var result))
+                            if (uint.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u32))
                             {
-                                token.Value = result.ToString();
-                                typeDefinition.Name = "u32";
-                                typeDefinition.PrimitiveType = new IntegerType {Bytes = 4};
-                                return typeDefinition;
+                                constant.TypeName = "u32";
+                                constant.Value = new Constant {UnsignedInteger = u32};
+                                // typeDefinition.PrimitiveType = new IntegerType {Bytes = 4};
+                                return constant;
                             }
                         }
                         else if (value.Length <= 16)
                         {
-                            if (ulong.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var result))
+                            if (ulong.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u64))
                             {
-                                token.Value = result.ToString();
-                                typeDefinition.Name = "u64";
-                                typeDefinition.PrimitiveType = new IntegerType {Bytes = 8};
-                                return typeDefinition;
+                                constant.TypeName = "u64";
+                                constant.Value = new Constant {UnsignedInteger = u64};
+                                // typeDefinition.PrimitiveType = new IntegerType {Bytes = 8};
+                                return constant;
                             }
                         }
                         ErrorReporter.Report($"Invalid integer '{token.Value}'", token);
@@ -2398,8 +2400,9 @@ namespace Lang
                     ErrorReporter.Report($"Unable to determine type of token '{token.Value}'", token);
                     return null;
                 case TokenType.Boolean:
-                    typeDefinition.Name = "bool";
-                    return typeDefinition;
+                    constant.TypeName = "bool";
+                    constant.Value = new Constant {Boolean = token.Value == "true"};
+                    return constant;
                 default:
                     ErrorReporter.Report($"Unable to determine type of token '{token.Value}'", token);
                     return null;

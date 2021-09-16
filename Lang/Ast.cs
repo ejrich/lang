@@ -14,6 +14,7 @@ namespace Lang
     public interface IType
     {
         string Name { get; set; }
+        string BackendName { get; set; }
         int TypeIndex { get; set; }
         TypeKind TypeKind { get; set; }
         uint Size { get; set; }
@@ -74,6 +75,7 @@ namespace Lang
         public uint Line { get; init; }
         public uint Column { get; init; }
         public string Name { get; set; }
+        public string BackendName { get; set; }
         public int TypeIndex { get; set; }
         public int OverloadIndex { get; set; }
         public TypeKind TypeKind { get; set; } = TypeKind.Function;
@@ -95,6 +97,7 @@ namespace Lang
         public uint Line { get; init; }
         public uint Column { get; init; }
         public string Name { get; set; }
+        public string BackendName { get; set; }
         public int TypeIndex { get; set; }
         public TypeKind TypeKind { get; set; }
         public uint Size { get; set; }
@@ -141,6 +144,7 @@ namespace Lang
         public uint Line { get; init; }
         public uint Column { get; init; }
         public string Name { get; set; }
+        public string BackendName { get; set; }
         public int TypeIndex { get; set; }
         public uint Size { get; set; } = 4;
         public TypeKind TypeKind { get; set; } = TypeKind.Enum;
@@ -173,6 +177,7 @@ namespace Lang
         public uint Line { get; init; }
         public uint Column { get; init; }
         public string Name { get; set; }
+        public string BackendName { get; set; }
         public int TypeIndex { get; set; }
         public TypeKind TypeKind { get; set; }
         public uint Size { get; set; }
@@ -185,6 +190,7 @@ namespace Lang
     public class ArrayType : IType
     {
         public string Name { get; set; }
+        public string BackendName { get; set; }
         public int TypeIndex { get; set; }
         public TypeKind TypeKind { get; set; } = TypeKind.CArray;
         public uint Size { get; set; }
@@ -197,9 +203,11 @@ namespace Lang
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
-        public TypeDefinition TypeDefinition { get; set; }
+        // public TypeDefinition TypeDefinition { get; set; }
+        public string TypeName { get; set; }
         public IType Type { get; set; }
-        public string Value { get; set; }
+        public Constant Value { get; set; }
+        public string String { get; set; }
     }
 
     public class NullAst : IAst
