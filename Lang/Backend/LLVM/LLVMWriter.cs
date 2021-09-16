@@ -230,12 +230,24 @@ namespace Lang.Backend.LLVM
 
                 LLVMApi.BuildStore(_builder, value, variable);
             }
-            // 3. Initialize struct field default values
+            // 3. TODO Initialize strings
+            // 4. Initialize lists
+            else if (declaration.Type.Name == "List")
+            {
+                // TODO Initialize count and reserve memory
+                if (declaration.Type.Count is ConstantAst constantAst)
+                {
+                    var count = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), ulong.Parse(constantAst.Value), false);
+                    var countPointer = LLVMApi.BuildStructGEP(_builder, variable, 0, "countptr");
+                    LLVMApi.BuildStore(_builder, count, countPointer);
+                }
+            }
+            // 5. Initialize struct field default values
             else if (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind)
             {
                 InitializeStruct(declaration.Type, variable);
             }
-            // 4. Or initialize to 0
+            // 6. Or initialize to 0
             else if (type.TypeKind != LLVMTypeKind.LLVMArrayTypeKind)
             {
                 var zero = GetConstZero(type);
@@ -255,7 +267,16 @@ namespace Lang.Backend.LLVM
 
                 var field = LLVMApi.BuildStructGEP(_builder, variable, (uint) i, structField.Name);
 
-                if (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind)
+                if (structField.Type.Name == "List")
+                {
+                    if (structField.Type.Count is ConstantAst constantAst)
+                    {
+                        var count = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), ulong.Parse(constantAst.Value), false);
+                        var countPointer = LLVMApi.BuildStructGEP(_builder, variable, 0, "countptr");
+                        LLVMApi.BuildStore(_builder, count, countPointer);
+                    }
+                }
+                else if (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind)
                 {
                     InitializeStruct(structField.Type, field);
                 }
@@ -675,8 +696,9 @@ namespace Lang.Backend.LLVM
 
             // 3. Build the pointer with the first index of 0
             var elementType = type.Generics[0];
-            return (elementType, LLVMApi.BuildGEP(_builder, variable,
-                new [] {GetConstZero(ConvertTypeDefinition(elementType)), indexValue}, "indexptr"));
+            var listData = LLVMApi.BuildStructGEP(_builder, variable, 1, "listdata");
+            var dataPointer = LLVMApi.BuildLoad(_builder, listData, "dataptr");
+            return (elementType, LLVMApi.BuildGEP(_builder, dataPointer, new [] {indexValue}, "indexptr"));
         }
 
         private LLVMValueRef BuildExpression((TypeDefinition type, LLVMValueRef value) lhs,
@@ -979,22 +1001,23 @@ namespace Lang.Backend.LLVM
                 _ => typeDef.Name switch
                 {
                     "bool" => LLVMTypeRef.Int1Type(),
-                    "List" => GetArrayType(typeDef),
+                    "List" => GetListType(typeDef),
                     "string" => LLVMApi.GetTypeByName(_module, "string"),
                     _ => LLVMApi.GetTypeByName(_module, typeDef.Name)
                 }
             };
         }
 
-        private LLVMTypeRef GetArrayType(TypeDefinition typeDef)
+        private LLVMTypeRef GetListType(TypeDefinition typeDef)
         {
-            if (typeDef.Count is ConstantAst constantAst)
-            {
-                var count = uint.Parse(constantAst.Value);
-                return LLVMTypeRef.ArrayType(ConvertTypeDefinition(typeDef.Generics[0]), count);
-            }
-            // TODO Implement variable sized arrays
-            return LLVMTypeRef.ArrayType(ConvertTypeDefinition(typeDef.Generics[0]), 10);
+            return LLVMApi.GetTypeByName(_module, "List");
+            // if (typeDef.Count is ConstantAst constantAst)
+            // {
+            //     var count = uint.Parse(constantAst.Value);
+            //     return LLVMTypeRef.ArrayType(ConvertTypeDefinition(typeDef.Generics[0]), count);
+            // }
+            // // TODO Implement variable sized arrays
+            // return LLVMTypeRef.PointerType(ConvertTypeDefinition(typeDef.Generics[0]), 10);
         }
     }
 }

@@ -104,14 +104,14 @@ struct ListStruct {
 
 List<int> create_list(int count) {
     list: List<int>[count];
-    each i in 0..count-1 {
-        list[i] = i * 5;
-    }
-    a := list[count-2];
-    list[0]++;
-    ++list[0];
+    //each i in 0..count-1 {
+    //    list[i] = i * 5;
+    //}
+    //a := list[count-2];
+    //list[0]++;
+    //++list[0];
     s: ListStruct;
-    s.list[0] = 8;
+    //s.list[0] = 8;
     return list;
 }
 
