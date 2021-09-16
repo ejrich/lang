@@ -220,12 +220,20 @@ namespace Lang.Backend.LLVM
             if (declaration.Value != null)
             {
                 var expressionValue = WriteExpression(declaration.Value, localVariables);
+                // var value = CastValue(declaration.Type, expressionValue, type);
+
                 LLVMApi.BuildStore(_builder, expressionValue, variable);
             }
             // 3. Initialize struct field default values
             else if (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind)
             {
                 InitializeStruct(declaration.Type, variable);
+            }
+            // 4. Or initialize to 0
+            else
+            {
+                var zero = GetConstZero(type);
+                LLVMApi.BuildStore(_builder, zero, variable);
             }
         }
 
@@ -561,8 +569,10 @@ namespace Lang.Backend.LLVM
                     {
                         return LLVMApi.ConstInt(type, constant.Value == "true" ? 1 : 0, false);
                     }
+                    var primitive = constant.Type.PrimitiveType as IntegerType;
                     return LLVMApi.ConstInt(type, ulong.Parse(constant.Value), true);
                 case LLVMTypeKind.LLVMFloatTypeKind:
+                case LLVMTypeKind.LLVMDoubleTypeKind:
                     return LLVMApi.ConstRealOfStringAndSize(type, constant.Value, (uint) constant.Value.Length);
                 // TODO Implement more branches
                 default:
@@ -665,7 +675,20 @@ namespace Lang.Backend.LLVM
 
             throw new NotImplementedException($"{op} not compatible with types '{lhs.TypeOf().TypeKind}' and '{rhs.TypeOf().TypeKind}'");
         }
-        
+
+        private LLVMValueRef CastValue(TypeDefinition targetType, LLVMValueRef value, LLVMTypeRef targetLType)
+        {
+            switch (targetType.PrimitiveType)
+            {
+                case IntegerType integerType:
+                    return LLVMApi.BuildIntCast(_builder, value, targetLType, "tmpint");
+                case FloatType floatType:
+                    return LLVMApi.BuildFPCast(_builder, value, targetLType, "tmpfp");
+            }
+
+            return value;
+        }
+
         private static LLVMIntPredicate ConvertIntOperator(Operator op)
         {
             return op switch
