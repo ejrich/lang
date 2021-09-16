@@ -84,7 +84,7 @@ namespace Lang.Runner
                     for (; index < count; index++)
                     {
                         var field = structAst.Fields[index];
-                        var fieldType = GetTypeFromDefinition(field.Type, name, structBuilder);
+                        var fieldType = GetTypeFromDefinition(field.Type, temporaryStructs);
                         if (fieldType == null)
                         {
                             break;
@@ -724,7 +724,7 @@ namespace Lang.Runner
                         {
                             var valueType = ExecuteExpression(call.Arguments[i], variables);
                             arguments[i] = valueType.Value;
-                            types[i] = GetTypeFromDefinition(valueType.Type, cCall: true);
+                            types[i] = GetTypeFromDefinition(valueType.Type, true);
                         }
 
                         // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
@@ -740,7 +740,7 @@ namespace Lang.Runner
                             else
                             {
                                 arguments[i] = valueType.Value;
-                                types[i] = GetTypeFromDefinition(valueType.Type, cCall: true);
+                                types[i] = GetTypeFromDefinition(valueType.Type, true);
                             }
                         }
 
@@ -755,7 +755,7 @@ namespace Lang.Runner
                             var argument = call.Arguments[i];
                             var valueType = ExecuteExpression(argument, variables);
                             arguments[i] = valueType.Value;
-                            types[i] = GetTypeFromDefinition(valueType.Type, cCall: function.Extern);
+                            types[i] = GetTypeFromDefinition(valueType.Type, function.Extern);
                         }
 
                         return CallFunction(call.Function, function, arguments, types);
@@ -1422,30 +1422,43 @@ namespace Lang.Runner
             };
         }
 
-        private Type GetTypeFromDefinition(TypeDefinition typeDef, string parentName = null, Type parentType = null, bool cCall = false)
+        private Type GetTypeFromDefinition(TypeDefinition typeDef, IDictionary<string, TypeBuilder> temporaryTypes)
         {
             switch (typeDef.PrimitiveType)
             {
                 case IntegerType integerType:
-                    if (integerType.Signed)
+                    return GetIntegerType(integerType);
+                case FloatType floatType:
+                    return floatType.Bytes == 4 ? typeof(float) : typeof(double);
+            }
+
+            switch (typeDef.Name)
+            {
+                case "bool":
+                    return typeof(bool);
+                case "*":
+                    var pointerType = GetTypeFromDefinition(typeDef.Generics[0], temporaryTypes);
+                    if (pointerType == null)
                     {
-                        return integerType.Bytes switch
-                        {
-                            1 => typeof(sbyte),
-                            2 => typeof(short),
-                            4 => typeof(int),
-                            8 => typeof(long),
-                            _ => typeof(int)
-                        };
+                        return null;
                     }
-                    return integerType.Bytes switch
-                    {
-                        1 => typeof(byte),
-                        2 => typeof(ushort),
-                        4 => typeof(uint),
-                        8 => typeof(ulong),
-                        _ => typeof(uint)
-                    };
+                    return pointerType.MakePointerType();
+            }
+
+            if (_types.TryGetValue(typeDef.GenericName, out var type))
+            {
+                return type;
+            }
+
+            return temporaryTypes.TryGetValue(typeDef.GenericName, out var tempType) ? tempType : null;
+        }
+
+        private Type GetTypeFromDefinition(TypeDefinition typeDef, bool cCall = false)
+        {
+            switch (typeDef.PrimitiveType)
+            {
+                case IntegerType integerType:
+                    return GetIntegerType(integerType);
                 case FloatType floatType:
                     return floatType.Bytes == 4 ? typeof(float) : typeof(double);
             }
@@ -1458,7 +1471,7 @@ namespace Lang.Runner
                     if (!cCall) break;
                     return typeof(char).MakePointerType();
                 case "*":
-                    var pointerType = GetTypeFromDefinition(typeDef.Generics[0], parentName, parentType);
+                    var pointerType = GetTypeFromDefinition(typeDef.Generics[0], cCall);
                     if (pointerType == null)
                     {
                         return null;
@@ -1466,11 +1479,30 @@ namespace Lang.Runner
                     return pointerType.MakePointerType();
             }
 
-            if (typeDef.GenericName == parentName)
-            {
-                return parentType;
-            }
             return _types.TryGetValue(typeDef.GenericName, out var type) ? type : null;
+        }
+
+        private Type GetIntegerType(IntegerType integerType)
+        {
+            if (integerType.Signed)
+            {
+                return integerType.Bytes switch
+                {
+                    1 => typeof(sbyte),
+                    2 => typeof(short),
+                    4 => typeof(int),
+                    8 => typeof(long),
+                    _ => typeof(int)
+                };
+            }
+            return integerType.Bytes switch
+            {
+                1 => typeof(byte),
+                2 => typeof(ushort),
+                4 => typeof(uint),
+                8 => typeof(ulong),
+                _ => typeof(uint)
+            };
         }
     }
 }
