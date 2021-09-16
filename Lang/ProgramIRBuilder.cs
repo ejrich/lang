@@ -486,6 +486,7 @@ namespace Lang
                     value.ConstantValue = new Constant {Boolean = false};
                     break;
                 case TypeKind.Integer:
+                case TypeKind.Enum:
                     value.ConstantValue = new Constant {Integer = 0};
                     break;
                 case TypeKind.Float:
@@ -590,7 +591,7 @@ namespace Lang
 
                         return new InstructionValue
                         {
-                            ValueType = InstructionValueType.Constant, Type = enumDef.BaseType,
+                            ValueType = InstructionValueType.Constant, Type = enumDef,
                             ConstantValue = new Constant {Integer = enumValue}
                         };
                     }
@@ -619,19 +620,24 @@ namespace Lang
                     var previousValue = EmitLoad(block, pointer.Type, pointer);
 
                     var constOne = new InstructionValue {ValueType = InstructionValueType.Constant, Type = changeByOne.Type};
+                    InstructionType instructionType;
                     if (changeByOne.Type.TypeKind == TypeKind.Integer)
                     {
+                        instructionType = changeByOne.Positive ? InstructionType.IntegerAdd : InstructionType.IntegerSubtract;
                         constOne.ConstantValue = new Constant {Integer = 1};
-                    }
-                    else if (changeByOne.Type.Size == 4)
-                    {
-                        constOne.ConstantValue = new Constant {Float = 1};
                     }
                     else
                     {
-                        constOne.ConstantValue = new Constant {Double = 1};
+                        instructionType = changeByOne.Positive ? InstructionType.FloatAdd : InstructionType.FloatSubtract;
+                        if (changeByOne.Type.Size == 4)
+                        {
+                            constOne.ConstantValue = new Constant {Float = 1};
+                        }
+                        else
+                        {
+                            constOne.ConstantValue = new Constant {Double = 1};
+                        }
                     }
-                    var instructionType = changeByOne.Positive ? InstructionType.Add : InstructionType.Subtract;
                     var newValue = EmitInstruction(instructionType, block, changeByOne.Type, previousValue, constOne);
                     EmitStore(block, pointer, newValue);
 
@@ -644,9 +650,9 @@ namespace Lang
                             value = EmitIR(function, unary.Value, scope, block);
                             return EmitInstruction(InstructionType.Not, block, value.Type, value);
                         case UnaryOperator.Negate:
-                            // TODO Get should there be different instructions for integers and floats?
                             value = EmitIR(function, unary.Value, scope, block);
-                            return EmitInstruction(InstructionType.Negate, block, value.Type, value);
+                            var negate = value.Type.TypeKind == TypeKind.Integer ? InstructionType.IntegerNegate : InstructionType.FloatNegate;
+                            return EmitInstruction(negate, block, value.Type, value);
                         case UnaryOperator.Dereference:
                             value = EmitIR(function, unary.Value, scope, block);
                             return EmitLoad(block, value.Type, value);
@@ -718,7 +724,7 @@ namespace Lang
 
                         return new InstructionValue
                         {
-                            ValueType = InstructionValueType.Constant, Type = enumDef.BaseType,
+                            ValueType = InstructionValueType.Constant, Type = enumDef,
                             ConstantValue = new Constant {Integer = enumValue}
                         };
                     }
@@ -1049,22 +1055,37 @@ namespace Lang
                     return EmitInstruction(InstructionType.BitwiseOr, block, type, lhs, rhs);
                 case Operator.Xor:
                     return EmitInstruction(InstructionType.Xor, block, type, lhs, rhs);
-                // TODO Float/unsigned int specific instructions?
-                case Operator.Add:
-                    return EmitInstruction(InstructionType.Add, block, type, lhs, rhs);
-                case Operator.Subtract:
-                    return EmitInstruction(InstructionType.Subtract, block, type, lhs, rhs);
-                case Operator.Multiply:
-                    return EmitInstruction(InstructionType.Multiply, block, type, lhs, rhs);
-                case Operator.Divide:
-                    return EmitInstruction(InstructionType.Divide, block, type, lhs, rhs);
-                case Operator.Modulus:
-                    return EmitInstruction(InstructionType.Modulus, block, type, lhs, rhs);
             }
 
-            Console.WriteLine("Operator not compatible");
-            Environment.Exit(ErrorCodes.BuildError);
-            return null;
+            InstructionType instructionType;
+            if (type.TypeKind == TypeKind.Integer)
+            {
+                var integerType = (PrimitiveAst)type;
+                instructionType = op switch
+                {
+                    Operator.Add => InstructionType.IntegerAdd,
+                    Operator.Subtract => InstructionType.IntegerSubtract,
+                    Operator.Multiply => InstructionType.IntegerMultiply,
+                    Operator.Divide => integerType.Primitive.Signed ? InstructionType.IntegerDivide : InstructionType.UnsignedIntegerDivide,
+                    Operator.Modulus => integerType.Primitive.Signed ? InstructionType.IntegerDivide : InstructionType.UnsignedIntegerModulus,
+                    // @Cleanup this branch should never be hit
+                    _ => InstructionType.IntegerAdd
+                };
+            }
+            else
+            {
+                instructionType = op switch
+                {
+                    Operator.Add => InstructionType.FloatAdd,
+                    Operator.Subtract => InstructionType.FloatAdd,
+                    Operator.Multiply => InstructionType.FloatAdd,
+                    Operator.Divide => InstructionType.FloatAdd,
+                    Operator.Modulus => InstructionType.FloatModulus,
+                    // @Cleanup this branch should never be hit
+                    _ => InstructionType.FloatAdd
+                };
+            }
+            return EmitInstruction(instructionType, block, type, lhs, rhs);
         }
 
         private InstructionValue EmitPointerOperation(BasicBlock block, InstructionValue lhs, InstructionValue rhs, Operator op, IType type)
@@ -1075,7 +1096,7 @@ namespace Lang
                 {
                     return EmitInstruction(InstructionType.IsNull, block, type, lhs);
                 }
-                return EmitInstruction(InstructionType.Equals, block, type, lhs, rhs);
+                return EmitInstruction(InstructionType.PointerEquals, block, type, lhs, rhs);
             }
             if (op == Operator.NotEqual)
             {
@@ -1083,13 +1104,13 @@ namespace Lang
                 {
                     return EmitInstruction(InstructionType.IsNotNull, block, type, lhs);
                 }
-                return EmitInstruction(InstructionType.NotEquals, block, type, lhs, rhs);
+                return EmitInstruction(InstructionType.PointerNotEquals, block, type, lhs, rhs);
             }
             if (op == Operator.Subtract)
             {
-                return EmitInstruction(InstructionType.Subtract, block, type, lhs, rhs);
+                return EmitInstruction(InstructionType.PointerSubtract, block, type, lhs, rhs);
             }
-            return EmitInstruction(InstructionType.Add, block, type, lhs, rhs);
+            return EmitInstruction(InstructionType.PointerAdd, block, type, lhs, rhs);
         }
 
         private InstructionValue EmitCompare(BasicBlock block, InstructionValue lhs, InstructionValue rhs, Operator op, IType type)
@@ -1100,7 +1121,6 @@ namespace Lang
                     switch (rhs.Type.TypeKind)
                     {
                         case TypeKind.Integer:
-                            // var signed = lhsInt.Signed || rhsInt.Signed;
                             if (lhs.Type.Size > rhs.Type.Size)
                             {
                                 rhs = EmitCastValue(block, rhs, lhs.Type);
@@ -1109,10 +1129,11 @@ namespace Lang
                             {
                                 lhs = EmitCastValue(block, lhs, rhs.Type);
                             }
-                            return EmitInstruction(ConvertIntOperator(op), block, type, lhs, rhs);
+                            var integerType = (PrimitiveAst)lhs.Type;
+                            return EmitInstruction(GetIntCompareInstructionType(op, integerType.Primitive.Signed), block, type, lhs, rhs);
                         case TypeKind.Float:
                             lhs = EmitCastValue(block, lhs, rhs.Type);
-                            return EmitInstruction(ConvertRealOperator(op), block, type, lhs, rhs);
+                            return EmitInstruction(GetFloatCompareInstructionType(op), block, type, lhs, rhs);
                     }
                     break;
                 case TypeKind.Float:
@@ -1120,7 +1141,7 @@ namespace Lang
                     {
                         case TypeKind.Integer:
                             rhs = EmitCastValue(block, rhs, lhs.Type);
-                            return EmitInstruction(ConvertRealOperator(op), block, type, lhs, rhs);
+                            return EmitInstruction(GetFloatCompareInstructionType(op), block, type, lhs, rhs);
                         case TypeKind.Float:
                             if (lhs.Type.Size > rhs.Type.Size)
                             {
@@ -1130,11 +1151,13 @@ namespace Lang
                             {
                                 lhs = EmitCastValue(block, lhs, _float64Type);
                             }
-                            return EmitInstruction(ConvertRealOperator(op), block, type, lhs, rhs);
+                            return EmitInstruction(GetFloatCompareInstructionType(op), block, type, lhs, rhs);
                     }
                     break;
                 case TypeKind.Enum:
-                    return EmitInstruction(ConvertIntOperator(op), block, type, lhs, rhs);
+                    var enumAst = (EnumAst)lhs.Type;
+                    var baseType = (PrimitiveAst)enumAst.BaseType;
+                    return EmitInstruction(GetIntCompareInstructionType(op, baseType.Primitive.Signed), block, type, lhs, rhs);
             }
 
             Console.WriteLine("Unexpected type in compare");
@@ -1142,35 +1165,33 @@ namespace Lang
             return null;
         }
 
-        private static InstructionType ConvertIntOperator(Operator op, bool signed = true)
+        private static InstructionType GetIntCompareInstructionType(Operator op, bool signed)
         {
             return op switch
             {
-                Operator.Equality => InstructionType.Equals,
-                Operator.NotEqual => InstructionType.NotEquals,
-                // TODO Should there be unsigned instruction types?
-                Operator.GreaterThan => signed ? InstructionType.GreaterThan : InstructionType.GreaterThan,
-                Operator.GreaterThanEqual => signed ? InstructionType.GreaterThanOrEqual : InstructionType.GreaterThanOrEqual,
-                Operator.LessThan => signed ? InstructionType.LessThan : InstructionType.LessThan,
-                Operator.LessThanEqual => signed ? InstructionType.LessThanOrEqual : InstructionType.LessThanOrEqual,
+                Operator.Equality => InstructionType.IntegerEquals,
+                Operator.NotEqual => InstructionType.IntegerNotEquals,
+                Operator.GreaterThan => signed ? InstructionType.IntegerGreaterThan : InstructionType.UnsignedIntegerGreaterThan,
+                Operator.GreaterThanEqual => signed ? InstructionType.IntegerGreaterThanOrEqual : InstructionType.UnsignedIntegerGreaterThanOrEqual,
+                Operator.LessThan => signed ? InstructionType.IntegerLessThan : InstructionType.UnsignedIntegerLessThan,
+                Operator.LessThanEqual => signed ? InstructionType.IntegerLessThanOrEqual : InstructionType.UnsignedIntegerLessThanOrEqual,
                 // @Cleanup This branch should never be hit
-                _ => InstructionType.Equals
+                _ => InstructionType.IntegerEquals
             };
         }
 
-        private static InstructionType ConvertRealOperator(Operator op)
+        private static InstructionType GetFloatCompareInstructionType(Operator op)
         {
             return op switch
             {
-                Operator.Equality => InstructionType.Equals,
-                Operator.NotEqual => InstructionType.NotEquals,
-                // TODO Should there be float instruction types?
-                Operator.GreaterThan => InstructionType.GreaterThan,
-                Operator.GreaterThanEqual => InstructionType.GreaterThanOrEqual,
-                Operator.LessThan => InstructionType.LessThan,
-                Operator.LessThanEqual => InstructionType.LessThanOrEqual,
+                Operator.Equality => InstructionType.FloatEquals,
+                Operator.NotEqual => InstructionType.FloatNotEquals,
+                Operator.GreaterThan => InstructionType.FloatGreaterThan,
+                Operator.GreaterThanEqual => InstructionType.FloatGreaterThanOrEqual,
+                Operator.LessThan => InstructionType.FloatLessThan,
+                Operator.LessThanEqual => InstructionType.FloatLessThanOrEqual,
                 // @Cleanup This branch should never be hit
-                _ => InstructionType.Equals
+                _ => InstructionType.FloatEquals
             };
         }
 
