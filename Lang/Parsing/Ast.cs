@@ -24,6 +24,12 @@ namespace Lang.Parsing
         public List<IAst> Children { get; } = new();
     }
 
+    public class ReturnAst : IAst
+    {
+        public IAst Value { get; set; }
+        public List<IAst> Children => null;
+    }
+
     public class ConstantAst : IAst
     {
         public Type Type { get; init; }
@@ -31,14 +37,15 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
-    public class ReturnAst : IAst
+    public class VariableAst : IAst
     {
-        public IAst Value { get; set; }
+        public string Name { get; init; }
         public List<IAst> Children => null;
     }
 
     public class ExpressionAst : IAst
     {
+        public bool HasErrors { get; set; }
         public List<IAst> Children { get; } = new();
     }
 
