@@ -1,4 +1,5 @@
-﻿using Lang.Parsing;
+﻿using System.Linq;
+using Lang.Parsing;
 using Lang.Project;
 
 namespace Lang
@@ -22,7 +23,7 @@ namespace Lang
         public void Compile(string[] args)
         {
             // 1. Load files in project
-            var project = _projectInterpreter.LoadProject();
+            var project = _projectInterpreter.LoadProject(args.FirstOrDefault());
 
             // 2. Parse source files to tokens
             var parseResult = _parser.Parse(project.BuildFiles);
