@@ -9,20 +9,11 @@ namespace Lang
     {
         public List<DeclarationAst> Variables { get; } = new();
         public Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> OperatorOverloads { get; } = new();
-        public List<TranslationError> Errors { get; } = new();
-    }
-
-    public class TranslationError
-    {
-        public int FileIndex { get; init; }
-        public string Error { get; init; }
-        public uint Line { get; init; }
-        public uint Column { get; init; }
     }
 
     public interface IProgramGraphBuilder
     {
-        ProgramGraph CreateProgramGraph(ParseResult parseResult);
+        ProgramGraph CreateProgramGraph(List<IAst> asts);
     }
 
     public class ProgramGraphBuilder : IProgramGraphBuilder
@@ -45,7 +36,7 @@ namespace Lang
             _irBuilder = irBuilder;
         }
 
-        public ProgramGraph CreateProgramGraph(ParseResult parseResult)
+        public ProgramGraph CreateProgramGraph(List<IAst> asts)
         {
             var mainDefined = false;
             bool verifyAdditional;
@@ -70,20 +61,20 @@ namespace Lang
             do
             {
                 // 1. Verify enum and struct definitions
-                for (var i = 0; i < parseResult.SyntaxTrees.Count; i++)
+                for (var i = 0; i < asts.Count; i++)
                 {
-                    switch (parseResult.SyntaxTrees[i])
+                    switch (asts[i])
                     {
                         case EnumAst enumAst:
                             VerifyEnum(enumAst);
-                            parseResult.SyntaxTrees.RemoveAt(i--);
+                            asts.RemoveAt(i--);
                             break;
                         case StructAst structAst:
                             if (structAst.Generics.Any())
                             {
                                 if (_polymorphicStructs.ContainsKey(structAst.Name))
                                 {
-                                    AddError($"Multiple definitions of polymorphic struct '{structAst.Name}'", structAst);
+                                    ErrorReporter.Report($"Multiple definitions of polymorphic struct '{structAst.Name}'", structAst);
                                 }
                                 _polymorphicStructs[structAst.Name] = structAst;
                             }
@@ -93,7 +84,7 @@ namespace Lang
                                 {
                                     structAst.TypeKind = TypeKind.String;
                                     VerifyStruct(structAst);
-                                    parseResult.SyntaxTrees.RemoveAt(i--);
+                                    asts.RemoveAt(i--);
                                 }
                                 else
                                 {
@@ -101,7 +92,7 @@ namespace Lang
                                 }
                                 if (!TypeTable.Add(structAst.Name, structAst))
                                 {
-                                    AddError($"Multiple definitions of struct '{structAst.Name}'", structAst);
+                                    ErrorReporter.Report($"Multiple definitions of struct '{structAst.Name}'", structAst);
                                     break;
                                 }
                             }
@@ -112,22 +103,22 @@ namespace Lang
                 }
 
                 // 2. Verify global variables and function return types/arguments
-                for (var i = 0; i < parseResult.SyntaxTrees.Count; i++)
+                for (var i = 0; i < asts.Count; i++)
                 {
-                    switch (parseResult.SyntaxTrees[i])
+                    switch (asts[i])
                     {
                         case DeclarationAst globalVariable:
                             VerifyGlobalVariable(globalVariable);
                             _programGraph.Variables.Add(globalVariable);
-                            parseResult.SyntaxTrees.RemoveAt(i--);
+                            asts.RemoveAt(i--);
                             break;
                     }
                 }
 
                 // 3. Verify function return types/arguments
-                for (var i = 0; i < parseResult.SyntaxTrees.Count; i++)
+                for (var i = 0; i < asts.Count; i++)
                 {
-                    switch (parseResult.SyntaxTrees[i])
+                    switch (asts[i])
                     {
                         case FunctionAst function:
                             var main = function.Name == "main";
@@ -135,33 +126,33 @@ namespace Lang
                             {
                                 if (mainDefined)
                                 {
-                                    AddError("Only one main function can be defined", function);
+                                    ErrorReporter.Report("Only one main function can be defined", function);
                                 }
 
                                 mainDefined = true;
                             }
 
                             VerifyFunctionDefinition(function, functionNames, main);
-                            parseResult.SyntaxTrees.RemoveAt(i--);
+                            asts.RemoveAt(i--);
                             break;
                         case OperatorOverloadAst overload:
                             VerifyOperatorOverloadDefinition(overload);
-                            parseResult.SyntaxTrees.RemoveAt(i--);
+                            asts.RemoveAt(i--);
                             break;
                     }
                 }
 
                 // 4. Verify struct bodies
-                for (var i = 0; i < parseResult.SyntaxTrees.Count; i++)
+                for (var i = 0; i < asts.Count; i++)
                 {
-                    switch (parseResult.SyntaxTrees[i])
+                    switch (asts[i])
                     {
                         case StructAst structAst:
                             if (!structAst.Verified)
                             {
                                 VerifyStruct(structAst);
                             }
-                            parseResult.SyntaxTrees.RemoveAt(i--);
+                            asts.RemoveAt(i--);
                             break;
                     }
                 }
@@ -169,9 +160,9 @@ namespace Lang
                 // 5. Verify and run top-level static ifs
                 verifyAdditional = false;
                 var additionalAsts = new List<IAst>();
-                for (int i = 0; i < parseResult.SyntaxTrees.Count; i++)
+                for (int i = 0; i < asts.Count; i++)
                 {
-                    switch (parseResult.SyntaxTrees[i])
+                    switch (asts[i])
                     {
                         case CompilerDirectiveAst directive:
                             switch (directive.Type)
@@ -190,7 +181,7 @@ namespace Lang
                                             additionalAsts.AddRange(conditional.ElseBlock.Children);
                                         }
                                     }
-                                    parseResult.SyntaxTrees.RemoveAt(i--);
+                                    asts.RemoveAt(i--);
                                     break;
                                 case DirectiveType.Assert:
                                     if (VerifyCondition(directive.Value, null, _globalScope))
@@ -198,10 +189,10 @@ namespace Lang
                                         _programRunner.Init(_programGraph);
                                         if (!_programRunner.ExecuteCondition(directive.Value))
                                         {
-                                            AddError("Assertion failed", directive.Value);
+                                            ErrorReporter.Report("Assertion failed", directive.Value);
                                         }
                                     }
-                                    parseResult.SyntaxTrees.RemoveAt(i--);
+                                    asts.RemoveAt(i--);
                                     break;
                             }
                             break;
@@ -209,7 +200,7 @@ namespace Lang
                 }
                 if (additionalAsts.Any())
                 {
-                    parseResult.SyntaxTrees.AddRange(additionalAsts);
+                    asts.AddRange(additionalAsts);
                     verifyAdditional = true;
                 }
             } while (verifyAdditional);
@@ -236,7 +227,7 @@ namespace Lang
             }
 
             // 8. Execute any other compiler directives
-            foreach (var ast in parseResult.SyntaxTrees)
+            foreach (var ast in asts)
             {
                 switch (ast)
                 {
@@ -249,7 +240,7 @@ namespace Lang
             if (!mainDefined)
             {
                 // @Cleanup allow errors to be reported without having a file/line/column
-                AddError("'main' function of the program is not defined");
+                ErrorReporter.Report("'main' function of the program is not defined");
             }
 
             return _programGraph;
@@ -267,7 +258,7 @@ namespace Lang
             // 1. Verify enum has not already been defined
             if (!TypeTable.Add(enumAst.Name, enumAst))
             {
-                AddError($"Multiple definitions of enum '{enumAst.Name}'", enumAst);
+                ErrorReporter.Report($"Multiple definitions of enum '{enumAst.Name}'", enumAst);
             }
             _globalScope.Identifiers.Add(enumAst.Name, enumAst);
 
@@ -281,7 +272,7 @@ namespace Lang
                 var baseType = VerifyType(enumAst.BaseTypeDefinition);
                 if (baseType != TypeKind.Integer && baseType != TypeKind.Error)
                 {
-                    AddError($"Base type of enum must be an integer, but got '{PrintTypeDefinition(enumAst.BaseTypeDefinition)}'", enumAst.BaseTypeDefinition);
+                    ErrorReporter.Report($"Base type of enum must be an integer, but got '{PrintTypeDefinition(enumAst.BaseTypeDefinition)}'", enumAst.BaseTypeDefinition);
                     enumAst.BaseTypeDefinition.PrimitiveType = new IntegerType {Bytes = 4, Signed = true};
                     enumAst.BaseType = TypeTable.Types["s32"];
                 }
@@ -306,7 +297,7 @@ namespace Lang
                 // 2a. Check if the value has been previously defined
                 if (!valueNames.Add(value.Name))
                 {
-                    AddError($"Enum '{enumAst.Name}' already contains value '{value.Name}'", value);
+                    ErrorReporter.Report($"Enum '{enumAst.Name}' already contains value '{value.Name}'", value);
                 }
 
                 // 2b. Check if the value has been previously used
@@ -314,7 +305,7 @@ namespace Lang
                 {
                     if (!values.Add(value.Value))
                     {
-                        AddError($"Value '{value.Value}' previously defined in enum '{enumAst.Name}'", value);
+                        ErrorReporter.Report($"Value '{value.Value}' previously defined in enum '{enumAst.Name}'", value);
                     }
                     else if (value.Value > largestValue)
                     {
@@ -330,7 +321,7 @@ namespace Lang
                 // 2d. Verify the value is in the range of the enum
                 if (value.Value < lowestAllowedValue || value.Value > largestAllowedValue)
                 {
-                    AddError($"Enum value '{enumAst.Name}.{value.Name}' value '{value.Value}' is out of range", value);
+                    ErrorReporter.Report($"Enum value '{enumAst.Name}.{value.Name}' value '{value.Value}' is out of range", value);
                 }
             }
         }
@@ -345,7 +336,7 @@ namespace Lang
                 // 1a. Check if the field has been previously defined
                 if (!fieldNames.Add(structField.Name))
                 {
-                    AddError($"Struct '{structAst.Name}' already contains field '{structField.Name}'", structField);
+                    ErrorReporter.Report($"Struct '{structAst.Name}' already contains field '{structField.Name}'", structField);
                 }
 
                 IType fieldType = null;
@@ -356,11 +347,11 @@ namespace Lang
 
                     if (type == TypeKind.Error)
                     {
-                        AddError($"Undefined type '{PrintTypeDefinition(structField.TypeDefinition)}' in struct field '{structAst.Name}.{structField.Name}'", structField.TypeDefinition);
+                        ErrorReporter.Report($"Undefined type '{PrintTypeDefinition(structField.TypeDefinition)}' in struct field '{structAst.Name}.{structField.Name}'", structField.TypeDefinition);
                     }
                     else if (type == TypeKind.Void)
                     {
-                        AddError($"Struct field '{structAst.Name}.{structField.Name}' cannot be assigned type 'void'", structField.TypeDefinition);
+                        ErrorReporter.Report($"Struct field '{structAst.Name}.{structField.Name}' cannot be assigned type 'void'", structField.TypeDefinition);
                     }
                     else
                     {
@@ -378,7 +369,7 @@ namespace Lang
                         {
                             if (type != TypeKind.Pointer)
                             {
-                                AddError("Cannot assign null to non-pointer type", structField.Value);
+                                ErrorReporter.Report("Cannot assign null to non-pointer type", structField.Value);
                             }
 
                             nullAst.TargetTypeDefinition = structField.TypeDefinition;
@@ -393,11 +384,11 @@ namespace Lang
                             {
                                 if (!TypeEquals(structField.TypeDefinition, valueType))
                                 {
-                                    AddError($"Expected struct field value to be type '{PrintTypeDefinition(structField.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", structField.Value);
+                                    ErrorReporter.Report($"Expected struct field value to be type '{PrintTypeDefinition(structField.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", structField.Value);
                                 }
                                 else if (!isConstant)
                                 {
-                                    AddError("Default values in structs must be constant", structField.Value);
+                                    ErrorReporter.Report("Default values in structs must be constant", structField.Value);
                                 }
                                 else if (structField.TypeDefinition.PrimitiveType != null && structField.Value is ConstantAst constant)
                                 {
@@ -410,7 +401,7 @@ namespace Lang
                     {
                         if (type != TypeKind.Struct && type != TypeKind.String)
                         {
-                            AddError($"Can only use object initializer with struct type, got '{PrintTypeDefinition(structField.TypeDefinition)}'", structField.TypeDefinition);
+                            ErrorReporter.Report($"Can only use object initializer with struct type, got '{PrintTypeDefinition(structField.TypeDefinition)}'", structField.TypeDefinition);
                         }
                         // Catch circular references
                         else if (fieldType != null && fieldType != structAst)
@@ -425,12 +416,12 @@ namespace Lang
                             {
                                 if (!fields.TryGetValue(name, out var field))
                                 {
-                                    AddError($"Field '{name}' not in struct '{PrintTypeDefinition(structField.TypeDefinition)}'", assignment.Reference);
+                                    ErrorReporter.Report($"Field '{name}' not in struct '{PrintTypeDefinition(structField.TypeDefinition)}'", assignment.Reference);
                                 }
 
                                 if (assignment.Operator != Operator.None)
                                 {
-                                    AddError("Cannot have operator assignments in object initializers", assignment.Reference);
+                                    ErrorReporter.Report("Cannot have operator assignments in object initializers", assignment.Reference);
                                 }
 
                                 var valueType = VerifyConstantExpression(assignment.Value, null, _globalScope, out var isConstant, out _);
@@ -438,11 +429,11 @@ namespace Lang
                                 {
                                     if (!TypeEquals(field.TypeDefinition, valueType))
                                     {
-                                        AddError($"Expected field value to be type '{PrintTypeDefinition(field.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                                        ErrorReporter.Report($"Expected field value to be type '{PrintTypeDefinition(field.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", assignment.Value);
                                     }
                                     else if (!isConstant)
                                     {
-                                        AddError("Default values in structs should be constant", assignment.Value);
+                                        ErrorReporter.Report("Default values in structs should be constant", assignment.Value);
                                     }
                                     else if (field.TypeDefinition.PrimitiveType != null && assignment.Value is ConstantAst constant)
                                     {
@@ -456,7 +447,7 @@ namespace Lang
                     {
                         if (type != TypeKind.Error && type != TypeKind.Array && type != TypeKind.CArray)
                         {
-                            AddError($"Cannot use array initializer to declare non-array type '{PrintTypeDefinition(structField.TypeDefinition)}'", structField.TypeDefinition);
+                            ErrorReporter.Report($"Cannot use array initializer to declare non-array type '{PrintTypeDefinition(structField.TypeDefinition)}'", structField.TypeDefinition);
                         }
                         else
                         {
@@ -469,11 +460,11 @@ namespace Lang
                                 {
                                     if (!TypeEquals(elementType, valueType))
                                     {
-                                        AddError($"Expected array value to be type '{PrintTypeDefinition(elementType)}', but got '{PrintTypeDefinition(valueType)}'", value);
+                                        ErrorReporter.Report($"Expected array value to be type '{PrintTypeDefinition(elementType)}', but got '{PrintTypeDefinition(valueType)}'", value);
                                     }
                                     else if (!isConstant)
                                     {
-                                        AddError("Default values in structs array initializers should be constant", value);
+                                        ErrorReporter.Report("Default values in structs array initializers should be constant", value);
                                     }
                                     else if (elementType.PrimitiveType != null && value is ConstantAst constant)
                                     {
@@ -487,7 +478,7 @@ namespace Lang
                     // Check type count
                     if (type == TypeKind.CArray && structField.TypeDefinition.Count == null && structField.TypeDefinition.ConstCount == null)
                     {
-                        AddError($"C array of field '{structAst.Name}.{structField.Name}' must be initialized with a constant size", structField.TypeDefinition);
+                        ErrorReporter.Report($"C array of field '{structAst.Name}.{structField.Name}' must be initialized with a constant size", structField.TypeDefinition);
                     }
                     else if (structField.TypeDefinition.Count != null)
                     {
@@ -498,11 +489,11 @@ namespace Lang
                         {
                             if (!isConstant || countType.PrimitiveType is not IntegerType)
                             {
-                                AddError($"Expected size of '{structAst.Name}.{structField.Name}' to be a constant integer", structField.TypeDefinition.Count);
+                                ErrorReporter.Report($"Expected size of '{structAst.Name}.{structField.Name}' to be a constant integer", structField.TypeDefinition.Count);
                             }
                             else if (count < 0)
                             {
-                                AddError($"Expected size of '{structAst.Name}.{structField.Name}' to be a positive integer", structField.TypeDefinition.Count);
+                                ErrorReporter.Report($"Expected size of '{structAst.Name}.{structField.Name}' to be a positive integer", structField.TypeDefinition.Count);
                             }
                             else
                             {
@@ -517,7 +508,7 @@ namespace Lang
                     {
                         if (structField.Value is NullAst nullAst)
                         {
-                            AddError("Cannot assign null value without declaring a type", structField.Value);
+                            ErrorReporter.Report("Cannot assign null value without declaring a type", structField.Value);
                         }
                         else
                         {
@@ -525,11 +516,11 @@ namespace Lang
 
                             if (!isConstant)
                             {
-                                AddError("Default values in structs must be constant", structField.Value);
+                                ErrorReporter.Report("Default values in structs must be constant", structField.Value);
                             }
                             if (VerifyType(valueType) == TypeKind.Void)
                             {
-                                AddError($"Struct field '{structAst.Name}.{structField.Name}' cannot be assigned type 'void'", structField.Value);
+                                ErrorReporter.Report($"Struct field '{structAst.Name}.{structField.Name}' cannot be assigned type 'void'", structField.Value);
                             }
                             structField.TypeDefinition = valueType;
                             TypeTable.Types.TryGetValue(valueType?.GenericName, out fieldType);
@@ -537,18 +528,18 @@ namespace Lang
                     }
                     else if (structField.Assignments != null)
                     {
-                        AddError("Struct literals are not yet supported", structField);
+                        ErrorReporter.Report("Struct literals are not yet supported", structField);
                     }
                     else if (structField.ArrayValues != null)
                     {
-                        AddError($"Declaration for struct field '{structAst.Name}.{structField.Name}' with array initializer must have the type declared", structField);
+                        ErrorReporter.Report($"Declaration for struct field '{structAst.Name}.{structField.Name}' with array initializer must have the type declared", structField);
                     }
                 }
 
                 // Check for circular dependencies
                 if (structAst.Name == structField.TypeDefinition.Name)
                 {
-                    AddError($"Struct '{structAst.Name}' contains circular reference in field '{structField.Name}'", structField);
+                    ErrorReporter.Report($"Struct '{structAst.Name}' contains circular reference in field '{structField.Name}'", structField);
                 }
 
                 // Set the size and offset
@@ -577,11 +568,11 @@ namespace Lang
             var returnType = VerifyType(function.ReturnTypeDefinition);
             if (returnType == TypeKind.Error)
             {
-                AddError($"Return type '{function.ReturnTypeDefinition.Name}' of function '{function.Name}' is not defined", function.ReturnTypeDefinition);
+                ErrorReporter.Report($"Return type '{function.ReturnTypeDefinition.Name}' of function '{function.Name}' is not defined", function.ReturnTypeDefinition);
             }
             else if (returnType == TypeKind.CArray && function.ReturnTypeDefinition.Count == null)
             {
-                AddError($"C array for function '{function.Name}' must have a constant size", function.ReturnTypeDefinition);
+                ErrorReporter.Report($"C array for function '{function.Name}' must have a constant size", function.ReturnTypeDefinition);
             }
             else if (function.ReturnTypeDefinition.Count != null)
             {
@@ -593,7 +584,7 @@ namespace Lang
                     {
                         if (count < 0)
                         {
-                            AddError($"Expected size of return type of function '{function.Name}' to be a positive integer", function.ReturnTypeDefinition.Count);
+                            ErrorReporter.Report($"Expected size of return type of function '{function.Name}' to be a positive integer", function.ReturnTypeDefinition.Count);
                         }
                         else
                         {
@@ -602,7 +593,7 @@ namespace Lang
                     }
                     else
                     {
-                        AddError($"Return type of function '{function.Name}' should have constant size", function.ReturnTypeDefinition.Count);
+                        ErrorReporter.Report($"Return type of function '{function.Name}' should have constant size", function.ReturnTypeDefinition.Count);
                     }
                 }
             }
@@ -615,7 +606,7 @@ namespace Lang
                 // 3a. Check if the argument has been previously defined
                 if (!argumentNames.Add(argument.Name))
                 {
-                    AddError($"Function '{function.Name}' already contains argument '{argument.Name}'", argument);
+                    ErrorReporter.Report($"Function '{function.Name}' already contains argument '{argument.Name}'", argument);
                 }
 
                 // 3b. Check for errored or undefined field types
@@ -628,7 +619,7 @@ namespace Lang
                     case TypeKind.VarArgs:
                         if (function.Varargs || function.Params)
                         {
-                            AddError($"Function '{function.Name}' cannot have multiple varargs", argument.TypeDefinition);
+                            ErrorReporter.Report($"Function '{function.Name}' cannot have multiple varargs", argument.TypeDefinition);
                         }
                         function.Varargs = true;
                         function.VarargsCalls = new List<List<TypeDefinition>>();
@@ -636,22 +627,22 @@ namespace Lang
                     case TypeKind.Params:
                         if (function.Varargs || function.Params)
                         {
-                            AddError($"Function '{function.Name}' cannot have multiple varargs", argument.TypeDefinition);
+                            ErrorReporter.Report($"Function '{function.Name}' cannot have multiple varargs", argument.TypeDefinition);
                         }
                         function.Params = true;
                         function.ParamsElementType = TypeTable.GetType(argument.TypeDefinition.Generics[0]);
                         break;
                     case TypeKind.Error:
-                        AddError($"Type '{PrintTypeDefinition(argument.TypeDefinition)}' of argument '{argument.Name}' in function '{function.Name}' is not defined", argument.TypeDefinition);
+                        ErrorReporter.Report($"Type '{PrintTypeDefinition(argument.TypeDefinition)}' of argument '{argument.Name}' in function '{function.Name}' is not defined", argument.TypeDefinition);
                         break;
                     default:
                         if (function.Varargs)
                         {
-                            AddError($"Cannot declare argument '{argument.Name}' following varargs", argument);
+                            ErrorReporter.Report($"Cannot declare argument '{argument.Name}' following varargs", argument);
                         }
                         else if (function.Params)
                         {
-                            AddError($"Cannot declare argument '{argument.Name}' following params", argument);
+                            ErrorReporter.Report($"Cannot declare argument '{argument.Name}' following params", argument);
                         }
                         else if (function.Extern && type == TypeKind.String)
                         {
@@ -667,18 +658,18 @@ namespace Lang
 
                     if (argument.HasGenerics)
                     {
-                        AddError($"Argument '{argument.Name}' in function '{function.Name}' cannot have default value if the argument has a generic type", argument.Value);
+                        ErrorReporter.Report($"Argument '{argument.Name}' in function '{function.Name}' cannot have default value if the argument has a generic type", argument.Value);
                     }
                     else if (defaultType != null)
                     {
                         if (!isConstant)
                         {
-                            AddError($"Expected default value of argument '{argument.Name}' in function '{function.Name}' to be a constant value", argument.Value);
+                            ErrorReporter.Report($"Expected default value of argument '{argument.Name}' in function '{function.Name}' to be a constant value", argument.Value);
 
                         }
                         else if (type != TypeKind.Error && !TypeEquals(argument.TypeDefinition, defaultType))
                         {
-                            AddError($"Type of argument '{argument.Name}' in function '{function.Name}' is '{PrintTypeDefinition(argument.TypeDefinition)}', but default value is type '{PrintTypeDefinition(defaultType)}'", argument.Value);
+                            ErrorReporter.Report($"Type of argument '{argument.Name}' in function '{function.Name}' is '{PrintTypeDefinition(argument.TypeDefinition)}', but default value is type '{PrintTypeDefinition(defaultType)}'", argument.Value);
                         }
                         else if (argument.TypeDefinition.PrimitiveType != null && argument.Value is ConstantAst constant)
                         {
@@ -687,7 +678,7 @@ namespace Lang
                     }
                     else if (isConstant && type != TypeKind.Pointer && type != TypeKind.Error)
                     {
-                        AddError($"Type of argument '{argument.Name}' in function '{function.Name}' is '{PrintTypeDefinition(argument.TypeDefinition)}', but default value is 'null'", argument.Value);
+                        ErrorReporter.Report($"Type of argument '{argument.Name}' in function '{function.Name}' is '{PrintTypeDefinition(argument.TypeDefinition)}', but default value is 'null'", argument.Value);
                     }
                 }
             }
@@ -697,18 +688,18 @@ namespace Lang
             {
                 if (returnType != TypeKind.Void && returnType != TypeKind.Integer)
                 {
-                    AddError("The main function should return type 'int' or 'void'", function);
+                    ErrorReporter.Report("The main function should return type 'int' or 'void'", function);
                 }
 
                 var argument = function.Arguments.FirstOrDefault();
                 if (argument != null && !(function.Arguments.Count == 1 && argument.TypeDefinition.TypeKind == TypeKind.Array && argument.TypeDefinition.Generics.FirstOrDefault()?.TypeKind == TypeKind.String))
                 {
-                    AddError("The main function should either have 0 arguments or 'Array<string>' argument", function);
+                    ErrorReporter.Report("The main function should either have 0 arguments or 'Array<string>' argument", function);
                 }
 
                 if (function.Generics.Any())
                 {
-                    AddError("The main function cannot have generics", function);
+                    ErrorReporter.Report("The main function cannot have generics", function);
                 }
             }
 
@@ -717,7 +708,7 @@ namespace Lang
             {
                 if (!function.ReturnTypeHasGenerics && function.Arguments.All(arg => !arg.HasGenerics))
                 {
-                    AddError($"Function '{function.Name}' has generic(s), but the generic(s) are not used in the argument(s) or the return type", function);
+                    ErrorReporter.Report($"Function '{function.Name}' has generic(s), but the generic(s) are not used in the argument(s) or the return type", function);
                 }
 
                 if (!_polymorphicFunctions.TryGetValue(function.Name, out var functions))
@@ -726,7 +717,7 @@ namespace Lang
                 }
                 if (functions.Any() && OverloadExistsForFunction(function, functions))
                 {
-                    AddError($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
+                    ErrorReporter.Report($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
                 }
                 functions.Add(function);
             }
@@ -738,11 +729,11 @@ namespace Lang
                 {
                     if (function.Extern)
                     {
-                        AddError($"Multiple definitions of extern function '{function.Name}'", function);
+                        ErrorReporter.Report($"Multiple definitions of extern function '{function.Name}'", function);
                     }
                     else if (OverloadExistsForFunction(function, _functions, false))
                     {
-                        AddError($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
+                        ErrorReporter.Report($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
                     }
                 }
             }
@@ -783,12 +774,12 @@ namespace Lang
                 {
                     if (structDef.Generics.Count != overload.Generics.Count)
                     {
-                        AddError($"Expected type '{overload.Type.Name}' to have {structDef.Generics.Count} generic(s), but got {overload.Generics.Count}", overload.Type);
+                        ErrorReporter.Report($"Expected type '{overload.Type.Name}' to have {structDef.Generics.Count} generic(s), but got {overload.Generics.Count}", overload.Type);
                     }
                 }
                 else
                 {
-                    AddError($"No polymorphic structs of type '{overload.Type.Name}'", overload.Type);
+                    ErrorReporter.Report($"No polymorphic structs of type '{overload.Type.Name}'", overload.Type);
                 }
             }
             else
@@ -801,7 +792,7 @@ namespace Lang
                     case TypeKind.String when overload.Operator != Operator.Subscript:
                         break;
                     default:
-                        AddError($"Cannot overload operator '{PrintOperator(overload.Operator)}' for type '{PrintTypeDefinition(overload.Type)}'", overload.Type);
+                        ErrorReporter.Report($"Cannot overload operator '{PrintOperator(overload.Operator)}' for type '{PrintTypeDefinition(overload.Type)}'", overload.Type);
                         break;
                 }
             }
@@ -809,7 +800,7 @@ namespace Lang
             // 2. Verify the argument types
             if (overload.Arguments.Count != 2)
             {
-                AddError($"Overload of operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}' should contain exactly 2 arguments to represent the l-value and r-value of the expression", overload);
+                ErrorReporter.Report($"Overload of operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}' should contain exactly 2 arguments to represent the l-value and r-value of the expression", overload);
             }
             var argumentNames = new HashSet<string>();
             for (var i = 0; i < overload.Arguments.Count; i++)
@@ -818,7 +809,7 @@ namespace Lang
                 // 2a. Check if the argument has been previously defined
                 if (!argumentNames.Add(argument.Name))
                 {
-                    AddError($"Overload of operator '{PrintOperator(overload.Operator)}' for type '{PrintTypeDefinition(overload.Type)}' already contains argument '{argument.Name}'", argument);
+                    ErrorReporter.Report($"Overload of operator '{PrintOperator(overload.Operator)}' for type '{PrintTypeDefinition(overload.Type)}' already contains argument '{argument.Name}'", argument);
                 }
 
                 // 2b. Check the argument is the same type as the overload type
@@ -826,13 +817,13 @@ namespace Lang
                 {
                     if (argument.TypeDefinition.PrimitiveType is not IntegerType)
                     {
-                        AddError($"Expected second argument of ");
-                        AddError($"Expected second argument of overload of operator '{PrintOperator(overload.Operator)}' to be an integer, but got '{PrintTypeDefinition(argument.TypeDefinition)}'", argument.TypeDefinition);
+                        ErrorReporter.Report($"Expected second argument of ");
+                        ErrorReporter.Report($"Expected second argument of overload of operator '{PrintOperator(overload.Operator)}' to be an integer, but got '{PrintTypeDefinition(argument.TypeDefinition)}'", argument.TypeDefinition);
                     }
                 }
                 else if (!TypeEquals(overload.Type, argument.TypeDefinition, true))
                 {
-                    AddError($"Expected overload of operator '{PrintOperator(overload.Operator)}' argument type to be '{PrintTypeDefinition(overload.Type)}', but got '{PrintTypeDefinition(argument.TypeDefinition)}'", argument.TypeDefinition);
+                    ErrorReporter.Report($"Expected overload of operator '{PrintOperator(overload.Operator)}' argument type to be '{PrintTypeDefinition(overload.Type)}', but got '{PrintTypeDefinition(argument.TypeDefinition)}'", argument.TypeDefinition);
                 }
 
                 // TODO Make this better, roll into VerifyType
@@ -848,7 +839,7 @@ namespace Lang
                 }
                 if (overloads.ContainsKey(overload.Operator))
                 {
-                    AddError($"Multiple definitions of overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}'", overload);
+                    ErrorReporter.Report($"Multiple definitions of overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}'", overload);
                 }
                 overloads[overload.Operator] = overload;
             }
@@ -860,7 +851,7 @@ namespace Lang
                 }
                 if (overloads.ContainsKey(overload.Operator))
                 {
-                    AddError($"Multiple definitions of overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}'", overload);
+                    ErrorReporter.Report($"Multiple definitions of overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}'", overload);
                 }
                 overloads[overload.Operator] = overload;
             }
@@ -888,7 +879,7 @@ namespace Lang
                 {
                     if (identifier is not DeclarationAst)
                     {
-                        AddError($"Argument '{argument.Name}' already exists as a type", argument);
+                        ErrorReporter.Report($"Argument '{argument.Name}' already exists as a type", argument);
                     }
                 }
                 if (function.Body != null)
@@ -903,7 +894,7 @@ namespace Lang
             {
                 if (function.Body != null)
                 {
-                    AddError("Extern function cannot have a body", function);
+                    ErrorReporter.Report("Extern function cannot have a body", function);
                 }
             }
             else if (!function.Compiler)
@@ -920,7 +911,7 @@ namespace Lang
                 // 5. Verify the main function doesn't call the compiler
                 if (function.Name == "main" && function.CallsCompiler)
                 {
-                    AddError("The main function cannot call the compiler", function);
+                    ErrorReporter.Report("The main function cannot call the compiler", function);
                 }
 
                 // 6. Verify the function returns on all paths
@@ -928,7 +919,7 @@ namespace Lang
                 {
                     if (returnType != TypeKind.Void)
                     {
-                        AddError($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnTypeDefinition)}' on all paths", function);
+                        ErrorReporter.Report($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnTypeDefinition)}' on all paths", function);
                     }
                     else
                     {
@@ -938,7 +929,7 @@ namespace Lang
             }
             function.Verified = true;
 
-            if (!_programGraph.Errors.Any())
+            if (!ErrorReporter.Errors.Any())
             {
                 _irBuilder.AddFunction(function);
             }
@@ -954,7 +945,7 @@ namespace Lang
                 {
                     if (identifier is not DeclarationAst)
                     {
-                        AddError($"Argument '{argument.Name}' already exists as a type", argument);
+                        ErrorReporter.Report($"Argument '{argument.Name}' already exists as a type", argument);
                     }
                 }
                 if (overload.Body != null)
@@ -977,11 +968,11 @@ namespace Lang
             // 4. Verify the body returns on all paths
             if (!returned)
             {
-                AddError($"Overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}' does not return type '{PrintTypeDefinition(overload.ReturnTypeDefinition)}' on all paths", overload);
+                ErrorReporter.Report($"Overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}' does not return type '{PrintTypeDefinition(overload.ReturnTypeDefinition)}' on all paths", overload);
             }
             overload.Verified = true;
 
-            if (!_programGraph.Errors.Any())
+            if (!ErrorReporter.Errors.Any())
             {
                 _irBuilder.AddOperatorOverload(overload);
             }
@@ -1035,11 +1026,11 @@ namespace Lang
                                     {
                                         if (function is FunctionAst functionAst)
                                         {
-                                            AddError($"Assertion failed in function '{functionAst.Name}'", directive.Value);
+                                            ErrorReporter.Report($"Assertion failed in function '{functionAst.Name}'", directive.Value);
                                         }
                                         else if (function is OperatorOverloadAst overload)
                                         {
-                                            AddError($"Assertion failed in overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}'", directive.Value);
+                                            ErrorReporter.Report($"Assertion failed in overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}'", directive.Value);
                                         }
                                     }
                                 }
@@ -1094,13 +1085,13 @@ namespace Lang
                 case BreakAst:
                     if (!canBreak)
                     {
-                        AddError("No parent loop to break", syntaxTree);
+                        ErrorReporter.Report("No parent loop to break", syntaxTree);
                     }
                     break;
                 case ContinueAst:
                     if (!canBreak)
                     {
-                        AddError("No parent loop to continue", syntaxTree);
+                        ErrorReporter.Report("No parent loop to continue", syntaxTree);
                     }
                     break;
                 default:
@@ -1121,7 +1112,7 @@ namespace Lang
             {
                 if (returnAst.Value != null)
                 {
-                    AddError("Function return should be void", returnAst);
+                    ErrorReporter.Report("Function return should be void", returnAst);
                 }
             }
             else
@@ -1130,13 +1121,13 @@ namespace Lang
                 var returnValueType = VerifyExpression(returnAst.Value, currentFunction, scope);
                 if (returnValueType == null)
                 {
-                    AddError($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnTypeDefinition)}'", returnAst);
+                    ErrorReporter.Report($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnTypeDefinition)}'", returnAst);
                 }
                 else
                 {
                     if (!TypeEquals(currentFunction.ReturnTypeDefinition, returnValueType))
                     {
-                        AddError($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnTypeDefinition)}', but returned type '{PrintTypeDefinition(returnValueType)}'", returnAst.Value);
+                        ErrorReporter.Report($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnTypeDefinition)}', but returned type '{PrintTypeDefinition(returnValueType)}'", returnAst.Value);
                     }
                 }
             }
@@ -1147,7 +1138,7 @@ namespace Lang
             // 1. Verify the variable is already defined
             if (GetScopeIdentifier(_globalScope, declaration.Name, out _))
             {
-                AddError($"Identifier '{declaration.Name}' already defined", declaration);
+                ErrorReporter.Report($"Identifier '{declaration.Name}' already defined", declaration);
                 return;
             }
 
@@ -1157,18 +1148,18 @@ namespace Lang
                 // 2a. Verify null can be assigned
                 if (declaration.TypeDefinition == null)
                 {
-                    AddError("Cannot assign null value without declaring a type", declaration.Value);
+                    ErrorReporter.Report("Cannot assign null value without declaring a type", declaration.Value);
                 }
                 else
                 {
                     var type = VerifyType(declaration.TypeDefinition);
                     if (type == TypeKind.Error)
                     {
-                        AddError($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                        ErrorReporter.Report($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
                     }
                     else if (type != TypeKind.Pointer)
                     {
-                        AddError("Cannot assign null to non-pointer type", declaration.Value);
+                        ErrorReporter.Report("Cannot assign null to non-pointer type", declaration.Value);
                     }
 
                     nullAst.TargetTypeDefinition = declaration.TypeDefinition;
@@ -1185,14 +1176,14 @@ namespace Lang
             {
                 if (declaration.TypeDefinition == null)
                 {
-                    AddError("Struct literals are not yet supported", declaration);
+                    ErrorReporter.Report("Struct literals are not yet supported", declaration);
                 }
                 else
                 {
                     var type = VerifyType(declaration.TypeDefinition);
                     if (type != TypeKind.Struct && type != TypeKind.String)
                     {
-                        AddError($"Can only use object initializer with struct type, got '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                        ErrorReporter.Report($"Can only use object initializer with struct type, got '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
                         return;
                     }
 
@@ -1202,12 +1193,12 @@ namespace Lang
                     {
                         if (!fields.TryGetValue(name, out var field))
                         {
-                            AddError($"Field '{name}' not present in struct '{PrintTypeDefinition(declaration.TypeDefinition)}'", assignment.Reference);
+                            ErrorReporter.Report($"Field '{name}' not present in struct '{PrintTypeDefinition(declaration.TypeDefinition)}'", assignment.Reference);
                         }
 
                         if (assignment.Operator != Operator.None)
                         {
-                            AddError("Cannot have operator assignments in object initializers", assignment.Reference);
+                            ErrorReporter.Report("Cannot have operator assignments in object initializers", assignment.Reference);
                         }
 
                         var valueType = VerifyConstantExpression(assignment.Value, null, _globalScope, out var isConstant, out _);
@@ -1215,11 +1206,11 @@ namespace Lang
                         {
                             if (!TypeEquals(field.TypeDefinition, valueType))
                             {
-                                AddError($"Expected field value to be type '{PrintTypeDefinition(field.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                                ErrorReporter.Report($"Expected field value to be type '{PrintTypeDefinition(field.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", assignment.Value);
                             }
                             else if (!isConstant)
                             {
-                                AddError($"Global variables can only be initialized with constant values", assignment.Value);
+                                ErrorReporter.Report($"Global variables can only be initialized with constant values", assignment.Value);
                             }
                             else if (field.TypeDefinition.PrimitiveType != null && assignment.Value is ConstantAst constant)
                             {
@@ -1234,14 +1225,14 @@ namespace Lang
             {
                 if (declaration.TypeDefinition == null)
                 {
-                    AddError($"Declaration for variable '{declaration.Name}' with array initializer must have the type declared", declaration);
+                    ErrorReporter.Report($"Declaration for variable '{declaration.Name}' with array initializer must have the type declared", declaration);
                 }
                 else
                 {
                     var type = VerifyType(declaration.TypeDefinition);
                     if (type != TypeKind.Error && type != TypeKind.Array && type != TypeKind.CArray)
                     {
-                        AddError($"Cannot use array initializer to declare non-array type '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                        ErrorReporter.Report($"Cannot use array initializer to declare non-array type '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
                     }
                     else
                     {
@@ -1255,11 +1246,11 @@ namespace Lang
                             {
                                 if (!TypeEquals(elementType, valueType))
                                 {
-                                    AddError($"Expected array value to be type '{PrintTypeDefinition(elementType)}', but got '{PrintTypeDefinition(valueType)}'", value);
+                                    ErrorReporter.Report($"Expected array value to be type '{PrintTypeDefinition(elementType)}', but got '{PrintTypeDefinition(valueType)}'", value);
                                 }
                                 else if (!isConstant)
                                 {
-                                    AddError($"Global variables can only be initialized with constant values", value);
+                                    ErrorReporter.Report($"Global variables can only be initialized with constant values", value);
                                 }
                                 else if (elementType.PrimitiveType != null && value is ConstantAst constant)
                                 {
@@ -1287,11 +1278,11 @@ namespace Lang
                         var type = VerifyType(declaration.TypeDefinition);
                         if (type == TypeKind.Error)
                         {
-                            AddError($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                            ErrorReporter.Report($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
                         }
                         else if (type == TypeKind.Void)
                         {
-                            AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
+                            ErrorReporter.Report($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
                         }
                         break;
                 }
@@ -1302,7 +1293,7 @@ namespace Lang
             {
                 if (declaration.TypeDefinition.TypeKind == TypeKind.CArray && declaration.TypeDefinition.Count == null && declaration.TypeDefinition.ConstCount == null)
                 {
-                    AddError($"Length of C array variable '{declaration.Name}' must be initialized to a constant integer", declaration.TypeDefinition);
+                    ErrorReporter.Report($"Length of C array variable '{declaration.Name}' must be initialized to a constant integer", declaration.TypeDefinition);
                 }
                 else if (declaration.TypeDefinition.Count != null)
                 {
@@ -1312,17 +1303,17 @@ namespace Lang
                     {
                         if (declaration.TypeDefinition.TypeKind == TypeKind.CArray && !isConstant)
                         {
-                            AddError($"Length of C array variable '{declaration.Name}' must be initialized with a constant size", declaration.TypeDefinition.Count);
+                            ErrorReporter.Report($"Length of C array variable '{declaration.Name}' must be initialized with a constant size", declaration.TypeDefinition.Count);
                         }
                         else if (countType.PrimitiveType is not IntegerType)
                         {
-                            AddError($"Expected count of variable '{declaration.Name}' to be an integer", declaration.TypeDefinition.Count);
+                            ErrorReporter.Report($"Expected count of variable '{declaration.Name}' to be an integer", declaration.TypeDefinition.Count);
                         }
                         if (isConstant)
                         {
                             if (count < 0)
                             {
-                                AddError($"Expected count of variable '{declaration.Name}' to be a positive integer", declaration.TypeDefinition.Count);
+                                ErrorReporter.Report($"Expected count of variable '{declaration.Name}' to be a positive integer", declaration.TypeDefinition.Count);
                             }
                             else
                             {
@@ -1338,7 +1329,7 @@ namespace Lang
             {
                 if (declaration.Value == null)
                 {
-                    AddError($"Constant variable '{declaration.Name}' should be assigned a constant value", declaration);
+                    ErrorReporter.Report($"Constant variable '{declaration.Name}' should be assigned a constant value", declaration);
                 }
                 else if (declaration.TypeDefinition != null)
                 {
@@ -1346,7 +1337,7 @@ namespace Lang
                 }
             }
 
-            if (!_programGraph.Errors.Any())
+            if (!ErrorReporter.Errors.Any())
             {
                 declaration.Type = TypeTable.GetType(declaration.TypeDefinition);
                 _irBuilder.EmitGlobalVariable(declaration, _globalScope);
@@ -1360,7 +1351,7 @@ namespace Lang
             var valueType = VerifyConstantExpression(declaration.Value, null, _globalScope, out var isConstant, out _);
             if (!isConstant)
             {
-                AddError($"Global variables can only be initialized with constant values", declaration.Value);
+                ErrorReporter.Report($"Global variables can only be initialized with constant values", declaration.Value);
             }
 
             // Verify the assignment value matches the type definition if it has been defined
@@ -1368,7 +1359,7 @@ namespace Lang
             {
                 if (VerifyType(valueType) == TypeKind.Void)
                 {
-                    AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.Value);
+                    ErrorReporter.Report($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.Value);
                 }
                 declaration.TypeDefinition = valueType;
             }
@@ -1377,11 +1368,11 @@ namespace Lang
                 var type = VerifyType(declaration.TypeDefinition);
                 if (type == TypeKind.Error)
                 {
-                    AddError($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                    ErrorReporter.Report($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
                 }
                 else if (type == TypeKind.Void)
                 {
-                    AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
+                    ErrorReporter.Report($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
                 }
 
                 // Verify the type is correct
@@ -1389,7 +1380,7 @@ namespace Lang
                 {
                     if (!TypeEquals(declaration.TypeDefinition, valueType))
                     {
-                        AddError($"Expected declaration value to be type '{PrintTypeDefinition(declaration.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", declaration.TypeDefinition);
+                        ErrorReporter.Report($"Expected declaration value to be type '{PrintTypeDefinition(declaration.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", declaration.TypeDefinition);
                     }
                     else if (declaration.TypeDefinition.PrimitiveType != null && declaration.Value is ConstantAst constant)
                     {
@@ -1404,7 +1395,7 @@ namespace Lang
             // 1. Verify the variable is already defined
             if (GetScopeIdentifier(scope, declaration.Name, out _))
             {
-                AddError($"Identifier '{declaration.Name}' already defined", declaration);
+                ErrorReporter.Report($"Identifier '{declaration.Name}' already defined", declaration);
                 return;
             }
 
@@ -1414,18 +1405,18 @@ namespace Lang
                 // 2a. Verify null can be assigned
                 if (declaration.TypeDefinition == null)
                 {
-                    AddError("Cannot assign null value without declaring a type", declaration.Value);
+                    ErrorReporter.Report("Cannot assign null value without declaring a type", declaration.Value);
                 }
                 else
                 {
                     var type = VerifyType(declaration.TypeDefinition);
                     if (type == TypeKind.Error)
                     {
-                        AddError($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                        ErrorReporter.Report($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
                     }
                     else if (type != TypeKind.Pointer)
                     {
-                        AddError("Cannot assign null to non-pointer type", declaration.Value);
+                        ErrorReporter.Report("Cannot assign null to non-pointer type", declaration.Value);
                     }
 
                     nullAst.TargetTypeDefinition = declaration.TypeDefinition;
@@ -1442,7 +1433,7 @@ namespace Lang
                 {
                     if (VerifyType(valueType) == TypeKind.Void)
                     {
-                        AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.Value);
+                        ErrorReporter.Report($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.Value);
                     }
                     declaration.TypeDefinition = valueType;
                 }
@@ -1451,11 +1442,11 @@ namespace Lang
                     var type = VerifyType(declaration.TypeDefinition);
                     if (type == TypeKind.Error)
                     {
-                        AddError($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                        ErrorReporter.Report($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
                     }
                     else if (type == TypeKind.Void)
                     {
-                        AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
+                        ErrorReporter.Report($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
                     }
 
                     // Verify the type is correct
@@ -1463,7 +1454,7 @@ namespace Lang
                     {
                         if (!TypeEquals(declaration.TypeDefinition, valueType))
                         {
-                            AddError($"Expected declaration value to be type '{PrintTypeDefinition(declaration.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", declaration.TypeDefinition);
+                            ErrorReporter.Report($"Expected declaration value to be type '{PrintTypeDefinition(declaration.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", declaration.TypeDefinition);
                         }
                         else if (declaration.TypeDefinition.PrimitiveType != null && declaration.Value is ConstantAst constant)
                         {
@@ -1477,14 +1468,14 @@ namespace Lang
             {
                 if (declaration.TypeDefinition == null)
                 {
-                    AddError("Struct literals are not yet supported", declaration);
+                    ErrorReporter.Report("Struct literals are not yet supported", declaration);
                 }
                 else
                 {
                     var type = VerifyType(declaration.TypeDefinition);
                     if (type != TypeKind.Struct && type != TypeKind.String)
                     {
-                        AddError($"Can only use object initializer with struct type, got '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                        ErrorReporter.Report($"Can only use object initializer with struct type, got '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
                         return;
                     }
 
@@ -1494,12 +1485,12 @@ namespace Lang
                     {
                         if (!fields.TryGetValue(name, out var field))
                         {
-                            AddError($"Field '{name}' not present in struct '{PrintTypeDefinition(declaration.TypeDefinition)}'", assignment.Reference);
+                            ErrorReporter.Report($"Field '{name}' not present in struct '{PrintTypeDefinition(declaration.TypeDefinition)}'", assignment.Reference);
                         }
 
                         if (assignment.Operator != Operator.None)
                         {
-                            AddError("Cannot have operator assignments in object initializers", assignment.Reference);
+                            ErrorReporter.Report("Cannot have operator assignments in object initializers", assignment.Reference);
                         }
 
                         var valueType = VerifyExpression(assignment.Value, currentFunction, scope);
@@ -1507,7 +1498,7 @@ namespace Lang
                         {
                             if (!TypeEquals(field.TypeDefinition, valueType))
                             {
-                                AddError($"Expected field value to be type '{PrintTypeDefinition(field.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                                ErrorReporter.Report($"Expected field value to be type '{PrintTypeDefinition(field.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", assignment.Value);
                             }
                             else if (field.TypeDefinition.PrimitiveType != null && assignment.Value is ConstantAst constant)
                             {
@@ -1522,14 +1513,14 @@ namespace Lang
             {
                 if (declaration.TypeDefinition == null)
                 {
-                    AddError($"Declaration for variable '{declaration.Name}' with array initializer must have the type declared", declaration);
+                    ErrorReporter.Report($"Declaration for variable '{declaration.Name}' with array initializer must have the type declared", declaration);
                 }
                 else
                 {
                     var type = VerifyType(declaration.TypeDefinition);
                     if (type != TypeKind.Error && type != TypeKind.Array && type != TypeKind.CArray)
                     {
-                        AddError($"Cannot use array initializer to declare non-array type '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                        ErrorReporter.Report($"Cannot use array initializer to declare non-array type '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
                     }
                     else
                     {
@@ -1543,7 +1534,7 @@ namespace Lang
                             {
                                 if (!TypeEquals(elementType, valueType))
                                 {
-                                    AddError($"Expected array value to be type '{PrintTypeDefinition(elementType)}', but got '{PrintTypeDefinition(valueType)}'", value);
+                                    ErrorReporter.Report($"Expected array value to be type '{PrintTypeDefinition(elementType)}', but got '{PrintTypeDefinition(valueType)}'", value);
                                 }
                                 else if (elementType.PrimitiveType != null && value is ConstantAst constant)
                                 {
@@ -1560,11 +1551,11 @@ namespace Lang
                 var type = VerifyType(declaration.TypeDefinition);
                 if (type == TypeKind.Error)
                 {
-                    AddError($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                    ErrorReporter.Report($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
                 }
                 else if (type == TypeKind.Void)
                 {
-                    AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
+                    ErrorReporter.Report($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
                 }
                 else if (type == TypeKind.Array || type == TypeKind.CArray)
                 {
@@ -1578,7 +1569,7 @@ namespace Lang
             {
                 if (declaration.TypeDefinition.TypeKind == TypeKind.CArray && declaration.TypeDefinition.Count == null && declaration.TypeDefinition.ConstCount == null)
                 {
-                    AddError($"Length of C array variable '{declaration.Name}' must be initialized to a constant integer", declaration.TypeDefinition);
+                    ErrorReporter.Report($"Length of C array variable '{declaration.Name}' must be initialized to a constant integer", declaration.TypeDefinition);
                 }
                 else if (declaration.TypeDefinition.Count != null)
                 {
@@ -1588,17 +1579,17 @@ namespace Lang
                     {
                         if (declaration.TypeDefinition.TypeKind == TypeKind.CArray && !isConstant)
                         {
-                            AddError($"Length of C array variable '{declaration.Name}' must be initialized with a constant size", declaration.TypeDefinition.Count);
+                            ErrorReporter.Report($"Length of C array variable '{declaration.Name}' must be initialized with a constant size", declaration.TypeDefinition.Count);
                         }
                         else if (countType.PrimitiveType is not IntegerType)
                         {
-                            AddError($"Expected count of variable '{declaration.Name}' to be an integer", declaration.TypeDefinition.Count);
+                            ErrorReporter.Report($"Expected count of variable '{declaration.Name}' to be an integer", declaration.TypeDefinition.Count);
                         }
                         if (isConstant)
                         {
                             if (count < 0)
                             {
-                                AddError($"Expected count of variable '{declaration.Name}' to be a positive integer", declaration.TypeDefinition.Count);
+                                ErrorReporter.Report($"Expected count of variable '{declaration.Name}' to be a positive integer", declaration.TypeDefinition.Count);
                             }
                             else
                             {
@@ -1620,7 +1611,7 @@ namespace Lang
                     case StructFieldRefAst structField when structField.IsEnum:
                         break;
                     default:
-                        AddError($"Constant variable '{declaration.Name}' should be assigned a constant value", declaration);
+                        ErrorReporter.Report($"Constant variable '{declaration.Name}' should be assigned a constant value", declaration);
                         break;
                 }
                 if (declaration.TypeDefinition != null)
@@ -1680,7 +1671,7 @@ namespace Lang
             if (variableTypeDefinition.Constant)
             {
                 var variable = assignment.Reference as IdentifierAst;
-                AddError($"Cannot reassign value of constant variable '{variable?.Name}'", assignment);
+                ErrorReporter.Report($"Cannot reassign value of constant variable '{variable?.Name}'", assignment);
                 return;
             }
 
@@ -1689,11 +1680,11 @@ namespace Lang
             {
                 if (assignment.Operator != Operator.None)
                 {
-                    AddError("Cannot assign null value with operator assignment", assignment.Value);
+                    ErrorReporter.Report("Cannot assign null value with operator assignment", assignment.Value);
                 }
                 if (variableTypeDefinition.Name != "*")
                 {
-                    AddError("Cannot assign null to non-pointer type", assignment.Value);
+                    ErrorReporter.Report("Cannot assign null to non-pointer type", assignment.Value);
                 }
                 nullAst.TargetTypeDefinition = variableTypeDefinition;
                 nullAst.TargetType = TypeTable.GetType(variableTypeDefinition);
@@ -1715,7 +1706,7 @@ namespace Lang
                         case Operator.Or:
                             if (lhs != TypeKind.Boolean || rhs != TypeKind.Boolean)
                             {
-                                AddError($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
                             }
                             break;
                         // Invalid assignment operators
@@ -1724,7 +1715,7 @@ namespace Lang
                         case Operator.LessThan:
                         case Operator.GreaterThanEqual:
                         case Operator.LessThanEqual:
-                            AddError($"Invalid operator '{PrintOperator(assignment.Operator)}' in assignment", assignment);
+                            ErrorReporter.Report($"Invalid operator '{PrintOperator(assignment.Operator)}' in assignment", assignment);
                             break;
                         // Requires same types and returns more precise type
                         case Operator.Add:
@@ -1735,7 +1726,7 @@ namespace Lang
                             if (!(lhs == TypeKind.Integer && rhs == TypeKind.Integer) &&
                                 !(lhs == TypeKind.Float && (rhs == TypeKind.Float || rhs == TypeKind.Integer)))
                             {
-                                AddError($"Operator {PrintOperator(assignment.Operator)} not applicable to types '{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                                ErrorReporter.Report($"Operator {PrintOperator(assignment.Operator)} not applicable to types '{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
                             }
                             break;
                         // Requires both integer or bool types and returns more same type
@@ -1745,7 +1736,7 @@ namespace Lang
                             if (!(lhs == TypeKind.Boolean && rhs == TypeKind.Boolean) &&
                                     !(lhs == TypeKind.Integer && rhs == TypeKind.Integer))
                             {
-                                AddError($"Operator {PrintOperator(assignment.Operator)} not applicable to types " +
+                                ErrorReporter.Report($"Operator {PrintOperator(assignment.Operator)} not applicable to types " +
                                         $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
                             }
                             break;
@@ -1756,14 +1747,14 @@ namespace Lang
                         case Operator.RotateRight:
                             if (lhs != TypeKind.Integer || rhs != TypeKind.Integer)
                             {
-                                AddError($"Operator {PrintOperator(assignment.Operator)} not applicable to types '{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                                ErrorReporter.Report($"Operator {PrintOperator(assignment.Operator)} not applicable to types '{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
                             }
                             break;
                     }
                 }
                 else if (!TypeEquals(variableTypeDefinition, valueType))
                 {
-                    AddError($"Expected assignment value to be type '{PrintTypeDefinition(variableTypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                    ErrorReporter.Report($"Expected assignment value to be type '{PrintTypeDefinition(variableTypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", assignment.Value);
                 }
                 else if (variableTypeDefinition.PrimitiveType != null && assignment.Value is ConstantAst constant)
                 {
@@ -1781,7 +1772,7 @@ namespace Lang
                     var variableTypeDefinition = GetVariable(identifier.Name, identifier, scope);
                     if (variableTypeDefinition.Constant)
                     {
-                        AddError($"Cannot reassign value of constant variable '{identifier.Name}'", identifier);
+                        ErrorReporter.Report($"Cannot reassign value of constant variable '{identifier.Name}'", identifier);
                     }
                     return variableTypeDefinition;
                 case IndexAst index:
@@ -1790,14 +1781,14 @@ namespace Lang
                     if (variableType == null) return null;
                     if (variableType.Constant)
                     {
-                        AddError($"Cannot reassign value of constant variable '{index.Name}'", index);
+                        ErrorReporter.Report($"Cannot reassign value of constant variable '{index.Name}'", index);
                     }
                     var type = VerifyIndex(index, variableType, currentFunction, scope, out var overloaded);
                     if (type != null && overloaded)
                     {
                         if (type.TypeKind != TypeKind.Pointer)
                         {
-                            AddError($"Overload [] for type '{PrintTypeDefinition(variableType)}' must be a pointer to be able to set the value", index);
+                            ErrorReporter.Report($"Overload [] for type '{PrintTypeDefinition(variableType)}' must be a pointer to be able to set the value", index);
                             return null;
                         }
                         hasPointer = false;
@@ -1819,7 +1810,7 @@ namespace Lang
                             if (refType == null) return null;
                             if (refType.Constant)
                             {
-                                AddError($"Cannot reassign value of constant variable '{identifier.Name}'", identifier);
+                                ErrorReporter.Report($"Cannot reassign value of constant variable '{identifier.Name}'", identifier);
                                 return null;
                             }
                             break;
@@ -1828,18 +1819,18 @@ namespace Lang
                             if (variableType == null) return null;
                             if (variableType.Constant)
                             {
-                                AddError($"Cannot reassign value of constant variable '{index.Name}'", index);
+                                ErrorReporter.Report($"Cannot reassign value of constant variable '{index.Name}'", index);
                                 return null;
                             }
                             refType = VerifyIndex(index, variableType, currentFunction, scope, out var overloaded);
                             if (refType != null && overloaded && refType.TypeKind != TypeKind.Pointer)
                             {
-                                AddError($"Overload [] for type '{PrintTypeDefinition(variableType)}' must be a pointer to be able to set the value", index);
+                                ErrorReporter.Report($"Overload [] for type '{PrintTypeDefinition(variableType)}' must be a pointer to be able to set the value", index);
                                 return null;
                             }
                             break;
                         default:
-                            AddError("Expected to have a reference to a variable, field, or pointer", structFieldRef.Children[0]);
+                            ErrorReporter.Report("Expected to have a reference to a variable, field, or pointer", structFieldRef.Children[0]);
                             return null;
                     }
                     if (refType == null)
@@ -1870,13 +1861,13 @@ namespace Lang
                                     }
                                     else
                                     {
-                                        AddError($"Overload [] for type '{PrintTypeDefinition(fieldType)}' must be a pointer to be able to set the value", index);
+                                        ErrorReporter.Report($"Overload [] for type '{PrintTypeDefinition(fieldType)}' must be a pointer to be able to set the value", index);
                                         return null;
                                     }
                                 }
                                 break;
                             default:
-                                AddError("Expected to have a reference to a variable, field, or pointer", structFieldRef.Children[i]);
+                                ErrorReporter.Report("Expected to have a reference to a variable, field, or pointer", structFieldRef.Children[i]);
                                 return null;
                         }
                         if (refType == null)
@@ -1890,7 +1881,7 @@ namespace Lang
                 case UnaryAst unary when unary.Operator == UnaryOperator.Dereference:
                     if (fromUnaryReference)
                     {
-                        AddError("Operators '*' and '&' cancel each other out", unary);
+                        ErrorReporter.Report("Operators '*' and '&' cancel each other out", unary);
                         return null;
                     }
                     var reference = GetReference(unary.Value, currentFunction, scope, out var canDereference);
@@ -1900,18 +1891,18 @@ namespace Lang
                     }
                     if (!canDereference)
                     {
-                        AddError("Cannot dereference pointer to assign value", unary.Value);
+                        ErrorReporter.Report("Cannot dereference pointer to assign value", unary.Value);
                         return null;
                     }
 
                     if (reference.TypeKind != TypeKind.Pointer)
                     {
-                        AddError("Expected to get pointer to dereference", unary.Value);
+                        ErrorReporter.Report("Expected to get pointer to dereference", unary.Value);
                         return null;
                     }
                     return reference.Generics[0];
                 default:
-                    AddError("Expected to have a reference to a variable, field, or pointer", ast);
+                    ErrorReporter.Report("Expected to have a reference to a variable, field, or pointer", ast);
                     return null;
             }
         }
@@ -1920,7 +1911,7 @@ namespace Lang
         {
             if (!GetScopeIdentifier(scope, name, out var identifier))
             {
-                AddError($"Variable '{name}' not defined", ast);
+                ErrorReporter.Report($"Variable '{name}' not defined", ast);
                 return null;
             }
             switch (identifier)
@@ -1932,7 +1923,7 @@ namespace Lang
                 case VariableAst variable:
                     return variable.TypeDefinition;
                 default:
-                    AddError($"Identifier '{name}' is not a variable", ast);
+                    ErrorReporter.Report($"Identifier '{name}' is not a variable", ast);
                     return null;
             }
         }
@@ -1945,7 +1936,7 @@ namespace Lang
                 case IdentifierAst identifier:
                     if (!GetScopeIdentifier(scope, identifier.Name, out var value))
                     {
-                        AddError($"Identifier '{identifier.Name}' not defined", structField);
+                        ErrorReporter.Report($"Identifier '{identifier.Name}' not defined", structField);
                         return null;
                     }
                     switch (value)
@@ -1959,7 +1950,7 @@ namespace Lang
                             refType = variable.TypeDefinition;
                             break;
                         default:
-                            AddError($"Cannot reference static field of type '{identifier.Name}'", structField);
+                            ErrorReporter.Report($"Cannot reference static field of type '{identifier.Name}'", structField);
                             return null;
                     }
                     break;
@@ -1988,7 +1979,7 @@ namespace Lang
                         refType = VerifyIndex(index, fieldType, currentFunction, scope, out _);
                         break;
                     default:
-                        AddError("Expected to have a reference to a variable, field, or pointer", structField.Children[i]);
+                        ErrorReporter.Report("Expected to have a reference to a variable, field, or pointer", structField.Children[i]);
                         return null;
                 }
                 if (refType == null)
@@ -2009,7 +2000,7 @@ namespace Lang
             }
             if (!TypeTable.Types.TryGetValue(structType.GenericName, out var typeDefinition))
             {
-                AddError($"Type '{PrintTypeDefinition(structType)}' not defined", ast);
+                ErrorReporter.Report($"Type '{PrintTypeDefinition(structType)}' not defined", ast);
                 return null;
             }
             structField.Types[fieldIndex] = typeDefinition;
@@ -2021,7 +2012,7 @@ namespace Lang
             }
             if (typeDefinition is not StructAst structDefinition)
             {
-                AddError($"Type '{PrintTypeDefinition(structType)}' does not contain field '{fieldName}'", ast);
+                ErrorReporter.Report($"Type '{PrintTypeDefinition(structType)}' does not contain field '{fieldName}'", ast);
                 return null;
             }
 
@@ -2038,7 +2029,7 @@ namespace Lang
             }
             if (field == null)
             {
-                AddError($"Struct '{PrintTypeDefinition(structType)}' does not contain field '{fieldName}'", ast);
+                ErrorReporter.Report($"Struct '{PrintTypeDefinition(structType)}' does not contain field '{fieldName}'", ast);
                 return null;
             }
 
@@ -2082,11 +2073,11 @@ namespace Lang
                 case TypeKind.Boolean:
                 case TypeKind.Pointer:
                     // Valid types
-                    return !_programGraph.Errors.Any();
+                    return !ErrorReporter.Errors.Any();
                 case TypeKind.Error:
                     return false;
                 default:
-                    AddError($"Expected condition to be bool, int, float, or pointer, but got '{PrintTypeDefinition(conditionalType)}'", ast);
+                    ErrorReporter.Report($"Expected condition to be bool, int, float, or pointer, but got '{PrintTypeDefinition(conditionalType)}'", ast);
                     return false;
             }
         }
@@ -2096,7 +2087,7 @@ namespace Lang
             // 1. Verify the iterator or range
             if (GetScopeIdentifier(scope, each.IterationVariable, out _))
             {
-                AddError($"Iteration variable '{each.IterationVariable}' already exists in scope", each);
+                ErrorReporter.Report($"Iteration variable '{each.IterationVariable}' already exists in scope", each);
             };
             if (each.Iteration != null)
             {
@@ -2128,7 +2119,7 @@ namespace Lang
                         each.Body.Identifiers.TryAdd(each.IterationVariable, iterator);
                         break;
                     default:
-                        AddError($"Type {PrintTypeDefinition(iterationTypeDefinition)} cannot be used as an iterator", each.Iteration);
+                        ErrorReporter.Report($"Type {PrintTypeDefinition(iterationTypeDefinition)} cannot be used as an iterator", each.Iteration);
                         break;
                 }
             }
@@ -2138,13 +2129,13 @@ namespace Lang
                 var beginType = VerifyType(begin);
                 if (beginType != TypeKind.Integer && beginType != TypeKind.Error)
                 {
-                    AddError($"Expected range to begin with 'int', but got '{PrintTypeDefinition(begin)}'", each.RangeBegin);
+                    ErrorReporter.Report($"Expected range to begin with 'int', but got '{PrintTypeDefinition(begin)}'", each.RangeBegin);
                 }
                 var end = VerifyExpression(each.RangeEnd, currentFunction, scope);
                 var endType = VerifyType(end);
                 if (endType != TypeKind.Integer && endType != TypeKind.Error)
                 {
-                    AddError($"Expected range to end with 'int', but got '{PrintTypeDefinition(end)}'", each.RangeEnd);
+                    ErrorReporter.Report($"Expected range to end with 'int', but got '{PrintTypeDefinition(end)}'", each.RangeEnd);
                 }
                 each.IterationVariableVariable = new VariableAst {Name = each.IterationVariable, TypeDefinition = _s32Type, Type = TypeTable.Types["s32"]};
                 each.Body.Identifiers.TryAdd(each.IterationVariable, each.IterationVariableVariable);
@@ -2161,14 +2152,14 @@ namespace Lang
                 case DirectiveType.Run:
                     // TODO Figure out where to put this IR
                     VerifyAst(directive.Value, null, _globalScope, false);
-                    if (!_programGraph.Errors.Any())
+                    if (!ErrorReporter.Errors.Any())
                     {
                         _programRunner.Init(_programGraph);
                         _programRunner.RunProgram(directive.Value);
                     }
                     break;
                 default:
-                    AddError($"Compiler directive '{directive.Type}' not supported", directive);
+                    ErrorReporter.Report($"Compiler directive '{directive.Type}' not supported", directive);
                     break;
             }
         }
@@ -2202,12 +2193,12 @@ namespace Lang
                         {
                             if (functions.Count > 1)
                             {
-                                AddError($"Cannot determine type for function '{identifierAst.Name}' that has multiple overloads", identifierAst);
+                                ErrorReporter.Report($"Cannot determine type for function '{identifierAst.Name}' that has multiple overloads", identifierAst);
                                 return null;
                             }
                             return new TypeDefinition {Name = "Type", TypeKind = TypeKind.Type, TypeIndex = functions[0].TypeIndex};
                         }
-                        AddError($"Identifier '{identifierAst.Name}' not defined", identifierAst);
+                        ErrorReporter.Report($"Identifier '{identifierAst.Name}' not defined", identifierAst);
                     }
                     switch (identifier)
                     {
@@ -2224,7 +2215,7 @@ namespace Lang
                         case IType type:
                             if (type is StructAst structAst && structAst.Generics.Any())
                             {
-                                AddError($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
+                                ErrorReporter.Report($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
                             }
                             return new TypeDefinition {Name = "Type", TypeKind = TypeKind.Type, TypeIndex = type.TypeIndex};
                         default:
@@ -2255,12 +2246,12 @@ namespace Lang
                         {
                             if (functions.Count > 1)
                             {
-                                AddError($"Cannot determine type for function '{identifierAst.Name}' that has multiple overloads", identifierAst);
+                                ErrorReporter.Report($"Cannot determine type for function '{identifierAst.Name}' that has multiple overloads", identifierAst);
                                 return null;
                             }
                             return new TypeDefinition {Name = "Type", TypeKind = TypeKind.Type, TypeIndex = functions[0].TypeIndex};
                         }
-                        AddError($"Identifier '{identifierAst.Name}' not defined", identifierAst);
+                        ErrorReporter.Report($"Identifier '{identifierAst.Name}' not defined", identifierAst);
                     }
                     switch (identifier)
                     {
@@ -2271,7 +2262,7 @@ namespace Lang
                         case IType type:
                             if (type is StructAst structAst && structAst.Generics.Any())
                             {
-                                AddError($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
+                                ErrorReporter.Report($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
                             }
                             return new TypeDefinition {Name = "Type", TypeKind = TypeKind.Type, TypeIndex = type.TypeIndex};
                         default:
@@ -2290,7 +2281,7 @@ namespace Lang
                                 var type = VerifyType(expressionType);
                                 if (type != TypeKind.Integer && type != TypeKind.Float)
                                 {
-                                    AddError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(expressionType)}'", changeByOne.Value);
+                                    ErrorReporter.Report($"Expected to {op} int or float, but got type '{PrintTypeDefinition(expressionType)}'", changeByOne.Value);
                                     return null;
                                 }
                                 changeByOne.Type = TypeTable.GetType(expressionType);
@@ -2298,7 +2289,7 @@ namespace Lang
 
                             return expressionType;
                         default:
-                            AddError($"Expected to {op} variable", changeByOne);
+                            ErrorReporter.Report($"Expected to {op} variable", changeByOne);
                             return null;
                     }
                 case UnaryAst unary:
@@ -2307,7 +2298,7 @@ namespace Lang
                         var referenceType = GetReference(unary.Value, currentFunction, scope, out var hasPointer, true);
                         if (!hasPointer)
                         {
-                            AddError("Unable to get reference of unary value", unary.Value);
+                            ErrorReporter.Report("Unable to get reference of unary value", unary.Value);
                             return null;
                         }
 
@@ -2342,7 +2333,7 @@ namespace Lang
                                 }
                                 else if (type != TypeKind.Error)
                                 {
-                                    AddError($"Expected type 'bool', but got type '{PrintTypeDefinition(valueType)}'", unary.Value);
+                                    ErrorReporter.Report($"Expected type 'bool', but got type '{PrintTypeDefinition(valueType)}'", unary.Value);
                                 }
                                 return null;
                             case UnaryOperator.Negate:
@@ -2352,7 +2343,7 @@ namespace Lang
                                 }
                                 else if (type != TypeKind.Error)
                                 {
-                                    AddError($"Negation not compatible with type '{PrintTypeDefinition(valueType)}'", unary.Value);
+                                    ErrorReporter.Report($"Negation not compatible with type '{PrintTypeDefinition(valueType)}'", unary.Value);
                                 }
                                 return null;
                             case UnaryOperator.Dereference:
@@ -2364,11 +2355,11 @@ namespace Lang
                                 }
                                 else if (type != TypeKind.Error)
                                 {
-                                    AddError($"Cannot dereference type '{PrintTypeDefinition(valueType)}'", unary.Value);
+                                    ErrorReporter.Report($"Cannot dereference type '{PrintTypeDefinition(valueType)}'", unary.Value);
                                 }
                                 return null;
                             default:
-                                AddError($"Unexpected unary operator '{unary.Operator}'", unary.Value);
+                                ErrorReporter.Report($"Unexpected unary operator '{unary.Operator}'", unary.Value);
                                 return null;
                         }
                     }
@@ -2401,14 +2392,14 @@ namespace Lang
                         case TypeKind.Float:
                             if (valueType != null && valueType.PrimitiveType == null)
                             {
-                                AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast.Value);
+                                ErrorReporter.Report($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast.Value);
                             }
                             cast.TargetType = TypeTable.GetType(cast.TargetTypeDefinition);
                             break;
                         case TypeKind.Pointer:
                             if (valueType != null && valueType.Name != "*")
                             {
-                                AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast.Value);
+                                ErrorReporter.Report($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast.Value);
                             }
                             cast.TargetType = TypeTable.GetType(cast.TargetTypeDefinition);
                             break;
@@ -2418,7 +2409,7 @@ namespace Lang
                         default:
                             if (valueType != null)
                             {
-                                AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast);
+                                ErrorReporter.Report($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast);
                             }
                             break;
                     }
@@ -2427,7 +2418,7 @@ namespace Lang
                 case null:
                     return null;
                 default:
-                    AddError($"Invalid expression", ast);
+                    ErrorReporter.Report($"Invalid expression", ast);
                     return null;
             }
         }
@@ -2444,7 +2435,7 @@ namespace Lang
                 case IntegerType integer when !type.Character:
                     if (!integer.Signed && constant.Value[0] == '-')
                     {
-                        AddError($"Unsigned type '{PrintTypeDefinition(constant.TypeDefinition)}' cannot be negative", constant);
+                        ErrorReporter.Report($"Unsigned type '{PrintTypeDefinition(constant.TypeDefinition)}' cannot be negative", constant);
                         break;
                     }
 
@@ -2458,7 +2449,7 @@ namespace Lang
                     };
                     if (!success)
                     {
-                        AddError($"Value '{constant.Value}' out of range for type '{PrintTypeDefinition(constant.TypeDefinition)}'", constant);
+                        ErrorReporter.Report($"Value '{constant.Value}' out of range for type '{PrintTypeDefinition(constant.TypeDefinition)}'", constant);
                     }
                     break;
             }
@@ -2471,13 +2462,13 @@ namespace Lang
 
             if (structField.Children.Count > 2)
             {
-                AddError("Cannot get a value of an enum value", structField.Children[2]);
+                ErrorReporter.Report("Cannot get a value of an enum value", structField.Children[2]);
                 return null;
             }
 
             if (structField.Children[1] is not IdentifierAst value)
             {
-                AddError($"Value of enum '{enumAst.Name}' should be an identifier", structField.Children[1]);
+                ErrorReporter.Report($"Value of enum '{enumAst.Name}' should be an identifier", structField.Children[1]);
                 return null;
             }
 
@@ -2494,7 +2485,7 @@ namespace Lang
 
             if (enumValue == null)
             {
-                AddError($"Enum '{enumAst.Name}' does not contain value '{value.Name}'", value);
+                ErrorReporter.Report($"Enum '{enumAst.Name}' does not contain value '{value.Name}'", value);
                 return null;
             }
 
@@ -2538,7 +2529,7 @@ namespace Lang
                 {
                     if (VerifyType(generic) == TypeKind.Error)
                     {
-                        AddError($"Undefined generic type '{PrintTypeDefinition(generic)}'", generic);
+                        ErrorReporter.Report($"Undefined generic type '{PrintTypeDefinition(generic)}'", generic);
                         argumentsError = true;
                     }
                 }
@@ -2552,7 +2543,7 @@ namespace Lang
                 {
                     if (polymorphicFunctions == null)
                     {
-                        AddError($"Call to undefined function '{call.FunctionName}'", call);
+                        ErrorReporter.Report($"Call to undefined function '{call.FunctionName}'", call);
                         return null;
                     }
 
@@ -3010,7 +3001,7 @@ namespace Lang
                         {
                             if (implementations.Count > 1)
                             {
-                                AddError($"Internal compiler error, multiple implementations of polymorphic function '{name}'", call);
+                                ErrorReporter.Report($"Internal compiler error, multiple implementations of polymorphic function '{name}'", call);
                             }
                             return implementations[0];
                         }
@@ -3038,11 +3029,11 @@ namespace Lang
 
             if (functions == null && polymorphicFunctions == null)
             {
-                AddError($"Call to undefined function '{call.FunctionName}'", call);
+                ErrorReporter.Report($"Call to undefined function '{call.FunctionName}'", call);
             }
             else
             {
-                AddError($"No overload of function '{call.FunctionName}' found with given arguments", call);
+                ErrorReporter.Report($"No overload of function '{call.FunctionName}' found with given arguments", call);
             }
             return null;
         }
@@ -3144,7 +3135,7 @@ namespace Lang
                 {
                     if (expression.TypeDefinition.Name != "*" || (op != Operator.Equality && op != Operator.NotEqual))
                     {
-                        AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and null", next);
+                        ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and null", next);
                     }
 
                     nullAst.TargetTypeDefinition = expression.TypeDefinition;
@@ -3175,7 +3166,7 @@ namespace Lang
                     }
                     else
                     {
-                        AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                        ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
                     }
                 }
                 else
@@ -3187,7 +3178,7 @@ namespace Lang
                         case Operator.Or:
                             if (type != TypeKind.Boolean || nextType != TypeKind.Boolean)
                             {
-                                AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                                ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
                                 expression.TypeDefinition = new TypeDefinition {Name = "bool", TypeKind = TypeKind.Boolean};
                             }
                             break;
@@ -3203,13 +3194,13 @@ namespace Lang
                             {
                                 if ((op != Operator.Equality && op != Operator.NotEqual) || !TypeEquals(expression.TypeDefinition, nextExpressionType))
                                 {
-                                    AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                                    ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
                                 }
                             }
                             else if (!(type == TypeKind.Integer || type == TypeKind.Float) &&
                                 !(nextType == TypeKind.Integer || nextType == TypeKind.Float))
                             {
-                                AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                                ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
                             }
                             expression.TypeDefinition = new TypeDefinition {Name = "bool", TypeKind = TypeKind.Boolean};
                             break;
@@ -3268,7 +3259,7 @@ namespace Lang
                             }
                             else
                             {
-                                AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                                ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
                             }
                             break;
                         // Requires both integer or bool types and returns more same type
@@ -3296,7 +3287,7 @@ namespace Lang
                             }
                             else if (!(type == TypeKind.Boolean && nextType == TypeKind.Boolean))
                             {
-                                AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                                ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
                                 if (nextType == TypeKind.Boolean || nextType == TypeKind.Integer)
                                 {
                                     expression.TypeDefinition = nextExpressionType;
@@ -3314,7 +3305,7 @@ namespace Lang
                         case Operator.RotateRight:
                             if (type != TypeKind.Integer || nextType != TypeKind.Integer)
                             {
-                                AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                                ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
                                 if (type != TypeKind.Integer)
                                 {
                                     if (nextType == TypeKind.Integer)
@@ -3342,12 +3333,12 @@ namespace Lang
         {
             if (!GetScopeIdentifier(scope, index.Name, out var identifier))
             {
-                AddError($"Variable '{index.Name}' not defined", index);
+                ErrorReporter.Report($"Variable '{index.Name}' not defined", index);
                 return null;
             }
             if (identifier is not DeclarationAst declaration)
             {
-                AddError($"Identifier '{index.Name}' is not a variable", index);
+                ErrorReporter.Report($"Identifier '{index.Name}' is not a variable", index);
                 return null;
             }
             return VerifyIndex(index, declaration.TypeDefinition, currentFunction, scope, out _);
@@ -3378,7 +3369,7 @@ namespace Lang
                     elementType = typeDef.Generics.FirstOrDefault();
                     if (elementType == null)
                     {
-                        AddError("Unable to determine element type of the Array", index);
+                        ErrorReporter.Report("Unable to determine element type of the Array", index);
                     }
                     break;
                 case TypeKind.String:
@@ -3386,7 +3377,7 @@ namespace Lang
                     elementType = _stringStruct.Fields[1].TypeDefinition.Generics[0];
                     break;
                 default:
-                    AddError($"Cannot index type '{PrintTypeDefinition(typeDef)}'", index);
+                    ErrorReporter.Report($"Cannot index type '{PrintTypeDefinition(typeDef)}'", index);
                     break;
             }
 
@@ -3395,7 +3386,7 @@ namespace Lang
             var indexType = VerifyType(indexValue);
             if (indexType != TypeKind.Integer && indexType != TypeKind.Type)
             {
-                AddError($"Expected index to be type 'int', but got '{PrintTypeDefinition(indexValue)}'", index);
+                ErrorReporter.Report($"Expected index to be type 'int', but got '{PrintTypeDefinition(indexValue)}'", index);
             }
 
             return elementType;
@@ -3435,7 +3426,7 @@ namespace Lang
             }
             else
             {
-                AddError($"Type '{PrintTypeDefinition(type)}' does not contain an overload for operator '{PrintOperator(op)}'", ast);
+                ErrorReporter.Report($"Type '{PrintTypeDefinition(type)}' does not contain an overload for operator '{PrintOperator(op)}'", ast);
                 return null;
             }
         }
@@ -3500,14 +3491,14 @@ namespace Lang
             {
                 if (typeDef.Generics.Any())
                 {
-                    AddError("Generic type cannot have additional generic types", typeDef);
+                    ErrorReporter.Report("Generic type cannot have additional generic types", typeDef);
                 }
                 return TypeKind.Generic;
             }
 
             if (typeDef.Count != null && typeDef.Name != "Array" && typeDef.Name != "CArray")
             {
-                AddError($"Type '{PrintTypeDefinition(typeDef)}' cannot have a count", typeDef);
+                ErrorReporter.Report($"Type '{PrintTypeDefinition(typeDef)}' cannot have a count", typeDef);
                 return TypeKind.Error;
             }
 
@@ -3518,7 +3509,7 @@ namespace Lang
                 case IntegerType:
                     if (hasGenerics)
                     {
-                        AddError($"Type '{typeDef.Name}' cannot have generics", typeDef);
+                        ErrorReporter.Report($"Type '{typeDef.Name}' cannot have generics", typeDef);
                         typeDef.TypeKind = TypeKind.Error;
                         return TypeKind.Error;
                     }
@@ -3527,7 +3518,7 @@ namespace Lang
                 case FloatType:
                     if (hasGenerics)
                     {
-                        AddError($"Type '{typeDef.Name}' cannot have generics", typeDef);
+                        ErrorReporter.Report($"Type '{typeDef.Name}' cannot have generics", typeDef);
                         typeDef.TypeKind = TypeKind.Error;
                         return TypeKind.Error;
                     }
@@ -3540,7 +3531,7 @@ namespace Lang
                 case "bool":
                     if (hasGenerics)
                     {
-                        AddError("Type 'bool' cannot have generics", typeDef);
+                        ErrorReporter.Report("Type 'bool' cannot have generics", typeDef);
                         typeDef.TypeKind = TypeKind.Error;
                     }
                     else
@@ -3551,7 +3542,7 @@ namespace Lang
                 case "string":
                     if (hasGenerics)
                     {
-                        AddError("Type 'string' cannot have generics", typeDef);
+                        ErrorReporter.Report("Type 'string' cannot have generics", typeDef);
                         typeDef.TypeKind = TypeKind.Error;
                     }
                     else
@@ -3562,7 +3553,7 @@ namespace Lang
                 case "Array":
                     if (typeDef.Generics.Count != 1)
                     {
-                        AddError($"Type 'Array' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
+                        ErrorReporter.Report($"Type 'Array' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
                         typeDef.TypeKind = TypeKind.Error;
                     }
                     else if (!VerifyArray(typeDef, depth, argument, out var hasGenericTypes))
@@ -3577,7 +3568,7 @@ namespace Lang
                 case "CArray":
                     if (typeDef.Generics.Count != 1)
                     {
-                        AddError($"Type 'CArray' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
+                        ErrorReporter.Report($"Type 'CArray' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
                         typeDef.TypeKind = TypeKind.Error;
                     }
                     else
@@ -3607,7 +3598,7 @@ namespace Lang
                 case "void":
                     if (hasGenerics)
                     {
-                        AddError("Type 'void' cannot have generics", typeDef);
+                        ErrorReporter.Report("Type 'void' cannot have generics", typeDef);
                         typeDef.TypeKind = TypeKind.Error;
                     }
                     else
@@ -3618,7 +3609,7 @@ namespace Lang
                 case "*":
                     if (typeDef.Generics.Count != 1)
                     {
-                        AddError($"pointer type should have reference to 1 type, but got {typeDef.Generics.Count}", typeDef);
+                        ErrorReporter.Report($"pointer type should have reference to 1 type, but got {typeDef.Generics.Count}", typeDef);
                         typeDef.TypeKind = TypeKind.Error;
                     }
                     else if (TypeTable.Types.ContainsKey(typeDef.GenericName))
@@ -3654,7 +3645,7 @@ namespace Lang
                 case "...":
                     if (hasGenerics)
                     {
-                        AddError("Type 'varargs' cannot have generics", typeDef);
+                        ErrorReporter.Report("Type 'varargs' cannot have generics", typeDef);
                         typeDef.TypeKind = TypeKind.Error;
                         return TypeKind.Error;
                     }
@@ -3666,17 +3657,17 @@ namespace Lang
                 case "Params":
                     if (!argument)
                     {
-                        AddError($"Params can only be used in function arguments", typeDef);
+                        ErrorReporter.Report($"Params can only be used in function arguments", typeDef);
                         typeDef.TypeKind = TypeKind.Error;
                     }
                     else if (depth != 0)
                     {
-                        AddError($"Params can only be declared as a top level type, such as 'Params<int>'", typeDef);
+                        ErrorReporter.Report($"Params can only be declared as a top level type, such as 'Params<int>'", typeDef);
                         typeDef.TypeKind = TypeKind.Error;
                     }
                     else if (typeDef.Generics.Count != 1)
                     {
-                        AddError($"Type 'Params' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
+                        ErrorReporter.Report($"Type 'Params' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
                         typeDef.TypeKind = TypeKind.Error;
                     }
                     else
@@ -3687,7 +3678,7 @@ namespace Lang
                 case "Type":
                     if (hasGenerics)
                     {
-                        AddError("Type 'Type' cannot have generics", typeDef);
+                        ErrorReporter.Report("Type 'Type' cannot have generics", typeDef);
                         typeDef.TypeKind = TypeKind.Error;
                     }
                     else
@@ -3722,12 +3713,12 @@ namespace Lang
                             }
                             if (!_polymorphicStructs.TryGetValue(typeDef.Name, out var structDef))
                             {
-                                AddError($"No polymorphic structs of type '{typeDef.Name}'", typeDef);
+                                ErrorReporter.Report($"No polymorphic structs of type '{typeDef.Name}'", typeDef);
                                 typeDef.TypeKind = TypeKind.Error;
                             }
                             else if (structDef.Generics.Count != typeDef.Generics.Count)
                             {
-                                AddError($"Expected type '{typeDef.Name}' to have {structDef.Generics.Count} generic(s), but got {typeDef.Generics.Count}", typeDef);
+                                ErrorReporter.Report($"Expected type '{typeDef.Name}' to have {structDef.Generics.Count} generic(s), but got {typeDef.Generics.Count}", typeDef);
                                 typeDef.TypeKind = TypeKind.Error;
                             }
                             else if (error)
@@ -3799,7 +3790,7 @@ namespace Lang
             }
             if (!_polymorphicStructs.TryGetValue("Array", out var structDef))
             {
-                AddError($"No polymorphic structs with name '{typeDef.Name}'", typeDef);
+                ErrorReporter.Report($"No polymorphic structs with name '{typeDef.Name}'", typeDef);
                 return false;
             }
 
@@ -3847,18 +3838,6 @@ namespace Lang
                 Operator.Subscript => "[]",
                 _ => ((char)op).ToString()
             };
-        }
-
-        private void AddError(string errorMessage, IAst ast = null)
-        {
-            var error = new TranslationError
-            {
-                Error = errorMessage,
-                FileIndex = ast?.FileIndex ?? 0,
-                Line = ast?.Line ?? 0,
-                Column = ast?.Column ?? 0
-            };
-            _programGraph.Errors.Add(error);
         }
     }
 }
