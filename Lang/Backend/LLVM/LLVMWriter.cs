@@ -692,8 +692,7 @@ namespace Lang.Backend.LLVM
                 Operator.GreaterThanEqual => LLVMRealPredicate.LLVMRealOGE,
                 Operator.LessThan => LLVMRealPredicate.LLVMRealOLT,
                 Operator.LessThanEqual => LLVMRealPredicate.LLVMRealOLE,
-                // TODO Handle unsigned compares
-                // This branch should never be hit
+               // This branch should never be hit
                 _ => LLVMRealPredicate.LLVMRealOEQ
             };
         }
