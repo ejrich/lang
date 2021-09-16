@@ -71,6 +71,7 @@ namespace Lang.Translation
                             }
                             else
                             {
+                                structAst.TypeIndex = _typeIndex++;
                                 _programGraph.Types.Add(structAst.Name, structAst);
                                 _globalIdentifiers.Add(structAst.Name, structAst);
                             }
@@ -209,6 +210,7 @@ namespace Lang.Translation
             {
                 AddError($"Multiple definitions of enum '{enumAst.Name}'", enumAst);
             }
+            enumAst.TypeIndex = _typeIndex++;
             _globalIdentifiers.Add(enumAst.Name, enumAst);
 
             // 2. Verify enums don't have repeated values
@@ -434,6 +436,13 @@ namespace Lang.Translation
             foreach (var argument in function.Arguments)
             {
                 // Arguments with the same name as a global variable will be used instead of the global
+                if (scopeIdentifiers.TryGetValue(argument.Name, out var identifier))
+                {
+                    if (identifier is not DeclarationAst)
+                    {
+                        AddError($"Argument '{argument.Name}' already exists as a type", argument);
+                    }
+                }
                 scopeIdentifiers[argument.Name] = argument;
             }
             var returnType = VerifyType(function.ReturnType);
@@ -1053,6 +1062,10 @@ namespace Lang.Translation
                         case EnumAst enumAst:
                             return new TypeDefinition {Name = "Type", TypeIndex = enumAst.TypeIndex, Generics = {new TypeDefinition {Name = enumAst.Name}}};
                         case StructAst structAst:
+                            if (structAst.Generics.Any())
+                            {
+                                AddError($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
+                            }
                             return new TypeDefinition {Name = "Type", TypeIndex = structAst.TypeIndex, Generics = {new TypeDefinition {Name = structAst.Name}}};
                         default:
                             return null;
@@ -1914,7 +1927,7 @@ namespace Lang.Translation
 
         private void CreatePolymorphedStruct(StructAst structAst, string name, params TypeDefinition[] genericTypes)
         {
-            var polyStruct = new StructAst {Name = name};
+            var polyStruct = new StructAst {Name = name, TypeIndex = _typeIndex++};
             foreach (var field in structAst.Fields)
             {
                 if (field.HasGeneric)
