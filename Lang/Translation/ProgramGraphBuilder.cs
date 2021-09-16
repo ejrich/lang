@@ -408,7 +408,7 @@ namespace Lang.Translation
                                 VerifyStruct(fieldStruct);
                             }
                         }
-                        field.Offset = (int)structAst.Size;
+                        field.Offset = structAst.Size;
                         structAst.Size += field.Type.CArray ? type.Size * field.Type.ConstCount.Value : type.Size;
                     }
                 }
