@@ -1668,6 +1668,7 @@ namespace Lang
                     {
                         int.TryParse(constant.Value, out count);
                     }
+                    VerifyType(constant.Type);
                     return constant.Type;
                 case NullAst:
                     isConstant = true;
@@ -1722,6 +1723,7 @@ namespace Lang
             switch (ast)
             {
                 case ConstantAst constant:
+                    VerifyType(constant.Type);
                     return constant.Type;
                 case NullAst:
                     return null;
@@ -2479,6 +2481,9 @@ namespace Lang
                         }
 
                         var polymorphedFunction = _polymorpher.CreatePolymorphedFunction(function, name, _programGraph.TypeCount++, genericTypes);
+                        VerifyType(polymorphedFunction.ReturnType);
+                        polymorphedFunction.Arguments.ForEach(arg => VerifyType(arg.Type, argument: true));
+
                         _programGraph.Functions[genericName] = new List<FunctionAst>{polymorphedFunction};
                         VerifyFunction(polymorphedFunction);
 
