@@ -1027,7 +1027,11 @@ namespace Lang.Backend
                 case InstructionValueType.Constant:
                     return GetConstant(value);
                 case InstructionValueType.Null:
-                    return LLVM.ConstNull(_u8PointerType);
+                    if (value.Type == null)
+                    {
+                        return LLVM.ConstNull(_u8PointerType);
+                    }
+                    return LLVM.ConstNull(_types[value.Type.TypeIndex]);
                 case InstructionValueType.ConstantStruct:
                 case InstructionValueType.ConstantArray:
                     // TODO Implement me

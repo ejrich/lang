@@ -375,7 +375,8 @@ namespace Lang
                                 AddError("Cannot assign null to non-pointer type", structField.Value);
                             }
 
-                            nullAst.TargetType = structField.TypeDefinition;
+                            nullAst.TargetTypeDefinition = structField.TypeDefinition;
+                            nullAst.TargetType = structField.Type;
                         }
                         else
                         {
@@ -1164,7 +1165,8 @@ namespace Lang
                         AddError("Cannot assign null to non-pointer type", declaration.Value);
                     }
 
-                    nullAst.TargetType = declaration.TypeDefinition;
+                    nullAst.TargetTypeDefinition = declaration.TypeDefinition;
+                    nullAst.TargetType = declaration.Type;
                 }
             }
             // 3. Verify declaration values
@@ -1420,7 +1422,8 @@ namespace Lang
                         AddError("Cannot assign null to non-pointer type", declaration.Value);
                     }
 
-                    nullAst.TargetType = declaration.TypeDefinition;
+                    nullAst.TargetTypeDefinition = declaration.TypeDefinition;
+                    nullAst.TargetType = declaration.Type;
                 }
             }
             // 3. Verify declaration values
@@ -1621,7 +1624,10 @@ namespace Lang
             }
 
             // TODO Move somewhere
-            declaration.Type = TypeTable.GetType(declaration.TypeDefinition);
+            if (declaration.TypeDefinition != null)
+            {
+                declaration.Type = TypeTable.GetType(declaration.TypeDefinition);
+            }
 
             scope.Identifiers.TryAdd(declaration.Name, declaration);
         }
@@ -1683,7 +1689,8 @@ namespace Lang
                 {
                     AddError("Cannot assign null to non-pointer type", assignment.Value);
                 }
-                nullAst.TargetType = variableTypeDefinition;
+                nullAst.TargetTypeDefinition = variableTypeDefinition;
+                nullAst.TargetType = TypeTable.GetType(variableTypeDefinition);
                 return;
             }
 
@@ -2345,7 +2352,9 @@ namespace Lang
                             case UnaryOperator.Dereference:
                                 if (type == TypeKind.Pointer)
                                 {
-                                    return valueType.Generics[0];
+                                    valueType = valueType.Generics[0];
+                                    unary.Type = TypeTable.GetType(valueType);
+                                    return valueType;
                                 }
                                 else if (type != TypeKind.Error)
                                 {
@@ -2596,7 +2605,8 @@ namespace Lang
                 }
                 else if (argumentAst is NullAst nullAst)
                 {
-                    nullAst.TargetType = functionArg.TypeDefinition;
+                    nullAst.TargetTypeDefinition = functionArg.TypeDefinition;
+                    nullAst.TargetType = functionArg.Type;
                 }
                 else
                 {
@@ -2645,7 +2655,8 @@ namespace Lang
                         var argumentAst = call.Arguments[i];
                         if (argumentAst is NullAst nullAst)
                         {
-                            nullAst.TargetType = paramsType;
+                            nullAst.TargetTypeDefinition = paramsType;
+                            nullAst.TargetType = function.ParamsElementType;
                         }
                         else
                         {
@@ -3130,7 +3141,7 @@ namespace Lang
                         AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and null", next);
                     }
 
-                    nullAst.TargetType = expression.TypeDefinition;
+                    nullAst.TargetTypeDefinition = expression.TypeDefinition;
                     expression.TypeDefinition = new TypeDefinition {Name = "bool", TypeKind = TypeKind.Boolean};
                     expression.ResultingTypeDefinitions.Add(expression.TypeDefinition);
                     expression.Type = TypeTable.Types["bool"];
