@@ -169,13 +169,15 @@ namespace Lang.Runner
 
         private void ExecuteDeclaration(DeclarationAst declaration, ProgramGraph programGraph, IDictionary<string, ValueType> variables)
         {
-            var value = declaration.Value == null ? GetUninitializedValue(declaration.Type, programGraph) :
+            var value = declaration.Value == null ?
+                GetUninitializedValue(declaration.Type, programGraph, variables, declaration.Assignments) :
                 ExecuteExpression(declaration.Value, programGraph, null).Value;
 
             variables[declaration.Name] = new ValueType {Type = declaration.Type, Value = value};
         }
 
-        private object GetUninitializedValue(TypeDefinition typeDef, ProgramGraph programGraph)
+        private object GetUninitializedValue(TypeDefinition typeDef, ProgramGraph programGraph,
+            IDictionary<string, ValueType> variables, List<AssignmentAst> values)
         {
             switch (typeDef.PrimitiveType)
             {
@@ -191,27 +193,59 @@ namespace Lang.Runner
                             return null;
                         case "*":
                             // TODO Handle pointers
-                            return null;
+                            return IntPtr.Zero;
                     }
                     var instanceType = _types[typeDef.GenericName];
                     var type = programGraph.Data.Types[typeDef.GenericName];
-                    var instance = Activator.CreateInstance(instanceType);
                     if (type is StructAst structAst)
                     {
-                        foreach (var field in structAst.Fields)
-                        {
-                            // TODO Make this better, just hard coding for now to bypass null reference exceptions
-                            if (field.Type.PrimitiveType == null && field.Type.Name != "*")
-                            {
-                                var fieldType = _types[field.Type.GenericName];
-                                var fieldInstance = instance!.GetType().GetField(field.Name);
-                                fieldInstance!.SetValue(instance, Activator.CreateInstance(fieldType));
-                            }
-                        }
+                        return InitializeStruct(instanceType, structAst, programGraph, variables, values);
                     }
 
-                    return instance;
+                    var enumAst = type as EnumAst;
+                    var value = Activator.CreateInstance(instanceType);
+                    return value;
             }
+        }
+
+        private object InitializeStruct(Type type, StructAst structAst, ProgramGraph programGraph,
+            IDictionary<string, ValueType> variables, List<AssignmentAst> values = null)
+        {
+            var assignments = values == null ? new Dictionary<string, AssignmentAst>() : values.ToDictionary(_ => (_.Variable as VariableAst)!.Name);
+            var instance = Activator.CreateInstance(type);
+            foreach (var field in structAst.Fields)
+            {
+                var fieldInstance = instance!.GetType().GetField(field.Name);
+
+                if (assignments.TryGetValue(field.Name, out var assignment))
+                {
+                    var expression = ExecuteExpression(assignment.Variable, programGraph, variables);
+                    var value = CastValue(expression, field.Type);
+
+                    fieldInstance!.SetValue(instance, value);
+                }
+                else if (field.DefaultValue != null)
+                {
+                    var value = GetConstant(field.Type, field.DefaultValue.Value);
+                    fieldInstance!.SetValue(instance, value);
+                }
+                else if (field.Type.PrimitiveType == null && field.Type.Name != "*")
+                {
+                    var fieldType = _types[field.Type.GenericName];
+                    var fieldTypeDef = programGraph.Data.Types[field.Type.GenericName];
+                    if (fieldTypeDef is StructAst fieldStructAst)
+                    {
+                        var value = InitializeStruct(fieldType, fieldStructAst, programGraph, variables);
+                        fieldInstance!.SetValue(instance, value);
+                    }
+                    else
+                    {
+                        fieldInstance!.SetValue(instance, Activator.CreateInstance(fieldType));
+                    }
+                }
+            }
+
+            return instance;
         }
 
         private void ExecuteAssignment(AssignmentAst assignment, ProgramGraph programGraph, IDictionary<string, ValueType> variables)
@@ -348,15 +382,9 @@ namespace Lang.Runner
             {
                 case ConstantAst constant:
                     var type = constant.Type;
-                    object value = type.PrimitiveType switch
-                    {
-                        IntegerType => int.Parse(constant.Value),
-                        FloatType => float.Parse(constant.Value),
-                        _ => constant.Value
-                    };
-                    return new ValueType {Type = type, Value = value};
+                    return new ValueType {Type = type, Value = GetConstant(type, constant.Value)};
                 case NullAst:
-                    return null;
+                    return new ValueType();
                 case StructFieldRefAst structField:
                     var structVariable = variables[structField.Name];
                     return GetStructFieldRef(structField, programGraph, structVariable.Value);
@@ -451,6 +479,17 @@ namespace Lang.Runner
             return null;
         }
 
+        private static object GetConstant(TypeDefinition type, string value)
+        {
+            object result = type.PrimitiveType switch
+            {
+                IntegerType => int.Parse(value),
+                FloatType => float.Parse(value),
+                _ => value
+            };
+            return result;
+        }
+
         private ValueType GetStructFieldRef(StructFieldRefAst structField, ProgramGraph programGraph,
             object structVariable)
         {
@@ -496,6 +535,12 @@ namespace Lang.Runner
         {
             // TODO Implement me
             return null;
+        }
+
+        private object CastValue(ValueType expression, TypeDefinition fieldType)
+        {
+            // TODO Implement me
+            return expression.Value;
         }
 
         private static void CreateFunction(TypeBuilder typeBuilder, string name, string library, Type returnType, params Type[] args)
