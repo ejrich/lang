@@ -1,4 +1,4 @@
-int Main(List<string> args)
+int Main(List<string,> args)
 {
     // Return positive exit code
     /*
