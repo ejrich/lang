@@ -877,15 +877,23 @@ namespace Lang.Backend
             {
                 // Initialize arrays
                 case TypeKind.Array:
-                    if (declaration.ArrayValues != null)
+                    if (declaration.Type.CArray)
                     {
-                        // TODO Implement me
+                        if (declaration.ArrayValues != null)
+                        {
+                            InitializeArrayValues(variable, declaration.ArrayValues, localVariables);
+                        }
+                        return;
                     }
-                    if (declaration.Type.CArray) return;
                     var elementType = declaration.Type.Generics[0];
                     if (declaration.Type.ConstCount != null)
                     {
-                        InitializeConstArray(variable, declaration.Type.ConstCount.Value, elementType);
+                        var arrayPointer = InitializeConstArray(variable, declaration.Type.ConstCount.Value, elementType);
+
+                        if (declaration.ArrayValues != null)
+                        {
+                            InitializeArrayValues(arrayPointer, declaration.ArrayValues, localVariables);
+                        }
                     }
                     else if (declaration.Type.Count != null)
                     {
@@ -921,6 +929,19 @@ namespace Lang.Backend
                     var zero = GetConstZero(ConvertTypeDefinition(declaration.Type));
                     LLVM.BuildStore(_builder, zero, variable);
                     break;
+            }
+        }
+
+        private void InitializeArrayValues(LLVMValueRef arrayPointer, List<IAst> arrayValues, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
+        {
+            for (var i = 0; i < arrayValues.Count; i++)
+            {
+                var (_, value) = WriteExpression(arrayValues[i], localVariables);
+
+                var index = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), (uint)i, false);
+                var pointer = _builder.BuildGEP(arrayPointer, new []{_zeroInt, index}, "dataptr");
+
+                LLVM.BuildStore(_builder, value, pointer);
             }
         }
 
@@ -982,7 +1003,7 @@ namespace Lang.Backend
             }
         }
 
-        private void InitializeConstArray(LLVMValueRef array, uint length, TypeDefinition arrayType)
+        private LLVMValueRef InitializeConstArray(LLVMValueRef array, uint length, TypeDefinition arrayType)
         {
             // 1. Set the count field
             var countValue = LLVM.ConstInt(LLVM.Int32Type(), (ulong)length, 0);
@@ -995,6 +1016,8 @@ namespace Lang.Backend
             var arrayDataPointer = _builder.BuildBitCast(arrayData, LLVM.PointerType(targetType, 0), "tmpdata");
             var dataPointer = _builder.BuildStructGEP(array, 1, "dataptr");
             LLVM.BuildStore(_builder, arrayDataPointer, dataPointer);
+
+            return arrayData;
         }
 
         private static LLVMValueRef GetConstZero(LLVMTypeRef type)
