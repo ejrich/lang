@@ -662,7 +662,8 @@ namespace Lang
                     var expressionValue = EmitIR(function, expression.Children[0], scope, block);
                     for (var i = 1; i < expression.Children.Count; i++)
                     {
-                        var rhs = EmitIR(function, expression.Children[i], scope, block);
+                        var foo = expression.Children[i];
+                        var rhs = EmitIR(function, foo, scope, block);
                         if (expression.OperatorOverloads.TryGetValue(i, out var overload))
                         {
                             expressionValue = EmitCall(block, GetOperatorOverloadName(overload.Type, overload.Operator), new []{expressionValue, rhs}, overload.ReturnType);
@@ -672,8 +673,7 @@ namespace Lang
                             expressionValue = EmitExpression(block, expressionValue, rhs, expression.Operators[i - 1], expression.ResultingTypes[i - 1]);
                         }
                     }
-                    // return expressionValue;
-                    return new InstructionValue();
+                    return expressionValue;
                 case TypeDefinition typeDef:
                     return GetConstantInteger(typeDef.TypeIndex.Value);
                 case CastAst cast:
@@ -1000,70 +1000,179 @@ namespace Lang
             }
         }
 
-        private InstructionValue EmitExpression(BasicBlock block, InstructionValue lhs, InstructionValue rhs, Operator op, IType targetType)
+        private InstructionValue EmitExpression(BasicBlock block, InstructionValue lhs, InstructionValue rhs, Operator op, IType type)
         {
             // TODO Implement me
-            // // 1. Handle pointer math
-            // if (lhs.type.Name == "*")
-            // {
-            //     return BuildPointerOperation(lhs.value, rhs.value, op);
-            // }
-            // if (rhs.type.Name == "*")
-            // {
-            //     return BuildPointerOperation(rhs.value, lhs.value, op);
-            // }
+            // 1. Handle pointer math
+            if (lhs.Type?.TypeKind == TypeKind.Pointer)
+            {
+                return EmitPointerOperation(block, lhs, rhs, op, type);
+            }
+            if (rhs.Type?.TypeKind == TypeKind.Pointer)
+            {
+                return EmitPointerOperation(block, rhs, lhs, op, type);
+            }
 
-            // // 2. Handle compares and shifts, since the lhs and rhs should not be cast to the target type
-            // switch (op)
-            // {
-            //     case Operator.And:
-            //         return lhs.type.Name == "bool" ? _builder.BuildAnd(lhs.value, rhs.value, "tmpand")
-            //             : BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, Operator.And);
-            //     case Operator.Or:
-            //         return lhs.type.Name == "bool" ? _builder.BuildOr(lhs.value, rhs.value, "tmpor")
-            //             : BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, Operator.Or);
-            //     case Operator.Equality:
-            //     case Operator.NotEqual:
-            //     case Operator.GreaterThanEqual:
-            //     case Operator.LessThanEqual:
-            //     case Operator.GreaterThan:
-            //     case Operator.LessThan:
-            //         return BuildCompare(lhs, rhs, op);
-            //     case Operator.ShiftLeft:
-            //         return BuildShift(lhs, rhs);
-            //     case Operator.ShiftRight:
-            //         return BuildShift(lhs, rhs, true);
-            //     case Operator.RotateLeft:
-            //         return BuildRotate(lhs, rhs);
-            //     case Operator.RotateRight:
-            //         return BuildRotate(lhs, rhs, true);
-            // }
+            // 2. Handle compares and shifts, since the lhs and rhs should not be cast to the target type
+            switch (op)
+            {
+                case Operator.And:
+                    return EmitInstruction(InstructionType.And, block, type, lhs, rhs);
+                case Operator.Or:
+                    return EmitInstruction(InstructionType.Or, block, type, lhs, rhs);
+                case Operator.ShiftLeft:
+                    return EmitInstruction(InstructionType.ShiftLeft, block, type, lhs, rhs);
+                case Operator.ShiftRight:
+                    return EmitInstruction(InstructionType.ShiftRight, block, type, lhs, rhs);
+                case Operator.RotateLeft:
+                    return EmitInstruction(InstructionType.RotateLeft, block, type, lhs, rhs);
+                case Operator.RotateRight:
+                    return EmitInstruction(InstructionType.RotateRight, block, type, lhs, rhs);
+                case Operator.Equality:
+                case Operator.NotEqual:
+                case Operator.GreaterThanEqual:
+                case Operator.LessThanEqual:
+                case Operator.GreaterThan:
+                case Operator.LessThan:
+                    return EmitCompare(block, lhs, rhs, op, type);
+            }
 
-            // // 3. Handle overloaded operators
-            // if (lhs.type.PrimitiveType == null && lhs.type.Name != "bool")
-            // {
-            //     return BuildOperatorOverloadCall(lhs.type, lhs.value, rhs.value, op);
-            // }
+            // 3. Cast lhs and rhs to the target types
+            lhs = EmitCastValue(block, lhs, type);
+            rhs = EmitCastValue(block, rhs, type);
 
-            // // 4. Cast lhs and rhs to the target types
-            // lhs.value = CastValue(lhs, targetType);
-            // rhs.value = CastValue(rhs, targetType);
+            // 4. Handle the rest of the simple operators
+            switch (op)
+            {
+                case Operator.BitwiseAnd:
+                    return EmitInstruction(InstructionType.BitwiseAnd, block, type, lhs, rhs);
+                case Operator.BitwiseOr:
+                    return EmitInstruction(InstructionType.BitwiseOr, block, type, lhs, rhs);
+                case Operator.Xor:
+                    return EmitInstruction(InstructionType.Xor, block, type, lhs, rhs);
+                // TODO Float/unsigned int specific instructions?
+                case Operator.Add:
+                    return EmitInstruction(InstructionType.Add, block, type, lhs, rhs);
+                case Operator.Subtract:
+                    return EmitInstruction(InstructionType.Subtract, block, type, lhs, rhs);
+                case Operator.Multiply:
+                    return EmitInstruction(InstructionType.Multiply, block, type, lhs, rhs);
+                case Operator.Divide:
+                    return EmitInstruction(InstructionType.Divide, block, type, lhs, rhs);
+                case Operator.Modulus:
+                    return EmitInstruction(InstructionType.Modulus, block, type, lhs, rhs);
+            }
 
-            // // 5. Handle the rest of the simple operators
-            // switch (op)
-            // {
-            //     case Operator.BitwiseAnd:
-            //         return _builder.BuildAnd(lhs.value, rhs.value, "tmpband");
-            //     case Operator.BitwiseOr:
-            //         return _builder.BuildOr(lhs.value, rhs.value, "tmpbor");
-            //     case Operator.Xor:
-            //         return _builder.BuildXor(lhs.value, rhs.value, "tmpxor");
-            // }
+            Console.WriteLine("Operator not compatible");
+            Environment.Exit(ErrorCodes.BuildError);
+            return null; // Return never happens
+        }
 
-            // // 6. Handle binary operations
-            // var signed = lhs.type.PrimitiveType.Signed || rhs.type.PrimitiveType.Signed;
-            // return BuildBinaryOperation(targetType, lhs.value, rhs.value, op, signed);
+        private InstructionValue EmitPointerOperation(BasicBlock block, InstructionValue lhs, InstructionValue rhs, Operator op, IType type)
+        {
+            if (op == Operator.Equality)
+            {
+                if (rhs.ValueType == InstructionValueType.Null)
+                {
+                    return EmitInstruction(InstructionType.IsNull, block, type, lhs);
+                }
+                return EmitInstruction(InstructionType.Equals, block, type, lhs, rhs);
+            }
+            if (op == Operator.NotEqual)
+            {
+                if (rhs.ValueType == InstructionValueType.Null)
+                {
+                    return EmitInstruction(InstructionType.IsNotNull, block, type, lhs);
+                }
+                return EmitInstruction(InstructionType.NotEquals, block, type, lhs, rhs);
+            }
+            if (op == Operator.Subtract)
+            {
+                return EmitInstruction(InstructionType.Subtract, block, type, lhs, rhs);
+            }
+            return EmitInstruction(InstructionType.Add, block, type, lhs, rhs);
+        }
+
+        private InstructionValue EmitCompare(BasicBlock block, InstructionValue lhs, InstructionValue rhs, Operator op, IType type)
+        {
+            switch (lhs.Type.TypeKind)
+            {
+                case TypeKind.Integer:
+                    switch (rhs.Type.TypeKind)
+                    {
+                        case TypeKind.Integer:
+                            // var signed = lhsInt.Signed || rhsInt.Signed;
+                            if (lhs.Type.Size > rhs.Type.Size)
+                            {
+                                rhs = EmitCastValue(block, rhs, lhs.Type);
+                            }
+                            else if (lhs.Type.Size < rhs.Type.Size)
+                            {
+                                lhs = EmitCastValue(block, lhs, rhs.Type);
+                            }
+                            return EmitInstruction(ConvertIntOperator(op), block, type, lhs, rhs);
+                        case TypeKind.Float:
+                            lhs = EmitCastValue(block, lhs, rhs.Type);
+                            return EmitInstruction(ConvertRealOperator(op), block, type, lhs, rhs);
+                    }
+                    break;
+                case TypeKind.Float:
+                    switch (rhs.Type.TypeKind)
+                    {
+                        case TypeKind.Integer:
+                            rhs = EmitCastValue(block, rhs, lhs.Type);
+                            return EmitInstruction(ConvertRealOperator(op), block, type, lhs, rhs);
+                        case TypeKind.Float:
+                            if (lhs.Type.Size > rhs.Type.Size)
+                            {
+                                rhs = EmitCastValue(block, rhs, _float64Type);
+                            }
+                            else if (lhs.Type.Size < rhs.Type.Size)
+                            {
+                                lhs = EmitCastValue(block, lhs, _float64Type);
+                            }
+                            return EmitInstruction(ConvertRealOperator(op), block, type, lhs, rhs);
+                    }
+                    break;
+                case TypeKind.Enum:
+                    return EmitInstruction(ConvertIntOperator(op), block, type, lhs, rhs);
+            }
+
+            Console.WriteLine("Unexpected type in compare");
+            Environment.Exit(ErrorCodes.BuildError);
             return null;
+        }
+
+        private static InstructionType ConvertIntOperator(Operator op, bool signed = true)
+        {
+            return op switch
+            {
+                Operator.Equality => InstructionType.Equals,
+                Operator.NotEqual => InstructionType.NotEquals,
+                // TODO Should there be unsigned instruction types?
+                Operator.GreaterThan => signed ? InstructionType.GreaterThan : InstructionType.GreaterThan,
+                Operator.GreaterThanEqual => signed ? InstructionType.GreaterThanOrEqual : InstructionType.GreaterThanOrEqual,
+                Operator.LessThan => signed ? InstructionType.LessThan : InstructionType.LessThan,
+                Operator.LessThanEqual => signed ? InstructionType.LessThanOrEqual : InstructionType.LessThanOrEqual,
+                // @Cleanup This branch should never be hit
+                _ => InstructionType.Equals
+            };
+        }
+
+        private static InstructionType ConvertRealOperator(Operator op)
+        {
+            return op switch
+            {
+                Operator.Equality => InstructionType.Equals,
+                Operator.NotEqual => InstructionType.NotEquals,
+                // TODO Should there be float instruction types?
+                Operator.GreaterThan => InstructionType.GreaterThan,
+                Operator.GreaterThanEqual => InstructionType.GreaterThanOrEqual,
+                Operator.LessThan => InstructionType.LessThan,
+                Operator.LessThanEqual => InstructionType.LessThanOrEqual,
+                // @Cleanup This branch should never be hit
+                _ => InstructionType.Equals
+            };
         }
 
         private InstructionValue EmitCastValue(BasicBlock block, InstructionValue value, IType type)
@@ -1073,6 +1182,7 @@ namespace Lang
                 return value;
             }
 
+            // TODO Make this more robust
             var targetType = new InstructionValue {ValueType = InstructionValueType.Type, Type = type};
             var castInstruction = new Instruction {Type = InstructionType.Cast, Value1 = value, Value2 = targetType};
 

@@ -101,6 +101,8 @@ namespace Lang
         Call,
         Cast,
         AllocateArray,
+        IsNull,
+        IsNotNull,
         Not,
         Negate,
         Add,
