@@ -342,7 +342,7 @@ namespace Lang
             var arrayVariable = new GlobalVariable
             {
                 Name = "____array", Index = arrayIndex, Size = elementType.Size,
-                     Array = true, ArrayLength = length, Type = elementType
+                Array = true, ArrayLength = length, Type = elementType
             };
             Program.GlobalVariables.Add(arrayVariable);
 
@@ -366,7 +366,7 @@ namespace Lang
                 {
                     case ReturnAst returnAst:
                         EmitReturn(function, returnAst, returnType, scope);
-                        break;
+                        return block;
                     case DeclarationAst declaration:
                         EmitDeclaration(function, declaration, scope);
                         break;
@@ -374,10 +374,20 @@ namespace Lang
                         EmitAssignment(function, assignment, scope);
                         break;
                     case ScopeAst childScope:
-                        block = EmitScope(function, block, scope, returnType);
+                        block = EmitScope(function, block, childScope, returnType);
+                        if (childScope.Returns)
+                        {
+                            scope.Returns = true;
+                            return block;
+                        }
                         break;
                     case ConditionalAst conditional:
-                        block = EmitConditional(function, block, conditional, scope, returnType);
+                        block = EmitConditional(function, block, conditional, scope, returnType, out var returns);
+                        if (returns)
+                        {
+                            scope.Returns = true;
+                            return block;
+                        }
                         break;
                     case WhileAst whileAst:
                         block = EmitWhile(function, block, whileAst, scope, returnType);
@@ -497,7 +507,7 @@ namespace Lang
             var allocation = new Allocation
             {
                 Index = index, Offset = function.StackSize, Size = type.Size,
-                      Array = array, ArrayLength = arrayLength, Type = type
+                Array = array, ArrayLength = arrayLength, Type = type
             };
             function.StackSize += array ? arrayLength * type.Size : type.Size;
             function.Allocations.Add(allocation);
@@ -660,9 +670,10 @@ namespace Lang
             }
 
             function.Instructions.Add(instruction);
+            scope.Returns = true;
         }
 
-        private BasicBlock EmitConditional(FunctionIR function, BasicBlock block, ConditionalAst conditional, ScopeAst scope, IType returnType)
+        private BasicBlock EmitConditional(FunctionIR function, BasicBlock block, ConditionalAst conditional, ScopeAst scope, IType returnType, out bool returns)
         {
             // Run the condition expression in the current basic block and then jump to the following
             var condition = EmitConditionExpression(function, conditional.Condition, scope);
@@ -674,7 +685,7 @@ namespace Lang
             Instruction jumpToAfter = null;
 
             // For when the the if block does not return and there is an else block, a jump to the after block is required
-            if (!conditional.IfReturns && conditional.ElseBlock != null)
+            if (!conditional.IfBlock.Returns && conditional.ElseBlock != null)
             {
                 jumpToAfter = new Instruction {Type = InstructionType.Jump};
                 function.Instructions.Add(jumpToAfter);
@@ -685,6 +696,7 @@ namespace Lang
             // Jump to the else block, otherwise fall through to the then block
             conditionJump.Index = elseBlock.Index;
 
+            returns = false;
             if (conditional.ElseBlock == null)
             {
                 return elseBlock;
@@ -692,14 +704,15 @@ namespace Lang
 
             elseBlock = EmitScope(function, elseBlock, conditional.ElseBlock, returnType);
 
-            if (conditional.IfReturns && conditional.ElseReturns)
+            if (conditional.IfBlock.Returns && conditional.ElseBlock.Returns)
             {
+                returns = true;
                 return elseBlock;
             }
 
             var afterBlock = elseBlock.Location < function.Instructions.Count ? AddBasicBlock(function) : elseBlock;
 
-            if (!conditional.IfReturns)
+            if (!conditional.IfBlock.Returns)
             {
                 jumpToAfter.Index = afterBlock.Index;
             }
@@ -900,7 +913,7 @@ namespace Lang
                         return new InstructionValue
                         {
                             ValueType = InstructionValueType.Constant, Type = enumDef,
-                                      ConstantValue = new Constant {Integer = enumValue}
+                            ConstantValue = new Constant {Integer = enumValue}
                         };
                     }
                     else if (structField.IsConstant)
@@ -1566,8 +1579,8 @@ namespace Lang
             return function.Name switch
             {
                 "main" => "__main",
-                    "__start" => "main",
-                    _ => function.OverloadIndex > 0 ? $"{function.Name}.{function.OverloadIndex}" : function.Name
+                "__start" => "main",
+                _ => function.OverloadIndex > 0 ? $"{function.Name}.{function.OverloadIndex}" : function.Name
             };
         }
 
@@ -1594,7 +1607,7 @@ namespace Lang
             var instruction = new Instruction
             {
                 Type = InstructionType.GetPointer, Value1 = pointer,
-                     Value2 = index, GetFirstPointer = getFirstPointer
+                Value2 = index, GetFirstPointer = getFirstPointer
             };
             return AddInstruction(function, instruction, type);
         }
