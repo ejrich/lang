@@ -55,14 +55,19 @@ namespace Lang.Backend.LLVM
             }
 
             // 6. Write Main function
-            {
-                var main = programGraph.Main;
-                _currentFunction = main;
-                var function = WriteFunctionDefinition("main", main.Arguments, main.ReturnType);
-                WriteFunction(main, globals, function);
-            }
+            var main = programGraph.Main;
+            _currentFunction = main;
+            _functions.Add("Main", main);
+            var mainFunction = WriteFunctionDefinition("Main", main.Arguments, main.ReturnType);
+            WriteFunction(main, globals, mainFunction);
 
-            // 7. Compile to object file
+            // 7. Write __start function
+            var start = programGraph.Start;
+            _currentFunction = start;
+            var startFunction = WriteFunctionDefinition("main", start.Arguments, start.ReturnType);
+            WriteFunction(start, globals, startFunction);
+
+            // 8. Compile to object file
             Compile(objectFile);
 
             return objectFile;

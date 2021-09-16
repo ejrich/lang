@@ -20,6 +20,9 @@ printf(string format, ... args) #extern
 
 // Runtime functions
 int __start(int argc, string* argv) {
-    printf("Argument count - %d\nFirst arg - %s\n", argc, *argv);
-    return 0;
+    args: List<string>[argc];
+
+    each i in 0..argc-1 then args[i] = *(argv + i);
+
+    return Main(args);
 }
