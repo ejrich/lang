@@ -1186,10 +1186,16 @@ namespace Lang.Parsing
                     return Operator.Or;
                 case TokenType.Equality:
                     return Operator.Equality;
+                case TokenType.NotEqual:
+                    return Operator.NotEqual;
                 case TokenType.Increment:
                     return Operator.Increment;
                 case TokenType.Decrement:
                     return Operator.Decrement;
+                case TokenType.GreaterThanEqual:
+                    return Operator.GreaterThanEqual;
+                case TokenType.LessThanEqual:
+                    return Operator.LessThanEqual;
                 // Handle single character operators
                 default:
                     var op = (Operator)token.Value[0];

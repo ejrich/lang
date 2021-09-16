@@ -470,25 +470,65 @@ namespace Lang.Translation
                     }
                     return function?.ReturnType;
                 case ExpressionAst expression:
-                    var expressionType = VerifyExpression(expression.Children[0], localVariables, errors);
-                    for (var i = 1; i < expression.Children.Count; i++)
-                    {
-                        var nextType = VerifyExpression(expression.Children[i], localVariables, errors);
-                        if (nextType == null) return null;
-
-                        if (TypeEquals(expressionType, nextType)) continue;
-
-                        errors.Add(CreateError($"Type mismatch between '{PrintTypeDefinition(expressionType)}' and '{PrintTypeDefinition(nextType)}'", expression.Children[i]));
-                        return null;
-                        // TODO Implement type interpretation based on the operators
-                    }
-                    return expressionType;
+                    return VerifyExpressionType(expression, localVariables, errors);
                 case null:
                     return null;
                 default:
                     errors.Add(CreateError($"Unexpected Ast '{ast}'", ast));
                     return null;
             }
+        }
+
+        private TypeDefinition VerifyExpressionType(ExpressionAst expression, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        {
+            // 1. Get the type of the initial child
+            var expressionType = VerifyExpression(expression.Children[0], localVariables, errors);
+            var operatorPrecedence = int.MinValue;
+            for (var i = 1; i < expression.Children.Count; i++)
+            {
+                // 2. Get the next operator and expression type
+                var op = expression.Operators[i - 1];
+                var nextType = VerifyExpression(expression.Children[i], localVariables, errors);
+                switch (op)
+                {
+                    // TODO Implement branches
+                    // Both need to be bool and returns bool
+                    case Operator.And:
+                    case Operator.Or:
+                    case Operator.Xor:
+                        break;
+                    // Requires same types and returns bool
+                    case Operator.Equality:
+                    case Operator.GreaterThan:
+                    case Operator.LessThan:
+                    case Operator.GreaterThanEqual:
+                    case Operator.LessThanEqual:
+                        break;
+                    // Requires same types and returns more precise type
+                    case Operator.Add:
+                    case Operator.Subtract:
+                    case Operator.Multiply:
+                    case Operator.Divide:
+                    case Operator.Modulus:
+                        break;
+                    // Requires integer types and returns more precise type
+                    case Operator.BitwiseAnd:
+                    case Operator.BitwiseOr:
+                        break;
+                }
+                if (nextType == null) return null;
+
+                // 3. Verify the operator and expression types are compatible
+                if (!TypeEquals(expressionType, nextType))
+                {
+                    errors.Add(CreateError($"Type mismatch between '{PrintTypeDefinition(expressionType)}' and '{PrintTypeDefinition(nextType)}'", expression.Children[i]));
+                    return null;
+                }
+
+                // 4. Convert the expression type if necessary
+                // 5. Create subexpressions to enforce operator precedence if necessary
+            }
+            return expressionType;
         }
 
         private TypeDefinition VerifyStructFieldRef(StructFieldRefAst structField, TypeDefinition structType,

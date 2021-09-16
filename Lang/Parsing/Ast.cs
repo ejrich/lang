@@ -197,8 +197,11 @@ namespace Lang.Parsing
         And, // &&
         Or, // ||
         Equality, // ==
+        NotEqual, // !=
         Increment, // ++
         Decrement, // --
+        GreaterThanEqual, // >=
+        LessThanEqual, // <=
         Add = '+',
         Subtract = '-',
         Multiply = '*',

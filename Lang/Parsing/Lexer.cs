@@ -279,6 +279,27 @@ namespace Lang.Parsing
                         default:
                             return false;
                     }
+                case TokenType.Not:
+                    if (type == TokenType.Equals)
+                    {
+                        currentToken.Type = TokenType.NotEqual;
+                        return true;
+                    }
+                    return false;
+                case TokenType.GreaterThan:
+                    if (type == TokenType.Equals)
+                    {
+                        currentToken.Type = TokenType.GreaterThanEqual;
+                        return true;
+                    }
+                    return false;
+                case TokenType.LessThan:
+                    if (type == TokenType.Equals)
+                    {
+                        currentToken.Type = TokenType.LessThanEqual;
+                        return true;
+                    }
+                    return false;
                 case TokenType.Ampersand:
                     return ChangeTypeIfSame(currentToken, type, TokenType.And);
                 case TokenType.Pipe:

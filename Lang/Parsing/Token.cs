@@ -27,8 +27,11 @@
         And,
         Or,
         Equality,
+        NotEqual,
         Increment,
         Decrement,
+        GreaterThanEqual,
+        LessThanEqual,
         In,
         Range,
         NumberRange, // Ignored by parser
