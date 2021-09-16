@@ -171,7 +171,7 @@ namespace Lang.Runner
         {
             var value = declaration.Value == null ?
                 GetUninitializedValue(declaration.Type, programGraph, variables, declaration.Assignments) :
-                ExecuteExpression(declaration.Value, programGraph, null).Value;
+                ExecuteExpression(declaration.Value, programGraph, variables).Value;
 
             variables[declaration.Name] = new ValueType {Type = declaration.Type, Value = value};
         }
