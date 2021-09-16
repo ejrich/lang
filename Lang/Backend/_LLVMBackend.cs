@@ -587,9 +587,67 @@ namespace Lang.Backend
                             values[instruction.ValueIndex] = _builder.BuildCall(callFunction, arguments);
                             break;
                         }
-                        case InstructionType.Cast:
+                        case InstructionType.IntegerExtend:
                         {
-                            // TODO Implement me
+                            var value = GetValue(instruction.Value1, values, allocations, functionPointer);
+                            var targetType = _types[instruction.Value2.Type.TypeIndex];
+                            values[instruction.ValueIndex] = _builder.BuildSExtOrBitCast(value, targetType);
+                            break;
+                        }
+                        case InstructionType.UnsignedIntegerExtend:
+                        {
+                            var value = GetValue(instruction.Value1, values, allocations, functionPointer);
+                            var targetType = _types[instruction.Value2.Type.TypeIndex];
+                            values[instruction.ValueIndex] = _builder.BuildZExtOrBitCast(value, targetType);
+                            break;
+                        }
+                        case InstructionType.IntegerTruncate:
+                        {
+                            var value = GetValue(instruction.Value1, values, allocations, functionPointer);
+                            var targetType = _types[instruction.Value2.Type.TypeIndex];
+                            values[instruction.ValueIndex] = _builder.BuildTrunc(value, targetType);
+                            break;
+                        }
+                        case InstructionType.IntegerToFloatCast:
+                        {
+                            var value = GetValue(instruction.Value1, values, allocations, functionPointer);
+                            var targetType = _types[instruction.Value2.Type.TypeIndex];
+                            values[instruction.ValueIndex] = _builder.BuildSIToFP(value, targetType);
+                            break;
+                        }
+                        case InstructionType.UnsignedIntegerToFloatCast:
+                        {
+                            var value = GetValue(instruction.Value1, values, allocations, functionPointer);
+                            var targetType = _types[instruction.Value2.Type.TypeIndex];
+                            values[instruction.ValueIndex] = _builder.BuildUIToFP(value, targetType);
+                            break;
+                        }
+                        case InstructionType.FloatCast:
+                        {
+                            var value = GetValue(instruction.Value1, values, allocations, functionPointer);
+                            var targetType = _types[instruction.Value2.Type.TypeIndex];
+                            values[instruction.ValueIndex] = _builder.BuildFPCast(value, targetType);
+                            break;
+                        }
+                        case InstructionType.FloatToIntegerCast:
+                        {
+                            var value = GetValue(instruction.Value1, values, allocations, functionPointer);
+                            var targetType = _types[instruction.Value2.Type.TypeIndex];
+                            values[instruction.ValueIndex] = _builder.BuildFPToSI(value, targetType);
+                            break;
+                        }
+                        case InstructionType.FloatToUnsignedIntegerCast:
+                        {
+                            var value = GetValue(instruction.Value1, values, allocations, functionPointer);
+                            var targetType = _types[instruction.Value2.Type.TypeIndex];
+                            values[instruction.ValueIndex] = _builder.BuildFPToUI(value, targetType);
+                            break;
+                        }
+                        case InstructionType.PointerCast:
+                        {
+                            var value = GetValue(instruction.Value1, values, allocations, functionPointer);
+                            var targetType = _types[instruction.Value2.Type.TypeIndex];
+                            values[instruction.ValueIndex] = _builder.BuildBitCast(value, targetType);
                             break;
                         }
                         case InstructionType.AllocateArray:
@@ -1037,9 +1095,9 @@ namespace Lang.Backend
                 LLVM.DIBuilderFinalize(_debugBuilder);
             }
 
-#if DEBUG
+            #if DEBUG
             LLVM.VerifyModule(_module, LLVMVerifierFailureAction.LLVMPrintMessageAction, null);
-#endif
+            #endif
 
             LLVM.InitializeX86TargetInfo();
             LLVM.InitializeX86Target();
@@ -1097,6 +1155,7 @@ namespace Lang.Backend
             return LLVMValueRef.CreateConstNamedStruct(_stringType, new [] {length, stringPointer});
         }
 
+        // TODO Rework the debugging info
         private LLVMMetadataRef GetDebugType(TypeDefinition type)
         {
             return type.TypeKind switch

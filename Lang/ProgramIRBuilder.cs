@@ -1524,17 +1524,54 @@ namespace Lang
             };
         }
 
-        private InstructionValue EmitCastValue(FunctionIR function, InstructionValue value, IType type)
+        private InstructionValue EmitCastValue(FunctionIR function, InstructionValue value, IType targetType)
         {
-            if (value.Type == type)
+            if (value.Type == targetType)
             {
                 return value;
             }
 
-            // TODO Make this more robust
-            var targetType = new InstructionValue {ValueType = InstructionValueType.Type, Type = type};
-            var castInstruction = new Instruction {Type = InstructionType.Cast, Value1 = value, Value2 = targetType};
-            return AddInstruction(function, castInstruction, type);
+            var castInstruction = new Instruction {Value1 = value, Value2 = new InstructionValue {ValueType = InstructionValueType.Type, Type = targetType}};
+
+            switch (targetType.TypeKind)
+            {
+                case TypeKind.Integer:
+                {
+                    var integerType = (PrimitiveAst)targetType;
+                    if (value.Type.TypeKind == TypeKind.Integer)
+                    {
+                        if (targetType.Size >= value.Type.Size)
+                        {
+                            castInstruction.Type = integerType.Primitive.Signed ? InstructionType.IntegerExtend : InstructionType.UnsignedIntegerExtend;
+                        }
+                        else
+                        {
+                            castInstruction.Type = InstructionType.IntegerTruncate;
+                        }
+                    }
+                    else
+                    {
+                        castInstruction.Type = integerType.Primitive.Signed ? InstructionType.FloatToIntegerCast: InstructionType.FloatToUnsignedIntegerCast;
+                    }
+                    break;
+                }
+                case TypeKind.Float:
+                    if (value.Type.TypeKind == TypeKind.Float)
+                    {
+                        castInstruction.Type = InstructionType.FloatCast;
+                    }
+                    else
+                    {
+                        var integerType = (PrimitiveAst)value.Type;
+                        castInstruction.Type = integerType.Primitive.Signed ? InstructionType.IntegerToFloatCast : InstructionType.UnsignedIntegerToFloatCast;
+                    }
+                    break;
+                case TypeKind.Pointer:
+                    castInstruction.Type = InstructionType.PointerCast;
+                    break;
+            }
+
+            return AddInstruction(function, castInstruction, targetType);
         }
 
         private InstructionValue GetConstantInteger(int value)
@@ -1654,6 +1691,14 @@ namespace Lang
 
         private InstructionValue AddInstruction(FunctionIR function, Instruction instruction, IType type)
         {
+            /* #if DEBUG
+            if (instruction.Type == InstructionType.None)
+            {
+                Console.WriteLine("Instruction did not have an assigned type");
+                throw new Exception();
+            }
+            #endif */
+
             instruction.ValueIndex = function.ValueCount++;
             var value = new InstructionValue {ValueIndex = function.Instructions.Count, Type = type};
             function.Instructions.Add(instruction);

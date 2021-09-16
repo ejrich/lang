@@ -94,7 +94,16 @@ namespace Lang
                             }
                             else
                             {
-                                structAst.TypeKind = structAst.Name == "string" ? TypeKind.String : TypeKind.Struct;
+                                if (structAst.Name == "string")
+                                {
+                                    structAst.TypeKind = TypeKind.String;
+                                    VerifyStruct(structAst);
+                                    parseResult.SyntaxTrees.RemoveAt(i--);
+                                }
+                                else
+                                {
+                                    structAst.TypeKind = TypeKind.Struct;
+                                }
                                 if (!TypeTable.Add(structAst.Name, structAst))
                                 {
                                     AddError($"Multiple definitions of struct '{structAst.Name}'", structAst);
@@ -636,6 +645,10 @@ namespace Lang
                         else if (function.Params)
                         {
                             AddError($"Cannot declare argument '{argument.Name}' following params", argument);
+                        }
+                        else if (function.Extern && type == TypeKind.String)
+                        {
+                            argument.Type = TypeTable.Types["*.u8"];
                         }
                         break;
                 }
@@ -2991,6 +3004,7 @@ namespace Lang
 
                         var polymorphedFunction = _polymorpher.CreatePolymorphedFunction(function, name, genericTypes);
                         VerifyType(polymorphedFunction.ReturnTypeDefinition);
+                        polymorphedFunction.ReturnType = TypeTable.GetType(polymorphedFunction.ReturnTypeDefinition);
                         polymorphedFunction.Arguments.ForEach(arg => {
                             VerifyType(arg.TypeDefinition, argument: true);
 
