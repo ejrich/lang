@@ -1521,7 +1521,7 @@ namespace Lang
                 case StructFieldRefAst structFieldRef:
                 {
                     structFieldRef.Pointers = new bool[structFieldRef.Children.Count - 1];
-                    structFieldRef.TypeNames = new string[structFieldRef.Children.Count - 1];
+                    structFieldRef.Types = new IType[structFieldRef.Children.Count - 1];
                     structFieldRef.ValueIndices = new int[structFieldRef.Children.Count - 1];
 
                     TypeDefinition refType;
@@ -1680,7 +1680,7 @@ namespace Lang
                 return null;
             }
             structField.Pointers = new bool[structField.Children.Count - 1];
-            structField.TypeNames = new string[structField.Children.Count - 1];
+            structField.Types = new IType[structField.Children.Count - 1];
             structField.ValueIndices = new int[structField.Children.Count - 1];
 
             for (var i = 1; i < structField.Children.Count; i++)
@@ -1716,12 +1716,12 @@ namespace Lang
                 structField.Pointers[fieldIndex] = true;
             }
             var genericName = structType.GenericName;
-            structField.TypeNames[fieldIndex] = genericName;
             if (!_programGraph.Types.TryGetValue(genericName, out var typeDefinition))
             {
                 AddError($"Struct '{PrintTypeDefinition(structType)}' not defined", ast);
                 return null;
             }
+            structField.Types[fieldIndex] = typeDefinition;
             if (typeDefinition is not StructAst structDefinition)
             {
                 AddError($"Type '{PrintTypeDefinition(structType)}' does not contain field '{fieldName}'", ast);
@@ -2149,7 +2149,7 @@ namespace Lang
         private TypeDefinition VerifyEnumValue(EnumAst enumAst, StructFieldRefAst structField)
         {
             structField.IsEnum = true;
-            structField.TypeNames = new [] {enumAst.Name};
+            structField.Types = new [] {enumAst};
 
             if (structField.Children.Count > 2)
             {

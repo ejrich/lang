@@ -173,11 +173,11 @@ namespace Lang
                             }
                             else if (integerType.Bytes == 8 && !integerType.Signed)
                             {
-                                value.ConstantValue = new InstructionConstant {Integer = ulong.Parse(constant.Value)};
+                                value.ConstantValue = new InstructionConstant {UnsignedInteger = ulong.Parse(constant.Value)};
                             }
                             else
                             {
-                                value.ConstantValue = new InstructionConstant {Integer = (ulong)long.Parse(constant.Value)};
+                                value.ConstantValue = new InstructionConstant {Integer = long.Parse(constant.Value)};
                             }
                             break;
                         case TypeKind.Float:
@@ -241,26 +241,28 @@ namespace Lang
                     //     value = _builder.BuildLoad(value, identifier.Name);
                     // }
                 case StructFieldRefAst structField:
-                    break;
+                    if (structField.IsEnum)
+                    {
+                        var enumDef = (EnumAst)structField.Types[0];
+                        var enumValue = enumDef.Values[structField.ValueIndices[0]].Value;
+
+                        return new InstructionValue
+                        {
+                            ValueType = InstructionValueType.Constant, Type = enumDef.BaseType,
+                            ConstantValue = new InstructionConstant {Integer = enumValue}
+                        };
+                    }
+                    var structFieldPointer = EmitGetStructPointer(function, structField, scope, block);
+                    // if (!loaded && !constant)
                     // {
-                    //     if (structField.IsEnum)
+                    //     if (getStringPointer && type.TypeKind == TypeKind.String)
                     //     {
-                    //         var enumName = structField.TypeNames[0];
-                    //         var enumDef = (EnumAst)_programGraph.Types[enumName];
-                    //         var value = enumDef.Values[structField.ValueIndices[0]].Value;
-                    //         return (enumDef.BaseType, LLVMValueRef.CreateConstInt(GetIntegerType(enumDef.BaseType.PrimitiveType), (ulong)value, false));
+                    //         field = _builder.BuildStructGEP(field, 1, "stringdata");
                     //     }
-                    //     var (type, field) = BuildStructField(structField, localVariables, out var loaded, out var constant);
-                    //     if (!loaded && !constant)
-                    //     {
-                    //         if (getStringPointer && type.TypeKind == TypeKind.String)
-                    //         {
-                    //             field = _builder.BuildStructGEP(field, 1, "stringdata");
-                    //         }
-                    //         field = _builder.BuildLoad(field, "field");
-                    //     }
-                    //     return (type, field);
+                    //     field = _builder.BuildLoad(field, "field");
                     // }
+                    // return (type, field);
+                    break;
                 case CallAst call:
                     var argumentCount = call.Function.Varargs ? call.Arguments.Count : call.Function.Arguments.Count;
                     var arguments = new InstructionValue[argumentCount];
@@ -272,6 +274,7 @@ namespace Lang
                             var argument = EmitIR(function, call.Arguments[i], scope, block);
                             arguments[i] = argument;//CastValue(value, functionDef.Arguments[i].Type);
                         }
+
                         // Rollup the rest of the arguments into an array
                         // var paramsType = call.Function.Arguments[^1].Type.Generics[0];
                         // InitializeConstArray(paramsPointer, (uint)(call.Arguments.Count - functionDef.Arguments.Count + 1), paramsType);
@@ -430,7 +433,7 @@ namespace Lang
                     return new InstructionValue
                     {
                         ValueType = InstructionValueType.Constant, Type = _s32Type,
-                        ConstantValue = new InstructionConstant {Integer = (uint)typeDef.TypeIndex}
+                        ConstantValue = new InstructionConstant {Integer = typeDef.TypeIndex.Value}
                     };
                 case CastAst cast:
                     var castValue = EmitIR(function, cast.Value, scope);
@@ -441,6 +444,11 @@ namespace Lang
                     block.Instructions.Add(castInstruction);
                     return new InstructionValue {ValueIndex = valueIndex, Type = cast.TargetType};
             }
+            return null;
+        }
+
+        private InstructionValue EmitGetStructPointer(FunctionIR function, StructFieldRefAst structField, ScopeAst scope, BasicBlock block)
+        {
             return null;
         }
 

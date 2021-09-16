@@ -112,7 +112,7 @@ namespace Lang
         public uint Column { get; init; }
         public bool IsEnum { get; set; }
         public bool[] Pointers { get; set; }
-        public string[] TypeNames { get; set; }
+        public IType[] Types { get; set; }
         public int[] ValueIndices { get; set; }
         public List<IAst> Children { get; } = new();
     }

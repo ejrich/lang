@@ -1053,8 +1053,7 @@ namespace Lang
 
         private ValueType GetEnum(StructFieldRefAst structField)
         {
-            var enumName = structField.TypeNames[0];
-            var enumDef = (EnumAst)_programGraph.Types[enumName];
+            var enumDef = (EnumAst)structField.Types[0];
             var enumValue = enumDef.Values[structField.ValueIndices[0]].Value;
             return new ValueType {Type = enumDef.BaseType, Value = CastValue(enumValue, enumDef.BaseType)};
         }
@@ -1120,8 +1119,6 @@ namespace Lang
 
             for (var i = 1; i < structField.Children.Count; i++)
             {
-                var structName = structField.TypeNames[i-1];
-
                 if (structField.Pointers[i-1])
                 {
                     if (!skipPointer)
@@ -1160,7 +1157,7 @@ namespace Lang
                     continue;
                 }
 
-                var structDefinition = (StructAst) _programGraph.Types[structName];
+                var structDefinition = (StructAst) structField.Types[i-1];
                 var field = structDefinition.Fields[structField.ValueIndices[i-1]];
                 var structType = GetTypeFromDefinition(type);
                 var offset = (int)Marshal.OffsetOf(structType, field.Name);
