@@ -1109,8 +1109,25 @@ namespace Lang
                 });
             }
 
-            // 2. Parse over the in keyword
             enumerator.MoveNext();
+            if (enumerator.Current?.Type == TokenType.Comma)
+            {
+                enumerator.MoveNext();
+                if (enumerator.Current?.Type == TokenType.Identifier)
+                {
+                    eachAst.IndexVariable = enumerator.Current.Value;
+                    enumerator.MoveNext();
+                }
+                else
+                {
+                    errors.Add(new ParseError
+                    {
+                        Error = "Expected index variable after comma in each declaration", Token = enumerator.Current ?? enumerator.Last
+                    });
+                }
+            }
+
+            // 2. Parse over the in keyword
             if (enumerator.Current?.Type != TokenType.In)
             {
                 errors.Add(new ParseError
@@ -1129,6 +1146,14 @@ namespace Lang
             switch (enumerator.Current?.Type)
             {
                 case TokenType.Range:
+                    if (eachAst.IndexVariable != null)
+                    {
+                        errors.Add(new ParseError
+                        {
+                            Error = "Range enumerators cannot have iteration and index variable", Token = enumerator.Current
+                        });
+                    }
+
                     eachAst.RangeBegin = expression;
                     enumerator.MoveNext();
                     if (enumerator.Current == null)
@@ -1146,7 +1171,6 @@ namespace Lang
                         });
                         return eachAst;
                     }
-
                     break;
                 case TokenType.OpenBrace:
                 case TokenType.Then:

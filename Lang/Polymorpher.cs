@@ -195,6 +195,7 @@ namespace Lang
         {
             var copy = CopyAst(each);
             copy.IterationVariable = each.IterationVariable;
+            copy.IndexVariable = each.IndexVariable;
             copy.Iteration = CopyExpression(each.Iteration, genericTypes, generics);
             copy.RangeBegin = CopyExpression(each.RangeBegin, genericTypes, generics);
             copy.RangeEnd = CopyExpression(each.RangeEnd, genericTypes, generics);
