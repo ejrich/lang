@@ -407,7 +407,7 @@ namespace Lang.Backend
                 {
                     var argumentType = functionAst.Arguments[i].Type;
                     argumentTypes[i] = ConvertTypeDefinition(argumentType);
-                    debugArgumentTypes[i] = GetDebugType(argumentType);
+                    debugArgumentTypes[i + 1] = GetDebugType(argumentType);
                 }
 
                 var file = _debugFiles[functionAst.FileIndex];
