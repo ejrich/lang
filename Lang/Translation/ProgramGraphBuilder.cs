@@ -930,7 +930,7 @@ namespace Lang.Translation
                     return type != null ? VerifyIndex(index, type, currentFunction, scopeIdentifiers) : null;
                 case StructFieldRefAst structFieldRef:
                     structFieldRef.Pointers = new bool[structFieldRef.Children.Count - 1];
-                    structFieldRef.StructNames = new string[structFieldRef.Children.Count - 1];
+                    structFieldRef.TypeNames = new string[structFieldRef.Children.Count - 1];
                     structFieldRef.ValueIndices = new int[structFieldRef.Children.Count - 1];
 
                     TypeDefinition refType;
@@ -1010,7 +1010,7 @@ namespace Lang.Translation
                 structField.Pointers[fieldIndex] = true;
             }
             var genericName = structType.GenericName;
-            structField.StructNames[fieldIndex] = genericName;
+            structField.TypeNames[fieldIndex] = genericName;
             if (!_programGraph.Types.TryGetValue(genericName, out var typeDefinition))
             {
                 AddError($"Struct '{PrintTypeDefinition(structType)}' not defined", ast);
@@ -1200,7 +1200,7 @@ namespace Lang.Translation
                         return null;
                     }
                     structField.Pointers = new bool[structField.Children.Count - 1];
-                    structField.StructNames = new string[structField.Children.Count - 1];
+                    structField.TypeNames = new string[structField.Children.Count - 1];
                     structField.ValueIndices = new int[structField.Children.Count - 1];
 
                     for (var i = 1; i < structField.Children.Count; i++)
@@ -1712,7 +1712,7 @@ namespace Lang.Translation
         private TypeDefinition VerifyEnumValue(EnumAst enumAst, StructFieldRefAst structField)
         {
             structField.IsEnum = true;
-            structField.StructNames = new [] {enumAst.Name};
+            structField.TypeNames = new [] {enumAst.Name};
 
             if (structField.Children.Count > 2)
             {

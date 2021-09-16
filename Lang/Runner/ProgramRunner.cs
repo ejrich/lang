@@ -348,7 +348,7 @@ namespace Lang.Runner
                             fieldInstance!.SetValue(instance, constantValue);
                             break;
                         case StructFieldRefAst structField:
-                            var enumName = structField.StructNames[0];
+                            var enumName = structField.TypeNames[0];
                             var enumDef = (EnumAst)_programGraph.Types[enumName];
                             var value = enumDef.Values[structField.ValueIndices[0]].Value;
                             var enumType = _types[enumName];
@@ -438,27 +438,53 @@ namespace Lang.Runner
                     break;
                 }
                 // TODO Get this working
-                // case StructFieldRefAst structField:
-                // {
-                //     var variable = variables[structField.Value];
+                case StructFieldRefAst structField:
+                {
+                    var variable = ExecuteExpression(structField.Children[0], variables).Value;
 
-                //     var fieldObject = variable.Value;
-                //     var value = structField.Value;
-                //     FieldInfo field;
-                //     while (true)
-                //     {
-                //         field = fieldObject!.GetType().GetField(value.Name);
-                //         if (value.Value == null)
-                //         {
-                //             break;
-                //         }
+                    for (var i = 1; i < structField.Children.Count; i++)
+                    {
+                        var structName = structField.TypeNames[i-1];
+                        var structDefinition = (StructAst) _programGraph.Types[structName];
 
-                //         fieldObject = field!.GetValue(fieldObject);
-                //         value = value.Value;
-                //     }
-                //     field!.SetValue(fieldObject, expression.Value);
-                //     break;
-                // }
+                        if (structField.Pointers[i-1])
+                        {
+                            var type = _types[structName];
+                            variable = Marshal.PtrToStructure(GetPointer(variable), type);
+                        }
+
+                        switch (structField.Children[i])
+                        {
+                            case IdentifierAst identifier:
+                                var field = variable!.GetType().GetField(identifier.Name);
+                                var fieldValue = field!.GetValue(variable);
+                                variable = fieldValue;
+                                break;
+                            case IndexAst index:
+                                var list = variable!.GetType().GetField(index.Name);
+                                var listValue = list!.GetValue(variable);
+                                var (_, _, listPointer) = GetListPointer(index, variables, listValue, fieldType);
+                                variable = PointerToTargetType(listPointer, fieldType);
+                                break;
+                        }
+                    }
+                    // var fieldObject = variable.Value;
+                    // var value = structField.Value;
+                    // FieldInfo field;
+                    // while (true)
+                    // {
+                    //     field = fieldObject!.GetType().GetField(value.Name);
+                    //     if (value.Value == null)
+                    //     {
+                    //         break;
+                    //     }
+
+                    //     fieldObject = field!.GetValue(fieldObject);
+                    //     value = value.Value;
+                    // }
+                    // field!.SetValue(fieldObject, expression.Value);
+                    break;
+                }
                 case IndexAst indexAst:
                     var (_, _, pointer) = GetListPointer(indexAst, variables);
                     Marshal.StructureToPtr(expression.Value, pointer, false);
@@ -609,7 +635,7 @@ namespace Lang.Runner
                 case StructFieldRefAst structField:
                     if (structField.IsEnum)
                     {
-                        var enumName = structField.StructNames[0];
+                        var enumName = structField.TypeNames[0];
                         var enumDef = (EnumAst)_programGraph.Types[enumName];
                         var value = enumDef.Values[structField.ValueIndices[0]].Value;
                         var enumType = _types[enumName];
@@ -870,7 +896,7 @@ namespace Lang.Runner
 
             for (var i = 1; i < structField.Children.Count; i++)
             {
-                var structName = structField.StructNames[i-1];
+                var structName = structField.TypeNames[i-1];
                 var structDefinition = (StructAst) _programGraph.Types[structName];
                 fieldType = structDefinition.Fields[structField.ValueIndices[i-1]].Type;
 
