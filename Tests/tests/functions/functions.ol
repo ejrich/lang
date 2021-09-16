@@ -41,7 +41,9 @@ default_arguments() {
 
     // Specifying arguments, can also move around non-default argument
     foo(5, c = false);
+
     foo(6, b = 7);
+
     foo(b = 7, a = 7);
 
     // Also works with params
@@ -61,12 +63,16 @@ foo_params(int a, int b = 8, Params<float> args) {
 }
 
 polymorphic_functions() {
-
+    float_value := add_int(3.1, 2);
+    int_value := add_int(35, 10);
+    printf("float_value = %.2f, should be 5.1\n", float_value);
+    printf("int_value = %d, should be 45\n", int_value);
 }
 
-T bar<T>(T a, int b) {
-    // TODO Add content
-    return a;
+T add_int<T>(T a, int b) {
+    value: T;
+    value += a + cast(T, b);
+    return value;
 }
 
 baz<T, U>(List<T> list, U* b) {
