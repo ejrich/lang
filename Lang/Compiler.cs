@@ -83,7 +83,7 @@ namespace Lang
             // 5. Assemble and link binaries
             stopwatch.Restart();
             var objectFile = _builder.BuildTranslatedFile(translatedFile);
-            _linker.Link(objectFile, project.Name);
+            _linker.Link(objectFile, project.Path);
             var buildTime = stopwatch.Elapsed;
 
             // 6. Log statistics

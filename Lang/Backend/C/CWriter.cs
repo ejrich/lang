@@ -5,10 +5,12 @@ namespace Lang.Backend.C
 {
     public class CWriter : IWriter
     {
+        private const string ObjectDirectory = "obj";
+
         public string WriteTranslatedFile(ProgramGraph programGraph, string projectName, string projectPath)
         {
             // 1. Verify obj directory exists
-            var objectPath = Path.Combine(projectPath, "obj");
+            var objectPath = Path.Combine(projectPath, ObjectDirectory);
             if (!Directory.Exists(objectPath))
                 Directory.CreateDirectory(objectPath);
             
