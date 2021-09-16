@@ -204,7 +204,13 @@ namespace Lang
                     {
                         if (declaration.Constant)
                         {
-                            return function.Constants[declaration.Name];
+                            // TODO Get global variables and constants
+                            if (function.Constants != null)
+                            {
+                                function.Constants.TryGetValue(declaration.Name, out var val);
+                                return val;
+                            }
+                            return null;
                         }
 
                         var loadInstruction = new Instruction {Type = InstructionType.Load, AllocationIndex = declaration.AllocationIndex};
@@ -235,101 +241,93 @@ namespace Lang
                     //     value = _builder.BuildLoad(value, identifier.Name);
                     // }
                 case StructFieldRefAst structField:
-                // {
-                //     if (structField.IsEnum)
-                //     {
-                //         var enumName = structField.TypeNames[0];
-                //         var enumDef = (EnumAst)_programGraph.Types[enumName];
-                //         var value = enumDef.Values[structField.ValueIndices[0]].Value;
-                //         return (enumDef.BaseType, LLVMValueRef.CreateConstInt(GetIntegerType(enumDef.BaseType.PrimitiveType), (ulong)value, false));
-                //     }
-                //     var (type, field) = BuildStructField(structField, localVariables, out var loaded, out var constant);
-                //     if (!loaded && !constant)
-                //     {
-                //         if (getStringPointer && type.TypeKind == TypeKind.String)
-                //         {
-                //             field = _builder.BuildStructGEP(field, 1, "stringdata");
-                //         }
-                //         field = _builder.BuildLoad(field, "field");
-                //     }
-                //     return (type, field);
-                // }
-                case CallAst call:
-                    // var functions = _programGraph.Functions[call.Function];
-                    // LLVMValueRef function;
-                    // if (call.Function == "main")
+                    break;
                     // {
-                    //     function = _module.GetNamedFunction("__main");
-                    // }
-                    // else
-                    // {
-                    //     var functionName = GetFunctionName(call.Function, call.FunctionIndex, functions.Count);
-                    //     function = _module.GetNamedFunction(functionName);
-                    // }
-                    // var functionDef = functions[call.FunctionIndex];
-
-                    // if (functionDef.Params)
-                    // {
-                    //     var callArguments = new LLVMValueRef[functionDef.Arguments.Count];
-                    //     for (var i = 0; i < functionDef.Arguments.Count - 1; i++)
+                    //     if (structField.IsEnum)
                     //     {
-                    //         var value = WriteExpression(call.Arguments[i], localVariables);
-                    //         callArguments[i] = CastValue(value, functionDef.Arguments[i].Type);
+                    //         var enumName = structField.TypeNames[0];
+                    //         var enumDef = (EnumAst)_programGraph.Types[enumName];
+                    //         var value = enumDef.Values[structField.ValueIndices[0]].Value;
+                    //         return (enumDef.BaseType, LLVMValueRef.CreateConstInt(GetIntegerType(enumDef.BaseType.PrimitiveType), (ulong)value, false));
                     //     }
-
-                    //     // Rollup the rest of the arguments into an array
-                    //     var paramsType = functionDef.Arguments[^1].Type.Generics[0];
-                    //     var paramsPointer = _allocationQueue.Dequeue();
-                    //     InitializeConstArray(paramsPointer, (uint)(call.Arguments.Count - functionDef.Arguments.Count + 1), paramsType);
-
-                    //     var arrayData = _builder.BuildStructGEP(paramsPointer, 1, "arraydata");
-                    //     var dataPointer = _builder.BuildLoad(arrayData, "dataptr");
-
-                    //     uint paramsIndex = 0;
-                    //     for (var i = functionDef.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
+                    //     var (type, field) = BuildStructField(structField, localVariables, out var loaded, out var constant);
+                    //     if (!loaded && !constant)
                     //     {
-                    //         var pointer = _builder.BuildGEP(dataPointer, new [] {LLVMValueRef.CreateConstInt(LLVM.Int32Type(), paramsIndex, false)}, "indexptr");
-                    //         var (_, value) = WriteExpression(call.Arguments[i], localVariables);
-                    //         LLVM.BuildStore(_builder, value, pointer);
-                    //     }
-
-                    //     var paramsValue = _builder.BuildLoad(paramsPointer, "params");
-                    //     callArguments[functionDef.Arguments.Count - 1] = paramsValue;
-                    //     return (functionDef.ReturnType, _builder.BuildCall(function, callArguments, string.Empty));
-                    // }
-                    // else if (functionDef.Varargs)
-                    // {
-                    //     var callArguments = new LLVMValueRef[call.Arguments.Count];
-                    //     for (var i = 0; i < functionDef.Arguments.Count - 1; i++)
-                    //     {
-                    //         var value = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
-                    //         callArguments[i] = CastValue(value, functionDef.Arguments[i].Type);
-                    //     }
-
-                    //     // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
-                    //     // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
-                    //     for (var i = functionDef.Arguments.Count - 1; i < call.Arguments.Count; i++)
-                    //     {
-                    //         var (type, value) = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
-                    //         if (type.Name == "float")
+                    //         if (getStringPointer && type.TypeKind == TypeKind.String)
                     //         {
-                    //             value = _builder.BuildFPExt(value, LLVM.DoubleType(), "tmpdouble");
+                    //             field = _builder.BuildStructGEP(field, 1, "stringdata");
                     //         }
-                    //         callArguments[i] = value;
+                    //         field = _builder.BuildLoad(field, "field");
                     //     }
+                    //     return (type, field);
+                    // }
+                case CallAst call:
+                    var argumentCount = call.Function.Varargs ? call.Arguments.Count : call.Function.Arguments.Count;
+                    var arguments = new InstructionValue[argumentCount];
 
-                    //     return (functionDef.ReturnType, _builder.BuildCall(function, callArguments, string.Empty));
-                    // }
-                    // else
-                    // {
-                    //     var callArguments = new LLVMValueRef[call.Arguments.Count];
-                    //     for (var i = 0; i < call.Arguments.Count; i++)
-                    //     {
-                    //         var value = WriteExpression(call.Arguments[i], localVariables, functionDef.Extern);
-                    //         callArguments[i] = CastValue(value, functionDef.Arguments[i].Type);
-                    //     }
-                    //     return (functionDef.ReturnType, _builder.BuildCall(function, callArguments, string.Empty));
-                    // }
+                    if (call.Function.Params)
+                    {
+                        for (var i = 0; i < argumentCount - 1; i++)
+                        {
+                            var argument = EmitIR(function, call.Arguments[i], scope, block);
+                            arguments[i] = argument;//CastValue(value, functionDef.Arguments[i].Type);
+                        }
+                        // Rollup the rest of the arguments into an array
+                        // var paramsType = call.Function.Arguments[^1].Type.Generics[0];
+                        // InitializeConstArray(paramsPointer, (uint)(call.Arguments.Count - functionDef.Arguments.Count + 1), paramsType);
+
+                        // var arrayData = _builder.BuildStructGEP(paramsPointer, 1, "arraydata");
+                        // var dataPointer = _builder.BuildLoad(arrayData, "dataptr");
+
+                        // uint paramsIndex = 0;
+                        // for (var i = functionDef.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
+                        // {
+                        //     var pointer = _builder.BuildGEP(dataPointer, new [] {LLVMValueRef.CreateConstInt(LLVM.Int32Type(), paramsIndex, false)}, "indexptr");
+                        //     var (_, value) = WriteExpression(call.Arguments[i], localVariables);
+                        //     LLVM.BuildStore(_builder, value, pointer);
+                        // }
+
+                        // var paramsValue = _builder.BuildLoad(paramsPointer, "params");
+                        // callArguments[functionDef.Arguments.Count - 1] = paramsValue;
+                    }
+                    else if (call.Function.Varargs)
+                    {
+                        var i = 0;
+                        for (; i < call.Function.Arguments.Count - 1; i++)
+                        {
+                            var argument = EmitIR(function, call.Arguments[i], scope, block);
+                            arguments[i] = argument;//CastValue(value, functionDef.Arguments[i].Type);
+                        }
+
+                        // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
+                        // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
+                        for (; i < argumentCount; i++)
+                        {
+                            var argument = EmitIR(function, call.Arguments[i], scope, block);
+                            // if (type.Name == "float")
+                            // {
+                            //     value = _builder.BuildFPExt(value, LLVM.DoubleType(), "tmpdouble");
+                            // }
+                            arguments[i] = argument;//CastValue(value, functionDef.Arguments[i].Type);
+                        }
+                    }
+                    else
+                    {
+                        for (var i = 0; i < argumentCount - 1; i++)
+                        {
+                            var argument = EmitIR(function, call.Arguments[i], scope, block);
+                            arguments[i] = argument;//CastValue(value, functionDef.Arguments[i].Type);
+                        }
+                    }
+
+                    var callInstruction = new Instruction
+                    {
+                        Type = InstructionType.Call, CallFunction = GetFunctionName(call.Function),
+                        Value1 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Arguments = arguments}
+                    };
+                    var callValue = new InstructionValue {ValueIndex = block.Instructions.Count, Type = call.Function.ReturnType};
+                    block.Instructions.Add(callInstruction);
+                    return callValue;
                 case ChangeByOneAst changeByOne:
                 // {
                 //     var constant = false;
@@ -437,11 +435,11 @@ namespace Lang
                 case CastAst cast:
                     var castValue = EmitIR(function, cast.Value, scope);
                     var targetType = new InstructionValue {ValueType = InstructionValueType.Type, Type = cast.TargetType};
-                    var instruction = new Instruction {Type = InstructionType.Cast, Value1 = castValue, Value2 = targetType};
+                    var castInstruction = new Instruction {Type = InstructionType.Cast, Value1 = castValue, Value2 = targetType};
 
                     var valueIndex = block.Instructions.Count;
-                    block.Instructions.Add(instruction);
-                    return new InstructionValue {ValueType = InstructionValueType.Value, ValueIndex = valueIndex};
+                    block.Instructions.Add(castInstruction);
+                    return new InstructionValue {ValueIndex = valueIndex, Type = cast.TargetType};
             }
             return null;
         }
