@@ -151,16 +151,4 @@ namespace Lang.Parsing
         Xor = '^',
         Modulus = '%',
     }
-
-    public enum Type
-    {
-        Int,
-        Float,
-        Boolean,
-        String,
-        List,
-        Void,
-        Other,
-        Error
-    }
 }
