@@ -120,6 +120,10 @@ namespace Lang.Translation
                             VerifyFunctionDefinition(function, functionNames, main);
                             parseResult.SyntaxTrees.RemoveAt(i--);
                             break;
+                        case OperatorOverloadAst overload:
+                            VerifyOperatorOverloadDefinition(overload);
+                            parseResult.SyntaxTrees.RemoveAt(i--);
+                            break;
                     }
                 }
 
@@ -595,6 +599,60 @@ namespace Lang.Translation
                 }
             }
             return false;
+        }
+
+        private void VerifyOperatorOverloadDefinition(OperatorOverloadAst overload)
+        {
+            // 1. Verify the operator type exists and is a struct
+            var targetType = VerifyType(overload.Type);
+            if (targetType != Type.Error && targetType != Type.Struct)
+            {
+                AddError($"Cannot overload operator for type '{PrintTypeDefinition(overload.Type)}'", overload.Type);
+            }
+
+            // 2. Verify the argument types
+            var argumentNames = new HashSet<string>();
+            foreach (var argument in overload.Arguments)
+            {
+                // 2a. Check if the argument has been previously defined
+                if (!argumentNames.Add(argument.Name))
+                {
+                    AddError($"Operator overload '{PrintTypeDefinition(overload.Type)}' already contains argument '{argument.Name}'", argument);
+                }
+
+                // 2b. Check the argument is the same type as the overload type
+                if (!TypeEquals(overload.Type, argument.Type, true))
+                {
+                    AddError($"Expected operator overload argument type to be '{PrintTypeDefinition(overload.Type)}', but got '{PrintTypeDefinition(argument.Type)}'", argument.Type);
+                }
+            }
+
+            // 3. Load the overload into the dictionary
+            if (overload.Generics.Any())
+            {
+                // TODO Implement me
+                // if (!_polymorphicFunctions.TryGetValue(overload.Name, out var functions))
+                // {
+                //     _polymorphicFunctions[overload.Name] = functions = new List<FunctionAst>();
+                // }
+                // if (functions.Any() && OverloadExistsForFunction(overload, functions))
+                // {
+                //     AddError($"Function '{overload.Name}' has multiple overloads with arguments ({string.Join(", ", overload.Arguments.Select(arg => PrintTypeDefinition(arg.Type)))})", overload);
+                // }
+                // functions.Add(overload);
+            }
+            else
+            {
+                if (!_programGraph.OperatorOverloads.TryGetValue(overload.Type.GenericName, out var overloads))
+                {
+                    _programGraph.OperatorOverloads[overload.Type.GenericName] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
+                }
+                if (overloads.ContainsKey(overload.Operator))
+                {
+                    AddError($"Multiple definitions of operator overload for type '{PrintTypeDefinition(overload.Type)}'", overload);
+                }
+                overloads[overload.Operator] = overload;
+            }
         }
 
         private void VerifyFunction(FunctionAst function)

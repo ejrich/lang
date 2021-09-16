@@ -19,6 +19,16 @@ namespace Lang.Parsing
         uint Size { get; set; }
     }
 
+    public interface IFunction
+    {
+        bool Verified { get; set; }
+        bool HasDirectives { get; set; }
+        TypeDefinition ReturnType { get; set; }
+        bool ReturnTypeHasGenerics { get; set; }
+        List<string> Generics { get; }
+        List<DeclarationAst> Arguments { get; }
+    }
+
     public class ScopeAst : IAst
     {
         public int FileIndex { get; set; }
@@ -27,7 +37,7 @@ namespace Lang.Parsing
         public List<IAst> Children { get; } = new();
     }
 
-    public class FunctionAst : IAst, IType
+    public class FunctionAst : IAst, IType, IFunction
     {
         public int FileIndex { get; set; }
         public int Line { get; init; }
@@ -301,7 +311,7 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
-    public class OperatorOverloadAst : IAst
+    public class OperatorOverloadAst : IAst, IFunction
     {
         public int FileIndex { get; set; }
         public int Line { get; init; }
