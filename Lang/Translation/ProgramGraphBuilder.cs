@@ -448,6 +448,11 @@ namespace Lang.Translation
                 {
                     AddError("The main function should either have 0 arguments or 'List<string>' argument", function);
                 }
+
+                if (function.Generics.Any())
+                {
+                    AddError("The main function cannot have generics", function);
+                }
             }
 
             // 3. Verify the argument types
