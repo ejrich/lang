@@ -38,6 +38,7 @@ namespace Lang
 
         // Used for Load and Store
         public int? AllocationIndex { get; set; }
+        public bool GetFirstPointer { get; set; }
         public string CallFunction { get; set; }
 
         public InstructionValue Value1 { get; set; }
@@ -77,6 +78,7 @@ namespace Lang
         Load,
         Store,
         GetPointer,
+        GetStructPointer,
         Call,
         Cast,
         Not,

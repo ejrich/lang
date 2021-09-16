@@ -213,7 +213,7 @@ namespace Lang
                             return null;
                         }
 
-                        return EmitLoad(declaration.AllocationIndex, block);
+                        return EmitLoad(block, declaration.AllocationIndex);
                     }
                     else if (identifierAst is IType type)
                     {
@@ -439,9 +439,21 @@ namespace Lang
             return null;
         }
 
-        private InstructionValue EmitLoad(int allocationIndex, BasicBlock block)
+        private InstructionValue EmitLoad(BasicBlock block, int? allocationIndex = null, InstructionValue value = null)
         {
-            var loadInstruction = new Instruction {Type = InstructionType.Load, AllocationIndex = allocationIndex};
+            var loadInstruction = new Instruction {Type = InstructionType.Load, AllocationIndex = allocationIndex, Value1 = value};
+            var loadValue = new InstructionValue {ValueIndex = block.Instructions.Count};
+            block.Instructions.Add(loadInstruction);
+            return loadValue;
+        }
+
+        private InstructionValue EmitGetPointer(BasicBlock block, InstructionValue pointer = null, InstructionValue index = null, bool getFirstPointer = false, int? allocationIndex = null)
+        {
+            var loadInstruction = new Instruction
+            {
+                Type = InstructionType.GetPointer, AllocationIndex = allocationIndex,
+                Value1 = pointer, Value2 = index, GetFirstPointer = getFirstPointer
+            };
             var loadValue = new InstructionValue {ValueIndex = block.Instructions.Count};
             block.Instructions.Add(loadInstruction);
             return loadValue;
@@ -566,6 +578,7 @@ namespace Lang
                 GetScopeIdentifier(scope, index.Name, out var identifier);
                 var declaration = (DeclarationAst) identifier;
                 type = declaration.Type;
+                variable = EmitGetPointer(block, allocationIndex: declaration.AllocationIndex);
             }
 
             // 2. Determine the index
@@ -595,22 +608,25 @@ namespace Lang
             {
                 elementType = type.Generics[0];
             }
+
+            loaded = false;
             if (type.TypeKind == TypeKind.Pointer)
             {
-                // var dataPointer = _builder.BuildLoad(variable, "dataptr");
-                // indexPointer = _builder.BuildGEP(dataPointer, new []{indexValue}, "indexptr");
+                var dataPointer = EmitLoad(block, value: variable);
+                // TODO For index value, calculate the size of the element
+                return EmitGetPointer(block, pointer: dataPointer, index: indexValue);
             }
             else if (type.CArray)
             {
-                // indexPointer = _builder.BuildGEP(variable, new []{_zeroInt, indexValue}, "dataptr");
+                return EmitGetPointer(block, variable, indexValue, true);
             }
             else
             {
+                // TODO Get struct pointer instruction first
                 // var arrayData = _builder.BuildStructGEP(variable, 1, "arraydata");
                 // var dataPointer = _builder.BuildLoad(arrayData, "dataptr");
                 // indexPointer = _builder.BuildGEP(dataPointer, new [] {indexValue}, "indexptr");
             }
-            loaded = false;
             return null;
         }
 
