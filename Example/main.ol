@@ -53,10 +53,10 @@ int main(List<string> args) {
     //sleep(5);
 
     z := 1;
-    each i in create_list(5) {
+    each i in create_list(4) {
         printf("Value %d = %d\n", z++, i);
     }
-    
+
     return 0;
 }
 
