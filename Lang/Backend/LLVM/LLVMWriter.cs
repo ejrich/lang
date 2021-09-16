@@ -293,7 +293,7 @@ namespace Lang.Backend.LLVM
 
         private bool StructHasList(string name)
         {
-            var structDef = _structs[name];
+            var structDef = _structs[name]; // TODO Use the right name here
             foreach (var field in structDef.Fields)
             {
                 if (field.Type.Name == "List")
@@ -412,7 +412,7 @@ namespace Lang.Backend.LLVM
 
         private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable)
         {
-            var structDef = _structs[typeDef.Name];
+            var structDef = _structs[typeDef.Name]; // TODO Get the right name here
             for (var i = 0; i < structDef.Fields.Count; i++)
             {
                 var structField = structDef.Fields[i];
@@ -1239,14 +1239,14 @@ namespace Lang.Backend.LLVM
             };
         }
 
-        private LLVMTypeRef ConvertTypeDefinition(TypeDefinition typeDef)
+        private LLVMTypeRef ConvertTypeDefinition(TypeDefinition type)
         {
-            if (typeDef.Name == "*")
+            if (type.Name == "*")
             {
-                return LLVMTypeRef.PointerType(ConvertTypeDefinition(typeDef.Generics[0]), 0);
+                return LLVMTypeRef.PointerType(ConvertTypeDefinition(type.Generics[0]), 0);
             }
 
-            return typeDef.PrimitiveType switch
+            return type.PrimitiveType switch
             {
                 IntegerType integerType => integerType.Bytes switch
                 {
@@ -1257,27 +1257,38 @@ namespace Lang.Backend.LLVM
                     _ => LLVMTypeRef.Int32Type()
                 },
                 FloatType floatType => floatType.Bytes == 8 ? LLVMApi.DoubleType() : LLVMTypeRef.FloatType(),
-                _ => typeDef.Name switch
+                _ => type.Name switch
                 {
                     "bool" => LLVMTypeRef.Int1Type(),
                     "void" => LLVMTypeRef.VoidType(),
-                    "List" => GetListType(typeDef),
-                    "Params" => GetListType(typeDef, true),
+                    "List" => GetListType(type),
+                    "Params" => GetListType(type, true),
                     "string" => LLVMTypeRef.PointerType(LLVMTypeRef.Int8Type(), 0), // LLVMApi.GetTypeByName(_module, "string"),
-                    _ => LLVMApi.GetTypeByName(_module, typeDef.Name)
+                    _ => GetStructType(type)
                 }
             };
         }
 
-        private LLVMTypeRef GetListType(TypeDefinition typeDef, bool isParams = false)
+        private LLVMTypeRef GetListType(TypeDefinition type, bool isParams = false)
         {
-            if (isParams && typeDef.Generics.Count == 0)
+            if (isParams && type.Generics.Count == 0)
             {
                 // TODO Get params without generic
                 return LLVMApi.GetTypeByName(_module, "List.int");
             }
-            var listType = typeDef.Generics[0];
+            var listType = type.Generics[0];
             return LLVMApi.GetTypeByName(_module, $"List.{listType.Name}");
+        }
+
+        private LLVMTypeRef GetStructType(TypeDefinition type)
+        {
+            var structName = type.Name;
+            foreach (var generic in type.Generics)
+            {
+                structName += $".{generic.Name}";
+            }
+
+            return LLVMApi.GetTypeByName(_module, structName);
         }
     }
 }
