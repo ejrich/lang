@@ -770,7 +770,17 @@ namespace Lang.Parsing
                 case TokenType.OpenBrace:
                 {
                     // Parse until close brace
-                    conditionalAst.Children.Add(ParseScope(enumerator, errors));
+                    while (enumerator.MoveNext())
+                    {
+                        if (enumerator.Current.Type == TokenType.CloseBrace)
+                        {
+                            break;
+                        }
+
+                        var ast = ParseLine(enumerator, errors);
+                        if (ast != null)
+                            conditionalAst.Children.Add(ast);
+                    }
                     break;
                 }
                 case null:
@@ -801,18 +811,29 @@ namespace Lang.Parsing
                         enumerator.MoveNext();
                         var ast = ParseLine(enumerator, errors);
                         if (ast != null)
-                            conditionalAst.Else = ast;
+                            conditionalAst.Else.Add(ast);
                         break;
                     }
                     case TokenType.OpenBrace:
                     {
                         // Parse until close brace
-                        conditionalAst.Else = ParseScope(enumerator, errors);
+                        while (enumerator.MoveNext())
+                        {
+                            if (enumerator.Current.Type == TokenType.CloseBrace)
+                            {
+                                break;
+                            }
+
+                            var ast = ParseLine(enumerator, errors);
+                            if (ast != null)
+                                conditionalAst.Else.Add(ast);
+                        }
                         break;
                     }
                     case TokenType.If:
                         // Nest another conditional in else children
-                        conditionalAst.Else = ParseConditional(enumerator, errors);
+                        var conditional = ParseConditional(enumerator, errors);
+                        conditionalAst.Else.Add(conditional);
                         break;
                     case null:
                         errors.Add(new ParseError {Error = "Expected body of else branch", Token = enumerator.Last});

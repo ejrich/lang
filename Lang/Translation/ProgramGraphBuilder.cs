@@ -682,9 +682,9 @@ namespace Lang.Translation
             var ifReturned = VerifyScope(conditional.Children, localVariables, errors);
 
             // 3. Verify the else block if necessary
-            if (conditional.Else != null)
+            if (conditional.Else.Any())
             {
-                var elseReturned = VerifyAst(conditional.Else, localVariables, errors);
+                var elseReturned = VerifyScope(conditional.Else, localVariables, errors);
                 return ifReturned && elseReturned;
             }
 
@@ -787,9 +787,9 @@ namespace Lang.Translation
                     {
                         
                     }
-                    else if (conditional.Else != null)
+                    else if (conditional.Else.Any())
                     {
-                        return VerifyAst(conditional.Else, localVariables, errors);
+                        return VerifyScope(conditional.Else, localVariables, errors);
                     }
                     break;
                 default:
