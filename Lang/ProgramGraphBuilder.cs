@@ -405,17 +405,11 @@ namespace Lang
                                 VerifyStruct(structDef);
                             }
                             var fields = structDef.Fields.ToDictionary(_ => _.Name);
-                            // TODO Make this a dictionary to begin with?
-                            foreach (var assignment in structField.Assignments)
+                            foreach (var (name, assignment) in structField.Assignments)
                             {
-                                StructFieldAst field = null;
-                                if (assignment.Reference is not IdentifierAst identifier)
+                                if (!fields.TryGetValue(name, out var field))
                                 {
-                                    AddError("Expected to get field in object initializer", assignment.Reference);
-                                }
-                                else if (!fields.TryGetValue(identifier.Name, out field))
-                                {
-                                    AddError($"Field '{identifier.Name}' not in struct '{PrintTypeDefinition(structField.Type)}'", assignment.Reference);
+                                    AddError($"Field '{name}' not in struct '{PrintTypeDefinition(structField.Type)}'", assignment.Reference);
                                 }
 
                                 if (assignment.Operator != Operator.None)
@@ -1135,16 +1129,11 @@ namespace Lang
 
                     var structDef = _programGraph.Types[declaration.Type.GenericName] as StructAst;
                     var fields = structDef!.Fields.ToDictionary(_ => _.Name);
-                    foreach (var assignment in declaration.Assignments)
+                    foreach (var (name, assignment) in declaration.Assignments)
                     {
-                        StructFieldAst field = null;
-                        if (assignment.Reference is not IdentifierAst identifier)
+                        if (!fields.TryGetValue(name, out var field))
                         {
-                            AddError("Expected to get field in object initializer", assignment.Reference);
-                        }
-                        else if (!fields.TryGetValue(identifier.Name, out field))
-                        {
-                            AddError($"Field '{identifier.Name}' not present in struct '{PrintTypeDefinition(declaration.Type)}'", assignment.Reference);
+                            AddError($"Field '{name}' not present in struct '{PrintTypeDefinition(declaration.Type)}'", assignment.Reference);
                         }
 
                         if (assignment.Operator != Operator.None)
