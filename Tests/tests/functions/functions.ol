@@ -81,6 +81,7 @@ T add_int<T>(T a, int b) {
 }
 
 baz<T, U>(List<T> list, U* b) {
+    #assert U == float || U == s32;
     #if U == float then printf("b = %.2f\n", *b);
     else {
         if T == s32 then printf("T is an int\n");

@@ -215,7 +215,7 @@ namespace Lang.Translation
                     {
                         if (generics[i] == identifier.Name)
                         {
-                            // TODO Should this copy the file and line info?
+                            // @Robustness Should this copy the file and line info?
                             return genericTypes[i];
                         }
                     }
