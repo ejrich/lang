@@ -296,6 +296,7 @@ namespace Lang
         public string Name { get; set; }
         public bool CallsOverload { get; set; }
         public TypeDefinition OverloadType { get; set; }
+        public TypeDefinition OverloadReturnType { get; set; }
         public IAst Index { get; set; }
     }
 

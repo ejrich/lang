@@ -167,12 +167,11 @@ namespace Lang
                             value.ConstantString = constantAst.Value;
                             break;
                         case TypeKind.Integer:
-                            var integerType = constantAst.Type.PrimitiveType;
                             if (constantAst.Type.Character)
                             {
                                 value.ConstantValue = new InstructionConstant {UnsignedInteger = (byte)constantAst.Value[0]};
                             }
-                            else if (integerType.Signed)
+                            else if (constantAst.Type.PrimitiveType.Signed)
                             {
                                 value.ConstantValue = new InstructionConstant {Integer = long.Parse(constantAst.Value)};
                             }
@@ -182,8 +181,7 @@ namespace Lang
                             }
                             break;
                         case TypeKind.Float:
-                            var floatType = constantAst.Type.PrimitiveType;
-                            if (floatType.Bytes == 4)
+                            if (constantAst.Type.PrimitiveType.Bytes == 4)
                             {
                                 value.ConstantValue = new InstructionConstant {Float = float.Parse(constantAst.Value)};
                             }
@@ -196,12 +194,9 @@ namespace Lang
                     return value;
                 case NullAst nullAst:
                     return new InstructionValue {ValueType = InstructionValueType.Null};
-                case IdentifierAst identifier:
-                    if (!GetScopeIdentifier(scope, identifier.Name, out var identifierAst))
-                    {
-                        return null;
-                    }
-                    if (identifierAst is DeclarationAst declaration)
+                case IdentifierAst identifierAst:
+                    var identifier = GetScopeIdentifier(scope, identifierAst.Name, out var global);
+                    if (identifier is DeclarationAst declaration)
                     {
                         if (declaration.Constant)
                         {
@@ -251,17 +246,17 @@ namespace Lang
                         };
                     }
                     var structFieldPointer = EmitGetStructPointer(function, structField, scope, block, out var loaded, out var constant);
-                    // if (!loaded && !constant)
-                    // {
-                    //     if (getStringPointer && type.TypeKind == TypeKind.String)
-                    //     {
-                    //         field = _builder.BuildStructGEP(field, 1, "stringdata");
-                    //     }
-                    //     field = _builder.BuildLoad(field, "field");
-                    // }
-                    // return (type, field);
-                    break;
+                    if (!loaded && !constant)
+                    {
+                        // if (getStringPointer && type.TypeKind == TypeKind.String)
+                        // {
+                        //     field = _builder.BuildStructGEP(field, 1, "stringdata");
+                        // }
+                        return EmitLoad(block, value: structFieldPointer);
+                    }
+                    return structFieldPointer;
                 case CallAst call:
+                    return EmitCall(function, call, scope, block);
                 case ChangeByOneAst changeByOne:
                     // var constant = false;
                     // var (variableType, pointer) = changeByOne.Value switch
@@ -379,9 +374,8 @@ namespace Lang
 
             switch (structField.Children[0])
             {
-                case IdentifierAst identifierAst:
-                    GetScopeIdentifier(scope, identifierAst.Name, out var identifier);
-                    var declaration = (DeclarationAst) identifier;
+                case IdentifierAst identifier:
+                    var declaration = (DeclarationAst) GetScopeIdentifier(scope, identifier.Name, out var global);
                     type = declaration.Type;
                     value = EmitGetPointer(block, allocationIndex: declaration.AllocationIndex);
                     break;
@@ -421,11 +415,11 @@ namespace Lang
                     {
                         value = EmitLoad(block, value: value);
                     }
-                    // type = type.Generics[0];
+                    type = type.Generics[0];
                 }
                 skipPointer = false;
 
-                if (type?.CArray ?? false)
+                if (type.CArray)
                 {
                     switch (structField.Children[i])
                     {
@@ -554,29 +548,23 @@ namespace Lang
 
         private InstructionValue EmitGetIndexPointer(FunctionIR function, IndexAst index, ScopeAst scope, BasicBlock block, TypeDefinition type = null, InstructionValue variable = null)
         {
-            // 1. Get the variable pointer
             if (type == null)
             {
-                GetScopeIdentifier(scope, index.Name, out var identifier);
-                var declaration = (DeclarationAst) identifier;
+                var declaration = (DeclarationAst) GetScopeIdentifier(scope, index.Name, out var global);
                 type = declaration.Type;
                 variable = EmitGetPointer(block, allocationIndex: declaration.AllocationIndex);
             }
 
-            // 2. Determine the index
             var indexValue = EmitIR(function, index.Index, scope, block);
 
-            // 3. Call the overload if needed
             if (index.CallsOverload)
             {
                 var overloadName = GetOperatorOverloadName(type, Operator.Subscript);
 
                 var value = EmitLoad(block, value: variable);
-                // TODO Add return type?
-                return EmitCall(block, overloadName, new []{value, indexValue});
+                return EmitCall(block, overloadName, new []{value, indexValue}, index.OverloadReturnType);
             }
 
-            // 4. Build the pointer with the first index of 0
             TypeDefinition elementType;
             if (type.TypeKind == TypeKind.String)
             {
@@ -604,16 +592,18 @@ namespace Lang
             }
         }
 
-        private bool GetScopeIdentifier(ScopeAst scope, string name, out IAst ast)
+        private IAst GetScopeIdentifier(ScopeAst scope, string name, out bool global)
         {
             do {
-                if (scope.Identifiers.TryGetValue(name, out ast))
+                if (scope.Identifiers.TryGetValue(name, out var ast))
                 {
-                    return true;
+                    global = scope.Parent == null;
+                    return ast;
                 }
                 scope = scope.Parent;
             } while (scope != null);
-            return false;
+            global = false;
+            return null;
         }
 
         private string GetFunctionName(FunctionAst function)
