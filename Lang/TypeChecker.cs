@@ -283,7 +283,7 @@ namespace Lang
             }
             else
             {
-                var baseType = VerifyType(enumAst.BaseTypeDefinition);
+                var baseType = VerifyType(enumAst.BaseTypeDefinition, _globalScope);
                 if (baseType?.TypeKind != TypeKind.Integer)
                 {
                     ErrorReporter.Report($"Base type of enum must be an integer, but got '{PrintTypeDefinition(enumAst.BaseTypeDefinition)}'", enumAst.BaseTypeDefinition);
@@ -358,7 +358,7 @@ namespace Lang
 
                 if (structField.TypeDefinition != null)
                 {
-                    fieldType = VerifyType(structField.TypeDefinition, out var isGeneric, out var isVarargs, out var isParams);
+                    fieldType = VerifyType(structField.TypeDefinition, _globalScope, out var isGeneric, out var isVarargs, out var isParams);
 
                     if (isVarargs || isParams)
                     {
@@ -494,29 +494,18 @@ namespace Lang
                     }
 
                     // Check type count
-                    if (fieldType.TypeKind == TypeKind.CArray && structField.TypeDefinition.Count == null && structField.TypeDefinition.ConstCount == null)
-                    {
-                        ErrorReporter.Report($"C array of field '{structAst.Name}.{structField.Name}' must be initialized with a constant size", structField.TypeDefinition);
-                    }
-                    else if (structField.TypeDefinition.Count != null)
+                    if (structField.Type?.TypeKind == TypeKind.Array && structField.TypeDefinition.Count != null)
                     {
                         // Verify the count is a constant
-                        var countType = VerifyConstantExpression(structField.TypeDefinition.Count, null, _globalScope, out var isConstant, out var count);
+                        var countType = VerifyConstantExpression(structField.TypeDefinition.Count, null, _globalScope, out var isConstant, out var arrayLength);
 
-                        if (countType != null)
+                        if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
                         {
-                            if (!isConstant || countType.TypeKind != TypeKind.Integer)
-                            {
-                                ErrorReporter.Report($"Expected size of '{structAst.Name}.{structField.Name}' to be a constant integer", structField.TypeDefinition.Count);
-                            }
-                            else if (count < 0)
-                            {
-                                ErrorReporter.Report($"Expected size of '{structAst.Name}.{structField.Name}' to be a positive integer", structField.TypeDefinition.Count);
-                            }
-                            else
-                            {
-                                structField.TypeDefinition.ConstCount = (uint)count;
-                            }
+                            ErrorReporter.Report($"Expected size of '{structAst.Name}.{structField.Name}' to be a constant, positive integer", structField.TypeDefinition.Count);
+                        }
+                        else
+                        {
+                            structField.TypeDefinition.ConstCount = arrayLength;
                         }
                     }
                 }
@@ -572,7 +561,7 @@ namespace Lang
                     }
                     structField.Type = fieldType;
                     structField.Offset = structAst.Size;
-                    structField.Size = fieldType.TypeKind == TypeKind.CArray ? fieldType.Size * structField.TypeDefinition.ConstCount.Value : fieldType.Size;
+                    structField.Size = fieldType.Size;
                     structAst.Size += fieldType.Size;
                 }
             }
@@ -590,7 +579,7 @@ namespace Lang
             }
             else
             {
-                function.ReturnType = VerifyType(function.ReturnTypeDefinition, out var isGeneric, out var isVarargs, out var isParams);
+                function.ReturnType = VerifyType(function.ReturnTypeDefinition, _globalScope, out var isGeneric, out var isVarargs, out var isParams);
                 if (isVarargs || isParams)
                 {
                     ErrorReporter.Report($"Return type of function '{function.Name}' cannot be varargs or Params", function.ReturnTypeDefinition);
@@ -599,32 +588,9 @@ namespace Lang
                 {
                     ErrorReporter.Report($"Return type '{PrintTypeDefinition(function.ReturnTypeDefinition)}' of function '{function.Name}' is not defined", function.ReturnTypeDefinition);
                 }
-                else if (function.ReturnType.TypeKind == TypeKind.CArray && function.ReturnTypeDefinition.Count == null)
+                else if (function.ReturnType?.TypeKind == TypeKind.Array && function.ReturnTypeDefinition.Count != null)
                 {
-                    ErrorReporter.Report($"C array for function '{function.Name}' must have a constant size", function.ReturnTypeDefinition);
-                }
-                else if (function.ReturnTypeDefinition.Count != null)
-                {
-                    var countType = VerifyConstantExpression(function.ReturnTypeDefinition.Count, null, _globalScope, out var isConstant, out var count);
-
-                    if (countType != null)
-                    {
-                        if (isConstant)
-                        {
-                            if (count < 0)
-                            {
-                                ErrorReporter.Report($"Expected size of return type of function '{function.Name}' to be a positive integer", function.ReturnTypeDefinition.Count);
-                            }
-                            else
-                            {
-                                function.ReturnTypeDefinition.ConstCount = (uint)count;
-                            }
-                        }
-                        else
-                        {
-                            ErrorReporter.Report($"Return type of function '{function.Name}' should have constant size", function.ReturnTypeDefinition.Count);
-                        }
-                    }
+                    ErrorReporter.Report($"Size of Array does not need to be specified for return type of function '{function.Name}'", function.ReturnTypeDefinition.Count);
                 }
             }
 
@@ -639,7 +605,7 @@ namespace Lang
                 }
 
                 // 3b. Check for errored or undefined field types
-                argument.Type = VerifyType(argument.TypeDefinition, out var isGeneric, out var isVarargs, out var isParams, allowParams: true);
+                argument.Type = VerifyType(argument.TypeDefinition, _globalScope, out var isGeneric, out var isVarargs, out var isParams, allowParams: true);
 
                 if (isVarargs)
                 {
@@ -815,7 +781,7 @@ namespace Lang
             else
             {
                 // var targetType = VerifyType(overload.Type);
-                var targetType = VerifyType(overload.Type, out var isGeneric, out var isVarargs, out var isParams);
+                var targetType = VerifyType(overload.Type, _globalScope, out var isGeneric, out var isVarargs, out var isParams);
                 if (isVarargs || isParams)
                 {
                     ErrorReporter.Report($"Cannot overload operator '{PrintOperator(overload.Operator)}' for type '{PrintTypeDefinition(overload.Type)}'", overload.Type);
@@ -851,7 +817,7 @@ namespace Lang
                 }
 
                 // 2b. Check the argument is the same type as the overload type
-                argument.Type = VerifyType(argument.TypeDefinition);
+                argument.Type = VerifyType(argument.TypeDefinition, _globalScope);
                 if (i > 0)
                 {
                     if (overload.Operator == Operator.Subscript)
@@ -995,7 +961,7 @@ namespace Lang
                 }
             }
             // var returnType = VerifyType(overload.ReturnTypeDefinition);
-            overload.ReturnType = VerifyType(overload.ReturnTypeDefinition);
+            overload.ReturnType = VerifyType(overload.ReturnTypeDefinition, _globalScope);
 
             // 2. Resolve the compiler directives in the body
             if (overload.Flags.HasFlag(FunctionFlags.HasDirectives))
@@ -1186,7 +1152,7 @@ namespace Lang
 
             if (declaration.TypeDefinition != null)
             {
-                declaration.Type = VerifyType(declaration.TypeDefinition, out _, out var isVarargs, out var isParams);
+                declaration.Type = VerifyType(declaration.TypeDefinition, _globalScope, out _, out var isVarargs, out var isParams);
                 if (isVarargs || isParams)
                 {
                     ErrorReporter.Report($"Variable '{declaration.Name}' cannot be varargs or Params", declaration.TypeDefinition);
@@ -1328,38 +1294,17 @@ namespace Lang
             }
 
             // 7. Verify the type definition count if necessary
-            if (declaration.Type != null)
+            if (declaration.Type?.TypeKind == TypeKind.Array && declaration.TypeDefinition.Count != null)
             {
-                if (declaration.Type.TypeKind == TypeKind.CArray && declaration.TypeDefinition.Count == null && declaration.TypeDefinition.ConstCount == null)
-                {
-                    ErrorReporter.Report($"Length of C array variable '{declaration.Name}' must be initialized to a constant integer", declaration.TypeDefinition);
-                }
-                else if ((declaration.Type.TypeKind == TypeKind.Array || declaration.Type.TypeKind == TypeKind.CArray) && declaration.TypeDefinition.Count != null)
-                {
-                    var countType = VerifyConstantExpression(declaration.TypeDefinition.Count, null, _globalScope, out var isConstant, out var count);
+                var countType = VerifyConstantExpression(declaration.TypeDefinition.Count, null, _globalScope, out var isConstant, out var arrayLength);
 
-                    if (countType != null)
-                    {
-                        if (declaration.Type.TypeKind == TypeKind.CArray && !isConstant)
-                        {
-                            ErrorReporter.Report($"Length of C array variable '{declaration.Name}' must be initialized with a constant size", declaration.TypeDefinition.Count);
-                        }
-                        else if (countType.TypeKind != TypeKind.Integer)
-                        {
-                            ErrorReporter.Report($"Expected count of variable '{declaration.Name}' to be an integer", declaration.TypeDefinition.Count);
-                        }
-                        if (isConstant)
-                        {
-                            if (count < 0)
-                            {
-                                ErrorReporter.Report($"Expected count of variable '{declaration.Name}' to be a positive integer", declaration.TypeDefinition.Count);
-                            }
-                            else
-                            {
-                                declaration.TypeDefinition.ConstCount = (uint)count;
-                            }
-                        }
-                    }
+                if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
+                {
+                    ErrorReporter.Report($"Expected Array length of global variable '{declaration.Name}' to be a constant, positive integer", declaration.TypeDefinition.Count);
+                }
+                else
+                {
+                    declaration.TypeDefinition.ConstCount = arrayLength;
                 }
             }
 
@@ -1429,7 +1374,7 @@ namespace Lang
 
             if (declaration.TypeDefinition != null)
             {
-                declaration.Type = VerifyType(declaration.TypeDefinition, out _, out var isVarargs, out var isParams);
+                declaration.Type = VerifyType(declaration.TypeDefinition, scope, out _, out var isVarargs, out var isParams);
                 if (isVarargs || isParams)
                 {
                     ErrorReporter.Report($"Variable '{declaration.Name}' cannot be varargs or Params", declaration.TypeDefinition);
@@ -1578,37 +1523,19 @@ namespace Lang
             }
 
             // 6. Verify the type definition count if necessary
-            if (declaration.Type != null)
+            if (declaration.Type?.TypeKind == TypeKind.Array && declaration.TypeDefinition?.Count != null)
             {
-                if (declaration.Type.TypeKind == TypeKind.CArray && declaration.TypeDefinition.Count == null && declaration.TypeDefinition.ConstCount == null)
-                {
-                    ErrorReporter.Report($"Length of C array variable '{declaration.Name}' must be initialized to a constant integer", declaration.TypeDefinition);
-                }
-                else if (declaration.TypeDefinition?.Count != null)
-                {
-                    var countType = VerifyConstantExpression(declaration.TypeDefinition.Count, currentFunction, scope, out var isConstant, out var count);
+                var countType = VerifyConstantExpression(declaration.TypeDefinition.Count, currentFunction, scope, out var isConstant, out var arrayLength);
 
-                    if (countType != null)
+                if (countType != null)
+                {
+                    if (countType.TypeKind != TypeKind.Integer || arrayLength < 0)
                     {
-                        if (declaration.Type.TypeKind == TypeKind.CArray && !isConstant)
-                        {
-                            ErrorReporter.Report($"Length of C array variable '{declaration.Name}' must be initialized with a constant size", declaration.TypeDefinition.Count);
-                        }
-                        else if (countType.TypeKind != TypeKind.Integer)
-                        {
-                            ErrorReporter.Report($"Expected count of variable '{declaration.Name}' to be an integer", declaration.TypeDefinition.Count);
-                        }
-                        if (isConstant)
-                        {
-                            if (count < 0)
-                            {
-                                ErrorReporter.Report($"Expected count of variable '{declaration.Name}' to be a positive integer", declaration.TypeDefinition.Count);
-                            }
-                            else
-                            {
-                                declaration.TypeDefinition.ConstCount = (uint)count;
-                            }
-                        }
+                        ErrorReporter.Report($"Expected count of variable '{declaration.Name}' to be a positive integer", declaration.TypeDefinition.Count);
+                    }
+                    if (isConstant)
+                    {
+                        declaration.TypeDefinition.ConstCount = arrayLength;
                     }
                 }
             }
@@ -2193,10 +2120,10 @@ namespace Lang
         }
 
         // private TypeDefinition VerifyConstantExpression(IAst ast, IFunction currentFunction, ScopeAst scope, out bool isConstant, out int count)
-        private IType VerifyConstantExpression(IAst ast, IFunction currentFunction, ScopeAst scope, out bool isConstant, out int count)
+        private IType VerifyConstantExpression(IAst ast, IFunction currentFunction, ScopeAst scope, out bool isConstant, out uint arrayLength)
         {
             isConstant = false;
-            count = 0;
+            arrayLength = 0;
             switch (ast)
             {
                 case ConstantAst constant:
@@ -2207,7 +2134,7 @@ namespace Lang
                     if (constant.Type.TypeKind == TypeKind.Integer)
                     {
                         // int.TryParse(constant.Value, out count);
-                        count = (int)constant.Value.Integer;
+                        arrayLength = (uint)constant.Value.UnsignedInteger;
                     }
                     return constant.Type;
                 case NullAst:
@@ -2242,7 +2169,7 @@ namespace Lang
                                 if (declaration.Value is ConstantAst constValue)
                                 {
                                     // int.TryParse(constValue.Value, out count);
-                                    count = (int)constValue.Value.Integer;
+                                    arrayLength = (uint)constValue.Value.UnsignedInteger;
                                 }
                             }
                             // return declaration.TypeDefinition;
@@ -2429,7 +2356,7 @@ namespace Lang
                     return VerifyIndexType(index, currentFunction, scope);
                 case TypeDefinition typeDef:
                 {
-                    var type = VerifyType(typeDef);
+                    var type = VerifyType(typeDef, scope);
                     if (type == null)
                     {
                         return null;
@@ -2440,7 +2367,7 @@ namespace Lang
                 }
                 case CastAst cast:
                 {
-                    cast.TargetType = VerifyType(cast.TargetTypeDefinition);
+                    cast.TargetType = VerifyType(cast.TargetTypeDefinition, scope);
                     var valueType = VerifyExpression(cast.Value, currentFunction, scope);
                     switch (cast.TargetType?.TypeKind)
                     {
@@ -2689,7 +2616,7 @@ namespace Lang
             {
                 foreach (var generic in call.Generics)
                 {
-                    var genericType = VerifyType(generic);
+                    var genericType = VerifyType(generic, scope);
                     if (genericType == null)
                     {
                         ErrorReporter.Report($"Undefined generic type '{PrintTypeDefinition(generic)}'", generic);
@@ -2725,7 +2652,7 @@ namespace Lang
                 return null;
             }
 
-            var function = DetermineCallingFunction(call, argumentTypes, specifiedArguments);
+            var function = DetermineCallingFunction(call, argumentTypes, specifiedArguments, scope);
 
             if (function == null)
             {
@@ -2907,7 +2834,7 @@ namespace Lang
         }
 
         // private FunctionAst DetermineCallingFunction(CallAst call, TypeDefinition[] arguments, Dictionary<string, TypeDefinition> specifiedArguments)
-        private FunctionAst DetermineCallingFunction(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments)
+        private FunctionAst DetermineCallingFunction(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments, ScopeAst scope)
         {
             if (TypeTable.Functions.TryGetValue(call.FunctionName, out var functions))
             {
@@ -3020,7 +2947,7 @@ namespace Lang
                         for (var index = 0; index < call.Generics.Count; index++)
                         {
                             var generic = call.Generics[i];
-                            genericTypes[i] = VerifyType(generic);
+                            genericTypes[i] = VerifyType(generic, scope);
                             if (genericTypes[i] == null)
                             {
                                 genericsError = true;
@@ -3183,13 +3110,13 @@ namespace Lang
                         var polymorphedFunction = _polymorpher.CreatePolymorphedFunction(function, name, genericTypes);
                         if (polymorphedFunction.ReturnType == null)
                         {
-                            polymorphedFunction.ReturnType = VerifyType(polymorphedFunction.ReturnTypeDefinition);
+                            polymorphedFunction.ReturnType = VerifyType(polymorphedFunction.ReturnTypeDefinition, scope);
                         }
                         foreach (var argument in polymorphedFunction.Arguments)
                         {
                             if (argument.Type == null)
                             {
-                                argument.Type = VerifyType(argument.TypeDefinition, out _, out _, out _, allowParams: true);
+                                argument.Type = VerifyType(argument.TypeDefinition, scope, out _, out _, out _, allowParams: true);
                             }
                         }
 
@@ -3333,7 +3260,7 @@ namespace Lang
                 {
                     if (TypeEquals(expression.Type, nextExpressionType, true))
                     {
-                        var overload = VerifyOperatorOverloadType((StructAst)expression.Type, op, currentFunction, expression.Children[i]);
+                        var overload = VerifyOperatorOverloadType((StructAst)expression.Type, op, currentFunction, expression.Children[i], scope);
                         if (overload != null)
                         {
                             expression.OperatorOverloads[i] = overload;
@@ -3541,7 +3468,7 @@ namespace Lang
                 case TypeKind.Struct:
                     index.CallsOverload = true;
                     overloaded = true;
-                    index.Overload = VerifyOperatorOverloadType((StructAst)type, Operator.Subscript, currentFunction, index);
+                    index.Overload = VerifyOperatorOverloadType((StructAst)type, Operator.Subscript, currentFunction, index, scope);
                     // elementType = index.Overload.ReturnTypeDefinition;
                     elementType = index.Overload.ReturnType;
                     break;
@@ -3585,7 +3512,7 @@ namespace Lang
             return elementType;
         }
 
-        private OperatorOverloadAst VerifyOperatorOverloadType(StructAst type, Operator op, IFunction currentFunction, IAst ast)
+        private OperatorOverloadAst VerifyOperatorOverloadType(StructAst type, Operator op, IFunction currentFunction, IAst ast, ScopeAst scope)
         {
             if (_operatorOverloads.TryGetValue(type.BackendName, out var overloads) && overloads.TryGetValue(op, out var overload))
             {
@@ -3608,7 +3535,7 @@ namespace Lang
                 {
                     if (argument.Type == null)
                     {
-                        argument.Type = VerifyType(argument.TypeDefinition);
+                        argument.Type = VerifyType(argument.TypeDefinition, scope);
                     }
                 }
 
@@ -3721,12 +3648,12 @@ namespace Lang
             return true;
         }*/
 
-        private IType VerifyType(TypeDefinition type, int depth = 0)
+        private IType VerifyType(TypeDefinition type, ScopeAst scope, int depth = 0)
         {
-            return VerifyType(type, out _, out _, out _, depth);
+            return VerifyType(type, scope, out _, out _, out _, depth);
         }
 
-        private IType VerifyType(TypeDefinition type, out bool isGeneric, out bool isVarargs, out bool isParams, int depth = 0, bool allowParams = false)
+        private IType VerifyType(TypeDefinition type, ScopeAst scope, out bool isGeneric, out bool isVarargs, out bool isParams, int depth = 0, bool allowParams = false)
         {
             isGeneric = false;
             isVarargs = false;
@@ -3770,7 +3697,7 @@ namespace Lang
                     {
                         ErrorReporter.Report($"Type 'Array' should have 1 generic type, but got {type.Generics.Count}", type);
                     }
-                    return VerifyArray(type, depth, out isGeneric);
+                    return VerifyArray(type, scope, depth, out isGeneric);
                 case "CArray":
                     if (type.Generics.Count != 1)
                     {
@@ -3779,19 +3706,25 @@ namespace Lang
                     }
                     else
                     {
-                        var elementTypeDef = type.Generics[0];
-                        var elementType = VerifyType(elementTypeDef, out isGeneric, out _, out _, depth + 1, allowParams);
+                        var elementType = VerifyType(type.Generics[0], scope, out isGeneric, out _, out _, depth + 1, allowParams);
                         if (elementType == null || isGeneric)
                         {
                             return null;
                         }
                         else
                         {
-                            if (!TypeTable.Types.TryGetValue(type.GenericName, out var arrayType))
+                            var countType = VerifyConstantExpression(type.Count, null, scope, out var isConstant, out var arrayLength);
+                            if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
                             {
-                                // TODO Set the length of the type
-                                arrayType = new ArrayType {Name = PrintTypeDefinition(type), BackendName = type.GenericName, Size = elementType.Size, ElementType = elementType};
-                                TypeTable.Add(type.GenericName, arrayType);
+                                ErrorReporter.Report($"Expected size of C array to be a constant, positive integer", type.Count);
+                                return null;
+                            }
+
+                            var backendName = $"{type.GenericName}.{arrayLength}";
+                            if (!TypeTable.Types.TryGetValue(backendName, out var arrayType))
+                            {
+                                arrayType = new ArrayType {Name = PrintTypeDefinition(type), BackendName = backendName, Size = elementType.Size * arrayLength, Length = arrayLength, ElementType = elementType};
+                                TypeTable.Add(backendName, arrayType);
                                 TypeTable.CreateTypeInfo(arrayType);
                             }
                             return arrayType;
@@ -3816,7 +3749,7 @@ namespace Lang
                     else
                     {
                         var typeDef = type.Generics[0];
-                        var pointedToType = VerifyType(typeDef, out isGeneric, out _, out _, depth + 1, allowParams);
+                        var pointedToType = VerifyType(typeDef, scope, out isGeneric, out _, out _, depth + 1, allowParams);
                         if (pointedToType == null || isGeneric)
                         {
                             return null;
@@ -3857,7 +3790,7 @@ namespace Lang
                         ErrorReporter.Report($"Type 'Params' should have 1 generic type, but got {type.Generics.Count}", type);
                         return null;
                     }
-                    return VerifyArray(type, depth, out isGeneric);
+                    return VerifyArray(type, scope, depth, out isGeneric);
                 case "Type":
                     if (hasGenerics)
                     {
@@ -3879,7 +3812,7 @@ namespace Lang
                             var error = false;
                             for (var i = 0; i < generics.Length; i++)
                             {
-                                var genericType = genericTypes[i] = VerifyType(generics[i], out var hasGeneric, out _, out _, depth + 1, allowParams);
+                                var genericType = genericTypes[i] = VerifyType(generics[i], scope, out var hasGeneric, out _, out _, depth + 1, allowParams);
                                 if (genericType == null)
                                 {
                                     error = true;
@@ -4213,11 +4146,11 @@ namespace Lang
             return typeDef.TypeKind.Value;
         }*/
 
-        private IType VerifyArray(TypeDefinition typeDef, int depth, out bool isGeneric)
+        private IType VerifyArray(TypeDefinition typeDef, ScopeAst scope, int depth, out bool isGeneric)
         {
             isGeneric = false;
             var elementTypeDef = typeDef.Generics[0];
-            var elementType = VerifyType(elementTypeDef, out isGeneric, out _, out _, depth + 1);
+            var elementType = VerifyType(elementTypeDef, scope, out isGeneric, out _, out _, depth + 1);
             if (elementType == null || isGeneric)
             {
                 return null;

@@ -423,7 +423,7 @@ namespace Lang
         // public bool Constant { get; set; }
         // public bool Character { get; set; }
         public int GenericIndex { get; set; }
-        public int? TypeIndex { get; set; }
+        public int TypeIndex { get; set; }
         // public IPrimitive PrimitiveType { get; set; }
         public List<TypeDefinition> Generics { get; } = new();
         public IAst Count { get; set; }
