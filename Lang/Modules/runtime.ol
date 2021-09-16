@@ -37,7 +37,7 @@ bool array_remove<T>(Array<T>* array, int index) {
     }
 
     if index <= length - 1 {
-        each i in index..length - 1 {
+        each i in index..length-2 {
             array.data[i] = array.data[i + 1];
         }
     }
@@ -54,7 +54,7 @@ struct string {
 operator == (string a, string b) {
     if (a.length != b.length) then return false;
 
-    each i in 0..a.length {
+    each i in 0..a.length-1 {
         if a[i] != b[i] then return false;
     }
 
@@ -138,7 +138,7 @@ void* memcpy(void* dest, void* src, int length) #extern "libc"
 
 // Runtime functions
 int __start(int argc, u8** argv) {
-    each i in 1..argc {
+    each i in 1..argc-1 {
         argument := convert_c_string(argv[i]);
         array_insert(&command_line_arguments, argument);
     }
