@@ -168,10 +168,9 @@ namespace Lang.Backend.LLVM
             types[i++] = CreateTypeInfo("u64", TypeKind.Integer, typeInfoType);
             types[i++] = CreateTypeInfo("float", TypeKind.Float, typeInfoType);
             types[i++] = CreateTypeInfo("float64", TypeKind.Float, typeInfoType);
-            types[i++] = CreateTypeInfo("string", TypeKind.String, typeInfoType);
             foreach (var (name, type) in programGraph.Types)
             {
-                var typeKind = name.StartsWith("List") ? TypeKind.List : type is StructAst ? TypeKind.Struct : TypeKind.Enum;
+                var typeKind = name == "string" ? TypeKind.String : name.StartsWith("List") ? TypeKind.List : type is StructAst ? TypeKind.Struct : TypeKind.Enum;
                 types[i++] = CreateTypeInfo(name, typeKind, typeInfoType);
             }
 

@@ -18,6 +18,7 @@ namespace Lang.Translation
         private BuildSettings _buildSettings;
         private readonly Dictionary<string, StructAst> _polymorphicStructs = new();
         private readonly Dictionary<string, IAst> _globalIdentifiers = new();
+        private int _typeIndex;
 
         public ProgramGraphBuilder(IProgramRunner programRunner)
         {
@@ -33,7 +34,19 @@ namespace Lang.Translation
             var mainDefined = false;
             bool verifyAdditional;
 
-            // TODO Add primitive types to global identifiers
+            // Add primitive types to global identifiers
+            AddPrimitive("void");
+            AddPrimitive("bool");
+            AddPrimitive("s8", new IntegerType {Signed = true, Bytes = 1});
+            AddPrimitive("u8", new IntegerType {Bytes = 1});
+            AddPrimitive("s16", new IntegerType {Signed = true, Bytes = 2});
+            AddPrimitive("u16", new IntegerType {Bytes = 2});
+            AddPrimitive("s32", new IntegerType {Signed = true, Bytes = 4});
+            AddPrimitive("u32", new IntegerType {Bytes = 4});
+            AddPrimitive("s64", new IntegerType {Signed = true, Bytes = 8});
+            AddPrimitive("u64", new IntegerType {Bytes = 8});
+            AddPrimitive("float", new FloatType {Bytes = 4});
+            AddPrimitive("float64", new FloatType {Bytes = 8});
 
             do
             {
@@ -181,6 +194,12 @@ namespace Lang.Translation
             }
 
             return _programGraph;
+        }
+
+        private void AddPrimitive(string name, IPrimitive primitive = null)
+        {
+            var primitiveAst = new PrimitiveAst {Name = name, TypeIndex = _typeIndex++, Primitive = primitive};
+            _globalIdentifiers[name] = primitiveAst;
         }
 
         private void VerifyEnum(EnumAst enumAst)
@@ -1029,10 +1048,12 @@ namespace Lang.Translation
                     {
                         case DeclarationAst declaration:
                             return declaration.Type;
+                        case PrimitiveAst primitive:
+                            return new TypeDefinition {Name = "Type", TypeIndex = primitive.TypeIndex, Generics = {new TypeDefinition {Name = primitive.Name}}};
                         case EnumAst enumAst:
-                            return new TypeDefinition {Name = "Type", Generics = {new TypeDefinition {Name = enumAst.Name}}};
+                            return new TypeDefinition {Name = "Type", TypeIndex = enumAst.TypeIndex, Generics = {new TypeDefinition {Name = enumAst.Name}}};
                         case StructAst structAst:
-                            return new TypeDefinition {Name = "Type", Generics = {new TypeDefinition {Name = structAst.Name}}};
+                            return new TypeDefinition {Name = "Type", TypeIndex = structAst.TypeIndex, Generics = {new TypeDefinition {Name = structAst.Name}}};
                         default:
                             return null;
                     }
@@ -1226,7 +1247,7 @@ namespace Lang.Translation
                                         var typeIndex = new ConstantAst
                                         {
                                             Type = new TypeDefinition {PrimitiveType = new IntegerType {Signed = true, Bytes = 4}},
-                                            Value = "13" // TODO Get the type index
+                                            Value = argument.TypeIndex.ToString() // TODO Get the type index
                                         };
                                         call.Arguments[i] = typeIndex;
                                         arguments[i] = typeIndex.Type;
