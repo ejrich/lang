@@ -1308,23 +1308,38 @@ namespace Lang
                 return;
             }
 
-            // 2. Parse expression, constant, or object initialization as the value
-            if (enumerator.Current.Type == TokenType.OpenBrace)
+            // 2. Parse expression, constant, or object/array initialization as the value
+            switch (enumerator.Current.Type)
             {
-                while (enumerator.Current?.Type != TokenType.CloseBrace && enumerator.MoveNext())
-                {
-                    if (enumerator.Current.Type == TokenType.CloseBrace)
+                case TokenType.OpenBrace:
+                    declaration.Assignments = new List<AssignmentAst>();
+                    while (enumerator.Current?.Type != TokenType.CloseBrace && enumerator.MoveNext())
                     {
-                        break;
-                    }
+                        if (enumerator.Current.Type == TokenType.CloseBrace)
+                        {
+                            break;
+                        }
 
-                    var assignment = ParseAssignment(enumerator, errors, currentFunction);
-                    declaration.Assignments.Add(assignment);
-                }
-            }
-            else
-            {
-                declaration.Value = ParseExpression(enumerator, errors, currentFunction);
+                        var assignment = ParseAssignment(enumerator, errors, currentFunction);
+                        declaration.Assignments.Add(assignment);
+                    }
+                    break;
+                case TokenType.OpenBracket:
+                    declaration.ArrayValues = new List<IAst>();
+                    while (enumerator.Current?.Type != TokenType.CloseBracket && enumerator.MoveNext())
+                    {
+                        if (enumerator.Current.Type == TokenType.CloseBracket)
+                        {
+                            break;
+                        }
+
+                        var value = ParseExpression(enumerator, errors, currentFunction, null, TokenType.Comma, TokenType.CloseBracket);
+                        declaration.ArrayValues.Add(value);
+                    }
+                    break;
+                default:
+                    declaration.Value = ParseExpression(enumerator, errors, currentFunction);
+                    break;
             }
         }
 

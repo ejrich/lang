@@ -982,7 +982,7 @@ namespace Lang
                 }
             }
             // 3. Verify object initializers
-            else if (declaration.Assignments.Any())
+            else if (declaration.Assignments != null)
             {
                 if (declaration.Type == null)
                 {
@@ -1031,7 +1031,12 @@ namespace Lang
                     }
                 }
             }
-            // 4. Verify declaration values
+            // 4. Verify array initializer
+            else if (declaration.ArrayValues != null)
+            {
+                // TODO Implement me
+            }
+            // 5. Verify declaration values
             else
             {
                 if (declaration.Value == null)
@@ -1049,7 +1054,7 @@ namespace Lang
 
                 var valueType = VerifyExpression(declaration.Value, currentFunction, scopeIdentifiers);
 
-                // 4a. Verify the assignment value matches the type definition if it has been defined
+                // Verify the assignment value matches the type definition if it has been defined
                 if (declaration.Type == null)
                 {
                     if (VerifyType(valueType) == TypeKind.Void)
@@ -1086,7 +1091,7 @@ namespace Lang
                 }
             }
 
-            // 5. Verify the type definition count if necessary
+            // 6. Verify the type definition count if necessary
             if (declaration.Type != null)
             {
                 if (declaration.Type.CArray && declaration.Type.Count == null)
@@ -1122,7 +1127,7 @@ namespace Lang
                 }
             }
 
-            // 6. Verify constant values
+            // 7. Verify constant values
             if (declaration.Constant)
             {
                 switch (declaration.Value)
