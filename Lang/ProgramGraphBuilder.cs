@@ -3037,6 +3037,7 @@ namespace Lang
                     index.OverloadType = typeDef;
                     overloaded = true;
                     elementType = VerifyOperatorOverloadType(typeDef, Operator.Subscript, currentFunction, index);
+                    index.OverloadReturnType = elementType;
                     break;
                 case TypeKind.Array:
                 case TypeKind.Params:
