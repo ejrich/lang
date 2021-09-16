@@ -1071,30 +1071,37 @@ namespace Lang
         private void VerifyReturnStatement(ReturnAst returnAst, IFunction currentFunction, ScopeAst scope, FunctionIR functionIR)
         {
             // 1. Infer the return type of the function
-            var returnType = VerifyType(currentFunction.ReturnType);
+            var returnTypeKind = VerifyType(currentFunction.ReturnType);
 
             // 2. Handle void case since it's the easiest to interpret
-            if (returnType == TypeKind.Void)
+            if (returnTypeKind == TypeKind.Void)
             {
                 if (returnAst.Value != null)
                 {
                     AddError("Function return should be void", returnAst);
                 }
-                return;
-            }
-
-            // 3. Determine if the expression returns the correct value
-            var returnValueType = VerifyExpression(returnAst.Value, currentFunction, scope);
-            if (returnValueType == null)
-            {
-                AddError($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnType)}'", returnAst);
             }
             else
             {
-                if (!TypeEquals(currentFunction.ReturnType, returnValueType))
+                // 3. Determine if the expression returns the correct value
+                var returnValueType = VerifyExpression(returnAst.Value, currentFunction, scope);
+                if (returnValueType == null)
                 {
-                    AddError($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnType)}', but returned type '{PrintTypeDefinition(returnValueType)}'", returnAst.Value);
+                    AddError($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnType)}'", returnAst);
                 }
+                else
+                {
+                    if (!TypeEquals(currentFunction.ReturnType, returnValueType))
+                    {
+                        AddError($"Expected to return type '{PrintTypeDefinition(currentFunction.ReturnType)}', but returned type '{PrintTypeDefinition(returnValueType)}'", returnAst.Value);
+                    }
+                }
+            }
+
+            if (!_programGraph.Errors.Any())
+            {
+                var returnType = _programGraph.Types[currentFunction.ReturnType.GenericName];
+                _irBuilder.EmitReturn(functionIR, returnAst, returnType);
             }
         }
 
