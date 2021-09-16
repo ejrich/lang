@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Runtime.InteropServices;
 
 namespace Lang
@@ -24,6 +26,18 @@ namespace Lang
 
     public unsafe class _ProgramRunner //: IProgramRunner
     {
+        private ModuleBuilder _moduleBuilder;
+        private int _version;
+        private readonly Dictionary<string, List<int>> _functionIndices = new();
+        private readonly List<(Type type, object libraryObject)> _functionLibraries = new();
+
+        private int _typeCount;
+        private IntPtr _typeTablePointer;
+        private IntPtr[] _typeInfoPointers;
+
+        private int _globalVariablesSize;
+        private IntPtr[] _globals;
+
         private readonly Dictionary<string, string> _compilerFunctions = new() {
             { "add_dependency", "AddDependency" }
         };
@@ -34,6 +48,284 @@ namespace Lang
             // - When a type/function is added to the TypeTable, add the TypeInfo object to the array
             // - When function IR is built and the function is extern, create the function ref
             // - When a global variable is added, store them in the global space
+
+
+            // Initialize the runner
+            if (_moduleBuilder == null)
+            {
+                var assemblyName = new AssemblyName("Runner");
+                var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
+                _moduleBuilder = assemblyBuilder.DefineDynamicModule("Runner");
+            }
+
+            TypeBuilder functionTypeBuilder = null;
+            foreach (var functions in TypeTable.Functions.Values)
+            {
+                foreach (var function in functions)
+                {
+                    if (!function.Flags.HasFlag(FunctionFlags.Extern)) continue;
+
+                    if (!_functionIndices.TryGetValue(function.Name, out var functionIndex))
+                        _functionIndices[function.Name] = functionIndex = new List<int>();
+
+                    // var returnType = GetTypeFromDefinition(function.ReturnTypeDefinition);
+
+                    if (function.Flags.HasFlag(FunctionFlags.Varargs))
+                    {
+                        for (var i = functionIndex.Count; i < function.VarargsCalls.Count; i++)
+                        {
+                    //         functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
+                    //         var callTypes = function.VarargsCalls[i];
+                    //         var varargs = callTypes.Select(arg => GetTypeFromDefinition(arg, cCall: true)).ToArray();
+                    //         CreateFunction(functionTypeBuilder, function.Name, function.ExternLib, returnType, varargs);
+                    //         functionIndex.Add(_version);
+                        }
+                    }
+                    else
+                    {
+                        if (!functionIndex.Any())
+                        {
+                    //         functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
+                    //         var args = function.Arguments.Select(arg => GetTypeFromDefinition(arg.TypeDefinition, cCall: true)).ToArray();
+                    //         CreateFunction(functionTypeBuilder, function.Name, function.ExternLib, returnType, args);
+                    //         functionIndex.Add(_version);
+                        }
+                    }
+                }
+            }
+
+            if (functionTypeBuilder != null)
+            {
+                var library = functionTypeBuilder.CreateType();
+                var functionObject = Activator.CreateInstance(library);
+                _functionLibraries.Add((library, functionObject));
+                _version++;
+            }
+
+            if (_globalVariablesSize < Program.GlobalVariablesSize)
+            {
+                var i = 0;
+                if (_globals == null)
+                {
+                    _globals = new IntPtr[Program.GlobalVariables.Count];
+                }
+                else
+                {
+                    i = _globals.Length;
+                    var newGlobals = new IntPtr[Program.GlobalVariables.Count];
+                    _globals.CopyTo(newGlobals, 0);
+                    _globals = newGlobals;
+                }
+
+                var pointer = Marshal.AllocHGlobal((int)Program.GlobalVariablesSize - _globalVariablesSize);
+                _globalVariablesSize = (int)Program.GlobalVariablesSize;
+
+                for (; i < Program.GlobalVariables.Count; i++)
+                {
+                    var variable = Program.GlobalVariables[i];
+
+                    if (_typeTablePointer == IntPtr.Zero && variable.Name == "__type_table")
+                    {
+                        _typeTablePointer = pointer;
+                    }
+
+                    // TODO Set initial value
+
+                    _globals[i] = pointer;
+                    pointer += (int)variable.Size;
+                }
+            }
+
+            if (_typeCount != TypeTable.Count)
+            {
+                _typeCount = TypeTable.Count;
+
+                if (_typeInfoPointers == null)
+                {
+                    _typeInfoPointers = new IntPtr[TypeTable.Count];
+                }
+                else
+                {
+                    var newTypeInfoPointers = new IntPtr[TypeTable.Count];
+                    _typeInfoPointers.CopyTo(newTypeInfoPointers, 0);
+                    _typeInfoPointers = newTypeInfoPointers;
+                }
+
+                Marshal.StructureToPtr(_typeCount, _typeTablePointer, false);
+                // TODO Implement me
+                // // Get required types and allocate the array
+                // var typeInfoArrayType = _types["Array.*.TypeInfo"];
+                // var typeInfoType = _types["TypeInfo"];
+                // var typeInfoSize = Marshal.SizeOf(typeInfoType);
+
+                // const int pointerSize = 8;
+                // var typeTable = Activator.CreateInstance(typeInfoArrayType);
+                // _typeDataPointer = InitializeConstArray(typeTable, typeInfoArrayType, pointerSize, _typeCount);
+
+                // // Create TypeInfo pointers
+                // var newTypeInfos = new List<(IType type, object typeInfo, IntPtr typeInfoPointer)>();
+                // foreach (var (name, type) in TypeTable.Types)
+                // {
+                //     if (!_typeInfoPointers.TryGetValue(name, out var typeInfoPointer))
+                //     {
+                //         var typeInfo = Activator.CreateInstance(typeInfoType);
+
+                //         var typeNameField = typeInfoType.GetField("name");
+                //         typeNameField.SetValue(typeInfo, GetString(type.Name));
+                //         var typeKindField = typeInfoType.GetField("type");
+                //         typeKindField.SetValue(typeInfo, type.TypeKind);
+                //         var typeSizeField = typeInfoType.GetField("size");
+                //         typeSizeField.SetValue(typeInfo, type.Size);
+
+                //         _typeInfoPointers[name] = typeInfoPointer = Marshal.AllocHGlobal(typeInfoSize);
+                //         newTypeInfos.Add((type, typeInfo, typeInfoPointer));
+                //     }
+
+                //     var arrayPointer = IntPtr.Add(_typeDataPointer, type.TypeIndex * pointerSize);
+                //     Marshal.StructureToPtr(typeInfoPointer, arrayPointer, false);
+                // }
+
+                // foreach (var (name, functions) in TypeTable.Functions)
+                // {
+                //     for (var i = 0; i < functions.Count; i++)
+                //     {
+                //         var function = functions[i];
+                //         if (!_typeInfoPointers.TryGetValue($"{name}.{i}", out var typeInfoPointer))
+                //         {
+                //             var typeInfo = Activator.CreateInstance(typeInfoType);
+
+                //             var typeNameField = typeInfoType.GetField("name");
+                //             typeNameField.SetValue(typeInfo, GetString(function.Name));
+                //             var typeKindField = typeInfoType.GetField("type");
+                //             typeKindField.SetValue(typeInfo, function.TypeKind);
+
+                //             _typeInfoPointers[$"{name}.{i}"] = typeInfoPointer = Marshal.AllocHGlobal(typeInfoSize);
+                //             newTypeInfos.Add((function, typeInfo, typeInfoPointer));
+                //         }
+
+                //         var arrayPointer = IntPtr.Add(_typeDataPointer, function.TypeIndex * pointerSize);
+                //         Marshal.StructureToPtr(typeInfoPointer, arrayPointer, false);
+                //     }
+                // }
+
+                // // Set fields and enum values on TypeInfo objects
+                // if (newTypeInfos.Any())
+                // {
+                //     var typeFieldArrayType = _types["Array.TypeField"];
+                //     var typeFieldType = _types["TypeField"];
+                //     var typeFieldSize = Marshal.SizeOf(typeFieldType);
+
+                //     var enumValueArrayType = _types["Array.EnumValue"];
+                //     var enumValueType = _types["EnumValue"];
+                //     var enumValueSize = Marshal.SizeOf(enumValueType);
+
+                //     var argumentArrayType = _types["Array.ArgumentType"];
+                //     var argumentType = _types["ArgumentType"];
+                //     var argumentSize = Marshal.SizeOf(argumentType);
+
+                //     foreach (var (type, typeInfo, typeInfoPointer) in newTypeInfos)
+                //     {
+                //         switch (type)
+                //         {
+                //             case StructAst structAst:
+                //                 var typeFieldArray = Activator.CreateInstance(typeFieldArrayType);
+                //                 InitializeConstArray(typeFieldArray, typeFieldArrayType, typeFieldSize, structAst.Fields.Count);
+
+                //                 var typeFieldsField = typeInfoType.GetField("fields");
+                //                 typeFieldsField.SetValue(typeInfo, typeFieldArray);
+
+                //                 var typeFieldArrayDataField = typeFieldArrayType.GetField("data");
+                //                 var typeFieldsDataPointer = GetPointer(typeFieldArrayDataField.GetValue(typeFieldArray));
+
+                //                 for (var i = 0; i < structAst.Fields.Count; i++)
+                //                 {
+                //                     var field = structAst.Fields[i];
+                //                     var typeField = Activator.CreateInstance(typeFieldType);
+
+                //                     var typeFieldName = typeFieldType.GetField("name");
+                //                     typeFieldName.SetValue(typeField, GetString(field.Name));
+                //                     var typeFieldOffset = typeFieldType.GetField("offset");
+                //                     typeFieldOffset.SetValue(typeField, field.Offset);
+                //                     var typeFieldInfo = typeFieldType.GetField("type_info");
+                //                     var typePointer = _typeInfoPointers[field.TypeDefinition.GenericName];
+                //                     typeFieldInfo.SetValue(typeField, typePointer);
+
+                //                     var arrayPointer = IntPtr.Add(typeFieldsDataPointer, typeFieldSize * i);
+                //                     Marshal.StructureToPtr(typeField, arrayPointer, false);
+                //                 }
+                //                 break;
+                //             case EnumAst enumAst:
+                //                 var enumValueArray = Activator.CreateInstance(enumValueArrayType);
+                //                 InitializeConstArray(enumValueArray, enumValueArrayType, enumValueSize, enumAst.Values.Count);
+
+                //                 var enumValuesField = typeInfoType.GetField("enum_values");
+                //                 enumValuesField.SetValue(typeInfo, enumValueArray);
+
+                //                 var enumValuesArrayDataField = enumValueArrayType.GetField("data");
+                //                 var enumValuesDataPointer = GetPointer(enumValuesArrayDataField.GetValue(enumValueArray));
+
+                //                 for (var i = 0; i < enumAst.Values.Count; i++)
+                //                 {
+                //                     var value = enumAst.Values[i];
+                //                     var enumValue = Activator.CreateInstance(enumValueType);
+
+                //                     var enumValueName = enumValueType.GetField("name");
+                //                     enumValueName.SetValue(enumValue, GetString(value.Name));
+                //                     var enumValueValue = enumValueType.GetField("value");
+                //                     enumValueValue.SetValue(enumValue, value.Value);
+
+                //                     var arrayPointer = IntPtr.Add(enumValuesDataPointer, enumValueSize * i);
+                //                     Marshal.StructureToPtr(enumValue, arrayPointer, false);
+                //                 }
+                //                 break;
+                //             case FunctionAst function:
+                //                 var returnTypeField = typeInfoType.GetField("return_type");
+                //                 returnTypeField.SetValue(typeInfo, _typeInfoPointers[function.ReturnTypeDefinition.GenericName]);
+
+                //                 var argumentArray = Activator.CreateInstance(argumentArrayType);
+                //                 var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
+                //                 InitializeConstArray(argumentArray, argumentArrayType, argumentSize, argumentCount);
+
+                //                 var argumentsField = typeInfoType.GetField("arguments");
+                //                 argumentsField.SetValue(typeInfo, argumentArray);
+
+                //                 var argumentArrayDataField = argumentArrayType.GetField("data");
+                //                 var argumentArrayDataPointer = GetPointer(argumentArrayDataField.GetValue(argumentArray));
+
+                //                 for (var i = 0; i < argumentCount; i++)
+                //                 {
+                //                     var argument = function.Arguments[i];
+                //                     var argumentValue = Activator.CreateInstance(argumentType);
+
+                //                     var argumentName = argumentType.GetField("name");
+                //                     argumentName.SetValue(argumentValue, GetString(argument.Name));
+                //                     var argumentTypeField = argumentType.GetField("type_info");
+
+                //                     var argumentTypeInfoPointer = argument.TypeDefinition.TypeKind switch
+                //                     {
+                //                         TypeKind.Type => _typeInfoPointers["s32"],
+                //                         TypeKind.Params => _typeInfoPointers[$"Array.{argument.TypeDefinition.Generics[0].GenericName}"],
+                //                         _ => _typeInfoPointers[argument.TypeDefinition.GenericName]
+                //                     };
+                //                     argumentTypeField.SetValue(argumentValue, argumentTypeInfoPointer);
+
+                //                     var arrayPointer = IntPtr.Add(argumentArrayDataPointer, argumentSize * i);
+                //                     Marshal.StructureToPtr(argumentValue, arrayPointer, false);
+                //                 }
+                //                 break;
+                //         }
+                //         Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
+                //     }
+                // }
+
+                // Set the data pointer
+                fixed (IntPtr* pointer = &_typeInfoPointers[0])
+                {
+                    var dataPointer = _typeTablePointer + 4;
+                    Buffer.MemoryCopy(pointer, dataPointer.ToPointer(), 8, 8);
+                }
+            }
+
         }
 
         public void RunProgram(FunctionIR function, IAst source)
@@ -1053,8 +1345,8 @@ namespace Lang
                 case InstructionValueType.Allocation:
                     if (value.Global)
                     {
-                        // TODO Implement me
-                        // return _globals[value.ValueIndex];
+                        var globalPointer = _globals[value.ValueIndex];
+                        return new Register {Pointer = globalPointer};
                     }
                     var allocation = function.Allocations[value.ValueIndex];
                     var pointer = stackPointer + (int)allocation.Offset;
@@ -1088,10 +1380,12 @@ namespace Lang
                     register.Bool = value.ConstantValue.Boolean;
                     break;
                 case TypeKind.Integer:
+                    var sourceIntegerType = (PrimitiveAst)value.Type;
+                    return GetIntegerValue(value.ConstantValue, sourceIntegerType);
                 case TypeKind.Enum:
-                    // TODO Implement me
-                    // return LLVMValueRef.CreateConstInt(_types[value.Type.TypeIndex], value.ConstantValue.UnsignedInteger, false);
-                    break;
+                    var enumType = (EnumAst)value.Type;
+                    sourceIntegerType = (PrimitiveAst)enumType.BaseType;
+                    return GetIntegerValue(value.ConstantValue, sourceIntegerType);
                 case TypeKind.Float:
                     if (value.Type.Size == 4)
                     {
@@ -1106,6 +1400,50 @@ namespace Lang
                     register.Pointer = GetString(value.ConstantString, value.UseRawString);
                     break;
             }
+            return register;
+        }
+
+        private static Register GetIntegerValue(Constant value, PrimitiveAst integerType)
+        {
+            var register = new Register();
+
+            if (integerType.Primitive.Signed)
+            {
+                switch (integerType.Size)
+                {
+                    case 1:
+                        register.SByte = (sbyte)value.Integer;
+                        break;
+                    case 2:
+                        register.Short = (short)value.Integer;
+                        break;
+                    case 8:
+                        register.Long = value.Integer;
+                        break;
+                    default:
+                        register.Integer = (int)value.Integer;
+                        break;
+                }
+            }
+            else
+            {
+                switch (integerType.Size)
+                {
+                    case 1:
+                        register.Byte = (byte)value.UnsignedInteger;
+                        break;
+                    case 2:
+                        register.UShort = (ushort)value.UnsignedInteger;
+                        break;
+                    case 8:
+                        register.ULong = value.UnsignedInteger;
+                        break;
+                    default:
+                        register.UInteger = (uint)value.UnsignedInteger;
+                        break;
+                }
+            }
+
             return register;
         }
 
