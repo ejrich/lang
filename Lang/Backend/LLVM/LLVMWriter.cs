@@ -601,14 +601,10 @@ namespace Lang.Backend.LLVM
                     {
                         return LLVMApi.ConstInt(type, constant.Value == "true" ? 1 : 0, false);
                     }
-                    var primitive = constant.Type.PrimitiveType as IntegerType;
                     return LLVMApi.ConstInt(type, (ulong)long.Parse(constant.Value), false);
                 case LLVMTypeKind.LLVMFloatTypeKind:
                 case LLVMTypeKind.LLVMDoubleTypeKind:
                     return LLVMApi.ConstRealOfStringAndSize(type, constant.Value, (uint) constant.Value.Length);
-                // TODO Implement more branches
-                default:
-                    break;
             }
             return LLVMApi.ConstInt(LLVMApi.Int32Type(), 0, true);
         }
@@ -639,10 +635,6 @@ namespace Lang.Backend.LLVM
                     return LLVMApi.BuildOr(_builder, lhs.value, rhs.value, "tmpor");
             }
 
-            // 2. Check the signage of the input types
-            var signed = lhs.type.PrimitiveType.Signed || rhs.type.PrimitiveType.Signed;
-            // TODO Implement 2a
-            // 2a. If both are unsigned, expand to larger type and perform unsigned operations
             // 3. Handle compares, since the lhs and rhs should not be cast to the target type 
             switch (op)
             {
@@ -652,7 +644,7 @@ namespace Lang.Backend.LLVM
                 case Operator.LessThanEqual:
                 case Operator.GreaterThan:
                 case Operator.LessThan:
-                    return BuildCompare(lhs, rhs, op, signed);
+                    return BuildCompare(lhs, rhs, op);
             }
 
             // 3. Cast lhs and rhs to the target types
@@ -671,181 +663,153 @@ namespace Lang.Backend.LLVM
             }
 
             // 5. Handle binary operations
-            return BuildBinaryOperation(lhs.value, rhs.value, op, signed);
+            var signed = lhs.type.PrimitiveType.Signed || rhs.type.PrimitiveType.Signed;
+            return BuildBinaryOperation(targetType, lhs.value, rhs.value, op, signed);
         }
 
         private LLVMValueRef BuildCompare((TypeDefinition type, LLVMValueRef value) lhs,
-            (TypeDefinition type, LLVMValueRef value) rhs, Operator op, bool signed = true)
+            (TypeDefinition type, LLVMValueRef value) rhs, Operator op)
         {
-            // TODO Actually implement me
-            return BuildCompare(lhs.value, rhs.value, op, signed);
-        }
-
-        // @Cleanup This should be removed eventually once the new function is implemented
-        private LLVMValueRef BuildCompare(LLVMValueRef lhs, LLVMValueRef rhs, Operator op, bool signed = true)
-        {
-            var lhsType = lhs.TypeOf();
-            var rhsType = rhs.TypeOf();
-            switch (lhsType.TypeKind)
+            switch (lhs.type.PrimitiveType)
             {
-                case LLVMTypeKind.LLVMIntegerTypeKind:
-                    switch (rhsType.TypeKind)
+                case IntegerType lhsInt:
+                    switch (rhs.type.PrimitiveType)
                     {
-                        case LLVMTypeKind.LLVMIntegerTypeKind:
+                        case IntegerType rhsInt:
                         {
-                            var lhsWidth = lhsType.GetIntTypeWidth();
-                            var rhsWidth = rhsType.GetIntTypeWidth();
-                            if (lhsWidth > rhsWidth)
+                            var signed = lhsInt.Signed || rhsInt.Signed;
+                            if (lhsInt.Bytes > rhsInt.Bytes)
                             {
-                                rhs = CastValue(rhs, lhsType);
+                                // TODO Figure out how to zest cast
+                                rhs.value = LLVMApi.BuildIntCast(_builder, rhs.value, ConvertTypeDefinition(lhs.type), "tmpint");
                             }
-                            else if (lhsWidth < rhsWidth)
+                            else if (lhsInt.Bytes < rhsInt.Bytes)
                             {
-                                lhs = CastValue(lhs, rhsType);
+                                // TODO Figure out how to zest cast
+                                lhs.value = LLVMApi.BuildIntCast(_builder, lhs.value, ConvertTypeDefinition(rhs.type), "tmpint");
                             }
                             var (predicate, name) = ConvertIntOperator(op, signed);
-                            return LLVMApi.BuildICmp(_builder, predicate, lhs, rhs, name);
+                            return LLVMApi.BuildICmp(_builder, predicate, lhs.value, rhs.value, name);
                         }
-                        case LLVMTypeKind.LLVMFloatTypeKind:
-                        case LLVMTypeKind.LLVMDoubleTypeKind:
+                        case FloatType:
                         {
+                            var lhsValue = CastValue(lhs, rhs.type);
                             var (predicate, name) = ConvertRealOperator(op);
-                            lhs = LLVMApi.BuildSIToFP(_builder, lhs, rhsType, "tmpfloat");
-                            return LLVMApi.BuildFCmp(_builder, predicate, lhs, rhs, name);
+                            return LLVMApi.BuildFCmp(_builder, predicate, lhsValue, rhs.value, name);
                         }
                     }
                     break;
-                case LLVMTypeKind.LLVMFloatTypeKind:
-                {
-                    var (predicate, name) = ConvertRealOperator(op);
-                    switch (rhsType.TypeKind)
+                case FloatType lhsFloat:
+                    switch (rhs.type.PrimitiveType)
                     {
-                        case LLVMTypeKind.LLVMFloatTypeKind:
-                            return LLVMApi.BuildFCmp(_builder, predicate, lhs, rhs, name);
-                        case LLVMTypeKind.LLVMDoubleTypeKind:
-                            lhs = LLVMApi.BuildFPExt(_builder, lhs, rhsType, "tmpfloat");
-                            return LLVMApi.BuildFCmp(_builder, predicate, lhs, rhs, name);
-                        case LLVMTypeKind.LLVMIntegerTypeKind:
-                            // TODO Check if signed or unsigned
-                            rhs = LLVMApi.BuildSIToFP(_builder, rhs, lhsType, "tmpfloat");
-                            return LLVMApi.BuildFCmp(_builder, predicate, lhs, rhs, name);
+                        case IntegerType:
+                        {
+                            var rhsValue = CastValue(rhs, lhs.type);
+                            var (predicate, name) = ConvertRealOperator(op);
+                            return LLVMApi.BuildFCmp(_builder, predicate, lhs.value, rhsValue, name);
+                        }
+                        case FloatType rhsFloat:
+                        {
+                            if (lhsFloat.Bytes > rhsFloat.Bytes)
+                            {
+                                rhs.value = LLVMApi.BuildFPCast(_builder, rhs.value, LLVMTypeRef.DoubleType(), "tmpfp");
+                            }
+                            else if (lhsFloat.Bytes < rhsFloat.Bytes)
+                            {
+                                lhs.value = LLVMApi.BuildFPCast(_builder, lhs.value, LLVMTypeRef.DoubleType(), "tmpfp");
+                            }
+                            var (predicate, name) = ConvertRealOperator(op);
+                            return LLVMApi.BuildFCmp(_builder, predicate, lhs.value, rhs.value, name);
+                        }
                     }
                     break;
-                }
-                case LLVMTypeKind.LLVMDoubleTypeKind:
-                {
-                    var (predicate, name) = ConvertRealOperator(op);
-                    switch (rhsType.TypeKind)
-                    {
-                        case LLVMTypeKind.LLVMDoubleTypeKind:
-                            return LLVMApi.BuildFCmp(_builder, predicate, lhs, rhs, name);
-                        case LLVMTypeKind.LLVMFloatTypeKind:
-                            rhs = LLVMApi.BuildFPExt(_builder, rhs, lhsType, "tmpfloat");
-                            return LLVMApi.BuildFCmp(_builder, predicate, lhs, rhs, name);
-                        case LLVMTypeKind.LLVMIntegerTypeKind:
-                            // TODO Check if signed or unsigned
-                            rhs = LLVMApi.BuildSIToFP(_builder, rhs, lhsType, "tmpfloat");
-                            return LLVMApi.BuildFCmp(_builder, predicate, lhs, rhs, name);
-                    }
-                    break;
-                }
             }
 
-            throw new NotImplementedException($"{op} not compatible with types '{lhs.TypeOf().TypeKind}' and '{rhs.TypeOf().TypeKind}'");
+            // @Future Operator overloading
+            throw new NotImplementedException($"{op} not compatible with types '{lhs.value.TypeOf().TypeKind}' and '{rhs.value.TypeOf().TypeKind}'");
         }
 
-        private LLVMValueRef BuildBinaryOperation((TypeDefinition type, LLVMValueRef value) lhs,
-            (TypeDefinition type, LLVMValueRef value) rhs, Operator op, bool signed = true)
+        private LLVMValueRef BuildBinaryOperation(TypeDefinition type, LLVMValueRef lhs, LLVMValueRef rhs, Operator op, bool signed = true)
         {
-            // TODO Actually implement me
-            return BuildBinaryOperation(lhs.value, rhs.value, op, signed);
-        }
-
-        // @Cleanup This should be removed eventually once the new function is implemented
-        private LLVMValueRef BuildBinaryOperation(LLVMValueRef lhs, LLVMValueRef rhs, Operator op, bool signed = true)
-        {
-            var lhsType = lhs.TypeOf();
-            var rhsType = rhs.TypeOf();
-            switch (lhsType.TypeKind)
+            switch (type.PrimitiveType)
             {
-                case LLVMTypeKind.LLVMIntegerTypeKind:
-                    switch (rhsType.TypeKind)
-                    {
-                        case LLVMTypeKind.LLVMIntegerTypeKind:
-                            var lhsWidth = lhsType.GetIntTypeWidth();
-                            var rhsWidth = rhsType.GetIntTypeWidth();
-                            if (lhsWidth > rhsWidth)
-                            {
-                                rhs = CastValue(rhs, lhsType);
-                            }
-                            else if (lhsWidth < rhsWidth)
-                            {
-                                lhs = CastValue(lhs, rhsType);
-                            }
-                            return BuildIntOperation(lhs, rhs, op, signed);
-                        case LLVMTypeKind.LLVMFloatTypeKind:
-                        case LLVMTypeKind.LLVMDoubleTypeKind:
-                            lhs = LLVMApi.BuildSIToFP(_builder, lhs, rhsType, "tmpfloat");
-                            return BuildRealOperation(lhs, rhs, op);
-                    }
-                    break;
-                case LLVMTypeKind.LLVMFloatTypeKind:
-                    switch (rhsType.TypeKind)
-                    {
-                        case LLVMTypeKind.LLVMFloatTypeKind:
-                            return BuildRealOperation(lhs, rhs, op);
-                        case LLVMTypeKind.LLVMDoubleTypeKind:
-                            lhs = LLVMApi.BuildFPExt(_builder, lhs, rhsType, "tmpfloat");
-                            return BuildRealOperation(lhs, rhs, op);
-                        case LLVMTypeKind.LLVMIntegerTypeKind:
-                            // TODO Check if signed or unsigned
-                            rhs = LLVMApi.BuildSIToFP(_builder, rhs, lhsType, "tmpfloat");
-                            return BuildRealOperation(lhs, rhs, op);
-                    }
-                    break;
-                case LLVMTypeKind.LLVMDoubleTypeKind:
-                    switch (rhsType.TypeKind)
-                    {
-                        case LLVMTypeKind.LLVMDoubleTypeKind:
-                            return BuildRealOperation(lhs, rhs, op);
-                        case LLVMTypeKind.LLVMFloatTypeKind:
-                            rhs = LLVMApi.BuildFPExt(_builder, rhs, rhsType, "tmpfloat");
-                            return BuildRealOperation(lhs, rhs, op);
-                        case LLVMTypeKind.LLVMIntegerTypeKind:
-                            // TODO Check if signed or unsigned
-                            rhs = LLVMApi.BuildSIToFP(_builder, rhs, lhsType, "tmpfloat");
-                            return BuildRealOperation(lhs, rhs, op);
-                    }
-                    break;
+                case IntegerType:
+                    return BuildIntOperation(lhs, rhs, op, signed);
+                case FloatType:
+                    return BuildRealOperation(lhs, rhs, op);
             }
 
+            // @Future Operator overloading
             throw new NotImplementedException($"{op} not compatible with types '{lhs.TypeOf().TypeKind}' and '{rhs.TypeOf().TypeKind}'");
         }
 
         private LLVMValueRef CastValue((TypeDefinition type, LLVMValueRef value) typeValue, TypeDefinition targetType)
         {
-            // TODO Implement better type casting
             var (type, value) = typeValue;
-            return CastValue(value, ConvertTypeDefinition(targetType));
-        }
 
-        private LLVMValueRef CastValue(LLVMValueRef value, LLVMTypeRef targetType)
-        {
-            var a = value.TypeOf().PrintTypeToString();
-            var b = targetType.PrintTypeToString();
-            if (a == b) return value;
+            if (TypeEquals(type, targetType)) return value;
 
-            switch (value.TypeOf().TypeKind)
+            var target = ConvertTypeDefinition(targetType);
+            switch (type.PrimitiveType)
             {
-                case LLVMTypeKind.LLVMIntegerTypeKind:
-                    // TODO Fix int to float casts, see line 94 of main.ol
-                    return LLVMApi.BuildIntCast(_builder, value, targetType, "tmpint");
-                case LLVMTypeKind.LLVMFloatTypeKind:
-                case LLVMTypeKind.LLVMDoubleTypeKind:
-                    return LLVMApi.BuildFPCast(_builder, value, targetType, "tmpfp");
+                case IntegerType intType:
+                    switch (targetType.PrimitiveType)
+                    {
+                        case IntegerType:
+                            // TODO Figure out how to zest cast
+                            return LLVMApi.BuildIntCast(_builder, value, target, "tmpint");
+                        case FloatType:
+                            return intType.Signed ? LLVMApi.BuildSIToFP(_builder, value, target, "tmpfp") :
+                                LLVMApi.BuildUIToFP(_builder, value, target, "tmpfp");
+                    }
+                    break;
+                case FloatType:
+                    switch (targetType.PrimitiveType)
+                    {
+                        case IntegerType intTarget:
+                            return intTarget.Signed ? LLVMApi.BuildFPToSI(_builder, value, target, "tmpfp") :
+                                LLVMApi.BuildFPToUI(_builder, value, target, "tmpfp");
+                        case FloatType:
+                            return LLVMApi.BuildFPCast(_builder, value, target, "tmpfp");
+                    }
+                    break;
             }
 
+            // @Future Polymorphic type casting
             return value;
+        }
+
+        private static bool TypeEquals(TypeDefinition a, TypeDefinition b)
+        {
+            switch (a.PrimitiveType)
+            {
+                case IntegerType aInt:
+                    if (b.PrimitiveType is IntegerType bInt)
+                    {
+                        return aInt.Bytes == bInt.Bytes && aInt.Signed == bInt.Signed;
+                    }
+                    return false;
+                case FloatType aFloat:
+                    if (b.PrimitiveType is FloatType bFloat)
+                    {
+                        return aFloat.Bytes == bFloat.Bytes && aFloat.Signed == bFloat.Signed;
+                    }
+                    return false;
+                default:
+                    if (b.PrimitiveType != null) return false;
+                    break;
+            }
+
+            // Check by name
+            if (a.Name != b.Name) return false;
+            if (a.Generics.Count != b.Generics.Count) return false;
+            for (var i = 0; i < a.Generics.Count; i++)
+            {
+                var ai = a.Generics[i];
+                var bi = b.Generics[i];
+                if (!TypeEquals(ai, bi)) return false;
+            }
+            return true;
         }
 
         private static (LLVMIntPredicate predicate, string name) ConvertIntOperator(Operator op, bool signed = true)
