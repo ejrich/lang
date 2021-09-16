@@ -282,10 +282,14 @@ u32 sleep(u32 seconds) #extern "libc"
     default_args(87);
     //set_global(99);
     node: Node;
-    printf("%d\n", node.value);
+    node.value = 7;
+    printf("Node Value = %d\n", node.value);
     global_a = 3;
     if global_a then
-        printf("%d\n", global_a);
+        printf("Global variable = %d\n", global_a);
+    my_struct: MyStruct;
+    my_struct.subValue.something = 8;
+    printf("Struct field value = %d\n", my_struct.subValue.something);
 }
 
 /*
