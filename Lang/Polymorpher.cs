@@ -5,18 +5,17 @@ namespace Lang
 {
     public interface IPolymorpher
     {
-        StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, TypeKind typeKind, int typeIndex, params TypeDefinition[] genericTypes);
-        FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, int typeIndex, TypeDefinition[] genericTypes);
+        StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, TypeKind typeKind, params TypeDefinition[] genericTypes);
+        FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, TypeDefinition[] genericTypes);
         OperatorOverloadAst CreatePolymorphedOperatorOverload(OperatorOverloadAst baseOverload, TypeDefinition[] genericTypes);
     }
 
     public class Polymorpher : IPolymorpher
     {
-        public StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, TypeKind typeKind, int typeIndex, params TypeDefinition[] genericTypes)
+        public StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, TypeKind typeKind, params TypeDefinition[] genericTypes)
         {
             var polyStruct = CopyAst(baseStruct);
             polyStruct.Name = name;
-            polyStruct.TypeIndex = typeIndex;
             polyStruct.TypeKind = typeKind;
 
             foreach (var field in baseStruct.Fields)
@@ -40,11 +39,10 @@ namespace Lang
             return polyStruct;
         }
 
-        public FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, int typeIndex, TypeDefinition[] genericTypes)
+        public FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, TypeDefinition[] genericTypes)
         {
             var function = CopyAst(baseFunction);
             function.Name = name;
-            function.TypeIndex = typeIndex;
             function.HasDirectives = baseFunction.HasDirectives;
             function.Params = baseFunction.Params;
             function.ReturnType = baseFunction.ReturnTypeHasGenerics ? CopyType(baseFunction.ReturnType, genericTypes) : baseFunction.ReturnType;

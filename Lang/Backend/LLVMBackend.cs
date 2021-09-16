@@ -50,7 +50,7 @@ namespace Lang.Backend
             var globals = WriteData();
 
             // 4. Write Function and Operator overload definitions
-            foreach (var (name, functions) in _programGraph.Functions)
+            foreach (var (name, functions) in TypeTable.Functions)
             {
                 for (var i = 0; i < functions.Count; i++)
                 {
@@ -76,7 +76,7 @@ namespace Lang.Backend
             }
 
             // 5. Write Function and Operator overload bodies
-            foreach (var (name, functions) in _programGraph.Functions)
+            foreach (var (name, functions) in TypeTable.Functions)
             {
                 for (var i = 0; i < functions.Count; i++)
                 {
@@ -157,7 +157,7 @@ namespace Lang.Backend
             var structs = new Dictionary<string, LLVMTypeRef>();
             if (_emitDebug)
             {
-                foreach (var (name, type) in _programGraph.Types)
+                foreach (var (name, type) in TypeTable.Types)
                 {
                     switch (type)
                     {
@@ -184,7 +184,7 @@ namespace Lang.Backend
                             break;
                     }
                 }
-                foreach (var (name, type) in _programGraph.Types)
+                foreach (var (name, type) in TypeTable.Types)
                 {
                     if (type is StructAst structAst && structAst.Fields.Any())
                     {
@@ -197,14 +197,14 @@ namespace Lang.Backend
             }
             else
             {
-                foreach (var (name, type) in _programGraph.Types)
+                foreach (var (name, type) in TypeTable.Types)
                 {
                     if (type is StructAst structAst)
                     {
                         structs[name] = _context.CreateNamedStruct(name);
                     }
                 }
-                foreach (var (name, type) in _programGraph.Types)
+                foreach (var (name, type) in TypeTable.Types)
                 {
                     if (type is StructAst structAst && structAst.Fields.Any())
                     {
@@ -263,16 +263,16 @@ namespace Lang.Backend
             SetPrivateConstant(typeTable);
             var typeInfoType = structs["TypeInfo"];
 
-            var types = new LLVMValueRef[_programGraph.TypeCount];
+            var types = new LLVMValueRef[TypeTable.Count];
             var typePointers = new Dictionary<string, (IType type, LLVMValueRef typeInfo)>();
-            foreach (var (name, type) in _programGraph.Types)
+            foreach (var (name, type) in TypeTable.Types)
             {
                 var typeInfo = _module.AddGlobal(typeInfoType, "____type_info");
                 SetPrivateConstant(typeInfo);
                 types[type.TypeIndex] = typeInfo;
                 typePointers[name] = (type, typeInfo);
             }
-            foreach (var (name, functions) in _programGraph.Functions)
+            foreach (var (name, functions) in TypeTable.Functions)
             {
                 for (var i = 0; i < functions.Count; i++)
                 {
@@ -760,7 +760,7 @@ namespace Lang.Backend
 
         private void BuildStructAllocations(string name, Dictionary<string, AssignmentAst> assignments = null)
         {
-            var structDef = _programGraph.Types[name] as StructAst;
+            var structDef = TypeTable.Types[name] as StructAst;
             if (assignments == null)
             {
                 foreach (var field in structDef!.Fields)
@@ -963,7 +963,7 @@ namespace Lang.Backend
 
         private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, Dictionary<string, AssignmentAst> assignments)
         {
-            var structDef = _programGraph.Types[typeDef.GenericName] as StructAst;
+            var structDef = TypeTable.Types[typeDef.GenericName] as StructAst;
             if (assignments == null)
             {
                 for (var i = 0; i < structDef!.Fields.Count; i++)
@@ -1397,7 +1397,7 @@ namespace Lang.Backend
                 {
                     if (!localVariables.TryGetValue(identifier.Name, out var typeValue))
                     {
-                        var typeDef = _programGraph.Types[identifier.Name];
+                        var typeDef = TypeTable.Types[identifier.Name];
                         return (_s32Type, LLVMValueRef.CreateConstInt(LLVM.Int32Type(), (uint)typeDef.TypeIndex, false));
                     }
                     var (type, value) = typeValue;
@@ -1435,7 +1435,7 @@ namespace Lang.Backend
                     return (type, field);
                 }
                 case CallAst call:
-                    var functions = _programGraph.Functions[call.FunctionName];
+                    var functions = TypeTable.Functions[call.FunctionName];
                     LLVMValueRef function;
                     if (call.FunctionName == "main")
                     {
@@ -1609,7 +1609,7 @@ namespace Lang.Backend
                     return expressionValue;
                 case TypeDefinition typeDef:
                 {
-                    var type = _programGraph.Types[typeDef.GenericName];
+                    var type = TypeTable.Types[typeDef.GenericName];
                     return (_s32Type, LLVMValueRef.CreateConstInt(LLVM.Int32Type(), (uint)type.TypeIndex, false));
                 }
                 case CastAst cast:
@@ -1875,7 +1875,7 @@ namespace Lang.Backend
             TypeDefinition elementType;
             if (type.TypeKind == TypeKind.String)
             {
-                _stringStruct ??= (StructAst)_programGraph.Types["string"];
+                _stringStruct ??= (StructAst)TypeTable.Types["string"];
                 elementType = _stringStruct.Fields[1].TypeDefinition.Generics[0];
             }
             else
@@ -2310,7 +2310,7 @@ namespace Lang.Backend
 
         private LLVMTypeRef GetStructType(TypeDefinition type)
         {
-            if (_programGraph.Types.TryGetValue(type.Name, out var typeDef) && typeDef is EnumAst)
+            if (TypeTable.Types.TryGetValue(type.Name, out var typeDef) && typeDef is EnumAst)
             {
                 return LLVM.Int32Type();
             }

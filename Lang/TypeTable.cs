@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 
 namespace Lang
@@ -17,9 +16,9 @@ namespace Lang
 
         public static List<FunctionAst> AddFunction(string name, FunctionAst function)
         {
-            if (!Functions.TryGetValue(function.Name, out var functions))
+            if (!Functions.TryGetValue(name, out var functions))
             {
-                Functions[function.Name] = functions = new List<FunctionAst>();
+                Functions[name] = functions = new List<FunctionAst>();
             }
             function.TypeIndex = Count++;
             function.OverloadIndex = functions.Count;

@@ -52,7 +52,7 @@ namespace Lang
             }
 
             var temporaryStructs = new Dictionary<string, TypeBuilder>();
-            foreach (var (name, type) in programGraph.Types)
+            foreach (var (name, type) in TypeTable.Types)
             {
                 if (type is StructAst structAst && !_types.ContainsKey(name))
                 {
@@ -67,7 +67,7 @@ namespace Lang
                 foreach (var (name, structBuilder) in temporaryStructs)
                 {
                     var indexFound = fieldIndices.TryGetValue(name, out var index);
-                    var structAst = programGraph.Types[name] as StructAst;
+                    var structAst = TypeTable.Types[name] as StructAst;
                     var count = structAst!.Fields.Count;
 
                     for (; index < count; index++)
@@ -107,7 +107,7 @@ namespace Lang
             }
 
             TypeBuilder functionTypeBuilder = null;
-            foreach (var functions in programGraph.Functions.Values)
+            foreach (var functions in TypeTable.Functions.Values)
             {
                 foreach (var function in functions.Where(_ => _.Extern))
                 {
@@ -156,9 +156,9 @@ namespace Lang
                 }
             }
 
-            if (_typeCount != programGraph.TypeCount)
+            if (_typeCount != TypeTable.Count)
             {
-                _typeCount = programGraph.Types.Count;
+                _typeCount = TypeTable.Count;
 
                 // Free old data
                 var typeTableVariable = _globalVariables["__type_table"];
@@ -176,11 +176,11 @@ namespace Lang
 
                 const int pointerSize = 8;
                 var typeTable = Activator.CreateInstance(typeInfoArrayType);
-                _typeDataPointer = InitializeConstArray(typeTable, typeInfoArrayType, pointerSize, programGraph.TypeCount);
+                _typeDataPointer = InitializeConstArray(typeTable, typeInfoArrayType, pointerSize, _typeCount);
 
                 // Create TypeInfo pointers
                 var newTypeInfos = new List<(IType type, object typeInfo, IntPtr typeInfoPointer)>();
-                foreach (var (name, type) in programGraph.Types)
+                foreach (var (name, type) in TypeTable.Types)
                 {
                     if (!_typeInfoPointers.TryGetValue(name, out var typeInfoPointer))
                     {
@@ -201,7 +201,7 @@ namespace Lang
                     Marshal.StructureToPtr(typeInfoPointer, arrayPointer, false);
                 }
 
-                foreach (var (name, functions) in programGraph.Functions)
+                foreach (var (name, functions) in TypeTable.Functions)
                 {
                     for (var i = 0; i < functions.Count; i++)
                     {
@@ -442,7 +442,7 @@ namespace Lang
                     return IntPtr.Zero;
                 default:
                     var instanceType = _types[typeDef.GenericName];
-                    var type = _programGraph.Types[typeDef.GenericName];
+                    var type = TypeTable.Types[typeDef.GenericName];
                     if (type is StructAst structAst)
                     {
                         return InitializeStruct(instanceType, structAst, variables, assignments);
@@ -509,7 +509,7 @@ namespace Lang
                     if (field.TypeDefinition.PrimitiveType == null)
                     {
                         var fieldType = _types[field.TypeDefinition.GenericName];
-                        var fieldTypeDef = _programGraph.Types[field.TypeDefinition.GenericName];
+                        var fieldTypeDef = TypeTable.Types[field.TypeDefinition.GenericName];
                         if (fieldTypeDef is StructAst fieldStructAst)
                         {
                             var value = InitializeStruct(fieldType, fieldStructAst, variables, field.Assignments);
@@ -863,7 +863,7 @@ namespace Lang
                 {
                     if (!variables.TryGetValue(identifier.Name, out var variable))
                     {
-                        var type = _programGraph.Types[identifier.Name];
+                        var type = TypeTable.Types[identifier.Name];
                         return new ValueType {Type = _s32Type, Value = type.TypeIndex};
                     }
 
@@ -1007,7 +1007,7 @@ namespace Lang
                 }
                 case TypeDefinition typeDef:
                 {
-                    var type = _programGraph.Types[typeDef.GenericName];
+                    var type = TypeTable.Types[typeDef.GenericName];
                     return new ValueType {Type = _s32Type, Value = type.TypeIndex};
                 }
                 case CastAst cast:
@@ -1320,7 +1320,7 @@ namespace Lang
 
             if (indexTypeDef.TypeKind == TypeKind.String)
             {
-                _stringStruct ??= (StructAst)_programGraph.Types["string"];
+                _stringStruct ??= (StructAst)TypeTable.Types["string"];
                 elementTypeDef = _stringStruct.Fields[1].TypeDefinition.Generics[0];
             }
             else
