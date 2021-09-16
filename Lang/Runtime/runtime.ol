@@ -32,10 +32,10 @@ enum TypeKind {
     Struct;
 }
 
-type_table: List<TypeInfo*>;
+__type_table: List<TypeInfo*>;
 
 TypeInfo type_of(int type_index) {
-    return *type_table[type_index];
+    return *__type_table[type_index];
 }
 
 
