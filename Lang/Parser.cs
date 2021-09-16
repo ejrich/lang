@@ -148,12 +148,12 @@ namespace Lang
             // 1a. Check if the return type is void
             if (enumerator.Peek()?.Type == TokenType.OpenParen)
             {
-                function.ReturnType = CreateAst<TypeDefinition>(enumerator.Current);
-                function.ReturnType.Name = "void";
+                function.ReturnTypeDefinition = CreateAst<TypeDefinition>(enumerator.Current);
+                function.ReturnTypeDefinition.Name = "void"; // TODO Don't set the type definition
             }
             else
             {
-                function.ReturnType = ParseType(enumerator, errors);
+                function.ReturnTypeDefinition = ParseType(enumerator, errors);
                 enumerator.MoveNext();
             }
 
@@ -165,23 +165,23 @@ namespace Lang
                     enumerator.MoveNext();
                     break;
                 case TokenType.OpenParen:
-                    if (function.ReturnType.Name == "*" || function.ReturnType.Count != null)
+                    if (function.ReturnTypeDefinition.Name == "*" || function.ReturnTypeDefinition.Count != null)
                     {
                         errors.Add(new ParseError
                         {
                             Error = "Expected the function name to be declared",
                             Token = new Token
                             {
-                                FileIndex = function.ReturnType.FileIndex,
-                                Line = function.ReturnType.Line,
-                                Column = function.ReturnType.Column
+                                FileIndex = function.ReturnTypeDefinition.FileIndex,
+                                Line = function.ReturnTypeDefinition.Line,
+                                Column = function.ReturnTypeDefinition.Column
                             }
                         });
                     }
                     else
                     {
-                        function.Name = function.ReturnType.Name;
-                        foreach (var generic in function.ReturnType.Generics)
+                        function.Name = function.ReturnTypeDefinition.Name;
+                        foreach (var generic in function.ReturnTypeDefinition.Generics)
                         {
                             if (generic.Generics.Any())
                             {
@@ -214,8 +214,8 @@ namespace Lang
                                 function.Generics.Add(generic.Name);
                             }
                         }
-                        function.ReturnType.Name = "void";
-                        function.ReturnType.Generics.Clear();
+                        function.ReturnTypeDefinition.Name = "void"; // TODO Don't set the type definition
+                        function.ReturnTypeDefinition.Generics.Clear();
                     }
                     break;
                 case null:
@@ -306,7 +306,7 @@ namespace Lang
             for (var i = 0; i < function.Generics.Count; i++)
             {
                 var generic = function.Generics[i];
-                if (SearchForGeneric(generic, i, function.ReturnType))
+                if (SearchForGeneric(generic, i, function.ReturnTypeDefinition))
                 {
                     function.ReturnTypeHasGenerics = true;
                 }
@@ -741,7 +741,7 @@ namespace Lang
             if (enumerator.Current?.Type == TokenType.Colon)
             {
                 enumerator.MoveNext();
-                enumAst.BaseType = ParseType(enumerator, errors);
+                enumAst.BaseTypeDefinition = ParseType(enumerator, errors);
                 enumerator.MoveNext();
             }
 
@@ -1425,7 +1425,7 @@ namespace Lang
                         token.Value = token.Value[1..];
                         expression.Operators.Add(Operator.Subtract);
                         var constant = CreateAst<ConstantAst>(token);
-                        constant.Type = InferType(token, errors);
+                        constant.TypeDefinition = InferType(token, errors);
                         constant.Value = token.Value;
                         expression.Children.Add(constant);
                         continue;
@@ -1530,7 +1530,7 @@ namespace Lang
                 case TokenType.Character:
                     // Parse constant
                     var constant = CreateAst<ConstantAst>(token);
-                    constant.Type = InferType(token, errors);
+                    constant.TypeDefinition = InferType(token, errors);
                     constant.Value = token.Value;
                     return constant;
                 case TokenType.Null:
@@ -2180,7 +2180,7 @@ namespace Lang
                 case Operator.GreaterThan:
                 case Operator.LessThan:
                 case Operator.Xor:
-                    overload.ReturnType = new TypeDefinition {Name = "bool"};
+                    overload.ReturnTypeDefinition = new TypeDefinition {Name = "bool"};
                     break;
                 case Operator.Subscript:
                     if (enumerator.Current?.Type != TokenType.Colon)
@@ -2194,10 +2194,10 @@ namespace Lang
                     {
                         if (enumerator.MoveNext())
                         {
-                            overload.ReturnType = ParseType(enumerator, errors);
+                            overload.ReturnTypeDefinition = ParseType(enumerator, errors);
                             for (var i = 0; i < overload.Generics.Count; i++)
                             {
-                                if (SearchForGeneric(overload.Generics[i], i, overload.ReturnType))
+                                if (SearchForGeneric(overload.Generics[i], i, overload.ReturnTypeDefinition))
                                 {
                                     overload.ReturnTypeHasGenerics = true;
                                 }
@@ -2207,11 +2207,11 @@ namespace Lang
                     }
                     break;
                 default:
-                    overload.ReturnType = overload.Type;
+                    overload.ReturnTypeDefinition = overload.Type;
                     overload.ReturnTypeHasGenerics = overload.Generics.Any();
                     for (var i = 0; i < overload.Generics.Count; i++)
                     {
-                        SearchForGeneric(overload.Generics[i], i, overload.ReturnType);
+                        SearchForGeneric(overload.Generics[i], i, overload.ReturnTypeDefinition);
                     }
                     break;
             }
@@ -2621,13 +2621,13 @@ namespace Lang
                 errors.Add(new ParseError {Error = "Expected to get the target type for the cast", Token = enumerator.Last});
                 return null;
             }
-            castAst.TargetType = ParseType(enumerator, errors, currentFunction);
+            castAst.TargetTypeDefinition = ParseType(enumerator, errors, currentFunction);
             if (currentFunction != null)
             {
                 for (var i = 0; i < currentFunction.Generics.Count; i++)
                 {
                     var generic = currentFunction.Generics[i];
-                    if (SearchForGeneric(generic, i, castAst.TargetType))
+                    if (SearchForGeneric(generic, i, castAst.TargetTypeDefinition))
                     {
                         castAst.HasGenerics = true;
                     }
