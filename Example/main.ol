@@ -165,6 +165,6 @@ int sum(List<int> args) {
 
 int sum2(...<int> args) {
     sum := 0;
-//    each i in args then sum += i;
+    //each i in args then sum += i;
     return sum;
 }

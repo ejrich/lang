@@ -118,14 +118,20 @@ namespace Lang.Backend.LLVM
             // 2. Allocate arguments on the stack
             for (var i = 0; i < functionAst.Arguments.Count; i++)
             {
-                if (functionAst.Arguments[i].Type.Name == "...")
+                var arg = functionAst.Arguments[i];
+                if (arg.Type.Name == "...")
                 {
                     // TODO Initialize varargs
+                    WriteFunctionDefinition("llvm.va_start", new List<Argument> {new() {Name = "arglist", Type = new TypeDefinition
+                    {
+                        Name = "*",
+                        Generics = {new TypeDefinition {Name = "u8", PrimitiveType = new IntegerType {Bytes = 1}}}}}
+                    }, new TypeDefinition {Name = "void"});
+                    localVariables.Add(arg.Name, (arg.Type, new LLVMValueRef()));
                 }
                 else
                 {
                     var argument = LLVMApi.GetParam(function, (uint) i);
-                    var arg = functionAst.Arguments[i];
                     var allocation = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(arg.Type), arg.Name);
                     LLVMApi.BuildStore(_builder, argument, allocation);
                     localVariables.Add(arg.Name, (arg.Type, allocation));
@@ -818,6 +824,7 @@ namespace Lang.Backend.LLVM
         private (TypeDefinition type, LLVMValueRef value) GetListPointer(IndexAst index,
             IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
         {
+            // TODO Handle varargs indices
             // 1. Get the variable pointer
             var (type, variable) = index.Variable switch
             {

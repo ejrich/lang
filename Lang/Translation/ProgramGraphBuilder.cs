@@ -207,6 +207,7 @@ namespace Lang.Translation
                 return;
             }
 
+            // TODO Verify the function has a return statement for non-void functions
             VerifyScope(function.Children, localVariables, errors);
         }
 
