@@ -489,7 +489,7 @@ namespace Lang
                 {
                     ErrorReporter.Report($"Expected struct '{structAst.Name}' to contain generics", enumerator.Current ?? enumerator.Last);
                 }
-                structAst.Generics.AddRange(generics);
+                structAst.Generics = generics.ToList();
             }
 
             // 3. Parse over the open brace
@@ -513,14 +513,17 @@ namespace Lang
             }
 
             // 5. Mark field types as generic if necessary
-            for (var i = 0; i < structAst.Generics.Count; i++)
+            if (structAst.Generics != null)
             {
-                var generic = structAst.Generics[i];
-                foreach (var field in structAst.Fields)
+                for (var i = 0; i < structAst.Generics.Count; i++)
                 {
-                    if (field.TypeDefinition != null && SearchForGeneric(generic, i, field.TypeDefinition))
+                    var generic = structAst.Generics[i];
+                    foreach (var field in structAst.Fields)
                     {
-                        field.HasGenerics = true;
+                        if (field.TypeDefinition != null && SearchForGeneric(generic, i, field.TypeDefinition))
+                        {
+                            field.HasGenerics = true;
+                        }
                     }
                 }
             }

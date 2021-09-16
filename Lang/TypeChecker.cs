@@ -24,8 +24,14 @@ namespace Lang
 
         private IType _voidType;
         private IType _boolType;
+        private IType _s8Type;
         private IType _u8Type;
+        private IType _s16Type;
+        private IType _u16Type;
         private PrimitiveAst _s32Type;
+        private IType _u32Type;
+        private IType _s64Type;
+        private IType _u64Type;
         private IType _float64Type;
         private IType _typeType;
         private IType _stringType;
@@ -46,14 +52,14 @@ namespace Lang
             // Add primitive types to global identifiers
             _voidType = AddPrimitive("void", TypeKind.Void, 1);
             _boolType = AddPrimitive("bool", TypeKind.Boolean, 1);
-            AddPrimitive("s8", TypeKind.Integer, 1, true);
+            _s8Type = AddPrimitive("s8", TypeKind.Integer, 1, true);
             _u8Type = AddPrimitive("u8", TypeKind.Integer, 1);
-            AddPrimitive("s16", TypeKind.Integer, 2, true);
-            AddPrimitive("u16", TypeKind.Integer, 2);
+            _s16Type = AddPrimitive("s16", TypeKind.Integer, 2, true);
+            _u16Type = AddPrimitive("u16", TypeKind.Integer, 2);
             _s32Type = AddPrimitive("s32", TypeKind.Integer, 4, true);
-            AddPrimitive("u32", TypeKind.Integer, 4);
-            AddPrimitive("s64", TypeKind.Integer, 8, true);
-            AddPrimitive("u64", TypeKind.Integer, 8);
+            _u32Type = AddPrimitive("u32", TypeKind.Integer, 4);
+            _s64Type = AddPrimitive("s64", TypeKind.Integer, 8, true);
+            _u64Type = AddPrimitive("u64", TypeKind.Integer, 8);
             AddPrimitive("float", TypeKind.Float, 4, true);
             _float64Type = AddPrimitive("float64", TypeKind.Float, 8, true);
             _typeType = AddPrimitive("Type", TypeKind.Type, 4, true);
@@ -73,7 +79,7 @@ namespace Lang
                             asts.RemoveAt(i--);
                             break;
                         case StructAst structAst:
-                            if (structAst.Generics.Any())
+                            if (structAst.Generics != null)
                             {
                                 if (_polymorphicStructs.ContainsKey(structAst.Name))
                                 {
@@ -837,21 +843,21 @@ namespace Lang
                 }
 
                 // 2b. Check the argument is the same type as the overload type
-                if (overload.Operator == Operator.Subscript && i == 1)
+                argument.Type = VerifyType(argument.TypeDefinition);
+                if (i > 0)
                 {
-                    if (argument.TypeDefinition.PrimitiveType is not IntegerType)
+                    if (overload.Operator == Operator.Subscript)
                     {
-                        ErrorReporter.Report($"Expected second argument of ");
-                        ErrorReporter.Report($"Expected second argument of overload of operator '{PrintOperator(overload.Operator)}' to be an integer, but got '{PrintTypeDefinition(argument.TypeDefinition)}'", argument.TypeDefinition);
+                        if (argument.Type?.TypeKind != TypeKind.Integer)
+                        {
+                            ErrorReporter.Report($"Expected second argument of overload of operator '{PrintOperator(overload.Operator)}' to be an integer, but got '{PrintTypeDefinition(argument.TypeDefinition)}'", argument.TypeDefinition);
+                        }
+                    }
+                    else if (!TypeDefinitionEquals(overload.Type, argument.TypeDefinition))
+                    {
+                        ErrorReporter.Report($"Expected overload of operator '{PrintOperator(overload.Operator)}' argument type to be '{PrintTypeDefinition(overload.Type)}', but got '{PrintTypeDefinition(argument.TypeDefinition)}'", argument.TypeDefinition);
                     }
                 }
-                else if (!TypeEquals(overload.Type, argument.Type, true))
-                {
-                    ErrorReporter.Report($"Expected overload of operator '{PrintOperator(overload.Operator)}' argument type to be '{PrintTypeDefinition(overload.Type)}', but got '{PrintTypeDefinition(argument.TypeDefinition)}'", argument.TypeDefinition);
-                }
-
-                // TODO Make this better, roll into VerifyType
-                argument.Type = TypeTable.GetType(argument.TypeDefinition);
             }
 
             // 3. Load the overload into the dictionary
@@ -1320,7 +1326,7 @@ namespace Lang
                 {
                     ErrorReporter.Report($"Length of C array variable '{declaration.Name}' must be initialized to a constant integer", declaration.TypeDefinition);
                 }
-                else if (declaration.TypeDefinition.Count != null)
+                else if ((declaration.Type.TypeKind == TypeKind.Array || declaration.Type.TypeKind == TypeKind.CArray) && declaration.TypeDefinition.Count != null)
                 {
                     var countType = VerifyConstantExpression(declaration.TypeDefinition.Count, null, _globalScope, out var isConstant, out var count);
 
@@ -2017,10 +2023,11 @@ namespace Lang
             }
 
             structField.Types[fieldIndex] = structType;
-            if (structType is ArrayType && fieldName == "length")
+            if (structType is ArrayType arrayType && fieldName == "length")
             {
                 structField.IsConstant = true;
-                structField.ConstantValue = structType.ConstCount.Value;
+                // structField.ConstantValue = structType.ConstCount.Value;
+                structField.ConstantValue = arrayType.Length;
                 return _s32Type;
             }
             if (structType is not StructAst structDefinition)
@@ -2118,9 +2125,9 @@ namespace Lang
                 switch (iterationType.TypeKind)
                 {
                     case TypeKind.CArray:
-                        each.CArrayLength = iterationType.ConstCount.Value;
                         // Same logic as below with special case for constant length
                         var arrayType = (ArrayType)iterationType;
+                        each.CArrayLength = arrayType.Length;
                         each.IterationVariable.Type = arrayType.ElementType;
                         each.Body.Identifiers.TryAdd(each.IterationVariable.Name, each.IterationVariable);
                         break;
@@ -3296,17 +3303,18 @@ namespace Lang
             }
             else
             {
-                if (callType.Name != argumentType.Name || callType.Generics.Count != argumentType.Generics.Count)
-                {
-                    return false;
-                }
-                for (var i = 0; i < callType.Generics.Count; i++)
-                {
-                    if (!VerifyPolymorphicArgument(callType.Generics[i], argumentType.Generics[i], genericTypes))
-                    {
-                        return false;
-                    }
-                }
+                // TODO Implement me
+                // if (callType.Name != argumentType.Name || callType.Generics.Count != argumentType.Generics.Count)
+                // {
+                //     return false;
+                // }
+                // for (var i = 0; i < callType.Generics.Count; i++)
+                // {
+                //     if (!VerifyPolymorphicArgument(callType.Generics[i], argumentType.Generics[i], genericTypes))
+                //     {
+                //         return false;
+                //     }
+                // }
             }
             return true;
         }
@@ -3351,12 +3359,12 @@ namespace Lang
                         if (overload != null)
                         {
                             expression.OperatorOverloads[i] = overload;
-                            expression.TypeDefinition = overload.ReturnTypeDefinition;
+                            expression.Type = overload.ReturnType;
                         }
                     }
                     else
                     {
-                        ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{nextExpressionType.Name}'", expression.Children[i]);
+                        ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{expression.Type.Name}' and '{nextExpressionType.Name}'", expression.Children[i]);
                     }
                 }
                 else
@@ -3368,7 +3376,7 @@ namespace Lang
                         case Operator.Or:
                             if (type != TypeKind.Boolean || nextType != TypeKind.Boolean)
                             {
-                                ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{nextExpressionType.Name}'", expression.Children[i]);
+                                ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{expression.Type.Name}' and '{nextExpressionType.Name}'", expression.Children[i]);
                                 expression.Type = _boolType;
                             }
                             break;
@@ -3384,13 +3392,13 @@ namespace Lang
                             {
                                 if ((op != Operator.Equality && op != Operator.NotEqual) || !TypeEquals(expression.Type, nextExpressionType))
                                 {
-                                    ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{nextExpressionType.Name}'", expression.Children[i]);
+                                    ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{expression.Type.Name}' and '{nextExpressionType.Name}'", expression.Children[i]);
                                 }
                             }
                             else if (!(type == TypeKind.Integer || type == TypeKind.Float) &&
                                 !(nextType == TypeKind.Integer || nextType == TypeKind.Float))
                             {
-                                ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{nextExpressionType.Name}'", expression.Children[i]);
+                                ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{expression.Type.Name}' and '{nextExpressionType.Name}'", expression.Children[i]);
                             }
                             expression.Type = _boolType;
                             break;
@@ -3412,25 +3420,13 @@ namespace Lang
                             else if ((type == TypeKind.Integer || type == TypeKind.Float) &&
                                 (nextType == TypeKind.Integer || nextType == TypeKind.Float))
                             {
+                                if (expression.Type == nextExpressionType)
+                                    break;
+
                                 // For integer operations, use the larger size and convert to signed if one type is signed
                                 if (type == TypeKind.Integer && nextType == TypeKind.Integer)
                                 {
-                                    var currentIntegerType = expression.TypeDefinition.PrimitiveType;
-                                    var nextIntegerType = nextExpressionType.PrimitiveType;
-                                    if (currentIntegerType.Bytes == nextIntegerType.Bytes &&
-                                        currentIntegerType.Signed == nextIntegerType.Signed)
-                                        break;
-
-                                    var integerType = new IntegerType
-                                    {
-                                        Bytes = currentIntegerType.Bytes > nextIntegerType.Bytes ? currentIntegerType.Bytes : nextIntegerType.Bytes,
-                                        Signed = currentIntegerType.Signed || nextIntegerType.Signed
-                                    };
-                                    expression.TypeDefinition = new TypeDefinition
-                                    {
-                                        Name = $"{(integerType.Signed ? "s" : "u")}{integerType.Bytes * 8}",
-                                        TypeKind = TypeKind.Integer, PrimitiveType = integerType
-                                    };
+                                    expression.Type = GetNextIntegerType(expression.Type, nextExpressionType);
                                 }
                                 // For floating point operations, convert to the larger size
                                 else if (type == TypeKind.Float && nextType == TypeKind.Float)
@@ -3449,7 +3445,7 @@ namespace Lang
                             }
                             else
                             {
-                                ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{nextExpressionType.Name}'", expression.Children[i]);
+                                ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{expression.Type.Name}' and '{nextExpressionType.Name}'", expression.Children[i]);
                             }
                             break;
                         // Requires both integer or bool types and returns more same type
@@ -3458,26 +3454,14 @@ namespace Lang
                         case Operator.Xor:
                             if (type == TypeKind.Integer && nextType == TypeKind.Integer)
                             {
-                                var currentIntegerType = expression.TypeDefinition.PrimitiveType;
-                                var nextIntegerType = nextExpressionType.PrimitiveType;
-                                if (currentIntegerType.Bytes == nextIntegerType.Bytes &&
-                                    currentIntegerType.Signed == nextIntegerType.Signed)
-                                    break;
-
-                                var integerType = new IntegerType
+                                if (expression.Type != nextExpressionType)
                                 {
-                                    Bytes = currentIntegerType.Bytes > nextIntegerType.Bytes ? currentIntegerType.Bytes : nextIntegerType.Bytes,
-                                    Signed = currentIntegerType.Signed || nextIntegerType.Signed
-                                };
-                                expression.TypeDefinition = new TypeDefinition
-                                {
-                                    Name = $"{(integerType.Signed ? "s" : "u")}{integerType.Bytes * 8}",
-                                    TypeKind = TypeKind.Integer, PrimitiveType = integerType
-                                };
+                                    expression.Type = GetNextIntegerType(expression.Type, nextExpressionType);
+                                }
                             }
                             else if (!(type == TypeKind.Boolean && nextType == TypeKind.Boolean))
                             {
-                                ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{nextExpressionType.Name}'", expression.Children[i]);
+                                ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{expression.Type.Name}' and '{nextExpressionType.Name}'", expression.Children[i]);
                                 if (nextType == TypeKind.Boolean || nextType == TypeKind.Integer)
                                 {
                                     expression.Type = nextExpressionType;
@@ -3495,7 +3479,7 @@ namespace Lang
                         case Operator.RotateRight:
                             if (type != TypeKind.Integer || nextType != TypeKind.Integer)
                             {
-                                ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.TypeDefinition)}' and '{nextExpressionType.Name}'", expression.Children[i]);
+                                ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{expression.Type.Name}' and '{nextExpressionType.Name}'", expression.Children[i]);
                                 if (type != TypeKind.Integer)
                                 {
                                     if (nextType == TypeKind.Integer)
@@ -3512,12 +3496,40 @@ namespace Lang
                             break;
                     }
                 }
-                expression.Type = TypeTable.GetType(expression.TypeDefinition);
+                // expression.Type = TypeTable.GetType(expression.TypeDefinition);
                 expression.ResultingTypes.Add(expression.Type);
-                expression.ResultingTypeDefinitions.Add(expression.TypeDefinition);
+                // expression.ResultingTypeDefinitions.Add(expression.TypeDefinition);
             }
             // return expression.TypeDefinition;
             return expression.Type;
+        }
+
+        private IType GetNextIntegerType(IType currentType, IType nextType)
+        {
+            var currentIntegerType = (PrimitiveAst)currentType;
+            var nextIntegerType = (PrimitiveAst)nextType;
+
+            var size = currentIntegerType.Size > nextIntegerType.Size ? currentIntegerType.Size : nextIntegerType.Size;
+            if (currentIntegerType.Signed || nextIntegerType.Signed)
+            {
+                return size switch
+                {
+                    1 => _s8Type,
+                    2 => _s16Type,
+                    8 => _s64Type,
+                    _ => _s32Type
+                };
+            }
+            else
+            {
+                return size switch
+                {
+                    1 => _u8Type,
+                    2 => _u16Type,
+                    8 => _u64Type,
+                    _ => _u32Type
+                };
+            }
         }
 
         // private TypeDefinition VerifyIndexType(IndexAst index, IFunction currentFunction, ScopeAst scope)
@@ -3666,6 +3678,18 @@ namespace Lang
             }
 
             return false;
+        }
+
+        private static bool TypeDefinitionEquals(TypeDefinition a, TypeDefinition b)
+        {
+            if (a?.Name != b?.Name || a.Generics.Count != b.Generics.Count) return false;
+
+            for (var i = 0; i < a.Generics.Count; i++)
+            {
+                if (!TypeDefinitionEquals(a.Generics[i], b.Generics[i])) return false;
+            }
+
+            return true;
         }
 
         /*private static bool TypeEquals(TypeDefinition a, TypeDefinition b, bool checkPrimitives = false, int depth = 0)
@@ -3872,10 +3896,11 @@ namespace Lang
                         else
                         {
                             var generics = type.Generics.ToArray();
+                            var genericTypes = new IType[generics.Length];
                             var error = false;
-                            foreach (var generic in generics)
+                            for (var i = 0; i < generics.Length; i++)
                             {
-                                var genericType = VerifyType(generic, out var hasGeneric, out _, out _, depth + 1, allowParams);
+                                var genericType = genericTypes[i] = VerifyType(generics[i], out var hasGeneric, out _, out _, depth + 1, allowParams);
                                 if (genericType == null)
                                 {
                                     error = true;
@@ -3901,7 +3926,8 @@ namespace Lang
                             }
                             else
                             {
-                                var polyStruct = _polymorpher.CreatePolymorphedStruct(structDef, PrintTypeDefinition(type), TypeKind.Struct, generics);
+                                var name = PrintTypeDefinition(type);
+                                var polyStruct = _polymorpher.CreatePolymorphedStruct(structDef, name, genericName, TypeKind.Struct, genericTypes, generics);
                                 TypeTable.Add(genericName, polyStruct);
                                 VerifyStruct(polyStruct);
                                 return polyStruct;
@@ -4229,7 +4255,7 @@ namespace Lang
                 return null;
             }
 
-            var arrayStruct = _polymorpher.CreatePolymorphedStruct(structDef, $"Array<{PrintTypeDefinition(elementTypeDef)}>", TypeKind.Array, elementTypeDef);
+            var arrayStruct = _polymorpher.CreatePolymorphedStruct(structDef, $"Array<{PrintTypeDefinition(elementTypeDef)}>", genericName, TypeKind.Array, new []{elementType}, elementTypeDef);
             TypeTable.Add(genericName, arrayStruct);
             VerifyStruct(arrayStruct);
             return arrayStruct;

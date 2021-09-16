@@ -107,7 +107,7 @@ namespace Lang
         public bool Verifying { get; set; }
         public List<string> Generics { get; set; }
         // TODO Implement
-        public List<IType> GenericTypes { get; set; }
+        public IType[] GenericTypes { get; set; }
         public List<StructFieldAst> Fields { get; } = new();
     }
 
@@ -198,6 +198,7 @@ namespace Lang
         public int TypeIndex { get; set; }
         public TypeKind TypeKind { get; set; } = TypeKind.CArray;
         public uint Size { get; set; }
+        public uint Length { get; set; } // TODO Set this
         // public TypeDefinition ElementTypeDefinition { get; set; }
         public IType ElementType { get; set; }
     }
@@ -236,10 +237,10 @@ namespace Lang
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
-        public TypeDefinition TypeDefinition { get; set; }
+        // public TypeDefinition TypeDefinition { get; set; }
         public IType Type { get; set; }
         public List<Operator> Operators { get; } = new();
-        public List<TypeDefinition> ResultingTypeDefinitions { get; } = new();
+        // public List<TypeDefinition> ResultingTypeDefinitions { get; } = new();
         public List<IType> ResultingTypes { get; } = new();
         public Dictionary<int, OperatorOverloadAst> OperatorOverloads { get; } = new();
         public List<IAst> Children { get; } = new();
