@@ -376,7 +376,33 @@ namespace Lang.Parsing
                         if (commaRequiredBeforeNextArgument)
                         {
                             enumerator.MoveNext();
-                            currentArgument.Value = ParseNextExpressionUnit(enumerator, errors, function, out _);
+                            currentArgument.Value = ParseExpression(enumerator, errors, function, null, TokenType.Comma, TokenType.CloseParen);
+                            switch (enumerator.Current?.Type)
+                            {
+                                case TokenType.Comma:
+                                    commaRequiredBeforeNextArgument = false;
+                                    function.Arguments.Add(currentArgument);
+                                    currentArgument = null;
+                                    break;
+                                case TokenType.CloseParen:
+                                    function.Arguments.Add(currentArgument);
+                                    currentArgument = null;
+                                    break;
+                                case null:
+                                    errors.Add(new ParseError
+                                    {
+                                        Error = $"Incomplete definition for function '{function.Name}'",
+                                        Token = enumerator.Last
+                                    });
+                                    return null;
+                                default:
+                                    errors.Add(new ParseError
+                                    {
+                                        Error = $"Unexpected token '{enumerator.Current.Value}' in arguments of function '{function.Name}'",
+                                        Token = enumerator.Current
+                                    });
+                                    break;
+                            }
                         }
                         else
                         {
@@ -386,6 +412,11 @@ namespace Lang.Parsing
                     default:
                         errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}' in arguments", Token = token});
                         break;
+                }
+
+                if (enumerator.Current?.Type == TokenType.CloseParen)
+                {
+                    break;
                 }
             }
 

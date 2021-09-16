@@ -155,6 +155,7 @@ namespace Lang.Runner
                 }
             }
 
+
             if (functionTypeBuilder != null)
             {
                 var library = functionTypeBuilder.CreateType();
@@ -196,6 +197,7 @@ namespace Lang.Runner
                     {
                         var typeInfo = Activator.CreateInstance(typeInfoType);
 
+
                         var typeNameField = typeInfoType.GetField("name");
                         typeNameField.SetValue(typeInfo, GetString(type.Name));
                         var typeKindField = typeInfoType.GetField("type");
@@ -216,7 +218,9 @@ namespace Lang.Runner
                     for (var i = 0; i < functions.Count; i++)
                     {
                         var function = functions[i];
-                        if (!_typeInfoPointers.TryGetValue($"name.{i}", out var typeInfoPointer))
+                        if (function.Generics.Any()) continue;
+
+                        if (!_typeInfoPointers.TryGetValue($"{name}.{i}", out var typeInfoPointer))
                         {
                             var typeInfo = Activator.CreateInstance(typeInfoType);
 
@@ -225,7 +229,7 @@ namespace Lang.Runner
                             var typeKindField = typeInfoType.GetField("type");
                             typeKindField.SetValue(typeInfo, function.TypeKind);
 
-                            _typeInfoPointers[$"name.{i}"] = typeInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoType));
+                            _typeInfoPointers[$"{name}.{i}"] = typeInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoType));
                             newTypeInfos.Add((function, typeInfo, typeInfoPointer));
                         }
 
