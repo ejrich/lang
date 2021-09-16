@@ -216,7 +216,7 @@ namespace Lang
                     return;
                 }
 
-                switch (declaration.TypeDefinition.TypeKind)
+                switch (declaration.Type.TypeKind)
                 {
                     // Initialize arrays
                     case TypeKind.Array:
@@ -230,7 +230,7 @@ namespace Lang
                             var constArray = new InstructionValue
                             {
                                 ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
-                                          Values = new [] {GetConstantInteger(0), new InstructionValue {ValueType = InstructionValueType.Null}}
+                                Values = new [] {GetConstantInteger(0), new InstructionValue {ValueType = InstructionValueType.Null}}
                             };
                             globalVariable.InitialValue = constArray;
                         }
@@ -241,16 +241,16 @@ namespace Lang
                             globalVariable.InitialArrayValues = declaration.ArrayValues.Select(val => EmitConstantIR(val, scope)).ToArray();
                         }
                         break;
-                        // Initialize struct field default values
+                    // Initialize struct field default values
                     case TypeKind.Struct:
                     case TypeKind.String:
                         globalVariable.InitialValue = GetConstantStruct((StructAst)declaration.Type, scope, declaration.Assignments);
                         break;
-                        // Initialize pointers to null
+                    // Initialize pointers to null
                     case TypeKind.Pointer:
                         globalVariable.InitialValue = new InstructionValue {ValueType = InstructionValueType.Null};
                         break;
-                        // Or initialize to default
+                    // Or initialize to default
                     default:
                         globalVariable.InitialValue = GetDefaultConstant(declaration.Type);
                         break;
@@ -423,7 +423,7 @@ namespace Lang
                     return;
                 }
 
-                switch (declaration.TypeDefinition.TypeKind)
+                switch (declaration.Type.TypeKind)
                 {
                     // Initialize arrays
                     case TypeKind.Array:

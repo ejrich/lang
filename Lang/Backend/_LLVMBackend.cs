@@ -21,6 +21,7 @@ namespace Lang.Backend
         private LLVMTypeRef _stringType;
         private LLVMTypeRef _u8PointerType;
         private LLVMTypeRef[] _types;
+        private LLVMValueRef[] _globals;
         private Queue<(LLVMValueRef, FunctionIR)> _functionsToWrite = new();
 
         private bool _emitDebug;
@@ -44,67 +45,7 @@ namespace Lang.Backend
             // 2. Initialize the LLVM module and builder
             InitLLVM(project, buildSettings.Release, objectPath);
 
-            // 3. Write Data section
-            var globals = WriteData();
-
-            // 4. Write the program beginning at the entrypoint
-            WriteFunctionDefinition("main", Program.EntryPoint);
-            while (_functionsToWrite.Any())
-            {
-                var (functionPointer, function) = _functionsToWrite.Dequeue();
-                WriteFunction(functionPointer, function);
-            }
-
-            // 5. Compile to object file
-            var objectFile = Path.Combine(objectPath, $"{project.Name}.o");
-            Compile(objectFile, buildSettings.OutputAssembly);
-
-            return objectFile;
-        }
-
-        private void InitLLVM(ProjectFile project, bool optimize, string objectPath)
-        {
-            _module = LLVMModuleRef.CreateWithName(project.Name);
-            _context = _module.Context;
-            _builder = LLVMBuilderRef.Create(_context);
-            _passManager = _module.CreateFunctionPassManager();
-            if (optimize)
-            {
-                LLVM.AddBasicAliasAnalysisPass(_passManager);
-                LLVM.AddPromoteMemoryToRegisterPass(_passManager);
-                LLVM.AddInstructionCombiningPass(_passManager);
-                LLVM.AddReassociatePass(_passManager);
-                LLVM.AddGVNPass(_passManager);
-                LLVM.AddCFGSimplificationPass(_passManager);
-
-                LLVM.InitializeFunctionPassManager(_passManager);
-            }
-            else
-            {
-                _emitDebug = true;
-                _debugBuilder = _module.CreateDIBuilder();
-                _debugFiles = project.SourceFiles.Select(file => _debugBuilder.CreateFile(Path.GetFileName(file), Path.GetDirectoryName(file))).ToList();
-                _debugCompilationUnit = _debugBuilder.CreateCompileUnit(LLVMDWARFSourceLanguage.LLVMDWARFSourceLanguageC, _debugFiles[0], "ol", 0, string.Empty, 0, string.Empty, LLVMDWARFEmissionKind.LLVMDWARFEmissionFull, 0, 0, 0, string.Empty, string.Empty);
-
-                AddModuleFlag("Dwarf Version", 4);
-                AddModuleFlag("Debug Info Version", LLVM.DebugMetadataVersion());
-                AddModuleFlag("PIE Level", 2);
-
-                _debugTypes = new Dictionary<string, LLVMMetadataRef>();
-                _debugFunctions = new Dictionary<string, LLVMMetadataRef>();
-            }
-        }
-
-        private void AddModuleFlag(string flagName, uint flagValue)
-        {
-            using var name = new MarshaledString(flagName);
-            var value = LLVM.ValueAsMetadata(LLVM.ConstInt(LLVM.Int32Type(), flagValue, 0));
-            LLVM.AddModuleFlag(_module, LLVMModuleFlagBehavior.LLVMModuleFlagBehaviorWarning, name.Value, (UIntPtr)name.Length, value);
-        }
-
-        private IDictionary<string, (TypeDefinition type, LLVMValueRef value)> WriteData()
-        {
-            // 1. Declare types
+            // 3. Declare types
             _types = new LLVMTypeRef[TypeTable.Count];
             var structs = new Dictionary<string, LLVMTypeRef>();
             // if (_emitDebug)
@@ -194,50 +135,60 @@ namespace Lang.Backend
             _stringType = structs["string"];
             _u8PointerType = LLVM.PointerType(LLVM.Int8Type(), 0);
 
-            // 2. Declare variables
-            var globals = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>();
-            // foreach (var globalVariable in _programGraph.Variables)
+            // 4. Declare variables
+            var typeTableIndex = 0;
+            _globals = new LLVMValueRef[Program.GlobalVariables.Count];
+            foreach (var globalVariable in Program.GlobalVariables)
+            {
+                if (globalVariable.Name == "__type_table")
+                {
+                    typeTableIndex = globalVariable.Index;
+                }
+
+                LLVMValueRef global;
+                if (globalVariable.Array)
+                {
+                    global = _module.AddGlobal(LLVM.ArrayType(_types[globalVariable.Type.TypeIndex], globalVariable.ArrayLength), globalVariable.Name);
+
+                    if (globalVariable.InitialArrayValues != null)
+                    {
+                        // TODO Get the initial values
+                    }
+                }
+                else
+                {
+                    var type = _types[globalVariable.Type.TypeIndex];
+                    global = _module.AddGlobal(type, globalVariable.Name);
+
+                    switch (globalVariable.InitialValue.ValueType)
+                    {
+                        case InstructionValueType.Constant:
+                            LLVM.SetInitializer(global, GetConstant(globalVariable.InitialValue));
+                            break;
+                        case InstructionValueType.Null:
+                            LLVM.SetInitializer(global, LLVM.ConstNull(type));
+                            break;
+                        case InstructionValueType.ConstantStruct:
+                            // TODO Implement me
+                            break;
+                    }
+                }
+
+                LLVM.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
+                _globals[globalVariable.Index] = global;
+            }
+            // if (_emitDebug)
             // {
-            //     if (globalVariable.Constant && globalVariable.TypeDefinition.TypeKind != TypeKind.String)
-            //     {
-            //         var (_, constant) = WriteExpression(globalVariable.Value, null);
-            //         globals.Add(globalVariable.Name, (globalVariable.TypeDefinition, constant));
-            //     }
-            //     else
-            //     {
-            //         var typeDef = globalVariable.TypeDefinition;
-            //         var type = ConvertTypeDefinition(typeDef);
-            //         var global = _module.AddGlobal(type, globalVariable.Name);
-            //         LLVM.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
-            //         if (globalVariable.Value != null)
-            //         {
-            //             LLVM.SetInitializer(global, WriteExpression(globalVariable.Value, null).value);
-            //         }
-            //         else if (typeDef.TypeKind == TypeKind.Integer || typeDef.TypeKind == TypeKind.Float)
-            //         {
-            //             LLVM.SetInitializer(global, GetConstZero(type));
-            //         }
-            //         else if (typeDef.TypeKind == TypeKind.Pointer)
-            //         {
-            //             LLVM.SetInitializer(global, LLVM.ConstNull(type));
-            //         }
+            //     using var name = new MarshaledString(globalVariable.Name);
 
-            //         if (_emitDebug)
-            //         {
-            //             using var name = new MarshaledString(globalVariable.Name);
-
-            //             var file = _debugFiles[globalVariable.FileIndex];
-            //             var debugType = GetDebugType(globalVariable.TypeDefinition);
-            //             var globalDebug = LLVM.DIBuilderCreateGlobalVariableExpression(_debugBuilder, _debugCompilationUnit, name.Value, (UIntPtr)name.Length, null, (UIntPtr)0, file, globalVariable.Line, debugType, 0, null, null, 0);
-            //             LLVM.GlobalSetMetadata(global, 0, globalDebug);
-            //         }
-
-            //         globals.Add(globalVariable.Name, (globalVariable.TypeDefinition, global));
-            //     }
+            //     var file = _debugFiles[globalVariable.FileIndex];
+            //     var debugType = GetDebugType(globalVariable.TypeDefinition);
+            //     var globalDebug = LLVM.DIBuilderCreateGlobalVariableExpression(_debugBuilder, _debugCompilationUnit, name.Value, (UIntPtr)name.Length, null, (UIntPtr)0, file, globalVariable.Line, debugType, 0, null, null, 0);
+            //     LLVM.GlobalSetMetadata(global, 0, globalDebug);
             // }
 
-            // 3. Write type table
-            var typeTable = globals["__type_table"].value;
+            // 5. Write type table
+            var typeTable = _globals[typeTableIndex];
             SetPrivateConstant(typeTable);
             var typeInfoType = structs["TypeInfo"];
 
@@ -414,7 +365,59 @@ namespace Lang.Backend
             var typeInfoArrayType = structs["Array.*.TypeInfo"];
             LLVM.SetInitializer(typeTable, LLVMValueRef.CreateConstNamedStruct(typeInfoArrayType, new LLVMValueRef[] {typeCount, typeArrayGlobal}));
 
-            return globals;
+            // 6. Write the program beginning at the entrypoint
+            WriteFunctionDefinition("main", Program.EntryPoint);
+            while (_functionsToWrite.Any())
+            {
+                var (functionPointer, function) = _functionsToWrite.Dequeue();
+                WriteFunction(functionPointer, function);
+            }
+
+            // 7. Compile to object file
+            var objectFile = Path.Combine(objectPath, $"{project.Name}.o");
+            Compile(objectFile, buildSettings.OutputAssembly);
+
+            return objectFile;
+        }
+
+        private void InitLLVM(ProjectFile project, bool optimize, string objectPath)
+        {
+            _module = LLVMModuleRef.CreateWithName(project.Name);
+            _context = _module.Context;
+            _builder = LLVMBuilderRef.Create(_context);
+            _passManager = _module.CreateFunctionPassManager();
+            if (optimize)
+            {
+                LLVM.AddBasicAliasAnalysisPass(_passManager);
+                LLVM.AddPromoteMemoryToRegisterPass(_passManager);
+                LLVM.AddInstructionCombiningPass(_passManager);
+                LLVM.AddReassociatePass(_passManager);
+                LLVM.AddGVNPass(_passManager);
+                LLVM.AddCFGSimplificationPass(_passManager);
+
+                LLVM.InitializeFunctionPassManager(_passManager);
+            }
+            else
+            {
+                _emitDebug = true;
+                _debugBuilder = _module.CreateDIBuilder();
+                _debugFiles = project.SourceFiles.Select(file => _debugBuilder.CreateFile(Path.GetFileName(file), Path.GetDirectoryName(file))).ToList();
+                _debugCompilationUnit = _debugBuilder.CreateCompileUnit(LLVMDWARFSourceLanguage.LLVMDWARFSourceLanguageC, _debugFiles[0], "ol", 0, string.Empty, 0, string.Empty, LLVMDWARFEmissionKind.LLVMDWARFEmissionFull, 0, 0, 0, string.Empty, string.Empty);
+
+                AddModuleFlag("Dwarf Version", 4);
+                AddModuleFlag("Debug Info Version", LLVM.DebugMetadataVersion());
+                AddModuleFlag("PIE Level", 2);
+
+                _debugTypes = new Dictionary<string, LLVMMetadataRef>();
+                _debugFunctions = new Dictionary<string, LLVMMetadataRef>();
+            }
+        }
+
+        private void AddModuleFlag(string flagName, uint flagValue)
+        {
+            using var name = new MarshaledString(flagName);
+            var value = LLVM.ValueAsMetadata(LLVM.ConstInt(LLVM.Int32Type(), flagValue, 0));
+            LLVM.AddModuleFlag(_module, LLVMModuleFlagBehavior.LLVMModuleFlagBehaviorWarning, name.Value, (UIntPtr)name.Length, value);
         }
 
         private LLVMTypeRef GetIntegerType(uint size)
@@ -1012,6 +1015,10 @@ namespace Lang.Backend
                 case InstructionValueType.Value:
                     return values[value.ValueIndex];
                 case InstructionValueType.Allocation:
+                    if (value.Global)
+                    {
+                        return _globals[value.ValueIndex];
+                    }
                     return allocations[value.ValueIndex];
                 case InstructionValueType.Argument:
                     return functionPointer.GetParam((uint)value.ValueIndex);
