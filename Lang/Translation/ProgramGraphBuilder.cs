@@ -82,7 +82,6 @@ namespace Lang.Translation
                             {
                                 errors.Add(CreateError("Only one main function can be defined", function));
                             }
-                            function.Name = "__main";
                             mainDefined = true;
                         }
                         VerifyFunctionDefinition(function, main, errors);
@@ -97,7 +96,6 @@ namespace Lang.Translation
                 {
                     case FunctionAst function:
                         _currentFunction = function;
-                        // The __start function does not need to be verified
                         if (function.Name == "__start")
                         {
                             graph.Start = function;
