@@ -238,6 +238,7 @@ namespace Lang
                     var structFieldPointer = EmitGetStructPointer(function, structField, scope, block, out var loaded, out var constant);
                     if (!loaded && !constant)
                     {
+                        // TODO Implement getStringPointer
                         // if (getStringPointer && type.TypeKind == TypeKind.String)
                         // {
                         //     field = _builder.BuildStructGEP(field, 1, "stringdata");
@@ -284,44 +285,25 @@ namespace Lang
                     //     LLVM.BuildStore(_builder, newValue, pointer);
                     // }
                     // return changeByOne.Prefix ? (variableType, newValue) : (variableType, value);
+                    break;
                 case UnaryAst unary:
-                    // if (unary.Operator == UnaryOperator.Reference)
-                    // {
-                    //     var (valueType, pointer) = unary.Value switch
-                    //     {
-                    //         IdentifierAst identifier => localVariables[identifier.Name],
-                    //         StructFieldRefAst structField => BuildStructField(structField, localVariables, out _, out _),
-                    //         IndexAst index => GetIndexPointer(index, localVariables, out _),
-                    //         // @Cleanup this branch should not be hit
-                    //         _ => (null, new LLVMValueRef())
-                    //     };
-                    //     var pointerType = new TypeDefinition {Name = "*", TypeKind = TypeKind.Pointer};
-                    //     if (valueType.CArray)
-                    //     {
-                    //         pointerType.Generics.Add(valueType.Generics[0]);
-                    //     }
-                    //     else
-                    //     {
-                    //         pointerType.Generics.Add(valueType);
-                    //     }
-                    //     return (pointerType, pointer);
-                    // }
-
-                    // var (type, value) = WriteExpression(unary.Value, localVariables);
-                    // return unary.Operator switch
-                    // {
-                    //     UnaryOperator.Not => (type, _builder.BuildNot(value, "not")),
-                    //     UnaryOperator.Negate => type.PrimitiveType switch
-                    //     {
-                    //         IntegerType => (type, _builder.BuildNeg(value, "neg")),
-                    //         FloatType => (type, _builder.BuildFNeg(value, "fneg")),
-                    //         // @Cleanup This branch should not be hit
-                    //         _ => (null, new LLVMValueRef())
-                    //     },
-                    //     UnaryOperator.Dereference => (type.Generics[0], _builder.BuildLoad(value, "tmpderef")),
-                    //     // @Cleanup This branch should not be hit
-                    //     _ => (null, new LLVMValueRef())
-                    // };
+                    InstructionValue value;
+                    switch (unary.Operator)
+                    {
+                        case UnaryOperator.Not:
+                            value = EmitIR(function, unary.Value, scope, block);
+                            return EmitInstruction(InstructionType.Not, block, value);
+                        case UnaryOperator.Negate:
+                            // TODO Get should there be different instructions for integers and floats?
+                            value = EmitIR(function, unary.Value, scope, block);
+                            return EmitInstruction(InstructionType.Negate, block, value);
+                        case UnaryOperator.Dereference:
+                            value = EmitIR(function, unary.Value, scope, block);
+                            return EmitLoad(block, value);
+                        case UnaryOperator.Reference:
+                            // TODO Get type?
+                            return EmitGetReference(function, unary.Value, scope, block);
+                    }
                     break;
                 case IndexAst index:
                     var indexPointer = EmitGetIndexPointer(function, index, scope, block);
@@ -452,6 +434,21 @@ namespace Lang
             return value;
         }
 
+        private InstructionValue EmitGetReference(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block)
+        {
+            switch (ast)
+            {
+                case IdentifierAst identifier:
+                    var declaration = (DeclarationAst) GetScopeIdentifier(scope, identifier.Name, out var global);
+                    return EmitGetPointer(block, allocationIndex: declaration.AllocationIndex, global: global);
+                case StructFieldRefAst structField:
+                    return EmitGetStructPointer(function, structField, scope, block, out _, out _);
+                case IndexAst index:
+                    return EmitGetIndexPointer(function, index, scope, block);
+            }
+            return null;
+        }
+
         private InstructionValue EmitGetStructPointer(FunctionIR function, StructFieldRefAst structField, ScopeAst scope, BasicBlock block, out bool loaded, out bool constant)
         {
             loaded = false;
@@ -464,7 +461,7 @@ namespace Lang
                 case IdentifierAst identifier:
                     var declaration = (DeclarationAst) GetScopeIdentifier(scope, identifier.Name, out var global);
                     type = declaration.Type;
-                    value = EmitGetPointer(block, allocationIndex: declaration.AllocationIndex);
+                    value = EmitGetPointer(block, allocationIndex: declaration.AllocationIndex, global: global);
                     break;
                 case IndexAst index:
                     value = EmitGetIndexPointer(function, index, scope, block);
@@ -639,7 +636,7 @@ namespace Lang
             {
                 var declaration = (DeclarationAst) GetScopeIdentifier(scope, index.Name, out var global);
                 type = declaration.Type;
-                variable = EmitGetPointer(block, allocationIndex: declaration.AllocationIndex);
+                variable = EmitGetPointer(block, allocationIndex: declaration.AllocationIndex, global: global);
             }
 
             var indexValue = EmitIR(function, index.Index, scope, block);
@@ -717,11 +714,11 @@ namespace Lang
         }
 
         // TODO For index value, calculate the size of the element
-        private InstructionValue EmitGetPointer(BasicBlock block, InstructionValue pointer = null, InstructionValue index = null, TypeDefinition type = null, bool getFirstPointer = false, int? allocationIndex = null)
+        private InstructionValue EmitGetPointer(BasicBlock block, InstructionValue pointer = null, InstructionValue index = null, TypeDefinition type = null, bool getFirstPointer = false, int? allocationIndex = null, bool global = false)
         {
             var loadInstruction = new Instruction
             {
-                Type = InstructionType.GetPointer, Index = allocationIndex,
+                Type = InstructionType.GetPointer, Index = allocationIndex, Global = global,
                 Value1 = pointer, Value2 = index, GetFirstPointer = getFirstPointer
             };
             var loadValue = new InstructionValue {ValueIndex = block.Instructions.Count, Type = type};
@@ -748,6 +745,14 @@ namespace Lang
             var callValue = new InstructionValue {ValueIndex = block.Instructions.Count, Type = returnType};
             block.Instructions.Add(callInstruction);
             return callValue;
+        }
+
+        private InstructionValue EmitInstruction(InstructionType type, BasicBlock block, InstructionValue value1, InstructionValue value2 = null)
+        {
+            var instruction = new Instruction {Type = type, Value1 = value1, Value2 = value2};
+            var value = new InstructionValue {ValueIndex = block.Instructions.Count};
+            block.Instructions.Add(instruction);
+            return value;
         }
     }
 }
