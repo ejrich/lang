@@ -115,7 +115,7 @@ int primitives() {
 
 struct ListStruct {
     int something = 5;
-    List<int>[6] list;
+    List<float64>[6] list;
 }
 
 List<int> create_list(int count) {
@@ -127,7 +127,8 @@ List<int> create_list(int count) {
     list[0]++;
     ++list[0];
     s: ListStruct;
-    s.list[0] = 8;
+    s.list[0] = 8.9;
+    printf("%.2f\n", s.list[0]);
     return list;
 }
 

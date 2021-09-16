@@ -379,9 +379,10 @@ namespace Lang.Backend.LLVM
             else if (declaration.Type.Name == "List")
             {
                 BuildStackSave();
+                var listType = declaration.Type.Generics[0];
                 if (declaration.Type.Count is ConstantAst constant)
                 {
-                    InitializeConstList(variable, int.Parse(constant.Value));
+                    InitializeConstList(variable, int.Parse(constant.Value), listType);
                 }
                 else if (declaration.Type.Count != null)
                 {
@@ -390,7 +391,7 @@ namespace Lang.Backend.LLVM
                     var countPointer = LLVMApi.BuildStructGEP(_builder, variable, 0, "countptr");
                     LLVMApi.BuildStore(_builder, count, countPointer);
 
-                    var targetType = LLVMTypeRef.Int32Type();
+                    var targetType = ConvertTypeDefinition(listType);
                     var listData = LLVMApi.BuildArrayAlloca(_builder, targetType, count, "listdata");
                     var dataPointer = LLVMApi.BuildStructGEP(_builder, variable, 1, "dataptr");
                     LLVMApi.BuildStore(_builder, listData, dataPointer);
@@ -425,7 +426,7 @@ namespace Lang.Backend.LLVM
                 {
                     BuildStackSave();
                     var count = (ConstantAst)structField.Type.Count;
-                    InitializeConstList(field, int.Parse(count.Value));
+                    InitializeConstList(field, int.Parse(count.Value), structField.Type.Generics[0]);
                 }
                 else if (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind)
                 {
@@ -439,7 +440,7 @@ namespace Lang.Backend.LLVM
             }
         }
 
-        private void InitializeConstList(LLVMValueRef list, int length)
+        private void InitializeConstList(LLVMValueRef list, int length, TypeDefinition listType)
         {
             // 1. Set the count field
             var countValue = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (ulong)length, false);
@@ -447,7 +448,7 @@ namespace Lang.Backend.LLVM
             LLVMApi.BuildStore(_builder, countValue, countPointer);
 
             // 2. Initialize the list data array
-            var targetType = LLVMTypeRef.Int32Type(); // TODO Get this from the type
+            var targetType = ConvertTypeDefinition(listType);
             var arrayType = LLVMTypeRef.ArrayType(targetType, (uint)length);
             var listData = LLVMApi.BuildAlloca(_builder, arrayType, "listdata");
             var listDataPointer = LLVMApi.BuildBitCast(_builder, listData, LLVMTypeRef.PointerType(targetType, 0), "tmpdata");
@@ -738,11 +739,12 @@ namespace Lang.Backend.LLVM
                         }
 
                         // Rollup the rest of the arguments into a list
-                        var paramsType = ConvertTypeDefinition(functionDef.Arguments[^1].Type);
+                        var paramsTypeDef = functionDef.Arguments[^1].Type;
+                        var paramsType = ConvertTypeDefinition(paramsTypeDef);
                         BuildStackPointer();
                         BuildStackSave();
                         var paramsPointer = LLVMApi.BuildAlloca(_builder, paramsType, "paramsptr");
-                        InitializeConstList(paramsPointer, call.Arguments.Count - functionDef.Arguments.Count + 1);
+                        InitializeConstList(paramsPointer, call.Arguments.Count - functionDef.Arguments.Count + 1, paramsTypeDef.Generics[0]); // TODO Handle 'Any' type params
 
                         var listData = LLVMApi.BuildStructGEP(_builder, paramsPointer, 1, "listdata");
                         var dataPointer = LLVMApi.BuildLoad(_builder, listData, "dataptr");
@@ -1260,17 +1262,22 @@ namespace Lang.Backend.LLVM
                     "bool" => LLVMTypeRef.Int1Type(),
                     "void" => LLVMTypeRef.VoidType(),
                     "List" => GetListType(typeDef),
-                    "Params" => GetListType(typeDef),
+                    "Params" => GetListType(typeDef, true),
                     "string" => LLVMTypeRef.PointerType(LLVMTypeRef.Int8Type(), 0), // LLVMApi.GetTypeByName(_module, "string"),
                     _ => LLVMApi.GetTypeByName(_module, typeDef.Name)
                 }
             };
         }
 
-        private LLVMTypeRef GetListType(TypeDefinition typeDef)
+        private LLVMTypeRef GetListType(TypeDefinition typeDef, bool isParams = false)
         {
-            // TODO Get list polymorphic type and params without generic
-            return LLVMApi.GetTypeByName(_module, "List");
+            if (isParams && typeDef.Generics.Count == 0)
+            {
+                // TODO Get params without generic
+                return LLVMApi.GetTypeByName(_module, "List.int");
+            }
+            var listType = typeDef.Generics[0];
+            return LLVMApi.GetTypeByName(_module, $"List.{listType.Name}");
         }
     }
 }
