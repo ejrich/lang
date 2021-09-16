@@ -11,6 +11,7 @@ namespace Lang
         public int TypeCount { get; set; }
         public Dictionary<string, IType> Types { get; } = new();
         public Dictionary<string, List<FunctionAst>> Functions { get; } = new();
+        public Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> OperatorOverloads { get; } = new();
         public List<string> Dependencies { get; set; }
         public List<TranslationError> Errors { get; } = new();
     }
