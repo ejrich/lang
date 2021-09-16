@@ -1736,6 +1736,18 @@ namespace Lang.Translation
                 }
             }
 
+            if (call.Generics != null)
+            {
+                foreach (var generic in call.Generics)
+                {
+                    if (VerifyType(generic) == Type.Error)
+                    {
+                        AddError($"Undefined generic type '{PrintTypeDefinition(generic)}'", generic);
+                        argumentsError = true;
+                    }
+                }
+            }
+
             if (argumentsError)
             {
                 _programGraph.Functions.TryGetValue(call.Function, out var functions);
@@ -2038,6 +2050,12 @@ namespace Lang.Translation
                 for (var i = 0; i < polymorphicFunctions.Count; i++)
                 {
                     var function = polymorphicFunctions[i];
+
+                    if (call.Generics != null && call.Generics.Count != function.Generics.Count)
+                    {
+                        continue;
+                    }
+
                     var match = true;
                     var callArgIndex = 0;
                     var functionArgCount = function.Varargs || function.Params ? function.Arguments.Count - 1 : function.Arguments.Count;
@@ -2144,6 +2162,33 @@ namespace Lang.Translation
                                         break;
                                     }
                                 }
+                            }
+                        }
+                    }
+
+                    if (call.Generics != null)
+                    {
+                        if (genericTypes.Any(t => t != null))
+                        {
+                            var genericTypesMatch = true;
+                            for (var t = 0; t < genericTypes.Length; t++)
+                            {
+                                if (!TypeEquals(call.Generics[i], genericTypes[i], true))
+                                {
+                                    genericTypesMatch = false;
+                                    break;
+                                }
+                            }
+                            if (!genericTypesMatch)
+                            {
+                                continue;
+                            }
+                        }
+                        else
+                        {
+                            for (var t = 0; t < genericTypes.Length; t++)
+                            {
+                                genericTypes[i] = call.Generics[i];
                             }
                         }
                     }

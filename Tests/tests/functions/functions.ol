@@ -72,6 +72,10 @@ polymorphic_functions() {
     baz(int_list, &float_value);
     baz(int_list, &int_value);
     baz(string_list, &int_value);
+
+    thing := create<Thing>();
+    create<Thing>();
+    printf("thing.a = %d, thing.b = %.2f\n", thing.a, thing.b);
 }
 
 T add_int<T>(T a, int b) {
@@ -87,6 +91,16 @@ baz<T, U>(List<T> list, U* b) {
         if T == s32 then printf("T is an int\n");
         else then printf("T is not an int\n");
     }
+}
+
+struct Thing {
+    int a = 9;
+    float64 b = 3.2;
+}
+
+T create<T>() {
+    thing: T;
+    return thing;
 }
 
 #run main();
