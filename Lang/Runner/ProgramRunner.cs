@@ -10,6 +10,7 @@ namespace Lang.Runner
 {
     public interface IProgramRunner
     {
+        BuildSettings BuildSettings { set; }
         void Init(ProgramGraph programGraph);
         void RunProgram(ProgramGraph programGraph);
         bool ExecuteCondition(IAst expression, ProgramGraph programGraph);
@@ -29,6 +30,8 @@ namespace Lang.Runner
             public TypeDefinition Type { get; set; }
             public object Value { get; set; }
         }
+
+        public BuildSettings BuildSettings { private get; set; }
 
         public void Init(ProgramGraph programGraph)
         {
@@ -217,7 +220,7 @@ namespace Lang.Runner
             var value = declaration.Name switch
             {
                 "os" => GetOSVersion(),
-                "build_env" => 0,
+                "build_env" => GetBuildEnv(),
                 _ => declaration.Value == null ?
                     GetUninitializedValue(declaration.Type, programGraph, variables, declaration.Assignments) :
                     ExecuteExpression(declaration.Value, programGraph, variables).Value
@@ -236,6 +239,11 @@ namespace Lang.Runner
                 PlatformID.MacOSX => 3,
                 _ => 0
             };
+        }
+
+        private int GetBuildEnv()
+        {
+            return BuildSettings.Release ? 2 : 1;
         }
 
         private object GetUninitializedValue(TypeDefinition typeDef, ProgramGraph programGraph,
