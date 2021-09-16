@@ -2100,20 +2100,21 @@ namespace Lang
         private void VerifyEach(EachAst each, IFunction currentFunction, ScopeAst scope)
         {
             // 1. Verify the iterator or range
-            if (GetScopeIdentifier(scope, each.IterationVariable, out _))
+            if (GetScopeIdentifier(scope, each.IterationVariable.Name, out _))
             {
-                ErrorReporter.Report($"Iteration variable '{each.IterationVariable}' already exists in scope", each);
+                ErrorReporter.Report($"Iteration variable '{each.IterationVariable.Name}' already exists in scope", each);
             };
             if (each.Iteration != null)
             {
                 var iterationTypeDefinition = VerifyExpression(each.Iteration, currentFunction, scope);
                 if (iterationTypeDefinition == null) return;
-                var iterator = new VariableAst {Name = each.IterationVariable, TypeDefinition = iterationTypeDefinition.Generics.FirstOrDefault()};
+                each.IterationVariable.TypeDefinition = iterationTypeDefinition.Generics.FirstOrDefault();
 
                 if (each.IndexVariable != null)
                 {
-                    each.IndexVariableVariable = new VariableAst {Name = each.IndexVariable, TypeDefinition = _s32Type, Type = TypeTable.Types["s32"]};
-                    each.Body.Identifiers.TryAdd(each.IndexVariable, each.IndexVariableVariable);
+                    each.IndexVariable.TypeDefinition = _s32Type;
+                    each.IndexVariable.Type = TypeTable.Types["s32"];
+                    each.Body.Identifiers.TryAdd(each.IndexVariable.Name, each.IndexVariable);
                 }
 
                 switch (iterationTypeDefinition.TypeKind)
@@ -2121,17 +2122,15 @@ namespace Lang
                     case TypeKind.CArray:
                         each.CArrayLength = iterationTypeDefinition.ConstCount.Value;
                         // Same logic as below with special case for constant length
-                        each.IteratorType = iterator.TypeDefinition;
-                        each.IterationVariableVariable = iterator;
-                        iterator.Type = TypeTable.GetType(iterator.TypeDefinition);
-                        each.Body.Identifiers.TryAdd(each.IterationVariable, iterator);
+                        each.IteratorType = each.IterationVariable.TypeDefinition;
+                        each.IterationVariable.Type = TypeTable.GetType(each.IterationVariable.TypeDefinition);
+                        each.Body.Identifiers.TryAdd(each.IterationVariable.Name, each.IterationVariable);
                         break;
                     case TypeKind.Array:
                     case TypeKind.Params:
-                        each.IteratorType = iterator.TypeDefinition;
-                        each.IterationVariableVariable = iterator;
-                        iterator.Type = TypeTable.GetType(iterator.TypeDefinition);
-                        each.Body.Identifiers.TryAdd(each.IterationVariable, iterator);
+                        each.IteratorType = each.IterationVariable.TypeDefinition;
+                        each.IterationVariable.Type = TypeTable.GetType(each.IterationVariable.TypeDefinition);
+                        each.Body.Identifiers.TryAdd(each.IterationVariable.Name, each.IterationVariable);
                         break;
                     default:
                         ErrorReporter.Report($"Type {PrintTypeDefinition(iterationTypeDefinition)} cannot be used as an iterator", each.Iteration);
@@ -2152,8 +2151,9 @@ namespace Lang
                 {
                     ErrorReporter.Report($"Expected range to end with 'int', but got '{PrintTypeDefinition(end)}'", each.RangeEnd);
                 }
-                each.IterationVariableVariable = new VariableAst {Name = each.IterationVariable, TypeDefinition = _s32Type, Type = TypeTable.Types["s32"]};
-                each.Body.Identifiers.TryAdd(each.IterationVariable, each.IterationVariableVariable);
+                each.IterationVariable.TypeDefinition = _s32Type;
+                each.IterationVariable.Type = TypeTable.Types["s32"];
+                each.Body.Identifiers.TryAdd(each.IterationVariable.Name, each.IterationVariable);
             }
 
             // 2. Verify the scope of the each block
