@@ -260,7 +260,7 @@ namespace Lang
             };
         }
 
-        private void EmitScope(FunctionIR function, BasicBlock block, ScopeAst scope, IType returnType)
+        private BasicBlock EmitScope(FunctionIR function, BasicBlock block, ScopeAst scope, IType returnType)
         {
             foreach (var ast in scope.Children)
             {
@@ -276,16 +276,16 @@ namespace Lang
                         EmitAssignment(function, block, assignment, scope);
                         break;
                     case ScopeAst childScope:
-                        EmitScope(function, block, scope, returnType);
+                        block = EmitScope(function, block, scope, returnType);
                         break;
                     case ConditionalAst conditional:
-                        EmitConditional(function, block, conditional, scope);
+                        block = EmitConditional(function, block, conditional, scope, returnType);
                         break;
                     case WhileAst whileAst:
-                        EmitWhile(function, whileAst, scope);
+                        block = EmitWhile(function, whileAst, scope, returnType);
                         break;
                     case EachAst each:
-                        EmitEach(function, block, each, scope);
+                        block = EmitEach(function, block, each, scope, returnType);
                         break;
                     case BreakAst:
                     case ContinueAst:
@@ -296,6 +296,7 @@ namespace Lang
                         break;
                 }
             }
+            return block;
         }
 
         private void EmitDeclaration(FunctionIR function, BasicBlock block, DeclarationAst declaration, ScopeAst scope)
@@ -563,25 +564,36 @@ namespace Lang
             block.Instructions.Add(instruction);
         }
 
-        private void EmitConditional(FunctionIR function, BasicBlock block, ConditionalAst conditional, ScopeAst scope)
+        private BasicBlock EmitConditional(FunctionIR function, BasicBlock block, ConditionalAst conditional, ScopeAst scope, IType returnType)
         {
             // Run the condition expression in the current basic block and then jump to the following
             var condition = EmitConditionExpression(function, conditional.Condition, scope, block);
             // TODO Add jumps
 
             var thenBlock = AddBasicBlock(function);
+            thenBlock = EmitScope(function, thenBlock, conditional.IfBlock, returnType);
+
             var elseBlock = conditional.ElseBlock == null ? null : AddBasicBlock(function);
             var afterBlock = AddBasicBlock(function);
+
+            return afterBlock;
         }
 
-        private void EmitWhile(FunctionIR function, WhileAst whileAst, ScopeAst scope)
+        private BasicBlock EmitWhile(FunctionIR function, WhileAst whileAst, ScopeAst scope, IType returnType)
         {
             // Create a block for the condition expression and then jump to the following
             var conditionBlock = AddBasicBlock(function);
             var condition = EmitConditionExpression(function, whileAst.Condition, scope, conditionBlock);
+            // TODO Add conditional jump to after block
 
             // Return the while body block
             var whileBodyBlock = AddBasicBlock(function);
+            whileBodyBlock = EmitScope(function, whileBodyBlock, whileAst.Body, returnType);
+            // TODO Add jump to condition block
+
+            var afterBlock = AddBasicBlock(function);
+
+            return afterBlock;
         }
 
         private InstructionValue EmitConditionExpression(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block)
@@ -602,11 +614,12 @@ namespace Lang
             }
         }
 
-        private void EmitEach(FunctionIR function, BasicBlock block, EachAst each, ScopeAst scope)
+        private BasicBlock EmitEach(FunctionIR function, BasicBlock block, EachAst each, ScopeAst scope, IType returnType)
         {
             // TODO Implement me
             // Initialize the loop in the current basic block
             // Create a basic block for the condition
+            return block;
         }
 
         private BasicBlock AddBasicBlock(FunctionIR function)
