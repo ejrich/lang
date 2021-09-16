@@ -330,17 +330,6 @@ namespace Lang.Backend.LLVM
                     var indexVariable = LLVMApi.BuildAlloca(_builder, LLVMTypeRef.Int32Type(), each.IterationVariable);
                     _allocationQueue.Enqueue(indexVariable);
 
-                    switch (each.Iteration)
-                    {
-                        // @PotentialBug I can't really think of other cases that would fall under here, but this may
-                        // become an issue if there are some new ways to creates lists
-                        case CallAst call:
-                            var function = _functions[call.Function];
-                            var iterationValue = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(function.ReturnType), "iterval");
-                            _allocationQueue.Enqueue(iterationValue);
-                            break;
-                    }
-
                     return BuildAllocations(each.Children);
                 case ExpressionAst:
                     BuildAllocations(ast.Children);
