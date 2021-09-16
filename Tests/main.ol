@@ -1,6 +1,6 @@
 int main() {
     // TODO Add the code to run the tests
-    dir := opendir(".");
+    dir := opendir("Tests/tests");
     if dir {
         file := readdir(dir);
         while file {
