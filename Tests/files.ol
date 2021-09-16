@@ -1,11 +1,11 @@
 struct DIR {}
 
 struct dirent {
-    u64 d_ino;
-    u64 d_off;
-    u16 d_reclen;
-    FileType d_type;
-    Array<u8>[256] #c_array d_name;
+    d_ino: u64;
+    d_off: u64;
+    d_reclen: u16;
+    d_type: FileType;
+    d_name: Array<u8>[256] #c_array;
 }
 
 enum FileType : u8 {

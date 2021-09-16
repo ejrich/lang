@@ -8,7 +8,7 @@ namespace Lang
         int FileIndex { get; set; }
         uint Line { get; init; }
         uint Column { get; init; }
-        List<IAst> Children { get; }
+        // List<IAst> Children { get; }
     }
 
     public interface IType
@@ -28,6 +28,17 @@ namespace Lang
         bool ReturnTypeHasGenerics { get; set; }
         List<string> Generics { get; }
         List<DeclarationAst> Arguments { get; }
+        List<IAst> Children { get; }
+    }
+
+    public interface IDeclaration : IAst
+    {
+        public string Name { get; set; }
+        public TypeDefinition Type { get; set; }
+        public bool HasGenerics { get; set; }
+        public IAst Value { get; set; }
+        public List<AssignmentAst> Assignments { get; set; }
+        public List<IAst> ArrayValues { get; set; }
     }
 
     public class ScopeAst : IAst
@@ -78,17 +89,19 @@ namespace Lang
         public List<IAst> Children => null;
     }
 
-    public class StructFieldAst : IAst
+    public class StructFieldAst : IDeclaration
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
-        public bool HasGeneric { get; set; }
         public string Name { get; set; }
         public uint Offset { get; set; }
         public uint Size { get; set; }
         public TypeDefinition Type { get; set; }
-        public IAst DefaultValue { get; set; }
+        public bool HasGenerics { get; set; }
+        public IAst Value { get; set; }
+        public List<AssignmentAst> Assignments { get; set; }
+        public List<IAst> ArrayValues { get; set; }
         public List<IAst> Children => null;
     }
 
@@ -227,16 +240,16 @@ namespace Lang
         public List<IAst> Children => null;
     }
 
-    public class DeclarationAst : IAst
+    public class DeclarationAst : IDeclaration
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
         public string Name { get; set; }
         public TypeDefinition Type { get; set; }
-        public IAst Value { get; set; }
-        public bool Constant { get; set; }
         public bool HasGenerics { get; set; }
+        public bool Constant { get; set; }
+        public IAst Value { get; set; }
         public List<AssignmentAst> Assignments { get; set; }
         public List<IAst> ArrayValues { get; set; }
         public List<IAst> Children => null;

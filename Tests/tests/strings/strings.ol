@@ -42,8 +42,8 @@ string_indexing() {
 }
 
 struct StringStruct {
-    int foo;
-    string bar;
+    foo: int;
+    bar: string;
 }
 
 #run main();

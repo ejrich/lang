@@ -129,13 +129,13 @@ int factorial(int n) {
 }
 
 struct MyStruct {
-    u8 field;
-    float something = 4.2;
-    OtherStruct subValue;
+    field: u8;
+    something := 4.2;
+    subValue: OtherStruct;
 }
 
 struct OtherStruct {
-    int something = 5;
+    something := 5;
 }
 
 MyStruct create() {
@@ -165,8 +165,8 @@ int primitives() {
 }
 
 struct ArrayStruct {
-    int something = 5;
-    Array<float64>[6] list;
+    something := 5;
+    list: Array<float64>[6];
 }
 
 Array<int> create_list(int count) {
@@ -190,8 +190,8 @@ manipulate_list_struct() {
 }
 
 struct Node {
-    int value;
-    Node* next;
+    value: int;
+    next: Node*;
 }
 
 int* pointers() {
@@ -248,8 +248,8 @@ overflow_test() {
 }
 
 struct PolyStruct<T, U> {
-    T field1;
-    U field2;
+    field1: T;
+    field2: U;
 }
 
 poly_test() {
@@ -267,9 +267,9 @@ enum State {
 }
 
 struct StateStruct {
-    State state = State.Running;
-    int something;
-    bool flag = true;
+    state := State.Running;
+    something: int;
+    flag := true;
 }
 
 State current_state(int a) {

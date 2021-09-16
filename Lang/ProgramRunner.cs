@@ -471,9 +471,9 @@ namespace Lang
 
                     fieldInstance!.SetValue(instance, value);
                 }
-                else if (field.DefaultValue != null)
+                else if (field.Value != null)
                 {
-                    var value = ExecuteExpression(field.DefaultValue, variables);
+                    var value = ExecuteExpression(field.Value, variables);
                     fieldInstance!.SetValue(instance, value.Value);
                 }
                 else switch (field.Type.TypeKind)

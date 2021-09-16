@@ -662,8 +662,8 @@ namespace Lang.Backend
                         }
                     }
                     break;
-                case ScopeAst:
-                    return BuildAllocations(ast.Children);
+                case ScopeAst scope:
+                    return BuildAllocations(scope.Children);
                 case ConditionalAst conditional:
                     BuildAllocations(conditional.Condition);
                     var ifReturned = BuildAllocations(conditional.IfBlock.Children);
@@ -712,8 +712,8 @@ namespace Lang.Backend
                     }
 
                     return BuildAllocations(each.Children);
-                case ExpressionAst:
-                    BuildAllocations(ast.Children);
+                case ExpressionAst expression:
+                    BuildAllocations(expression.Children);
                     break;
                 case IndexAst index:
                     BuildAllocations(index.Index);
@@ -987,9 +987,9 @@ namespace Lang.Backend
                             break;
                         default:
                             LLVMValueRef value;
-                            if (structField.DefaultValue != null)
+                            if (structField.Value != null)
                             {
-                                (_, value) = WriteExpression(structField.DefaultValue, localVariables);
+                                (_, value) = WriteExpression(structField.Value, localVariables);
                             }
                             else
                             {

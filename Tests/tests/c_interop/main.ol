@@ -42,8 +42,8 @@ c_array_structs() {
 struct_array_size := 5; #const
 
 struct ArrayStruct {
-    int something;
-    Array<int>[struct_array_size] #c_array array;
+    something: int;
+    array: Array<int>[struct_array_size] #c_array;
 }
 
 #run main();

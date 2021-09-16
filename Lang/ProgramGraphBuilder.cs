@@ -341,6 +341,7 @@ namespace Lang
                 }
 
                 // 1b. Check for errored or undefined field types
+                // TODO If the type is null, infer from the value
                 var type = VerifyType(structField.Type);
 
                 if (type == TypeKind.Error)
@@ -376,28 +377,28 @@ namespace Lang
                 }
 
                 // 1d. Check if the default value has the correct type
-                if (structField.DefaultValue != null)
+                if (structField.Value != null)
                 {
-                    var defaultType = VerifyConstantExpression(structField.DefaultValue, null, _globalIdentifiers, out var isConstant, out _);
+                    var defaultType = VerifyConstantExpression(structField.Value, null, _globalIdentifiers, out var isConstant, out _);
 
                     if (defaultType != null)
                     {
                         if (!isConstant)
                         {
-                            AddError($"Expected default value of '{structAst.Name}.{structField.Name}' to be a constant value", structField.DefaultValue);
+                            AddError($"Expected default value of '{structAst.Name}.{structField.Name}' to be a constant value", structField.Value);
                         }
                         else if (type != TypeKind.Error && !TypeEquals(structField.Type, defaultType))
                         {
-                            AddError($"Type of field '{structAst.Name}.{structField.Name}' is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(defaultType)}'", structField.DefaultValue);
+                            AddError($"Type of field '{structAst.Name}.{structField.Name}' is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(defaultType)}'", structField.Value);
                         }
-                        else if (structField.Type.PrimitiveType != null && structField.DefaultValue is ConstantAst constant)
+                        else if (structField.Type.PrimitiveType != null && structField.Value is ConstantAst constant)
                         {
                             VerifyConstant(constant, structField.Type);
                         }
                     }
                     else if (isConstant && type != TypeKind.Pointer && type != TypeKind.Error)
                     {
-                        AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is 'null'", structField.DefaultValue);
+                        AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is 'null'", structField.Value);
                     }
                 }
 
@@ -815,10 +816,14 @@ namespace Lang
                 var ast = asts[i];
                 switch (ast)
                 {
-                    case ScopeAst:
-                    case WhileAst:
-                    case EachAst:
-                        ResolveCompilerDirectives(ast.Children, function);
+                    case ScopeAst scope:
+                        ResolveCompilerDirectives(scope.Children, function);
+                        break;
+                    case WhileAst whileAst:
+                        ResolveCompilerDirectives(whileAst.Block.Children, function);
+                        break;
+                    case EachAst each:
+                        ResolveCompilerDirectives(each.Children, function);
                         break;
                     case ConditionalAst conditional:
                         if (conditional.IfBlock != null) ResolveCompilerDirectives(conditional.IfBlock.Children, function);
@@ -1045,10 +1050,6 @@ namespace Lang
                     {
                         AddError($"Cannot use array initializer to declare non-array type '{PrintTypeDefinition(declaration.Type)}'", declaration.Type);
                     }
-                    else if (declaration.Type.Count != null)
-                    {
-                        AddError($"Array length should not be defined with array initializer", declaration.Type.Count);
-                    }
                     else
                     {
                         var elementType = declaration.Type.Generics[0];
@@ -1067,7 +1068,6 @@ namespace Lang
                                 }
                             }
                         }
-                        declaration.Type.ConstCount = (uint)declaration.ArrayValues.Count;
                     }
                 }
             }
