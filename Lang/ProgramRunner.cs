@@ -1989,7 +1989,7 @@ namespace Lang
             };
         }
 
-        private Type GetTypeFromDefinition(TypeDefinition typeDef, IDictionary<string, TypeBuilder> temporaryTypes)
+        private Type GetTypeFromDefinition(TypeDefinition typeDef, IDictionary<string, TypeBuilder> temporaryTypes, bool pointer = false)
         {
             switch (typeDef.PrimitiveType)
             {
@@ -2002,12 +2002,14 @@ namespace Lang
 
             switch (typeDef.TypeKind)
             {
+                case TypeKind.Void:
+                    return pointer ? typeof(byte) : typeof(void);
                 case TypeKind.Boolean:
                     return typeof(bool);
                 case TypeKind.Type:
                     return typeof(int);
                 case TypeKind.Pointer:
-                    var pointerType = GetTypeFromDefinition(typeDef.Generics[0], temporaryTypes);
+                    var pointerType = GetTypeFromDefinition(typeDef.Generics[0], temporaryTypes, true);
                     if (pointerType == null)
                     {
                         return null;
@@ -2026,7 +2028,7 @@ namespace Lang
             return temporaryTypes.TryGetValue(typeDef.GenericName, out var tempType) ? tempType : null;
         }
 
-        private Type GetTypeFromDefinition(TypeDefinition typeDef, bool cCall = false)
+        private Type GetTypeFromDefinition(TypeDefinition typeDef, bool cCall = false, bool pointer = false)
         {
             switch (typeDef.PrimitiveType)
             {
@@ -2039,6 +2041,8 @@ namespace Lang
 
             switch (typeDef.TypeKind)
             {
+                case TypeKind.Void:
+                    return pointer ? typeof(byte) : typeof(void);
                 case TypeKind.Boolean:
                     return typeof(bool);
                 case TypeKind.Type:
@@ -2047,7 +2051,7 @@ namespace Lang
                     if (!cCall) break;
                     return typeof(char).MakePointerType();
                 case TypeKind.Pointer:
-                    var pointerType = GetTypeFromDefinition(typeDef.Generics[0], cCall);
+                    var pointerType = GetTypeFromDefinition(typeDef.Generics[0], cCall, true);
                     if (pointerType == null)
                     {
                         return null;

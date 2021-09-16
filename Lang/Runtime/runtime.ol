@@ -6,12 +6,19 @@ struct Array<T> {
     T* data;
 }
 
+ARRAY_BLOCK_SIZE := 10;
+
 array_insert<T>(Array<T>* array, T value) {
-    // TODO Implement me
-    // Get the size and determine if the array needs to be expanded
-    // If no expansion required, set the value at the index
-    // If expansion required, allocate new data and memcpy the original data
-    // Update the length
+    // Reallocate the array if necessary
+    if (array.length % ARRAY_BLOCK_SIZE == 0) {
+        // @Future add custom allocators
+        new_blocks := array.length / ARRAY_BLOCK_SIZE + 1;
+        new_data := malloc(lize_of(T) * new_blocks * ARRAY_BLOCK_SIZE);
+        array.data = cast(s32*, new_data);
+    }
+
+    array.data[array.length] = value;
+    array.length++;
 }
 
 array_remove<T>(Array<T>* array, int index) {
@@ -99,6 +106,8 @@ u32 size_of(Type type) {
 // Basic functions
 printf(string format, ... args) #extern "libc"
 exit(int exit_code) #extern "libc"
+void* malloc(int size) #extern "libc"
+free(void* data) #extern "libc"
 
 
 // Runtime functions
