@@ -176,11 +176,11 @@ namespace Lang
                                         _programRunner.Init(_programGraph);
                                         if (_programRunner.ExecuteCondition(conditional!.Condition))
                                         {
-                                            additionalAsts.AddRange(conditional.Children);
+                                            additionalAsts.AddRange(conditional.IfBlock.Children);
                                         }
-                                        else if (conditional.Else.Any())
+                                        else if (conditional.ElseBlock != null)
                                         {
-                                            additionalAsts.AddRange(conditional.Else);
+                                            additionalAsts.AddRange(conditional.ElseBlock.Children);
                                         }
                                     }
                                     parseResult.SyntaxTrees.RemoveAt(i--);
@@ -820,8 +820,8 @@ namespace Lang
                         ResolveCompilerDirectives(ast.Children, function);
                         break;
                     case ConditionalAst conditional:
-                        ResolveCompilerDirectives(conditional.Children, function);
-                        ResolveCompilerDirectives(conditional.Else, function);
+                        if (conditional.IfBlock != null) ResolveCompilerDirectives(conditional.IfBlock.Children, function);
+                        if (conditional.ElseBlock != null) ResolveCompilerDirectives(conditional.ElseBlock.Children, function);
                         break;
                     case CompilerDirectiveAst directive:
                         asts.RemoveAt(i);
@@ -835,11 +835,11 @@ namespace Lang
                                     _programRunner.Init(_programGraph);
                                     if (_programRunner.ExecuteCondition(conditional!.Condition))
                                     {
-                                        asts.InsertRange(i, conditional.Children);
+                                        asts.InsertRange(i, conditional.IfBlock.Children);
                                     }
-                                    else if (conditional.Else.Any())
+                                    else if (conditional.ElseBlock != null)
                                     {
-                                        asts.InsertRange(i, conditional.Else);
+                                        asts.InsertRange(i, conditional.ElseBlock.Children);
                                     }
                                 }
                                 break;
@@ -880,13 +880,13 @@ namespace Lang
             return returns;
         }
 
-        private bool VerifyScope(List<IAst> syntaxTrees, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private bool VerifyScope(ScopeAst scope, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Create scope variables
             var scopeVariables = new Dictionary<string, IAst>(scopeIdentifiers);
 
             // 2. Verify function lines
-            return VerifyAsts(syntaxTrees, currentFunction, scopeVariables);
+            return VerifyAsts(scope.Children, currentFunction, scopeVariables);
         }
 
         private bool VerifyAst(IAst syntaxTree, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
@@ -903,7 +903,7 @@ namespace Lang
                     VerifyAssignment(assignment, currentFunction, scopeIdentifiers);
                     break;
                 case ScopeAst scope:
-                    return VerifyScope(scope.Children, currentFunction, scopeIdentifiers);
+                    return VerifyScope(scope, currentFunction, scopeIdentifiers);
                 case ConditionalAst conditional:
                     return VerifyConditional(conditional, currentFunction, scopeIdentifiers);
                 case WhileAst whileAst:
@@ -1541,12 +1541,12 @@ namespace Lang
             VerifyCondition(conditional.Condition, currentFunction, scopeIdentifiers);
 
             // 2. Verify the conditional scope
-            var ifReturned = VerifyScope(conditional.Children, currentFunction, scopeIdentifiers);
+            var ifReturned = VerifyScope(conditional.IfBlock, currentFunction, scopeIdentifiers);
 
             // 3. Verify the else block if necessary
-            if (conditional.Else.Any())
+            if (conditional.ElseBlock != null)
             {
-                var elseReturned = VerifyScope(conditional.Else, currentFunction, scopeIdentifiers);
+                var elseReturned = VerifyScope(conditional.ElseBlock, currentFunction, scopeIdentifiers);
                 return ifReturned && elseReturned;
             }
 
@@ -1559,7 +1559,7 @@ namespace Lang
             VerifyCondition(whileAst.Condition, currentFunction, scopeIdentifiers);
 
             // 2. Verify the scope of the while block
-            return VerifyScope(whileAst.Children, currentFunction, scopeIdentifiers);
+            return VerifyScope(whileAst.Block, currentFunction, scopeIdentifiers);
         }
 
         private bool VerifyCondition(IAst ast, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
