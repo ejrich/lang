@@ -50,6 +50,8 @@ int main(List<string> args) {
 
     default_args(8);
     default_args();
+    default_args_enum(State.Stopping);
+    default_args_enum();
 
     sdl_video := 0x20;
     x := 0xfeABD4;
@@ -293,6 +295,10 @@ null_test(int* value_ptr) {
 
 default_args(int val = 5) {
     printf("Value = %d\n", val);
+}
+
+default_args_enum(State val = State.Running) {
+    printf("Enum value = %d\n", val);
 }
 
 open_window() {
