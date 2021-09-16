@@ -32,7 +32,7 @@ namespace Lang.Backend
 
         private readonly Queue<LLVMValueRef> _allocationQueue = new();
         private readonly LLVMValueRef _zeroInt = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), 0, false);
-        private readonly TypeDefinition _intTypeDefinition = new() {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
+        private readonly TypeDefinition _s32Type = new() {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
 
         public string Build(ProjectFile project, ProgramGraph programGraph, BuildSettings buildSettings)
         {
@@ -856,14 +856,7 @@ namespace Lang.Backend
             localVariables.Add(declaration.Name, (declaration.Type, variable));
             if (_emitDebug)
             {
-                using var name = new MarshaledString(declaration.Name);
-
-                var file = _debugFiles[declaration.FileIndex];
-                var debugVariable = LLVM.DIBuilderCreateAutoVariable(_debugBuilder, block, name.Value, (UIntPtr)name.Length, file, declaration.Line, GetDebugType(declaration.Type), 0, LLVMDIFlags.LLVMDIFlagZero, 0);
-                var expression = LLVM.DIBuilderCreateExpression(_debugBuilder, null, (UIntPtr)0);
-                var location = LLVM.GetCurrentDebugLocation2(_builder);
-
-                LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, variable, debugVariable, expression, location, _builder.InsertBlock);
+                DeclareDebugVariable(declaration.Name, declaration.Type, declaration, variable, block);
             }
 
             // 2. Set value if it exists
@@ -1162,8 +1155,6 @@ namespace Lang.Backend
 
             // 1. Initialize each values
             var indexVariable = _allocationQueue.Dequeue();
-            var listData = new LLVMValueRef();
-            var compareTarget = new LLVMValueRef();
             TypeDefinition iterationType = null;
             var iterationValue = new LLVMValueRef();
             switch (each.Iteration)
@@ -1188,16 +1179,19 @@ namespace Lang.Backend
             }
 
             // 2. Initialize the first variable in the loop and the compare target
+            var listData = new LLVMValueRef();
+            var compareTarget = new LLVMValueRef();
             if (each.Iteration != null)
             {
-                LLVM.BuildStore(_builder, _zeroInt, indexVariable);
                 if (each.IndexVariable != null)
                 {
-                    // TODO Implement me
+                    eachVariables.Add(each.IndexVariable, (_s32Type, indexVariable));
                     if (_emitDebug)
                     {
+                        DeclareDebugVariable(each.IndexVariable, _s32Type, each, indexVariable, block);
                     }
                 }
+                LLVM.BuildStore(_builder, _zeroInt, indexVariable);
 
                 switch (iterationType!.Name)
                 {
@@ -1226,14 +1220,7 @@ namespace Lang.Backend
                 var (type, value) = WriteExpression(each.RangeBegin, localVariables);
                 if (_emitDebug)
                 {
-                    using var name = new MarshaledString(each.IterationVariable);
-
-                    var file = _debugFiles[each.FileIndex];
-                    var debugVariable = LLVM.DIBuilderCreateAutoVariable(_debugBuilder, block, name.Value, (UIntPtr)name.Length, file, each.Line, GetDebugType(type), 0, LLVMDIFlags.LLVMDIFlagZero, 0);
-                    var expression = LLVM.DIBuilderCreateExpression(_debugBuilder, null, (UIntPtr)0);
-                    var location = LLVM.GetCurrentDebugLocation2(_builder);
-
-                    LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, indexVariable, debugVariable, expression, location, _builder.InsertBlock);
+                    DeclareDebugVariable(each.IterationVariable, type, each, indexVariable, block);
                 }
 
                 LLVM.BuildStore(_builder, value, indexVariable);
@@ -1263,14 +1250,7 @@ namespace Lang.Backend
 
                         if (_emitDebug)
                         {
-                            using var name = new MarshaledString(each.IterationVariable);
-
-                            var file = _debugFiles[each.FileIndex];
-                            var debugVariable = LLVM.DIBuilderCreateAutoVariable(_debugBuilder, block, name.Value, (UIntPtr)name.Length, file, each.Line, GetDebugType(each.IteratorType), 0, LLVMDIFlags.LLVMDIFlagZero, 0);
-                            var expression = LLVM.DIBuilderCreateExpression(_debugBuilder, null, (UIntPtr)0);
-                            var location = LLVM.GetCurrentDebugLocation2(_builder);
-
-                            LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, iterationVariable, debugVariable, expression, location, _builder.InsertBlock);
+                            DeclareDebugVariable(each.IterationVariable, each.IteratorType, each, iterationVariable, block);
                         }
                         break;
                 }
@@ -1303,6 +1283,18 @@ namespace Lang.Backend
             return false;
         }
 
+        private void DeclareDebugVariable(string variableName, TypeDefinition type, IAst ast, LLVMValueRef variable, LLVMMetadataRef block)
+        {
+            using var name = new MarshaledString(variableName);
+
+            var file = _debugFiles[ast.FileIndex];
+            var debugVariable = LLVM.DIBuilderCreateAutoVariable(_debugBuilder, block, name.Value, (UIntPtr)name.Length, file, ast.Line, GetDebugType(type), 0, LLVMDIFlags.LLVMDIFlagZero, 0);
+            var expression = LLVM.DIBuilderCreateExpression(_debugBuilder, null, (UIntPtr)0);
+            var location = LLVM.GetCurrentDebugLocation2(_builder);
+
+            LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, variable, debugVariable, expression, location, _builder.InsertBlock);
+        }
+
         private (TypeDefinition type, LLVMValueRef value) WriteExpression(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, bool getStringPointer = false)
         {
             switch (ast)
@@ -1322,7 +1314,7 @@ namespace Lang.Backend
                     if (!localVariables.TryGetValue(identifier.Name, out var typeValue))
                     {
                         var typeDef = _programGraph.Types[identifier.Name];
-                        return (_intTypeDefinition, LLVMValueRef.CreateConstInt(LLVM.Int32Type(), (uint)typeDef.TypeIndex, false));
+                        return (_s32Type, LLVMValueRef.CreateConstInt(LLVM.Int32Type(), (uint)typeDef.TypeIndex, false));
                     }
                     var (type, value) = typeValue;
                     if (type.TypeKind == TypeKind.String)
@@ -1535,7 +1527,7 @@ namespace Lang.Backend
                 case TypeDefinition typeDef:
                 {
                     var type = _programGraph.Types[typeDef.GenericName];
-                    return (_intTypeDefinition, LLVMValueRef.CreateConstInt(LLVM.Int32Type(), (uint)type.TypeIndex, false));
+                    return (_s32Type, LLVMValueRef.CreateConstInt(LLVM.Int32Type(), (uint)type.TypeIndex, false));
                 }
                 case CastAst cast:
                 {
