@@ -5,6 +5,7 @@ namespace Lang
 {
     public static class Program
     {
+        public static int FunctionCount { get; set; }
         public static FunctionIR EntryPoint { get; set; }
         public static Dictionary<string, FunctionIR> Functions { get; } = new();
         public static Dictionary<string, InstructionValue> Constants { get; } = new();
@@ -16,12 +17,11 @@ namespace Lang
         #if DEBUG
         public string Name { get; set; }
         #endif
+        public int Index { get; set; }
         public uint StackSize { get; set; }
         public int ValueCount { get; set; }
         public bool SaveStack { get; set; }
-        public bool Varargs { get; set; }
-        public IType[] Arguments { get; set; }
-        public IType ReturnType { get; set; }
+        public IFunction Source { get; set; }
         public List<Allocation> Allocations { get; set; }
         public List<Instruction> Instructions { get; set; }
         public List<BasicBlock> BasicBlocks { get; set; }
