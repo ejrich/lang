@@ -70,8 +70,8 @@ struct OtherStruct {
 MyStruct create() {
     s1: MyStruct;
     s2: OtherStruct;
-    //s2.something += 8;
+    s2.something += 8;
     s1.field++;
-    //s1.subValue.something = s2.something;
+    s1.subValue.something = s2.something;
     return s1;
 }

@@ -15,6 +15,7 @@ namespace Lang.Backend.LLVM
 
         private LLVMModuleRef _module;
         private LLVMBuilderRef _builder;
+        private readonly IDictionary<string, StructAst> _structs = new Dictionary<string, StructAst>();
 
         public string WriteFile(ProgramGraph programGraph, string projectName, string projectPath)
         {
@@ -55,7 +56,6 @@ namespace Lang.Backend.LLVM
             return objectFile;
         }
 
-
         private void InitLLVM(string projectName)
         {
             _module = LLVMApi.ModuleCreateWithName(projectName);
@@ -68,7 +68,9 @@ namespace Lang.Backend.LLVM
             var structs = new LLVMTypeRef[data.Structs.Count];
             for (var i = 0; i < data.Structs.Count; i++)
             {
-                structs[i] = LLVMApi.StructCreateNamed(LLVMApi.GetModuleContext(_module), data.Structs[i].Name);
+                var structAst = data.Structs[i];
+                structs[i] = LLVMApi.StructCreateNamed(LLVMApi.GetModuleContext(_module), structAst.Name);
+                _structs.Add(structAst.Name, structAst);
             }
             for (var i = 0; i < data.Structs.Count; i++)
             {
@@ -211,22 +213,53 @@ namespace Lang.Backend.LLVM
         {
             // 1. Declare variable on the stack
             var type = ConvertTypeDefinition(declaration.Type);
-            var allocation = LLVMApi.BuildAlloca(_builder, type, declaration.Name);
-            localVariables.Add(declaration.Name, allocation);
+            var variable = LLVMApi.BuildAlloca(_builder, type, declaration.Name);
+            localVariables.Add(declaration.Name, variable);
 
             // 2. Set value if it exists
             if (declaration.Value != null)
             {
                 var expressionValue = WriteExpression(declaration.Value, localVariables);
-                LLVMApi.BuildStore(_builder, expressionValue, allocation);
+                LLVMApi.BuildStore(_builder, expressionValue, variable);
             }
             // 3. Initialize struct field default values
             else if (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind)
             {
-                // TODO Implement me
+                InitializeStruct(declaration.Type, variable);
             }
         }
-        
+
+        private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable)
+        {
+            var structDef = _structs[typeDef.Name];
+            for (var i = 0; i < structDef.Fields.Count; i++)
+            {
+                var structField = structDef.Fields[i];
+                var field = LLVMApi.BuildStructGEP(_builder, variable, (uint) i, structField.Name);
+
+                var type = ConvertTypeDefinition(structField.Type);
+                if (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind)
+                {
+                    InitializeStruct(structField.Type, field);
+                }
+                else
+                {
+                    var defaultValue = structField.DefaultValue == null ? GetConstZero(type) : BuildConstant(type, structField.DefaultValue);
+                    LLVMApi.BuildStore(_builder, defaultValue, field);
+                }
+            }
+        }
+
+        private static LLVMValueRef GetConstZero(LLVMTypeRef type)
+        {
+            return type.TypeKind switch
+            {
+                LLVMTypeKind.LLVMIntegerTypeKind => LLVMApi.ConstInt(type, 0, false),
+                LLVMTypeKind.LLVMFloatTypeKind => LLVMApi.ConstReal(type, 0),
+                _ => LLVMApi.ConstInt(type, 0, false)
+            };
+        }
+
         private void WriteAssignment(AssignmentAst assignment, IDictionary<string, LLVMValueRef> localVariables)
         {
             // 1. Get the variable on the stack
@@ -450,22 +483,7 @@ namespace Lang.Backend.LLVM
             {
                 case ConstantAst constant:
                     var type = ConvertTypeDefinition(constant.Type);
-                    switch (type.TypeKind)
-                    {
-                        case LLVMTypeKind.LLVMIntegerTypeKind:
-                            // Specific case for parsing booleans
-                            if (type.ToString() == "i1")
-                            {
-                                return LLVMApi.ConstInt(type, constant.Value == "true" ? 1 : 0, false);
-                            }
-                            return LLVMApi.ConstInt(type, ulong.Parse(constant.Value), true);
-                        case LLVMTypeKind.LLVMFloatTypeKind:
-                            return LLVMApi.ConstRealOfStringAndSize(type, constant.Value, (uint) constant.Value.Length);
-                        // TODO Implement more branches
-                        default:
-                            break;
-                    }
-                    break;
+                    return BuildConstant(type, constant);
                 case VariableAst variable:
                     return LLVMApi.BuildLoad(_builder, localVariables[variable.Name], variable.Name);
                 case StructFieldRefAst structField:
@@ -531,7 +549,25 @@ namespace Lang.Backend.LLVM
                     Environment.Exit(ErrorCodes.BuildError);
                     return new LLVMValueRef(); // Return never happens
             }
+        }
 
+        private static LLVMValueRef BuildConstant(LLVMTypeRef type, ConstantAst constant)
+        {
+            switch (type.TypeKind)
+            {
+                case LLVMTypeKind.LLVMIntegerTypeKind:
+                    // Specific case for parsing booleans
+                    if (type.ToString() == "i1")
+                    {
+                        return LLVMApi.ConstInt(type, constant.Value == "true" ? 1 : 0, false);
+                    }
+                    return LLVMApi.ConstInt(type, ulong.Parse(constant.Value), true);
+                case LLVMTypeKind.LLVMFloatTypeKind:
+                    return LLVMApi.ConstRealOfStringAndSize(type, constant.Value, (uint) constant.Value.Length);
+                // TODO Implement more branches
+                default:
+                    break;
+            }
             return LLVMApi.ConstInt(LLVMApi.Int32Type(), 0, true);
         }
 
