@@ -1221,6 +1221,16 @@ namespace Lang.Translation
                                     {
                                         VerifyConstant(constant, functionArg.Type);
                                     }
+                                    else if (functionArg.Type.Name == "Type")
+                                    {
+                                        var typeIndex = new ConstantAst
+                                        {
+                                            Type = new TypeDefinition {PrimitiveType = new IntegerType {Signed = true, Bytes = 4}},
+                                            Value = "13" // TODO Get the type index
+                                        };
+                                        call.Arguments[i] = typeIndex;
+                                        arguments[i] = typeIndex.Type;
+                                    }
                                 }
                             }
                         }
@@ -1634,7 +1644,6 @@ namespace Lang.Translation
             }
         }
 
-
         private TypeDefinition VerifyIndex(IndexAst index, TypeDefinition typeDef, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Verify the variable is a list
@@ -1689,6 +1698,7 @@ namespace Lang.Translation
 
             // Check by name
             if (a?.Name != b?.Name) return false;
+            if (a?.Name == "Type") return true;
             if (a?.Generics.Count != b?.Generics.Count) return false;
             for (var i = 0; i < a?.Generics.Count; i++)
             {
@@ -1698,6 +1708,7 @@ namespace Lang.Translation
             }
             return true;
         }
+
 
         private Type VerifyType(TypeDefinition typeDef)
         {
@@ -1710,6 +1721,7 @@ namespace Lang.Translation
                     AddError("Generic type cannot have additional generic types", typeDef);
                 }
                 return Type.Struct;
+
             }
 
             var hasGenerics = typeDef.Generics.Any();
