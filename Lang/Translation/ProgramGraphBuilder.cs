@@ -205,29 +205,11 @@ namespace Lang.Translation
                     case ConstantAst constant:
                         if (!TypeEquals(structField.Type, constant.Type))
                         {
-                            errors.Add(CreateError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(constant.Type)}'", constant));
+                            errors.Add(CreateError($"Type of field {structAst.Name}.{structField.Name} is '{type}', but default value is type '{PrintTypeDefinition(constant.Type)}'", structField.DefaultValue));
                         }
                         break;
                     case StructFieldRefAst structFieldRef:
-                        if (_programGraph.Types.TryGetValue(structFieldRef.Name, out var fieldType))
-                        {
-                            if (fieldType is EnumAst enumAst)
-                            {
-                                var enumType = VerifyEnumValue(structFieldRef, enumAst, errors);
-                                if (enumType != null && !TypeEquals(structField.Type, enumType))
-                                {
-                                    errors.Add(CreateError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(enumType)}'", structFieldRef));
-                                }
-                            }
-                            else
-                            {
-                                errors.Add(CreateError($"Default value must be constant or enum value, but got field of '{structFieldRef.Name}'", structFieldRef));
-                            }
-                        }
-                        else
-                        {
-                            errors.Add(CreateError($"Type '{structFieldRef.Name}' not defined", structFieldRef));
-                        }
+                        // TODO Verify me
                         break;
                 }
             }
