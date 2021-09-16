@@ -32,7 +32,12 @@ namespace Lang
         {
             var functionName = GetFunctionName(function);
 
-            var functionIR = new FunctionIR();
+            var functionIR = new FunctionIR {Varargs = function.Varargs, Arguments = new IType[function.Varargs ? function.Arguments.Count - 1 : function.Arguments.Count], ReturnType = function.ReturnType};
+
+            for (var i = 0; i < functionIR.Arguments.Length; i++)
+            {
+                functionIR.Arguments[i] = function.Arguments[i].Type;
+            }
 
             if (functionName == "main")
             {
@@ -77,7 +82,11 @@ namespace Lang
         {
             var functionName = GetOperatorOverloadName(overload.Type, overload.Operator);
 
-            var functionIR = new FunctionIR {Allocations = new(), Instructions = new(), BasicBlocks = new()};
+            var functionIR = new FunctionIR
+            {
+                Arguments = overload.Arguments.Select(arg => arg.Type).ToArray(), ReturnType = overload.ReturnType,
+                Allocations = new(), Instructions = new(), BasicBlocks = new()
+            };
             var entryBlock = AddBasicBlock(functionIR);
 
             for (var i = 0; i < overload.Arguments.Count; i++)
