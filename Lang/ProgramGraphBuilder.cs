@@ -122,7 +122,7 @@ namespace Lang
                                 AddError("Global variable must either not be initialized or be initialized to a constant value", globalVariable.Value);
                             }
 
-                            // TODO IR for global variables
+                            // TODO Add VerifyGlobalVariable function, since the logic is different than VerifyDeclaration
                             VerifyDeclaration(globalVariable, null, _globalScope, null);
                             _programGraph.Variables.Add(globalVariable);
                             parseResult.SyntaxTrees.RemoveAt(i--);
@@ -349,6 +349,7 @@ namespace Lang
                 {
                     var type = VerifyType(structField.TypeDefinition);
 
+                    // TODO Axe #c_array compiler directive and make it's own type
                     var fieldTypeName = structField.TypeDefinition.CArray ? structField.TypeDefinition.Generics[0].GenericName : structField.TypeDefinition.GenericName;
                     _programGraph.Types.TryGetValue(fieldTypeName, out fieldType);
 
@@ -549,6 +550,7 @@ namespace Lang
                             VerifyStruct(fieldStruct);
                         }
                     }
+                    structField.Type = fieldType;
                     structField.Offset = structAst.Size;
                     structField.Size = structField.TypeDefinition.CArray ? fieldType.Size * structField.TypeDefinition.ConstCount.Value : fieldType.Size;
                     structAst.Size += fieldType.Size;
@@ -607,7 +609,8 @@ namespace Lang
                 // 3b. Check for errored or undefined field types
                 var type = VerifyType(argument.TypeDefinition, argument: true);
                 // TODO Make this better, roll into VerifyType
-                _programGraph.Types.TryGetValue(argument.TypeDefinition.GenericName, out var argumentType);
+                var argumentTypeName = type == TypeKind.Params ? $"Array.{argument.TypeDefinition.Generics[0].GenericName}" : argument.TypeDefinition.GenericName;
+                _programGraph.Types.TryGetValue(argumentTypeName, out var argumentType);
                 argument.Type = argumentType;
 
                 switch (type)
@@ -2723,7 +2726,14 @@ namespace Lang
 
                         var polymorphedFunction = _polymorpher.CreatePolymorphedFunction(function, name, _programGraph.TypeCount++, genericTypes);
                         VerifyType(polymorphedFunction.ReturnType);
-                        polymorphedFunction.Arguments.ForEach(arg => VerifyType(arg.TypeDefinition, argument: true));
+                        polymorphedFunction.Arguments.ForEach(arg => {
+                            VerifyType(arg.TypeDefinition, argument: true);
+
+                            // TODO Make this better, roll into VerifyType
+                            var argumentTypeName = arg.TypeDefinition.TypeKind == TypeKind.Params ? $"Array.{arg.TypeDefinition.Generics[0].GenericName}" : arg.TypeDefinition.GenericName;
+                            _programGraph.Types.TryGetValue(argumentTypeName, out var argumentType);
+                            arg.Type = argumentType;
+                        });
 
                         _programGraph.Functions[genericName] = new List<FunctionAst>{polymorphedFunction};
                         VerifyFunction(polymorphedFunction);
