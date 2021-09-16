@@ -13,6 +13,7 @@ namespace Lang.Backend.LLVM
     {
         private const string ObjectDirectory = "obj";
 
+        private ProgramGraph _programGraph;
         private LLVMModuleRef _module;
         private LLVMBuilderRef _builder;
         private LLVMPassManagerRef _passManager;
@@ -21,14 +22,13 @@ namespace Lang.Backend.LLVM
         private bool _stackPointerExists;
         private bool _stackSaved;
 
-        private Dictionary<string, List<FunctionAst>> _functions;
-        private Dictionary<string, IType> _types;
         private readonly Queue<LLVMValueRef> _allocationQueue = new();
         private readonly LLVMValueRef _zeroInt = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), 0, false);
         private readonly TypeDefinition _intTypeDefinition = new() {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
 
         public string WriteFile(string projectPath, ProgramGraph programGraph, BuildSettings buildSettings)
         {
+            _programGraph = programGraph;
             // 1. Initialize the LLVM module and builder
             InitLLVM(programGraph.Name, buildSettings.Release);
 
@@ -43,7 +43,6 @@ namespace Lang.Backend.LLVM
             var globals = WriteData(programGraph);
 
             // 4. Write Function and Operator overload definitions
-            _functions = programGraph.Functions;
             foreach (var (name, functions) in programGraph.Functions)
             {
                 for (var i = 0; i < functions.Count; i++)
@@ -133,7 +132,6 @@ namespace Lang.Backend.LLVM
         {
             // 1. Declare structs and enums
             var structs = new Dictionary<string, LLVMTypeRef>();
-            _types = programGraph.Types;
             foreach (var (name, type) in programGraph.Types)
             {
                 if (type is StructAst structAst)
@@ -520,7 +518,7 @@ namespace Lang.Backend.LLVM
                             BuildCallAllocations(call);
                             if (!structField.Pointers[0])
                             {
-                                var function = _functions[call.Function][call.FunctionIndex];
+                                var function = _programGraph.Functions[call.Function][call.FunctionIndex];
                                 var iterationValue = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(function.ReturnType), function.Name);
                                 _allocationQueue.Enqueue(iterationValue);
                             }
@@ -553,7 +551,7 @@ namespace Lang.Backend.LLVM
                         case CallAst call:
                         {
                             BuildCallAllocations(call);
-                            var function = _functions[call.Function][call.FunctionIndex];
+                            var function = _programGraph.Functions[call.Function][call.FunctionIndex];
                             var iterationValue = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(function.ReturnType), function.Name);
                             _allocationQueue.Enqueue(iterationValue);
                             break;
@@ -566,7 +564,7 @@ namespace Lang.Backend.LLVM
                                     BuildCallAllocations(call);
                                     if (!structField.Pointers[0])
                                     {
-                                        var function = _functions[call.Function][call.FunctionIndex];
+                                        var function = _programGraph.Functions[call.Function][call.FunctionIndex];
                                         var iterationValue = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(function.ReturnType), function.Name);
                                         _allocationQueue.Enqueue(iterationValue);
                                     }
@@ -599,7 +597,7 @@ namespace Lang.Backend.LLVM
         {
             if (call.Params)
             {
-                var functionDef = _functions[call.Function][call.FunctionIndex];
+                var functionDef = _programGraph.Functions[call.Function][call.FunctionIndex];
 
                 var paramsTypeDef = functionDef.Arguments[^1].Type;
                 var paramsType = ConvertTypeDefinition(paramsTypeDef);
@@ -621,7 +619,7 @@ namespace Lang.Backend.LLVM
 
         private void BuildStructAllocations(string name)
         {
-            var structDef = _types[name] as StructAst;
+            var structDef = _programGraph.Types[name] as StructAst;
             foreach (var field in structDef!.Fields)
             {
                 if (field.Type.Name == "List")
@@ -754,7 +752,7 @@ namespace Lang.Backend.LLVM
             IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, List<AssignmentAst> values = null)
         {
             var assignments = values?.ToDictionary(_ => (_.Reference as IdentifierAst)!.Name);
-            var structDef = _types[typeDef.GenericName] as StructAst;
+            var structDef = _programGraph.Types[typeDef.GenericName] as StructAst;
             for (var i = 0; i < structDef!.Fields.Count; i++)
             {
                 var structField = structDef.Fields[i];
@@ -793,7 +791,7 @@ namespace Lang.Backend.LLVM
                                 break;
                             case StructFieldRefAst structFieldRef:
                                 var enumName = structFieldRef.TypeNames[0];
-                                var enumDef = (EnumAst)_types[enumName];
+                                var enumDef = (EnumAst)_programGraph.Types[enumName];
                                 var value = enumDef.Values[structFieldRef.ValueIndices[0]].Value;
                                 var enumValue = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (ulong)value, false);
                                 LLVMApi.BuildStore(_builder, enumValue, field);
@@ -1120,7 +1118,7 @@ namespace Lang.Backend.LLVM
                 {
                     if (!localVariables.TryGetValue(identifier.Name, out var typeValue))
                     {
-                        var typeDef = _types[identifier.Name];
+                        var typeDef = _programGraph.Types[identifier.Name];
                         return (_intTypeDefinition, LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (uint)typeDef.TypeIndex, false));
                     }
                     var (type, value) = typeValue;
@@ -1135,7 +1133,7 @@ namespace Lang.Backend.LLVM
                     if (structField.IsEnum)
                     {
                         var enumName = structField.TypeNames[0];
-                        var enumDef = (EnumAst)_types[enumName];
+                        var enumDef = (EnumAst)_programGraph.Types[enumName];
                         var value = enumDef.Values[structField.ValueIndices[0]].Value;
                         return (enumDef.BaseType, LLVMApi.ConstInt(GetIntegerType(enumDef.BaseType.PrimitiveType), (ulong)value, false));
                     }
@@ -1147,7 +1145,7 @@ namespace Lang.Backend.LLVM
                     return (type, field);
                 }
                 case CallAst call:
-                    var functions = _functions[call.Function];
+                    var functions = _programGraph.Functions[call.Function];
                     LLVMValueRef function;
                     if (call.Function == "main")
                     {
@@ -1312,7 +1310,7 @@ namespace Lang.Backend.LLVM
                     return expressionValue;
                 case TypeDefinition typeDef:
                 {
-                    var type = _types[typeDef.GenericName];
+                    var type = _programGraph.Types[typeDef.GenericName];
                     return (_intTypeDefinition, LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (uint)type.TypeIndex, false));
                 }
                 case CastAst cast:
@@ -1482,7 +1480,7 @@ namespace Lang.Backend.LLVM
                 }
 
                 var structName = structField.TypeNames[i-1];
-                var structDefinition = (StructAst) _types[structName];
+                var structDefinition = (StructAst) _programGraph.Types[structName];
                 type = structDefinition.Fields[structField.ValueIndices[i-1]].Type;
 
                 switch (structField.Children[i])
@@ -1867,15 +1865,17 @@ namespace Lang.Backend.LLVM
 
         private LLVMValueRef BuildRealOperation(LLVMValueRef lhs, LLVMValueRef rhs, Operator op)
         {
-            return op switch
+            switch (op)
             {
-                Operator.Add => LLVMApi.BuildFAdd(_builder, lhs, rhs, "tmpadd"),
-                Operator.Subtract => LLVMApi.BuildFSub(_builder, lhs, rhs, "tmpsub"),
-                Operator.Multiply => LLVMApi.BuildFMul(_builder, lhs, rhs, "tmpmul"),
-                Operator.Divide => LLVMApi.BuildFDiv(_builder, lhs, rhs, "tmpdiv"),
-                Operator.Modulus => LLVMApi.BuildFRem(_builder, lhs, rhs, "tmpmod"),
+                case Operator.Add: return LLVMApi.BuildFAdd(_builder, lhs, rhs, "tmpadd");
+                case Operator.Subtract: return LLVMApi.BuildFSub(_builder, lhs, rhs, "tmpsub");
+                case Operator.Multiply: return LLVMApi.BuildFMul(_builder, lhs, rhs, "tmpmul");
+                case Operator.Divide: return LLVMApi.BuildFDiv(_builder, lhs, rhs, "tmpdiv");
+                case Operator.Modulus:
+                    _programGraph.Dependencies.Add("m");
+                    return LLVMApi.BuildFRem(_builder, lhs, rhs, "tmpmod");
                 // @Cleanup This branch should never be hit
-                _ => new LLVMValueRef()
+                default: return new LLVMValueRef();
             };
         }
 
@@ -1931,7 +1931,7 @@ namespace Lang.Backend.LLVM
 
         private LLVMTypeRef GetStructType(TypeDefinition type)
         {
-            if (_types.TryGetValue(type.Name, out var typeDef) && typeDef is EnumAst)
+            if (_programGraph.Types.TryGetValue(type.Name, out var typeDef) && typeDef is EnumAst)
             {
                 return LLVMTypeRef.Int32Type();
             }

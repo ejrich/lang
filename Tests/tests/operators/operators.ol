@@ -20,6 +20,9 @@ operator_overloading() {
     div := a / b;
     printf("Divide: x = %.2f, y = %.2f, z = %.2f\n", div.x, div.y, div.z);
 
+    mod := a % b;
+    printf("Modulus: x = %.2f, y = %.2f, z = %.2f\n", mod.x, mod.y, mod.z);
+
     and := a && b;
     or := a || b;
     xor := a ^ b;
@@ -58,6 +61,11 @@ operator * Vector3(Vector3 a, Vector3 b) {
 
 operator / Vector3(Vector3 a, Vector3 b) {
     c: Vector3 = { x = a.x / b.x; y = a.y / b.y; z = a.z / b.z; }
+    return c;
+}
+
+operator % Vector3(Vector3 a, Vector3 b) {
+    c: Vector3 = { x = a.x % b.x; y = a.y % b.y; z = a.z % b.z; }
     return c;
 }
 
