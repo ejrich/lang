@@ -58,6 +58,7 @@ namespace Lang.Translation
 
             // 2. Verify struct bodies, global variables, and function return types and arguments
             var globalVariables = new Dictionary<string, TypeDefinition>();
+            var mainDefined = false;
             foreach (var ast in parseResult.SyntaxTrees)
             {
                 switch (ast)
@@ -74,13 +75,22 @@ namespace Lang.Translation
                         graph.Data.Variables.Add(globalVariable);
                         break;
                     case FunctionAst function:
-                        VerifyFunctionDefinition(function, errors);
+                        var main = function.Name == "main";
+                        if (main)
+                        {
+                            if (mainDefined)
+                            {
+                                errors.Add(CreateError("Only one main function can be defined", function));
+                            }
+                            function.Name = "__main";
+                            mainDefined = true;
+                        }
+                        VerifyFunctionDefinition(function, main, errors);
                         break;
                 }
             }
 
             // 3. Verify function bodies
-            var mainDefined = false;
             foreach (var ast in parseResult.SyntaxTrees)
             {
                 switch (ast)
@@ -91,21 +101,10 @@ namespace Lang.Translation
                         if (function.Name == "__start")
                         {
                             graph.Start = function;
-                            VerifyFunction(function, false, globalVariables, errors);
-                            continue;
                         }
 
                         // Verify the function body
-                        var main = function.Name == "main";
-                        VerifyFunction(function, main, globalVariables, errors);
-                        if (main)
-                        {
-                            if (mainDefined)
-                            {
-                                errors.Add(CreateError("Only one main function can be defined", function));
-                            }
-                            mainDefined = true;
-                        }
+                        VerifyFunction(function, globalVariables, errors);
                         graph.Functions.Add(function.Name, function);
                         break;
                     case CompilerDirectiveAst compilerDirective:
@@ -341,15 +340,15 @@ namespace Lang.Translation
                     }
                 }
             }
-
-            // 4. Load the function into the dictionary
-            if (!_programGraph.Functions.TryAdd(function.Name, function))
+            
+            // 4. Load the function into the dictionary 
+            if (!_functions.TryAdd(function.Name, function))
             {
                 errors.Add(CreateError($"Multiple definitions of function '{function.Name}'", function));
             }
         }
 
-        private void VerifyFunction(FunctionAst function, List<TranslationError> errors)
+        private void VerifyFunction(FunctionAst function, IDictionary<string, TypeDefinition> globals, List<TranslationError> errors)
         {
             // 1. Initialize local variables
             var localVariables = new Dictionary<string, TypeDefinition>(_globalVariables);
@@ -359,6 +358,7 @@ namespace Lang.Translation
                 localVariables[argument.Name] = argument.Type;
             }
             var returnType = VerifyType(function.ReturnType, errors);
+
 
             // 2. For extern functions, simply verify there is no body and return
             if (function.Extern)
@@ -371,7 +371,7 @@ namespace Lang.Translation
                 return;
             }
 
-            // 4. Loop through function body and verify all ASTs
+            // 3. Loop through function body and verify all ASTs
             var returned = VerifyAsts(function.Children, localVariables, errors);
 
             // 4. Verify the function returns on all paths
