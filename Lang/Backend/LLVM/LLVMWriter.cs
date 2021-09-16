@@ -1746,6 +1746,14 @@ namespace Lang.Backend.LLVM
         private LLVMTypeRef GetListType(TypeDefinition type)
         {
             var listType = type.Generics[0];
+
+            if (type.CArray)
+            {
+                var elementType = LLVMApi.GetTypeByName(_module, listType.GenericName);
+                var count = type.Count == null ? 0 : 12;
+                return LLVMApi.ArrayType(elementType, (uint)count);
+            }
+
             return LLVMApi.GetTypeByName(_module, $"List.{listType.GenericName}");
         }
 
