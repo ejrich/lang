@@ -19,3 +19,4 @@ var container = serviceCollection.BuildServiceProvider();
 
 var compiler = container.GetService<ICompiler>();
 compiler.Compile(args);
+Allocator.Free();
