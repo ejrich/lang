@@ -2313,6 +2313,7 @@ namespace Lang
                         {
                             pointerType.Generics.Add(referenceType);
                         }
+                        unary.Type = TypeTable.GetType(pointerType);
                         return pointerType;
                     }
                     else

@@ -243,6 +243,7 @@ namespace Lang
         public uint Column { get; init; }
         public UnaryOperator Operator { get; set; }
         public IAst Value { get; set; }
+        public IType Type { get; set; }
     }
 
     public class CallAst : IAst

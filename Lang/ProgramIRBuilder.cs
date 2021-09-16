@@ -540,11 +540,13 @@ namespace Lang
             EmitStore(function, lengthPointer, lengthValue);
 
             var dataIndex = AddAllocation(function, elementType, true, length);
-            var arrayDataPointer = AllocationValue(dataIndex);
+            var dataPointerType = arrayStruct.Fields[1].Type;
+            var arrayData = AllocationValue(dataIndex);
+            var arrayDataPointer = EmitInstruction(InstructionType.PointerCast, function, dataPointerType, arrayData, new InstructionValue {ValueType = InstructionValueType.Type, Type = dataPointerType});
             var dataPointer = EmitGetStructPointer(function, arrayPointer, arrayStruct, 1);
             EmitStore(function, dataPointer, arrayDataPointer);
 
-            return arrayDataPointer;
+            return arrayData;
         }
 
         private void InitializeArrayValues(FunctionIR function, InstructionValue arrayPointer, IType elementType, List<IAst> arrayValues, ScopeAst scope)
@@ -985,7 +987,8 @@ namespace Lang
                             value = EmitIR(function, unary.Value, scope);
                             return EmitLoad(function, value.Type, value);
                         case UnaryOperator.Reference:
-                            return EmitGetReference(function, unary.Value, scope);
+                            value = EmitGetReference(function, unary.Value, scope);
+                            return new InstructionValue {ValueType = value.ValueType, ValueIndex = value.ValueIndex, Type = unary.Type};
                     }
                     break;
                 case IndexAst index:
