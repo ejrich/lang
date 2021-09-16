@@ -67,7 +67,7 @@ namespace Lang.Runner
                     for (; index < count; index++)
                     {
                         var field = structAst.Fields[index];
-                        var fieldType = GetTypeFromDefinition(field.Type);
+                        var fieldType = GetTypeFromDefinition(field.Type, name, structBuilder);
                         if (fieldType == null)
                         {
                             break;
@@ -189,10 +189,8 @@ namespace Lang.Runner
                     switch (typeDef.Name)
                     {
                         case "List":
-                            // TODO Handle lists
-                            return null;
+                            return InitializeList(typeDef, programGraph, variables);
                         case "*":
-                            // TODO Handle pointers
                             return IntPtr.Zero;
                     }
                     var instanceType = _types[typeDef.GenericName];
@@ -209,13 +207,13 @@ namespace Lang.Runner
         private object InitializeStruct(Type type, StructAst structAst, ProgramGraph programGraph,
             IDictionary<string, ValueType> variables, List<AssignmentAst> values = null)
         {
-            var assignments = values == null ? new Dictionary<string, AssignmentAst>() : values.ToDictionary(_ => (_.Variable as VariableAst)!.Name);
+            var assignments = values?.ToDictionary(_ => (_.Variable as VariableAst)!.Name);
             var instance = Activator.CreateInstance(type);
             foreach (var field in structAst.Fields)
             {
                 var fieldInstance = instance!.GetType().GetField(field.Name);
 
-                if (assignments.TryGetValue(field.Name, out var assignment))
+                if (assignments != null && assignments.TryGetValue(field.Name, out var assignment))
                 {
                     var expression = ExecuteExpression(assignment.Value, programGraph, variables);
                     var value = CastValue(expression.Value, field.Type);
@@ -239,27 +237,67 @@ namespace Lang.Runner
                             break;
                     }
                 }
-                else if (field.Type.Name == "*")
+                else switch (field.Type.Name)
                 {
-                    // TODO Implement pointers
-                }
-                else if (field.Type.PrimitiveType == null)
-                {
-                    var fieldType = _types[field.Type.GenericName];
-                    var fieldTypeDef = programGraph.Data.Types[field.Type.GenericName];
-                    if (fieldTypeDef is StructAst fieldStructAst)
+                    case "List":
+                        var list = InitializeList(field.Type, programGraph, variables);
+                        fieldInstance!.SetValue(instance, list);
+                        break;
+                    case "*":
+                        break;
+                    default:
                     {
-                        var value = InitializeStruct(fieldType, fieldStructAst, programGraph, variables);
-                        fieldInstance!.SetValue(instance, value);
-                    }
-                    else
-                    {
-                        fieldInstance!.SetValue(instance, Activator.CreateInstance(fieldType));
+                        if (field.Type.PrimitiveType == null)
+                        {
+                            var fieldType = _types[field.Type.GenericName];
+                            var fieldTypeDef = programGraph.Data.Types[field.Type.GenericName];
+                            if (fieldTypeDef is StructAst fieldStructAst)
+                            {
+                                var value = InitializeStruct(fieldType, fieldStructAst, programGraph, variables);
+                                fieldInstance!.SetValue(instance, value);
+                            }
+                            else
+                            {
+                                fieldInstance!.SetValue(instance, Activator.CreateInstance(fieldType));
+                            }
+                        }
+                        break;
                     }
                 }
             }
 
             return instance;
+        }
+
+        private object InitializeList(TypeDefinition typeDef, ProgramGraph programGraph, IDictionary<string, ValueType> variables)
+        {
+            var listType = _types[typeDef.GenericName];
+            var genericType = GetTypeFromDefinition(typeDef.Generics[0]);
+
+            var list = Activator.CreateInstance(listType);
+            var dataField = listType.GetField("data");
+            if (typeDef.Count != null)
+            {
+                var count = (int)ExecuteExpression(typeDef.Count, programGraph, variables).Value;
+                var countField = listType.GetField("length");
+                countField!.SetValue(list, count);
+                var array = Array.CreateInstance(genericType, count);
+                unsafe
+                {
+                    var arrayRef = __makeref(array);
+                    dataField!.SetValue(list, (IntPtr)(&arrayRef));
+                }
+            }
+            else
+            {
+                var array = Array.CreateInstance(genericType, 100);
+                unsafe
+                {
+                    var arrayRef = __makeref(array);
+                    dataField!.SetValue(list, (IntPtr)(&arrayRef));
+                }
+            }
+            return list;
         }
 
         private void ExecuteAssignment(AssignmentAst assignment, ProgramGraph programGraph, IDictionary<string, ValueType> variables)
@@ -1061,7 +1099,7 @@ namespace Lang.Runner
             method.SetCustomAttribute(caBuilder);
         }
 
-        private Type GetTypeFromDefinition(TypeDefinition typeDef)
+        private Type GetTypeFromDefinition(TypeDefinition typeDef, string parentName = null, Type parentType = null)
         {
             switch (typeDef.PrimitiveType)
             {
@@ -1096,9 +1134,18 @@ namespace Lang.Runner
                 case "string":
                     return typeof(string);
                 case "*":
-                    return typeof(IntPtr);
+                    var pointerType = GetTypeFromDefinition(typeDef.Generics[0], parentName, parentType);
+                    if (pointerType == null)
+                    {
+                        return null;
+                    }
+                    return pointerType.MakePointerType();
             }
 
+            if (typeDef.GenericName == parentName)
+            {
+                return parentType;
+            }
             return _types.TryGetValue(typeDef.GenericName, out var type) ? type : null;
         }
     }
