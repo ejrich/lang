@@ -20,6 +20,8 @@ struct TypeInfo {
     u32 size;
     List<TypeField> fields;
     List<EnumValue> enum_values;
+    TypeInfo* return_type;
+    List<ArgumentType> arguments;
 }
 
 enum TypeKind {
@@ -45,6 +47,11 @@ struct EnumValue {
     int value;
 }
 
+struct ArgumentType {
+    string name;
+    TypeInfo* type_info;
+}
+
 __type_table: List<TypeInfo*>;
 
 TypeInfo type_of(Type type) {
@@ -66,7 +73,6 @@ int __start(int argc, string* argv) {
 
     each i in 1..argc-1 then args[i-1] = *(argv + i);
 
-    // @Future Add compile time execution to write the correct return
     #assert type_of(main).type == TypeKind.Function;
     #if type_of(main).return_type.type == TypeKind.Void {
         #if type_of(main).arguments.length == 0 then main();

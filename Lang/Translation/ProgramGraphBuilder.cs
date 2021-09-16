@@ -175,7 +175,7 @@ namespace Lang.Translation
             } while (verifyAdditional);
 
             // 4. Verify function bodies
-            foreach (var (_, function) in _programGraph.Functions)
+            foreach (var function in _programGraph.Functions.Values)
             {
                 if (function.Verified) continue;
                 VerifyFunction(function);
