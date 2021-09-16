@@ -648,15 +648,8 @@ namespace Lang.Translation
                     case Operator.BitwiseAnd:
                     case Operator.BitwiseOr:
                     case Operator.Xor:
-                        if (type == Type.Boolean && nextType == Type.Boolean)
-                        {
-                            expressionType = new TypeDefinition {Name = "bool"};
-                        }
-                        else if (type == Type.Int && nextType == Type.Int)
-                        {
-                            expressionType = new TypeDefinition {Name = "int"};
-                        }
-                        else
+                        if (!(type == Type.Boolean && nextType == Type.Boolean) &&
+                            !(type == Type.Int && nextType == Type.Int))
                         {
                             errors.Add(CreateError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expressionType)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]));
                             if (nextType == Type.Boolean || nextType == Type.Int)

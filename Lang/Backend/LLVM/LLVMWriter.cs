@@ -15,7 +15,8 @@ namespace Lang.Backend.LLVM
 
         private LLVMModuleRef _module;
         private LLVMBuilderRef _builder;
-        private readonly IDictionary<string, StructAst> _structs = new Dictionary<string, StructAst>();
+        private readonly Dictionary<string, TypeDefinition> _functionTypes = new();
+        private readonly Dictionary<string, StructAst> _structs = new();
         private FunctionAst _currentFunction;
 
         public string WriteFile(ProgramGraph programGraph, string projectName, string projectPath)
@@ -87,6 +88,7 @@ namespace Lang.Backend.LLVM
 
         private LLVMValueRef WriteFunctionDefinition(string name, List<Argument> arguments, TypeDefinition returnType)
         {
+            _functionTypes.Add(name, returnType);
             var argumentTypes = arguments.Select(arg => ConvertTypeDefinition(arg.Type)).ToArray();
             var function = LLVMApi.AddFunction(_module, name, LLVMApi.FunctionType(ConvertTypeDefinition(returnType), argumentTypes, false));
 
@@ -517,8 +519,8 @@ namespace Lang.Backend.LLVM
                         var value = WriteExpression(call.Arguments[i], localVariables);
                         callArguments[i] = value.value;
                     }
-                    // TODO Get function return type
-                    return (null, LLVMApi.BuildCall(_builder, function, callArguments, "callTmp"));
+                    var functionType = _functionTypes[call.Function];
+                    return (functionType, LLVMApi.BuildCall(_builder, function, callArguments, "callTmp"));
                 case ChangeByOneAst changeByOne:
                 {
                     var variableName = changeByOne.Variable switch
