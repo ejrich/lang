@@ -279,7 +279,8 @@ SDL_CreateWindow(string title, int x, int y, int w, int h, u32 flags) #extern "S
 u32 sleep(u32 seconds) #extern "libc"
 
 #run {
-    //args: List<string>[0];
+    //args: List<string>[1];
+    //args[0] = "Hello world";
     //main(args);
     main();
     /*default_args(87);
