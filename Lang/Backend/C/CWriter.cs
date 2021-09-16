@@ -13,7 +13,7 @@ namespace Lang.Backend.C
             var objectPath = Path.Combine(projectPath, ObjectDirectory);
             if (!Directory.Exists(objectPath))
                 Directory.CreateDirectory(objectPath);
-            
+
             var file = Path.Combine(objectPath, $"{projectName}.cpp");
             var fileContents = new StringBuilder();
 
