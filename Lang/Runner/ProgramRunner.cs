@@ -961,6 +961,11 @@ namespace Lang.Runner
                     var (typeDef, elementType, pointer) = GetListPointer(indexAst, variables);
                     return new ValueType {Type = typeDef, Value = PointerToTargetType(pointer, typeDef, elementType)};
                 }
+                case CastAst cast:
+                {
+                    var value = ExecuteExpression(cast.Value, variables);
+                    return new ValueType {Type = cast.TargetType, Value = CastValue(value.Value, cast.TargetType)};
+                }
             }
 
             return null;

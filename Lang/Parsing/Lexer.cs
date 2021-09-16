@@ -38,7 +38,8 @@ namespace Lang.Parsing
             {"in", TokenType.In},
             {"struct", TokenType.Struct},
             {"enum", TokenType.Enum},
-            {"null", TokenType.Null}
+            {"null", TokenType.Null},
+            {"cast", TokenType.Cast}
         };
 
         public List<Token> LoadFileTokens(string filePath, int fileIndex, out List<ParseError> errors)
@@ -63,7 +64,7 @@ namespace Lang.Parsing
             while (reader.Peek() > 0)
             {
                 var character = (char)reader.Read();
- 
+
                 column++;
                 if (character == '\n')
                 {

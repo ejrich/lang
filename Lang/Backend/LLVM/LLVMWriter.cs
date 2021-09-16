@@ -1248,6 +1248,11 @@ namespace Lang.Backend.LLVM
                         expressionValue.type = expression.ResultingTypes[i - 1];
                     }
                     return expressionValue;
+                case CastAst cast:
+                {
+                    var value = WriteExpression(cast.Value, localVariables);
+                    return (cast.TargetType, CastValue(value, cast.TargetType));
+                }
                 default:
                     // @Cleanup This branch should not be hit since we've already verified that these ASTs are handled,
                     // but notify the user and exit just in case
@@ -1306,7 +1311,11 @@ namespace Lang.Backend.LLVM
         {
             switch (constant.Type.PrimitiveType)
             {
-                case IntegerType:
+                case IntegerType integerType:
+                    if (integerType.Bytes == 8 && !integerType.Signed)
+                    {
+                        return LLVMApi.ConstInt(type, ulong.Parse(constant.Value), false);
+                    }
                     return LLVMApi.ConstInt(type, (ulong)long.Parse(constant.Value), false);
                 case FloatType:
                     return LLVMApi.ConstRealOfStringAndSize(type, constant.Value, (uint)constant.Value.Length);
