@@ -37,7 +37,7 @@ namespace Lang
         public InstructionType Type { get; set; }
 
         // Used for Load and Store
-        public int AllocationIndex { get; set; }
+        public int? AllocationIndex { get; set; }
         public string CallFunction { get; set; }
 
         public InstructionValue Value1 { get; set; }
