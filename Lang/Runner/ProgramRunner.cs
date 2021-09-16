@@ -54,9 +54,8 @@ namespace Lang.Runner
             var temporaryStructs = new Dictionary<string, TypeBuilder>();
             foreach (var (name, type) in programGraph.Types)
             {
-                if (type is StructAst structAst)
+                if (type is StructAst structAst && !_types.ContainsKey(name))
                 {
-                    if (_types.ContainsKey(name)) break;
                     var structBuilder = _moduleBuilder.DefineType(name, TypeAttributes.Public | TypeAttributes.SequentialLayout);
                     temporaryStructs[name] = structBuilder;
                 }
@@ -698,8 +697,7 @@ namespace Lang.Runner
 
                 for (var i = 0; i < length; i++)
                 {
-                    var valuePointer = IntPtr.Add(dataPointer, Marshal.SizeOf(type) * i);
-                    iterationVariable.Value = Marshal.PtrToStructure(valuePointer, type);
+                    iterationVariable.Value = IntPtr.Add(dataPointer, Marshal.SizeOf(type) * i);
 
                     var value = ExecuteAsts(each.Children, eachVariables, out returned);
 
@@ -711,13 +709,16 @@ namespace Lang.Runner
             }
             else
             {
-                var rangeBegin = ExecuteExpression(each.RangeBegin, variables);
+                var iterationValue = ExecuteExpression(each.RangeBegin, variables);
                 var rangeEnd = ExecuteExpression(each.RangeEnd, variables);
-                var iterationVariable = new ValueType {Type = rangeBegin.Type, Value = rangeBegin.Value};
+
+                var pointer = Marshal.AllocHGlobal(Marshal.SizeOf(GetTypeFromDefinition(iterationValue.Type)));
+                var iterationVariable = new ValueType {Type = iterationValue.Type, Value = pointer};
                 eachVariables.Add(each.IterationVariable, iterationVariable);
 
-                while ((bool)RunExpression(iterationVariable, rangeEnd, Operator.LessThanEqual, iterationVariable.Type))
+                while ((bool)RunExpression(iterationValue, rangeEnd, Operator.LessThanEqual, iterationValue.Type))
                 {
+                    Marshal.StructureToPtr(iterationValue.Value, pointer, false);
                     var value = ExecuteAsts(each.Children, eachVariables, out returned);
 
                     if (returned)
@@ -725,7 +726,7 @@ namespace Lang.Runner
                         return value;
                     }
 
-                    iterationVariable.Value = (int)iterationVariable.Value + 1;
+                    iterationValue.Value = (int)iterationValue.Value + 1;
                 }
             }
 
@@ -796,22 +797,33 @@ namespace Lang.Runner
                         }
                         case StructFieldRefAst structField:
                         {
-                            var result = GetStructFieldRef(structField, variables, out _, out var constant);
+                            var result = GetStructFieldRef(structField, variables, out var loaded, out var constant);
+                            var type = result.Type;
                             var pointer = GetPointer(result.Value);
 
-                            var previousValue = constant ? pointer : PointerToTargetType(pointer, result.Type);
-                            var newValue = PerformOperation(result.Type, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
+                            if (loaded && type.Name == "*")
+                            {
+                                type = type.Generics[0];
+                            }
+
+                            var previousValue = constant ? pointer : PointerToTargetType(pointer, type);
+                            var newValue = PerformOperation(type, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
 
                             if (!constant)
                             {
                                 Marshal.StructureToPtr(newValue, pointer, false);
                             }
 
-                            return new ValueType {Type = result.Type, Value = changeByOne.Prefix ? newValue : previousValue};
+                            return new ValueType {Type = type, Value = changeByOne.Prefix ? newValue : previousValue};
                         }
                         case IndexAst indexAst:
                         {
-                            var (type, elementType, pointer) = GetListPointer(indexAst, variables, out _);
+                            var (type, elementType, pointer) = GetListPointer(indexAst, variables, out var loaded);
+                            if (loaded)
+                            {
+                                type = type.Generics[0];
+                                elementType = GetTypeFromDefinition(type);
+                            }
 
                             var previousValue = Marshal.PtrToStructure(GetPointer(pointer), elementType);
                             var newValue = PerformOperation(type, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
@@ -978,6 +990,8 @@ namespace Lang.Runner
             {
                 case IdentifierAst identifier:
                     var variable = variables[identifier.Name];
+                    type = variable.Type;
+                    pointer = GetPointer(variable.Value);
                     break;
                 case IndexAst index:
                     var (typeDef, elementType, listPointer) = GetListPointer(index, variables, out _);
@@ -1055,15 +1069,17 @@ namespace Lang.Runner
 
                 var structDefinition = (StructAst) _programGraph.Types[structName];
                 var field = structDefinition.Fields[structField.ValueIndices[i-1]];
+                var structType = GetTypeFromDefinition(type);
+                var offset = (int)Marshal.OffsetOf(structType, field.Name);
                 type = field.Type;
 
                 switch (structField.Children[i])
                 {
                     case IdentifierAst identifier:
-                        pointer = IntPtr.Add(pointer, field.Offset);
+                        pointer = IntPtr.Add(pointer, offset);
                         break;
                     case IndexAst index:
-                        pointer = IntPtr.Add(pointer, field.Offset);
+                        pointer = IntPtr.Add(pointer, offset);
                         var indexValue = (int)ExecuteExpression(index.Index, variables).Value;
                         if (index.CallsOverload)
                         {
@@ -1210,11 +1226,6 @@ namespace Lang.Runner
                 var variable = variables[index.Name];
                 pointer = GetPointer(variable.Value);
                 listTypeDef ??= variable.Type;
-                elementTypeDef = variable.Type.Generics[0];
-            }
-            else
-            {
-                elementTypeDef = listTypeDef.Generics[0];
             }
 
             if (index.CallsOverload)
@@ -1226,6 +1237,7 @@ namespace Lang.Runner
                 return (value.Type, GetTypeFromDefinition(value.Type), value.Value);
             }
 
+            elementTypeDef = listTypeDef.Generics[0];
             var elementType = GetTypeFromDefinition(elementTypeDef);
 
             if (!listTypeDef.CArray)
@@ -2003,6 +2015,8 @@ namespace Lang.Runner
                         return null;
                     }
                     return pointerType.MakePointerType();
+                case "Params":
+                    return _types.TryGetValue($"List.{typeDef.Generics[0].GenericName}", out var listType) ? listType : null;
                 case "List" when typeDef.CArray:
                     var elementType = GetTypeFromDefinition(typeDef.Generics[0]);
                     return elementType.MakeArrayType();
