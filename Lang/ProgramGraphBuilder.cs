@@ -2310,7 +2310,7 @@ namespace Lang
                     var argument = arguments[i];
                     if (argument != null)
                     {
-                        if (functionArg.TypeDefinition.Name == "Type")
+                        if (functionArg.TypeDefinition.TypeKind == TypeKind.Type)
                         {
                             var typeIndex = new ConstantAst
                             {
@@ -2359,7 +2359,7 @@ namespace Lang
                             var argument = arguments[i];
                             if (argument != null)
                             {
-                                if (paramsType.Name == "Type")
+                                if (paramsType.TypeKind == TypeKind.Type)
                                 {
                                     var typeIndex = new ConstantAst
                                     {
@@ -2373,7 +2373,6 @@ namespace Lang
                                     {
                                         continue;
                                     }
-
                                     else
                                     {
                                         var type = TypeTable.Types[argument.GenericName];

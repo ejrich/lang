@@ -129,15 +129,15 @@ namespace Lang
                 AddAllocation(function, declaration, allocationIndex);
 
                 // TODO Add initialization values
+                var block = function.BasicBlocks[^1];
                 if (declaration.Value != null)
                 {
-                    var block = function.BasicBlocks[^1];
                     var value = EmitIR(function, declaration.Value, scope, block); // TODO CastValue
                     EmitStore(block, allocationIndex, value);
                 }
                 else if (declaration.ArrayValues != null)
                 {
-                    // value = InitializeArray(declaration.Type, variables, declaration.ArrayValues);
+                    // InitializeConstArray(function, (StructAst)declaration.Type, scope, block, declaration.ArrayValues);
                 }
                 else
                 {
@@ -161,6 +161,10 @@ namespace Lang
             };
             function.StackSize += type.Size;
             function.Allocations.Add(allocation);
+        }
+
+        private void InitializeConstArray(FunctionIR function, StructAst arrayDef, ScopeAst scope, BasicBlock block, List<IAst> arrayValues = null)
+        {
         }
 
         public void EmitAssignment(FunctionIR function, AssignmentAst assignment, ScopeAst scope)
@@ -223,10 +227,17 @@ namespace Lang
                         return new InstructionValue
                         {
                             ValueType = InstructionValueType.Constant, Type = _s32Type,
-                            ConstantValue = new InstructionConstant {Integer = (uint)type.TypeIndex}
+                            ConstantValue = new InstructionConstant {Integer = type.TypeIndex}
                         };
                     }
-                    break;
+                    else
+                    {
+                        return new InstructionValue
+                        {
+                            ValueType = InstructionValueType.Constant, Type = _s32Type,
+                            ConstantValue = new InstructionConstant {Integer = TypeTable.Functions[identifierAst.Name][0].TypeIndex}
+                        };
+                    }
                     // TODO Implement getStringPointer
                     // if (type.TypeKind == TypeKind.String)
                     // {
