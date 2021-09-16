@@ -6,8 +6,10 @@
 
 * Strongly typed
 * Native code with no runtime/GC
-* Combines the strengths of C# with the performance of C
-* Full C/C++ interoperability
+* Full C interoperability
+* Ability to execute any code during compilation
+* Built in runtime type information
+* Simple polymorphism for structs, functions, and operator overloading
 * Concise standard library
 * Modules and packages
 * Build tools and project files, not makefiles

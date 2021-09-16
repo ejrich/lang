@@ -2883,7 +2883,6 @@ namespace Lang.Translation
                         AddError($"Type 'Params' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
                         return Type.Error;
                     }
-                    // TODO Might need to change this for generic types
                     return VerifyList(typeDef, depth, argument, out _) ? Type.Params : Type.Error;
                 }
                 case "Type":

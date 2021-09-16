@@ -8,7 +8,7 @@ namespace Lang
         public string Path { get; set; }
         public Linker Linker { get; set; }
         public List<string> SourceFiles { get; set; }
-        public List<string> Dependencies { get; } = new();
+        public HashSet<string> Dependencies { get; } = new();
         public List<string> Packages { get; } = new();
         public List<string> Exclude { get; } = new();
     }
