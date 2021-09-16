@@ -19,7 +19,7 @@ int Main(List<string> args) {
     prim := primitives();
     list := create_list(4);
     ptr := pointers();
-    return ptr;
+    return *ptr;
 }
 
 bool test(int a) {
@@ -115,7 +115,7 @@ List<int> create_list(int count) {
 
 int* pointers() {
     a := 6;
-    b := &a
+    b := &a;
     c := *b;
     return b;
 }

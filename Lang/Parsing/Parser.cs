@@ -1042,6 +1042,8 @@ namespace Lang.Parsing
                     }
                 case TokenType.Not:
                 case TokenType.Minus:
+                case TokenType.Asterisk:
+                case TokenType.Ampersand:
                     if (enumerator.MoveNext())
                     {
                         var unaryAst = CreateAst<UnaryAst>(token);
@@ -1381,6 +1383,12 @@ namespace Lang.Parsing
                         Error = "Expected type to contain generics", Token = enumerator.Current ?? enumerator.Last
                     });
                 }
+            }
+
+            if (enumerator.Peek()?.Type == TokenType.Asterisk)
+            {
+                enumerator.MoveNext();
+                typeDefinition.Pointer = true;
             }
 
             if (enumerator.Peek()?.Type == TokenType.OpenBracket)

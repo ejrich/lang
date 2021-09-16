@@ -563,12 +563,50 @@ namespace Lang.Translation
                     var type = VerifyType(valueType, errors);
                     switch (unary.Operator)
                     {
-                        case UnaryOperator.Not when type == Type.Boolean:
-                            return valueType;
-                        case UnaryOperator.Minus when (type == Type.Int || type == Type.Float):
-                            return valueType;
-                        default:
+                        case UnaryOperator.Not:
+                            if (type == Type.Boolean)
+                            {
+                                return valueType;
+                            }
                             errors.Add(CreateError($"Expected type 'bool', but got type '{PrintTypeDefinition(valueType)}'", unary.Value));
+                            return null;
+                        case UnaryOperator.Negate:
+                            if (type == Type.Int || type == Type.Float)
+                            {
+                                return valueType;
+                            }
+                            errors.Add(CreateError($"Negation not compatible with type '{PrintTypeDefinition(valueType)}'", unary.Value));
+                            return null;
+                        case UnaryOperator.Dereference:
+                            if (valueType.Pointer)
+                            {
+                                var rawType = new TypeDefinition
+                                {
+                                    Name = valueType.Name,
+                                    PrimitiveType = valueType.PrimitiveType,
+                                    Count = valueType.Count
+                                };
+                                rawType.Generics.AddRange(valueType.Generics);
+                                return rawType;
+                            }
+                            errors.Add(CreateError($"Cannot dereference type '{PrintTypeDefinition(valueType)}'", unary.Value));
+                            return null;
+                        case UnaryOperator.Reference:
+                            if (valueType.Pointer)
+                            {
+                                // TODO Figure out how to reference existing pointer types
+                            }
+                            var pointerType = new TypeDefinition
+                            {
+                                Pointer = true,
+                                Name = valueType.Name,
+                                PrimitiveType = valueType.PrimitiveType,
+                                Count = valueType.Count
+                            };
+                            pointerType.Generics.AddRange(valueType.Generics);
+                            return pointerType;
+                        default:
+                            errors.Add(CreateError($"Unexpected unary operator '{unary.Operator}'", unary.Value));
                             return null;
                     }
                 }
@@ -852,6 +890,9 @@ namespace Lang.Translation
 
         private static bool TypeEquals(TypeDefinition a, TypeDefinition b)
         {
+            // Check if pointers
+            if (a.Pointer != b.Pointer) return false;
+
             // Check by primitive type
             switch (a.PrimitiveType)
             {

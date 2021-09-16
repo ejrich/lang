@@ -578,13 +578,16 @@ namespace Lang.Backend.LLVM
                     return unary.Operator switch
                     {
                         UnaryOperator.Not => (type, LLVMApi.BuildNot(_builder, value, "not")),
-                        UnaryOperator.Minus => type.PrimitiveType switch
+                        UnaryOperator.Negate => type.PrimitiveType switch
                         {
                             IntegerType => (type, LLVMApi.BuildNeg(_builder, value, "neg")),
                             FloatType => (type, LLVMApi.BuildFNeg(_builder, value, "fneg")),
                             // @Cleanup This branch should not be hit
                             _ => (null, new LLVMValueRef())
                         },
+                        // TODO Implement these
+                        UnaryOperator.Dereference => (null, new LLVMValueRef()),
+                        UnaryOperator.Reference => (null, new LLVMValueRef()),
                         // @Cleanup This branch should not be hit
                         _ => (null, new LLVMValueRef())
                     };
@@ -926,6 +929,7 @@ namespace Lang.Backend.LLVM
 
         private LLVMTypeRef ConvertTypeDefinition(TypeDefinition typeDef)
         {
+            // TODO Handle pointer types
             return typeDef.PrimitiveType switch
             {
                 IntegerType integerType => integerType.Bytes switch
