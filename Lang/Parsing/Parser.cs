@@ -326,6 +326,7 @@ namespace Lang.Parsing
                     if (commaRequiredBeforeNextArgument)
                     {
                         function.Arguments.Add(currentArgument);
+                        currentArgument = null;
                     }
                     break;
                 }
@@ -418,6 +419,14 @@ namespace Lang.Parsing
                 {
                     break;
                 }
+            }
+
+            if (currentArgument != null)
+            {
+                errors.Add(new ParseError
+                {
+                    Error = $"Incomplete function argument in function '{function.Name}'", Token = enumerator.Current
+                });
             }
 
             if (!commaRequiredBeforeNextArgument && function.Arguments.Any())
