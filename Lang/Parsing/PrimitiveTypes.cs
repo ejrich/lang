@@ -14,7 +14,7 @@ namespace Lang.Parsing
 
     public class FloatType : IPrimitive
     {
-        public ushort Bytes { get; init; }
+        public ushort Bytes { get; set; }
         public bool Signed => true;
     }
 
