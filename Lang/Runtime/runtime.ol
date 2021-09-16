@@ -6,15 +6,26 @@ struct List<T> {
     T* data;
 }
 
-/* TODO Implement enums to get this working
+//* TODO Implement enums to get this working
 struct Any {
-    Type type;
+    TypeKind type;
     void* data;
 }
 
 enum TypeKind {
-    // TODO Coordinate types from builder
-}*/
+    Int;
+    Float;
+    Boolean;
+    String;
+    List;
+    Void;
+    Pointer;
+    Struct;
+    Enum;
+    VarArgs;
+    Params;
+    Error;
+}
 
 
 /* @Future Update strings to use this struct

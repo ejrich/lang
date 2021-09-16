@@ -9,6 +9,7 @@ namespace Lang.Parsing
         public bool Success => !Errors.Any();
         public List<FunctionAst> Functions { get; } = new();
         public List<StructAst> Structs { get; } = new();
+        public List<EnumAst> Enums { get; } = new();
         public List<DeclarationAst> GlobalVariables { get; } = new();
         public List<ParseError> Errors { get; } = new();
     }
@@ -81,6 +82,9 @@ namespace Lang.Parsing
                             case StructAst structAst:
                                 parseResult.Structs.Add(structAst);
                                 break;
+                            case EnumAst enumAst:
+                                parseResult.Enums.Add(enumAst);
+                                break;
                             case DeclarationAst globalVariable:
                                 parseResult.GlobalVariables.Add(globalVariable);
                                 break;
@@ -115,6 +119,9 @@ namespace Lang.Parsing
                         break;
                     case TokenType.Struct:
                         syntaxTrees.Add(ParseStruct(enumerator, errors));
+                        break;
+                    case TokenType.Enum:
+                        syntaxTrees.Add(ParseEnum(enumerator, errors));
                         break;
                     default:
                         errors.Add(new ParseError
@@ -494,6 +501,123 @@ namespace Lang.Parsing
             }
 
             return structAst;
+        }
+
+        private static EnumAst ParseEnum(TokenEnumerator enumerator, List<ParseError> errors)
+        {
+            var enumAst = CreateAst<EnumAst>(enumerator.Current);
+
+            // 1. Determine name of enum
+            enumerator.MoveNext();
+            switch (enumerator.Current?.Type)
+            {
+                case TokenType.Token:
+                    enumAst.Name = enumerator.Current.Value;
+                    break;
+                case null:
+                    errors.Add(new ParseError {Error = "Expected enum to have name", Token = enumerator.Last});
+                    break;
+                default:
+                    errors.Add(new ParseError
+                    {
+                        Error = $"Unexpected token '{enumerator.Current.Value}' in enum definition", Token = enumerator.Current
+                    });
+                    break;
+            }
+
+            // 2. Parse over the open brace
+            enumerator.MoveNext();
+            if (enumerator.Current?.Type != TokenType.OpenBrace)
+            {
+                errors.Add(new ParseError
+                {
+                    Error = "Expected '{' token in enum definition", Token = enumerator.Current ?? enumerator.Last
+                });
+                while (enumerator.Current != null && enumerator.Current.Type != TokenType.OpenBrace)
+                    enumerator.MoveNext();
+            }
+
+            // 3. Iterate through fields
+            EnumValueAst currentValue = null;
+            var parsingValueDefault = false;
+            while (enumerator.MoveNext())
+            {
+                var token = enumerator.Current;
+
+                if (token.Type == TokenType.CloseBrace)
+                {
+                    break;
+                }
+
+                switch (token.Type)
+                {
+                    case TokenType.Token:
+                        if (currentValue == null)
+                        {
+                            currentValue = CreateAst<EnumValueAst>(token);
+                            currentValue.Name = token.Value;
+                        }
+                        else
+                        {
+                            errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}' in enum", Token = token});
+                        }
+                        break;
+                    case TokenType.SemiColon:
+                        if (currentValue != null)
+                        {
+                            // Catch if the name hasn't been set
+                            if (currentValue.Name == null || parsingValueDefault)
+                            {
+                                errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}' in enum", Token = token});
+                            }
+                            // Add the value to the enum and continue
+                            enumAst.Values.Add(currentValue);
+                            currentValue = null;
+                            parsingValueDefault = false;
+                        }
+                        break;
+                    case TokenType.Equals:
+                        if (currentValue?.Name != null)
+                        {
+                            parsingValueDefault = true;
+                        }
+                        else
+                        {
+                            errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}' in enum", Token = token});
+                        }
+                        break;
+                    case TokenType.Number:
+                        if (currentValue != null && parsingValueDefault)
+                        {
+                            if (int.TryParse(token.Value, out var value))
+                            {
+                                currentValue.Value = value;
+                                currentValue.Defined = true;
+                            }
+                            else
+                            {
+                                errors.Add(new ParseError {Error = $"Expected enum value to be an integer, but got '{token.Value}'", Token = token});
+                            }
+                            parsingValueDefault = false;
+                        }
+                        else
+                        {
+                            errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}' in enum", Token = token});
+                        }
+                        break;
+                    default:
+                        errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}' in enum", Token = token});
+                        break;
+                }
+            }
+
+            if (currentValue != null)
+            {
+                var token = enumerator.Current ?? enumerator.Last;
+                errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}' in enum", Token = token});
+            }
+
+            return enumAst;
         }
 
         private static bool SearchForGeneric(string generic, int index, TypeDefinition type)

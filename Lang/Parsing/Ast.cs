@@ -68,6 +68,27 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
+    public class EnumAst : IAst
+    {
+        public int FileIndex { get; set; }
+        public int Line { get; init; }
+        public int Column { get; init; }
+        public string Name { get; set; }
+        public List<EnumValueAst> Values { get; } = new();
+        public List<IAst> Children => null;
+    }
+
+    public class EnumValueAst : IAst
+    {
+        public int FileIndex { get; set; }
+        public int Line { get; init; }
+        public int Column { get; init; }
+        public string Name { get; set; }
+        public int Value { get; set; }
+        public bool Defined { get; set; }
+        public List<IAst> Children => null;
+    }
+
     public class ReturnAst : IAst
     {
         public int FileIndex { get; set; }

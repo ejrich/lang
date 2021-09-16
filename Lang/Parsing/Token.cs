@@ -34,6 +34,7 @@ namespace Lang.Parsing
         LessThanEqual,
         In,
         Range,
+        Enum,
         NumberRange, // Ignored by parser
         VarArgs, // Ignored by parser
         OpenParen = '(',

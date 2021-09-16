@@ -15,5 +15,6 @@ namespace Lang
     {
         public List<DeclarationAst> Variables { get; } = new();
         public List<StructAst> Structs { get; set; }
+        public List<EnumAst> Enums { get; set; }
     }
 }

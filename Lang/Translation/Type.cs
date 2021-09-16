@@ -9,9 +9,10 @@ namespace Lang.Translation
         List,
         Void,
         Pointer,
+        Struct,
+        Enum,
         VarArgs,
         Params,
-        Other,
         Error
     }
 }
