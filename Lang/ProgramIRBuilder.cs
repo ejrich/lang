@@ -150,6 +150,7 @@ namespace Lang
                         }
                         else if (declaration.TypeDefinition.Count != null)
                         {
+                            // TODO Implement me
                             // BuildStackSave();
                             // var (_, count) = WriteExpression(declaration.TypeDefinition.Count, localVariables);
 
@@ -185,7 +186,7 @@ namespace Lang
                     case TypeKind.Pointer:
                         EmitStore(block, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Null});
                         break;
-                    // Or initialize to 0
+                    // Or initialize to default
                     default:
                         var zero = GetDefaultConstant(declaration.Type);
                         EmitStore(block, allocationIndex, zero);
@@ -222,14 +223,18 @@ namespace Lang
             return index;
         }
 
-        private InstructionValue InitializeConstArray(FunctionIR function, BasicBlock block, InstructionValue arrayPointer, StructAst arrayDef, uint length)
+        private InstructionValue InitializeConstArray(FunctionIR function, BasicBlock block, InstructionValue arrayPointer, StructAst arrayDef, uint length, IType elementType = null)
         {
             var lengthPointer = EmitGetStructPointer(block, arrayPointer, 0);
             var lengthValue = new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new InstructionConstant {Integer = length}};
             EmitStore(block, lengthPointer, lengthValue);
 
-            var pointerType = (PrimitiveAst)arrayDef.Fields[1].Type;
-            var dataIndex = AddAllocation(function, pointerType.PointerType, true, length);
+            if (elementType == null)
+            {
+                var pointerType = (PrimitiveAst)arrayDef.Fields[1].Type;
+                elementType = pointerType.PointerType;
+            }
+            var dataIndex = AddAllocation(function, elementType, true, length);
             var arrayDataPointer = EmitGetPointer(block, allocationIndex: dataIndex);
             var dataPointer = EmitGetStructPointer(block, arrayPointer, 1);
             EmitStore(block, dataPointer, arrayDataPointer);
@@ -776,8 +781,10 @@ namespace Lang
                 }
 
                 // Rollup the rest of the arguments into an array
-                // var paramsType = call.Function.Arguments[^1].Type.Generics[0];
-                // InitializeConstArray(paramsPointer, (uint)(call.Arguments.Count - functionDef.Arguments.Count + 1), paramsType);
+                // TODO Make this work
+                // var paramsAllocationIndex = AddAllocation(function, call.Function.ParamsType);
+                // var paramsPointer = EmitGetPointer(block, allocationIndex: paramsAllocationIndex);
+                // InitializeConstArray(function, block, paramsPointer, (StructAst)call.Function.ParamsType, (uint)(call.Arguments.Count - call.Function.Arguments.Count + 1), call.Function.ParamsElementType);
 
                 // var arrayData = _builder.BuildStructGEP(paramsPointer, 1, "arraydata");
                 // var dataPointer = _builder.BuildLoad(arrayData, "dataptr");
