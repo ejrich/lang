@@ -535,6 +535,12 @@ namespace Lang.Translation
                 }
             }
 
+            // 5. Verify the type definition count if necessary
+            if (declaration.Type?.Count != null)
+            {
+                VerifyExpression(declaration.Type.Count, localVariables, errors);
+            }
+
             localVariables.Add(declaration.Name, declaration.Type);
         }
 

@@ -20,9 +20,9 @@ printf(string format, ... args) #extern
 
 // Runtime functions
 int __start(int argc, string* argv) {
-    args: List<string>[argc];
+    args: List<string>[argc-1];
 
-    each i in 0..argc-1 then args[i] = *(argv + i);
+    each i in 1..argc-1 then args[i] = *(argv + i);
 
     return Main(args);
 
