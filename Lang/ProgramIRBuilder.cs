@@ -252,7 +252,7 @@ namespace Lang
                 case InstructionValueType.Value:
                     return $"v{value.ValueIndex}";
                 case InstructionValueType.Allocation:
-                    return $"a{value.ValueIndex}{(value.Global ? "global " : string.Empty)}";
+                    return value.Global ? $"global{value.ValueIndex}" : $"a{value.ValueIndex}";
                 case InstructionValueType.Argument:
                     return $"arg{value.ValueIndex}";
                 case InstructionValueType.Constant:

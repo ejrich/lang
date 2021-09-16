@@ -355,7 +355,43 @@ namespace Lang
                     break;
                 case InstructionValueType.Constant:
                     var constant = GetConstant(value);
-                    // TODO Implement me
+                    switch (value.Type.TypeKind)
+                    {
+                        case TypeKind.Boolean:
+                            Marshal.StructureToPtr(constant.Bool, pointer, false);
+                            break;
+                        case TypeKind.Integer:
+                        case TypeKind.Enum:
+                            switch (value.Type.Size)
+                            {
+                                case 1:
+                                    Marshal.StructureToPtr(constant.Byte, pointer, false);
+                                    break;
+                                case 2:
+                                    Marshal.StructureToPtr(constant.UShort, pointer, false);
+                                    break;
+                                case 4:
+                                    Marshal.StructureToPtr(constant.UInteger, pointer, false);
+                                    break;
+                                case 8:
+                                    Marshal.StructureToPtr(constant.ULong, pointer, false);
+                                    break;
+                            }
+                            break;
+                        case TypeKind.Float:
+                            if (value.Type.Size == 4)
+                            {
+                                Marshal.StructureToPtr(constant.Float, pointer, false);
+                            }
+                            else
+                            {
+                                Marshal.StructureToPtr(constant.Double, pointer, false);
+                            }
+                            break;
+                        case TypeKind.String:
+                            Buffer.MemoryCopy(constant.Pointer.ToPointer(), pointer.ToPointer(), stringLength, stringLength);
+                            break;
+                    }
                     break;
                 case InstructionValueType.Null:
                     Marshal.StructureToPtr(IntPtr.Zero, pointer, false);
@@ -1491,6 +1527,8 @@ namespace Lang
             return register;
         }
 
+        private const int stringLength = 12;
+
         private static IntPtr GetString(string value, bool useRawString = false)
         {
             if (useRawString)
@@ -1498,7 +1536,6 @@ namespace Lang
                 return Marshal.StringToHGlobalAnsi(value);
             }
 
-            const int stringLength = 12;
             var stringPointer = Marshal.AllocHGlobal(stringLength);
 
             Marshal.StructureToPtr(value.Length, stringPointer, false);
