@@ -696,6 +696,12 @@ namespace Lang.Runner
                     }
                     break;
                 }
+                case UnaryAst unary:
+                {
+                    var pointer = ExecuteExpression(unary.Value, variables).Value;
+                    Marshal.StructureToPtr(expression.Value, GetPointer(pointer), false);
+                    break;
+                }
             }
         }
 
