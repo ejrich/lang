@@ -71,19 +71,19 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
-    // public class StructFieldRefAst : IAst
-    // {
-    //     public int FileIndex { get; set; }
-    //     public int Line { get; init; }
-    //     public int Column { get; init; }
-    //     public IAst Value { get; set; }
-    //     public bool IsEnum { get; set; }
-    //     public bool IsPointer { get; set; }
-    //     public string StructName { get; set; }
-    //     public StructFieldRefAst Field { get; set; }
-    //     public int ValueIndex { get; set; }
-    //     public List<IAst> Children => null;
-    // }
+    public class StructFieldRefAst : IAst
+    {
+        public int FileIndex { get; set; }
+        public int Line { get; init; }
+        public int Column { get; init; }
+        // public IAst Value { get; set; }
+        // public bool IsEnum { get; set; }
+        // public bool IsPointer { get; set; }
+        // public string StructName { get; set; }
+        // public StructFieldRefAst Field { get; set; }
+        // public int ValueIndex { get; set; }
+        public List<IAst> Children { get; } = new();
+    }
 
     public class EnumAst : IAst, IType
     {
