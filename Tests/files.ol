@@ -5,7 +5,7 @@ struct dirent {
     d_off: u64;
     d_reclen: u16;
     d_type: FileType;
-    d_name: Array<u8>[256] #c_array;
+    d_name: CArray<u8>[256];
 }
 
 enum FileType : u8 {

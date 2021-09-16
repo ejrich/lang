@@ -33,7 +33,7 @@ int main() {
 }
 
 string get_file_name(dirent* file) {
-    name: string = { data = file.d_name.data; }
+    name: string = { data = &file.d_name; }
 
     each i in 0..file.d_name.length - 1 {
         if file.d_name[i] != 0 then name.length++;

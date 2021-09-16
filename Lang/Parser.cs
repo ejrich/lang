@@ -165,7 +165,7 @@ namespace Lang
                     enumerator.MoveNext();
                     break;
                 case TokenType.OpenParen:
-                    if (function.ReturnType.Name == "*" || function.ReturnType.Count != null || function.ReturnType.CArray)
+                    if (function.ReturnType.Name == "*" || function.ReturnType.Count != null)
                     {
                         errors.Add(new ParseError
                         {
@@ -1569,7 +1569,7 @@ namespace Lang
                         {
                             if (TryParseType(enumerator, errors, out var typeDefinition))
                             {
-                                if (!typeDefinition.CArray && enumerator.Current?.Type == TokenType.OpenParen)
+                                if (enumerator.Current?.Type == TokenType.OpenParen)
                                 {
                                     var callAst = new CallAst
                                     {
@@ -2014,7 +2014,7 @@ namespace Lang
             {
                 foreach (var generic in overload.Type.Generics)
                 {
-                    if (generic.Name == "*" || generic.Count != null || generic.CArray)
+                    if (generic.Name == "*" || generic.Count != null)
                     {
                         errors.Add(new ParseError
                         {
@@ -2386,32 +2386,6 @@ namespace Lang
                 enumerator.MoveNext();
                 enumerator.MoveNext();
                 typeDefinition.Count = ParseExpression(enumerator, errors, currentFunction, null, TokenType.CloseBracket);
-            }
-
-            if (enumerator.Peek()?.Type == TokenType.Pound)
-            {
-                enumerator.MoveNext();
-                switch (enumerator.Peek()?.Value)
-                {
-                    case "c_array":
-                        typeDefinition.CArray = true;
-                        break;
-                    case null:
-                        errors.Add(new ParseError
-                        {
-                            Error = "Expected compiler directive value",
-                            Token = enumerator.Last
-                        });
-                        break;
-                    default:
-                        errors.Add(new ParseError
-                        {
-                            Error = $"Unexpected compiler directive '{enumerator.Current.Value}'",
-                            Token = enumerator.Current
-                        });
-                        break;
-                }
-                enumerator.MoveNext();
             }
 
             return typeDefinition;

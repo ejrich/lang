@@ -520,7 +520,7 @@ namespace Lang
                 }
                 skipPointer = false;
 
-                if (type.CArray)
+                if (type.TypeKind == TypeKind.CArray)
                 {
                     switch (structField.Children[i])
                     {
@@ -530,15 +530,6 @@ namespace Lang
                             {
                                 value = EmitIR(function, type.Count, scope, block);
                                 type = _s32Type;
-                            }
-                            else
-                            {
-                                type = new TypeDefinition {Name = "*", TypeKind = TypeKind.Pointer, Generics = {type.Generics[0]}};
-                                var index = new InstructionValue
-                                {
-                                    ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new InstructionConstant {Integer = 0}
-                                };
-                                value = EmitGetPointer(block, value, index, type, true);
                             }
                             break;
                         case IndexAst index:
@@ -681,7 +672,7 @@ namespace Lang
                 var dataPointer = EmitLoad(block, variable);
                 return EmitGetPointer(block, dataPointer, indexValue, elementType);
             }
-            else if (type.CArray)
+            else if (type.TypeKind == TypeKind.CArray)
             {
                 return EmitGetPointer(block, variable, indexValue, elementType, true);
             }

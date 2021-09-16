@@ -338,9 +338,6 @@ namespace Lang
                 {
                     var type = VerifyType(structField.TypeDefinition);
 
-                    // TODO Axe #c_array compiler directive and make it's own type
-                    var fieldTypeName = structField.TypeDefinition.CArray ? structField.TypeDefinition.Generics[0].GenericName : structField.TypeDefinition.GenericName;
-                    TypeTable.Types.TryGetValue(fieldTypeName, out fieldType);
 
                     if (type == TypeKind.Error)
                     {
@@ -349,6 +346,10 @@ namespace Lang
                     else if (type == TypeKind.Void)
                     {
                         AddError($"Struct field '{structAst.Name}.{structField.Name}' cannot be assigned type 'void'", structField.TypeDefinition);
+                    }
+                    else
+                    {
+                        fieldType = TypeTable.GetType(structField.TypeDefinition);
                     }
 
                     if (structField.Value != null)
@@ -432,7 +433,7 @@ namespace Lang
                     }
                     else if (structField.ArrayValues != null)
                     {
-                        if (type != TypeKind.Error && type != TypeKind.Array)
+                        if (type != TypeKind.Error && type != TypeKind.Array && type != TypeKind.CArray)
                         {
                             AddError($"Cannot use array initializer to declare non-array type '{PrintTypeDefinition(structField.TypeDefinition)}'", structField.TypeDefinition);
                         }
@@ -463,7 +464,7 @@ namespace Lang
                     }
 
                     // Check type count
-                    if (structField.TypeDefinition.CArray && structField.TypeDefinition.Count == null && structField.TypeDefinition.ConstCount == null)
+                    if (type == TypeKind.CArray && structField.TypeDefinition.Count == null && structField.TypeDefinition.ConstCount == null)
                     {
                         AddError($"C array of field '{structAst.Name}.{structField.Name}' must be initialized with a constant size", structField.TypeDefinition);
                     }
@@ -541,7 +542,7 @@ namespace Lang
                     }
                     structField.Type = fieldType;
                     structField.Offset = structAst.Size;
-                    structField.Size = structField.TypeDefinition.CArray ? fieldType.Size * structField.TypeDefinition.ConstCount.Value : fieldType.Size;
+                    structField.Size = structField.TypeDefinition.TypeKind == TypeKind.CArray ? fieldType.Size * structField.TypeDefinition.ConstCount.Value : fieldType.Size;
                     structAst.Size += fieldType.Size;
                 }
             }
@@ -557,7 +558,7 @@ namespace Lang
             {
                 AddError($"Return type '{function.ReturnType.Name}' of function '{function.Name}' is not defined", function.ReturnType);
             }
-            else if (function.ReturnType.CArray && function.ReturnType.Count == null)
+            else if (returnType == TypeKind.CArray && function.ReturnType.Count == null)
             {
                 AddError($"C array for function '{function.Name}' must have a constant size", function.ReturnType);
             }
@@ -1191,7 +1192,7 @@ namespace Lang
                 else
                 {
                     var type = VerifyType(declaration.TypeDefinition);
-                    if (type != TypeKind.Error && type != TypeKind.Array)
+                    if (type != TypeKind.Error && type != TypeKind.Array && type != TypeKind.CArray)
                     {
                         AddError($"Cannot use array initializer to declare non-array type '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
                     }
@@ -1247,7 +1248,7 @@ namespace Lang
             // 7. Verify the type definition count if necessary
             if (declaration.TypeDefinition != null)
             {
-                if (declaration.TypeDefinition.CArray && declaration.TypeDefinition.Count == null && declaration.TypeDefinition.ConstCount == null)
+                if (declaration.TypeDefinition.TypeKind == TypeKind.CArray && declaration.TypeDefinition.Count == null && declaration.TypeDefinition.ConstCount == null)
                 {
                     AddError($"Length of C array variable '{declaration.Name}' must be initialized to a constant integer", declaration.TypeDefinition);
                 }
@@ -1257,7 +1258,7 @@ namespace Lang
 
                     if (countType != null)
                     {
-                        if (declaration.TypeDefinition.CArray && !isConstant)
+                        if (declaration.TypeDefinition.TypeKind == TypeKind.CArray && !isConstant)
                         {
                             AddError($"Length of C array variable '{declaration.Name}' must be initialized with a constant size", declaration.TypeDefinition.Count);
                         }
@@ -1727,10 +1728,14 @@ namespace Lang
             var genericName = structType.GenericName;
             if (!TypeTable.Types.TryGetValue(genericName, out var typeDefinition))
             {
-                AddError($"Struct '{PrintTypeDefinition(structType)}' not defined", ast);
+                AddError($"Type '{PrintTypeDefinition(structType)}' not defined", ast);
                 return null;
             }
             structField.Types[fieldIndex] = typeDefinition;
+            if (typeDefinition is ArrayType && fieldName == "length")
+            {
+                return _s32Type;
+            }
             if (typeDefinition is not StructAst structDefinition)
             {
                 AddError($"Type '{PrintTypeDefinition(structType)}' does not contain field '{fieldName}'", ast);
@@ -1825,6 +1830,7 @@ namespace Lang
                 switch (variableTypeDefinition.TypeKind)
                 {
                     case TypeKind.Array:
+                    case TypeKind.CArray:
                     case TypeKind.Params:
                         each.IteratorType = iterator.TypeDefinition;
                         each.Body.Identifiers.TryAdd(each.IterationVariable, iterator);
@@ -2016,7 +2022,7 @@ namespace Lang
                         }
 
                         var pointerType = new TypeDefinition {Name = "*", TypeKind = TypeKind.Pointer};
-                        if (referenceType.CArray)
+                        if (type == TypeKind.CArray)
                         {
                             pointerType.Generics.Add(referenceType.Generics[0]);
                         }
@@ -3057,6 +3063,7 @@ namespace Lang
                     index.OverloadReturnType = elementType;
                     break;
                 case TypeKind.Array:
+                case TypeKind.CArray:
                 case TypeKind.Params:
                 case TypeKind.Pointer:
                     elementType = typeDef.Generics.FirstOrDefault();
@@ -3189,12 +3196,7 @@ namespace Lang
                 return TypeKind.Generic;
             }
 
-            if (typeDef.CArray && typeDef.Name != "Array")
-            {
-                AddError("Directive #c_array can only be applied to arrays", typeDef);
-            }
-
-            if (typeDef.Count != null && typeDef.Name != "Array")
+            if (typeDef.Count != null && typeDef.Name != "Array" && typeDef.Name != "CArray")
             {
                 AddError($"Type '{PrintTypeDefinition(typeDef)}' cannot have a count", typeDef);
                 return TypeKind.Error;
@@ -3261,6 +3263,36 @@ namespace Lang
                     else
                     {
                         typeDef.TypeKind = hasGenericTypes ? TypeKind.Generic : TypeKind.Array;
+                    }
+                    break;
+                case "CArray":
+                    if (typeDef.Generics.Count != 1)
+                    {
+                        AddError($"Type 'CArray' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
+                        typeDef.TypeKind = TypeKind.Error;
+                    }
+                    else
+                    {
+                        var elementType = typeDef.Generics[0];
+                        var elementTypeKind = VerifyType(elementType, depth + 1, argument);
+                        if (elementTypeKind == TypeKind.Error)
+                        {
+                            typeDef.TypeKind = TypeKind.Error;
+                        }
+                        else if (elementTypeKind == TypeKind.Generic)
+                        {
+                            typeDef.TypeKind = TypeKind.Generic;
+                        }
+                        else
+                        {
+                            if (!TypeTable.Types.ContainsKey(typeDef.GenericName))
+                            {
+                                var type = TypeTable.Types[elementType.GenericName];
+                                var arrayType = new ArrayType {Name = PrintTypeDefinition(typeDef), Size = type.Size, ElementTypeDefinition = elementType, ElementType = type};
+                                TypeTable.Add(typeDef.GenericName, arrayType);
+                            }
+                            typeDef.TypeKind = TypeKind.CArray;
+                        }
                     }
                     break;
                 case "void":

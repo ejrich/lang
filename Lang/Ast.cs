@@ -164,6 +164,16 @@ namespace Lang
         public TypeDefinition PointerType { get; set; }
     }
 
+    public class ArrayType : IType
+    {
+        public string Name { get; set; }
+        public int TypeIndex { get; set; }
+        public TypeKind TypeKind { get; set; } = TypeKind.CArray;
+        public uint Size { get; set; }
+        public TypeDefinition ElementTypeDefinition { get; set; }
+        public IType ElementType { get; set; }
+    }
+
     public class ConstantAst : IAst
     {
         public int FileIndex { get; set; }
@@ -353,7 +363,6 @@ namespace Lang
         public bool Character { get; set; }
         public int GenericIndex { get; set; }
         public int? TypeIndex { get; set; }
-        public bool CArray { get; set; }
         public IPrimitive PrimitiveType { get; set; }
         public List<TypeDefinition> Generics { get; } = new();
         public IAst Count { get; set; }
@@ -449,6 +458,7 @@ namespace Lang
         Enum,
         Struct,
         Function,
+        CArray,
         // Below not used in the backend
         VarArgs,
         Params,

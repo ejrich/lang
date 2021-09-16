@@ -79,7 +79,7 @@ namespace Lang
                             break;
                         }
                         var structField = structBuilder.DefineField(field.Name, fieldType, FieldAttributes.Public);
-                        if (field.TypeDefinition.CArray)
+                        if (field.TypeDefinition.TypeKind == TypeKind.CArray)
                         {
                             var marshalAsType = typeof(MarshalAsAttribute);
                             var sizeConstField = marshalAsType.GetField("SizeConst");
@@ -414,7 +414,7 @@ namespace Lang
             }
 
             var variable = new ValueType {Type = declaration.TypeDefinition};
-            if (declaration.TypeDefinition.CArray)
+            if (declaration.TypeDefinition.TypeKind == TypeKind.CArray)
             {
                 variable.Value = value;
             }
@@ -437,6 +437,7 @@ namespace Lang
                 case TypeKind.Float:
                     return typeDef.PrimitiveType.Bytes == 4 ? 0f : 0.0;
                 case TypeKind.Array:
+                case TypeKind.CArray:
                     return InitializeArray(typeDef, variables);
                 case TypeKind.Pointer:
                     return IntPtr.Zero;
@@ -498,6 +499,7 @@ namespace Lang
             else switch (field.TypeDefinition.TypeKind)
             {
                 case TypeKind.Array:
+                case TypeKind.CArray:
                     var array = InitializeArray(field.TypeDefinition, variables, field.ArrayValues, true);
                     fieldInstance!.SetValue(instance, array);
                     break;
@@ -527,12 +529,11 @@ namespace Lang
 
         private object InitializeArray(TypeDefinition type, IDictionary<string, ValueType> variables, List<IAst> arrayValues = null, bool structField = false)
         {
-            var arrayType = _types[type.GenericName];
             var elementTypeDef = type.Generics[0];
             var elementType = GetTypeFromDefinition(elementTypeDef);
             var elementSize = Marshal.SizeOf(elementType);
 
-            if (type.CArray)
+            if (type.TypeKind == TypeKind.CArray)
             {
                 if (structField)
                 {
@@ -562,6 +563,7 @@ namespace Lang
             }
             else
             {
+                var arrayType = _types[type.GenericName];
                 var array = Activator.CreateInstance(arrayType);
                 if (type.ConstCount != null)
                 {
@@ -752,7 +754,7 @@ namespace Lang
 
                 IntPtr dataPointer;
                 int length;
-                if (iterator.Type.CArray)
+                if (iterator.Type.TypeKind == TypeKind.CArray)
                 {
                     dataPointer = GetPointer(iterator.Value);
                     length = (int)iterator.Type.ConstCount.Value;
@@ -867,7 +869,7 @@ namespace Lang
                         return new ValueType {Type = _s32Type, Value = type.TypeIndex};
                     }
 
-                    var value = variable.Type.CArray ? variable.Value : PointerToTargetType(GetPointer(variable.Value), variable.Type);
+                    var value = variable.Type.TypeKind == TypeKind.CArray ? variable.Value : PointerToTargetType(GetPointer(variable.Value), variable.Type);
                     return new ValueType {Type = variable.Type, Value = value};
                 }
                 case ChangeByOneAst changeByOne:
@@ -950,7 +952,14 @@ namespace Lang
                         }
 
                         var pointerType = new TypeDefinition {Name = "*", TypeKind = TypeKind.Pointer};
-                        pointerType.Generics.Add(typeDef);
+                        if (typeDef.TypeKind == TypeKind.CArray)
+                        {
+                            pointerType.Generics.Add(typeDef.Generics[0]);
+                        }
+                        else
+                        {
+                            pointerType.Generics.Add(typeDef);
+                        }
 
                         return new ValueType {Type = pointerType, Value = pointer};
                     }
@@ -1129,7 +1138,7 @@ namespace Lang
                 }
                 skipPointer = false;
 
-                if (type.CArray)
+                if (type.TypeKind == TypeKind.CArray)
                 {
                     switch (structField.Children[i])
                     {
@@ -1140,12 +1149,6 @@ namespace Lang
                                 var typeCount = ExecuteExpression(type.Count, variables);
                                 type = typeCount.Type;
                                 value = typeCount.Value;
-                            }
-                            else
-                            {
-                                // Pointer already is to the beginning of the array
-                                value = pointer;
-                                type = new TypeDefinition {Name = "*", TypeKind = TypeKind.Pointer, Generics = {type.Generics[0]}};
                             }
                             break;
                         case IndexAst index:
@@ -1204,7 +1207,7 @@ namespace Lang
             if (value == null)
             {
                 loaded = false;
-                value = load && !type.CArray ? PointerToTargetType(pointer, type) : pointer;
+                value = load && type.TypeKind != TypeKind.CArray ? PointerToTargetType(pointer, type) : pointer;
             }
             else
             {
@@ -1333,7 +1336,7 @@ namespace Lang
             {
                 pointer = Marshal.ReadIntPtr(pointer);
             }
-            else if (!indexTypeDef.CArray)
+            else if (indexTypeDef.TypeKind != TypeKind.CArray)
             {
                 var arrayObject = PointerToTargetType(pointer, indexTypeDef);
                 var dataField = arrayObject.GetType().GetField("data");
@@ -2075,7 +2078,7 @@ namespace Lang
                         return null;
                     }
                     return pointerType.MakePointerType();
-                case TypeKind.Array when typeDef.CArray:
+                case TypeKind.CArray:
                     var elementType = GetTypeFromDefinition(typeDef.Generics[0]);
                     return elementType.MakeArrayType();
             }
@@ -2119,7 +2122,7 @@ namespace Lang
                     return pointerType.MakePointerType();
                 case TypeKind.Params:
                     return _types.TryGetValue($"Array.{typeDef.Generics[0].GenericName}", out var arrayType) ? arrayType : null;
-                case TypeKind.Array when typeDef.CArray:
+                case TypeKind.CArray:
                     var elementType = GetTypeFromDefinition(typeDef.Generics[0]);
                     return elementType.MakePointerType();
             }
