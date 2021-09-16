@@ -20,6 +20,7 @@ namespace Lang.Parsing
     public class Parser : IParser
     {
         private readonly ILexer _lexer;
+        private static FunctionAst _currentFunction;
 
         private class TokenEnumerator
         {
@@ -122,6 +123,7 @@ namespace Lang.Parsing
         {
             // 1. Determine return type and name of the function
             var function = CreateAst<FunctionAst>(enumerator.Current);
+            _currentFunction = function;
 
             // 1a. Check if the return type is void
             if (enumerator.Peek()?.Type == TokenType.OpenParen)
@@ -248,6 +250,9 @@ namespace Lang.Parsing
                             enumerator.MoveNext();
                             function.ExternLib = enumerator.Current.Value;
                         }
+                        return function;
+                    case "compiler":
+                        function.Compiler = true;
                         return function;
                     case null:
                         errors.Add(new ParseError
@@ -1721,6 +1726,7 @@ namespace Lang.Parsing
                 case "if":
                     directive.Type = DirectiveType.If;
                     directive.Value = ParseConditional(enumerator, errors);
+                    _currentFunction.HasDirectives = true;
                     break;
                 default:
                     errors.Add(new ParseError {Error = $"Unsupported compiler directive '{token.Value}'", Token = token});

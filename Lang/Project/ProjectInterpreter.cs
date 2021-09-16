@@ -7,7 +7,7 @@ namespace Lang.Project
 {
     public interface IProjectInterpreter
     {
-        Project LoadProject(string projectPath);
+        ProjectFile LoadProject(string projectPath);
     }
 
     public class ProjectInterpreter : IProjectInterpreter
@@ -16,7 +16,7 @@ namespace Lang.Project
         private const string ProjectFilePattern = "*.olproj";
         private const string SourceFilePattern = "*.ol";
 
-        public Project LoadProject(string projectPath)
+        public ProjectFile LoadProject(string projectPath)
         {
             // 1. Check if project file is null or a directory
             if (string.IsNullOrWhiteSpace(projectPath))
@@ -32,22 +32,14 @@ namespace Lang.Project
             var projectFile = LoadProjectFile(projectPath);
 
             // 3. Recurse through the directories and load the files to build
-            var projectDirectory = Path.GetDirectoryName(Path.GetFullPath(projectPath));
-            var sourceFiles = GetSourceFiles(new DirectoryInfo(projectDirectory!)).ToList();
+            projectFile.SourceFiles = GetSourceFiles(new DirectoryInfo(projectFile.Path)).ToList();
 
             // 4. Load runtime and dependency files
             var libraryDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Runtime");
             var libraryFiles = GetSourceFiles(new DirectoryInfo(libraryDirectory));
-            sourceFiles.AddRange(libraryFiles);
+            projectFile.SourceFiles.AddRange(libraryFiles);
 
-            return new Project
-            {
-                Name = projectFile.Name,
-                Path = projectDirectory,
-                Linker = projectFile.Linker,
-                BuildFiles = sourceFiles,
-                Dependencies = projectFile.Dependencies
-            };
+            return projectFile;
         }
 
         private static string GetProjectPathInDirectory(string directory)
@@ -68,7 +60,10 @@ namespace Lang.Project
 
         private static ProjectFile LoadProjectFile(string projectPath)
         {
-            var projectFile = new ProjectFile();
+            var projectFile = new ProjectFile
+            {
+                Path = Path.GetDirectoryName(Path.GetFullPath(projectPath))
+            };
 
             var currentSection = ProjectFileSection.None;
             foreach (var line in File.ReadLines(projectPath))

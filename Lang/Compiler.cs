@@ -57,7 +57,7 @@ namespace Lang
 
             // 3. Parse source files to tokens
             stopwatch.Restart();
-            var parseResult = _parser.Parse(project.BuildFiles);
+            var parseResult = _parser.Parse(project.SourceFiles);
             var parseTime = stopwatch.Elapsed;
 
             if (!parseResult.Success)
@@ -69,7 +69,7 @@ namespace Lang
                     {
                         if (currentFile != Int32.MinValue) Console.WriteLine();
                         currentFile = parseError.FileIndex;
-                        Console.WriteLine($"Failed to parse file: \"{project.BuildFiles[currentFile].Replace(project.Path, string.Empty)}\":");
+                        Console.WriteLine($"Failed to parse file: \"{project.SourceFiles[currentFile].Replace(project.Path, string.Empty)}\":");
                     }
                     Console.WriteLine($"\t{parseError.Error} at line {parseError.Token.Line}:{parseError.Token.Column}");
                 }
@@ -78,22 +78,22 @@ namespace Lang
 
             // 4. Build program graph
             stopwatch.Restart();
-            var programGraph = _graphBuilder.CreateProgramGraph(parseResult, buildSettings, out var errors);
+            var programGraph = _graphBuilder.CreateProgramGraph(parseResult, project, buildSettings);
             var graphTime = stopwatch.Elapsed;
 
-            if (errors.Any())
+            if (programGraph.Errors.Any())
             {
-                Console.WriteLine($"{errors.Count} compilation error(s):\n");
-                foreach (var error in errors)
+                Console.WriteLine($"{programGraph.Errors.Count} compilation error(s):\n");
+                foreach (var error in programGraph.Errors)
                 {
-                    Console.WriteLine($"\t{project.BuildFiles[error.FileIndex].Replace(project.Path, string.Empty)}: {error.Error} at line {error.Line}:{error.Column}");
+                    Console.WriteLine($"\t{project.SourceFiles[error.FileIndex].Replace(project.Path, string.Empty)}: {error.Error} at line {error.Line}:{error.Column}");
                 }
                 Environment.Exit(ErrorCodes.CompilationError);
             }
 
             // 5. Build program and link binaries
             stopwatch.Restart();
-            _backend.Build(programGraph, project, buildSettings);
+            _backend.Build(project, programGraph, buildSettings);
             stopwatch.Stop();
             var buildTime = stopwatch.Elapsed;
 
