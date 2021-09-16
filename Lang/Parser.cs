@@ -1208,6 +1208,10 @@ namespace Lang
         private static DeclarationAst ParseDeclaration(TokenEnumerator enumerator, List<ParseError> errors, IFunction currentFunction = null)
         {
             var declaration = CreateAst<DeclarationAst>(enumerator.Current);
+            if (enumerator.Current.Type != TokenType.Identifier)
+            {
+                errors.Add(new ParseError {Error = $"Expected variable name to be an identifier, but got '{enumerator.Current.Value}'", Token = enumerator.Current});
+            }
             declaration.Name = enumerator.Current.Value;
 
             // 1. Expect to get colon
@@ -1297,16 +1301,20 @@ namespace Lang
             switch (enumerator.Current.Type)
             {
                 case TokenType.OpenBrace:
-                    declaration.Assignments = new List<AssignmentAst>();
+                    declaration.Assignments = new Dictionary<string, AssignmentAst>();
                     while (enumerator.Current?.Type != TokenType.CloseBrace && enumerator.MoveNext())
                     {
-                        if (enumerator.Current.Type == TokenType.CloseBrace)
+                        var token = enumerator.Current;
+                        if (token.Type == TokenType.CloseBrace)
                         {
                             break;
                         }
 
                         var assignment = ParseAssignment(enumerator, errors, currentFunction);
-                        declaration.Assignments.Add(assignment);
+                        if (!declaration.Assignments.TryAdd(token.Value, assignment))
+                        {
+                            errors.Add(new ParseError {Error = $"Multiple assignments for field '{token.Value}'", Token = token});
+                        }
                     }
                     break;
                 case TokenType.OpenBracket:
@@ -1338,6 +1346,10 @@ namespace Lang
             if (reference == null)
             {
                 var variableAst = CreateAst<IdentifierAst>(enumerator.Current);
+                if (enumerator.Current.Type != TokenType.Identifier)
+                {
+                    errors.Add(new ParseError {Error = $"Expected variable name to be an identifier, but got '{enumerator.Current.Value}'", Token = enumerator.Current});
+                }
                 variableAst.Name = enumerator.Current.Value;
                 assignment.Reference = variableAst;
 

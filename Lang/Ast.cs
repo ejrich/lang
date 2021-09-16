@@ -36,8 +36,8 @@ namespace Lang
         public TypeDefinition Type { get; set; }
         public bool HasGenerics { get; set; }
         public IAst Value { get; set; }
-        public List<AssignmentAst> Assignments { get; set; }
-        // TODO Implement me! public Dictionary<string, AssignmentAst> Assignments { get; set; }
+        // public List<AssignmentAst> Assignments { get; set; }
+        public Dictionary<string, AssignmentAst> Assignments { get; set; }
         public List<IAst> ArrayValues { get; set; }
     }
 
@@ -99,7 +99,7 @@ namespace Lang
         public TypeDefinition Type { get; set; }
         public bool HasGenerics { get; set; }
         public IAst Value { get; set; }
-        public List<AssignmentAst> Assignments { get; set; }
+        public Dictionary<string, AssignmentAst> Assignments { get; set; }
         public List<IAst> ArrayValues { get; set; }
     }
 
@@ -238,7 +238,7 @@ namespace Lang
         public bool HasGenerics { get; set; }
         public bool Constant { get; set; }
         public IAst Value { get; set; }
-        public List<AssignmentAst> Assignments { get; set; }
+        public Dictionary<string, AssignmentAst> Assignments { get; set; }
         public List<IAst> ArrayValues { get; set; }
     }
 
