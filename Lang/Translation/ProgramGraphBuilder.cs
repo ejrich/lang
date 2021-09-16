@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -98,7 +97,7 @@ namespace Lang.Translation
                             }
                             mainDefined = true;
                         }
-                        graph.Functions.Add(function);
+                        graph.Functions.Add(function.Name, function);
                         break;
                     case CompilerDirectiveAst compilerDirective:
                         VerifyTopLevelDirective(compilerDirective, globalVariables, errors);
@@ -522,6 +521,11 @@ namespace Lang.Translation
                 // 4a. Verify the assignment value matches the type definition if it has been defined
                 if (declaration.Type == null)
                 {
+                    if (valueType.Name == "void")
+                    {
+                        errors.Add(CreateError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.Value));
+                        return;
+                    }
                     declaration.Type = valueType;
                 }
                 else
@@ -530,6 +534,10 @@ namespace Lang.Translation
                     if (type == Type.Error)
                     {
                         errors.Add(CreateError($"Undefined type in declaration '{PrintTypeDefinition(declaration.Type)}'", declaration.Type));
+                    }
+                    else if (type == Type.Void)
+                    {
+                        errors.Add(CreateError($"Variables cannot be assigned type 'void'", declaration.Type));
                     }
 
                     // Verify the type is correct
@@ -782,12 +790,12 @@ namespace Lang.Translation
 
         private void VerifyTopLevelDirective(CompilerDirectiveAst directive, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
-            switch (directive.Directive)
+            switch (directive.Type)
             {
-                case Directive.Run:
+                case DirectiveType.Run:
                     VerifyAst(directive.Value, localVariables, errors);
                     break;
-                case Directive.If:
+                case DirectiveType.If:
                     var conditional = directive.Value as ConditionalAst;
                     VerifyAst(conditional!.Condition, localVariables, errors);
                     break;

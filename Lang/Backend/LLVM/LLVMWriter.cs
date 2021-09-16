@@ -21,7 +21,7 @@ namespace Lang.Backend.LLVM
         private bool _stackPointerExists;
         private bool _stackSaved;
 
-        private readonly Dictionary<string, FunctionAst> _functions = new();
+        private Dictionary<string, FunctionAst> _functions;
         private readonly Dictionary<string, IAst> _types = new();
         private readonly Queue<LLVMValueRef> _allocationQueue = new();
 
@@ -41,17 +41,19 @@ namespace Lang.Backend.LLVM
             var globals = WriteData(programGraph.Data);
 
             // 4. Write Function definitions
-            foreach (var function in programGraph.Functions)
+            _functions = programGraph.Functions;
+            foreach (var (name, function) in programGraph.Functions)
             {
-                _functions.Add(function.Name, function);
-                WriteFunctionDefinition(function.Name, function.Arguments, function.ReturnType, function.Varargs);
+                WriteFunctionDefinition(name, function.Arguments, function.ReturnType, function.Varargs);
             }
 
             // 5. Write Function bodies
-            foreach (var functionAst in programGraph.Functions.Where(func => !func.Extern))
+            foreach (var (name, functionAst) in programGraph.Functions)
             {
+                if (functionAst.Extern) continue;
+
                 _currentFunction = functionAst;
-                var function = LLVMApi.GetNamedFunction(_module, functionAst.Name);
+                var function = LLVMApi.GetNamedFunction(_module, name);
                 WriteFunction(functionAst, globals, function);
             }
 
