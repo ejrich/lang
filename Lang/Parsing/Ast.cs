@@ -65,6 +65,7 @@ namespace Lang.Parsing
     {
         Int,
         Float,
+        Boolean,
         String,
         List,
         Struct,
@@ -95,6 +96,13 @@ namespace Lang.Parsing
                         return Type.Error;
                     }
                     return Type.Float;
+                case "bool":
+                    if (hasGenerics)
+                    {
+                        error = new TranslationError {Error = "boolean type cannot have generics"};
+                        return Type.Error;
+                    }
+                    return Type.Boolean;
                 case "string":
                     if (hasGenerics)
                     {
@@ -140,6 +148,8 @@ namespace Lang.Parsing
                     {
                         return Type.Other;
                     }
+                case TokenType.Boolean:
+                    return Type.Boolean;
                 // TODO This isn't right, but works for now
                 case TokenType.Token:
                     return Type.Other;
