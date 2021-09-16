@@ -82,6 +82,7 @@ int main(Array<string> args) {
     return 0;
 }
 
+// global_c := global_b; TODO Make this work
 global_a := 7;
 global_b: int = 456; #const
 
