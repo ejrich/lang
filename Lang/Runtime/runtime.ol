@@ -69,6 +69,7 @@ printf(string format, ... args) #extern "libc"
 
 // Runtime functions
 int __start(int argc, string* argv) {
+    exit_code := 0;
     args: List<string>[argc-1];
 
     each i in 1..argc-1 then args[i-1] = *(argv + i);
@@ -77,10 +78,11 @@ int __start(int argc, string* argv) {
     #if type_of(main).return_type.type == TypeKind.Void {
         #if type_of(main).arguments.length == 0 then main();
         else then main(args);
-        return 0;
     }
     else {
-        #if type_of(main).arguments.length == 0 then return main();
-        else then return main(args);
+        #if type_of(main).arguments.length == 0 then exit_code = main();
+        else then exit_code = main(args);
     }
+
+    return exit_code;
 }
