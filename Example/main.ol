@@ -293,9 +293,7 @@ u32 sleep(u32 seconds) #extern "libc"
     args[0] = "Hello world";
     main(args);
 
-    if os == OS.Linux {
-        add_dependency("X11");
-    }
+    build();
 }
 
 compiler_directives() {
@@ -305,6 +303,12 @@ compiler_directives() {
         printf("Running Debug code\n");
     #if build_env == BuildEnv.Release then
         printf("Running Release code\n");
+}
+
+build() {
+    if os == OS.Linux {
+        add_dependency("X11");
+    }
 }
 
 #if os == OS.Linux {
