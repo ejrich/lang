@@ -269,7 +269,6 @@ namespace Lang.Translation
                         errors.Add(CreateError($"Expected declaration value to be type '{PrintTypeDefinition(declaration.Type)}', " +
                             $"but got '{PrintTypeDefinition(valueType)}'", declaration.Type));
                     }
-                    // TODO Implement this in other parts of these functions
                     else if (declaration.Type.PrimitiveType != null && declaration.Value is ConstantAst constant)
                     {
                         constant.Type.Name = declaration.Type.Name;
@@ -362,6 +361,12 @@ namespace Lang.Translation
                 {
                     errors.Add(CreateError($"Expected assignment value to be type '{PrintTypeDefinition(variableTypeDefinition)}'", assignment.Value));
                 }
+                else if (variableTypeDefinition.PrimitiveType != null && assignment.Value is ConstantAst constant)
+                {
+                    constant.Type.Name = variableTypeDefinition.Name;
+                    constant.Type.PrimitiveType = variableTypeDefinition.PrimitiveType;
+                    VerifyConstant(constant, errors);
+                }
             }
         }
 
@@ -424,12 +429,12 @@ namespace Lang.Translation
                 var beginType = VerifyExpression(each.RangeBegin, localVariables, errors);
                 if (VerifyType(beginType, errors) != Type.Int)
                 {
-                    errors.Add(CreateError($"Expected range to begin with an int, but got '{PrintTypeDefinition(beginType)}'", each.RangeBegin));
+                    errors.Add(CreateError($"Expected range to begin with 'int', but got '{PrintTypeDefinition(beginType)}'", each.RangeBegin));
                 }
-                var endType = VerifyExpression(each.RangeBegin, localVariables, errors);
-                if (VerifyType(beginType, errors) != Type.Int)
+                var endType = VerifyExpression(each.RangeEnd, localVariables, errors);
+                if (VerifyType(endType, errors) != Type.Int)
                 {
-                    errors.Add(CreateError($"Expected range to end with an int, but got '{PrintTypeDefinition(beginType)}'", each.RangeEnd));
+                    errors.Add(CreateError($"Expected range to end with 'int', but got '{PrintTypeDefinition(endType)}'", each.RangeEnd));
                 }
                 if (!eachVariables.TryAdd(each.IterationVariable, new TypeDefinition {Name = "int"}))
                 {
@@ -590,7 +595,7 @@ namespace Lang.Translation
         private TypeDefinition VerifyExpressionType(ExpressionAst expression, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             // 1. Get the type of the initial child
-            var expressionType = VerifyExpression(expression.Children[0], localVariables, errors);
+            expression.Type = VerifyExpression(expression.Children[0], localVariables, errors);
             for (var i = 1; i < expression.Children.Count; i++)
             {
                 // 2. Get the next operator and expression type
@@ -599,7 +604,7 @@ namespace Lang.Translation
                 if (nextExpressionType == null) return null;
 
                 // 3. Verify the operator and expression types are compatible and convert the expression type if necessary
-                var type = VerifyType(expressionType, errors);
+                var type = VerifyType(expression.Type, errors);
                 var nextType = VerifyType(nextExpressionType, errors);
                 switch (op)
                 {
@@ -608,8 +613,8 @@ namespace Lang.Translation
                     case Operator.Or:
                         if (type != Type.Boolean || nextType != Type.Boolean)
                         {
-                            errors.Add(CreateError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expressionType)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]));
-                            expressionType = new TypeDefinition {Name = "bool"};
+                            errors.Add(CreateError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]));
+                            expression.Type = new TypeDefinition {Name = "bool"};
                         }
                         break;
                     // Requires same types and returns bool
@@ -621,9 +626,9 @@ namespace Lang.Translation
                         if (!(type == Type.Int || type == Type.Float) &&
                             !(nextType == Type.Int || nextType == Type.Float))
                         {
-                            errors.Add(CreateError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expressionType)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]));
+                            errors.Add(CreateError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]));
                         }
-                        expressionType = new TypeDefinition {Name = "bool"};
+                        expression.Type = new TypeDefinition {Name = "bool"};
                         break;
                     // Requires same types and returns more precise type
                     case Operator.Add:
@@ -634,14 +639,40 @@ namespace Lang.Translation
                         if ((type == Type.Int || type == Type.Float) ||
                             (nextType == Type.Int || nextType == Type.Float))
                         {
-                            if (nextType == Type.Float)
+                            // For integer operations, use the larger size and convert to signed if one type is signed
+                            if (type == Type.Int && nextType == Type.Int)
                             {
-                                expressionType = nextExpressionType;
+                                var currentIntegerType = (IntegerType)expression.Type.PrimitiveType;
+                                var nextIntegerType = (IntegerType)nextExpressionType.PrimitiveType;
+                                var integerType = new IntegerType
+                                {
+                                    Bytes = currentIntegerType.Bytes > nextIntegerType.Bytes ? currentIntegerType.Bytes : nextIntegerType.Bytes,
+                                    Signed = currentIntegerType.Signed || nextIntegerType.Signed
+                                };
+                                expression.Type = new TypeDefinition
+                                {
+                                    Name = $"{(integerType.Signed ? "s" : "u")}{integerType.Bytes * 8}",
+                                    PrimitiveType = integerType
+                                };
+                            }
+                            // For floating point operations, convert to the larger size
+                            else if (type == Type.Float && nextType == Type.Float)
+                            {
+                                if (expression.Type.PrimitiveType.Bytes < nextExpressionType.PrimitiveType.Bytes)
+                                {
+                                    expression.Type = nextExpressionType;
+                                }
+                            }
+                            // For an int lhs and float rhs, convert to the floating point type
+                            // Note that float lhs and int rhs are covered since the floating point is already selected
+                            else if (nextType == Type.Float)
+                            {
+                                expression.Type = nextExpressionType;
                             }
                         }
                         else
                         {
-                            errors.Add(CreateError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expressionType)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]));
+                            errors.Add(CreateError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]));
                         }
                         break;
                     // Requires both integer or bool types and returns more same type
@@ -651,21 +682,22 @@ namespace Lang.Translation
                         if (!(type == Type.Boolean && nextType == Type.Boolean) &&
                             !(type == Type.Int && nextType == Type.Int))
                         {
-                            errors.Add(CreateError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expressionType)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]));
+                            errors.Add(CreateError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]));
                             if (nextType == Type.Boolean || nextType == Type.Int)
                             {
-                                expressionType = nextExpressionType;
+                                expression.Type = nextExpressionType;
                             }
                             else if (!(type == Type.Boolean || type == Type.Int))
                             {
                                 // If the type can't be determined, default to int
-                                expressionType = new TypeDefinition {Name = "int"};
+                                expression.Type = new TypeDefinition {Name = "int"};
                             }
                         }
                         break;
                 }
+                expression.ResultingTypes.Add(expression.Type);
             }
-            return expressionType;
+            return expression.Type;
         }
 
         private TypeDefinition VerifyStructFieldRef(StructFieldRefAst structField, TypeDefinition structType,

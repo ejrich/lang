@@ -97,6 +97,7 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public TypeDefinition Type { get; set; }
         public List<Operator> Operators { get; } = new();
+        public List<TypeDefinition> ResultingTypes { get; } = new();
         public List<IAst> Children { get; } = new();
     }
 
