@@ -34,7 +34,7 @@ namespace Lang
     {
         void Init();
         void InitExternFunction(FunctionAst function);
-        void InitVarargsFunction(FunctionAst function, int count);
+        void InitVarargsFunction(FunctionAst function, TypeDefinition[] types);
         void RunProgram(FunctionIR function, IAst source);
         bool ExecuteCondition(FunctionIR function, IAst source);
     }
@@ -44,7 +44,7 @@ namespace Lang
         private ModuleBuilder _moduleBuilder;
         private TypeBuilder _functionTypeBuilder;
         private int _version;
-        private readonly Dictionary<string, Dictionary<int, MethodInfo>> _externFunctions = new();
+        private readonly Dictionary<string, List<MethodInfo>> _externFunctions = new();
 
         private int _typeCount;
         private IntPtr _typeTablePointer;
@@ -61,21 +61,85 @@ namespace Lang
 
         public void InitExternFunction(FunctionAst function)
         {
-            CreateFunction(function.Name, function.ExternLib, function.Arguments.Count);
+            var functionTypes = new Type[function.Arguments.Count];
+
+            for (var i = 0; i < function.Arguments.Count; i++)
+            {
+                var argument = function.Arguments[i];
+                functionTypes[i] = GetType(argument.TypeDefinition);
+            }
+
+            CreateFunction(function.Name, function.ExternLib, functionTypes);
         }
 
-        public void InitVarargsFunction(FunctionAst function, int count)
+        public void InitVarargsFunction(FunctionAst function, TypeDefinition[] types)
         {
-            CreateFunction(function.Name, function.ExternLib, count);
+            var functionTypes = new Type[types.Length];
+
+            for (var i = 0; i < types.Length; i++)
+            {
+                functionTypes[i] = GetType(types[i]);
+            }
+
+            CreateFunction(function.Name, function.ExternLib, functionTypes);
+        }
+
+        // TODO Update this to use IType
+        private Type GetType(TypeDefinition type)
+        {
+            switch (type.TypeKind)
+            {
+                case TypeKind.Boolean:
+                    return typeof(bool);
+                case TypeKind.Integer:
+                case TypeKind.Enum:
+                    switch (type.PrimitiveType.Bytes)
+                    {
+                        case 1:
+                            return typeof(byte);
+                        case 2:
+                            return typeof(ushort);
+                        case 8:
+                            return typeof(ulong);
+                        default:
+                            return typeof(uint);
+                    }
+                case TypeKind.Float:
+                    if (type.PrimitiveType.Bytes == 4)
+                    {
+                        return typeof(float);
+                    }
+                    else
+                    {
+                        return typeof(double);
+                    }
+                // case TypeKind.String:
+                // case TypeKind.Pointer:
+                // case TypeKind.Array:
+                // case TypeKind.Struct:
+                // case TypeKind.CArray:
+                default:
+                    return typeof(IntPtr);
+            }
+        }
+
+        private void CreateFunction(string name, string library, Type[] argumentTypes)
+        {
+            _functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
+
+            var method = _functionTypeBuilder.DefineMethod(name, MethodAttributes.Public | MethodAttributes.Static, typeof(Register), argumentTypes);
+            var caBuilder = new CustomAttributeBuilder(typeof(DllImportAttribute).GetConstructor(new []{typeof(string)}), new []{library});
+
+            /* @Future Uncomment this for when shipping on Windows
+            var dllImport = typeof(DllImportAttribute);
+            var callingConvention = dllImport.GetField("CallingConvention");
+            var caBuilder = new CustomAttributeBuilder(dllImport.GetConstructor(new []{typeof(string)}), new []{library}, new []{callingConvention}, new object[]{CallingConvention.Cdecl});
+            */
+            method.SetCustomAttribute(caBuilder);
         }
 
         public void Init()
         {
-            // How this should work
-            // - When a type/function is added to the TypeTable, add the TypeInfo object to the array
-            // - When function IR is built and the function is extern, create the function ref
-            // - When a global variable is added, store them in the global space
-
             if (_functionTypeBuilder != null)
             {
                 var library = _functionTypeBuilder.CreateType();
@@ -86,11 +150,11 @@ namespace Lang
                     var argumentCount = function.GetParameters().Length;
                     if (!_externFunctions.TryGetValue(function.Name, out var functions))
                     {
-                        _externFunctions[function.Name] = new Dictionary<int, MethodInfo> {{argumentCount, function}};
+                        _externFunctions[function.Name] = new List<MethodInfo> {function};
                     }
                     else
                     {
-                        functions[argumentCount] = function;
+                        functions.Add(function);
                     }
                 }
                 _version++;
@@ -132,7 +196,6 @@ namespace Lang
                 }
             }
 
-
             if (_typeCount != TypeTable.Count)
             {
                 _typeCount = TypeTable.Count;
@@ -149,24 +212,6 @@ namespace Lang
                 var typeTableArray = new TypeTable.Array {Length = TypeTable.Count, Data = typeTableArrayPointer};
                 Marshal.StructureToPtr(typeTableArray, _typeTablePointer, false);
             }
-        }
-
-        private void CreateFunction(string name, string library, int argumentCount)
-        {
-            _functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
-
-            var args = new Type[argumentCount];
-            Array.Fill(args, typeof(Register));
-
-            var method = _functionTypeBuilder.DefineMethod(name, MethodAttributes.Public | MethodAttributes.Static, typeof(Register), args);
-            var caBuilder = new CustomAttributeBuilder(typeof(DllImportAttribute).GetConstructor(new []{typeof(string)}), new []{library});
-
-            /* @Future Uncomment this for when shipping on Windows
-            var dllImport = typeof(DllImportAttribute);
-            var callingConvention = dllImport.GetField("CallingConvention");
-            var caBuilder = new CustomAttributeBuilder(dllImport.GetConstructor(new []{typeof(string)}), new []{library}, new []{callingConvention}, new object[]{CallingConvention.Cdecl});
-            */
-            method.SetCustomAttribute(caBuilder);
         }
 
         private void InitializeGlobalVariable(IntPtr pointer, InstructionValue value)
@@ -446,24 +491,52 @@ namespace Lang
                             var args = new object[instruction.Value1.Values.Length];
                             for (var i = 0; i < args.Length; i++)
                             {
-                                // TODO Switch back to old varargs calls implementation
-                                args[i] = GetValue(instruction.Value1.Values[i], registers, stackPointer, function, arguments);
-                                // var argument = instruction.Value1.Values[i];
-                                // var value = GetValue(argument, registers, stackPointer, function, arguments);
+                                var argument = instruction.Value1.Values[i];
+                                var value = GetValue(argument, registers, stackPointer, function, arguments);
 
-                                // args[i] = argument.Type.TypeKind switch
-                                // {
-                                //     TypeKind.Boolean => value.Bool,
-                                //     TypeKind.Integer or TypeKind.Enum => value.UInteger,
-                                //     TypeKind.Float => argument.Type.Size == 4 ? value.Float : value.Double,
-                                //     _ => value.Pointer
-                                // };
+                                switch (argument.Type.TypeKind)
+                                {
+                                    case TypeKind.Boolean:
+                                        args[i] = value.Bool;
+                                        break;
+                                    case TypeKind.Integer:
+                                    case TypeKind.Enum:
+                                        switch (argument.Type.Size)
+                                        {
+                                            case 1:
+                                                args[i] = value.Byte;
+                                                break;
+                                            case 2:
+                                                args[i] = value.UShort;
+                                                break;
+                                            case 8:
+                                                args[i] = value.ULong;
+                                                break;
+                                            default:
+                                                args[i] = value.UInteger;
+                                                break;
+                                        }
+                                        break;
+                                    case TypeKind.Float:
+                                        if (argument.Type.Size == 4)
+                                        {
+                                            args[i] = value.Float;
+                                        }
+                                        else
+                                        {
+                                            args[i] = value.Double;
+                                        }
+                                        break;
+                                    default:
+                                        args[i] = value.Pointer;
+                                        break;
+                                }
                             }
 
-                            var functionDecl = _externFunctions[instruction.String][args.Length];
+                            var functionDecl = _externFunctions[instruction.String][instruction.Index];
                             var returnValue = functionDecl.Invoke(null, args);
                             registers[instruction.ValueIndex] = (Register)returnValue;
-                       }
+                        }
                         else if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Compiler))
                         {
                             var returnValue = new Register();

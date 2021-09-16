@@ -1300,6 +1300,7 @@ namespace Lang
         {
             loaded = false;
             InstructionValue value = null;
+            var skipPointer = false;
 
             switch (structField.Children[0])
             {
@@ -1327,6 +1328,7 @@ namespace Lang
                     break;
                 case CallAst call:
                     value = EmitCall(function, call, scope);
+                    skipPointer = true;
                     if (!structField.Pointers[0])
                     {
                         var type = structField.Types[0];
@@ -1342,7 +1344,6 @@ namespace Lang
                     break;
             }
 
-            var skipPointer = false;
             for (var i = 1; i < structField.Children.Count; i++)
             {
                 var type = structField.Types[i-1];
@@ -1461,7 +1462,8 @@ namespace Lang
                 }
             }
 
-            return EmitCall(function, GetFunctionName(call.Function), arguments, call.Function.ReturnType);
+            var functionName = GetFunctionName(call.Function);
+            return EmitCall(function, functionName, arguments, call.Function.ReturnType, call.ExternIndex);
         }
 
         private InstructionValue EmitGetIndexPointer(FunctionIR function, IndexAst index, ScopeAst scope, IType type = null, InstructionValue variable = null)
@@ -1862,11 +1864,11 @@ namespace Lang
         }
 
 
-        private InstructionValue EmitCall(FunctionIR function, string name, InstructionValue[] arguments, IType returnType)
+        private InstructionValue EmitCall(FunctionIR function, string name, InstructionValue[] arguments, IType returnType, int callIndex = 0)
         {
             var callInstruction = new Instruction
             {
-                Type = InstructionType.Call, String = name,
+                Type = InstructionType.Call, Index = callIndex, String = name,
                 Value1 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Values = arguments}
             };
             return AddInstruction(function, callInstruction, returnType);
