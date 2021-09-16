@@ -8,16 +8,9 @@ namespace Lang
     {
         ProgramIR Program { get; }
         void Init();
-        FunctionIR AddFunction(FunctionAst function);
-        FunctionIR AddOperatorOverload(OperatorOverloadAst overload);
+        void AddFunction(FunctionAst function);
+        void AddOperatorOverload(OperatorOverloadAst overload);
         void EmitGlobalVariable(DeclarationAst declaration, ScopeAst scope);
-        void EmitDeclaration(FunctionIR function, DeclarationAst declaration, ScopeAst scope);
-        void EmitAssignment(FunctionIR function, AssignmentAst assignment, ScopeAst scope);
-        void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, ScopeAst scope, BasicBlock block = null);
-        BasicBlock EmitConditional(FunctionIR function, ConditionalAst conditional, ScopeAst scope, BasicBlock block);
-        BasicBlock EmitWhile(FunctionIR function, WhileAst whileAst, ScopeAst scope);
-        BasicBlock EmitEach(FunctionIR function, EachAst each, ScopeAst scope);
-        InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block = null, bool useRawString = false);
     }
 
     public class ProgramIRBuilder : IProgramIRBuilder
@@ -38,7 +31,7 @@ namespace Lang
             _float64Type = TypeTable.Types["float64"];
         }
 
-        public FunctionIR AddFunction(FunctionAst function)
+        public void AddFunction(FunctionAst function)
         {
             var functionName = GetFunctionName(function);
 
@@ -72,11 +65,10 @@ namespace Lang
             {
                 Program.Functions[functionName] = functionIR;
             }
-
-            return functionIR;
+            // TODO Emit function body
         }
 
-        public FunctionIR AddOperatorOverload(OperatorOverloadAst overload)
+        public void AddOperatorOverload(OperatorOverloadAst overload)
         {
             var functionName = GetOperatorOverloadName(overload.Type, overload.Operator);
 
@@ -92,8 +84,7 @@ namespace Lang
             }
 
             Program.Functions[functionName] = functionIR;
-
-            return functionIR;
+            // TODO Emit function body
         }
 
         public void EmitGlobalVariable(DeclarationAst declaration, ScopeAst scope)
@@ -266,7 +257,7 @@ namespace Lang
             };
         }
 
-        public void EmitDeclaration(FunctionIR function, DeclarationAst declaration, ScopeAst scope)
+        private void EmitDeclaration(FunctionIR function, DeclarationAst declaration, ScopeAst scope)
         {
             if (declaration.Constant)
             {
@@ -507,7 +498,7 @@ namespace Lang
             return value;
         }
 
-        public void EmitAssignment(FunctionIR function, AssignmentAst assignment, ScopeAst scope)
+        private void EmitAssignment(FunctionIR function, AssignmentAst assignment, ScopeAst scope)
         {
             var block = function.BasicBlocks[^1];
             var pointer = EmitGetReference(function, assignment.Reference, scope, block);
@@ -538,7 +529,7 @@ namespace Lang
             block.Instructions.Add(instruction);
         }
 
-        public BasicBlock EmitConditional(FunctionIR function, ConditionalAst conditional, ScopeAst scope, BasicBlock block)
+        private BasicBlock EmitConditional(FunctionIR function, ConditionalAst conditional, ScopeAst scope, BasicBlock block)
         {
             // Run the condition expression in the current basic block and then jump to the following
             var condition = EmitConditionExpression(function, conditional.Condition, scope, block);
@@ -551,7 +542,7 @@ namespace Lang
             return thenBlock;
         }
 
-        public BasicBlock EmitWhile(FunctionIR function, WhileAst whileAst, ScopeAst scope)
+        private BasicBlock EmitWhile(FunctionIR function, WhileAst whileAst, ScopeAst scope)
         {
             // Create a block for the condition expression and then jump to the following
             var conditionBlock = AddBasicBlock(function);
@@ -581,7 +572,7 @@ namespace Lang
             }
         }
 
-        public BasicBlock EmitEach(FunctionIR function, EachAst each, ScopeAst scope)
+        private BasicBlock EmitEach(FunctionIR function, EachAst each, ScopeAst scope)
         {
             // TODO Implement me
             // Initialize the loop in the current basic block
@@ -597,7 +588,7 @@ namespace Lang
             return block;
         }
 
-        public InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block = null, bool useRawString = false)
+        private InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, BasicBlock block = null, bool useRawString = false)
         {
             if (block == null)
             {
