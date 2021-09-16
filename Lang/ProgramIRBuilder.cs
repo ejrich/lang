@@ -1681,6 +1681,7 @@ namespace Lang
 
         private InstructionValue AddInstruction(FunctionIR function, Instruction instruction, IType type)
         {
+            instruction.ValueIndex = function.ValueCount++;
             var value = new InstructionValue {ValueIndex = function.Instructions.Count, Type = type};
             function.Instructions.Add(instruction);
             return value;
