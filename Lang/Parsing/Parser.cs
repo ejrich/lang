@@ -38,6 +38,10 @@ namespace Lang.Parsing
                 var fileParseResult = ParseFile(file);
                 if (!fileParseResult.Success)
                 {
+                    foreach (var error in fileParseResult.Errors)
+                    {
+                        error.File = file;
+                    }
                     parseResult.Errors.AddRange(fileParseResult.Errors);
                     parseResult.Success = false;
                 }
@@ -295,7 +299,7 @@ namespace Lang.Parsing
                 switch (token.Type)
                 {
                     case TokenType.Token:
-                        returnAst.Children.Add(new ConstantAst {Value = token.Value});
+                        returnAst.Value = new ConstantAst {Value = token.Value};
                         // TODO Add support for expressions and calls
                         break;
                     default:

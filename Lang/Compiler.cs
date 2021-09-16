@@ -68,7 +68,7 @@ namespace Lang
 
             if (errors.Any())
             {
-                Console.WriteLine($"{errors.Count} compilation errors:\n");
+                Console.WriteLine($"{errors.Count} compilation error(s):\n");
                 foreach (var error in errors)
                 {
                     Console.WriteLine($"\t{error.File}: {error.Error} at line {error.Line}:{error.Column}");
