@@ -341,6 +341,7 @@ namespace Lang
         public string Name { get; set; }
         public bool IsGeneric { get; set; }
         public bool Constant { get; set; }
+        public bool Character { get; set; }
         public int GenericIndex { get; set; }
         public int? TypeIndex { get; set; }
         public bool CArray { get; set; }

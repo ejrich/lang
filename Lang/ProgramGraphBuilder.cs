@@ -1884,7 +1884,7 @@ namespace Lang
             var type = constant.Type;
             switch (type.PrimitiveType)
             {
-                case IntegerType integer:
+                case IntegerType integer when !type.Character:
                     if (!integer.Signed && constant.Value[0] == '-')
                     {
                         AddError($"Unsigned type '{PrintTypeDefinition(constant.Type)}' cannot be negative", constant);
