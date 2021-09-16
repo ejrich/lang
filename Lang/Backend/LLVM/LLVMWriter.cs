@@ -511,18 +511,30 @@ namespace Lang.Backend.LLVM
                     BuildAllocations(assignment.Value);
                     break;
                 case StructFieldRefAst structField:
-                    switch (structField.Children[0])
+                    for (var i = 0; i < structField.Pointers.Length; i++)
                     {
-                        // To get the field of a call, the value needs to be stored on the stack to use GetElementPtr
-                        case CallAst call:
-                            BuildCallAllocations(call);
-                            if (!structField.Pointers[0])
-                            {
-                                var function = _programGraph.Functions[call.Function][call.FunctionIndex];
-                                var iterationValue = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(function.ReturnType), function.Name);
-                                _allocationQueue.Enqueue(iterationValue);
-                            }
-                            break;
+                        switch (structField.Children[i])
+                        {
+                            // To get the field of a call, the value needs to be stored on the stack to use GetElementPtr
+                            case CallAst call:
+                                BuildCallAllocations(call);
+                                if (!structField.Pointers[i])
+                                {
+                                    var function = _programGraph.Functions[call.Function][call.FunctionIndex];
+                                    var iterationValue = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(function.ReturnType), function.Name);
+                                    _allocationQueue.Enqueue(iterationValue);
+                                }
+                                break;
+                            case IndexAst index:
+                                BuildAllocations(index.Index);
+                                if (index.CallsOverload && !structField.Pointers[i])
+                                {
+                                    var overload = _programGraph.OperatorOverloads[index.OverloadType.GenericName][Operator.Subscript];
+                                    var iterationValue = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(overload.ReturnType), overload.ReturnType.GenericName);
+                                    _allocationQueue.Enqueue(iterationValue);
+                                }
+                                break;
+                        }
                     }
                     break;
                 case ScopeAst:
@@ -576,6 +588,9 @@ namespace Lang.Backend.LLVM
                     return BuildAllocations(each.Children);
                 case ExpressionAst:
                     BuildAllocations(ast.Children);
+                    break;
+                case IndexAst index:
+                    BuildAllocations(index.Index);
                     break;
             }
             return false;
@@ -1428,7 +1443,17 @@ namespace Lang.Backend.LLVM
                     (type, value) = localVariables[identifier.Name];
                     break;
                 case IndexAst index:
-                    (type, value) = GetListPointer(index, localVariables, out _);
+                    var (indexType, indexValue) = GetListPointer(index, localVariables, out _);
+                    type = indexType;
+                    if (index.CallsOverload && !structField.Pointers[0])
+                    {
+                        value = _allocationQueue.Dequeue();
+                        LLVMApi.BuildStore(_builder, indexValue, value);
+                    }
+                    else
+                    {
+                        value = indexValue;
+                    }
                     break;
                 case CallAst call:
                     var (callType, callValue) = WriteExpression(call, localVariables);
@@ -1493,20 +1518,41 @@ namespace Lang.Backend.LLVM
                         value = LLVMApi.BuildStructGEP(_builder, value, (uint)structField.ValueIndices[i-1], identifier.Name);
                         break;
                     case IndexAst index:
-                        value = LLVMApi.BuildStructGEP(_builder, value, (uint)structField.ValueIndices[i-1], index.Name);
                         var (_, indexValue) = WriteExpression(index.Index, localVariables);
-
-                        if (type.CArray)
+                        if (index.CallsOverload)
                         {
-                            value = LLVMApi.BuildGEP(_builder, value, new []{_zeroInt, indexValue}, "indexptr");
+                            var overloadName = GetOperatorOverloadName(type, Operator.Subscript);
+                            var overload = LLVMApi.GetNamedFunction(_module, overloadName);
+                            var overloadDef = _programGraph.OperatorOverloads[type.GenericName][Operator.Subscript];
+
+                            type = overloadDef.ReturnType;
+                            var callValue = LLVMApi.BuildCall(_builder, overload, new []{value, indexValue}, string.Empty);
+                            if (i < structField.Pointers.Length && !structField.Pointers[i])
+                            {
+                                value = _allocationQueue.Dequeue();
+                                LLVMApi.BuildStore(_builder, callValue, value);
+                            }
+                            else
+                            {
+                                value = callValue;
+                            }
                         }
                         else
                         {
-                            var listData = LLVMApi.BuildStructGEP(_builder, value, 1, "listdata");
-                            var dataPointer = LLVMApi.BuildLoad(_builder, listData, "dataptr");
-                            value = LLVMApi.BuildGEP(_builder, dataPointer, new [] {indexValue}, "indexptr");
+                            value = LLVMApi.BuildStructGEP(_builder, value, (uint)structField.ValueIndices[i-1], index.Name);
+
+                            if (type.CArray)
+                            {
+                                value = LLVMApi.BuildGEP(_builder, value, new []{_zeroInt, indexValue}, "indexptr");
+                            }
+                            else
+                            {
+                                var listData = LLVMApi.BuildStructGEP(_builder, value, 1, "listdata");
+                                var dataPointer = LLVMApi.BuildLoad(_builder, listData, "dataptr");
+                                value = LLVMApi.BuildGEP(_builder, dataPointer, new [] {indexValue}, "indexptr");
+                            }
+                            type = type.Generics[0];
                         }
-                        type = type.Generics[0];
                         break;
                 }
             }

@@ -289,6 +289,7 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public string Name { get; set; }
         public bool CallsOverload { get; set; }
+        public TypeDefinition OverloadType { get; set; }
         public IAst Index { get; set; }
         public List<IAst> Children => null;
     }
