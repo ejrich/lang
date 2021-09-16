@@ -224,7 +224,7 @@ namespace Lang.Parsing
                 }
             }
 
-            if (currentToken != null) yield return currentToken;
+            if (!lexerStatus.ReadingComment && currentToken != null) yield return currentToken;
         }
 
         private void CheckForReservedTokensAndErrors(Token token, List<ParseError> errors, char character = default)

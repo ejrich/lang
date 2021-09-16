@@ -490,6 +490,7 @@ namespace Lang.Runner
                         fieldInstance!.SetValue(instance, list);
                         break;
                     case "*":
+                    case "bool":
                         break;
                     default:
                     {
@@ -634,17 +635,35 @@ namespace Lang.Runner
                             case IndexAst index:
                                 var list = variable!.GetType().GetField(index.Name);
                                 var listValue = list!.GetValue(variable);
-                                // TODO Test this
-                                var (_, _, listPointer) = GetListPointer(index, variables, listValue, fieldType);
-                                fieldType = fieldType.Generics[0];
-                                if (i == structField.Children.Count - 1)
+                                if (index.CallsOverload)
                                 {
-                                    Marshal.StructureToPtr(expression.Value, listPointer, false);
+                                    var indexValue = (int)ExecuteExpression(index.Index, variables).Value;
+                                    var pointer = HandleOverloadedOperator(fieldType, Operator.Subscript, listValue, indexValue);
+
+                                    // TODO Test this
+                                    fieldType = pointer.Type;
+                                    if (i == structField.Children.Count - 1)
+                                    {
+                                        Marshal.StructureToPtr(expression.Value, GetPointer(pointer.Value), false);
+                                    }
+                                    else
+                                    {
+                                        variable = pointer.Value;
+                                    }
                                 }
                                 else
                                 {
-                                    var elementType = fieldType.Generics[0];
-                                    variable = PointerToTargetType(listPointer, elementType);
+                                    var (_, _, listPointer) = GetListPointer(index, variables, listValue, fieldType);
+                                    fieldType = fieldType.Generics[0];
+                                    if (i == structField.Children.Count - 1)
+                                    {
+                                        Marshal.StructureToPtr(expression.Value, listPointer, false);
+                                    }
+                                    else
+                                    {
+                                        var elementType = fieldType.Generics[0];
+                                        variable = PointerToTargetType(listPointer, elementType);
+                                    }
                                 }
                                 break;
                         }
@@ -652,11 +671,12 @@ namespace Lang.Runner
                     break;
                 }
                 case IndexAst indexAst:
+                {
                     if (indexAst.CallsOverload)
                     {
-                        var index = (int)ExecuteExpression(indexAst.Index, variables).Value;
+                        var indexValue = (int)ExecuteExpression(indexAst.Index, variables).Value;
                         var variable = variables[indexAst.Name];
-                        var pointer = HandleOverloadedOperator(variable.Type, Operator.Subscript, variable.Value, index).Value;
+                        var pointer = HandleOverloadedOperator(variable.Type, Operator.Subscript, variable.Value, indexValue).Value;
                         Marshal.StructureToPtr(expression.Value, GetPointer(pointer), false);
                     }
                     else
@@ -665,6 +685,7 @@ namespace Lang.Runner
                         Marshal.StructureToPtr(expression.Value, pointer, false);
                     }
                     break;
+                }
             }
         }
 
@@ -942,15 +963,32 @@ namespace Lang.Runner
                                     case IndexAst index:
                                         var list = variable!.GetType().GetField(index.Name);
                                         var listValue = list!.GetValue(variable);
-                                        // TODO Check this
-                                        var (_, _, listPointer) = GetListPointer(index, variables, listValue, fieldType);
-                                        fieldType = fieldType.Generics[0];
-                                        variable = PointerToTargetType(listPointer, fieldType);
-                                        if (i == structField.Children.Count - 1)
+                                        if (index.CallsOverload)
                                         {
-                                            previousValue = variable;
-                                            newValue = PerformOperation(fieldType, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
-                                            Marshal.StructureToPtr(newValue, listPointer, false);
+                                            var indexValue = (int)ExecuteExpression(index.Index, variables).Value;
+                                            var pointer = HandleOverloadedOperator(fieldType, Operator.Subscript, listValue, indexValue);
+
+                                            // TODO Test this
+                                            fieldType = pointer.Type;
+                                            variable = pointer.Value;
+                                            if (i == structField.Children.Count - 1)
+                                            {
+                                                previousValue = variable;
+                                                newValue = PerformOperation(fieldType, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
+                                                Marshal.StructureToPtr(newValue, GetPointer(pointer.Value), false);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            var (_, _, listPointer) = GetListPointer(index, variables, listValue, fieldType);
+                                            fieldType = fieldType.Generics[0];
+                                            variable = PointerToTargetType(listPointer, fieldType);
+                                            if (i == structField.Children.Count - 1)
+                                            {
+                                                previousValue = variable;
+                                                newValue = PerformOperation(fieldType, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
+                                                Marshal.StructureToPtr(newValue, listPointer, false);
+                                            }
                                         }
                                         break;
                                 }
@@ -960,11 +998,31 @@ namespace Lang.Runner
                         case IndexAst indexAst:
                         {
                             // TODO Check this
-                            var (typeDef, elementType, pointer) = GetListPointer(indexAst, variables);
+                            TypeDefinition typeDef;
+                            object previousValue, newValue;
+                            if (indexAst.CallsOverload)
+                            {
+                                var indexValue = (int)ExecuteExpression(indexAst.Index, variables).Value;
+                                var variable = variables[indexAst.Name];
+                                var pointer = HandleOverloadedOperator(variable.Type, Operator.Subscript, variable.Value, indexValue);
 
-                            var previousValue = Marshal.PtrToStructure(pointer, elementType);
-                            var newValue = PerformOperation(typeDef, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
-                            Marshal.StructureToPtr(newValue, pointer, false);
+                                // TODO Test this
+                                typeDef = pointer.Type.Generics[0];
+                                var rawPointer = GetPointer(pointer.Value);
+                                previousValue = PointerToTargetType(rawPointer, typeDef);
+                                newValue = PerformOperation(typeDef, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
+                                Marshal.StructureToPtr(newValue, rawPointer, false);
+                            }
+                            else
+                            {
+
+                                var (type, elementType, pointer) = GetListPointer(indexAst, variables);
+                                typeDef = type;
+
+                                previousValue = Marshal.PtrToStructure(pointer, elementType);
+                                newValue = PerformOperation(typeDef, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
+                                Marshal.StructureToPtr(newValue, pointer, false);
+                            }
 
                             return new ValueType {Type = typeDef, Value = changeByOne.Prefix ? newValue : previousValue};
                         }
@@ -1258,16 +1316,27 @@ namespace Lang.Runner
                     case IndexAst index:
                         var list = value!.GetType().GetField(index.Name);
                         var listValue = list!.GetValue(value);
-                        // TODO Test this
-                        var (_, _, listPointer) = GetListPointer(index, variables, listValue, fieldType);
-                        fieldType = fieldType.Generics[0];
-                        if (getPointer && i == structField.Children.Count - 1)
+                        if (index.CallsOverload)
                         {
-                            value = listPointer;
+                            var indexValue = (int)ExecuteExpression(index.Index, variables).Value;
+                            var pointer = HandleOverloadedOperator(fieldType, Operator.Subscript, listValue, indexValue);
+
+                            // TODO Test this
+                            fieldType = pointer.Type;
+                            value = pointer.Value;
                         }
                         else
                         {
-                            value = PointerToTargetType(listPointer, fieldType);
+                            var (_, _, listPointer) = GetListPointer(index, variables, listValue, fieldType);
+                            fieldType = fieldType.Generics[0];
+                            if (getPointer && i == structField.Children.Count - 1)
+                            {
+                                value = listPointer;
+                            }
+                            else
+                            {
+                                value = PointerToTargetType(listPointer, fieldType);
+                            }
                         }
                         break;
                 }

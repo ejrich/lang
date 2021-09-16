@@ -193,10 +193,17 @@ index_overloading() {
     printf("Vector values: x = %.2f, y = %.2f, z = %.2f\n", vector.x, vector.y, vector.z);
     printf("Vector value: x = %.2f\n", a[3].x);
 
-    // TODO Check for setting and when pointers are returned
     b: ListStruct<int>;
     b[8] = 7;
     printf("Integer value: b[8] = %d\n", *b[8]);
+
+    c: NestedStruct;
+    initial_vector: Vector3 = { x = 1.0; y = 2.0; z = 3.0; }
+    c.inner_list[2] = initial_vector;
+    c.inner_list[2].y = 1.5;
+    c.inner_list[2].x++;
+    new_vec := c.inner_list[2];
+    printf("Inner list vector values: x = %.2f, y = %.2f, z = %.2f\n", c.inner_list[2].x, new_vec.y, new_vec.z);
 }
 
 struct SOAVector3 {
@@ -219,6 +226,11 @@ operator [] ListStruct<T>(ListStruct<T> a, int index) : T* {
     if index < 0 then return &a.list[0];
     if index >= a.max then return &a.list[a.max - 1];
     return &a.list[index];
+}
+
+struct NestedStruct {
+    bool foo;
+    ListStruct<Vector3> inner_list;
 }
 
 #run main();
