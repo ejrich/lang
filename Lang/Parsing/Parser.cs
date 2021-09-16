@@ -1890,18 +1890,24 @@ namespace Lang.Parsing
             return typeDefinition;
         }
 
-        private static bool TryParseType(TokenEnumerator enumerator, List<ParseError> errors, int peekCount = 0)
+        private static bool TryParseType(TokenEnumerator enumerator, List<ParseError> errors)
+        {
+            var steps = 0;
+            return TryParseType(enumerator, errors, ref steps);
+        }
+
+        private static bool TryParseType(TokenEnumerator enumerator, List<ParseError> errors, ref int steps)
         {
             // Determine whether to parse a generic type, otherwise return
-            if (enumerator.Peek(peekCount)?.Type == TokenType.LessThan)
+            if (enumerator.Peek(steps)?.Type == TokenType.LessThan)
             {
                 // Clear the '<' before entering loop
-                peekCount++;
+                steps++;
                 var hasGenerics = false;
                 var commaRequiredBeforeNextType = false;
-                while (enumerator.Peek(peekCount) != null)
+                while (enumerator.Peek(steps) != null)
                 {
-                    var token = enumerator.Peek(peekCount++);
+                    var token = enumerator.Peek(steps++);
 
                     if (token.Type == TokenType.GreaterThan)
                     {
@@ -1917,7 +1923,7 @@ namespace Lang.Parsing
                         switch (token.Type)
                         {
                             case TokenType.Token:
-                                if (!TryParseType(enumerator, errors, peekCount))
+                                if (!TryParseType(enumerator, errors, ref steps))
                                 {
                                     return false;
                                 }
@@ -1947,9 +1953,9 @@ namespace Lang.Parsing
                 }
             }
 
-            while (enumerator.Peek()?.Type == TokenType.Asterisk)
+            while (enumerator.Peek(steps)?.Type == TokenType.Asterisk)
             {
-                peekCount++;
+                steps++;
             }
 
             return true;
