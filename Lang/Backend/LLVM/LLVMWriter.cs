@@ -695,7 +695,7 @@ namespace Lang.Backend.LLVM
                         }
                         case FloatType:
                         {
-                            var lhsValue = CastValue(lhs, rhs.type);
+                            var lhsValue = CastValue(lhs, rhs.type, false);
                             var (predicate, name) = ConvertRealOperator(op);
                             return LLVMApi.BuildFCmp(_builder, predicate, lhsValue, rhs.value, name);
                         }
@@ -706,7 +706,7 @@ namespace Lang.Backend.LLVM
                     {
                         case IntegerType:
                         {
-                            var rhsValue = CastValue(rhs, lhs.type);
+                            var rhsValue = CastValue(rhs, lhs.type, false);
                             var (predicate, name) = ConvertRealOperator(op);
                             return LLVMApi.BuildFCmp(_builder, predicate, lhs.value, rhsValue, name);
                         }
@@ -745,11 +745,12 @@ namespace Lang.Backend.LLVM
             throw new NotImplementedException($"{op} not compatible with types '{lhs.TypeOf().TypeKind}' and '{rhs.TypeOf().TypeKind}'");
         }
 
-        private LLVMValueRef CastValue((TypeDefinition type, LLVMValueRef value) typeValue, TypeDefinition targetType)
+        private LLVMValueRef CastValue((TypeDefinition type, LLVMValueRef value) typeValue, TypeDefinition targetType,
+            bool checkType = true)
         {
             var (type, value) = typeValue;
 
-            if (TypeEquals(type, targetType)) return value;
+            if (checkType && TypeEquals(type, targetType)) return value;
 
             var target = ConvertTypeDefinition(targetType);
             switch (type.PrimitiveType)
