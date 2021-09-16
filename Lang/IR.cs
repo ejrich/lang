@@ -56,9 +56,8 @@ namespace Lang
     {
         public InstructionType Type { get; set; }
 
-        // Used for Jump, Load, Store, GetPointer, and GetStructPointer
+        // Used for Jump, Call, GetPointer, and GetStructPointer
         public int? Index { get; set; }
-        public bool Global { get; set; }
         public bool GetFirstPointer { get; set; }
         public string CallFunction { get; set; }
 
@@ -72,6 +71,7 @@ namespace Lang
 
         public int ValueIndex { get; set; }
         public IType Type { get; set; }
+        public bool Global { get; set; }
 
         // For constant values
         public Constant ConstantValue { get; set; }
@@ -101,11 +101,8 @@ namespace Lang
         Return,
         ReturnVoid,
         Load,
-        LoadAllocation,
         Store,
-        StoreToAllocation,
         GetPointer,
-        GetAllocationPointer,
         GetStructPointer,
         Call,
         Cast,
@@ -161,6 +158,7 @@ namespace Lang
     public enum InstructionValueType
     {
         Value,
+        Allocation,
         Argument,
         Constant,
         Null,
