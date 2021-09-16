@@ -686,6 +686,16 @@ namespace Lang.Translation
                 {
                     if (!localVariables.TryGetValue(structField.Name, out var structType))
                     {
+                        if (_types.TryGetValue(structField.Name, out var type))
+                        {
+                            if (type is EnumAst enumAst)
+                            {
+                                structField.IsEnum = true;
+                                return VerifyEnumValue(structField, enumAst, errors);
+                            }
+                            errors.Add(CreateError($"Cannot reference static field of type '{structField.Name}'", ast));
+                            return null;
+                        }
                         errors.Add(CreateError($"Variable '{structField.Name}' not defined", ast));
                         return null;
                     }
@@ -1040,6 +1050,36 @@ namespace Lang.Translation
             return expression.Type;
         }
 
+        private TypeDefinition VerifyEnumValue(StructFieldRefAst enumRef, EnumAst enumAst, List<TranslationError> errors)
+        {
+            var value = enumRef.Value;
+
+            if (value.Value != null)
+            {
+                errors.Add(CreateError("Cannot get a value of an enum value", value.Value));
+                return null;
+            }
+
+            EnumValueAst enumValue = null;
+            for (var i = 0; i < enumAst.Values.Count; i++)
+            {
+                if (enumAst.Values[i].Name == value.Name)
+                {
+                    enumRef.ValueIndex = i;
+                    enumValue = enumAst.Values[i];
+                    break;
+                }
+            }
+
+            if (enumValue == null)
+            {
+                errors.Add(CreateError($"Enum '{enumAst.Name}' does not contain value '{value.Name}'", value));
+                return null;
+            }
+
+            return new TypeDefinition {Name = enumAst.Name};
+        }
+
         private TypeDefinition VerifyStructFieldRef(StructFieldRefAst structField, TypeDefinition structType,
             List<TranslationError> errors)
         {
@@ -1298,6 +1338,11 @@ namespace Lang.Translation
                         if (!_polymorphicStructs.TryGetValue(typeDef.Name, out var structDef))
                         {
                             errors.Add(CreateError($"No polymorphic structs of type '{typeDef.Name}'", typeDef));
+                            return Type.Error;
+                        }
+                        if (structDef.Generics.Count != typeDef.Generics.Count)
+                        {
+                            errors.Add(CreateError($"Expected type '{typeDef.Name}' to have {structDef.Generics.Count} generic(s), but got {typeDef.Generics.Count}", typeDef));
                             return Type.Error;
                         }
                         CreatePolymorphedStruct(structDef, genericName, typeDef.Generics.ToArray());
