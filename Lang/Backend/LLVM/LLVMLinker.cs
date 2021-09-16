@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -19,7 +20,8 @@ namespace Lang.Backend.LLVM
             // 2. Determine lib directories
             var libDirectory = DetermineLibDirectory();
             var linker = DetermineLinker(libDirectory);
-            var gccDirectory = DetermineGCCDirectory();
+            var gccDirectory = DetermineGCCDirectory(libDirectory);
+            var defaultObjects = DefaultObjects(libDirectory.FullName);
 
             // 3. Run the linker
             var executableFile = Path.Combine(projectPath, BinaryDirectory, Path.GetFileNameWithoutExtension(objectFile));
@@ -29,7 +31,7 @@ namespace Lang.Backend.LLVM
                 StartInfo =
                 {
                     FileName = "ld",
-                    Arguments = $"-dynamic-linker {linker} -o {executableFile} {objectFile} {DefaultDependencies(libDirectory)} " +
+                    Arguments = $"-dynamic-linker {linker} -o {executableFile} {objectFile} {defaultObjects} " +
                                 $"{dependencyList} -L{gccDirectory} --start-group -lgcc -lgcc_eh -lc --end-group"
                 }
             };
@@ -37,28 +39,54 @@ namespace Lang.Backend.LLVM
             buildProcess.WaitForExit();
         }
 
-        private static string DetermineLibDirectory()
+        private static DirectoryInfo DetermineLibDirectory()
         {
-            return "/usr/lib";
+            return new("/usr/lib");
         }
 
-        private readonly string[] _cRuntimeObjects = {
+        private readonly string[] _crtObjects = {
             "crt1.o", "crti.o", "crtn.o"
         };
 
-        private string DefaultDependencies(string libDirectory)
+        private string DefaultObjects(string libDirectory)
         {
-            return string.Join(' ', _cRuntimeObjects.Select(o => Path.Combine(libDirectory, o)));
+            return string.Join(' ', _crtObjects.Select(o => Path.Combine(libDirectory, o)));
         }
 
-        private static string DetermineLinker(string libDirectory)
+        private static string DetermineLinker(DirectoryInfo libDirectory)
         {
-            return Path.Combine(libDirectory, "ld-2.33.so");
+            var linker = libDirectory.GetFiles("ld*.so").FirstOrDefault();
+            if (linker == null)
+            {
+                Console.WriteLine($"Cannot find linker in directory '{libDirectory.FullName}'");
+                Environment.Exit(ErrorCodes.LinkError);
+            }
+            return linker.FullName;
         }
 
-        private static string DetermineGCCDirectory()
+        private static string DetermineGCCDirectory(DirectoryInfo libDirectory)
         {
-            return "/usr/lib/gcc/x86_64-pc-linux-gnu/10.2.0";
+            var gccDirectory = libDirectory.GetDirectories("gcc").FirstOrDefault();
+            if (gccDirectory == null)
+            {
+                Console.WriteLine($"Cannot find gcc in directory '{libDirectory.FullName}'");
+                Environment.Exit(ErrorCodes.LinkError);
+            }
+
+            var platformDirectory = gccDirectory.GetDirectories("x86_64*gnu").FirstOrDefault();
+            if (platformDirectory == null)
+            {
+                Console.WriteLine($"Cannot find x86_64 libs in directory '{gccDirectory.FullName}'");
+                Environment.Exit(ErrorCodes.LinkError);
+            }
+
+            var versionDirectory = platformDirectory.GetDirectories().FirstOrDefault();
+            if (versionDirectory == null)
+            {
+                Console.WriteLine($"Cannot find any versions of gcc directory {platformDirectory.FullName}'");
+                Environment.Exit(ErrorCodes.LinkError);
+            }
+            return versionDirectory.FullName;
         }
     }
 }
