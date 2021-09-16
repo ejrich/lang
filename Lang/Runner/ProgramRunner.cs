@@ -214,11 +214,28 @@ namespace Lang.Runner
 
         private void ExecuteDeclaration(DeclarationAst declaration, ProgramGraph programGraph, IDictionary<string, ValueType> variables)
         {
-            var value = declaration.Value == null ?
-                GetUninitializedValue(declaration.Type, programGraph, variables, declaration.Assignments) :
-                ExecuteExpression(declaration.Value, programGraph, variables).Value;
+            var value = declaration.Name switch
+            {
+                "os" => GetOSVersion(),
+                "build_env" => 0,
+                _ => declaration.Value == null ?
+                    GetUninitializedValue(declaration.Type, programGraph, variables, declaration.Assignments) :
+                    ExecuteExpression(declaration.Value, programGraph, variables).Value
+            };
 
             variables[declaration.Name] = new ValueType {Type = declaration.Type, Value = value};
+        }
+
+        private int GetOSVersion()
+        {
+            var platform = Environment.OSVersion.Platform;
+            return platform switch
+            {
+                PlatformID.Unix => 1,
+                PlatformID.Win32NT => 2,
+                PlatformID.MacOSX => 3,
+                _ => 0
+            };
         }
 
         private object GetUninitializedValue(TypeDefinition typeDef, ProgramGraph programGraph,
