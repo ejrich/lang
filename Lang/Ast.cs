@@ -96,6 +96,7 @@ namespace Lang
         public TypeKind TypeKind { get; set; }
         public uint Size { get; set; }
         public bool Verified { get; set; }
+        public bool Verifying { get; set; }
         public List<string> Generics { get; } = new();
         public List<StructFieldAst> Fields { get; } = new();
     }
