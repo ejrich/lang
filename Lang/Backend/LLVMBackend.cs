@@ -449,7 +449,7 @@ namespace Lang.Backend
                 var debugFunction = _debugFunctions[name] = _debugBuilder.CreateFunction(file, debugName, name, file, functionAst.Line, functionType, 0, 1, functionAst.Line, LLVMDIFlags.LLVMDIFlagPrototyped, 0);
 
                 // Declare the function
-                var function = _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(functionAst.ReturnType), argumentTypes.ToArray(), varargs));
+                var function = _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(functionAst.ReturnType), argumentTypes, varargs));
                 LLVM.SetSubprogram(function, debugFunction);
             }
             else
@@ -459,7 +459,7 @@ namespace Lang.Backend
                 {
                     argumentTypes[i] = ConvertTypeDefinition(functionAst.Arguments[i].Type, externFunction);
                 }
-                _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(functionAst.ReturnType), argumentTypes.ToArray(), varargs));
+                _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(functionAst.ReturnType), argumentTypes, varargs));
             }
         }
 
