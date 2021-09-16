@@ -409,17 +409,17 @@ namespace Lang.Runner
                 var lengthField = iterator.Value.GetType().GetField("length");
                 var length = (int)lengthField!.GetValue(iterator.Value)!;
 
-                var dataField = iterator.Value.GetType().GetField("data");
                 var elementType = iterator.Type.Generics[0];
                 var type = GetTypeFromDefinition(elementType);
                 var iterationVariable = new ValueType {Type = elementType};
                 eachVariables.Add(each.IterationVariable, iterationVariable);
 
+                var dataField = iterator.Value.GetType().GetField("data");
+                var data = dataField!.GetValue(iterator.Value);
+                var dataPointer = GetPointer(data!);
+
                 for (var i = 0; i < length; i++)
                 {
-                    var data = dataField!.GetValue(iterator.Value);
-                    var dataPointer = GetPointer(data!);
-
                     var valuePointer = IntPtr.Add(dataPointer, Marshal.SizeOf(type) * i);
                     iterationVariable.Value = Marshal.PtrToStructure(valuePointer, type);
 
@@ -501,17 +501,7 @@ namespace Lang.Runner
                             var variable = variables[variableAst.Name];
 
                             var previousValue = new ValueType {Type = variable.Type, Value = variable.Value};
-
-                            if (variable.Type.PrimitiveType is IntegerType)
-                            {
-                                var value = (int)variable.Value;
-                                variable.Value = changeByOne.Positive ? value + 1 : value - 1;
-                            }
-                            else
-                            {
-                                var value = (float)variable.Value;
-                                variable.Value = changeByOne.Positive ? value + 1 : value - 1;
-                            }
+                            variable.Value = PerformOperation(variable.Type, variable.Value, changeByOne.Positive ? 1 : -1, Operator.Add);
 
                             return changeByOne.Prefix ? variable : previousValue;
                         }
@@ -547,21 +537,10 @@ namespace Lang.Runner
                         case IndexAst indexAst:
                         {
                             var (typeDef, elementType, pointer) = GetListPointer(indexAst, programGraph, variables);
-                            var previousValue = Marshal.PtrToStructure(pointer, elementType);
-                            object newValue;
 
-                            if (typeDef.PrimitiveType is IntegerType)
-                            {
-                                var value = (int)previousValue!;
-                                newValue = changeByOne.Positive ? value + 1 : value - 1;
-                                Marshal.StructureToPtr(newValue, pointer, false);
-                            }
-                            else
-                            {
-                                var value = (float)previousValue!;
-                                newValue = changeByOne.Positive ? value + 1 : value - 1;
-                                Marshal.StructureToPtr(newValue, pointer, false);
-                            }
+                            var previousValue = Marshal.PtrToStructure(pointer, elementType);
+                            var newValue = PerformOperation(typeDef, previousValue, changeByOne.Positive ? 1 : -1, Operator.Add);
+                            Marshal.StructureToPtr(newValue, pointer, false);
 
                             return new ValueType {Type = typeDef, Value = changeByOne.Prefix ? newValue : previousValue};
                         }
@@ -600,7 +579,7 @@ namespace Lang.Runner
                         {
                             var pointer = GetPointer(valueType.Value);
                             var pointerType = valueType.Type.Generics[0];
-                            var pointerValue = Marshal.PtrToStructure(pointer, GetTypeFromDefinition(pointerType));
+                            var pointerValue = PointerToTargetType(pointer, pointerType);
 
                             return new ValueType {Type = pointerType, Value = pointerValue};
                         }
@@ -701,7 +680,7 @@ namespace Lang.Runner
                 case IndexAst indexAst:
                 {
                     var (typeDef, elementType, pointer) = GetListPointer(indexAst, programGraph, variables);
-                    return new ValueType {Type = typeDef, Value = Marshal.PtrToStructure(pointer, elementType)};
+                    return new ValueType {Type = typeDef, Value = PointerToTargetType(pointer, typeDef, elementType)};
                 }
             }
 
@@ -761,12 +740,17 @@ namespace Lang.Runner
             var index = (int)ExecuteExpression(indexAst.Index, programGraph, variables).Value;
 
             var variable = ExecuteExpression(indexAst.Variable, programGraph, variables);
-            var dataField = variable.Value.GetType().GetField("data");
             var typeDef = variable.Type.Generics[0];
             var elementType = GetTypeFromDefinition(typeDef);
 
+            var dataField = variable.Value.GetType().GetField("data");
             var data = dataField!.GetValue(variable.Value);
             var dataPointer = GetPointer(data!);
+
+            if (index == 0)
+            {
+                return (typeDef, elementType, dataPointer);
+            }
 
             var valuePointer = IntPtr.Add(dataPointer, Marshal.SizeOf(elementType) * index);
 
@@ -783,6 +767,17 @@ namespace Lang.Runner
                 }
             }
             return (IntPtr)value;
+        }
+
+        private object PointerToTargetType(IntPtr pointer, TypeDefinition targetType, Type type = null)
+        {
+            if (targetType.Name == "*")
+            {
+                return pointer;
+            }
+
+            type ??= GetTypeFromDefinition(targetType);
+            return Marshal.PtrToStructure(pointer, type);
         }
 
         private ValueType CallFunction(string functionName, FunctionAst function, ProgramGraph programGraph, object[] arguments)
@@ -1145,14 +1140,14 @@ namespace Lang.Runner
                     if (floatType.Bytes == 4)
                     {
                         var lhsFloat = Convert.ToSingle(lhsValue);
-                        var rhsFloat = Convert.ToSingle(lhsValue);
+                        var rhsFloat = Convert.ToSingle(rhsValue);
                         var result = FloatOperations(lhsFloat, rhsFloat, op);
                         return CastValue(result, targetType);
                     }
                     else
                     {
                         var lhsFloat = Convert.ToDouble(lhsValue);
-                        var rhsFloat = Convert.ToDouble(lhsValue);
+                        var rhsFloat = Convert.ToDouble(rhsValue);
                         var result = DoubleOperations(lhsFloat, rhsFloat, op);
                         return CastValue(result, targetType);
                     }
@@ -1176,7 +1171,8 @@ namespace Lang.Runner
                         _ => integerType.Signed ? Convert.ToInt32(value) : Convert.ToUInt32(value)
                     };
                 case FloatType floatType:
-                    return floatType.Bytes == 4 ? Convert.ToSingle(value) : Convert.ToDouble(value);
+                    if (floatType.Bytes == 4) return Convert.ToSingle(value);
+                    return Convert.ToDouble(value);
             }
 
             // @Future Polymorphic type casting
