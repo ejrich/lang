@@ -1293,18 +1293,18 @@ namespace Lang.Translation
                 }
                 case ChangeByOneAst changeByOne:
                     var op = changeByOne.Positive ? "increment" : "decrement";
-                    switch (changeByOne.Variable)
+                    switch (changeByOne.Value)
                     {
                         case IdentifierAst:
                         case StructFieldRefAst:
                         case IndexAst:
-                            var expressionType = VerifyExpression(changeByOne.Variable, currentFunction, scopeIdentifiers);
+                            var expressionType = VerifyExpression(changeByOne.Value, currentFunction, scopeIdentifiers);
                             if (expressionType != null)
                             {
                                 var type = VerifyType(expressionType);
                                 if (type != Type.Int && type != Type.Float)
                                 {
-                                    AddError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(expressionType)}'", changeByOne.Variable);
+                                    AddError($"Expected to {op} int or float, but got type '{PrintTypeDefinition(expressionType)}'", changeByOne.Value);
                                     return null;
                                 }
                             }

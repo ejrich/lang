@@ -1172,7 +1172,7 @@ namespace Lang.Backend.LLVM
                     }
                 case ChangeByOneAst changeByOne:
                 {
-                    var (variableType, pointer) = changeByOne.Variable switch
+                    var (variableType, pointer) = changeByOne.Value switch
                     {
                         IdentifierAst identifier => localVariables[identifier.Name],
                         StructFieldRefAst structField => BuildStructField(structField, localVariables),

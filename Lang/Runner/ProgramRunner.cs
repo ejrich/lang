@@ -742,7 +742,7 @@ namespace Lang.Runner
                 case IdentifierAst identifier:
                     return variables[identifier.Name];
                 case ChangeByOneAst changeByOne:
-                    switch (changeByOne.Variable)
+                    switch (changeByOne.Value)
                     {
                         case IdentifierAst identifier:
                         {
