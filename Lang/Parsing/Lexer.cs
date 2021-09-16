@@ -14,18 +14,19 @@ namespace Lang.Parsing
     public class Lexer : ILexer
     {
         private readonly Regex _escapableCharacters = new(@"['""\\abfnrtv]");
-        private  readonly IDictionary<string, TokenType> _reservedTokens = new Dictionary<string, TokenType>
+
+        private readonly IDictionary<string, TokenType> _reservedTokens = new Dictionary<string, TokenType>
         {
-            { "return", TokenType.Return },
-            { "true", TokenType.Boolean },
-            { "false", TokenType.Boolean },
-            { "var", TokenType.Var },
-            { "if", TokenType.If },
-            { "else", TokenType.Else },
-            { "then", TokenType.Then },
-            { "while", TokenType.While },
-            { "each", TokenType.Each },
-            { "in", TokenType.In }
+            {"return", TokenType.Return},
+            {"true", TokenType.Boolean},
+            {"false", TokenType.Boolean},
+            {"var", TokenType.Var},
+            {"if", TokenType.If},
+            {"else", TokenType.Else},
+            {"then", TokenType.Then},
+            {"while", TokenType.While},
+            {"each", TokenType.Each},
+            {"in", TokenType.In}
         };
 
         public List<Token> LoadFileTokens(string filePath, out List<ParseError> errors)
@@ -107,8 +108,7 @@ namespace Lang.Parsing
                             {
                                 errors.Add(new ParseError
                                 {
-                                    Error = $"Unexpected token '{currentToken.Value}'",
-                                    Token = currentToken
+                                    Error = $"Unexpected token '{currentToken.Value}'", Token = currentToken
                                 });
                             }
                             yield return currentToken;
@@ -189,10 +189,7 @@ namespace Lang.Parsing
 
                     currentToken = new Token
                     {
-                        Type = tokenType,
-                        Value = character.ToString(),
-                        Line = line,
-                        Column = column
+                        Type = tokenType, Value = character.ToString(), Line = line, Column = column
                     };
                 }
             }
@@ -213,11 +210,7 @@ namespace Lang.Parsing
 
             if (token.Error)
             {
-                errors.Add(new ParseError
-                {
-                    Error = $"Unexpected token '{token.Value + character}'",
-                    Token = token
-                });
+                errors.Add(new ParseError {Error = $"Unexpected token '{token.Value + character}'", Token = token});
             }
         }
 
