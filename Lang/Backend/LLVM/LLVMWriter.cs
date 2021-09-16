@@ -213,7 +213,14 @@ namespace Lang.Backend.LLVM
 
         private void WriteReturnStatement(ReturnAst returnAst, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
         {
-            // 1. Get the return value
+            // 1. Return void if the value is null
+            if (returnAst.Value == null)
+            {
+                LLVMApi.BuildRetVoid(_builder);
+                return;
+            }
+
+            // 2. Get the return value
             var returnExpression = WriteExpression(returnAst.Value, localVariables);
 
             // 2. Write expression as return value

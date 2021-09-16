@@ -141,7 +141,7 @@ string string_test() {
 }
 
 print(string format, ... args) {
-    printf(format.data, args);
+    vprintf(format.data, args);
 }
 
-printf(u8* format, ... args) #extern
+vprintf(u8* format, va_list args) #extern
