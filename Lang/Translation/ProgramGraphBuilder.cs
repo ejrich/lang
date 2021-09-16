@@ -88,7 +88,10 @@ namespace Lang.Translation
                     switch (parseResult.SyntaxTrees[i])
                     {
                         case StructAst structAst:
-                            VerifyStruct(structAst);
+                            if (!structAst.Verified)
+                            {
+                                VerifyStruct(structAst);
+                            }
                             parseResult.SyntaxTrees.RemoveAt(i--);
                             break;
                         case DeclarationAst globalVariable:
@@ -255,12 +258,14 @@ namespace Lang.Translation
         private void VerifyStruct(StructAst structAst)
         {
             // 1. Verify struct fields have valid types
+            var invalid = false;
             var fieldNames = new HashSet<string>();
             foreach (var structField in structAst.Fields)
             {
                 // 1a. Check if the field has been previously defined
                 if (!fieldNames.Add(structField.Name))
                 {
+                    invalid = true;
                     AddError($"Struct '{structAst.Name}' already contains field '{structField.Name}'", structField);
                 }
 
@@ -269,6 +274,7 @@ namespace Lang.Translation
 
                 if (type == Type.Error)
                 {
+                    invalid = true;
                     AddError($"Type '{PrintTypeDefinition(structField.Type)}' of field {structAst.Name}.{structField.Name} is not defined", structField);
                 }
                 else if (structField.Type.Count != null)
@@ -277,11 +283,13 @@ namespace Lang.Translation
                     {
                         if (!uint.TryParse(constant.Value, out _))
                         {
+                            invalid = true;
                             AddError($"Expected type count to be positive integer, but got '{constant.Value}'", constant);
                         }
                     }
                     else
                     {
+                        invalid = true;
                         AddError("Type count should be a constant value", structField.Type.Count);
                     }
                 }
@@ -292,6 +300,7 @@ namespace Lang.Translation
                     case ConstantAst constant:
                         if (!TypeEquals(structField.Type, constant.Type))
                         {
+                            invalid = true;
                             AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(constant.Type)}'", constant);
                         }
                         break;
@@ -305,31 +314,57 @@ namespace Lang.Translation
                                     var enumType = VerifyEnumValue(enumAst, structFieldRef);
                                     if (enumType != null && !TypeEquals(structField.Type, enumType))
                                     {
+                                            invalid = true;
                                         AddError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(enumType)}'", structFieldRef);
                                     }
                                 }
                                 else
                                 {
+                                    invalid = true;
                                     AddError($"Default value of '{structAst.Name}.{structField.Name}' must be constant or enum value", structFieldRef);
                                 }
                             }
                             else
                             {
+                                invalid = true;
                                 AddError($"Type '{identifier.Name}' is not defined", identifier);
                             }
                         }
                         else
                         {
+                            invalid = true;
                             AddError($"Default value of '{structAst.Name}.{structField.Name}' must be constant or enum value", structFieldRef);
                         }
                         break;
                     case null:
                         break;
                     default:
+                        invalid = true;
                         AddError($"Expected default value of {structAst.Name}.{structField.Name} to be a constant value", structField.DefaultValue);
                         break;
                 }
+
+                // 1d. Check for circular dependencies
+                if (structAst.Name == structField.Type.Name)
+                {
+                    invalid = true;
+                    AddError($"Struct '{structAst.Name}' has circular reference in field '{structField.Name}'", structField);
+                }
             }
+
+            // 2, Empty structs are not allowed
+            if (structAst.Fields.Count == 0)
+            {
+                invalid = true;
+                AddError($"Struct '{structAst.Name}' must have at least 1 field", structAst);
+            }
+
+            // 3. Calculate the size of the struct
+            if (!structAst.Generics.Any() && !invalid)
+            {
+                CalculateStructSize(structAst);
+            }
+            structAst.Verified = true;
         }
 
         private void VerifyFunctionDefinition(FunctionAst function, bool main)
@@ -1865,7 +1900,6 @@ namespace Lang.Translation
                     AddError("Generic type cannot have additional generic types", typeDef);
                 }
                 return Type.Struct;
-
             }
 
             var hasGenerics = typeDef.Generics.Any();
@@ -2058,7 +2092,7 @@ namespace Lang.Translation
 
         private void CreatePolymorphedStruct(StructAst structAst, string name, string genericName, TypeKind typeKind, params TypeDefinition[] genericTypes)
         {
-            var polyStruct = new StructAst {Name = name, TypeIndex = _typeIndex++, TypeKind = typeKind};
+            var polyStruct = new StructAst {Name = name, TypeIndex = _typeIndex++, TypeKind = typeKind, Verified = true};
             foreach (var field in structAst.Fields)
             {
                 if (field.HasGeneric)
@@ -2074,6 +2108,8 @@ namespace Lang.Translation
                 }
             }
 
+            // TODO Calculate the size of the type
+            CalculateStructSize(polyStruct);
             _programGraph.Types.Add(genericName, polyStruct);
         }
 
@@ -2095,6 +2131,25 @@ namespace Lang.Translation
             VerifyType(copyType);
 
             return copyType;
+        }
+
+        private void CalculateStructSize(StructAst structAst)
+        {
+            foreach (var field in structAst.Fields)
+            {
+                // 1. Get the type from program graph
+                var type = _programGraph.Types[field.Type.GenericName];
+
+                // 2. If the type is a struct and the size hasn't been calculated, verify the struct and calculate the size
+                if (type is StructAst fieldStruct)
+                {
+                    if (!fieldStruct.Verified)
+                    {
+                        VerifyStruct(fieldStruct);
+                    }
+                }
+                structAst.Size += type.Size;
+            }
         }
 
         private static string PrintTypeDefinition(TypeDefinition type)

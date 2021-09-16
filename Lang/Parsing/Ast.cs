@@ -54,8 +54,9 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public string Name { get; set; }
         public int TypeIndex { get; set; }
-        public uint Size { get; set; }
         public TypeKind TypeKind { get; set; }
+        public uint Size { get; set; }
+        public bool Verified { get; set; }
         public List<string> Generics { get; } = new();
         public List<StructFieldAst> Fields { get; } = new();
         public List<IAst> Children => null;
