@@ -1028,6 +1028,8 @@ namespace Lang.Parsing
 
         private static ExpressionAst CreateSubExpression(ExpressionAst expression, int parentPrecedence, int i, out int end)
         {
+            // @Fix this case 'd := a + 1 == b + 2 && 1 + b == 2 || b > 3 + 4 * c - 1;' should make these subexpressions
+            //                'd := a + 1 == (b + 2) && (1 + b == 2) || (b > (3 + (4 * c) - 1));'
             var subExpression = new ExpressionAst
             {
                 FileIndex = expression.Children[i].FileIndex,
