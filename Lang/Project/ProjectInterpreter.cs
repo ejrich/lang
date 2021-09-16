@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -65,13 +64,16 @@ namespace Lang.Project
 
         private static IEnumerable<string> GetSourceFiles(DirectoryInfo directory)
         {
-            foreach (var sourceFile in directory.GetFiles().Where(_ => _.Name.EndsWith(SourceFileExtension)))
+            foreach (var sourceFile in directory.GetFiles("*.ol"))
             {
                 yield return sourceFile.FullName;
             }
 
-            foreach (var subDirectory in directory.GetDirectories().Where(_ => _.Name != "bin"))
+            foreach (var subDirectory in directory.GetDirectories())
             {
+                if (subDirectory.Name == "bin" || subDirectory.Name == "obj")
+                    continue;
+
                 foreach (var sourceFile in GetSourceFiles(subDirectory))
                 {
                     yield return sourceFile;
