@@ -859,9 +859,15 @@ namespace Lang.Backend.LLVM
                 // @Cleanup This branch should never be hit
                 _ => (null, new LLVMValueRef())
             };
-            if (assignment.Reference is IndexAst indexAst && indexAst.CallsOverload && type.Type == Lang.Translation.Type.Pointer)
+            switch (assignment.Reference)
             {
-                type = type.Generics[0];
+                case IndexAst index when index.CallsOverload:
+                case StructFieldRefAst structField when structField.Children[^1] is IndexAst indexAst && indexAst.CallsOverload:
+                    if (type.Type == Lang.Translation.Type.Pointer)
+                    {
+                        type = type.Generics[0];
+                    }
+                    break;
             }
 
             // 2. Evaluate the expression value

@@ -564,10 +564,16 @@ namespace Lang.Runner
             if (assignment.Operator != Operator.None)
             {
                 var lhs = ExecuteExpression(assignment.Reference, variables);
-                if (assignment.Reference is IndexAst indexAst && indexAst.CallsOverload && lhs.Type.Name == "*")
+                switch (assignment.Reference)
                 {
-                    lhs.Type = lhs.Type.Generics[0];
-                    lhs.Value = Marshal.PtrToStructure(GetPointer(lhs.Value), GetTypeFromDefinition(lhs.Type));
+                    case IndexAst index when index.CallsOverload:
+                    case StructFieldRefAst structField when structField.Children[^1] is IndexAst indexAst && indexAst.CallsOverload:
+                        if (lhs.Type.Name == "*")
+                        {
+                            lhs.Type = lhs.Type.Generics[0];
+                            lhs.Value = PointerToTargetType(GetPointer(lhs.Value), lhs.Type);
+                        }
+                        break;
                 }
                 expression.Value = RunExpression(lhs, expression, assignment.Operator, lhs.Type);
                 expression.Type = lhs.Type;
@@ -874,7 +880,7 @@ namespace Lang.Runner
                         var type = _programGraph.Types[identifier.Name];
                         return new ValueType {Type = _intTypeDefinition, Value = type.TypeIndex};
                     }
-                    return variable;
+                    return new ValueType {Type = variable.Type, Value = variable.Value};
                 }
                 case ChangeByOneAst changeByOne:
                     switch (changeByOne.Value)

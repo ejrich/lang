@@ -212,7 +212,7 @@ index_overloading() {
     d: NestedStruct<float>;
     d.inner_list[1] = 3.7;
     d.inner_list[1]++;
-    d.inner_list[1] -= 2.0; // TODO Fix me
+    d.inner_list[1] -= 2.0;
     printf("Inner list float value: d.inner_list[1] = %.2f\n", *d.inner_list[1]);
 }
 
