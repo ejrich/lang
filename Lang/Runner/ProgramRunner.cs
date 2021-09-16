@@ -172,6 +172,7 @@ namespace Lang.Runner
                 Marshal.FreeHGlobal(oldDataPointer);
 
                 // Create TypeInfo pointers
+                var newTypeInfos = new Dictionary<string, (IType type, object typeInfo)>();
                 var typeInfoType = _types["TypeInfo"];
                 foreach (var (name, type) in programGraph.Types)
                 {
@@ -185,11 +186,17 @@ namespace Lang.Runner
                         typeKindField.SetValue(typeInfo, type.TypeKind);
 
                         _typeInfoPointers[name] = typeInfoPointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoType));
+                        newTypeInfos[name] = (type, typeInfo);
                         Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
                     }
 
                     var listPointer = IntPtr.Add(typeDataPointer, size * type.TypeIndex);
                     Marshal.StructureToPtr(typeInfoPointer, listPointer, false);
+                }
+
+                foreach (var (name, (type, typeInfo)) in newTypeInfos)
+                {
+                    // TODO Iterate througn fields and get the name and the type pointer
                 }
 
                 _typeCount = programGraph.Types.Count;
