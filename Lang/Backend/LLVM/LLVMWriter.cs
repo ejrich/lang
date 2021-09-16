@@ -1767,13 +1767,13 @@ namespace Lang.Backend.LLVM
             if (type.CArray)
             {
                 var elementType = ConvertTypeDefinition(listType);
-                uint count = 0;
+                uint length = 0;
                 if (type.Count != null)
                 {
                     var constant = (ConstantAst)type.Count;
-                    count = uint.Parse(constant.Value);
+                    length = uint.Parse(constant.Value);
                 }
-                return LLVMApi.ArrayType(elementType, count);
+                return LLVMApi.ArrayType(elementType, length);
             }
 
             return LLVMApi.GetTypeByName(_module, $"List.{listType.GenericName}");
