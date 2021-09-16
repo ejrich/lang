@@ -179,10 +179,11 @@ int* pointers() {
     
     loop_node := &node;
     i := 1;
-    //while loop_node {
-    //    printf("Value %d = %d\n", i++, loop_node.value);
-    //    loop_node = loop_node.next;
-    //}
+    while loop_node {
+        //printf("Value %d = %d\n", i++, loop_node.value);
+        printf("Value = %d\n", loop_node.value);
+        loop_node = loop_node.next;
+    }
 
     list: List<int>[8];
     list_ptr := &list[4];

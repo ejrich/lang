@@ -337,14 +337,12 @@ namespace Lang.Runner
                     var indexVariable = ExecuteExpression(indexAst.Variable, programGraph, variables);
                     var dataField = indexVariable.Value.GetType().GetField("data");
                     var type = GetTypeFromDefinition(indexVariable.Type.Generics[0]);
-                    unsafe
-                    {
-                        var data = dataField!.GetValue(indexVariable.Value);
-                        var dataPointer = Pointer.Unbox(data!);
 
-                        var valuePointer = IntPtr.Add((IntPtr)dataPointer, Marshal.SizeOf(type) * index);
-                        Marshal.StructureToPtr(expression.Value, valuePointer, false);
-                    }
+                    var data = dataField!.GetValue(indexVariable.Value);
+                    var dataPointer = GetPointer(data!);
+
+                    var valuePointer = IntPtr.Add(dataPointer, Marshal.SizeOf(type) * index);
+                    Marshal.StructureToPtr(expression.Value, valuePointer, false);
                     break;
             }
         }
@@ -394,7 +392,7 @@ namespace Lang.Runner
             {
                 IntegerType => (int)value != 0,
                 FloatType => (float)value != 0f,
-                _ when type.Name == "*" => (IntPtr)value != IntPtr.Zero,
+                _ when type.Name == "*" => GetPointer(value) != IntPtr.Zero,
                 _ => (bool)value
             };
         }
@@ -416,14 +414,11 @@ namespace Lang.Runner
 
                 for (var i = 0; i < length; i++)
                 {
-                    unsafe
-                    {
-                        var data = dataField!.GetValue(iterator.Value);
-                        var dataPointer = Pointer.Unbox(data!);
+                    var data = dataField!.GetValue(iterator.Value);
+                    var dataPointer = GetPointer(data!);
 
-                        var valuePointer = IntPtr.Add((IntPtr)dataPointer, Marshal.SizeOf(type) * i);
-                        iterationVariable.Value = Marshal.PtrToStructure(valuePointer, type);
-                    }
+                    var valuePointer = IntPtr.Add(dataPointer, Marshal.SizeOf(type) * i);
+                    iterationVariable.Value = Marshal.PtrToStructure(valuePointer, type);
 
                     var value = ExecuteAsts(each.Children, programGraph, eachVariables, out returned);
 
@@ -559,36 +554,36 @@ namespace Lang.Runner
                             return new ValueType {Type = fieldType, Value = changeByOne.Prefix ? newValue : previousValue};
                         }
                         case IndexAst indexAst:
+                        {
                             var index = (int)ExecuteExpression(indexAst.Index, programGraph, variables).Value;
 
                             var indexVariable = ExecuteExpression(indexAst.Variable, programGraph, variables);
                             var elementType = indexVariable.Type.Generics[0];
                             var type = GetTypeFromDefinition(elementType);
                             var dataField = indexVariable.Value.GetType().GetField("data");
-                            unsafe
+
+                            var data = dataField!.GetValue(indexVariable.Value);
+                            var dataPointer = GetPointer(data!);
+
+                            var valuePointer = IntPtr.Add(dataPointer, Marshal.SizeOf(type) * index);
+                            var previousValue = Marshal.PtrToStructure(valuePointer, type);
+                            object newValue;
+
+                            if (elementType.PrimitiveType is IntegerType)
                             {
-                                var data = dataField!.GetValue(indexVariable.Value);
-                                var dataPointer = Pointer.Unbox(data!);
-
-                                var valuePointer = IntPtr.Add((IntPtr)dataPointer, Marshal.SizeOf(type) * index);
-                                var previousValue = Marshal.PtrToStructure(valuePointer, type);
-                                object newValue;
-
-                                if (elementType.PrimitiveType is IntegerType)
-                                {
-                                    var value = (int)previousValue!;
-                                    newValue = changeByOne.Positive ? value + 1 : value - 1;
-                                    Marshal.StructureToPtr(newValue, valuePointer, false);
-                                }
-                                else
-                                {
-                                    var value = (float)previousValue!;
-                                    newValue = changeByOne.Positive ? value + 1 : value - 1;
-                                    Marshal.StructureToPtr(newValue, valuePointer, false);
-                                }
-
-                                return new ValueType {Type = elementType, Value = changeByOne.Prefix ? newValue : previousValue};
+                                var value = (int)previousValue!;
+                                newValue = changeByOne.Positive ? value + 1 : value - 1;
+                                Marshal.StructureToPtr(newValue, valuePointer, false);
                             }
+                            else
+                            {
+                                var value = (float)previousValue!;
+                                newValue = changeByOne.Positive ? value + 1 : value - 1;
+                                Marshal.StructureToPtr(newValue, valuePointer, false);
+                            }
+
+                            return new ValueType {Type = elementType, Value = changeByOne.Prefix ? newValue : previousValue};
+                        }
                     }
                     break;
                 case UnaryAst unary:
@@ -610,18 +605,13 @@ namespace Lang.Runner
                                 return new ValueType {Type = valueType.Type, Value = -floatValue};
                             }
                         case UnaryOperator.Dereference:
-                            unsafe
-                            {
-                                var pointer = valueType.Value switch
-                                {
-                                    Pointer => (IntPtr)Pointer.Unbox(valueType.Type),
-                                    _ => (IntPtr) valueType.Value
-                                };
-                                var pointerType = valueType.Type.Generics[0];
-                                var pointerValue = Marshal.PtrToStructure(pointer, GetTypeFromDefinition(pointerType));
+                        {
+                            var pointer = GetPointer(valueType.Value);
+                            var pointerType = valueType.Type.Generics[0];
+                            var pointerValue = Marshal.PtrToStructure(pointer, GetTypeFromDefinition(pointerType));
 
-                                return new ValueType {Type = pointerType, Value = pointerValue};
-                            }
+                            return new ValueType {Type = pointerType, Value = pointerValue};
+                        }
                         case UnaryOperator.Reference:
                         {
                             var pointerType = new TypeDefinition {Name = "*"};
@@ -678,14 +668,12 @@ namespace Lang.Runner
                     var dataField = variable.Value.GetType().GetField("data");
                     var elementType = variable.Type.Generics[0];
                     var type = GetTypeFromDefinition(elementType);
-                    unsafe
-                    {
-                        var data = dataField!.GetValue(variable.Value);
-                        var dataPointer = Pointer.Unbox(data!);
 
-                        var valuePointer = IntPtr.Add((IntPtr)dataPointer, Marshal.SizeOf(type) * index);
-                        return new ValueType {Type = elementType, Value = Marshal.PtrToStructure(valuePointer, type)};
-                    }
+                    var data = dataField!.GetValue(variable.Value);
+                    var dataPointer = GetPointer(data!);
+
+                    var valuePointer = IntPtr.Add(dataPointer, Marshal.SizeOf(type) * index);
+                    return new ValueType {Type = elementType, Value = Marshal.PtrToStructure(valuePointer, type)};
                 }
             }
 
@@ -709,7 +697,12 @@ namespace Lang.Runner
             var value = structField.Value;
             var structDefinition = (StructAst) programGraph.Data.Types[structField.StructName];
 
-            var field = structVariable.GetType().GetField(value.Name);
+            if (structField.IsPointer)
+            {
+                var type = _types[structField.StructName];
+                structVariable = Marshal.PtrToStructure(GetPointer(structVariable), type);
+            }
+            var field = structVariable!.GetType().GetField(value.Name);
             var fieldValue = field!.GetValue(structVariable);
 
             if (value.Value == null)
@@ -719,6 +712,18 @@ namespace Lang.Runner
             }
 
             return GetStructFieldRef(value, programGraph, fieldValue);
+        }
+
+        private static IntPtr GetPointer(object value)
+        {
+            if (value is Pointer)
+            {
+                unsafe
+                {
+                    return (IntPtr)Pointer.Unbox(value);
+                }
+            }
+            return (IntPtr)value;
         }
 
         private ValueType CallFunction(FunctionAst function, ProgramGraph programGraph, object[] arguments)
@@ -746,7 +751,6 @@ namespace Lang.Runner
 
         private static object RunExpression(ValueType lhs, ValueType rhs, Operator op, TypeDefinition targetType)
         {
-            // TODO Implement pointers
             // 1. Handle pointer math 
             if (lhs.Type.Name == "*")
             {
@@ -934,14 +938,14 @@ namespace Lang.Runner
 
         private static object PointerOperation(object lhs, object rhs, Operator op)
         {
-            var lhsPointer = (IntPtr)lhs;
+            var lhsPointer = GetPointer(lhs);
             if (op == Operator.Equality)
             {
                 if (rhs == null)
                 {
                     return lhsPointer == IntPtr.Zero;
                 }
-                return lhsPointer == (IntPtr)rhs;
+                return lhsPointer == GetPointer(rhs);
             }
             if (op == Operator.NotEqual)
             {
@@ -949,7 +953,7 @@ namespace Lang.Runner
                 {
                     return lhsPointer != IntPtr.Zero;
                 }
-                return lhsPointer == (IntPtr)rhs;
+                return lhsPointer == GetPointer(rhs);
             }
             if (op == Operator.Subtract)
             {
