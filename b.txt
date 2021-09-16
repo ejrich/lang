@@ -1,0 +1,296 @@
+
+IR for function 'main'
+
+--------------- Basic Block 0 ---------------
+
+	Store a0, arg0
+	Store a1, 0
+	Load a0 Array<string> => v0
+	Store a2, v0
+	GetStructPointer a2 0 => v1
+	Load v1 s32 => v2
+	GetStructPointer a2 1 => v3
+	Load v3 string* => v4
+
+--------------- Basic Block 1 ---------------
+
+	Load a1 s32 => v5
+	IntegerGreaterThanOrEqual v5, v2 => v6
+	GetPointer v4, v5 => v7
+	ConditionalJump 4 v6
+
+--------------- Basic Block 2 ---------------
+
+	PointerCast "Arg %d: "%s" -- length = %d
+", u8* => v8
+	Load a1 s32 => v9
+	GetStructPointer v7 1 => v10
+	Load v10 u8* => v11
+	GetStructPointer v7 0 => v12
+	Load v12 s32 => v13
+	Call printf v8, v9, v11, v13 => v14
+
+--------------- Basic Block 3 ---------------
+
+	IntegerAdd v5, 1 => v15
+	Store a1, v15
+	Jump 1
+
+--------------- Basic Block 4 ---------------
+
+	Store a3, "This is an "escaped" string literal
+With a new line!"
+	Store a4, 4.2
+	Load a4 float => v16
+	FloatAdd v16, 1 => v17
+	Store a4, v17
+	Call foo  => v18
+	IntegerAdd 3, 1 => v19
+	Call bar v19, "Hello", 1.2 => v20
+	IntegerAdd v18, v20 => v21
+	Store a5, v21
+	IntegerSubtract 4, 1 => v22
+	IntegerMultiply 6, v22 => v23
+	Store a6, v23
+	Store a7, 2
+	Load a4 float => v24
+	IntegerToFloatCast 1, float => v25
+	FloatAdd v24, v25 => v26
+	Load a6 s32 => v27
+	IntegerAdd v27, 2 => v28
+	IntegerToFloatCast v28, float => v29
+	FloatEquals v26, v29 => v30
+	Load a6 s32 => v31
+	IntegerAdd 1, v31 => v32
+	IntegerEquals v32, 2 => v33
+	And v30, v33 => v34
+	Load a6 s32 => v35
+	Load a7 s32 => v36
+	IntegerMultiply 4, v36 => v37
+	IntegerAdd 3, v37 => v38
+	IntegerSubtract v38, 1 => v39
+	IntegerGreaterThan v35, v39 => v40
+	Or v34, v40 => v41
+	Store a8, v41
+	Load a8 bool => v42
+	Not v42 => v43
+	Store a9, v43
+	Call test 3 => v44
+	Store a10, v44
+	Call test_each  => v45
+	Store a11, v45
+	Load a4 float => v46
+	IntegerToFloatCast 3, float => v47
+	FloatGreaterThan v47, v46 => v48
+	Store a12, v48
+	Call factorial 6 => v49
+	Store a13, v49
+	PointerCast "%d! = %d
+", u8* => v50
+	Load a13 s32 => v51
+	Call printf v50, 6, v51 => v52
+	Call create  => v53
+	Store a14, v53
+	PointerCast "my_struct: field = %d, something = %f, subvalue.something = %d, subvalue.foo = %d
+", u8* => v54
+	GetStructPointer a14 0 => v55
+	Load v55 u8 => v56
+	GetStructPointer a14 1 => v57
+	Load v57 float => v58
+	FloatCast v58, float64 => v59
+	GetStructPointer a14 2 => v60
+	GetStructPointer v60 0 => v61
+	Load v61 s32 => v62
+	GetStructPointer a14 2 => v63
+	GetStructPointer v63 1 => v64
+	Load v64 s32 => v65
+	Call printf v54, v56, v59, v62, v65 => v66
+	Call create  => v67
+	Store a16, v67
+	GetStructPointer a16 1 => v68
+	Load v68 float => v69
+	Store a15, v69
+	PointerCast "call_field = %f
+", u8* => v70
+	Load a15 float => v71
+	FloatCast v71, float64 => v72
+	Call printf v70, v72 => v73
+	Call primitives  => v74
+	Store a17, v74
+	Call create_array 4 => v75
+	Store a18, v75
+	Call string_test  => v76
+	Store a19, v76
+	PointerCast "%s - Hello world %d, %d, %d
+", u8* => v77
+	GetStructPointer a19 1 => v78
+	Load v78 u8* => v79
+	Load a6 s32 => v80
+	Call printf v77, v79, 1, 2, v80 => v81
+	Call sum_test  => v82
+	PointerCast "Initial array values %d, %p
+", u8* => v83
+	GetStructPointer a3global  0 => v84
+	Load v84 s32 => v85
+	GetStructPointer a3global  1 => v86
+	Load v86 s32* => v87
+	Call printf v83, v85, v87 => v88
+	PointerCast "Initial PolyStruct values %d, %.2f
+", u8* => v89
+	GetStructPointer a1global  0 => v90
+	Load v90 s32 => v91
+	GetStructPointer a1global  1 => v92
+	Load v92 float64 => v93
+	Call printf v89, v91, v93 => v94
+	PointerCast "Initial MyStruct values %d, %.2f, {%d, %d}
+", u8* => v95
+	GetStructPointer a0global  0 => v96
+	Load v96 u8 => v97
+	GetStructPointer a0global  1 => v98
+	Load v98 float => v99
+	FloatCast v99, float64 => v100
+	GetStructPointer a0global  2 => v101
+	GetStructPointer v101 0 => v102
+	Load v102 s32 => v103
+	GetStructPointer a0global  2 => v104
+	GetStructPointer v104 1 => v105
+	Load v105 s32 => v106
+	Call printf v95, v97, v100, v103, v106 => v107
+	Call set_global 8 => v108
+	PointerCast "'global_a' = %d
+", u8* => v109
+	Load a4global  s32 => v110
+	Call printf v109, v110 => v111
+	PointerCast "'global_b' = %d
+", u8* => v112
+	Call printf v112, 456 => v113
+	Call poly_test  => v114
+	Call current_state 7 => v115
+	Store a20, v115
+	PointerCast "Current state - %d
+", u8* => v116
+	Load a20 State => v117
+	Call printf v116, v117 => v118
+	Load a20 State => v119
+	IntegerEquals v119, 6 => v120
+	Not v120 => v121
+	ConditionalJump 6 v121
+
+--------------- Basic Block 5 ---------------
+
+	PointerCast "The state is Running
+", u8* => v122
+	Call printf v122 => v123
+	Jump 9
+
+--------------- Basic Block 6 ---------------
+
+	Load a20 State => v124
+	IntegerNotEquals v124, 6 => v125
+	Not v125 => v126
+	ConditionalJump 8 v126
+
+--------------- Basic Block 7 ---------------
+
+	PointerCast "The state is not Running
+", u8* => v127
+	Call printf v127 => v128
+
+--------------- Basic Block 8 ---------------
+
+
+--------------- Basic Block 9 ---------------
+
+	PointerCast null, s32* => v129
+	Store a21, v129
+	Store a21, null
+	Store a22, 7
+	Call null_test a22 => v130
+	Call null_test null => v131
+	Call default_args 8 => v132
+	Call default_args 5 => v133
+	Call default_args_enum 1 => v134
+	Call default_args_enum 6 => v135
+	Store a23, 32
+	Store a24, 16690132
+	Store a25, 1
+	Store a26, 0
+	Call create_array 5 => v136
+	Store a27, v136
+	GetStructPointer a27 0 => v137
+	Load v137 s32 => v138
+	GetStructPointer a27 1 => v139
+	Load v139 s32* => v140
+
+--------------- Basic Block 10 ---------------
+
+	Load a26 s32 => v141
+	IntegerGreaterThanOrEqual v141, v138 => v142
+	GetPointer v140, v141 => v143
+	ConditionalJump 13 v142
+
+--------------- Basic Block 11 ---------------
+
+	PointerCast "Value %d = %d
+", u8* => v144
+	Load a25 s32 => v145
+	IntegerAdd v145, 1 => v146
+	Store a25, v146
+	Load v143 s32 => v147
+	Call printf v144, v145, v147 => v148
+
+--------------- Basic Block 12 ---------------
+
+	IntegerAdd v141, 1 => v149
+	Store a26, v149
+	Jump 10
+
+--------------- Basic Block 13 ---------------
+
+	Call compiler_directives  => v150
+	Call open_window  => v151
+	Call type_casts  => v152
+	Call break_and_continue  => v153
+	Return 0
+Front-end time: 0.1307324 seconds
+LLVM build time: 0.0658916 seconds
+Linking time: 0.0410688 seconds
+Hello world 1, 3.50
+Arg 0: "" -- length = 0
+6! = 720
+my_struct: field = 1, something = 0.000000, subvalue.something = -1073741824, subvalue.foo = 13
+call_field = 4.200000
+9.90, 0.00, 0.00, 0.00, 0.00, 0.00, 
+@©Ø‚U - Hello world 1, 2, 18
+Sum of Array  = 425
+Sum of Params = 1479377578
+Initial array values -2099775796, 0x5582d7f706ad
+Initial PolyStruct values 587202560, 0.00
+Initial MyStruct values 176, 0.00, {1073741824, 85}
+'global_a' = -1862270976
+'global_b' = 456
+87, 3.141590
+State is 6
+Current state - 6
+The state is Running
+Pointer value is -669144848
+Pointer value is -669154672
+Value = 8
+Value = 5
+Enum value = 1, Running = 0
+Enum value = 6, Running = 1
+9.90, 0.00, 0.00, 0.00, 0.00, 0.00, 
+Value 1 = 2
+Value 2 = 5
+Value 3 = 2141464293
+Value 4 = 680525824
+Value 5 = 2141464293
+Constant value = 7
+Running Debug code
+Opening X11 window
+a = 18446744073709486080, b = -65536, c = 0.000000, d = -32
+Value = 1
+Value = 2
+Value = 3
+Special Value = 4
+Special Value = 5

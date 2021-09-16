@@ -10,6 +10,7 @@ serviceCollection.AddTransient<IProjectInterpreter, ProjectInterpreter>();
 serviceCollection.AddTransient<IProgramGraphBuilder, ProgramGraphBuilder>();
 serviceCollection.AddTransient<IPolymorpher, Polymorpher>();
 serviceCollection.AddTransient<IProgramRunner, ProgramRunner>();
+serviceCollection.AddTransient<_IProgramRunner, _ProgramRunner>();
 serviceCollection.AddTransient<IProgramIRBuilder, ProgramIRBuilder>();
 serviceCollection.AddTransient<ILinker, Linker>();
 // LLVM Backend
