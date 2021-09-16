@@ -29,7 +29,6 @@ namespace Lang.Parsing
         public string ExternLib { get; set; }
         public bool Varargs { get; set; }
         public bool Params { get; set; }
-        public bool Verified { get; set; }
         public bool HasDirectives { get; set; }
         public TypeDefinition ReturnType { get; set; }
         public List<Argument> Arguments { get; } = new();
