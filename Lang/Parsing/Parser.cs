@@ -1166,8 +1166,7 @@ namespace Lang.Parsing
             return assignment;
         }
 
-        private static IAst ParseExpression(TokenEnumerator enumerator, List<ParseError> errors, ExpressionAst initial = null,
-            params TokenType[] endToken)
+        private static IAst ParseExpression(TokenEnumerator enumerator, List<ParseError> errors, ExpressionAst initial = null, params TokenType[] endToken)
         {
             var operatorRequired = initial != null;
 
@@ -1211,7 +1210,12 @@ namespace Lang.Parsing
                         continue;
                     }
                     var op = ConvertOperator(token);
-                    if (op != Operator.None)
+                    if (op == Operator.Dot)
+                    {
+                        var structFieldRef = ParseStructFieldRef(enumerator, errors, expression.Children[^1]);
+                        expression.Children[^1] = structFieldRef;
+                    }
+                    else if (op != Operator.None)
                     {
                         expression.Operators.Add(op);
                         operatorRequired = false;
@@ -1259,6 +1263,36 @@ namespace Lang.Parsing
                 SetOperatorPrecedence(expression);
             }
             return expression;
+        }
+
+        private static IAst ParseStructFieldRef(TokenEnumerator enumerator, List<ParseError> errors, IAst initialAst)
+        {
+            // 1. Initialize and move over the dot operator
+            var structFieldRef = new StructFieldRefAst {FileIndex = initialAst.FileIndex, Line = initialAst.Line, Column = initialAst.Column};
+            structFieldRef.Children.Add(initialAst);
+
+            // 2. Parse expression units until the operator is not '.'
+            var operatorRequired = false;
+            while (enumerator.MoveNext())
+            {
+                if (operatorRequired)
+                {
+                    if (ConvertOperator(enumerator.Current) != Operator.Dot)
+                    {
+                        enumerator.Move(-1);
+                        break;
+                    }
+                    operatorRequired = false;
+                }
+                else
+                {
+                    var ast = ParseNextExpressionUnit(enumerator, errors, out operatorRequired);
+                    if (ast != null)
+                        structFieldRef.Children.Add(ast);
+                }
+            }
+
+            return structFieldRef;
         }
 
         private static IAst ParseNextExpressionUnit(TokenEnumerator enumerator, List<ParseError> errors, out bool operatorRequired)
