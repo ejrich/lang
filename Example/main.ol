@@ -106,7 +106,7 @@ List<int> create_list(int count) {
     each i in 0..count-1 {
         list[i] = i * 5;
     }
-    a := list[1];
+    a := list[count-2];
     s: ListStruct;
     s.list[0] = 8;
     return list;
