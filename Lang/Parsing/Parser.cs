@@ -300,6 +300,7 @@ namespace Lang.Parsing
                 // Clear the '<' before entering loop
                 enumerator.MoveNext();
                 var commaRequiredBeforeNextType = false;
+                var generics = new HashSet<string>();
                 while (enumerator.MoveNext())
                 {
                     var token = enumerator.Current;
@@ -323,7 +324,13 @@ namespace Lang.Parsing
                         switch (token.Type)
                         {
                             case TokenType.Token:
-                                structAst.Generics.Add(token.Value);
+                                if (!generics.Add(token.Value))
+                                {
+                                    errors.Add(new ParseError
+                                    {
+                                        Error = $"Duplicate struct generic '{token.Value}'", Token = token
+                                    });
+                                }
                                 commaRequiredBeforeNextType = true;
                                 break;
                             default:
@@ -353,13 +360,14 @@ namespace Lang.Parsing
                     }
                 }
 
-                if (!structAst.Generics.Any())
+                if (!generics.Any())
                 {
                     errors.Add(new ParseError
                     {
                         Error = "Expected struct to contain generics", Token = enumerator.Current ?? enumerator.Last
                     });
                 }
+                structAst.Generics.AddRange(generics);
             }
 
             // 3. Parse over the open brace
@@ -456,7 +464,29 @@ namespace Lang.Parsing
                 errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}' in struct", Token = token});
             }
 
+            // 5. Mark field types as generic if necessary
+            foreach (var generic in structAst.Generics)
+            {
+                foreach (var field in structAst.Fields)
+                {
+                    SearchForGeneric(generic, field.Type);
+                }
+            }
+
             return structAst;
+        }
+
+        private static void SearchForGeneric(string generic, TypeDefinition type)
+        {
+            if (type.Name == generic)
+            {
+                type.IsGeneric = true;
+            }
+
+            foreach (var typeGeneric in type.Generics)
+            {
+                SearchForGeneric(generic, typeGeneric);
+            }
         }
 
         private static IAst ParseLine(TokenEnumerator enumerator, List<ParseError> errors)
