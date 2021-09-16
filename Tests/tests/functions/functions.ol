@@ -108,7 +108,7 @@ T create<T>() {
 }
 
 struct PolyStruct<I> {
-    a I;
+    a: I;
 }
 
 foobar<T, U>(PolyStruct<T> c, Params<U> args) {
