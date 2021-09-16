@@ -60,7 +60,7 @@ namespace Lang
             var parseResult = _parser.Parse(project.SourceFiles);
             var parseTime = stopwatch.Elapsed;
 
-            if (!parseResult.Success)
+            if (parseResult.Errors.Any())
             {
                 var currentFile = Int32.MinValue;
                 foreach (var parseError in parseResult.Errors)
