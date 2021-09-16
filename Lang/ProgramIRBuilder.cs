@@ -73,9 +73,10 @@ namespace Lang
                     finalBlock.Instructions.Add(new Instruction {Type = InstructionType.Return});
                 }
 
-                #if DEBUG
-                PrintFunction(function.Name, functionIR);
-                #endif
+                if (function.PrintIR)
+                {
+                    PrintFunction(function.Name, functionIR);
+                }
             }
         }
 
