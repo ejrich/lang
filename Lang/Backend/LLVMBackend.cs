@@ -1143,13 +1143,21 @@ namespace Lang.Backend
                         return (_intTypeDefinition, LLVM.ConstInt(LLVMTypeRef.Int32Type(), (uint)typeDef.TypeIndex, false));
                     }
                     var (type, value) = typeValue;
-                    if (getStringPointer && type.TypeKind == TypeKind.String)
+                    if (!type.Constant)
                     {
-                        value = LLVM.BuildStructGEP(_builder, value, 1, "stringdata");
+                        if (getStringPointer && type.TypeKind == TypeKind.String)
+                        {
+                            value = LLVM.BuildStructGEP(_builder, value, 1, "stringdata");
+                        }
                         value = LLVM.BuildLoad(_builder, value, identifier.Name);
                     }
-                    else if (!type.Constant)
+                    else if (type.TypeKind == TypeKind.String)
                     {
+                        // TODO Get the string from the constant string dictionary
+                        if (getStringPointer)
+                        {
+                            value = LLVM.BuildStructGEP(_builder, value, 1, "stringdata");
+                        }
                         value = LLVM.BuildLoad(_builder, value, identifier.Name);
                     }
                     return (type, value);
