@@ -32,15 +32,15 @@ namespace Lang.Backend
 
         private readonly LLVMValueRef _zeroInt = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), 0, false);
 
-        public string Build(ProjectFile project, ProgramGraph programGraph, BuildSettings buildSettings)
+        public string Build(ProgramGraph programGraph, List<string> sourceFiles)
         {
             // 1. Verify obj directory exists
-            var objectPath = Path.Combine(project.Path, ObjectDirectory);
+            var objectPath = Path.Combine(BuildSettings.Path, ObjectDirectory);
             if (!Directory.Exists(objectPath))
                 Directory.CreateDirectory(objectPath);
 
             // 2. Initialize the LLVM module and builder
-            InitLLVM(project, buildSettings.Release, objectPath);
+            InitLLVM(objectPath, sourceFiles);
 
             // 3. Declare types
             _types = new LLVMTypeRef[TypeTable.Count];
@@ -353,19 +353,19 @@ namespace Lang.Backend
             }
 
             // 7. Compile to object file
-            var objectFile = Path.Combine(objectPath, $"{project.Name}.o");
-            Compile(objectFile, buildSettings.OutputAssembly);
+            var objectFile = Path.Combine(objectPath, $"{BuildSettings.Name}.o");
+            Compile(objectFile, BuildSettings.OutputAssembly);
 
             return objectFile;
         }
 
-        private void InitLLVM(ProjectFile project, bool optimize, string objectPath)
+        private void InitLLVM(string objectPath, List<string> sourceFiles)
         {
-            _module = LLVMModuleRef.CreateWithName(project.Name);
+            _module = LLVMModuleRef.CreateWithName(BuildSettings.Name);
             _context = _module.Context;
             _builder = LLVMBuilderRef.Create(_context);
             _passManager = _module.CreateFunctionPassManager();
-            if (optimize)
+            if (BuildSettings.Release)
             {
                 LLVM.AddBasicAliasAnalysisPass(_passManager);
                 LLVM.AddPromoteMemoryToRegisterPass(_passManager);
@@ -380,7 +380,7 @@ namespace Lang.Backend
             {
                 _emitDebug = true;
                 _debugBuilder = _module.CreateDIBuilder();
-                _debugFiles = project.SourceFiles.Select(file => _debugBuilder.CreateFile(Path.GetFileName(file), Path.GetDirectoryName(file))).ToList();
+                _debugFiles = sourceFiles.Select(file => _debugBuilder.CreateFile(Path.GetFileName(file), Path.GetDirectoryName(file))).ToList();
                 _debugCompilationUnit = _debugBuilder.CreateCompileUnit(LLVMDWARFSourceLanguage.LLVMDWARFSourceLanguageC, _debugFiles[0], "ol", 0, string.Empty, 0, string.Empty, LLVMDWARFEmissionKind.LLVMDWARFEmissionFull, 0, 0, 0, string.Empty, string.Empty);
 
                 AddModuleFlag("Dwarf Version", 4);
@@ -928,7 +928,7 @@ namespace Lang.Backend
                         }
                         case InstructionType.FloatModulus:
                         {
-                            _programGraph.Dependencies.Add("m");
+                            BuildSettings.Dependencies.Add("m");
                             var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
                             var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
                             values[instruction.ValueIndex] = _builder.BuildFRem(lhs, rhs);

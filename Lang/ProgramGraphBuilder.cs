@@ -9,7 +9,6 @@ namespace Lang
     {
         public List<DeclarationAst> Variables { get; } = new();
         public Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> OperatorOverloads { get; } = new();
-        public HashSet<string> Dependencies { get; set; }
         public List<TranslationError> Errors { get; } = new();
     }
 
@@ -23,7 +22,7 @@ namespace Lang
 
     public interface IProgramGraphBuilder
     {
-        ProgramGraph CreateProgramGraph(ParseResult parseResult, ProjectFile project);
+        ProgramGraph CreateProgramGraph(ParseResult parseResult);
     }
 
     public class ProgramGraphBuilder : IProgramGraphBuilder
@@ -46,10 +45,8 @@ namespace Lang
             _irBuilder = irBuilder;
         }
 
-        public ProgramGraph CreateProgramGraph(ParseResult parseResult, ProjectFile project)
+        public ProgramGraph CreateProgramGraph(ParseResult parseResult)
         {
-            _programGraph.Dependencies = project.Dependencies;
-
             var mainDefined = false;
             bool verifyAdditional;
 
@@ -1656,7 +1653,7 @@ namespace Lang
             {
                 Children = {
                     new IdentifierAst {Name = "BuildEnv"},
-                    new IdentifierAst {Name = _buildSettings.Release ? "Release" : "Debug"}
+                    new IdentifierAst {Name = BuildSettings.Release ? "Release" : "Debug"}
                 }
             };
         }

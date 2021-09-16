@@ -7,29 +7,29 @@ namespace Lang
 {
     public interface ILinker
     {
-        void Link(string objectFile, ProjectFile project, ProgramGraph programGraph);
+        void Link(string objectFile);
     }
 
     public class Linker : ILinker
     {
         private const string BinaryDirectory = "bin";
 
-        public void Link(string objectFile, ProjectFile project, ProgramGraph programGraph)
+        public void Link(string objectFile)
         {
             // 1. Verify bin directory exists
-            var binaryPath = Path.Combine(project.Path, BinaryDirectory);
+            var binaryPath = Path.Combine(BuildSettings.Path, BinaryDirectory);
             if (!Directory.Exists(binaryPath))
                 Directory.CreateDirectory(binaryPath);
 
             // 2. Determine lib directories
             var libDirectory = DetermineLibDirectory();
-            var linker = DetermineLinker(project.Linker, libDirectory);
+            var linker = DetermineLinker(BuildSettings.Linker, libDirectory);
             var gccDirectory = DetermineGCCDirectory(libDirectory);
             var defaultObjects = DefaultObjects(libDirectory);
 
             // 3. Run the linker
-            var executableFile = Path.Combine(binaryPath, project.Name);
-            var dependencyList = string.Join(' ', programGraph.Dependencies.Select(d => $"-l{d}"));
+            var executableFile = Path.Combine(binaryPath, BuildSettings.Name);
+            var dependencyList = string.Join(' ', BuildSettings.Dependencies.Select(d => $"-l{d}"));
             var buildProcess = new Process
             {
                 StartInfo =

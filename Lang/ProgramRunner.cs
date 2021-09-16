@@ -1465,7 +1465,7 @@ namespace Lang
 
         private void AddDependency(string library)
         {
-            _programGraph.Dependencies.Add(library);
+            BuildSettings.Dependencies.Add(library);
         }
 
         private object RunExpression(ValueType lhs, ValueType rhs, Operator op, TypeDefinition targetType)

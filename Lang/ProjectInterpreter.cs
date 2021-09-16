@@ -5,26 +5,9 @@ using System.Linq;
 
 namespace Lang
 {
-    public class ProjectFile
-    {
-        public string Name { get; set; }
-        public string Path { get; set; }
-        public LinkerType Linker { get; set; }
-        public List<string> SourceFiles { get; set; }
-        public HashSet<string> Dependencies { get; } = new();
-        public List<string> Packages { get; } = new();
-        public List<string> Exclude { get; } = new();
-    }
-
-    public enum LinkerType
-    {
-        Static,
-        Dynamic
-    }
-
     public interface IProjectInterpreter
     {
-        ProjectFile LoadProject(string projectPath);
+        List<string> LoadProject(string projectPath);
     }
 
     public class ProjectInterpreter : IProjectInterpreter
@@ -38,12 +21,11 @@ namespace Lang
             None,
             Name,
             Dependencies,
-            Packages,
             Linker,
             Exclude
         }
 
-        public ProjectFile LoadProject(string projectPath)
+        public List<string> LoadProject(string projectPath)
         {
             // 1. Check if project file is null or a directory
             if (string.IsNullOrWhiteSpace(projectPath))
@@ -56,17 +38,56 @@ namespace Lang
             }
 
             // 2. Load the project file
-            var projectFile = LoadProjectFile(projectPath);
+            BuildSettings.Path = Path.GetDirectoryName(Path.GetFullPath(projectPath));
+
+            var excludedFiles = new List<string>();
+            var currentSection = ProjectFileSection.None;
+            foreach (var line in File.ReadLines(projectPath))
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    currentSection = ProjectFileSection.None;
+                }
+                else if (currentSection != ProjectFileSection.None)
+                {
+                    switch (currentSection)
+                    {
+                        case ProjectFileSection.Name:
+                            BuildSettings.Name = line;
+                            break;
+                        case ProjectFileSection.Dependencies:
+                            BuildSettings.Dependencies.Add(line);
+                            break;
+                        case ProjectFileSection.Linker:
+                            BuildSettings.Linker = (LinkerType) Enum.Parse(typeof(LinkerType), line, true);
+                            break;
+                        case ProjectFileSection.Exclude:
+                            excludedFiles.Add(Path.Combine(BuildSettings.Path, line));
+                            break;
+                    }
+                }
+                else
+                {
+                    currentSection = line switch
+                    {
+                        "#name" => ProjectFileSection.Name,
+                        "#dependencies" => ProjectFileSection.Dependencies,
+                        "#linker" => ProjectFileSection.Linker,
+                        "#exclude" => ProjectFileSection.Exclude,
+                        _ => ProjectFileSection.None,
+                    };
+                }
+            }
 
             // 3. Recurse through the directories and load the files to build
-            projectFile.SourceFiles = GetSourceFiles(new DirectoryInfo(projectFile.Path), projectFile.Exclude).ToList();
+            var sourceFiles = GetSourceFiles(new DirectoryInfo(BuildSettings.Path), excludedFiles).ToList();
 
             // 4. Load runtime and dependency files
             var libraryDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Runtime");
             var libraryFiles = GetSourceFiles(new DirectoryInfo(libraryDirectory));
-            projectFile.SourceFiles.AddRange(libraryFiles);
+            sourceFiles.AddRange(libraryFiles);
 
-            return projectFile;
+            return sourceFiles;
         }
 
         private static string GetProjectPathInDirectory(string directory)
@@ -89,58 +110,6 @@ namespace Lang
             }
 
             return projectPath;
-        }
-
-        private static ProjectFile LoadProjectFile(string projectPath)
-        {
-            var projectFile = new ProjectFile
-            {
-                Path = Path.GetDirectoryName(Path.GetFullPath(projectPath))
-            };
-
-            var currentSection = ProjectFileSection.None;
-            foreach (var line in File.ReadLines(projectPath))
-            {
-                if (string.IsNullOrWhiteSpace(line))
-                {
-                    currentSection = ProjectFileSection.None;
-                }
-                else if (currentSection != ProjectFileSection.None)
-                {
-                    switch (currentSection)
-                    {
-                        case ProjectFileSection.Name:
-                            projectFile.Name = line;
-                            break;
-                        case ProjectFileSection.Dependencies:
-                            projectFile.Dependencies.Add(line);
-                            break;
-                        case ProjectFileSection.Packages:
-                            projectFile.Packages.Add(line);
-                            break;
-                        case ProjectFileSection.Linker:
-                            projectFile.Linker = (LinkerType) Enum.Parse(typeof(LinkerType), line, true);
-                            break;
-                        case ProjectFileSection.Exclude:
-                            projectFile.Exclude.Add(Path.Combine(projectFile.Path, line));
-                            break;
-                    }
-                }
-                else
-                {
-                    currentSection = line switch
-                    {
-                        "#name" => ProjectFileSection.Name,
-                        "#dependencies" => ProjectFileSection.Dependencies,
-                        "#packages" => ProjectFileSection.Packages,
-                        "#linker" => ProjectFileSection.Linker,
-                        "#exclude" => ProjectFileSection.Exclude,
-                        _ => ProjectFileSection.None,
-                    };
-                }
-            }
-
-            return projectFile;
         }
 
         private static IEnumerable<string> GetSourceFiles(DirectoryInfo directory, List<string> excluded = null)
