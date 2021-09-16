@@ -444,6 +444,12 @@ namespace Lang.Translation
                             errors.Add(CreateError( $"Expected to {op} variable", changeByOne));
                             return null;
                     }
+                case NotAst not:
+                    var valueType = VerifyExpression(not.Value, localVariables, errors);
+                    if (VerifyType(valueType, errors) == Type.Boolean) return valueType;
+
+                    errors.Add(CreateError($"Expected type 'bool', but got type '{PrintTypeDefinition(valueType)}'", not.Value));
+                    return null;
                 case CallAst call:
                     if (_functions.TryGetValue(call.Function, out var function))
                     {
