@@ -236,6 +236,14 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
+    public class CompilerDirectiveAst : IAst
+    {
+        public int FileIndex { get; set; }
+        public int Line { get; init; }
+        public int Column { get; init; }
+        public List<IAst> Children { get; } = new();
+    }
+
     public class Argument : IAst
     {
         public int FileIndex { get; set; }

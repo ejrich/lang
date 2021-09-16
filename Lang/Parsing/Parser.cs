@@ -124,6 +124,9 @@ namespace Lang.Parsing
                     case TokenType.Enum:
                         syntaxTrees.Add(ParseEnum(enumerator, errors));
                         break;
+                    case TokenType.Pound:
+                        // TODO Add this
+                        break;
                     default:
                         errors.Add(new ParseError
                         {
@@ -701,6 +704,8 @@ namespace Lang.Parsing
                     return ParseExpression(enumerator, errors);
                 case TokenType.OpenBrace:
                     return ParseScope(enumerator, errors);
+                case TokenType.Pound:
+                    return ParseCompilerDirective(enumerator, errors);
                 case null:
                     errors.Add(new ParseError
                     {
@@ -1606,6 +1611,23 @@ namespace Lang.Parsing
             }
         }
 
+        private static IAst ParseCompilerDirective(TokenEnumerator enumerator, List<ParseError> errors)
+        {
+            var directive = CreateAst<CompilerDirectiveAst>(enumerator.Current);
+
+            if (!enumerator.MoveNext())
+            {
+                errors.Add(new ParseError { Error = "Expected compiler directive to have a value", Token = enumerator.Last});
+                return null;
+            }
+
+            var ast = ParseLine(enumerator, errors);
+            if (ast != null)
+                directive.Children.Add(ast);
+
+            return directive;
+        }
+
         private static IndexAst ParseIndex(TokenEnumerator enumerator, List<ParseError> errors, IAst variable)
         {
             // 1. Initialize the index ast
@@ -1636,7 +1658,7 @@ namespace Lang.Parsing
             "int", "u64", "s64", "u32", "s32", "u16", "s16", "u8", "s8"
         };
 
-        public static readonly HashSet<string> FloatTypes = new() {"float", "float64"};
+        private static readonly HashSet<string> FloatTypes = new() {"float", "float64"};
 
         private static TypeDefinition ParseType(TokenEnumerator enumerator, List<ParseError> errors, bool argument = false)
         {
