@@ -400,7 +400,7 @@ namespace Lang.Translation
                 return;
             }
 
-            // 3. Loop through function body and verify all ASTs
+            // 4. Loop through function body and verify all ASTs
             var returned = VerifyAsts(function.Children, localVariables, errors);
 
             // 4. Verify the function returns on all paths
@@ -422,6 +422,18 @@ namespace Lang.Translation
                 }
             }
             return returns;
+        }
+
+        private bool VerifyAsts(List<IAst> asts, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        {
+            foreach (var ast in asts)
+            {
+                if (VerifyAst(ast, localVariables, errors))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private bool VerifyScope(List<IAst> syntaxTrees, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
@@ -854,40 +866,6 @@ namespace Lang.Translation
             return VerifyAsts(each.Children, eachVariables, errors);
         }
 
-        private void VerifyTopLevelDirective(CompilerDirectiveAst directive, List<TranslationError> errors)
-        {
-            switch (directive.Type)
-            {
-                case DirectiveType.Run:
-                    VerifyAst(directive.Value, _globalVariables, errors);
-                    break;
-                case DirectiveType.If:
-                    var conditional = directive.Value as ConditionalAst;
-                    VerifyExpression(conditional!.Condition, _globalVariables, errors);
-                    break;
-                default:
-                    errors.Add(CreateError("Compiler directive not supported", directive.Value));
-                    break;
-            }
-        }
-
-        private bool VerifyCompilerDirective(CompilerDirectiveAst directive, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
-        {
-            _currentFunction.HasDirectives = true;
-            switch (directive.Type)
-            {
-                case DirectiveType.If:
-                    var conditional = directive.Value as ConditionalAst;
-                    VerifyExpression(conditional!.Condition, localVariables, errors);
-                    break;
-                default:
-                    errors.Add(CreateError("Compiler directive not supported", directive.Value));
-                    break;
-            }
-
-            return false;
-        }
-
         private bool VerifyCompilerDirective(CompilerDirectiveAst directive, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
             switch (directive.Value)
@@ -895,11 +873,11 @@ namespace Lang.Translation
                 case ConditionalAst conditional:
                     if (EvaluateCompileTimeExpression(conditional.Condition, errors))
                     {
-                        
+                        return VerifyAsts(conditional.Children, localVariables, errors);
                     }
                     else if (conditional.Else.Any())
                     {
-                        return VerifyScope(conditional.Else, localVariables, errors);
+                        return VerifyAsts(conditional.Else, localVariables, errors);
                     }
                     break;
                 default:
