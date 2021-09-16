@@ -113,10 +113,14 @@ namespace Lang
                     var text = $"\t{instruction.Type} ";
                     switch (instruction.Type)
                     {
+                        case InstructionType.Jump:
+                            text += instruction.Index.Value.ToString();
+                            break;
                         case InstructionType.LoadAllocation:
                         case InstructionType.GetAllocationPointer:
                             text += $"{instruction.Index.Value} {(instruction.Global ? "global" : string.Empty)}";
                             break;
+                        case InstructionType.ConditionalJump:
                         case InstructionType.StoreToAllocation:
                         case InstructionType.GetStructPointer:
                             text += $"{instruction.Index.Value} {PrintInstructionValue(instruction.Value1)}";
@@ -126,7 +130,6 @@ namespace Lang
                             break;
                         case InstructionType.AllocateArray:
                             break;
-                        case InstructionType.Jump:
                         case InstructionType.Load:
                         case InstructionType.Return:
                         case InstructionType.IsNull:
@@ -154,8 +157,6 @@ namespace Lang
             {
                 case InstructionValueType.Value:
                     return $"v{value.ValueIndex}";
-                case InstructionValueType.Block:
-                    return value.ValueIndex.ToString();
                 case InstructionValueType.Argument:
                     return $"arg{value.ValueIndex}";
                 case InstructionValueType.Constant:
@@ -665,13 +666,24 @@ namespace Lang
         {
             // Run the condition expression in the current basic block and then jump to the following
             var condition = EmitConditionExpression(function, conditional.Condition, scope);
+            var conditionJump = new Instruction {Type = InstructionType.ConditionalJump, Value1 = condition};
+            function.Instructions.Add(conditionJump);
 
             var thenBlock = AddBasicBlock(function);
             thenBlock = EmitScope(function, thenBlock, conditional.IfBlock, returnType);
+            Instruction jumpToAfter = null;
+
+            // For when the the if block does not return and there is an else block, a jump to the after block is required
+            if (!conditional.IfReturns && conditional.ElseBlock != null)
+            {
+                jumpToAfter = new Instruction {Type = InstructionType.Jump};
+                function.Instructions.Add(jumpToAfter);
+            }
+
             var elseBlock = AddBasicBlock(function);
 
             // Jump to the else block, otherwise fall through to the then block
-            EmitInstruction(InstructionType.ConditionalJump, function, null, condition, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = elseBlock.Index});
+            conditionJump.Index = elseBlock.Index;
 
             if (conditional.ElseBlock == null)
             {
@@ -687,10 +699,9 @@ namespace Lang
 
             var afterBlock = elseBlock.Location < function.Instructions.Count ? AddBasicBlock(function) : elseBlock;
 
-            // For when the the if block does not return, a jump to the after block is required
             if (!conditional.IfReturns)
             {
-                EmitInstruction(InstructionType.Jump, function, null, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = afterBlock.Index});
+                jumpToAfter.Index = afterBlock.Index;
             }
 
             return afterBlock;
@@ -701,13 +712,16 @@ namespace Lang
             // Create a block for the condition expression and then jump to the following
             var conditionBlock = block.Location < function.Instructions.Count ? AddBasicBlock(function) : block;
             var condition = EmitConditionExpression(function, whileAst.Condition, scope);
+            var conditionJump = new Instruction {Type = InstructionType.ConditionalJump, Value1 = condition};
+            function.Instructions.Add(conditionJump);
 
             var whileBodyBlock = AddBasicBlock(function);
             whileBodyBlock = EmitScope(function, whileBodyBlock, whileAst.Body, returnType);
-            EmitInstruction(InstructionType.Jump, function, null, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = conditionBlock.Index});
+            var jumpToCondition = new Instruction {Type = InstructionType.Jump, Index = conditionBlock.Index};
+            function.Instructions.Add(jumpToCondition);
 
             var afterBlock = AddBasicBlock(function);
-            EmitInstruction(InstructionType.ConditionalJump, function, null, condition, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = afterBlock.Index});
+            conditionJump.Index = afterBlock.Index;
 
             return afterBlock;
         }
@@ -789,6 +803,8 @@ namespace Lang
                 var iterationVariable = EmitGetPointer(function, arrayData, indexValue, each.IterationVariableVariable.Type, cArrayIteration);
                 each.IterationVariableVariable.Pointer = iterationVariable;
             }
+            var conditionJump = new Instruction {Type = InstructionType.ConditionalJump, Value1 = condition};
+            function.Instructions.Add(conditionJump);
 
             var eachBodyBlock = AddBasicBlock(function);
             eachBodyBlock = EmitScope(function, eachBodyBlock, each.Body, returnType);
@@ -796,10 +812,11 @@ namespace Lang
             var eachIncrementBlock = eachBodyBlock.Location < function.Instructions.Count ? AddBasicBlock(function) : eachBodyBlock;
             var nextValue = EmitInstruction(InstructionType.IntegerAdd, function, _s32Type, indexValue, GetConstantInteger(1));
             EmitStore(function, indexVariable, nextValue);
-            EmitInstruction(InstructionType.Jump, function, null, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = conditionBlock.Index});
+            var jumpToCondition = new Instruction {Type = InstructionType.Jump, Index = conditionBlock.Index};
+            function.Instructions.Add(jumpToCondition);
 
             var afterBlock = AddBasicBlock(function);
-            EmitInstruction(InstructionType.ConditionalJump, function, null, condition, new InstructionValue {ValueType = InstructionValueType.Block, ValueIndex = afterBlock.Index});
+            conditionJump.Index = afterBlock.Index;
 
             return afterBlock;
         }
