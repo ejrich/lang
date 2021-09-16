@@ -33,7 +33,8 @@ namespace Lang
     public interface IDeclaration : IAst
     {
         public string Name { get; set; }
-        public TypeDefinition Type { get; set; }
+        public TypeDefinition TypeDefinition { get; set; }
+        public IType Type { get; set; }
         public bool HasGenerics { get; set; }
         public IAst Value { get; set; }
         public Dictionary<string, AssignmentAst> Assignments { get; set; }
@@ -98,7 +99,8 @@ namespace Lang
         public string Name { get; set; }
         public uint Offset { get; set; }
         public uint Size { get; set; }
-        public TypeDefinition Type { get; set; }
+        public TypeDefinition TypeDefinition { get; set; }
+        public IType Type { get; set; }
         public bool HasGenerics { get; set; }
         public IAst Value { get; set; }
         public Dictionary<string, AssignmentAst> Assignments { get; set; }
@@ -237,7 +239,8 @@ namespace Lang
         public uint Line { get; init; }
         public uint Column { get; init; }
         public string Name { get; set; }
-        public TypeDefinition Type { get; set; }
+        public TypeDefinition TypeDefinition { get; set; }
+        public IType Type { get; set; }
         public bool HasGenerics { get; set; }
         public bool Constant { get; set; }
         public int AllocationIndex { get; set; }
