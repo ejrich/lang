@@ -275,14 +275,14 @@ namespace Lang.Parsing
                         default:
                             return false;
                     }
-                case TokenType.Divide:
+                case TokenType.ForwardSlash:
                     switch (type)
                     {
-                        case TokenType.Divide:
+                        case TokenType.ForwardSlash:
                             currentToken.Type = TokenType.Comment;
                             lexerStatus.ReadingComment = true;
                             return true;
-                        case TokenType.Multiply:
+                        case TokenType.Asterisk:
                             currentToken.Type = TokenType.Comment;
                             lexerStatus.ReadingComment = true;
                             lexerStatus.MultiLineComment = true;
