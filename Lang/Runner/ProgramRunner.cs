@@ -366,7 +366,13 @@ namespace Lang.Runner
                 return ExecuteScope(conditional.Children, programGraph, variables, out returned);
             }
 
-            return ExecuteScope(conditional.Else, programGraph, variables, out returned);
+            if (conditional.Else.Any())
+            {
+                return ExecuteScope(conditional.Else, programGraph, variables, out returned);
+            }
+
+            returned = false;
+            return null;
         }
 
         private ValueType ExecuteWhile(WhileAst whileAst, ProgramGraph programGraph,
