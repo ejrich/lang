@@ -34,6 +34,7 @@ namespace Lang.Parsing
         public TypeDefinition ReturnType { get; set; }
         public List<Argument> Arguments { get; } = new();
         public List<List<TypeDefinition>> VarargsCalls { get; set; }
+        public int VarargsCallsRegistered { get; set; }
         public List<IAst> Children { get; } = new();
     }
 
@@ -45,6 +46,7 @@ namespace Lang.Parsing
         public string Name { get; set; }
         public List<string> Generics { get; } = new();
         public List<StructFieldAst> Fields { get; } = new();
+        public bool Registered { get; set; }
         public List<IAst> Children => null;
     }
 
@@ -81,6 +83,7 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public string Name { get; set; }
         public List<EnumValueAst> Values { get; } = new();
+        public bool Registered { get; set; }
         public List<IAst> Children => null;
     }
 
