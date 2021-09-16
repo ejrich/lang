@@ -1760,8 +1760,7 @@ namespace Lang.Translation
                         {
                             for (; callArgIndex < arguments.Length; callArgIndex++)
                             {
-                                var argumentAst = call.Arguments[callArgIndex];
-                                if (!VerifyArgument(argumentAst, arguments[callArgIndex], paramsType))
+                                if (!VerifyArgument(call.Arguments[callArgIndex], arguments[callArgIndex], paramsType))
                                 {
                                     match = false;
                                     break;
