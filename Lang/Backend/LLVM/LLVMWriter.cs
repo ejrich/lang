@@ -99,7 +99,7 @@ namespace Lang.Backend.LLVM
         {
             // 1. Declare structs
             var structs = new Dictionary<string, LLVMTypeRef>();
-            foreach (var (name, type) in data.Types)
+            foreach (var (name, type) in programGraph.Types)
             {
                 switch (type)
                 {
@@ -112,7 +112,7 @@ namespace Lang.Backend.LLVM
                         break;
                 }
             }
-            foreach (var (name, type) in data.Types)
+            foreach (var (name, type) in programGraph.Types)
             {
                 if (type is StructAst structAst)
                 {
