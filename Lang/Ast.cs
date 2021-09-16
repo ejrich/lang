@@ -347,6 +347,20 @@ namespace Lang
         public IAst Value { get; set; }
     }
 
+    public class BreakAst : IAst
+    {
+        public int FileIndex { get; set; }
+        public uint Line { get; init; }
+        public uint Column { get; init; }
+    }
+
+    public class ContinueAst : IAst
+    {
+        public int FileIndex { get; set; }
+        public uint Line { get; init; }
+        public uint Column { get; init; }
+    }
+
     public class OperatorOverloadAst : IFunction
     {
         public int FileIndex { get; set; }

@@ -42,7 +42,7 @@ namespace Lang
             {"cast", TokenType.Cast},
             {"operator", TokenType.Operator},
             {"break", TokenType.Break},
-            {"continue", TokenType.Continue},
+            {"continue", TokenType.Continue}
         };
 
         public List<Token> LoadFileTokens(string filePath, int fileIndex, out List<ParseError> errors)
@@ -459,6 +459,7 @@ namespace Lang
         Operator,
         Break,
         Continue,
+        VarArgs,
         OpenParen = '(',    // 40
         CloseParen = ')',   // 41
         OpenBracket = '[',  // 91
@@ -484,9 +485,9 @@ namespace Lang
         Comma = ',',        // 44
         Period = '.',       // 46
         Pound = '#',        // 35
-        Comment = 256, // Ignored by parser
-        NumberRange, // Ignored by parser
-        VarArgs, // Ignored by parser
+        // Ignored by parser
+        Comment = 256,
+        NumberRange
     }
 
     [Flags]

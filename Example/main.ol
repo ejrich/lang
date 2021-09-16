@@ -79,6 +79,8 @@ int main(Array<string> args) {
 
     type_casts();
 
+    break_and_continue();
+
     return 0;
 }
 
@@ -361,4 +363,20 @@ type_casts() {
     c := cast(float64, a);
     d := cast(u8, State.Running);
     printf("a = %llu, b = %d, c = %f, d = %d\n", a, b, c, d);
+}
+
+break_and_continue() {
+    a := 0;
+    b := 0;
+    while a < 100 {
+        a += 10;
+        b += 4;
+        if (b > 10) then break;
+    }
+
+    each i in 1..10 {
+        if (i > 5) then break;
+        if (i > 3) then continue;
+        printf("Value = %d\n", i);
+    }
 }

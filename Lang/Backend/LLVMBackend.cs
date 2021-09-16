@@ -855,6 +855,9 @@ namespace Lang.Backend
                     return WriteWhile(whileAst, localVariables, function, block);
                 case EachAst each:
                     return WriteEach(each, localVariables, function, block);
+                case BreakAst:
+                case ContinueAst:
+                    break;
                 default:
                     WriteExpression(ast, localVariables);
                     break;

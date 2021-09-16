@@ -893,6 +893,34 @@ namespace Lang
                     return ParseScope(enumerator, errors, currentFunction);
                 case TokenType.Pound:
                     return ParseCompilerDirective(enumerator, errors, currentFunction);
+                case TokenType.Break:
+                    var breakAst = CreateAst<BreakAst>(token);
+                    if (enumerator.MoveNext())
+                    {
+                        if (enumerator.Current.Type != TokenType.SemiColon)
+                        {
+                            errors.Add(new ParseError {Error = "Expected ';'", Token = enumerator.Current});
+                        }
+                    }
+                    else
+                    {
+                        errors.Add(new ParseError {Error = "End of file reached without closing scope", Token = enumerator.Last});
+                    }
+                    return breakAst;
+                case TokenType.Continue:
+                    var continueAst = CreateAst<ContinueAst>(token);
+                    if (enumerator.MoveNext())
+                    {
+                        if (enumerator.Current.Type != TokenType.SemiColon)
+                        {
+                            errors.Add(new ParseError {Error = "Expected ';'", Token = enumerator.Current});
+                        }
+                    }
+                    else
+                    {
+                        errors.Add(new ParseError {Error = "End of file reached without closing scope", Token = enumerator.Last});
+                    }
+                    return continueAst;
                 case null:
                     errors.Add(new ParseError
                     {
