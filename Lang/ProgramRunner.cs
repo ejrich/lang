@@ -859,9 +859,6 @@ namespace Lang
                                 typeDef = value.Type;
                                 pointer = value.Value;
                                 break;
-                            default:
-                                // TODO Add an error or something
-                                break;
                         }
 
                         var pointerType = new TypeDefinition {Name = "*"};
@@ -1029,9 +1026,6 @@ namespace Lang
                         pointer = Marshal.AllocHGlobal(Marshal.SizeOf(GetTypeFromDefinition(callResult.Type)));
                         Marshal.StructureToPtr(callResult.Value, pointer, false);
                     }
-                    break;
-                default:
-                    // TODO Report something here
                     break;
             }
 
