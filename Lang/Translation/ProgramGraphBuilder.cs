@@ -30,19 +30,6 @@ namespace Lang.Translation
                     errors.Add(CreateError($"Multiple definitions of struct '{structAst.Name}'", structAst));
                 }
             }
-
-            // 2. Verify struct bodies
-            foreach (var structAst in structs)
-            {
-                VerifyStruct(structAst, errors);
-            }
-
-            // 3. Load and verify function return types and arguments
-            foreach (var function in parseResult.SyntaxTrees.Where(ast => ast is FunctionAst).Cast<FunctionAst>())
-            {
-                VerifyFunctionDefinition(function, errors);
-            }
-
             var graph = new ProgramGraph
             {
                 Data = new Data
@@ -50,7 +37,32 @@ namespace Lang.Translation
                     Structs = _structs.Values.ToList()
                 }
             };
-            // 4. Verify function bodies
+
+            // 2. Verify struct bodies
+            foreach (var structAst in structs)
+            {
+                VerifyStruct(structAst, errors);
+            }
+
+            // 3. Verify global variables
+            var globalVariables = new Dictionary<string, TypeDefinition>();
+            foreach (var globalVariable in parseResult.SyntaxTrees.Where(ast => ast is DeclarationAst).Cast<DeclarationAst>())
+            {
+                if (globalVariable.Value != null && globalVariable.Value is not ConstantAst)
+                {
+                    errors.Add(CreateError("Global variable must either not be initialized or be initialized to a constant value", globalVariable.Value));
+                }
+                VerifyDeclaration(globalVariable, globalVariables, errors);
+                graph.Data.Variables.Add(globalVariable);
+            }
+
+            // 4. Load and verify function return types and arguments
+            foreach (var function in parseResult.SyntaxTrees.Where(ast => ast is FunctionAst).Cast<FunctionAst>())
+            {
+                VerifyFunctionDefinition(function, errors);
+            }
+
+            // 5. Verify function bodies
             foreach (var syntaxTree in parseResult.SyntaxTrees)
             {
                 switch (syntaxTree)
@@ -58,7 +70,7 @@ namespace Lang.Translation
                     case FunctionAst function:
                         _currentFunction = function;
                         var main = function.Name.Equals("main", StringComparison.OrdinalIgnoreCase);
-                        VerifyFunction(function, main, errors);
+                        VerifyFunction(function, main, globalVariables, errors);
                         if (main)
                         {
                             if (graph.Main != null)
@@ -199,10 +211,15 @@ namespace Lang.Translation
             }
         }
 
-        private void VerifyFunction(FunctionAst function, bool main, List<TranslationError> errors)
+        private void VerifyFunction(FunctionAst function, bool main, IDictionary<string, TypeDefinition> globals, List<TranslationError> errors)
         {
             // 1. Initialize local variables
-            var localVariables = function.Arguments.ToDictionary(arg=> arg.Name, arg => arg.Type);
+            var localVariables = new Dictionary<string, TypeDefinition>(globals);
+            foreach (var argument in function.Arguments)
+            {
+                // Arguments with the same name as a global variable will be used instead of the global
+                localVariables[argument.Name] = argument.Type;
+            }
             var returnType = VerifyType(function.ReturnType, errors);
 
             // 2. Verify main function return type and arguments
