@@ -697,7 +697,7 @@ namespace Lang
         {
             while (ExecuteCondition(whileAst.Condition, variables))
             {
-                var value = ExecuteScope(whileAst.Block, variables, out returned);
+                var value = ExecuteScope(whileAst.Body, variables, out returned);
 
                 if (returned)
                 {
@@ -777,7 +777,7 @@ namespace Lang
                         Marshal.StructureToPtr(i, indexVariablePointer, false);
                         iterationVariable.Value = IntPtr.Add(dataPointer, Marshal.SizeOf(type) * i);
 
-                        var value = ExecuteAsts(each.Children, eachVariables, out returned);
+                        var value = ExecuteAsts(each.Body.Children, eachVariables, out returned);
 
                         if (returned)
                         {
@@ -791,7 +791,7 @@ namespace Lang
                     {
                         iterationVariable.Value = IntPtr.Add(dataPointer, Marshal.SizeOf(type) * i);
 
-                        var value = ExecuteAsts(each.Children, eachVariables, out returned);
+                        var value = ExecuteAsts(each.Body.Children, eachVariables, out returned);
 
                         if (returned)
                         {
@@ -812,7 +812,7 @@ namespace Lang
                 while ((bool)RunExpression(iterationValue, rangeEnd, Operator.LessThanEqual, iterationValue.Type))
                 {
                     Marshal.StructureToPtr(iterationValue.Value, pointer, false);
-                    var value = ExecuteAsts(each.Children, eachVariables, out returned);
+                    var value = ExecuteAsts(each.Body.Children, eachVariables, out returned);
 
                     if (returned)
                     {
@@ -1428,7 +1428,7 @@ namespace Lang
                 variables[arg.Name] = new ValueType {Type = arg.Type, Value = pointer};
             }
 
-            return ExecuteAsts(function.Children, variables, out _);
+            return ExecuteAsts(function.Body.Children, variables, out _);
         }
 
         private static object GetCArg(object argument)

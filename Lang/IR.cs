@@ -11,8 +11,8 @@ namespace Lang
     public class FunctionIR
     {
         public int StackSize { get; set; }
-        public List<Allocation> Allocations { get; } = new();
-        public List<BasicBlock> BasicBlocks { get; } = new();
+        public List<Allocation> Allocations { get; set; }
+        public List<BasicBlock> BasicBlocks { get; set; }
     }
 
     public class Allocation

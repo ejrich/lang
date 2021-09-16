@@ -27,7 +27,7 @@ namespace Lang
         bool ReturnTypeHasGenerics { get; set; }
         List<string> Generics { get; }
         List<DeclarationAst> Arguments { get; }
-        List<IAst> Children { get; }
+        ScopeAst Body { get; set; }
     }
 
     public interface IDeclaration : IAst
@@ -45,6 +45,8 @@ namespace Lang
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
+        public ScopeAst Parent { get; set; }
+        public Dictionary<string, IAst> Identifiers { get; } = new();
         public List<IAst> Children { get; } = new();
     }
 
@@ -55,11 +57,12 @@ namespace Lang
         public uint Column { get; init; }
         public string Name { get; set; }
         public int TypeIndex { get; set; }
+        public int OverloadIndex { get; set; }
         public TypeKind TypeKind { get; set; } = TypeKind.Function;
         public uint Size { get; set; } // Will always be 0
         public bool Extern { get; set; }
-        public bool Compiler { get; set; }
         public string ExternLib { get; set; }
+        public bool Compiler { get; set; }
         public bool Varargs { get; set; }
         public bool Params { get; set; }
         public bool Verified { get; set; }
@@ -70,7 +73,7 @@ namespace Lang
         public List<string> Generics { get; } = new();
         public List<DeclarationAst> Arguments { get; } = new();
         public List<List<TypeDefinition>> VarargsCalls { get; set; }
-        public List<IAst> Children { get; } = new();
+        public ScopeAst Body { get; set; }
     }
 
     public class StructAst : IAst, IType
@@ -267,7 +270,7 @@ namespace Lang
         public uint Line { get; init; }
         public uint Column { get; init; }
         public IAst Condition { get; set; }
-        public ScopeAst Block { get; set; }
+        public ScopeAst Body { get; set; }
     }
 
     public class EachAst : IAst
@@ -281,7 +284,7 @@ namespace Lang
         public TypeDefinition IteratorType { get; set; }
         public IAst RangeBegin { get; set; }
         public IAst RangeEnd { get; set; }
-        public List<IAst> Children { get; } = new();
+        public ScopeAst Body { get; set; }
     }
 
     public class IndexAst : IAst
@@ -328,7 +331,7 @@ namespace Lang
         public bool ReturnTypeHasGenerics { get; set; }
         public List<string> Generics { get; } = new();
         public List<DeclarationAst> Arguments { get; } = new();
-        public List<IAst> Children { get; } = new();
+        public ScopeAst Body { get; set; }
     }
 
     public class TypeDefinition : IAst
