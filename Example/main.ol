@@ -17,7 +17,7 @@ int main(List<string> args) {
     h := 3 > a;
     fac6 := factorial(6);
     printf("%d! = %d\n", 6, fac6);
-    my_struct := create();
+    my_struct := create().something;
     prim := primitives();
     list := create_list(4);
     ptr := pointers();

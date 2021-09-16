@@ -459,8 +459,10 @@ namespace Lang.Parsing
                         }
                         else if (parsingFieldDefault)
                         {
-                            var structField = ParseStructField(enumerator, errors);
+                            var structField = ParseExpression(enumerator, errors);
                             currentField.DefaultValue = structField;
+                            structAst.Fields.Add(currentField);
+                            currentField = null;
                             parsingFieldDefault = false;
                         }
                         else
@@ -699,8 +701,8 @@ namespace Lang.Parsing
                             return ParseDeclaration(enumerator, errors);
                         case TokenType.Equals:
                             return ParseAssignment(enumerator, errors);
-                        case TokenType.Period:
-                            return ParseStructFieldExpression(enumerator, errors);
+                        // case TokenType.Period:
+                        //     return ParseStructFieldExpression(enumerator, errors);
                         default:
                             // Peek again for an '=', this is likely an operator assignment
                             if (enumerator.Peek(1)?.Type == TokenType.Equals)
@@ -1159,75 +1161,75 @@ namespace Lang.Parsing
             return assignment;
         }
 
-        private static IAst ParseStructFieldExpression(TokenEnumerator enumerator, List<ParseError> errors)
-        {
-            // 1. Parse struct field until finished
-            var structField = ParseStructField(enumerator, errors);
+        // private static IAst ParseStructFieldExpression(TokenEnumerator enumerator, List<ParseError> errors)
+        // {
+        //     // 1. Parse struct field until finished
+        //     var structField = ParseExpression(enumerator, errors, null, TokenType.Equals);//ParseStructField(enumerator, errors);
 
-            // 2. Determine if expression or assignment
-            var nextToken = enumerator.Peek();
-            switch (nextToken?.Type)
-            {
-                case TokenType.SemiColon:
-                    enumerator.MoveNext();
-                    return structField;
-                case TokenType.Equals:
-                    return ParseAssignment(enumerator, errors, structField);
-                case TokenType.Increment:
-                case TokenType.Decrement:
-                    enumerator.MoveNext();
-                    var changeByOneAst = CreateAst<ChangeByOneAst>(enumerator.Current);
-                    changeByOneAst.Positive = enumerator.Current.Type == TokenType.Increment;
-                    changeByOneAst.Variable = structField;
-                    enumerator.MoveNext();
-                    if (enumerator.Current?.Type == TokenType.SemiColon)
-                    {
-                        return changeByOneAst;
-                    }
+        //     // 2. Determine if expression or assignment
+        //     var nextToken = enumerator.Peek();
+        //     switch (nextToken?.Type)
+        //     {
+        //         case TokenType.SemiColon:
+        //             enumerator.MoveNext();
+        //             return structField;
+        //         case TokenType.Equals:
+        //             return ParseAssignment(enumerator, errors, structField);
+        //         case TokenType.Increment:
+        //         case TokenType.Decrement:
+        //             enumerator.MoveNext();
+        //             var changeByOneAst = CreateAst<ChangeByOneAst>(enumerator.Current);
+        //             changeByOneAst.Positive = enumerator.Current.Type == TokenType.Increment;
+        //             changeByOneAst.Variable = structField;
+        //             enumerator.MoveNext();
+        //             if (enumerator.Current?.Type == TokenType.SemiColon)
+        //             {
+        //                 return changeByOneAst;
+        //             }
 
-                    var expression = CreateAst<ExpressionAst>(enumerator.Current);
-                    expression.Children.Add(changeByOneAst);
-                    return ParseExpression(enumerator, errors, expression);
-                case TokenType.OpenBracket:
-                    return ParseIndexExpression(enumerator, errors, structField);
-                case null:
-                    errors.Add(new ParseError {Error = "Expected value", Token = enumerator.Last});
-                    return null;
-                default:
-                    if (enumerator.Peek(1)?.Type == TokenType.Equals)
-                    {
-                        return ParseAssignment(enumerator, errors, structField);
-                    }
-                    else
-                    {
-                        errors.Add(new ParseError {Error = $"Unexpected token '{enumerator.Current.Value}'", Token = enumerator.Current});
-                        return structField;
-                    }
-            }
-        }
+        //             var expression = CreateAst<ExpressionAst>(enumerator.Current);
+        //             expression.Children.Add(changeByOneAst);
+        //             return ParseExpression(enumerator, errors, expression);
+        //         case TokenType.OpenBracket:
+        //             return ParseIndexExpression(enumerator, errors, structField);
+        //         case null:
+        //             errors.Add(new ParseError {Error = "Expected value", Token = enumerator.Last});
+        //             return null;
+        //         default:
+        //             if (enumerator.Peek(1)?.Type == TokenType.Equals)
+        //             {
+        //                 return ParseAssignment(enumerator, errors, structField);
+        //             }
+        //             else
+        //             {
+        //                 errors.Add(new ParseError {Error = $"Unexpected token '{enumerator.Current.Value}'", Token = enumerator.Current});
+        //                 return structField;
+        //             }
+        //     }
+        // }
 
-        private static StructFieldRefAst ParseStructField(TokenEnumerator enumerator, List<ParseError> errors)
-        {
-            var structField = CreateAst<StructFieldRefAst>(enumerator.Current);
-            structField.Name = enumerator.Current.Value;
+        // private static StructFieldRefAst ParseStructField(TokenEnumerator enumerator, List<ParseError> errors)
+        // {
+        //     var structField = CreateAst<StructFieldRefAst>(enumerator.Current);
+        //     structField.Value = ParseNextExpressionUnit(enumerator, errors, out _);
 
-            if (enumerator.Peek()?.Type == TokenType.Period)
-            {
-                enumerator.MoveNext();
-                if (enumerator.Peek()?.Type == TokenType.Token)
-                {
-                    enumerator.MoveNext();
-                    structField.Value = ParseStructField(enumerator, errors);
-                }
-                else
-                {
-                    var token = enumerator.Current ?? enumerator.Last;
-                    errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}'", Token = token});
-                }
-            }
+        //     if (enumerator.Peek()?.Type == TokenType.Period)
+        //     {
+        //         enumerator.MoveNext();
+        //         if (enumerator.Peek()?.Type == TokenType.Token)
+        //         {
+        //             enumerator.MoveNext();
+        //             structField.Value = ParseStructField(enumerator, errors);
+        //         }
+        //         else
+        //         {
+        //             var token = enumerator.Current ?? enumerator.Last;
+        //             errors.Add(new ParseError {Error = $"Unexpected token '{token.Value}'", Token = token});
+        //         }
+        //     }
 
-            return structField;
-        }
+        //     return structField;
+        // }
 
         private static IAst ParseExpression(TokenEnumerator enumerator, List<ParseError> errors, ExpressionAst initial = null,
             params TokenType[] endToken)
@@ -1343,13 +1345,13 @@ namespace Lang.Parsing
                     {
                         case TokenType.OpenParen:
                             return ParseCall(enumerator, errors);
-                        case TokenType.Period:
-                            var structField = ParseStructField(enumerator, errors);
-                            if (enumerator.Peek()?.Type == TokenType.OpenBracket)
-                            {
-                                return ParseIndex(enumerator, errors, structField);
-                            }
-                            return structField;
+                        // case TokenType.Period:
+                        //     var structField = ParseStructField(enumerator, errors);
+                        //     if (enumerator.Peek()?.Type == TokenType.OpenBracket)
+                        //     {
+                        //         return ParseIndex(enumerator, errors, structField);
+                        //     }
+                        //     return structField;
                         case TokenType.OpenBracket:
                             var variableAst = CreateAst<IdentifierAst>(token);
                             variableAst.Name = token.Value;
