@@ -108,6 +108,8 @@ List<int> create_list(int count) {
         list[i] = i * 5;
     }
     a := list[count-2];
+    list[0]++;
+    ++list[0];
     s: ListStruct;
     s.list[0] = 8;
     return list;
@@ -124,6 +126,8 @@ int* pointers() {
     next: Node;
     next.value = 8;
     node.next = &next;
+    list: List<int>[8];
+    list_ptr := &list[4];
     a := 6;
     b := &a;
     d := &a + 1;
