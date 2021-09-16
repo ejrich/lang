@@ -208,10 +208,10 @@ namespace Lang.Backend.LLVM
         private void WriteReturnStatement(ReturnAst returnAst, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables)
         {
             // 1. Get the return value
-            var (_, returnValue) = WriteExpression(returnAst.Value, localVariables);
+            var returnExpression = WriteExpression(returnAst.Value, localVariables);
 
             // 2. Write expression as return value
-            returnValue = CastValue(returnValue, _currentFunction.ReturnType);
+            var returnValue = CastValue(returnExpression, _currentFunction.ReturnType);
             LLVMApi.BuildRet(_builder, returnValue);
         }
 
@@ -225,8 +225,8 @@ namespace Lang.Backend.LLVM
             // 2. Set value if it exists
             if (declaration.Value != null)
             {
-                var (_, expressionValue) = WriteExpression(declaration.Value, localVariables);
-                var value = CastValue(expressionValue, type);
+                var expression = WriteExpression(declaration.Value, localVariables);
+                var value = CastValue(expression, declaration.Type);
 
                 LLVMApi.BuildStore(_builder, value, variable);
             }
@@ -290,17 +290,18 @@ namespace Lang.Backend.LLVM
             }
 
             // 2. Evaluate the expression value
-            var (type, expressionValue) = WriteExpression(assignment.Value, localVariables);
+            var expression = WriteExpression(assignment.Value, localVariables);
             if (assignment.Operator != Operator.None)
             {
                 // 2a. Build expression with variable value as the LHS
                 var value = LLVMApi.BuildLoad(_builder, variable.value, variableName);
-                expressionValue = BuildExpression((variable.type, value), (type, expressionValue), assignment.Operator, variable.type);
+                expression.value = BuildExpression((variable.type, value), expression, assignment.Operator, variable.type);
+                expression.type = variable.type; // The type should now be the type of the variable
             }
 
             // 3. Reallocate the value of the variable
-            expressionValue = CastValue(expressionValue, variable.type);
-            LLVMApi.BuildStore(_builder, expressionValue, variable.value);
+            var assignmentValue = CastValue(expression, variable.type);
+            LLVMApi.BuildStore(_builder, assignmentValue, variable.value);
         }
 
         private bool WriteScope(List<IAst> scopeChildren, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)
@@ -480,7 +481,7 @@ namespace Lang.Backend.LLVM
             else
             {
                 var value = LLVMApi.BuildLoad(_builder, variable, "iter");
-                var nextValue = BuildExpression(value, LLVMApi.ConstInt(LLVMApi.Int32Type(), 1, true), Operator.Add);
+                var nextValue = LLVMApi.BuildAdd(_builder, value, LLVMApi.ConstInt(LLVMApi.Int32Type(), 1, false), "tmpadd");
                 LLVMApi.BuildStore(_builder, nextValue, variable);
             }
 
@@ -673,36 +674,8 @@ namespace Lang.Backend.LLVM
             return BuildBinaryOperation(lhs.value, rhs.value, op, signed);
         }
 
-        // @Cleanup This should be removed eventually once the new function is fully implemented
-        private LLVMValueRef BuildExpression(LLVMValueRef lhs, LLVMValueRef rhs, Operator op)
-        {
-            return op switch
-            {
-                // Bit operators
-                Operator.And => LLVMApi.BuildAnd(_builder, lhs, rhs, "tmpand"),
-                Operator.Or => LLVMApi.BuildOr(_builder, lhs, rhs, "tmpor"),
-                Operator.BitwiseAnd => LLVMApi.BuildAnd(_builder, lhs, rhs, "tmpband"),
-                Operator.BitwiseOr => LLVMApi.BuildOr(_builder, lhs, rhs, "tmpbor"),
-                Operator.Xor => LLVMApi.BuildXor(_builder, lhs, rhs, "tmpxor"),
-                // Comparison operators
-                Operator.Equality => BuildCompare(lhs, rhs, op),
-                Operator.NotEqual => BuildCompare(lhs, rhs, op),
-                Operator.GreaterThanEqual => BuildCompare(lhs, rhs, op),
-                Operator.LessThanEqual => BuildCompare(lhs, rhs, op),
-                Operator.GreaterThan => BuildCompare(lhs, rhs, op),
-                Operator.LessThan => BuildCompare(lhs, rhs, op),
-                // Arithmetic operators
-                Operator.Add => BuildBinaryOperation(lhs, rhs, op),
-                Operator.Subtract => BuildBinaryOperation(lhs, rhs, op),
-                Operator.Multiply => BuildBinaryOperation(lhs, rhs, op),
-                Operator.Divide => BuildBinaryOperation(lhs, rhs, op),
-                Operator.Modulus => BuildBinaryOperation(lhs, rhs, op),
-                // @Cleanup This branch should never be hit
-                _ => new LLVMValueRef()
-            };
-        }
-
-        private LLVMValueRef BuildCompare((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, Operator op, bool signed = true)
+        private LLVMValueRef BuildCompare((TypeDefinition type, LLVMValueRef value) lhs,
+            (TypeDefinition type, LLVMValueRef value) rhs, Operator op, bool signed = true)
         {
             // TODO Actually implement me
             return BuildCompare(lhs.value, rhs.value, op, signed);
@@ -781,6 +754,14 @@ namespace Lang.Backend.LLVM
             throw new NotImplementedException($"{op} not compatible with types '{lhs.TypeOf().TypeKind}' and '{rhs.TypeOf().TypeKind}'");
         }
 
+        private LLVMValueRef BuildBinaryOperation((TypeDefinition type, LLVMValueRef value) lhs,
+            (TypeDefinition type, LLVMValueRef value) rhs, Operator op, bool signed = true)
+        {
+            // TODO Actually implement me
+            return BuildBinaryOperation(lhs.value, rhs.value, op, signed);
+        }
+
+        // @Cleanup This should be removed eventually once the new function is implemented
         private LLVMValueRef BuildBinaryOperation(LLVMValueRef lhs, LLVMValueRef rhs, Operator op, bool signed = true)
         {
             var lhsType = lhs.TypeOf();
@@ -841,18 +822,14 @@ namespace Lang.Backend.LLVM
             throw new NotImplementedException($"{op} not compatible with types '{lhs.TypeOf().TypeKind}' and '{rhs.TypeOf().TypeKind}'");
         }
 
-        private LLVMValueRef CastValue((TypeDefinition type, LLVMValueRef value) value, TypeDefinition targetType)
+        private LLVMValueRef CastValue((TypeDefinition type, LLVMValueRef value) typeValue, TypeDefinition targetType)
         {
             // TODO Implement better type casting
-            return CastValue(value.value, targetType);
+            var (type, value) = typeValue;
+            return CastValue(value, ConvertTypeDefinition(targetType));
         }
 
-        private LLVMValueRef CastValue(LLVMValueRef value, TypeDefinition targetType)
-        {
-            return CastValue(value, ConvertTypeDefinition(targetType), targetType.PrimitiveType?.Signed);
-        }
-
-        private LLVMValueRef CastValue(LLVMValueRef value, LLVMTypeRef targetType, bool? signed = true)
+        private LLVMValueRef CastValue(LLVMValueRef value, LLVMTypeRef targetType)
         {
             var a = value.TypeOf().PrintTypeToString();
             var b = targetType.PrintTypeToString();
@@ -861,6 +838,7 @@ namespace Lang.Backend.LLVM
             switch (value.TypeOf().TypeKind)
             {
                 case LLVMTypeKind.LLVMIntegerTypeKind:
+                    // TODO Fix int to float casts, see line 94 of main.ol
                     return LLVMApi.BuildIntCast(_builder, value, targetType, "tmpint");
                 case LLVMTypeKind.LLVMFloatTypeKind:
                 case LLVMTypeKind.LLVMDoubleTypeKind:
