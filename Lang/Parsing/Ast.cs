@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Lang.Translation;
 
@@ -63,6 +64,13 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
+    public class ConditionalAst : IAst
+    {
+        public IAst Condition { get; set; }
+        public List<IAst> Children { get; } = new();
+        public List<IAst> ElseChildren { get; } = new();
+    }
+
     public class Variable
     {
         public TypeDefinition Type { get; init; }
@@ -77,16 +85,20 @@ namespace Lang.Parsing
 
     public enum Operator
     {
+        None = 0,
+        And, // &&
+        Or, // ||
+        Equality, // ==
         Add = '+',
         Subtract = '-',
         Multiply = '*',
         Divide = '/',
         GreaterThan = '>',
         LessThan = '<',
-        Or = '|',
-        And = '&',
+        BitwiseOr = '|',
+        BitwiseAnd = '&',
         Xor = '^',
-        Modulus = '%'
+        Modulus = '%',
     }
 
     public enum Type
@@ -102,7 +114,7 @@ namespace Lang.Parsing
         Error
     }
 
-    public static class TypeExtensions
+    public static class Extensions
     {
         public static Type InferType(this TypeDefinition typeDef, out TranslationError error)
         {
@@ -183,6 +195,24 @@ namespace Lang.Parsing
                     return Type.Other;
                 default:
                     return Type.Other;
+            }
+        }
+
+        public static Operator ConvertOperator(this Token token)
+        {
+            switch (token.Type)
+            {
+                // Multi-character operators
+                case TokenType.And:
+                    return Operator.And;
+                case TokenType.Or:
+                    return Operator.Or;
+                case TokenType.Equality:
+                    return Operator.Equality;
+                // Handle single character operators
+                default:
+                    var op = (Operator)token.Value[0];
+                    return Enum.IsDefined(typeof(Operator), op) ? op : Operator.None;
             }
         }
     }
