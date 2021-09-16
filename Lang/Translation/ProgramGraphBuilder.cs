@@ -32,12 +32,13 @@ namespace Lang.Translation
             bool verifyAdditional;
 
             // 1. Verify enum and struct definitions
-            foreach (var ast in parseResult.SyntaxTrees)
+            for (var i = 0; i < parseResult.SyntaxTrees.Count; i++)
             {
-                switch (ast)
+                switch (parseResult.SyntaxTrees[i])
                 {
                     case EnumAst enumAst:
                         VerifyEnum(enumAst, errors);
+                        parseResult.SyntaxTrees.RemoveAt(i--);
                         break;
                     case StructAst structAst:
                         if (_types.ContainsKey(structAst.Name))
@@ -57,22 +58,23 @@ namespace Lang.Translation
             } while (verifyAdditional);
 
             // 2. Verify struct bodies, global variables, and function return types and arguments
-            var globalVariables = new Dictionary<string, TypeDefinition>();
             var mainDefined = false;
-            foreach (var ast in parseResult.SyntaxTrees)
+            for (var i = 0; i < parseResult.SyntaxTrees.Count; i++)
             {
-                switch (ast)
+                switch (parseResult.SyntaxTrees[i])
                 {
                     case StructAst structAst:
                         VerifyStruct(structAst, errors);
+                        parseResult.SyntaxTrees.RemoveAt(i--);
                         break;
                     case DeclarationAst globalVariable:
                         if (globalVariable.Value != null && globalVariable.Value is not ConstantAst)
                         {
                             errors.Add(CreateError("Global variable must either not be initialized or be initialized to a constant value", globalVariable.Value));
                         }
-                        VerifyDeclaration(globalVariable, globalVariables, errors);
+                        VerifyDeclaration(globalVariable, _globalVariables, errors);
                         graph.Data.Variables.Add(globalVariable);
+                        parseResult.SyntaxTrees.RemoveAt(i--);
                         break;
                     case FunctionAst function:
                         var main = function.Name == "main";
@@ -84,29 +86,48 @@ namespace Lang.Translation
                             }
                             mainDefined = true;
                         }
+                        else if (function.Name == "__start")
+                        {
+                            graph.Start = function;
+                        }
                         VerifyFunctionDefinition(function, main, errors);
+                        parseResult.SyntaxTrees.RemoveAt(i--);
                         break;
                 }
             }
 
-            // 3. Verify function bodies
+            // 3. Verify and run top-level static ifs
+            for (int i = 0; i < parseResult.SyntaxTrees.Count; i++)
+            {
+                switch (parseResult.SyntaxTrees[i])
+                {
+                    case CompilerDirectiveAst directive:
+                        if (directive.Type == DirectiveType.If)
+                        {
+                            // TODO Implement me
+                            parseResult.SyntaxTrees.RemoveAt(i--);
+                        }
+                        break;
+                }
+            }
+
+            // 4. Verify function bodies
+            foreach (var (_, function) in _functions)
+            {
+                if (function.Verified) continue;
+                _currentFunction = function;
+                VerifyFunction(function, errors);
+            }
+            VerifyFunction(graph.Start, errors);
+            graph.Functions = _functions;
+
+            // 5. Execute any other compiler directives
             foreach (var ast in parseResult.SyntaxTrees)
             {
                 switch (ast)
                 {
-                    case FunctionAst function:
-                        _currentFunction = function;
-                        if (function.Name == "__start")
-                        {
-                            graph.Start = function;
-                        }
-
-                        // Verify the function body
-                        VerifyFunction(function, globalVariables, errors);
-                        graph.Functions.Add(function.Name, function);
-                        break;
                     case CompilerDirectiveAst compilerDirective:
-                        VerifyTopLevelDirective(compilerDirective, globalVariables, errors);
+                        VerifyTopLevelDirective(compilerDirective, errors);
                         graph.Directives.Add(compilerDirective);
                         break;
                 }
@@ -346,7 +367,7 @@ namespace Lang.Translation
             }
         }
 
-        private void VerifyFunction(FunctionAst function, IDictionary<string, TypeDefinition> globals, List<TranslationError> errors)
+        private void VerifyFunction(FunctionAst function, List<TranslationError> errors)
         {
             // 1. Initialize local variables
             var localVariables = new Dictionary<string, TypeDefinition>(_globalVariables);
@@ -356,7 +377,6 @@ namespace Lang.Translation
                 localVariables[argument.Name] = argument.Type;
             }
             var returnType = VerifyType(function.ReturnType, errors);
-
 
             // 2. For extern functions, simply verify there is no body and return
             if (function.Extern)
@@ -378,19 +398,6 @@ namespace Lang.Translation
                 errors.Add(CreateError($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnType)}' on all paths", function));
             }
             function.Verified = true;
-        }
-
-        private bool VerifyAsts(List<IAst> asts, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
-        {
-            var returns = false;
-            foreach (var ast in asts)
-            {
-                if (VerifyAst(ast, localVariables, errors))
-                {
-                    returns = true;
-                }
-            }
-            return returns;
         }
 
         private bool VerifyAsts(List<IAst> asts, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
@@ -836,16 +843,16 @@ namespace Lang.Translation
             return VerifyAsts(each.Children, eachVariables, errors);
         }
 
-        private void VerifyTopLevelDirective(CompilerDirectiveAst directive, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
+        private void VerifyTopLevelDirective(CompilerDirectiveAst directive, List<TranslationError> errors)
         {
             switch (directive.Type)
             {
                 case DirectiveType.Run:
-                    VerifyAst(directive.Value, localVariables, errors);
+                    VerifyAst(directive.Value, _globalVariables, errors);
                     break;
                 case DirectiveType.If:
                     var conditional = directive.Value as ConditionalAst;
-                    VerifyExpression(conditional!.Condition, localVariables, errors);
+                    VerifyExpression(conditional!.Condition, _globalVariables, errors);
                     break;
                 default:
                     errors.Add(CreateError("Compiler directive not supported", directive.Value));

@@ -1697,18 +1697,18 @@ namespace Lang.Parsing
                 case "run":
                     directive.Type = DirectiveType.Run;
                     enumerator.MoveNext();
+                    var ast = ParseLine(enumerator, errors);
+                    if (ast != null)
+                        directive.Value = ast;
                     break;
                 case "if":
                     directive.Type = DirectiveType.If;
+                    directive.Value = ParseConditional(enumerator, errors);
                     break;
                 default:
                     errors.Add(new ParseError {Error = $"Unsupported top-level compiler directive '{token.Value}'", Token = token});
                     return null;
             }
-
-            var ast = ParseLine(enumerator, errors);
-            if (ast != null)
-                directive.Value = ast;
 
             return directive;
         }
@@ -1728,15 +1728,12 @@ namespace Lang.Parsing
             {
                 case "if":
                     directive.Type = DirectiveType.If;
+                    directive.Value = ParseConditional(enumerator, errors);
                     break;
                 default:
                     errors.Add(new ParseError {Error = $"Unsupported compiler directive '{token.Value}'", Token = token});
                     return null;
             }
-
-            var ast = ParseLine(enumerator, errors);
-            if (ast != null)
-                directive.Value = ast;
 
             return directive;
         }
