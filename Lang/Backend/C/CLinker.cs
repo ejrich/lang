@@ -4,7 +4,7 @@
     {
         public void Link(string objectPath, string executableName)
         {
-            throw new System.NotImplementedException();
+            // TODO Implement me
         }
     }
 }
