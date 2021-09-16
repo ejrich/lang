@@ -76,12 +76,10 @@ namespace Lang.Parsing
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
-        // public IAst Value { get; set; }
-        // public bool IsEnum { get; set; }
-        // public bool IsPointer { get; set; }
-        // public string StructName { get; set; }
-        // public StructFieldRefAst Field { get; set; }
-        // public int ValueIndex { get; set; }
+        public bool IsEnum { get; set; }
+        public bool[] Pointers { get; set; }
+        public string[] StructNames { get; set; }
+        public int[] ValueIndices { get; set; }
         public List<IAst> Children { get; } = new();
     }
 
