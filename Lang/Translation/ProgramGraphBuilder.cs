@@ -395,14 +395,15 @@ namespace Lang.Translation
 
         private bool VerifyAsts(List<IAst> asts, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
         {
+            var returns = false;
             foreach (var ast in asts)
             {
                 if (VerifyAst(ast, localVariables, errors))
                 {
-                    return true;
+                    returns = true;
                 }
             }
-            return false;
+            return returns;
         }
 
         private bool VerifyScope(List<IAst> syntaxTrees, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
@@ -844,7 +845,7 @@ namespace Lang.Translation
                     break;
                 case DirectiveType.If:
                     var conditional = directive.Value as ConditionalAst;
-                    VerifyAst(conditional!.Condition, localVariables, errors);
+                    VerifyExpression(conditional!.Condition, localVariables, errors);
                     break;
                 default:
                     errors.Add(CreateError("Compiler directive not supported", directive.Value));
@@ -857,14 +858,7 @@ namespace Lang.Translation
             switch (directive.Value)
             {
                 case ConditionalAst conditional:
-                    if (EvaluateCompileTimeExpression(conditional.Condition, errors))
-                    {
-                        return VerifyAsts(conditional.Children, localVariables, errors);
-                    }
-                    else if (conditional.Else.Any())
-                    {
-                        return VerifyAsts(conditional.Else, localVariables, errors);
-                    }
+                    VerifyExpression(conditional.Condition, localVariables, errors);
                     break;
                 default:
                     errors.Add(CreateError("Compiler directive not supported", directive.Value));
@@ -872,11 +866,6 @@ namespace Lang.Translation
             }
 
             return false;
-        }
-
-        private bool EvaluateCompileTimeExpression(IAst ast, List<TranslationError> errors)
-        {
-            return true;
         }
 
         private TypeDefinition VerifyExpression(IAst ast, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
