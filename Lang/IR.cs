@@ -69,6 +69,7 @@ namespace Lang
         // For constant values
         public Constant ConstantValue { get; set; }
         public string ConstantString { get; set; }
+        public bool UseRawString { get; set; }
 
         // For calls
         public InstructionValue[] Arguments { get; set; }
