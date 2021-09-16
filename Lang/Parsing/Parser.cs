@@ -1556,11 +1556,27 @@ namespace Lang.Parsing
                         {
                             if (TryParseType(enumerator, errors, out var typeDefinition))
                             {
-                                for (var i = 0; i < currentFunction.Generics.Count; i++)
+                                if (!typeDefinition.CArray && enumerator.Current?.Type == TokenType.OpenParen)
                                 {
-                                    SearchForGeneric(currentFunction.Generics[i], i, typeDefinition);
+                                    var callAst = new CallAst
+                                    {
+                                        FileIndex = typeDefinition.FileIndex, Line = typeDefinition.Line,
+                                        Column = typeDefinition.Column
+                                    };
+                                    callAst.Function = typeDefinition.Name;
+                                    callAst.Generics = typeDefinition.Generics;
+                                    enumerator.MoveNext();
+                                    ParseArguments(callAst, enumerator, errors, currentFunction);
+                                    return callAst;
                                 }
-                                return typeDefinition;
+                                else
+                                {
+                                    for (var i = 0; i < currentFunction.Generics.Count; i++)
+                                    {
+                                        SearchForGeneric(currentFunction.Generics[i], i, typeDefinition);
+                                    }
+                                    return typeDefinition;
+                                }
                             }
                             break;
                         }
@@ -1751,6 +1767,39 @@ namespace Lang.Parsing
             // This enumeration is the open paren
             enumerator.MoveNext();
             // Enumerate over the first argument
+            ParseArguments(callAst, enumerator, errors, currentFunction);
+
+            var current = enumerator.Current;
+            if (current == null)
+            {
+                errors.Add(new ParseError
+                {
+                    Error = "Expected to close call", Token = enumerator.Last
+                });
+            }
+            else if (requiresSemicolon)
+            {
+                if (current.Type == TokenType.SemiColon)
+                    return callAst;
+
+                if (enumerator.Peek()?.Type != TokenType.SemiColon)
+                {
+                    errors.Add(new ParseError
+                    {
+                        Error = "Expected ';'", Token = enumerator.Current ?? enumerator.Last
+                    });
+                }
+                else
+                {
+                    enumerator.MoveNext();
+                }
+            }
+
+            return callAst;
+        }
+
+        private static void ParseArguments(CallAst callAst, TokenEnumerator enumerator, List<ParseError> errors, FunctionAst currentFunction)
+        {
             while (enumerator.MoveNext())
             {
                 var token = enumerator.Current;
@@ -1794,34 +1843,6 @@ namespace Lang.Parsing
                     }
                 }
             }
-
-            var current = enumerator.Current;
-            if (current == null)
-            {
-                errors.Add(new ParseError
-                {
-                    Error = "Expected to close call", Token = enumerator.Last
-                });
-            }
-            else if (requiresSemicolon)
-            {
-                if (current.Type == TokenType.SemiColon)
-                    return callAst;
-
-                if (enumerator.Peek()?.Type != TokenType.SemiColon)
-                {
-                    errors.Add(new ParseError
-                    {
-                        Error = "Expected ';'", Token = enumerator.Current ?? enumerator.Last
-                    });
-                }
-                else
-                {
-                    enumerator.MoveNext();
-                }
-            }
-
-            return callAst;
         }
 
         private static ReturnAst ParseReturn(TokenEnumerator enumerator, List<ParseError> errors, FunctionAst currentFunction)
