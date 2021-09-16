@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -18,22 +19,25 @@ namespace Lang.Project
 
         public Project LoadProject(string projectPath)
         {
-            // 1. Check if project file is null
+            // 1. Check if project file is null or a directory
             if (string.IsNullOrWhiteSpace(projectPath))
+            {
                 projectPath = GetProjectPathInDirectory(Directory.GetCurrentDirectory());
+            }
+            else if (!projectPath.EndsWith(ProjectFileExtension))
+            {
+                projectPath = GetProjectPathInDirectory(projectPath);
+            }
 
             // 2. Load the project file
-            var fileAttributes = File.GetAttributes(projectPath);
-
-            if (fileAttributes.HasFlag(FileAttributes.Directory))
-                projectPath = GetProjectPathInDirectory(projectPath);
-
             var projectFileContents = File.ReadAllText(projectPath);
 
+            // 3. Parse project file
+            // @PerformanceCheck - this takes about 40x longer than the rest of the steps ~130 ms
             var projectFile = JsonSerializer.Deserialize<ProjectFile>(projectFileContents,
                 new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
-            // 3. Recurse through the directories and load the files to build
+            // 4. Recurse through the directories and load the files to build
             var sourceFiles = GetSourceFiles(new DirectoryInfo(Path.GetDirectoryName(Path.GetFullPath(projectPath))));
 
             return new Project
@@ -51,7 +55,10 @@ namespace Lang.Project
 
             // b. If no project file, throw and exit
             if (projectPath == null)
-                throw new ArgumentException("Project file not found in current directory");
+            {
+                Console.WriteLine($"Project file not found in directory: \"{directory}\"");
+                Environment.Exit(ErrorCodes.ProjectFileNotFound);
+            }
 
             return projectPath;
         }

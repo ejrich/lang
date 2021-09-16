@@ -7,7 +7,7 @@ namespace Lang.Parsing
 {
     public interface ILexer
     {
-        List<Token> LoadFileTokens(string path);
+        List<Token> LoadFileTokens(string filePath);
     }
 
     public class Lexer : ILexer
@@ -15,27 +15,27 @@ namespace Lang.Parsing
         private bool _readingComment;
         private bool _multiLineComment;
 
-        public List<Token> LoadFileTokens(string path)
+        public List<Token> LoadFileTokens(string filePath)
         {
-            var fileContents = File.ReadAllText(path);
+            var fileContents = File.ReadAllText(filePath);
 
-            #if DEBUG
-            var tokens = GetTokens(fileContents).ToList();
-            foreach (var token in tokens)
-                Console.WriteLine($"{token.Type}, {token.Value}");
-
-            return tokens;
-            #else
             return GetTokens(fileContents).ToList();
-            #endif
         }
 
         private IEnumerable<Token> GetTokens(string fileContents)
         {
             Token currentToken = null;
             var closingMultiLineComment = false;
+            var line = 1;
+            var column = 0;
             foreach (var character in fileContents)
             {
+                column++;
+                if (character == '\n')
+                {
+                    line++;
+                    column = 0;
+                }
                 if (_readingComment)
                 {
                     if (_multiLineComment)
@@ -46,6 +46,7 @@ namespace Lang.Parsing
                             _readingComment = false;
                             currentToken = null;
                         }
+
                         closingMultiLineComment = character == '*';
                     }
                     else if (character == '\n')
@@ -53,9 +54,11 @@ namespace Lang.Parsing
                         _readingComment = false;
                         currentToken = null;
                     }
+
                     continue;
                 }
-                if (IgnoreChar(character))
+
+                if (char.IsWhiteSpace(character))
                 {
                     if (currentToken != null)
                         yield return currentToken;
@@ -78,7 +81,9 @@ namespace Lang.Parsing
                     currentToken = new Token
                     {
                         Type = tokenType,
-                        Value = $"{character}"
+                        Value = $"{character}",
+                        Line = line,
+                        Column = column
                     };
                 }
             }
@@ -86,14 +91,9 @@ namespace Lang.Parsing
             if (currentToken != null) yield return currentToken;
         }
 
-        private static bool IgnoreChar(char token)
-        {
-            return Char.IsWhiteSpace(token);
-        }
-
         private static TokenType GetTokenType(char character)
         {
-            var token = (TokenType) character;
+            var token = (TokenType)character;
 
             return Enum.IsDefined(typeof(TokenType), token) ? token : TokenType.Token;
         }
