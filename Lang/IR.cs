@@ -63,7 +63,8 @@ namespace Lang
     public struct InstructionConstant
     {
         [FieldOffset(0)] public bool Boolean;
-        [FieldOffset(0)] public ulong Integer;
+        [FieldOffset(0)] public long Integer;
+        [FieldOffset(0)] public ulong UnsignedInteger;
         [FieldOffset(0)] public float Float;
         [FieldOffset(0)] public double Double;
     }

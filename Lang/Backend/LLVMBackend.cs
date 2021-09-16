@@ -1419,8 +1419,7 @@ namespace Lang.Backend
                 {
                     if (structField.IsEnum)
                     {
-                        var enumName = structField.TypeNames[0];
-                        var enumDef = (EnumAst)_programGraph.Types[enumName];
+                        var enumDef = (EnumAst)structField.Types[0];
                         var value = enumDef.Values[structField.ValueIndices[0]].Value;
                         return (enumDef.BaseType, LLVMValueRef.CreateConstInt(GetIntegerType(enumDef.BaseType.PrimitiveType), (ulong)value, false));
                     }
@@ -1815,8 +1814,7 @@ namespace Lang.Backend
                     continue;
                 }
 
-                var structName = structField.TypeNames[i-1];
-                var structDefinition = (StructAst) _programGraph.Types[structName];
+                var structDefinition = (StructAst) structField.Types[i-1];
                 type = structDefinition.Fields[structField.ValueIndices[i-1]].Type;
 
                 switch (structField.Children[i])
