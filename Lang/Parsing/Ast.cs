@@ -108,6 +108,15 @@ namespace Lang.Parsing
         public List<IAst> Children => null;
     }
 
+    public class NotAst : IAst
+    {
+        public int FileIndex { get; set; }
+        public int Line { get; init; }
+        public int Column { get; init; }
+        public IAst Value { get; set; }
+        public List<IAst> Children => null;
+    }
+
     public class CallAst : IAst
     {
         public int FileIndex { get; set; }

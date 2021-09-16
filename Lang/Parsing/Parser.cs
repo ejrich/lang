@@ -989,6 +989,18 @@ namespace Lang.Parsing
                         errors.Add(new ParseError {Error = $"Expected token to follow '{token.Value}'", Token = token});
                         return null;
                     }
+                case TokenType.Not:
+                    if (enumerator.MoveNext())
+                    {
+                        var notAst = CreateAst<NotAst>(enumerator.Current);
+                        notAst.Value = ParseNextExpressionUnit(enumerator, errors, out operatorRequired);
+                        return notAst;
+                    }
+                    else
+                    {
+                        errors.Add(new ParseError {Error = $"Expected token to follow '{token.Value}'", Token = token});
+                        return null;
+                    }
                 default:
                     errors.Add(new ParseError
                     {
