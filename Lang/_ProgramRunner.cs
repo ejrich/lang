@@ -1,8 +1,26 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace Lang
 {
+    [StructLayout(LayoutKind.Explicit)]
+    public struct Register
+    {
+        [FieldOffset(0)] public bool Boolean;
+        [FieldOffset(0)] public sbyte SByte;
+        [FieldOffset(0)] public byte Byte;
+        [FieldOffset(0)] public short Short;
+        [FieldOffset(0)] public ushort UShort;
+        [FieldOffset(0)] public int Integer;
+        [FieldOffset(0)] public uint UInteger;
+        [FieldOffset(0)] public long Long;
+        [FieldOffset(0)] public ulong ULong;
+        [FieldOffset(0)] public float Float;
+        [FieldOffset(0)] public double Double;
+        [FieldOffset(0)] public IntPtr Pointer;
+    }
+
     public class _ProgramRunner //: IProgramRunner
     {
         private readonly Dictionary<string, string> _compilerFunctions = new() {
@@ -17,13 +35,36 @@ namespace Lang
             // - When a global variable is added, store them in the global space
         }
 
-        public void RunProgram(FunctionIR function)
+        public void RunProgram(FunctionIR function, IAst source)
         {
+            try
+            {
+                ExecuteFunction(function, new IntPtr[0]);
+            }
+            catch (Exception e)
+            {
+                ErrorReporter.Report("Internal compiler error running program", source);
+                #if DEBUG
+                Console.WriteLine(e);
+                #endif
+            }
         }
 
-        public bool ExecuteCondition(FunctionIR function)
+        public bool ExecuteCondition(FunctionIR function, IAst source)
         {
-            return true;
+            try
+            {
+                ExecuteFunction(function, new IntPtr[0]);
+                return true;
+            }
+            catch (Exception e)
+            {
+                ErrorReporter.Report("Internal compiler error executing condition", source);
+                #if DEBUG
+                Console.WriteLine(e);
+                #endif
+                return false;
+            }
         }
 
         private void AddDependency(string library)
@@ -34,16 +75,18 @@ namespace Lang
         private void ExecuteFunction(FunctionIR function, IntPtr[] arguments)
         {
             var instructionPointer = 0;
+            var stackPointer = Marshal.AllocHGlobal((int)function.StackSize);
+            var registers = new Register[function.ValueCount];
 
             while (instructionPointer < function.Instructions.Count)
             {
-                var instruction = function.Instructions[instructionPointer];
+                var instruction = function.Instructions[instructionPointer++];
 
                 switch (instruction.Type)
                 {
                     case InstructionType.Jump:
                     {
-                        // _builder.BuildBr(basicBlocks[instruction.Value1.JumpBlock.Index]);
+                        instructionPointer = instruction.Value1.JumpBlock.Location;
                         break;
                     }
                     case InstructionType.ConditionalJump:
@@ -60,8 +103,7 @@ namespace Lang
                     }
                     case InstructionType.ReturnVoid:
                     {
-                        // _builder.BuildRetVoid();
-                        break;
+                        return;
                     }
                     case InstructionType.Load:
                     {
@@ -529,7 +571,7 @@ namespace Lang
                 case InstructionValueType.Constant:
                     return GetConstant(value);
                 case InstructionValueType.Null:
-                    return null;
+                    return IntPtr.Zero;
             }
             return null;
         }
