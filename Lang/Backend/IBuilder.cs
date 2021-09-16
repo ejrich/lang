@@ -8,6 +8,6 @@
         /// </summary>
         /// <param name="filePath">The path to the translated source file</param>
         /// <returns>The path to the object file</returns>
-        string BuildTranslatedFile(string filePath);
+        string BuildFile(string filePath);
     }
 }

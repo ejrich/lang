@@ -1,6 +1,6 @@
-﻿namespace Lang.Backend.Assembly
+﻿namespace Lang.Backend.LLVM
 {
-    public class AssemblyWriter : IWriter
+    public class LLVMWriter : IWriter
     {
         public string WriteFile(ProgramGraph programGraph, string projectName, string projectPath)
         {
