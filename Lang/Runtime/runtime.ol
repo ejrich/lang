@@ -25,6 +25,13 @@ operator != string(string a, string b) {
     return !(a == b);
 }
 
+string convert_c_string(u8* string_pointer) {
+    length := 0;
+    while string_pointer[length] then length++;
+    str: string = { length = length; data = string_pointer; }
+    return str;
+}
+
 
 // Runtime type information data
 struct TypeInfo {
@@ -83,11 +90,11 @@ exit(int exit_code) #extern "libc"
 
 
 // Runtime functions
-int __start(int argc, string* argv) {
+int __start(int argc, u8** argv) {
     exit_code := 0;
     args: List<string>[argc-1];
 
-    each i in 1..argc-1 then args[i-1] = *(argv + i);
+    each i in 1..argc-1 then args[i-1] = convert_c_string(argv[i]);
 
     #assert type_of(main).type == TypeKind.Function;
     #if type_of(main).return_type.type == TypeKind.Void {

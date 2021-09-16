@@ -135,17 +135,20 @@ namespace Lang.Backend
                 _debugFiles = project.SourceFiles.Select(file => _debugBuilder.CreateFile(Path.GetFileName(file), Path.GetDirectoryName(file))).ToList();
                 _debugCompilationUnit = _debugBuilder.CreateCompileUnit(LLVMDWARFSourceLanguage.LLVMDWARFSourceLanguageC, _debugFiles[0], "ol", 0, string.Empty, 0, string.Empty, LLVMDWARFEmissionKind.LLVMDWARFEmissionFull, 0, 0, 0, string.Empty, string.Empty);
 
-                using var dwarfVersionString = new MarshaledString("Dwarf Version");
-                var dwarfVersion = LLVM.ValueAsMetadata(LLVM.ConstInt(LLVM.Int32Type(), 4, 0));
-                LLVM.AddModuleFlag(_module, LLVMModuleFlagBehavior.LLVMModuleFlagBehaviorWarning, dwarfVersionString.Value, (UIntPtr)dwarfVersionString.Length, dwarfVersion);
-
-                using var debugInfoString = new MarshaledString("Debug Info Version");
-                var debugInfo = LLVM.ValueAsMetadata(LLVM.ConstInt(LLVM.Int32Type(), LLVM.DebugMetadataVersion(), 0));
-                LLVM.AddModuleFlag(_module, LLVMModuleFlagBehavior.LLVMModuleFlagBehaviorWarning, debugInfoString.Value, (UIntPtr)debugInfoString.Length, debugInfo);
+                AddModuleFlag("Dwarf Version", 4);
+                AddModuleFlag("Debug Info Version", LLVM.DebugMetadataVersion());
+                AddModuleFlag("PIE Level", 2);
 
                 _debugTypes = new Dictionary<string, LLVMMetadataRef>();
                 _debugFunctions = new Dictionary<string, LLVMMetadataRef>();
             }
+        }
+
+        private void AddModuleFlag(string flagName, uint flagValue)
+        {
+            using var name = new MarshaledString(flagName);
+            var value = LLVM.ValueAsMetadata(LLVM.ConstInt(LLVM.Int32Type(), flagValue, 0));
+            LLVM.AddModuleFlag(_module, LLVMModuleFlagBehavior.LLVMModuleFlagBehaviorWarning, name.Value, (UIntPtr)name.Length, value);
         }
 
         private IDictionary<string, (TypeDefinition type, LLVMValueRef value)> WriteData()
