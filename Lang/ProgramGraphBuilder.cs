@@ -1503,7 +1503,12 @@ namespace Lang
             switch (ast)
             {
                 case IdentifierAst identifier:
-                    return GetVariable(identifier.Name, identifier, scope);
+                    var variableTypeDefinition = GetVariable(identifier.Name, identifier, scope);
+                    if (variableTypeDefinition.Constant)
+                    {
+                        AddError($"Cannot reassign value of constant variable '{identifier.Name}'", identifier);
+                    }
+                    return variableTypeDefinition;
                 case IndexAst index:
                 {
                     var variableType = GetVariable(index.Name, index, scope);
@@ -1983,6 +1988,7 @@ namespace Lang
                             var expressionType = GetReference(changeByOne.Value, currentFunction, scope, out _);
                             if (expressionType != null)
                             {
+                                changeByOne.Type = expressionType;
                                 var type = VerifyType(expressionType);
                                 if (type != TypeKind.Integer && type != TypeKind.Float)
                                 {

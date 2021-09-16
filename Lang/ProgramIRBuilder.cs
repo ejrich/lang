@@ -249,43 +249,28 @@ namespace Lang
                 case CallAst call:
                     return EmitCall(function, call, scope, block);
                 case ChangeByOneAst changeByOne:
-                    // var constant = false;
-                    // var (variableType, pointer) = changeByOne.Value switch
-                    // {
-                    //     IdentifierAst identifier => localVariables[identifier.Name],
-                    //     StructFieldRefAst structField => BuildStructField(structField, localVariables, out _, out constant),
-                    //     IndexAst index => GetIndexPointer(index, localVariables, out _),
-                    //     // @Cleanup This branch should never be hit
-                    //     _ => (null, new LLVMValueRef())
-                    // };
+                    var pointer = EmitGetReference(function, changeByOne.Value, scope, block);
+                    var previousValue = EmitLoad(block, pointer);
 
-                    // var value = constant ? pointer : _builder.BuildLoad(pointer, "tmpvalue");
-                    // if (variableType.TypeKind == TypeKind.Pointer)
-                    // {
-                    //     variableType = variableType.Generics[0];
-                    // }
-                    // var type = ConvertTypeDefinition(variableType);
+                    var constOne = new InstructionValue {ValueType = InstructionValueType.Constant, Type = changeByOne.Type};
+                    if (changeByOne.Type.PrimitiveType is IntegerType)
+                    {
+                        constOne.ConstantValue = new InstructionConstant {Integer = 1};
+                    }
+                    else if (changeByOne.Type.PrimitiveType.Bytes == 4)
+                    {
+                        constOne.ConstantValue = new InstructionConstant {Float = 1};
+                    }
+                    else
+                    {
+                        constOne.ConstantValue = new InstructionConstant {Double = 1};
+                    }
+                    var instructionType = changeByOne.Positive ? InstructionType.Add : InstructionType.Subtract;
+                    var newValue = EmitInstruction(instructionType, block, previousValue, constOne);
 
-                    // LLVMValueRef newValue;
-                    // if (variableType.PrimitiveType is IntegerType)
-                    // {
-                    //     newValue = changeByOne.Positive
-                    //         ? _builder.BuildAdd(value, LLVMValueRef.CreateConstInt(type, 1, false), "inc")
-                    //         : _builder.BuildSub(value, LLVMValueRef.CreateConstInt(type, 1, false), "dec");
-                    // }
-                    // else
-                    // {
-                    //     newValue = changeByOne.Positive
-                    //         ? _builder.BuildFAdd(value, LLVM.ConstReal(type, 1), "incf")
-                    //         : _builder.BuildFSub(value, LLVM.ConstReal(type, 1), "decf");
-                    // }
+                    EmitInstruction(InstructionType.Store, block, pointer, newValue);
 
-                    // if (!constant) // Values are either readonly or constants, so don't store
-                    // {
-                    //     LLVM.BuildStore(_builder, newValue, pointer);
-                    // }
-                    // return changeByOne.Prefix ? (variableType, newValue) : (variableType, value);
-                    break;
+                    return changeByOne.Prefix ? newValue : previousValue;
                 case UnaryAst unary:
                     InstructionValue value;
                     switch (unary.Operator)
