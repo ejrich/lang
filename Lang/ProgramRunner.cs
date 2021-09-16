@@ -410,7 +410,7 @@ namespace Lang
             }
             else if (declaration.ArrayValues != null)
             {
-                value = InitializeArray(declaration.Type, variables, arrayValues: declaration.ArrayValues);
+                value = InitializeArray(declaration.Type, variables, declaration.ArrayValues);
             }
             else
             {
@@ -502,7 +502,7 @@ namespace Lang
             else switch (field.Type.TypeKind)
             {
                 case TypeKind.Array:
-                    var array = InitializeArray(field.Type, variables, true);
+                    var array = InitializeArray(field.Type, variables, field.ArrayValues, true);
                     fieldInstance!.SetValue(instance, array);
                     break;
                 case TypeKind.Pointer:
@@ -529,7 +529,7 @@ namespace Lang
             }
         }
 
-        private object InitializeArray(TypeDefinition type, IDictionary<string, ValueType> variables, bool structField = false, List<IAst> arrayValues = null)
+        private object InitializeArray(TypeDefinition type, IDictionary<string, ValueType> variables, List<IAst> arrayValues = null, bool structField = false)
         {
             var arrayType = _types[type.GenericName];
             var elementTypeDef = type.Generics[0];

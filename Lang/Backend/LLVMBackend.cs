@@ -765,7 +765,7 @@ namespace Lang.Backend
             {
                 foreach (var field in structDef!.Fields)
                 {
-                    BuildAllocations(field);
+                    BuildFieldAllocations(field);
                 }
             }
             else
@@ -778,15 +778,15 @@ namespace Lang.Backend
                     }
                     else
                     {
-                        BuildAllocations(field);
+                        BuildFieldAllocations(field);
                     }
                 }
             }
         }
 
-        private void BuildAllocations(StructFieldAst field)
+        private void BuildFieldAllocations(StructFieldAst field)
         {
-            if (field.Type.TypeKind == TypeKind.Array && !field.Type.CArray && field.Type.Count != null)
+            if (field.Type.TypeKind == TypeKind.Array && !field.Type.CArray && field.Type.ConstCount != null)
             {
                 var elementType = field.Type.Generics[0];
                 var targetType = ConvertTypeDefinition(elementType);
@@ -901,9 +901,8 @@ namespace Lang.Backend
                         {
                             InitializeArrayValues(variable, elementType, declaration.ArrayValues, localVariables);
                         }
-                        return;
                     }
-                    if (declaration.Type.ConstCount != null)
+                    else if (declaration.Type.ConstCount != null)
                     {
                         var arrayPointer = InitializeConstArray(variable, declaration.Type.ConstCount.Value, elementType);
 
@@ -1004,10 +1003,22 @@ namespace Lang.Backend
             switch (field.Type.TypeKind)
             {
                 case TypeKind.Array:
-                    if (field.Type.CArray) return;
-                    if (field.Type.ConstCount != null)
+                    var elementType = field.Type.Generics[0];
+                    if (field.Type.CArray)
                     {
-                        InitializeConstArray(fieldPointer, field.Type.ConstCount.Value, field.Type.Generics[0]);
+                        if (field.ArrayValues != null)
+                        {
+                            InitializeArrayValues(fieldPointer, elementType, field.ArrayValues, localVariables);
+                        }
+                    }
+                    else if (field.Type.ConstCount != null)
+                    {
+                        var arrayPointer = InitializeConstArray(fieldPointer, field.Type.ConstCount.Value, elementType);
+
+                        if (field.ArrayValues != null)
+                        {
+                            InitializeArrayValues(arrayPointer, elementType, field.ArrayValues, localVariables);
+                        }
                     }
                     else
                     {

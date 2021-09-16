@@ -521,7 +521,6 @@ namespace Lang
                     }
                     else if (structField.Assignments != null)
                     {
-                        // TODO Is this still right?
                         AddError("Struct literals are not yet supported", structField);
                     }
                     else if (structField.ArrayValues != null)
