@@ -99,6 +99,7 @@ namespace Lang
         Jump,
         ConditionalJump,
         Return,
+        ReturnVoid,
         Load,
         LoadAllocation,
         Store,
