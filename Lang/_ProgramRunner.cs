@@ -24,7 +24,21 @@ namespace Lang
         [FieldOffset(0)] public IntPtr Pointer;
     }
 
-    public unsafe class _ProgramRunner //: IProgramRunner
+    [StructLayout(LayoutKind.Explicit)]
+    public struct String
+    {
+        [FieldOffset(0)] public int Length;
+        [FieldOffset(4)] public IntPtr Data;
+    }
+
+    public interface _IProgramRunner
+    {
+        void Init();
+        void RunProgram(FunctionIR function, IAst source);
+        bool ExecuteCondition(FunctionIR function, IAst source);
+    }
+
+    public unsafe class _ProgramRunner : _IProgramRunner
     {
         private ModuleBuilder _moduleBuilder;
         private int _version;
@@ -37,10 +51,6 @@ namespace Lang
 
         private int _globalVariablesSize;
         private IntPtr[] _globals;
-
-        private readonly Dictionary<string, string> _compilerFunctions = new() {
-            { "add_dependency", "AddDependency" }
-        };
 
         public void Init()
         {
@@ -68,27 +78,26 @@ namespace Lang
                     if (!_functionIndices.TryGetValue(function.Name, out var functionIndex))
                         _functionIndices[function.Name] = functionIndex = new List<int>();
 
-                    // var returnType = GetTypeFromDefinition(function.ReturnTypeDefinition);
-
                     if (function.Flags.HasFlag(FunctionFlags.Varargs))
                     {
                         for (var i = functionIndex.Count; i < function.VarargsCalls.Count; i++)
                         {
-                    //         functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
-                    //         var callTypes = function.VarargsCalls[i];
-                    //         var varargs = callTypes.Select(arg => GetTypeFromDefinition(arg, cCall: true)).ToArray();
-                    //         CreateFunction(functionTypeBuilder, function.Name, function.ExternLib, returnType, varargs);
-                    //         functionIndex.Add(_version);
+                            functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
+                            var callTypes = function.VarargsCalls[i];
+                            var varargsTypes = new Type[callTypes.Count];
+                            Array.Fill(varargsTypes, typeof(Register));
+                            CreateFunction(functionTypeBuilder, function.Name, function.ExternLib, varargsTypes);
+                            functionIndex.Add(_version);
                         }
                     }
                     else
                     {
                         if (!functionIndex.Any())
                         {
-                    //         functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
-                    //         var args = function.Arguments.Select(arg => GetTypeFromDefinition(arg.TypeDefinition, cCall: true)).ToArray();
-                    //         CreateFunction(functionTypeBuilder, function.Name, function.ExternLib, returnType, args);
-                    //         functionIndex.Add(_version);
+                            functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
+                            var args = function.Arguments.Select(_ => typeof(Register)).ToArray();
+                            CreateFunction(functionTypeBuilder, function.Name, function.ExternLib, args);
+                            functionIndex.Add(_version);
                         }
                     }
                 }
@@ -319,13 +328,19 @@ namespace Lang
                 // }
 
                 // Set the data pointer
-                fixed (IntPtr* pointer = &_typeInfoPointers[0])
-                {
-                    var dataPointer = _typeTablePointer + 4;
-                    Buffer.MemoryCopy(pointer, dataPointer.ToPointer(), 8, 8);
-                }
+                // fixed (IntPtr* pointer = &_typeInfoPointers[0])
+                // {
+                //     var dataPointer = _typeTablePointer + 4;
+                //     Buffer.MemoryCopy(pointer, dataPointer.ToPointer(), 8, 8);
+                // }
             }
+        }
 
+        private void CreateFunction(TypeBuilder typeBuilder, string name, string library, Type[] args)
+        {
+            var method = typeBuilder.DefineMethod(name, MethodAttributes.Public | MethodAttributes.Static, typeof(Register), args);
+            var caBuilder = new CustomAttributeBuilder(typeof(DllImportAttribute).GetConstructor(new []{typeof(string)}), new []{library});
+            method.SetCustomAttribute(caBuilder);
         }
 
         public void RunProgram(FunctionIR function, IAst source)
@@ -360,9 +375,10 @@ namespace Lang
             }
         }
 
-        private void AddDependency(string library)
+        private void AddDependency(String library)
         {
-            BuildSettings.Dependencies.Add(library);
+            var lib = Marshal.PtrToStringAnsi(library.Data);
+            BuildSettings.Dependencies.Add(lib);
         }
 
         private Register ExecuteFunction(FunctionIR function, Register[] arguments)
@@ -403,14 +419,14 @@ namespace Lang
                     {
                         var pointer = GetPointerValue(instruction.Value1, registers, stackPointer, function);
                         var register = new Register();
-                        switch (instruction.Value2.Type.TypeKind)
+                        switch (instruction.Value1.Type.TypeKind)
                         {
                             case TypeKind.Boolean:
                                 register.Bool = Marshal.PtrToStructure<bool>(pointer.Pointer);
                                 break;
                             case TypeKind.Integer:
                             case TypeKind.Enum:
-                                switch (instruction.Value2.Type.Size)
+                                switch (instruction.Value1.Type.Size)
                                 {
                                     case 1:
                                         register.Byte = Marshal.PtrToStructure<byte>(pointer.Pointer);
@@ -427,7 +443,7 @@ namespace Lang
                                 }
                                 break;
                             case TypeKind.Float:
-                                if (instruction.Value2.Type.Size == 4)
+                                if (instruction.Value1.Type.Size == 4)
                                 {
                                     register.Float = Marshal.PtrToStructure<float>(pointer.Pointer);
                                 }
@@ -437,8 +453,8 @@ namespace Lang
                                 }
                                 break;
                             case TypeKind.Pointer:
-                                register.Pointer = Marshal.ReadIntPtr(pointer.Pointer);
-                                break;
+                                // register.Pointer = Marshal.ReadIntPtr(pointer.Pointer);
+                                // break;
                             case TypeKind.String:
                             case TypeKind.Array:
                             case TypeKind.Struct:
@@ -536,50 +552,59 @@ namespace Lang
                     case InstructionType.Call:
                     {
                         var callingFunction = Program.Functions[instruction.String];
-                        var callArguments = new Register[instruction.Value1.Values.Length];
-                        for (var i = 0; i < instruction.Value1.Values.Length; i++)
-                        {
-                            arguments[i] = GetValue(instruction.Value1.Values[i], registers);
-                        }
 
                         if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Extern))
                         {
-                            // TODO Implement me
-                            // var args = arguments.Select(GetCArg).ToArray();
-                            // if (function.Varargs)
-                            // {
-                            //     var functionIndex = _functionIndices[functionName][callIndex];
-                            //     var (type, functionObject) = _functionLibraries[functionIndex];
-                            //     var functionDecl = type.GetMethod(functionName, argumentTypes!);
-                            //     var returnValue = functionDecl.Invoke(functionObject, args);
-                            //     return new ValueType {Type = function.ReturnTypeDefinition, Value = returnValue};
-                            // }
-                            // else
-                            // {
-                            //     var functionIndex = _functionIndices[functionName][callIndex];
-                            //     var (type, functionObject) = _functionLibraries[functionIndex];
-                            //     var functionDecl = type.GetMethod(functionName);
-                            //     var returnValue = functionDecl.Invoke(functionObject, args);
-                            //     return new ValueType {Type = function.ReturnTypeDefinition, Value = returnValue};
-                            // }
-                        }
-                        else if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Compiler))
-                        {
-                            if (!_compilerFunctions.TryGetValue(callingFunction.Source.Name, out var name))
+                            var args = new object[instruction.Value1.Values.Length];
+                            for (var i = 0; i < args.Length; i++)
                             {
-                                ErrorReporter.Report($"Undefined compiler function '{callingFunction.Source.Name}'", callingFunction.Source);
+                                args[i] = GetValue(instruction.Value1.Values[i], registers);
+                            }
+
+                            if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Varargs))
+                            {
+                                var functionIndex = _functionIndices[instruction.String][instruction.Index];
+                                var (type, functionObject) = _functionLibraries[functionIndex];
+                                var argumentTypes = new Type[args.Length];
+                                Array.Fill(argumentTypes, typeof(Register));
+                                var functionDecl = type.GetMethod(instruction.String, argumentTypes!);
+                                var returnValue = functionDecl.Invoke(functionObject, args);
+                                registers[instruction.ValueIndex] = (Register)returnValue;
                             }
                             else
                             {
-                                var functionDecl = typeof(ProgramRunner).GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance);
-                                // TODO Implement me
-                                // var returnValue = functionDecl.Invoke(this, args);
-                                // registers[instruction.ValueIndex] = returnValue;
+                                var functionIndex = _functionIndices[instruction.String][instruction.Index];
+                                var (type, functionObject) = _functionLibraries[functionIndex];
+                                var functionDecl = type.GetMethod(instruction.String);
+                                var returnValue = functionDecl.Invoke(functionObject, args);
+                                registers[instruction.ValueIndex] = (Register)returnValue;
                             }
+                        }
+                        else if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Compiler))
+                        {
+                            var returnValue = new Register();
+                            switch (instruction.String)
+                            {
+                                case "add_dependency":
+                                    var value = GetValue(instruction.Value1.Values[0], registers);
+                                    var library = Marshal.PtrToStructure<String>(value.Pointer);
+                                    AddDependency(library);
+                                    break;
+                                default:
+                                    ErrorReporter.Report($"Undefined compiler function '{callingFunction.Source.Name}'", callingFunction.Source);
+                                    break;
+                            }
+                            registers[instruction.ValueIndex] = returnValue;
                         }
                         else
                         {
-                            registers[instruction.ValueIndex] = ExecuteFunction(callingFunction, arguments);
+                            var args = new Register[instruction.Value1.Values.Length];
+                            for (var i = 0; i < instruction.Value1.Values.Length; i++)
+                            {
+                                args[i] = GetValue(instruction.Value1.Values[i], registers);
+                            }
+
+                            registers[instruction.ValueIndex] = ExecuteFunction(callingFunction, args);
                         }
                         break;
                     }
@@ -1457,9 +1482,9 @@ namespace Lang
             const int stringLength = 12;
             var stringPointer = Marshal.AllocHGlobal(stringLength);
 
-            Marshal.StructureToPtr<int>(value.Length, stringPointer, false);
+            Marshal.StructureToPtr(value.Length, stringPointer, false);
             var s = Marshal.StringToHGlobalAnsi(value);
-            Marshal.StructureToPtr<IntPtr>(s, stringPointer + 4, false);
+            Marshal.StructureToPtr(s, stringPointer + 4, false);
 
             return stringPointer;
         }
