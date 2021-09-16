@@ -1117,15 +1117,11 @@ namespace Lang.Translation
 
             if (typeDef.IsGeneric)
             {
-                var hasError = false;
-                foreach (var generic in typeDef.Generics)
+                if (typeDef.Generics.Any())
                 {
-                    if (VerifyType(generic, errors) == Type.Error)
-                    {
-                        hasError = true;
-                    }
+                    errors.Add(CreateError("Generic type cannot have additional generic types", typeDef));
                 }
-                return hasError ? Type.Error : Type.Other;
+                return Type.Other;
             }
 
             var hasGenerics = typeDef.Generics.Any();
@@ -1279,10 +1275,7 @@ namespace Lang.Translation
 
         private void CreatePolymorphedStruct(StructAst structAst, string name, params TypeDefinition[] genericTypes)
         {
-            var polyStruct = new StructAst
-            {
-                Name = name
-            };
+            var polyStruct = new StructAst {Name = name};
             foreach (var field in structAst.Fields)
             {
                 if (field.HasGeneric)
