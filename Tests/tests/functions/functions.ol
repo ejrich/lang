@@ -84,7 +84,8 @@ T add_int<T>(T a, int b) {
     return value;
 }
 
-baz<T, U>(List<T> list, U* b) {
+struct RCG<I> {I a;} // TODO Remove when done
+baz<T, U>(List<T> list, U* b, RCG<T> c) {
     #assert U == float || U == s32;
     #if U == float then printf("b = %.2f\n", *b);
     else {
