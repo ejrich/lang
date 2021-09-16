@@ -1439,6 +1439,10 @@ namespace Lang.Backend
             switch (constant.Type.PrimitiveType)
             {
                 case IntegerType integerType:
+                    if (constant.Type.Character)
+                    {
+                        return LLVM.ConstInt(type, (byte)constant.Value[0], false);
+                    }
                     if (integerType.Bytes == 8 && !integerType.Signed)
                     {
                         return LLVM.ConstInt(type, ulong.Parse(constant.Value), false);

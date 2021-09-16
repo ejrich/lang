@@ -1538,6 +1538,7 @@ namespace Lang
                 case TokenType.Number:
                 case TokenType.Boolean:
                 case TokenType.Literal:
+                case TokenType.Character:
                     // Parse constant
                     var constant = CreateAst<ConstantAst>(token);
                     constant.Type = InferType(token, errors);
@@ -2557,6 +2558,11 @@ namespace Lang
             {
                 case TokenType.Literal:
                     typeDefinition.Name = "string";
+                    return typeDefinition;
+                case TokenType.Character:
+                    typeDefinition.Name = "u8";
+                    typeDefinition.Character = true;
+                    typeDefinition.PrimitiveType = new IntegerType {Bytes = 1};
                     return typeDefinition;
                 case TokenType.Number:
                     if (token.Flags == TokenFlags.None)

@@ -50,7 +50,7 @@ string format_string(string format, Params<string> args) {
 
     while format_index < format.length {
         char := format[format_index];
-        if char == 37 { // TODO Have a character syntax
+        if char == '%' {
             arg := args[arg_index++];
             each i in 0..arg.length - 1 {
                 str[str.length++] = arg[i];

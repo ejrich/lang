@@ -20,13 +20,13 @@ string_compare() {
 string_indexing() {
     a := "Hello world!";
 
-    a[2] = 0x65; // TODO Char syntax
+    a[2] = 'e';
 
     printf("%s\n", a);
     assert(a == "Heelo world!");
 
     b: StringStruct = {foo = 12; bar = "Hey what's up";}
-    b.bar[2] = 0x65; // TODO Char syntax
+    b.bar[2] = 'e';
 
     printf("%s\n", b.bar);
     assert(b.bar == "Hee what's up");
