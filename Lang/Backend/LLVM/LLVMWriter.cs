@@ -247,18 +247,66 @@ namespace Lang.Backend.LLVM
             {
                 case ReturnAst:
                     return true;
-                case DeclarationAst declaration:
-                    var type = ConvertTypeDefinition(declaration.Type);
-                    if (declaration.Type.Name == "List" || (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind && StructHasList(declaration.Type.GenericName)))
+                case CallAst call:
+                {
+                    if (call.Params)
                     {
-                        BuildStackPointer();
+                        var functionDef = _functions[call.Function];
+
+                        var paramsTypeDef = functionDef.Arguments[^1].Type;
+                        var paramsType = ConvertTypeDefinition(paramsTypeDef);
+
+                        var paramsVariable = LLVMApi.BuildAlloca(_builder, paramsType, "params");
+                        _allocationQueue.Enqueue(paramsVariable);
+
+                        var targetType = ConvertTypeDefinition(paramsTypeDef);
+                        var arrayType = LLVMTypeRef.ArrayType(targetType, (uint)(call.Arguments.Count - functionDef.Arguments.Count + 1));
+                        var listData = LLVMApi.BuildAlloca(_builder, arrayType, "listdata");
+                        _allocationQueue.Enqueue(listData);
+
+                        if (paramsTypeDef.Generics.Any()) break;
+
+                        // TODO Initialize Any arguments
+                        // for (var i = functionDef.Arguments.Count - 1; i < call.Arguments.Count; i++)
+                        // {
+                        //     var anyVariable = LLVMApi.BuildAlloca(_builder, LLVMApi.GetTypeByName(_module, "Any"), "any");
+                        //     _allocationQueue.Enqueue(anyVariable);
+                        // }
                     }
 
+                    foreach (var argument in call.Arguments)
+                    {
+                        BuildAllocations(argument);
+                    }
+                    break;
+                }
+                case DeclarationAst declaration:
+                    var type = ConvertTypeDefinition(declaration.Type);
                     var variable = LLVMApi.BuildAlloca(_builder, type, declaration.Name);
                     _allocationQueue.Enqueue(variable);
+
+                    if (declaration.Type.Name == "List")
+                    {
+                        if (declaration.Type.Count is ConstantAst constant)
+                        {
+                            var listType = declaration.Type.Generics[0];
+                            var targetType = ConvertTypeDefinition(listType);
+                            var arrayType = LLVMTypeRef.ArrayType(targetType, uint.Parse(constant.Value));
+                            var listData = LLVMApi.BuildAlloca(_builder, arrayType, "listdata");
+                            _allocationQueue.Enqueue(listData);
+                        }
+                        else if (declaration.Type.Count != null)
+                        {
+                            BuildStackPointer();
+                        }
+                    }
+                    else if (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind)
+                    {
+                        BuildStructAllocations(declaration.Type.GenericName);
+                    }
                     break;
-                case ScopeAst scope:
-                    foreach (var childAst in scope.Children)
+                case ScopeAst:
+                    foreach (var childAst in ast.Children)
                     {
                         if (BuildAllocations(childAst))
                         {
@@ -267,6 +315,7 @@ namespace Lang.Backend.LLVM
                     }
                     break;
                 case ConditionalAst conditional:
+                    BuildAllocations(conditional.Condition);
                     var ifReturned = false;
                     foreach (var childAst in conditional.Children)
                     {
@@ -304,29 +353,37 @@ namespace Lang.Backend.LLVM
                         }
                     }
                     break;
+                case ExpressionAst:
+                    foreach (var childAst in ast.Children)
+                    {
+                        BuildAllocations(childAst);
+                    }
+                    break;
             }
             return false;
         }
 
-        private bool StructHasList(string name)
+        private void BuildStructAllocations(string name)
         {
             var structDef = _types[name] as StructAst;
             foreach (var field in structDef!.Fields)
             {
                 if (field.Type.Name == "List")
                 {
-                    return true;
+                    var listType = field.Type.Generics[0];
+                    var targetType = ConvertTypeDefinition(listType);
+
+                    var count = (ConstantAst)field.Type.Count;
+                    var arrayType = LLVMTypeRef.ArrayType(targetType, uint.Parse(count.Value));
+                    var listData = LLVMApi.BuildAlloca(_builder, arrayType, "listdata");
+                    _allocationQueue.Enqueue(listData);
+                    continue;
                 }
 
                 if (ConvertTypeDefinition(field.Type).TypeKind != LLVMTypeKind.LLVMStructTypeKind) continue;
 
-                if (StructHasList(field.Type.GenericName))
-                {
-                    return true;
-                }
+                BuildStructAllocations(field.Type.GenericName);
             }
-
-            return false;
         }
 
         private bool WriteFunctionLine(IAst ast, IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, LLVMValueRef function)
@@ -395,7 +452,6 @@ namespace Lang.Backend.LLVM
             // 3. Initialize lists
             else if (declaration.Type.Name == "List")
             {
-                BuildStackSave();
                 var listType = declaration.Type.Generics[0];
                 if (declaration.Type.Count is ConstantAst constant)
                 {
@@ -403,6 +459,7 @@ namespace Lang.Backend.LLVM
                 }
                 else if (declaration.Type.Count != null)
                 {
+                    BuildStackSave();
                     var (_, count) = WriteExpression(declaration.Type.Count, localVariables);
 
                     var countPointer = LLVMApi.BuildStructGEP(_builder, variable, 0, "countptr");
@@ -441,7 +498,6 @@ namespace Lang.Backend.LLVM
 
                 if (structField.Type.Name == "List")
                 {
-                    BuildStackSave();
                     var count = (ConstantAst)structField.Type.Count;
                     InitializeConstList(field, int.Parse(count.Value), structField.Type.Generics[0]);
                 }
@@ -457,7 +513,7 @@ namespace Lang.Backend.LLVM
             }
         }
 
-        private void InitializeConstList(LLVMValueRef list, int length, TypeDefinition listType)
+        private void InitializeConstList(LLVMValueRef list, int length, TypeDefinition listType = null)
         {
             // 1. Set the count field
             var countValue = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (ulong)length, false);
@@ -466,8 +522,7 @@ namespace Lang.Backend.LLVM
 
             // 2. Initialize the list data array
             var targetType = ConvertTypeDefinition(listType);
-            var arrayType = LLVMTypeRef.ArrayType(targetType, (uint)length);
-            var listData = LLVMApi.BuildAlloca(_builder, arrayType, "listdata");
+            var listData = _allocationQueue.Dequeue();
             var listDataPointer = LLVMApi.BuildBitCast(_builder, listData, LLVMTypeRef.PointerType(targetType, 0), "tmpdata");
             var dataPointer = LLVMApi.BuildStructGEP(_builder, list, 1, "dataptr");
             LLVMApi.BuildStore(_builder, listDataPointer, dataPointer);
@@ -766,16 +821,13 @@ namespace Lang.Backend.LLVM
                         }
 
                         // Rollup the rest of the arguments into a list
-                        var paramsTypeDef = functionDef.Arguments[^1].Type;
-                        var paramsType = ConvertTypeDefinition(paramsTypeDef);
-                        BuildStackPointer();
-                        BuildStackSave();
-                        var paramsPointer = LLVMApi.BuildAlloca(_builder, paramsType, "paramsptr");
-                        InitializeConstList(paramsPointer, call.Arguments.Count - functionDef.Arguments.Count + 1, paramsTypeDef.Generics[0]); // TODO Handle 'Any' type params
+                        var paramsPointer = _allocationQueue.Dequeue();
+                        InitializeConstList(paramsPointer, call.Arguments.Count - functionDef.Arguments.Count + 1);
 
                         var listData = LLVMApi.BuildStructGEP(_builder, paramsPointer, 1, "listdata");
                         var dataPointer = LLVMApi.BuildLoad(_builder, listData, "dataptr");
 
+                        // TODO Handle Any arguments
                         ulong paramsIndex = 0;
                         for (var i = functionDef.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
                         {
@@ -1290,6 +1342,11 @@ namespace Lang.Backend.LLVM
 
         private LLVMTypeRef ConvertTypeDefinition(TypeDefinition type)
         {
+            if (type == null)
+            {
+                return LLVMApi.GetTypeByName(_module, "Any");
+            }
+
             if (type.Name == "*")
             {
                 return LLVMTypeRef.PointerType(ConvertTypeDefinition(type.Generics[0]), 0);
@@ -1322,8 +1379,7 @@ namespace Lang.Backend.LLVM
         {
             if (isParams && type.Generics.Count == 0)
             {
-                // TODO Get params without generic
-                return LLVMApi.GetTypeByName(_module, "List.int");
+                return LLVMApi.GetTypeByName(_module, "List.Any");
             }
             var listType = type.Generics[0];
             return LLVMApi.GetTypeByName(_module, $"List.{listType.Name}");
