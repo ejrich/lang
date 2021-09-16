@@ -624,7 +624,7 @@ namespace Lang.Translation
             // 3. Resolve the compiler directives in the function
             if (function.HasDirectives)
             {
-                ResolveCompilerDirectives(function.Children);
+                ResolveCompilerDirectives(function.Children, function);
             }
 
             // 4. Loop through function body and verify all ASTs
@@ -644,7 +644,7 @@ namespace Lang.Translation
             function.Verified = true;
         }
 
-        private void ResolveCompilerDirectives(List<IAst> asts)
+        private void ResolveCompilerDirectives(List<IAst> asts, FunctionAst function)
         {
             for (int i = 0; i < asts.Count; i++)
             {
@@ -654,11 +654,11 @@ namespace Lang.Translation
                     case ScopeAst:
                     case WhileAst:
                     case EachAst:
-                        ResolveCompilerDirectives(ast.Children);
+                        ResolveCompilerDirectives(ast.Children, function);
                         break;
                     case ConditionalAst conditional:
-                        ResolveCompilerDirectives(conditional.Children);
-                        ResolveCompilerDirectives(conditional.Else);
+                        ResolveCompilerDirectives(conditional.Children, function);
+                        ResolveCompilerDirectives(conditional.Else, function);
                         break;
                     case CompilerDirectiveAst directive:
                         asts.RemoveAt(i);
@@ -686,7 +686,7 @@ namespace Lang.Translation
                                     _programRunner.Init(_programGraph);
                                     if (!_programRunner.ExecuteCondition(directive.Value))
                                     {
-                                        AddError("Assertion failed", directive.Value);
+                                        AddError($"Assertion failed in function '{function.Name}'", directive.Value);
                                     }
                                 }
                                 break;
