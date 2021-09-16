@@ -470,27 +470,7 @@ namespace Lang
                 }
             }
 
-            // 2. Verify main function return type and arguments
-            if (main)
-            {
-                if (returnType != TypeKind.Void && returnType != TypeKind.Integer)
-                {
-                    AddError("The main function should return type 'int' or 'void'", function);
-                }
-
-                var argument = function.Arguments.FirstOrDefault();
-                if (argument != null && !(function.Arguments.Count == 1 && argument.Type.Name == "List" && argument.Type.Generics.FirstOrDefault()?.Name == "string"))
-                {
-                    AddError("The main function should either have 0 arguments or 'List<string>' argument", function);
-                }
-
-                if (function.Generics.Any())
-                {
-                    AddError("The main function cannot have generics", function);
-                }
-            }
-
-            // 3. Verify the argument types
+            // 2. Verify the argument types
             var argumentNames = new HashSet<string>();
             foreach (var argument in function.Arguments)
             {
@@ -564,6 +544,26 @@ namespace Lang
                     {
                         AddError($"Type of argument '{argument.Name}' in function '{function.Name}' is '{PrintTypeDefinition(argument.Type)}', but default value is 'null'", argument.Value);
                     }
+                }
+            }
+
+            // 3. Verify main function return type and arguments
+            if (main)
+            {
+                if (returnType != TypeKind.Void && returnType != TypeKind.Integer)
+                {
+                    AddError("The main function should return type 'int' or 'void'", function);
+                }
+
+                var argument = function.Arguments.FirstOrDefault();
+                if (argument != null && !(function.Arguments.Count == 1 && argument.Type.TypeKind == TypeKind.Array && argument.Type.Generics.FirstOrDefault()?.TypeKind == TypeKind.String))
+                {
+                    AddError("The main function should either have 0 arguments or 'Array<string>' argument", function);
+                }
+
+                if (function.Generics.Any())
+                {
+                    AddError("The main function cannot have generics", function);
                 }
             }
 
@@ -1602,10 +1602,10 @@ namespace Lang
                     eachIdentifiers.TryAdd(each.IndexVariable, indexVariable);
                 }
 
-                switch (variableTypeDefinition.Name)
+                switch (variableTypeDefinition.TypeKind)
                 {
-                    case "List":
-                    case "Params":
+                    case TypeKind.Array:
+                    case TypeKind.Params:
                         each.IteratorType = iterator.Type;
                         eachIdentifiers.TryAdd(each.IterationVariable, iterator);
                         break;
@@ -2805,7 +2805,7 @@ namespace Lang
 
         private TypeDefinition VerifyIndex(IndexAst index, TypeDefinition typeDef, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers, out bool overloaded)
         {
-            // 1. Verify the variable is a list or the operator overload exists
+            // 1. Verify the variable is an array or the operator overload exists
             overloaded = false;
             var type = VerifyType(typeDef);
             TypeDefinition elementType = null;
@@ -2819,13 +2819,13 @@ namespace Lang
                     overloaded = true;
                     elementType = VerifyOperatorOverloadType(typeDef, Operator.Subscript, currentFunction, index);
                     break;
-                case TypeKind.List:
+                case TypeKind.Array:
                 case TypeKind.Params:
                 case TypeKind.Pointer:
                     elementType = typeDef.Generics.FirstOrDefault();
                     if (elementType == null)
                     {
-                        AddError("Unable to determine element type of the List", index);
+                        AddError("Unable to determine element type of the Array", index);
                     }
                     break;
                 case TypeKind.String:
@@ -2927,12 +2927,12 @@ namespace Lang
                 return TypeKind.Generic;
             }
 
-            if (typeDef.CArray && typeDef.Name != "List")
+            if (typeDef.CArray && typeDef.Name != "Array")
             {
-                AddError("Directive #c_array can only be applied to List", typeDef);
+                AddError("Directive #c_array can only be applied to arrays", typeDef);
             }
 
-            if (typeDef.Count != null && typeDef.Name != "List")
+            if (typeDef.Count != null && typeDef.Name != "Array")
             {
                 AddError($"Type '{PrintTypeDefinition(typeDef)}' cannot have a count", typeDef);
                 return TypeKind.Error;
@@ -2986,19 +2986,19 @@ namespace Lang
                         typeDef.TypeKind = TypeKind.String;
                     }
                     break;
-                case "List":
+                case "Array":
                     if (typeDef.Generics.Count != 1)
                     {
-                        AddError($"Type 'List' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
+                        AddError($"Type 'Array' should have 1 generic type, but got {typeDef.Generics.Count}", typeDef);
                         typeDef.TypeKind = TypeKind.Error;
                     }
-                    else if (!VerifyList(typeDef, depth, argument, out var hasGenericTypes))
+                    else if (!VerifyArray(typeDef, depth, argument, out var hasGenericTypes))
                     {
                         typeDef.TypeKind = TypeKind.Error;
                     }
                     else
                     {
-                        typeDef.TypeKind = hasGenericTypes ? TypeKind.Generic : TypeKind.List;
+                        typeDef.TypeKind = hasGenericTypes ? TypeKind.Generic : TypeKind.Array;
                     }
                     break;
                 case "void":
@@ -3072,7 +3072,7 @@ namespace Lang
                     }
                     else
                     {
-                        typeDef.TypeKind = VerifyList(typeDef, depth, argument, out _) ? TypeKind.Params : TypeKind.Error;
+                        typeDef.TypeKind = VerifyArray(typeDef, depth, argument, out _) ? TypeKind.Params : TypeKind.Error;
                     }
                     break;
                 case "Type":
@@ -3164,11 +3164,11 @@ namespace Lang
             return typeDef.TypeKind.Value;
         }
 
-        private bool VerifyList(TypeDefinition typeDef, int depth, bool argument, out bool hasGenerics)
+        private bool VerifyArray(TypeDefinition typeDef, int depth, bool argument, out bool hasGenerics)
         {
             hasGenerics = false;
-            var listType = typeDef.Generics[0];
-            var genericType = VerifyType(listType, depth + 1, argument);
+            var elementType = typeDef.Generics[0];
+            var genericType = VerifyType(elementType, depth + 1, argument);
             if (genericType == TypeKind.Error)
             {
                 return false;
@@ -3179,20 +3179,20 @@ namespace Lang
                 return true;
             }
 
-            var genericName = $"List.{listType.GenericName}";
+            var genericName = $"Array.{elementType.GenericName}";
             if (_programGraph.Types.ContainsKey(genericName))
             {
                 return true;
             }
-            if (!_polymorphicStructs.TryGetValue("List", out var structDef))
+            if (!_polymorphicStructs.TryGetValue("Array", out var structDef))
             {
                 AddError($"No polymorphic structs with name '{typeDef.Name}'", typeDef);
                 return false;
             }
 
-            var listStruct = _polymorpher.CreatePolymorphedStruct(structDef, $"List<{PrintTypeDefinition(listType)}>", TypeKind.List, _programGraph.TypeCount++, listType);
-            _programGraph.Types.Add(genericName, listStruct);
-            VerifyStruct(listStruct);
+            var arrayStruct = _polymorpher.CreatePolymorphedStruct(structDef, $"Array<{PrintTypeDefinition(elementType)}>", TypeKind.Array, _programGraph.TypeCount++, elementType);
+            _programGraph.Types.Add(genericName, arrayStruct);
+            VerifyStruct(arrayStruct);
             return true;
         }
 
