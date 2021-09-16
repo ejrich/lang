@@ -337,7 +337,7 @@ namespace Lang
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
-        public TypeKind? Type { get; set; }
+        public TypeKind? TypeKind { get; set; }
         public string Name { get; set; }
         public bool IsGeneric { get; set; }
         public bool Constant { get; set; }
