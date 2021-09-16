@@ -1086,7 +1086,7 @@ namespace Lang.Translation
                                     }
                                     else if (argument.PrimitiveType != null && call.Arguments[i] is ConstantAst constant)
                                     {
-                                        VerifyConstant(constant, functionArg.Type, errors);
+                                        callError = true;
                                     }
                                 }
                             }
@@ -1143,22 +1143,12 @@ namespace Lang.Translation
                                         // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
                                         if (argument.PrimitiveType is FloatType {Bytes: 4})
                                         {
-                                            arguments[i] = argument = new TypeDefinition
-                                            {
-                                                Name = "float64", PrimitiveType = new FloatType {Bytes = 8}
-                                            };
-                                        }
-                                        if (!TypeEquals(callTypes[i], argument, true))
-                                        {
-                                            callMatches = false;
-                                            break;
+                                            callError = true;
                                         }
                                     }
-
-                                    if (callMatches)
+                                    else
                                     {
-                                        found = true;
-                                        break;
+                                        callError = true;
                                     }
                                 }
                             }
@@ -1174,6 +1164,16 @@ namespace Lang.Translation
                             errors.Add(CreateError($"Call to function '{function.Name}' expected arguments (" +
                                 $"{string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.Type)))})", call));
                         }
+
+                        if (callError)
+                        {
+                            errors.Add(CreateError($"Call to function '{function.Name}' expected arguments (" +
+                                $"{string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.Type)))})", call));
+                        }
+                    }
+                    else
+                    {
+                        errors.Add(CreateError($"Call to undefined function '{call.Function}'", call));
                     }
                     return function?.ReturnType;
                 case ExpressionAst expression:
