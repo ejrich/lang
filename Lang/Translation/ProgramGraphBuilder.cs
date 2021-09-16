@@ -1109,7 +1109,6 @@ namespace Lang.Translation
 
         private bool VerifyCondition(IAst ast, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
-            var errorCount = _programGraph.Errors.Count;
             var conditionalType = VerifyExpression(ast, currentFunction, scopeIdentifiers);
             switch (VerifyType(conditionalType))
             {
@@ -1118,7 +1117,7 @@ namespace Lang.Translation
                 case Type.Boolean:
                 case Type.Pointer:
                     // Valid types
-                    return errorCount == _programGraph.Errors.Count;
+                    return !_programGraph.Errors.Any();
                 case Type.Error:
                     AddError($"Expected condition to be bool, int, float, or pointer", ast);
                     return false;
