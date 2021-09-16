@@ -280,7 +280,7 @@ u32 sleep(u32 seconds) #extern "libc"
 
 #run {
     default_args(87);
-    //set_global(99);
+    set_global(99);
     node: Node;
     node.value = 7;
     printf("Node Value = %d\n", node.value);
