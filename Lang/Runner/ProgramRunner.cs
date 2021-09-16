@@ -22,6 +22,7 @@ namespace Lang.Runner
 
         private ProgramGraph _programGraph;
         private int _typeCount;
+        private IntPtr _typeDataPointer;
 
         private readonly Dictionary<string, List<int>> _functionIndices = new();
         private readonly List<(Type type, object libraryObject)> _functionLibraries = new();
@@ -151,13 +152,22 @@ namespace Lang.Runner
             {
                 _typeCount = programGraph.Types.Count;
 
+                // Free old data
+                var typeTableVariable = _globalVariables["__type_table"];
+                var oldPointer = GetPointer(typeTableVariable.Value);
+                if (_typeDataPointer != IntPtr.Zero)
+                {
+                    Marshal.FreeHGlobal(_typeDataPointer);
+                }
+                Marshal.FreeHGlobal(oldPointer);
+
                 // Get required types and allocate the array
                 var typeInfoListType = _types["List.*.TypeInfo"];
                 var typeInfoType = _types["TypeInfo"];
                 var typeInfoPointerType = typeInfoType.MakePointerType();
 
                 var typeTable = Activator.CreateInstance(typeInfoListType);
-                var typeDataPointer = InitializeConstList(typeTable, typeInfoListType, typeInfoPointerType, programGraph.TypeCount);
+                _typeDataPointer = InitializeConstList(typeTable, typeInfoListType, typeInfoPointerType, programGraph.TypeCount);
 
                 // Create TypeInfo pointers
                 const int pointerSize = 8;
@@ -179,7 +189,7 @@ namespace Lang.Runner
                         newTypeInfos.Add((type, typeInfo, typeInfoPointer));
                     }
 
-                    var listPointer = IntPtr.Add(typeDataPointer, type.TypeIndex * pointerSize);
+                    var listPointer = IntPtr.Add(_typeDataPointer, type.TypeIndex * pointerSize);
                     Marshal.StructureToPtr(typeInfoPointer, listPointer, false);
                 }
 
@@ -201,7 +211,7 @@ namespace Lang.Runner
                             newTypeInfos.Add((function, typeInfo, typeInfoPointer));
                         }
 
-                        var listPointer = IntPtr.Add(typeDataPointer, function.TypeIndex * pointerSize);
+                        var listPointer = IntPtr.Add(_typeDataPointer, function.TypeIndex * pointerSize);
                         Marshal.StructureToPtr(typeInfoPointer, listPointer, false);
                     }
                 }
@@ -319,18 +329,6 @@ namespace Lang.Runner
                         Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
                     }
                 }
-
-                // Free old data
-                var typeTableVariable = _globalVariables["__type_table"];
-                var oldPointer = GetPointer(typeTableVariable.Value);
-                var oldData = Marshal.PtrToStructure(oldPointer, typeInfoListType);
-                var dataField = typeInfoListType.GetField("data");
-                var oldDataPointer = GetPointer(dataField.GetValue(oldData));
-                if (oldDataPointer != IntPtr.Zero)
-                {
-                    Marshal.FreeHGlobal(oldDataPointer);
-                }
-                Marshal.FreeHGlobal(oldPointer);
 
                 // Set the variable
                 var pointer = Marshal.AllocHGlobal(Marshal.SizeOf(typeInfoListType));
