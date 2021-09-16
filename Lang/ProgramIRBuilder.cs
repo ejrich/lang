@@ -20,6 +20,7 @@ namespace Lang
     {
         private IType _u8Type;
         private IType _s32Type;
+        private IType _float64Type;
 
         public ProgramIR Program { get; } = new();
 
@@ -27,6 +28,7 @@ namespace Lang
         {
             _u8Type = TypeTable.Types["u8"];
             _s32Type = TypeTable.Types["s32"];
+            _float64Type = TypeTable.Types["float64"];
         }
 
         public FunctionIR AddFunction(FunctionAst function)
@@ -146,9 +148,10 @@ namespace Lang
                     // Initialize arrays
                     case TypeKind.Array:
                         var pointer = EmitGetPointer(block, allocationIndex: allocationIndex);
+                        var arrayStruct = (StructAst)declaration.Type;
                         if (declaration.TypeDefinition.ConstCount != null)
                         {
-                            var arrayPointer = InitializeConstArray(function, block, pointer, (StructAst)declaration.Type, declaration.TypeDefinition.ConstCount.Value);
+                            var arrayPointer = InitializeConstArray(function, block, pointer, arrayStruct, declaration.TypeDefinition.ConstCount.Value);
 
                             if (declaration.ArrayValues != null)
                             {
@@ -171,7 +174,7 @@ namespace Lang
                         }
                         else
                         {
-                            var lengthPointer = EmitGetStructPointer(block, pointer, 0);
+                            var lengthPointer = EmitGetStructPointer(block, pointer, arrayStruct, 0);
                             var lengthValue = GetDefaultConstant(_s32Type);
                             EmitStore(block, lengthPointer, lengthValue);
                         }
@@ -230,20 +233,20 @@ namespace Lang
             return index;
         }
 
-        private InstructionValue InitializeConstArray(FunctionIR function, BasicBlock block, InstructionValue arrayPointer, StructAst arrayDef, uint length, IType elementType = null)
+        private InstructionValue InitializeConstArray(FunctionIR function, BasicBlock block, InstructionValue arrayPointer, StructAst arrayStruct, uint length, IType elementType = null)
         {
-            var lengthPointer = EmitGetStructPointer(block, arrayPointer, 0);
+            var lengthPointer = EmitGetStructPointer(block, arrayPointer, arrayStruct, 0);
             var lengthValue = new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new InstructionConstant {Integer = length}};
             EmitStore(block, lengthPointer, lengthValue);
 
             if (elementType == null)
             {
-                var pointerType = (PrimitiveAst)arrayDef.Fields[1].Type;
+                var pointerType = (PrimitiveAst)arrayStruct.Fields[1].Type;
                 elementType = pointerType.PointerType;
             }
             var dataIndex = AddAllocation(function, elementType, true, length);
             var arrayDataPointer = EmitGetPointer(block, allocationIndex: dataIndex);
-            var dataPointer = EmitGetStructPointer(block, arrayPointer, 1);
+            var dataPointer = EmitGetStructPointer(block, arrayPointer, arrayStruct, 1);
             EmitStore(block, dataPointer, arrayDataPointer);
 
             return arrayDataPointer;
@@ -270,7 +273,7 @@ namespace Lang
                 {
                     var field = structDef.Fields[i];
 
-                    var fieldPointer = EmitGetStructPointer(block, pointer, i);
+                    var fieldPointer = EmitGetStructPointer(block, pointer, structDef, i, field);
 
                     InitializeField(function, block, field, fieldPointer, scope);
                 }
@@ -281,14 +284,13 @@ namespace Lang
                 {
                     var field = structDef.Fields[i];
 
-                    var fieldPointer = EmitGetStructPointer(block, pointer, i);
+                    var fieldPointer = EmitGetStructPointer(block, pointer, structDef, i, field);
 
                     if (assignments.TryGetValue(field.Name, out var assignment))
                     {
                         var value = EmitIR(function, assignment.Value, scope, block);
-                        // var value = CastValue(expression, field.TypeDefinition);
 
-                        EmitStore(block, fieldPointer, value);
+                        EmitStore(block, fieldPointer, EmitCastValue(block, value, field.Type));
                     }
                     else
                     {
@@ -304,9 +306,10 @@ namespace Lang
             {
                 // Initialize arrays
                 case TypeKind.Array:
+                    var arrayStruct = (StructAst)field.Type;
                     if (field.TypeDefinition.ConstCount != null)
                     {
-                        var arrayPointer = InitializeConstArray(function, block, pointer, (StructAst)field.Type, field.TypeDefinition.ConstCount.Value);
+                        var arrayPointer = InitializeConstArray(function, block, pointer, arrayStruct, field.TypeDefinition.ConstCount.Value);
 
                         if (field.ArrayValues != null)
                         {
@@ -315,7 +318,7 @@ namespace Lang
                     }
                     else
                     {
-                        var lengthPointer = EmitGetStructPointer(block, pointer, 0);
+                        var lengthPointer = EmitGetStructPointer(block, pointer, arrayStruct, 0);
                         var lengthValue = GetDefaultConstant(_s32Type);
                         EmitStore(block, lengthPointer, lengthValue);
                     }
@@ -376,8 +379,8 @@ namespace Lang
             var value = EmitIR(function, assignment.Value, scope, block);
             if (assignment.Operator != Operator.None)
             {
-                var previousValue = EmitLoad(block, pointer);
                 // TODO Translate BulidExpression from LLVMBackend
+                // var previousValue = EmitLoad(block, pointer);
                 // value = EmitExpression(block, previousValue, value);
             }
 
@@ -421,7 +424,7 @@ namespace Lang
                             return global ? Program.Constants[declaration.Name] : function.Constants[declaration.Name];
                         }
 
-                        return EmitLoad(block, allocationIndex: declaration.AllocationIndex, global: global);
+                        return EmitLoad(block, declaration.Type, allocationIndex: declaration.AllocationIndex, global: global);
                     }
                     else if (identifierAst is IType type)
                     {
@@ -476,14 +479,14 @@ namespace Lang
                         // {
                         //     field = _builder.BuildStructGEP(field, 1, "stringdata");
                         // }
-                        return EmitLoad(block, structFieldPointer);
+                        return EmitLoad(block, structFieldPointer.Type, structFieldPointer);
                     }
                     return structFieldPointer;
                 case CallAst call:
                     return EmitCall(function, call, scope, block);
                 case ChangeByOneAst changeByOne:
                     var pointer = EmitGetReference(function, changeByOne.Value, scope, block);
-                    var previousValue = EmitLoad(block, pointer);
+                    var previousValue = EmitLoad(block, pointer.Type, pointer);
 
                     var constOne = new InstructionValue {ValueType = InstructionValueType.Constant, Type = changeByOne.Type};
                     if (changeByOne.Type.TypeKind == TypeKind.Integer)
@@ -517,7 +520,7 @@ namespace Lang
                             return EmitInstruction(InstructionType.Negate, block, value);
                         case UnaryOperator.Dereference:
                             value = EmitIR(function, unary.Value, scope, block);
-                            return EmitLoad(block, value);
+                            return EmitLoad(block, value.Type, value);
                         case UnaryOperator.Reference:
                             // TODO Get type?
                             return EmitGetReference(function, unary.Value, scope, block);
@@ -526,7 +529,7 @@ namespace Lang
                 case IndexAst index:
                     var indexPointer = EmitGetIndexPointer(function, index, scope, block);
 
-                    return index.CallsOverload ? indexPointer : EmitLoad(block, indexPointer);
+                    return index.CallsOverload ? indexPointer : EmitLoad(block, indexPointer.Type, indexPointer);
                 case ExpressionAst expression:
                     // var expressionValue = WriteExpression(expression.Children[0], localVariables);
                     // for (var i = 1; i < expression.Children.Count; i++)
@@ -536,7 +539,7 @@ namespace Lang
                     //     expressionValue.type = expression.ResultingTypes[i - 1];
                     // }
                     // return expressionValue;
-                    break;
+                    return new InstructionValue();
                 case TypeDefinition typeDef:
                     return new InstructionValue
                     {
@@ -545,12 +548,7 @@ namespace Lang
                     };
                 case CastAst cast:
                     var castValue = EmitIR(function, cast.Value, scope);
-                    var targetType = new InstructionValue {ValueType = InstructionValueType.Type, Type = cast.TargetType};
-                    var castInstruction = new Instruction {Type = InstructionType.Cast, Value1 = castValue, Value2 = targetType};
-
-                    var valueIndex = block.Instructions.Count;
-                    block.Instructions.Add(castInstruction);
-                    return new InstructionValue {ValueIndex = valueIndex, Type = cast.TargetType};
+                    return EmitCastValue(block, castValue, cast.TargetType);
             }
             return null;
         }
@@ -721,7 +719,7 @@ namespace Lang
                 {
                     if (!skipPointer)
                     {
-                        value = EmitLoad(block, value);
+                        value = EmitLoad(block, type, value);
                     }
                 }
                 skipPointer = false;
@@ -740,12 +738,12 @@ namespace Lang
                 {
                     var structDefinition = (StructAst) type;
                     var fieldIndex = structField.ValueIndices[i-1];
+                    var field = structDefinition.Fields[fieldIndex];
 
-                    value = EmitGetStructPointer(block, value, fieldIndex);
+                    value = EmitGetStructPointer(block, value, structDefinition, fieldIndex, field);
                     if (structField.Children[i] is IndexAst index)
                     {
-                        var fieldType = structDefinition.Fields[fieldIndex].Type;
-                        value = EmitGetIndexPointer(function, index, scope, block, fieldType, value);
+                        value = EmitGetIndexPointer(function, index, scope, block, field.Type, value);
 
                         if (index.CallsOverload)
                         {
@@ -778,14 +776,15 @@ namespace Lang
                 for (var i = 0; i < argumentCount - 1; i++)
                 {
                     var argument = EmitIR(function, call.Arguments[i], scope, block);
-                    arguments[i] = argument;//CastValue(value, functionDef.Arguments[i].Type);
+                    arguments[i] = EmitCastValue(block, argument, call.Function.Arguments[i].Type);
                 }
 
                 // Rollup the rest of the arguments into an array
                 var paramsType = call.Function.Arguments[^1].Type;
+                var elementType = call.Function.ParamsElementType;
                 var paramsAllocationIndex = AddAllocation(function, paramsType);
                 var paramsPointer = EmitGetPointer(block, allocationIndex: paramsAllocationIndex);
-                var dataPointer = InitializeConstArray(function, block, paramsPointer, (StructAst)paramsType, (uint)(call.Arguments.Count - call.Function.Arguments.Count + 1), call.Function.ParamsType);
+                var dataPointer = InitializeConstArray(function, block, paramsPointer, (StructAst)paramsType, (uint)(call.Arguments.Count - call.Function.Arguments.Count + 1), elementType);
 
                 uint paramsIndex = 0;
                 for (var i = call.Function.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
@@ -794,11 +793,10 @@ namespace Lang
                     var pointer = EmitGetPointer(block, dataPointer, index, getFirstPointer: true);
 
                     var value = EmitIR(function, call.Arguments[i], scope, block);
-                    // TODO Cast value
-                    EmitStore(block, pointer, value);
+                    EmitStore(block, pointer, EmitCastValue(block, value, elementType));
                 }
 
-                var paramsValue = EmitLoad(block, allocationIndex: paramsAllocationIndex);
+                var paramsValue = EmitLoad(block, paramsType, allocationIndex: paramsAllocationIndex);
                 arguments[argumentCount - 1] = paramsValue;
             }
             else if (call.Function.Varargs)
@@ -807,7 +805,7 @@ namespace Lang
                 for (; i < call.Function.Arguments.Count - 1; i++)
                 {
                     var argument = EmitIR(function, call.Arguments[i], scope, block);
-                    arguments[i] = argument;//CastValue(value, functionDef.Arguments[i].Type);
+                    arguments[i] = EmitCastValue(block, argument, call.Function.Arguments[i].Type);
                 }
 
                 // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
@@ -815,11 +813,11 @@ namespace Lang
                 for (; i < argumentCount; i++)
                 {
                     var argument = EmitIR(function, call.Arguments[i], scope, block);
-                    // if (type.Name == "float")
+                    // if (argument.Type.TypeKind == TypeKind.Float && argument.Type.Size == 4)
                     // {
-                    //     value = _builder.BuildFPExt(value, LLVM.DoubleType(), "tmpdouble");
+                    //     argument = EmitCastValue(block, argument, _float64Type);
                     // }
-                    arguments[i] = argument;//CastValue(value, functionDef.Arguments[i].Type);
+                    arguments[i] = argument;
                 }
             }
             else
@@ -827,7 +825,7 @@ namespace Lang
                 for (var i = 0; i < argumentCount - 1; i++)
                 {
                     var argument = EmitIR(function, call.Arguments[i], scope, block);
-                    arguments[i] = argument;//CastValue(value, functionDef.Arguments[i].Type);
+                    arguments[i] = EmitCastValue(block, argument, call.Function.Arguments[i].Type);
                 }
             }
 
@@ -849,7 +847,7 @@ namespace Lang
             {
                 var overloadName = GetOperatorOverloadName(index.Overload.Type, Operator.Subscript);
 
-                var value = EmitLoad(block, variable);
+                var value = EmitLoad(block, type, variable);
                 return EmitCall(block, overloadName, new []{value, indexValue}, index.Overload.ReturnType);
             }
 
@@ -859,7 +857,7 @@ namespace Lang
                 var pointerType = (PrimitiveAst)type;
                 elementType = pointerType.PointerType;
 
-                var dataPointer = EmitLoad(block, variable);
+                var dataPointer = EmitLoad(block, type, variable);
                 return EmitGetPointer(block, dataPointer, indexValue, elementType);
             }
             else if (type.TypeKind == TypeKind.CArray)
@@ -871,21 +869,37 @@ namespace Lang
             }
             else
             {
+                var structAst = (StructAst)type;
+                var dataField = structAst.Fields[1];
                 if (type.TypeKind == TypeKind.String)
                 {
                     elementType = _u8Type;
                 }
                 else
                 {
-                    var arrayStruct = (StructAst)type;
-                    var pointerType = (PrimitiveAst)arrayStruct.Fields[1].Type;
+                    var pointerType = (PrimitiveAst)dataField.Type;
                     elementType = pointerType.PointerType;
                 }
 
-                var data = EmitGetStructPointer(block, variable, 1);
-                var dataPointer = EmitLoad(block, data);
+                var data = EmitGetStructPointer(block, variable, structAst, 1, dataField);
+                var dataPointer = EmitLoad(block, data.Type, data);
                 return EmitGetPointer(block, dataPointer, indexValue, elementType);
             }
+        }
+
+        private InstructionValue EmitCastValue(BasicBlock block, InstructionValue value, IType type)
+        {
+            if (value.Type == type)
+            {
+                return value;
+            }
+
+            var targetType = new InstructionValue {ValueType = InstructionValueType.Type, Type = type};
+            var castInstruction = new Instruction {Type = InstructionType.Cast, Value1 = value, Value2 = targetType};
+
+            var valueIndex = block.Instructions.Count;
+            block.Instructions.Add(castInstruction);
+            return new InstructionValue {ValueIndex = valueIndex, Type = type};
         }
 
         private IAst GetScopeIdentifier(ScopeAst scope, string name, out bool global)
@@ -917,10 +931,10 @@ namespace Lang
             return $"operator.{op}.{type.GenericName}";
         }
 
-        private InstructionValue EmitLoad(BasicBlock block, InstructionValue value = null, int? allocationIndex = null, bool global = false)
+        private InstructionValue EmitLoad(BasicBlock block, IType type, InstructionValue value = null, int? allocationIndex = null, bool global = false)
         {
             var loadInstruction = new Instruction {Type = InstructionType.Load, Index = allocationIndex, Global = global, Value1 = value};
-            var loadValue = new InstructionValue {ValueIndex = block.Instructions.Count};
+            var loadValue = new InstructionValue {ValueIndex = block.Instructions.Count, Type = type};
             block.Instructions.Add(loadInstruction);
             return loadValue;
         }
@@ -939,10 +953,15 @@ namespace Lang
         }
 
         // TODO Add the offset size
-        private InstructionValue EmitGetStructPointer(BasicBlock block, InstructionValue value, int fieldIndex)
+        private InstructionValue EmitGetStructPointer(BasicBlock block, InstructionValue value, StructAst structDef, int fieldIndex, StructFieldAst field = null)
         {
+            if (field == null)
+            {
+                 field = structDef.Fields[fieldIndex];
+            }
+
             var loadInstruction = new Instruction {Type = InstructionType.GetStructPointer, Index = fieldIndex, Value1 = value};
-            var loadValue = new InstructionValue {ValueIndex = block.Instructions.Count};
+            var loadValue = new InstructionValue {ValueIndex = block.Instructions.Count, Type = field.Type};
             block.Instructions.Add(loadInstruction);
             return loadValue;
         }
