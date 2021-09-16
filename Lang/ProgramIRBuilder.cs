@@ -929,10 +929,10 @@ namespace Lang
             {
                 if (each.IndexVariable != null)
                 {
-                    each.IndexVariableVariable.AllocationIndex = indexVariable;
+                    each.IndexVariable.AllocationIndex = indexVariable;
                     if (!BuildSettings.Release)
                     {
-                        function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = each.IndexVariable, Source = each.IndexVariableVariable, Value1 = new InstructionValue {ValueType = InstructionValueType.Allocation, ValueIndex = indexVariable, Type = _s32Type}});
+                        function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = each.IndexVariable.Name, Source = each.IndexVariable, Value1 = new InstructionValue {ValueType = InstructionValueType.Allocation, ValueIndex = indexVariable, Type = _s32Type}});
                     }
                 }
                 EmitStore(function, indexVariable, GetConstantInteger(0));
@@ -966,10 +966,10 @@ namespace Lang
                 var value = EmitIR(function, each.RangeBegin, scope);
 
                 EmitStore(function, indexVariable, value);
-                each.IterationVariableVariable.AllocationIndex = indexVariable;
+                each.IterationVariable.AllocationIndex = indexVariable;
                 if (!BuildSettings.Release)
                 {
-                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = each.IterationVariable, Source = each.IterationVariableVariable, Value1 = new InstructionValue {ValueType = InstructionValueType.Allocation, ValueIndex = indexVariable, Type = _s32Type}});
+                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = each.IterationVariable.Name, Source = each.IterationVariable, Value1 = new InstructionValue {ValueType = InstructionValueType.Allocation, ValueIndex = indexVariable, Type = _s32Type}});
                 }
 
                 // Get the end of the range
@@ -981,12 +981,12 @@ namespace Lang
             var condition = EmitInstruction(InstructionType.IntegerGreaterThanOrEqual, function, _boolType, indexValue, compareTarget);
             if (each.Iteration != null)
             {
-                var iterationVariable = EmitGetPointer(function, arrayData, indexValue, each.IterationVariableVariable.Type, cArrayIteration);
-                each.IterationVariableVariable.Pointer = iterationVariable;
+                var iterationVariable = EmitGetPointer(function, arrayData, indexValue, each.IterationVariable.Type, cArrayIteration);
+                each.IterationVariable.Pointer = iterationVariable;
 
                 if (!BuildSettings.Release)
                 {
-                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = each.IterationVariable, Source = each.IterationVariableVariable, Value1 = iterationVariable});
+                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = each.IterationVariable.Name, Source = each.IterationVariable, Value1 = iterationVariable});
                 }
             }
             var conditionJump = new Instruction {Type = InstructionType.ConditionalJump, Value1 = condition};
