@@ -1748,6 +1748,7 @@ namespace Lang
                     }
                     break;
                 case TypeKind.Pointer:
+                    // TODO This is getting called for printfs, NOT GOOD
                     castInstruction.Type = InstructionType.PointerCast;
                     break;
             }
