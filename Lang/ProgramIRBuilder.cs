@@ -596,7 +596,7 @@ namespace Lang
                     }
                     else if (structField.IsConstant)
                     {
-                        return EmitIR(function, structField.ConstantValue, scope, block);
+                        return GetConstantInteger(structField.ConstantValue);
                     }
                     var structFieldPointer = EmitGetStructPointer(function, structField, scope, block, out var loaded);
                     if (!loaded)
@@ -1002,7 +1002,6 @@ namespace Lang
 
         private InstructionValue EmitExpression(BasicBlock block, InstructionValue lhs, InstructionValue rhs, Operator op, IType type)
         {
-            // TODO Implement me
             // 1. Handle pointer math
             if (lhs.Type?.TypeKind == TypeKind.Pointer)
             {
@@ -1065,7 +1064,7 @@ namespace Lang
 
             Console.WriteLine("Operator not compatible");
             Environment.Exit(ErrorCodes.BuildError);
-            return null; // Return never happens
+            return null;
         }
 
         private InstructionValue EmitPointerOperation(BasicBlock block, InstructionValue lhs, InstructionValue rhs, Operator op, IType type)

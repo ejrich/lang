@@ -1979,7 +1979,7 @@ namespace Lang
             if (typeDefinition is ArrayType && fieldName == "length")
             {
                 structField.IsConstant = true;
-                structField.ConstantValue = structType.Count;
+                structField.ConstantValue = structType.ConstCount.Value;
                 return _s32Type;
             }
             if (typeDefinition is not StructAst structDefinition)
