@@ -82,8 +82,7 @@ namespace Lang
                         for (var i = functionIndex.Count; i < function.VarargsCalls.Count; i++)
                         {
                             functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
-                            var callTypes = function.VarargsCalls[i];
-                            var varargsTypes = new Type[callTypes.Count];
+                            var varargsTypes = new Type[function.VarargsCalls[i]];
                             Array.Fill(varargsTypes, typeof(Register));
                             CreateFunction(functionTypeBuilder, function.Name, function.ExternLib, varargsTypes);
                             functionIndex.Add(_version);
