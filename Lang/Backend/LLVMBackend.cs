@@ -73,7 +73,7 @@ namespace Lang.Backend
                     else
                     {
                         var functionName = GetFunctionName(name, i, functions.Count);
-                        WriteFunctionDefinition(functionName, function.Arguments, function.ReturnType, function.Varargs);
+                        WriteFunctionDefinition(functionName, function.Arguments, function.ReturnType, function.Varargs, function.Extern);
                     }
                 }
             }
@@ -346,7 +346,7 @@ namespace Lang.Backend
             LLVM.SetUnnamedAddr(variable, true);
         }
 
-        private LLVMValueRef WriteFunctionDefinition(string name, List<DeclarationAst> arguments, TypeDefinition returnType, bool varargs = false)
+        private LLVMValueRef WriteFunctionDefinition(string name, List<DeclarationAst> arguments, TypeDefinition returnType, bool varargs = false, bool externFunction = false)
         {
             var argumentCount = varargs ? arguments.Count - 1 : arguments.Count;
             var argumentTypes = new LLVMTypeRef[argumentCount];
@@ -354,8 +354,7 @@ namespace Lang.Backend
             // 1. Determine argument types and varargs
             for (var i = 0; i < argumentCount; i++)
             {
-                // TODO If the function is extern and the argument is string, use u8*
-                argumentTypes[i] = ConvertTypeDefinition(arguments[i].Type);
+                argumentTypes[i] = ConvertTypeDefinition(arguments[i].Type, externFunction);
             }
 
             // 2. Declare function
@@ -1981,11 +1980,11 @@ namespace Lang.Backend
             };
         }
 
-        private LLVMTypeRef ConvertTypeDefinition(TypeDefinition type, bool pointer = false)
+        private LLVMTypeRef ConvertTypeDefinition(TypeDefinition type, bool externFunction = false, bool pointer = false)
         {
             if (type.Name == "*")
             {
-                return LLVMTypeRef.PointerType(ConvertTypeDefinition(type.Generics[0], true), 0);
+                return LLVMTypeRef.PointerType(ConvertTypeDefinition(type.Generics[0], externFunction, true), 0);
             }
 
             return type.PrimitiveType switch
@@ -1999,7 +1998,7 @@ namespace Lang.Backend
                     "void" => pointer ? LLVMTypeRef.Int8Type() : LLVMTypeRef.VoidType(),
                     "List" => GetListType(type),
                     "Params" => GetListType(type),
-                    // "string" => LLVMTypeRef.PointerType(LLVMTypeRef.Int8Type(), 0),
+                    "string" => externFunction ? LLVMTypeRef.PointerType(LLVMTypeRef.Int8Type(), 0) : LLVM.GetTypeByName(_module, "string"),
                     "Type" => LLVMTypeRef.Int32Type(),
                     _ => GetStructType(type)
                 }
