@@ -762,13 +762,35 @@ namespace Lang.Backend.LLVM
                         callArguments[functionDef.Arguments.Count - 1] = paramsValue;
                         return (functionDef.ReturnType, LLVMApi.BuildCall(_builder, function, callArguments, string.Empty));
                     }
+                    else if (functionDef.Varargs)
+                    {
+                        var callArguments = new LLVMValueRef[call.Arguments.Count];
+                        for (var i = 0; i < functionDef.Arguments.Count - 1; i++)
+                        {
+                            var (_, value) = WriteExpression(call.Arguments[i], localVariables);
+                            callArguments[i] = value;
+                        }
+
+                        // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
+                        // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
+                        for (var i = functionDef.Arguments.Count - 1; i < call.Arguments.Count; i++)
+                        {
+                            var (type, value) = WriteExpression(call.Arguments[i], localVariables);
+                            if (type.Name == "float")
+                            {
+                                value = LLVMApi.BuildFPExt(_builder, value, LLVMTypeRef.DoubleType(), "tmpdouble");
+                            }
+                            callArguments[i] = value;
+                        }
+                        return (functionDef.ReturnType, LLVMApi.BuildCall(_builder, function, callArguments, string.Empty));
+                    }
                     else
                     {
                         var callArguments = new LLVMValueRef[call.Arguments.Count];
                         for (var i = 0; i < call.Arguments.Count; i++)
                         {
-                            var value = WriteExpression(call.Arguments[i], localVariables);
-                            callArguments[i] = value.value;
+                            var (_, value) = WriteExpression(call.Arguments[i], localVariables);
+                            callArguments[i] = value;
                         }
                         return (functionDef.ReturnType, LLVMApi.BuildCall(_builder, function, callArguments, string.Empty));
                     }
