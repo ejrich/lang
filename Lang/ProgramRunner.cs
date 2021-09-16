@@ -390,6 +390,9 @@ namespace Lang
                 case EachAst each:
                     returnValue = ExecuteEach(each, variables, out returned);
                     break;
+                case BreakAst:
+                case ContinueAst:
+                    break;
                 default:
                     return ExecuteExpression(ast, variables);
             }
