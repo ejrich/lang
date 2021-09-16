@@ -525,12 +525,6 @@ namespace Lang
                     var length = (int)ExecuteExpression(type.Count, variables).Value;
                     InitializeConstArray(array, arrayType, genericType, length);
                 }
-                else
-                {
-                    var dataField = arrayType.GetField("data");
-                    var arrayPointer = Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * 10);
-                    dataField!.SetValue(array, arrayPointer);
-                }
             }
 
             return array;
