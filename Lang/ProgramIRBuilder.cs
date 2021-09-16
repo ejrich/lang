@@ -178,7 +178,8 @@ namespace Lang
                     // Initialize struct field default values
                     case TypeKind.Struct:
                     case TypeKind.String:
-                        // InitializeStruct(declaration.TypeDefinition, variable, localVariables, declaration.Assignments);
+                        var structPointer = EmitGetPointer(block, allocationIndex: allocationIndex);
+                        InitializeStruct(function, block, (StructAst)declaration.Type, structPointer, scope, declaration.Assignments);
                         break;
                     // Initialize pointers to null
                     case TypeKind.Pointer:
@@ -186,7 +187,7 @@ namespace Lang
                         break;
                     // Or initialize to 0
                     default:
-                        var zero = GetConstZero(declaration.Type);
+                        var zero = GetDefaultConstant(declaration.Type);
                         EmitStore(block, allocationIndex, zero);
                         break;
                 }
@@ -250,7 +251,88 @@ namespace Lang
             }
         }
 
-        private InstructionValue GetConstZero(IType type)
+        private void InitializeStruct(FunctionIR function, BasicBlock block, StructAst structDef, InstructionValue pointer, ScopeAst scope, Dictionary<string, AssignmentAst> assignments)
+        {
+            if (assignments == null)
+            {
+                for (var i = 0; i < structDef.Fields.Count; i++)
+                {
+                    var field = structDef.Fields[i];
+
+                    var fieldPointer = EmitGetStructPointer(block, pointer, i);
+
+                    InitializeField(function, block, field, fieldPointer, scope);
+                }
+            }
+            else
+            {
+                for (var i = 0; i < structDef.Fields.Count; i++)
+                {
+                    var field = structDef.Fields[i];
+
+                    var fieldPointer = EmitGetStructPointer(block, pointer, i);
+
+                    if (assignments.TryGetValue(field.Name, out var assignment))
+                    {
+                        var value = EmitIR(function, assignment.Value, scope, block);
+                        // var value = CastValue(expression, field.TypeDefinition);
+
+                        EmitStore(block, fieldPointer, value);
+                    }
+                    else
+                    {
+                        InitializeField(function, block, field, fieldPointer, scope);
+                    }
+                }
+            }
+        }
+
+        private void InitializeField(FunctionIR function, BasicBlock block, StructFieldAst field, InstructionValue pointer, ScopeAst scope)
+        {
+            switch (field.Type.TypeKind)
+            {
+                // Initialize arrays
+                case TypeKind.Array:
+                    if (field.TypeDefinition.ConstCount != null)
+                    {
+                        var arrayPointer = InitializeConstArray(function, block, pointer, (StructAst)field.Type, field.TypeDefinition.ConstCount.Value);
+
+                        if (field.ArrayValues != null)
+                        {
+                            InitializeArrayValues(function, block, arrayPointer, field.ArrayValues, scope);
+                        }
+                    }
+                    else
+                    {
+                        var lengthPointer = EmitGetStructPointer(block, pointer, 0);
+                        var lengthValue = new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new InstructionConstant {Integer = 0}};
+                        EmitStore(block, lengthPointer, lengthValue);
+                    }
+                    break;
+                case TypeKind.CArray:
+                    if (field.ArrayValues != null)
+                    {
+                        InitializeArrayValues(function, block, pointer, field.ArrayValues, scope);
+                    }
+                    break;
+                // Initialize struct field default values
+                case TypeKind.Struct:
+                case TypeKind.String: // TODO String default values
+                    InitializeStruct(function, block, (StructAst)field.Type, pointer, scope, field.Assignments);
+                    break;
+                // Initialize pointers to null
+                case TypeKind.Pointer:
+                    EmitStore(block, pointer, new InstructionValue {ValueType = InstructionValueType.Null});
+                    break;
+                // Or initialize to default
+                default:
+                    var defaultValue = field.Value == null ? GetDefaultConstant(field.Type) : EmitIR(function, field.Value, scope, block);
+                    EmitStore(block, pointer, defaultValue);
+                    break;
+            }
+        }
+
+        private InstructionValue GetDefaultConstant(IType type)
         {
             var value = new InstructionValue {ValueType = InstructionValueType.Constant, };// TODO Get this working Type = type};
             switch (type.TypeKind)
