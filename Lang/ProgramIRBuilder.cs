@@ -8,6 +8,7 @@ namespace Lang
         FunctionIR AddFunction(FunctionAst function, Dictionary<string, IType> types);
         FunctionIR AddOperatorOverload(OperatorOverloadAst overload, Dictionary<string, IType> types);
         void EmitDeclaration(FunctionIR function, DeclarationAst declaration, IType type);
+        void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType);
         InstructionValue EmitIR(FunctionIR function, IAst ast, BasicBlock block = null);
     }
 
@@ -124,6 +125,22 @@ namespace Lang
             };
             function.StackSize += type.Size;
             function.Allocations.Add(allocation);
+        }
+
+        public void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, BasicBlock block = null)
+        {
+            if (block == null)
+            {
+                block = function.BasicBlocks[^1];
+            }
+
+            var instruction = new Instruction {Type = InstructionType.Return};
+            if (returnAst.Value != null)
+            {
+                instruction.Value1 = EmitIR(function, returnAst.Value, block);
+            }
+
+            block.Instructions.Add(instruction);
         }
 
         public InstructionValue EmitIR(FunctionIR function, IAst ast, BasicBlock block = null)
