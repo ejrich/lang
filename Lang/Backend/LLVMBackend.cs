@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-using LLVMSharp;
 
 namespace Lang.Backend
 {
@@ -133,10 +132,10 @@ namespace Lang.Backend
             else
             {
                 _emitDebug = true;
-                _debugBuilder = LLVM.NewDIBuilder(_module);
-                _debugCompilationUnit = LLVM.DIBuilderCreateCompileUnit(_debugBuilder, 2, "", "obj", "ol", 0, string.Empty, 0);
-                _debugFiles = project.SourceFiles.Select(file =>
-                    LLVM.DIBuilderCreateFile(_debugBuilder, Path.GetFileName(file), Path.GetDirectoryName(file))).ToList();
+                _debugBuilder = LLVM.CreateDIBuilder(_module);
+                // _debugCompilationUnit = LLVM.DIBuilderCreateCompileUnit(_debugBuilder, 2, "", "obj", "ol", 0, string.Empty, 0);
+                // _debugFiles = project.SourceFiles.Select(file =>
+                //     LLVM.DIBuilderCreateFile(_debugBuilder, Path.GetFileName(file), Path.GetDirectoryName(file))).ToList();
             }
         }
 
@@ -173,14 +172,15 @@ namespace Lang.Backend
                 }
                 else
                 {
-                    var type = ConvertTypeDefinition(globalVariable.Type);
+                    var typeDef = globalVariable.Type;
+                    var type = ConvertTypeDefinition(typeDef);
                     var global = LLVM.AddGlobal(_module, type, globalVariable.Name);
                     LLVM.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
                     if (globalVariable.Value != null)
                     {
                         LLVM.SetInitializer(global, WriteExpression(globalVariable.Value, null).value);
                     }
-                    else if (type.TypeKind != LLVMTypeKind.LLVMStructTypeKind && type.TypeKind != LLVMTypeKind.LLVMArrayTypeKind)
+                    else if (typeDef.TypeKind == TypeKind.Integer || typeDef.TypeKind == TypeKind.Float)
                     {
                         LLVM.SetInitializer(global, GetConstZero(type));
                     }
@@ -243,7 +243,7 @@ namespace Lang.Backend
                     }
 
                     var typeFieldArray = LLVM.ConstArray(typeInfoType, typeFields);
-                    var typeFieldArrayGlobal = LLVM.AddGlobal(_module, typeFieldArray.TypeOf(), "____type_fields");
+                    var typeFieldArrayGlobal = LLVM.AddGlobal(_module, LLVM.TypeOf(typeFieldArray), "____type_fields");
                     SetPrivateConstant(typeFieldArrayGlobal);
                     LLVM.SetInitializer(typeFieldArrayGlobal, typeFieldArray);
 
@@ -274,7 +274,7 @@ namespace Lang.Backend
                     }
 
                     var enumValuesArray = LLVM.ConstArray(typeInfoType, enumValueRefs);
-                    var enumValuesArrayGlobal = LLVM.AddGlobal(_module, enumValuesArray.TypeOf(), "____enum_values");
+                    var enumValuesArrayGlobal = LLVM.AddGlobal(_module, LLVM.TypeOf(enumValuesArray), "____enum_values");
                     SetPrivateConstant(enumValuesArrayGlobal);
                     LLVM.SetInitializer(enumValuesArrayGlobal, enumValuesArray);
 
@@ -315,7 +315,7 @@ namespace Lang.Backend
                     }
 
                     var argumentArray = LLVM.ConstArray(typeInfoType, argumentValues);
-                    var argumentArrayGlobal = LLVM.AddGlobal(_module, argumentArray.TypeOf(), "____type_fields");
+                    var argumentArrayGlobal = LLVM.AddGlobal(_module, LLVM.TypeOf(argumentArray), "____type_fields");
                     SetPrivateConstant(argumentArrayGlobal);
                     LLVM.SetInitializer(argumentArrayGlobal, argumentArray);
 
@@ -335,7 +335,7 @@ namespace Lang.Backend
             }
 
             var typeArray = LLVM.ConstArray(LLVM.PointerType(typeInfoType, 0), types);
-            var typeArrayGlobal = LLVM.AddGlobal(_module, typeArray.TypeOf(), "____type_array");
+            var typeArrayGlobal = LLVM.AddGlobal(_module, LLVM.TypeOf(typeArray), "____type_array");
             SetPrivateConstant(typeArrayGlobal);
             LLVM.SetInitializer(typeArrayGlobal, typeArray);
 
@@ -380,7 +380,7 @@ namespace Lang.Backend
         {
             _currentFunction = functionAst;
             // 1. Get function definition
-            LLVM.PositionBuilderAtEnd(_builder, function.AppendBasicBlock("entry"));
+            LLVM.PositionBuilderAtEnd(_builder, LLVM.AppendBasicBlock(function, "entry"));
             var localVariables = new Dictionary<string, (TypeDefinition type, LLVMValueRef value)>(globals);
 
             // 2. Allocate arguments on the stack
@@ -433,7 +433,7 @@ namespace Lang.Backend
             // 7. Verify the function
             LLVM.RunFunctionPassManager(_passManager, function);
             #if DEBUG
-            function.VerifyFunction(LLVMVerifierFailureAction.LLVMPrintMessageAction);
+            LLVM.VerifyFunction(function, LLVMVerifierFailureAction.LLVMPrintMessageAction);
             #endif
         }
 
@@ -461,15 +461,15 @@ namespace Lang.Backend
             if (outputIntermediate)
             {
                 var llvmIrFile = objectFile[..^1] + "ll";
-                LLVM.PrintModuleToFile(_module, llvmIrFile, out _);
+                LLVM.PrintModuleToFile(_module, llvmIrFile, out string _);
 
                 var assemblyFile = objectFile[..^1] + "s";
-                var assemblyFilePtr = Marshal.StringToCoTaskMemAnsi(assemblyFile);
-                LLVM.TargetMachineEmitToFile(targetMachine, _module, assemblyFilePtr, LLVMCodeGenFileType.LLVMAssemblyFile, out _);
+                // var assemblyFilePtr = Marshal.StringToCoTaskMemAnsi(assemblyFile);
+                LLVM.TargetMachineEmitToFile(targetMachine, _module, assemblyFile, LLVMCodeGenFileType.LLVMAssemblyFile, out string _);
             }
 
-            var file = Marshal.StringToCoTaskMemAnsi(objectFile);
-            LLVM.TargetMachineEmitToFile(targetMachine, _module, file, LLVMCodeGenFileType.LLVMObjectFile, out _);
+            // var file = Marshal.StringToCoTaskMemAnsi(objectFile);
+            LLVM.TargetMachineEmitToFile(targetMachine, _module, objectFile, LLVMCodeGenFileType.LLVMObjectFile, out string _);
         }
 
         private bool BuildAllocations(IAst ast)
@@ -508,7 +508,7 @@ namespace Lang.Backend
                             BuildStackPointer();
                         }
                     }
-                    else if (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind)
+                    else if (LLVM.GetTypeKind(type) == LLVMTypeKind.LLVMStructTypeKind)
                     {
                         BuildStructAllocations(declaration.Type.GenericName, declaration.Assignments);
                     }
@@ -659,7 +659,7 @@ namespace Lang.Backend
                     var listData = LLVM.BuildAlloca(_builder, arrayType, "listdata");
                     _allocationQueue.Enqueue(listData);
                 }
-                else if (ConvertTypeDefinition(field.Type).TypeKind == LLVMTypeKind.LLVMStructTypeKind)
+                else if (field.Type.TypeKind == TypeKind.Struct)
                 {
                     BuildStructAllocations(field.Type.GenericName);
                 }
@@ -768,12 +768,12 @@ namespace Lang.Backend
                 }
             }
             // 4. Initialize struct field default values
-            else if (type.TypeKind == LLVMTypeKind.LLVMStructTypeKind)
+            else if (LLVM.GetTypeKind(type) == LLVMTypeKind.LLVMStructTypeKind)
             {
                 InitializeStruct(declaration.Type, variable, localVariables, declaration.Assignments);
             }
             // 5. Or initialize to 0
-            else if (type.TypeKind != LLVMTypeKind.LLVMArrayTypeKind)
+            else if (LLVM.GetTypeKind(type) != LLVMTypeKind.LLVMArrayTypeKind)
             {
                 var zero = GetConstZero(type);
                 LLVM.BuildStore(_builder, zero, variable);
@@ -788,7 +788,8 @@ namespace Lang.Backend
             {
                 var structField = structDef.Fields[i];
                 var type = ConvertTypeDefinition(structField.Type);
-                if (type.TypeKind == LLVMTypeKind.LLVMArrayTypeKind)
+                var typeKind = LLVM.GetTypeKind(type);
+                if (typeKind == LLVMTypeKind.LLVMArrayTypeKind)
                     continue;
 
                 var field = LLVM.BuildStructGEP(_builder, variable, (uint) i, structField.Name);
@@ -805,7 +806,7 @@ namespace Lang.Backend
                     if (structField.Type.CArray) continue;
                     InitializeConstList(field, structField.Type.ConstCount.Value, structField.Type.Generics[0]);
                 }
-                else switch (type.TypeKind)
+                else switch (typeKind)
                 {
                     case LLVMTypeKind.LLVMPointerTypeKind:
                         LLVM.BuildStore(_builder, LLVM.ConstNull(type), field);
@@ -853,7 +854,7 @@ namespace Lang.Backend
 
         private static LLVMValueRef GetConstZero(LLVMTypeRef type)
         {
-            return type.TypeKind switch
+            return LLVM.GetTypeKind(type) switch
             {
                 LLVMTypeKind.LLVMIntegerTypeKind => LLVM.ConstInt(type, 0, false),
                 LLVMTypeKind.LLVMFloatTypeKind => LLVM.ConstReal(type, 0),
@@ -1011,9 +1012,9 @@ namespace Lang.Backend
             return type.PrimitiveType switch
             {
                 IntegerType => LLVM.BuildICmp(_builder, LLVMIntPredicate.LLVMIntNE,
-                    conditionExpression, LLVM.ConstInt(conditionExpression.TypeOf(), 0, false), "ifcond"),
+                    conditionExpression, LLVM.ConstInt(LLVM.TypeOf(conditionExpression), 0, false), "ifcond"),
                 FloatType => LLVM.BuildFCmp(_builder, LLVMRealPredicate.LLVMRealONE,
-                    conditionExpression, LLVM.ConstReal(conditionExpression.TypeOf(), 0), "ifcond"),
+                    conditionExpression, LLVM.ConstReal(LLVM.TypeOf(conditionExpression), 0), "ifcond"),
                 _ when type.Name == "*" => LLVM.BuildIsNotNull(_builder, conditionExpression, "whilecond"),
                 _ => conditionExpression
             };
@@ -1476,7 +1477,7 @@ namespace Lang.Backend
         private LLVMValueRef BuildString(string value, bool getStringPointer = false, bool constant = true)
         {
             var stringValue = LLVM.ConstString(value, (uint)value.Length, false);
-            var stringGlobal = LLVM.AddGlobal(_module, stringValue.TypeOf(), "str");
+            var stringGlobal = LLVM.AddGlobal(_module, LLVM.TypeOf(stringValue), "str");
             if (constant)
             {
                 SetPrivateConstant(stringGlobal);
@@ -1733,21 +1734,21 @@ namespace Lang.Backend
         {
             if (op == Operator.Equality)
             {
-                if (rhs.IsNull())
+                if (LLVM.IsNull(rhs))
                 {
                     return LLVM.BuildIsNull(_builder, lhs, "isnull");
                 }
                 var diff = LLVM.BuildPtrDiff(_builder, lhs, rhs, "ptrdiff");
-                return LLVM.BuildICmp(_builder, LLVMIntPredicate.LLVMIntEQ, diff, LLVM.ConstInt(diff.TypeOf(), 0, false), "ptreq");
+                return LLVM.BuildICmp(_builder, LLVMIntPredicate.LLVMIntEQ, diff, LLVM.ConstInt(LLVM.TypeOf(diff), 0, false), "ptreq");
             }
             if (op == Operator.NotEqual)
             {
-                if (rhs.IsNull())
+                if (LLVM.IsNull(rhs))
                 {
                     return LLVM.BuildIsNotNull(_builder, lhs, "notnull");
                 }
                 var diff = LLVM.BuildPtrDiff(_builder, lhs, rhs, "ptrdiff");
-                return LLVM.BuildICmp(_builder, LLVMIntPredicate.LLVMIntNE, diff, LLVM.ConstInt(diff.TypeOf(), 0, false), "ptreq");
+                return LLVM.BuildICmp(_builder, LLVMIntPredicate.LLVMIntNE, diff, LLVM.ConstInt(LLVM.TypeOf(diff), 0, false), "ptreq");
             }
             if (op == Operator.Subtract)
             {
