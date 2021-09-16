@@ -129,8 +129,6 @@ namespace Lang
                         case InstructionType.Call:
                             text += $"{instruction.CallFunction} {PrintInstructionValue(instruction.Value1)}";
                             break;
-                        case InstructionType.AllocateArray:
-                            break;
                         case InstructionType.Load:
                         case InstructionType.Return:
                         case InstructionType.IsNull:
@@ -171,10 +169,6 @@ namespace Lang
                         case TypeKind.Enum:
                             return value.ConstantValue.Integer.ToString();
                         case TypeKind.Float:
-                            if (value.Type.Size == 4)
-                            {
-                                return value.ConstantValue.Float.ToString();
-                            }
                             return value.ConstantValue.Double.ToString();
                         case TypeKind.String:
                             return $"\"{value.ConstantString}\"";
@@ -647,14 +641,7 @@ namespace Lang
                     value.ConstantValue = new Constant {Integer = 0};
                     break;
                 case TypeKind.Float:
-                    if (type.Size == 4)
-                    {
-                        value.ConstantValue = new Constant {Float = 0};
-                    }
-                    else
-                    {
-                        value.ConstantValue = new Constant {Double = 0};
-                    }
+                    value.ConstantValue = new Constant {Double = 0};
                     break;
             }
             return value;
@@ -965,14 +952,7 @@ namespace Lang
                     else
                     {
                         instructionType = changeByOne.Positive ? InstructionType.FloatAdd : InstructionType.FloatSubtract;
-                        if (changeByOne.Type.Size == 4)
-                        {
-                            constOne.ConstantValue = new Constant {Float = 1};
-                        }
-                        else
-                        {
-                            constOne.ConstantValue = new Constant {Double = 1};
-                        }
+                        constOne.ConstantValue = new Constant {Double = 1};
                     }
                     var newValue = EmitInstruction(instructionType, function, changeByOne.Type, previousValue, constOne);
                     EmitStore(function, pointer, newValue);
@@ -1095,14 +1075,7 @@ namespace Lang
                     }
                     break;
                 case TypeKind.Float:
-                    if (constant.TypeDefinition.PrimitiveType.Bytes == 4)
-                    {
-                        value.ConstantValue = new Constant {Float = float.Parse(constant.Value)};
-                    }
-                    else
-                    {
-                        value.ConstantValue = new Constant {Double = double.Parse(constant.Value)};
-                    }
+                    value.ConstantValue = new Constant {Double = double.Parse(constant.Value)};
                     break;
             }
             return value;
