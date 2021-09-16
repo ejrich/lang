@@ -10,6 +10,7 @@ namespace Lang.Backend
         /// <param name="objectFile">Path to the object file</param>
         /// <param name="projectPath">Name of the executable file</param>
         /// <param name="dependencies">The library dependencies to link the executable with</param>
-        void Link(string objectFile, string projectPath, List<string> dependencies);
+        /// <param name="buildSettings">Build settings from the cli args</param>
+        void Link(string objectFile, string projectPath, List<string> dependencies, BuildSettings buildSettings);
     }
 }

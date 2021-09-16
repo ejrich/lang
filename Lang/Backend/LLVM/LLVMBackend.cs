@@ -14,10 +14,10 @@ namespace Lang.Backend.LLVM
         public void Build(ProgramGraph programGraph, Project.Project project, BuildSettings buildSettings)
         {
             // 1. Build the object file
-            var objectFile = _writer.WriteFile(programGraph, project.Name, project.Path, buildSettings.Optimize);
+            var objectFile = _writer.WriteFile(programGraph, project.Name, project.Path, buildSettings);
 
             // 2. Link binaries
-            _linker.Link(objectFile, project.Path, project.Dependencies);
+            _linker.Link(objectFile, project.Path, project.Dependencies, buildSettings);
         }
     }
 }
