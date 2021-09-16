@@ -7,11 +7,25 @@ namespace Lang
     {
         public static int Count { get; set; }
         public static Dictionary<string, IType> Types { get; } = new();
+        public static Dictionary<string, List<FunctionAst>> Functions { get; } = new();
 
-        public static int Add(string name, IType type)
+        public static bool Add(string name, IType type)
         {
-            Types[name] = type;
-            return Count++;
+            type.TypeIndex = Count++;
+            return Types.TryAdd(name, type);
+        }
+
+        public static List<FunctionAst> AddFunction(string name, FunctionAst function)
+        {
+            if (!Functions.TryGetValue(function.Name, out var functions))
+            {
+                Functions[function.Name] = functions = new List<FunctionAst>();
+            }
+            function.TypeIndex = Count++;
+            function.OverloadIndex = functions.Count;
+            functions.Add(function);
+
+            return functions;
         }
 
         public static IType GetType(TypeDefinition typeDef)

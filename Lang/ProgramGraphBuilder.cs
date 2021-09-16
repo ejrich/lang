@@ -273,8 +273,8 @@ namespace Lang
             {
                 AddError($"Multiple definitions of enum '{enumAst.Name}'", enumAst);
             }
-            TypeTable.Add(enumAst.Name, enumAst);
             enumAst.TypeIndex = _programGraph.TypeCount++;
+            TypeTable.Add(enumAst.Name, enumAst);
             _globalScope.Identifiers.Add(enumAst.Name, enumAst);
 
             if (enumAst.BaseType == null)
@@ -720,6 +720,20 @@ namespace Lang
             {
                 functionNames.Add(function.Name);
                 function.TypeIndex = _programGraph.TypeCount++;
+                var _functions = TypeTable.AddFunction(function.Name, function);
+                if (_functions.Count > 1)
+                {
+                    if (function.Extern)
+                    {
+                        AddError($"Multiple definitions of extern function '{function.Name}'", function);
+                    }
+                    else if (OverloadExistsForFunction(function, _functions, false))
+                    {
+                        AddError($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
+                    }
+                }
+
+                // TODO Remove this
                 if (!_programGraph.Functions.TryGetValue(function.Name, out var functions))
                 {
                     _programGraph.Functions[function.Name] = functions = new List<FunctionAst>();
@@ -740,10 +754,12 @@ namespace Lang
             }
         }
 
-        private bool OverloadExistsForFunction(IFunction currentFunction, List<FunctionAst> existingFunctions)
+        private bool OverloadExistsForFunction(IFunction currentFunction, List<FunctionAst> existingFunctions, bool checkAll = true)
         {
-            foreach (var existingFunction in existingFunctions)
+            var functionCount = checkAll ? existingFunctions.Count : existingFunctions.Count - 1;
+            for (var function = 0; function < functionCount; function++)
             {
+                var existingFunction = existingFunctions[function];
                 if (currentFunction.Arguments.Count == existingFunction.Arguments.Count)
                 {
                     var match = true;
@@ -2737,6 +2753,7 @@ namespace Lang
                         });
 
                         _programGraph.Functions[genericName] = new List<FunctionAst>{polymorphedFunction};
+                        TypeTable.AddFunction(genericName, function);
                         VerifyFunction(polymorphedFunction);
 
                         return polymorphedFunction;
@@ -3416,8 +3433,8 @@ namespace Lang
                             {
                                 var polyStruct = _polymorpher.CreatePolymorphedStruct(structDef, PrintTypeDefinition(typeDef), TypeKind.Struct, _programGraph.TypeCount++, generics);
                                 _programGraph.Types.Add(genericName, polyStruct); // TODO Remove
-                                VerifyStruct(polyStruct);
                                 TypeTable.Add(genericName, polyStruct);
+                                VerifyStruct(polyStruct);
                                 typeDef.TypeKind = TypeKind.Struct;
                             }
                         }
@@ -3476,8 +3493,8 @@ namespace Lang
 
             var arrayStruct = _polymorpher.CreatePolymorphedStruct(structDef, $"Array<{PrintTypeDefinition(elementType)}>", TypeKind.Array, _programGraph.TypeCount++, elementType);
             _programGraph.Types.Add(genericName, arrayStruct); // TODO Remove
-            VerifyStruct(arrayStruct);
             TypeTable.Add(genericName, arrayStruct);
+            VerifyStruct(arrayStruct);
             return true;
         }
 
