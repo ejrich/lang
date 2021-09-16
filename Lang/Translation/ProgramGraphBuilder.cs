@@ -190,7 +190,17 @@ namespace Lang.Translation
                 }
             } while (verifyAdditional);
 
-            // 5. Verify function bodies
+            // 5. Verify operator overload bodies
+            foreach (var overloads in _programGraph.OperatorOverloads.Values)
+            {
+                foreach (var overload in overloads.Values)
+                {
+                    if (overload.Verified) continue;
+                    VerifyOperatorOverload(overload);
+                }
+            }
+
+            // 6. Verify function bodies
             foreach (var name in functionNames)
             {
                 var functions = _programGraph.Functions[name];
@@ -201,7 +211,7 @@ namespace Lang.Translation
                 }
             }
 
-            // 6. Execute any other compiler directives
+            // 7. Execute any other compiler directives
             foreach (var ast in parseResult.SyntaxTrees)
             {
                 switch (ast)
@@ -226,7 +236,7 @@ namespace Lang.Translation
             var primitiveAst = new PrimitiveAst
             {
                 Name = name, TypeIndex = _programGraph.TypeCount++, TypeKind = typeKind,
-                Size = primitive?.Bytes ?? size, Primitive = primitive
+                     Size = primitive?.Bytes ?? size, Primitive = primitive
             };
             _globalIdentifiers.Add(name, primitiveAst);
             _programGraph.Types.Add(name, primitiveAst);
@@ -577,7 +587,7 @@ namespace Lang.Translation
             }
         }
 
-        private bool OverloadExistsForFunction(FunctionAst currentFunction, List<FunctionAst> existingFunctions)
+        private bool OverloadExistsForFunction(IFunction currentFunction, List<FunctionAst> existingFunctions)
         {
             foreach (var existingFunction in existingFunctions)
             {
@@ -607,17 +617,21 @@ namespace Lang.Translation
             var targetType = VerifyType(overload.Type);
             if (targetType != Type.Error && targetType != Type.Struct)
             {
-                AddError($"Cannot overload operator for type '{PrintTypeDefinition(overload.Type)}'", overload.Type);
+                AddError($"Cannot overload operator '{PrintOperator(overload.Operator)}' for type '{PrintTypeDefinition(overload.Type)}'", overload.Type);
             }
 
             // 2. Verify the argument types
+            if (overload.Arguments.Count != 2)
+            {
+                AddError($"Overload of operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}' should contain exactly 2 arguments to represent the l-value and r-value of the expression", overload);
+            }
             var argumentNames = new HashSet<string>();
             foreach (var argument in overload.Arguments)
             {
                 // 2a. Check if the argument has been previously defined
                 if (!argumentNames.Add(argument.Name))
                 {
-                    AddError($"Operator overload '{PrintTypeDefinition(overload.Type)}' already contains argument '{argument.Name}'", argument);
+                    AddError($"Overload of operator '{PrintOperator(overload.Operator)}' for type '{PrintTypeDefinition(overload.Type)}' already contains argument '{argument.Name}'", argument);
                 }
 
                 // 2b. Check the argument is the same type as the overload type
@@ -649,7 +663,7 @@ namespace Lang.Translation
                 }
                 if (overloads.ContainsKey(overload.Operator))
                 {
-                    AddError($"Multiple definitions of operator overload for type '{PrintTypeDefinition(overload.Type)}'", overload);
+                    AddError($"Multiple definitions of overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}'", overload);
                 }
                 overloads[overload.Operator] = overload;
             }
@@ -707,7 +721,42 @@ namespace Lang.Translation
             function.Verified = true;
         }
 
-        private void ResolveCompilerDirectives(List<IAst> asts, FunctionAst function)
+        private void VerifyOperatorOverload(OperatorOverloadAst overload)
+        {
+            // 1. Initialize local variables
+            var scopeIdentifiers = new Dictionary<string, IAst>(_globalIdentifiers);
+            foreach (var argument in overload.Arguments)
+            {
+                // Arguments with the same name as a global variable will be used instead of the global
+                if (scopeIdentifiers.TryGetValue(argument.Name, out var identifier))
+                {
+                    if (identifier is not DeclarationAst)
+                    {
+                        AddError($"Argument '{argument.Name}' already exists as a type", argument);
+                    }
+                }
+                scopeIdentifiers[argument.Name] = argument;
+            }
+            var returnType = VerifyType(overload.ReturnType);
+
+            // 2. Resolve the compiler directives in the body
+            if (overload.HasDirectives)
+            {
+                ResolveCompilerDirectives(overload.Children, overload);
+            }
+
+            // 3. Loop through body and verify all ASTs
+            var returned = VerifyAsts(overload.Children, overload, scopeIdentifiers);
+
+            // 4. Verify the body returns on all paths
+            if (!returned)
+            {
+                AddError($"Overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}' does not return type '{PrintTypeDefinition(overload.ReturnType)}' on all paths", overload);
+            }
+            overload.Verified = true;
+        }
+
+        private void ResolveCompilerDirectives(List<IAst> asts, IFunction function)
         {
             for (int i = 0; i < asts.Count; i++)
             {
@@ -749,7 +798,14 @@ namespace Lang.Translation
                                     _programRunner.Init(_programGraph);
                                     if (!_programRunner.ExecuteCondition(directive.Value))
                                     {
-                                        AddError($"Assertion failed in function '{function.Name}'", directive.Value);
+                                        if (function is FunctionAst functionAst)
+                                        {
+                                            AddError($"Assertion failed in function '{functionAst.Name}'", directive.Value);
+                                        }
+                                        else if (function is OperatorOverloadAst overload)
+                                        {
+                                            AddError($"Assertion failed in overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}'", directive.Value);
+                                        }
                                     }
                                 }
                                 break;
@@ -760,7 +816,7 @@ namespace Lang.Translation
             }
         }
 
-        private bool VerifyAsts(List<IAst> asts, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private bool VerifyAsts(List<IAst> asts, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             var returns = false;
             foreach (var ast in asts)
@@ -773,7 +829,7 @@ namespace Lang.Translation
             return returns;
         }
 
-        private bool VerifyScope(List<IAst> syntaxTrees, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private bool VerifyScope(List<IAst> syntaxTrees, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Create scope variables
             var scopeVariables = new Dictionary<string, IAst>(scopeIdentifiers);
@@ -782,7 +838,7 @@ namespace Lang.Translation
             return VerifyAsts(syntaxTrees, currentFunction, scopeVariables);
         }
 
-        private bool VerifyAst(IAst syntaxTree, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private bool VerifyAst(IAst syntaxTree, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             switch (syntaxTree)
             {
@@ -811,7 +867,7 @@ namespace Lang.Translation
             return false;
         }
 
-        private void VerifyReturnStatement(ReturnAst returnAst, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private void VerifyReturnStatement(ReturnAst returnAst, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Infer the return type of the function
             var returnType = VerifyType(currentFunction.ReturnType);
@@ -841,7 +897,7 @@ namespace Lang.Translation
             }
         }
 
-        private void VerifyDeclaration(DeclarationAst declaration, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private void VerifyDeclaration(DeclarationAst declaration, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Verify the variable is already defined
             if (scopeIdentifiers.ContainsKey(declaration.Name))
@@ -914,7 +970,7 @@ namespace Lang.Translation
                             if (!TypeEquals(field.Type, valueType))
                             {
                                 AddError($"Expected field value to be type '{PrintTypeDefinition(field.Type)}', " +
-                                    $"but got '{PrintTypeDefinition(valueType)}'", field.Type);
+                                        $"but got '{PrintTypeDefinition(valueType)}'", field.Type);
                             }
                             else if (field.Type.PrimitiveType != null && assignment.Value is ConstantAst constant)
                             {
@@ -970,7 +1026,7 @@ namespace Lang.Translation
                         if (!TypeEquals(declaration.Type, valueType))
                         {
                             AddError($"Expected declaration value to be type '{PrintTypeDefinition(declaration.Type)}', " +
-                                $"but got '{PrintTypeDefinition(valueType)}'", declaration.Type);
+                                    $"but got '{PrintTypeDefinition(valueType)}'", declaration.Type);
                         }
                         else if (declaration.Type.PrimitiveType != null && declaration.Value is ConstantAst constant)
                         {
@@ -1068,7 +1124,7 @@ namespace Lang.Translation
             };
         }
 
-        private void VerifyAssignment(AssignmentAst assignment, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private void VerifyAssignment(AssignmentAst assignment, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Verify the variable is already defined and that it is not a constant
             var variableTypeDefinition = GetReference(assignment.Reference, currentFunction, scopeIdentifiers);
@@ -1112,10 +1168,10 @@ namespace Lang.Translation
                             if (lhs != Type.Boolean || rhs != Type.Boolean)
                             {
                                 AddError($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types " +
-                                    $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                                        $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
                             }
                             break;
-                        // Invalid assignment operators
+                            // Invalid assignment operators
                         case Operator.Equality:
                         case Operator.GreaterThan:
                         case Operator.LessThan:
@@ -1123,31 +1179,31 @@ namespace Lang.Translation
                         case Operator.LessThanEqual:
                             AddError($"Invalid operator '{PrintOperator(assignment.Operator)}' in assignment", assignment);
                             break;
-                        // Requires same types and returns more precise type
+                            // Requires same types and returns more precise type
                         case Operator.Add:
                         case Operator.Subtract:
                         case Operator.Multiply:
                         case Operator.Divide:
                         case Operator.Modulus:
                             if (!(lhs == Type.Int && rhs == Type.Int) &&
-                                !(lhs == Type.Float && (rhs == Type.Float || rhs == Type.Int)))
+                                    !(lhs == Type.Float && (rhs == Type.Float || rhs == Type.Int)))
                             {
                                 AddError($"Operator {PrintOperator(assignment.Operator)} not applicable to types " +
-                                    $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                                        $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
                             }
                             break;
-                        // Requires both integer or bool types and returns more same type
+                            // Requires both integer or bool types and returns more same type
                         case Operator.BitwiseAnd:
                         case Operator.BitwiseOr:
                         case Operator.Xor:
                             if (!(lhs == Type.Boolean && rhs == Type.Boolean) &&
-                                !(lhs == Type.Int && rhs == Type.Int))
+                                    !(lhs == Type.Int && rhs == Type.Int))
                             {
                                 AddError($"Operator {PrintOperator(assignment.Operator)} not applicable to types " +
-                                    $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                                        $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
                             }
                             break;
-                        // Requires both to be integers
+                            // Requires both to be integers
                         case Operator.ShiftLeft:
                         case Operator.ShiftRight:
                         case Operator.RotateLeft:
@@ -1155,7 +1211,7 @@ namespace Lang.Translation
                             if (lhs != Type.Int || rhs != Type.Int)
                             {
                                 AddError($"Operator {PrintOperator(assignment.Operator)} not applicable to types " +
-                                    $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
+                                        $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
                             }
                             break;
                     }
@@ -1171,7 +1227,7 @@ namespace Lang.Translation
             }
         }
 
-        private TypeDefinition GetReference(IAst ast, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private TypeDefinition GetReference(IAst ast, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             switch (ast)
             {
@@ -1253,7 +1309,7 @@ namespace Lang.Translation
             return declaration.Type;
         }
 
-        private TypeDefinition VerifyStructFieldRef(StructFieldRefAst structField, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private TypeDefinition VerifyStructFieldRef(StructFieldRefAst structField, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             TypeDefinition refType;
             switch (structField.Children[0])
@@ -1353,7 +1409,7 @@ namespace Lang.Translation
             return field.Type;
         }
 
-        private bool VerifyConditional(ConditionalAst conditional, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private bool VerifyConditional(ConditionalAst conditional, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Verify the condition expression
             VerifyCondition(conditional.Condition, currentFunction, scopeIdentifiers);
@@ -1371,7 +1427,7 @@ namespace Lang.Translation
             return false;
         }
 
-        private bool VerifyWhile(WhileAst whileAst, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private bool VerifyWhile(WhileAst whileAst, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Verify the condition expression
             VerifyCondition(whileAst.Condition, currentFunction, scopeIdentifiers);
@@ -1380,7 +1436,7 @@ namespace Lang.Translation
             return VerifyScope(whileAst.Children, currentFunction, scopeIdentifiers);
         }
 
-        private bool VerifyCondition(IAst ast, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private bool VerifyCondition(IAst ast, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             var conditionalType = VerifyExpression(ast, currentFunction, scopeIdentifiers);
             switch (VerifyType(conditionalType))
@@ -1400,7 +1456,7 @@ namespace Lang.Translation
             }
         }
 
-        private bool VerifyEach(EachAst each, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private bool VerifyEach(EachAst each, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             var eachIdentifiers = new Dictionary<string, IAst>(scopeIdentifiers);
             // 1. Verify the iterator or range
@@ -1446,7 +1502,7 @@ namespace Lang.Translation
                 var iterType = new DeclarationAst
                 {
                     Name = each.IterationVariable,
-                    Type = new TypeDefinition {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}}
+                         Type = new TypeDefinition {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}}
                 };
                 if (!eachIdentifiers.TryAdd(each.IterationVariable, iterType))
                 {
@@ -1476,7 +1532,7 @@ namespace Lang.Translation
             }
         }
 
-        private TypeDefinition VerifyConstantExpression(IAst ast, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers, out bool isConstant, out int count)
+        private TypeDefinition VerifyConstantExpression(IAst ast, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers, out bool isConstant, out int count)
         {
             isConstant = false;
             count = 0;
@@ -1536,7 +1592,7 @@ namespace Lang.Translation
             }
         }
 
-        private TypeDefinition VerifyExpression(IAst ast, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private TypeDefinition VerifyExpression(IAst ast, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Verify the expression value
             switch (ast)
@@ -1548,34 +1604,34 @@ namespace Lang.Translation
                 case StructFieldRefAst structField:
                     return VerifyStructFieldRef(structField, currentFunction, scopeIdentifiers);
                 case IdentifierAst identifierAst:
-                {
-                    if (!scopeIdentifiers.TryGetValue(identifierAst.Name, out var identifier))
                     {
-                        if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functions))
+                        if (!scopeIdentifiers.TryGetValue(identifierAst.Name, out var identifier))
                         {
-                            if (functions.Count > 1)
+                            if (_programGraph.Functions.TryGetValue(identifierAst.Name, out var functions))
                             {
-                                AddError($"Cannot determine type for function '{identifierAst.Name}' that has multiple overloads", identifierAst);
-                                return null;
+                                if (functions.Count > 1)
+                                {
+                                    AddError($"Cannot determine type for function '{identifierAst.Name}' that has multiple overloads", identifierAst);
+                                    return null;
+                                }
+                                return new TypeDefinition {Name = "Type", TypeIndex = functions[0].TypeIndex};
                             }
-                            return new TypeDefinition {Name = "Type", TypeIndex = functions[0].TypeIndex};
+                            AddError($"Identifier '{identifierAst.Name}' not defined", identifierAst);
                         }
-                        AddError($"Identifier '{identifierAst.Name}' not defined", identifierAst);
+                        switch (identifier)
+                        {
+                            case DeclarationAst declaration:
+                                return declaration.Type;
+                            case IType type:
+                                if (type is StructAst structAst && structAst.Generics.Any())
+                                {
+                                    AddError($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
+                                }
+                                return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
+                            default:
+                                return null;
+                        }
                     }
-                    switch (identifier)
-                    {
-                        case DeclarationAst declaration:
-                            return declaration.Type;
-                        case IType type:
-                            if (type is StructAst structAst && structAst.Generics.Any())
-                            {
-                                AddError($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
-                            }
-                            return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
-                        default:
-                            return null;
-                    }
-                }
                 case ChangeByOneAst changeByOne:
                     var op = changeByOne.Positive ? "increment" : "decrement";
                     switch (changeByOne.Value)
@@ -1600,66 +1656,66 @@ namespace Lang.Translation
                             return null;
                     }
                 case UnaryAst unary:
-                {
-                    var valueType = VerifyExpression(unary.Value, currentFunction, scopeIdentifiers);
-                    var type = VerifyType(valueType);
-                    switch (unary.Operator)
                     {
-                        case UnaryOperator.Not:
-                            if (type == Type.Boolean)
-                            {
-                                return valueType;
-                            }
-                            else if (type != Type.Error)
-                            {
-                                AddError($"Expected type 'bool', but got type '{PrintTypeDefinition(valueType)}'", unary.Value);
-                            }
-                            return null;
-                        case UnaryOperator.Negate:
-                            if (type == Type.Int || type == Type.Float)
-                            {
-                                return valueType;
-                            }
-                            else if (type != Type.Error)
-                            {
-                                AddError($"Negation not compatible with type '{PrintTypeDefinition(valueType)}'", unary.Value);
-                            }
-                            return null;
-                        case UnaryOperator.Dereference:
-                            if (type == Type.Pointer)
-                            {
-                                return valueType.Generics[0];
-                            }
-                            else if (type != Type.Error)
-                            {
-                                AddError($"Cannot dereference type '{PrintTypeDefinition(valueType)}'", unary.Value);
-                            }
-                            return null;
-                        case UnaryOperator.Reference:
-                            if (unary.Value is IdentifierAst || unary.Value is StructFieldRefAst || unary.Value is IndexAst || type == Type.Pointer)
-                            {
-                                if (type == Type.Error)
+                        var valueType = VerifyExpression(unary.Value, currentFunction, scopeIdentifiers);
+                        var type = VerifyType(valueType);
+                        switch (unary.Operator)
+                        {
+                            case UnaryOperator.Not:
+                                if (type == Type.Boolean)
                                 {
-                                    return null;
+                                    return valueType;
                                 }
-                                var pointerType = new TypeDefinition {Name = "*"};
-                                if (valueType.CArray)
+                                else if (type != Type.Error)
                                 {
-                                    pointerType.Generics.Add(valueType.Generics[0]);
+                                    AddError($"Expected type 'bool', but got type '{PrintTypeDefinition(valueType)}'", unary.Value);
                                 }
-                                else
+                                return null;
+                            case UnaryOperator.Negate:
+                                if (type == Type.Int || type == Type.Float)
                                 {
-                                    pointerType.Generics.Add(valueType);
+                                    return valueType;
                                 }
-                                return pointerType;
-                            }
-                            AddError("Can only reference variables, structs, or struct fields", unary.Value);
-                            return null;
-                        default:
-                            AddError($"Unexpected unary operator '{unary.Operator}'", unary.Value);
-                            return null;
+                                else if (type != Type.Error)
+                                {
+                                    AddError($"Negation not compatible with type '{PrintTypeDefinition(valueType)}'", unary.Value);
+                                }
+                                return null;
+                            case UnaryOperator.Dereference:
+                                if (type == Type.Pointer)
+                                {
+                                    return valueType.Generics[0];
+                                }
+                                else if (type != Type.Error)
+                                {
+                                    AddError($"Cannot dereference type '{PrintTypeDefinition(valueType)}'", unary.Value);
+                                }
+                                return null;
+                            case UnaryOperator.Reference:
+                                if (unary.Value is IdentifierAst || unary.Value is StructFieldRefAst || unary.Value is IndexAst || type == Type.Pointer)
+                                {
+                                    if (type == Type.Error)
+                                    {
+                                        return null;
+                                    }
+                                    var pointerType = new TypeDefinition {Name = "*"};
+                                    if (valueType.CArray)
+                                    {
+                                        pointerType.Generics.Add(valueType.Generics[0]);
+                                    }
+                                    else
+                                    {
+                                        pointerType.Generics.Add(valueType);
+                                    }
+                                    return pointerType;
+                                }
+                                AddError("Can only reference variables, structs, or struct fields", unary.Value);
+                                return null;
+                            default:
+                                AddError($"Unexpected unary operator '{unary.Operator}'", unary.Value);
+                                return null;
+                        }
                     }
-                }
                 case CallAst call:
                     return VerifyCall(call, currentFunction, scopeIdentifiers);
                 case ExpressionAst expression:
@@ -1667,42 +1723,42 @@ namespace Lang.Translation
                 case IndexAst index:
                     return VerifyIndexType(index, currentFunction, scopeIdentifiers);
                 case TypeDefinition typeDef:
-                {
-                    if (VerifyType(typeDef) == Type.Error)
                     {
-                        return null;
-                    }
-                    if (!_programGraph.Types.TryGetValue(typeDef.GenericName, out var type))
-                    {
-                        return null;
-                    }
-                    return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
-                }
-                case CastAst cast:
-                {
-                    var targetType = VerifyType(cast.TargetType);
-                    var valueType = VerifyExpression(cast.Value, currentFunction, scopeIdentifiers);
-                    switch (targetType)
-                    {
-                        case Type.Int:
-                        case Type.Float:
-                            if (valueType != null && valueType.PrimitiveType == null)
-                            {
-                                AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetType)}'", cast.Value);
-                            }
-                            break;
-                        case Type.Error:
-                            // Don't need to report additional errors
+                        if (VerifyType(typeDef) == Type.Error)
+                        {
                             return null;
-                        default:
-                            if (valueType != null)
-                            {
-                                AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetType)}'", cast);
-                            }
-                            break;
+                        }
+                        if (!_programGraph.Types.TryGetValue(typeDef.GenericName, out var type))
+                        {
+                            return null;
+                        }
+                        return new TypeDefinition {Name = "Type", TypeIndex = type.TypeIndex};
                     }
-                    return cast.TargetType;
-                }
+                case CastAst cast:
+                    {
+                        var targetType = VerifyType(cast.TargetType);
+                        var valueType = VerifyExpression(cast.Value, currentFunction, scopeIdentifiers);
+                        switch (targetType)
+                        {
+                            case Type.Int:
+                            case Type.Float:
+                                if (valueType != null && valueType.PrimitiveType == null)
+                                {
+                                    AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetType)}'", cast.Value);
+                                }
+                                break;
+                            case Type.Error:
+                                // Don't need to report additional errors
+                                return null;
+                            default:
+                                if (valueType != null)
+                                {
+                                    AddError($"Unable to cast type '{PrintTypeDefinition(valueType)}' to '{PrintTypeDefinition(cast.TargetType)}'", cast);
+                                }
+                                break;
+                        }
+                        return cast.TargetType;
+                    }
                 case null:
                     return null;
                 default:
@@ -1729,10 +1785,10 @@ namespace Lang.Translation
                     var success = integer.Bytes switch
                     {
                         1 => integer.Signed ? sbyte.TryParse(constant.Value, out _) : byte.TryParse(constant.Value, out _),
-                        2 => integer.Signed ? short.TryParse(constant.Value, out _) : ushort.TryParse(constant.Value, out _),
-                        4 => integer.Signed ? int.TryParse(constant.Value, out _) : uint.TryParse(constant.Value, out _),
-                        8 => integer.Signed ? long.TryParse(constant.Value, out _) : ulong.TryParse(constant.Value, out _),
-                        _ => integer.Signed ? int.TryParse(constant.Value, out _) : uint.TryParse(constant.Value, out _),
+                          2 => integer.Signed ? short.TryParse(constant.Value, out _) : ushort.TryParse(constant.Value, out _),
+                          4 => integer.Signed ? int.TryParse(constant.Value, out _) : uint.TryParse(constant.Value, out _),
+                          8 => integer.Signed ? long.TryParse(constant.Value, out _) : ulong.TryParse(constant.Value, out _),
+                          _ => integer.Signed ? int.TryParse(constant.Value, out _) : uint.TryParse(constant.Value, out _),
                     };
                     if (!success)
                     {
@@ -1780,7 +1836,7 @@ namespace Lang.Translation
             return new TypeDefinition {Name = enumAst.Name, PrimitiveType = new EnumType {Bytes = primitive.Bytes, Signed = primitive.Signed}};
         }
 
-        private TypeDefinition VerifyCall(CallAst call, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private TypeDefinition VerifyCall(CallAst call, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             var arguments = new TypeDefinition[call.Arguments.Count];
             var argumentsError = false;
@@ -2381,7 +2437,7 @@ namespace Lang.Translation
             return true;
         }
 
-        private TypeDefinition VerifyExpressionType(ExpressionAst expression, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private TypeDefinition VerifyExpressionType(ExpressionAst expression, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Get the type of the initial child
             expression.Type = VerifyExpression(expression.Children[0], currentFunction, scopeIdentifiers);
@@ -2410,58 +2466,125 @@ namespace Lang.Translation
                 // 3. Verify the operator and expression types are compatible and convert the expression type if necessary
                 var type = VerifyType(expression.Type);
                 var nextType = VerifyType(nextExpressionType);
-                switch (op)
+                if (type == Type.Struct && nextType == Type.Struct)
                 {
-                    // Both need to be bool and returns bool
-                    case Operator.And:
-                    case Operator.Or:
-                        if (type != Type.Boolean || nextType != Type.Boolean)
+                    if (TypeEquals(expression.Type, nextExpressionType, true))
+                    {
+                        if (_programGraph.OperatorOverloads.TryGetValue(expression.Type.GenericName, out var overloads) && overloads.TryGetValue(op, out var overload))
                         {
-                            AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
-                            expression.Type = new TypeDefinition {Name = "bool"};
+                            if (!overload.Verified && overload != currentFunction)
+                            {
+                                VerifyOperatorOverload(overload);
+                            }
+                            expression.Type = overload.ReturnType;
                         }
-                        break;
-                    // Requires same types and returns bool
-                    case Operator.Equality:
-                    case Operator.NotEqual:
-                    case Operator.GreaterThan:
-                    case Operator.LessThan:
-                    case Operator.GreaterThanEqual:
-                    case Operator.LessThanEqual:
-                        if ((type == Type.Enum && nextType == Type.Enum)
-                            || (type == Type.Type && nextType == Type.Type))
+                        else
                         {
-                            if ((op != Operator.Equality && op != Operator.NotEqual) || !TypeEquals(expression.Type, nextExpressionType))
+                            AddError($"Type '{PrintTypeDefinition(expression.Type)}' does not contain an overload for operator '{PrintOperator(op)}'", expression.Children[i]);
+                        }
+                    }
+                    else
+                    {
+                        AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                    }
+                }
+                else
+                {
+                    switch (op)
+                    {
+                        // Both need to be bool and returns bool
+                        case Operator.And:
+                        case Operator.Or:
+                            if (type != Type.Boolean || nextType != Type.Boolean)
+                            {
+                                AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                                expression.Type = new TypeDefinition {Name = "bool"};
+                            }
+                            break;
+                            // Requires same types and returns bool
+                        case Operator.Equality:
+                        case Operator.NotEqual:
+                        case Operator.GreaterThan:
+                        case Operator.LessThan:
+                        case Operator.GreaterThanEqual:
+                        case Operator.LessThanEqual:
+                            if ((type == Type.Enum && nextType == Type.Enum)
+                                    || (type == Type.Type && nextType == Type.Type))
+                            {
+                                if ((op != Operator.Equality && op != Operator.NotEqual) || !TypeEquals(expression.Type, nextExpressionType))
+                                {
+                                    AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                                }
+                            }
+                            else if (!(type == Type.Int || type == Type.Float) &&
+                                !(nextType == Type.Int || nextType == Type.Float))
                             {
                                 AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
                             }
-                        }
-                        else if (!(type == Type.Int || type == Type.Float) &&
-                            !(nextType == Type.Int || nextType == Type.Float))
-                        {
-                            AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
-                        }
-                        expression.Type = new TypeDefinition {Name = "bool"};
-                        break;
-                    // Requires same types and returns more precise type
-                    case Operator.Add:
-                    case Operator.Subtract:
-                    case Operator.Multiply:
-                    case Operator.Divide:
-                    case Operator.Modulus:
-                        if (((type == Type.Pointer && nextType == Type.Int) ||
-                            (type == Type.Int && nextType == Type.Pointer)) &&
-                            (op == Operator.Add || op == Operator.Subtract))
-                        {
-                            if (nextType == Type.Pointer)
+                            expression.Type = new TypeDefinition {Name = "bool"};
+                            break;
+                        // Requires same types and returns more precise type
+                        case Operator.Add:
+                        case Operator.Subtract:
+                        case Operator.Multiply:
+                        case Operator.Divide:
+                        case Operator.Modulus:
+                            if (((type == Type.Pointer && nextType == Type.Int) ||
+                                (type == Type.Int && nextType == Type.Pointer)) &&
+                                (op == Operator.Add || op == Operator.Subtract))
                             {
-                                expression.Type = nextExpressionType;
+                                if (nextType == Type.Pointer)
+                                {
+                                    expression.Type = nextExpressionType;
+                                }
                             }
-                        }
-                        else if ((type == Type.Int || type == Type.Float) &&
-                            (nextType == Type.Int || nextType == Type.Float))
-                        {
-                            // For integer operations, use the larger size and convert to signed if one type is signed
+                            else if ((type == Type.Int || type == Type.Float) &&
+                                (nextType == Type.Int || nextType == Type.Float))
+                            {
+                                // For integer operations, use the larger size and convert to signed if one type is signed
+                                if (type == Type.Int && nextType == Type.Int)
+                                {
+                                    var currentIntegerType = expression.Type.PrimitiveType;
+                                    var nextIntegerType = nextExpressionType.PrimitiveType;
+                                    if (currentIntegerType.Bytes == nextIntegerType.Bytes &&
+                                        currentIntegerType.Signed == nextIntegerType.Signed)
+                                        break;
+
+                                    var integerType = new IntegerType
+                                    {
+                                        Bytes = currentIntegerType.Bytes > nextIntegerType.Bytes ? currentIntegerType.Bytes : nextIntegerType.Bytes,
+                                        Signed = currentIntegerType.Signed || nextIntegerType.Signed
+                                    };
+                                    expression.Type = new TypeDefinition
+                                    {
+                                        Name = $"{(integerType.Signed ? "s" : "u")}{integerType.Bytes * 8}",
+                                        PrimitiveType = integerType
+                                    };
+                                }
+                                // For floating point operations, convert to the larger size
+                                else if (type == Type.Float && nextType == Type.Float)
+                                {
+                                    if (expression.Type.PrimitiveType.Bytes < nextExpressionType.PrimitiveType.Bytes)
+                                    {
+                                        expression.Type = nextExpressionType;
+                                    }
+                                }
+                                // For an int lhs and float rhs, convert to the floating point type
+                                // Note that float lhs and int rhs are covered since the floating point is already selected
+                                else if (nextType == Type.Float)
+                                {
+                                    expression.Type = nextExpressionType;
+                                }
+                            }
+                            else
+                            {
+                                AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                            }
+                            break;
+                        // Requires both integer or bool types and returns more same type
+                        case Operator.BitwiseAnd:
+                        case Operator.BitwiseOr:
+                        case Operator.Xor:
                             if (type == Type.Int && nextType == Type.Int)
                             {
                                 var currentIntegerType = expression.Type.PrimitiveType;
@@ -2481,91 +2604,49 @@ namespace Lang.Translation
                                     PrimitiveType = integerType
                                 };
                             }
-                            // For floating point operations, convert to the larger size
-                            else if (type == Type.Float && nextType == Type.Float)
+                            else if (!(type == Type.Boolean && nextType == Type.Boolean))
                             {
-                                if (expression.Type.PrimitiveType.Bytes < nextExpressionType.PrimitiveType.Bytes)
+                                AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                                if (nextType == Type.Boolean || nextType == Type.Int)
                                 {
                                     expression.Type = nextExpressionType;
                                 }
-                            }
-                            // For an int lhs and float rhs, convert to the floating point type
-                            // Note that float lhs and int rhs are covered since the floating point is already selected
-                            else if (nextType == Type.Float)
-                            {
-                                expression.Type = nextExpressionType;
-                            }
-                        }
-                        else
-                        {
-                            AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
-                        }
-                        break;
-                    // Requires both integer or bool types and returns more same type
-                    case Operator.BitwiseAnd:
-                    case Operator.BitwiseOr:
-                    case Operator.Xor:
-                        if (type == Type.Int && nextType == Type.Int)
-                        {
-                            var currentIntegerType = expression.Type.PrimitiveType;
-                            var nextIntegerType = nextExpressionType.PrimitiveType;
-                            if (currentIntegerType.Bytes == nextIntegerType.Bytes &&
-                                currentIntegerType.Signed == nextIntegerType.Signed)
-                                break;
-
-                            var integerType = new IntegerType
-                            {
-                                Bytes = currentIntegerType.Bytes > nextIntegerType.Bytes ? currentIntegerType.Bytes : nextIntegerType.Bytes,
-                                Signed = currentIntegerType.Signed || nextIntegerType.Signed
-                            };
-                            expression.Type = new TypeDefinition
-                            {
-                                Name = $"{(integerType.Signed ? "s" : "u")}{integerType.Bytes * 8}",
-                                PrimitiveType = integerType
-                            };
-                        }
-                        else if (!(type == Type.Boolean && nextType == Type.Boolean))
-                        {
-                            AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
-                            if (nextType == Type.Boolean || nextType == Type.Int)
-                            {
-                                expression.Type = nextExpressionType;
-                            }
-                            else if (!(type == Type.Boolean || type == Type.Int))
-                            {
-                                // If the type can't be determined, default to int
-                                expression.Type = new TypeDefinition {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
-                            }
-                        }
-                        break;
-                    case Operator.ShiftLeft:
-                    case Operator.ShiftRight:
-                    case Operator.RotateLeft:
-                    case Operator.RotateRight:
-                        if (type != Type.Int || nextType != Type.Int)
-                        {
-                            AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
-                            if (type != Type.Int)
-                            {
-                                if (nextType == Type.Int)
-                                {
-                                    expression.Type = nextExpressionType;
-                                }
-                                else
+                                else if (!(type == Type.Boolean || type == Type.Int))
                                 {
                                     // If the type can't be determined, default to int
                                     expression.Type = new TypeDefinition {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
                                 }
                             }
-                        }
-                        break;
+                            break;
+                        case Operator.ShiftLeft:
+                        case Operator.ShiftRight:
+                        case Operator.RotateLeft:
+                        case Operator.RotateRight:
+                            if (type != Type.Int || nextType != Type.Int)
+                            {
+                                AddError($"Operator {PrintOperator(op)} not applicable to types '{PrintTypeDefinition(expression.Type)}' and '{PrintTypeDefinition(nextExpressionType)}'", expression.Children[i]);
+                                if (type != Type.Int)
+                                {
+                                    if (nextType == Type.Int)
+                                    {
+                                        expression.Type = nextExpressionType;
+                                    }
+                                    else
+                                    {
+                                        // If the type can't be determined, default to int
+                                        expression.Type = new TypeDefinition {Name = "s32", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
+                                    }
+                                }
+                            }
+                            break;
+                    }
                 }
                 expression.ResultingTypes.Add(expression.Type);
             }
             return expression.Type;
         }
 
-        private TypeDefinition VerifyIndexType(IndexAst index, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private TypeDefinition VerifyIndexType(IndexAst index, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             if (!scopeIdentifiers.TryGetValue(index.Name, out var identifier))
             {
@@ -2580,7 +2661,7 @@ namespace Lang.Translation
             return VerifyIndex(index, declaration.Type, currentFunction, scopeIdentifiers);
         }
 
-        private TypeDefinition VerifyIndex(IndexAst index, TypeDefinition typeDef, FunctionAst currentFunction, IDictionary<string, IAst> scopeIdentifiers)
+        private TypeDefinition VerifyIndex(IndexAst index, TypeDefinition typeDef, IFunction currentFunction, IDictionary<string, IAst> scopeIdentifiers)
         {
             // 1. Verify the variable is a list
             var type = VerifyType(typeDef);
@@ -2878,6 +2959,10 @@ namespace Lang.Translation
                 Operator.NotEqual => "!=",
                 Operator.GreaterThanEqual => ">=",
                 Operator.LessThanEqual => "<=",
+                Operator.ShiftLeft => "<<",
+                Operator.ShiftRight => ">>",
+                Operator.RotateLeft => "<<<",
+                Operator.RotateRight => ">>>",
                 _ => ((char)op).ToString()
             };
         }

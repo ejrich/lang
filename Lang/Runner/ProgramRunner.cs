@@ -1359,6 +1359,11 @@ namespace Lang.Runner
                 return new ValueType {Type = function.ReturnType, Value = returnValue};
             }
 
+            return ExecuteFunction(function, arguments);
+        }
+
+        private ValueType ExecuteFunction(IFunction function, object[] arguments)
+        {
             var variables = new Dictionary<string, ValueType>(_globalVariables);
 
             for (var i = 0; i < function.Arguments.Count; i++)
@@ -1413,7 +1418,7 @@ namespace Lang.Runner
             _programGraph.Dependencies.Add(library);
         }
 
-        private static object RunExpression(ValueType lhs, ValueType rhs, Operator op, TypeDefinition targetType)
+        private object RunExpression(ValueType lhs, ValueType rhs, Operator op, TypeDefinition targetType)
         {
             // 1. Handle pointer math
             if (lhs.Type.Name == "*")
@@ -1430,9 +1435,16 @@ namespace Lang.Runner
             {
                 case Operator.And:
                 case Operator.Or:
-                    var lhsBool = (bool)lhs.Value;
-                    var rhsBool = (bool)rhs.Value;
-                    return op == Operator.And ? lhsBool && rhsBool : lhsBool || rhsBool;
+                    if (lhs.Type.Name == "bool")
+                    {
+                        var lhsBool = (bool)lhs.Value;
+                        var rhsBool = (bool)rhs.Value;
+                        return op == Operator.And ? lhsBool && rhsBool : lhsBool || rhsBool;
+                    }
+                    else
+                    {
+                        return HandleOverloadedOperator(lhs.Type, op, lhs.Value, rhs.Value);
+                    }
                 case Operator.Equality:
                 case Operator.NotEqual:
                 case Operator.GreaterThanEqual:
@@ -1634,7 +1646,7 @@ namespace Lang.Runner
             return IntPtr.Add(lhsPointer, (int)rhs);
         }
 
-        private static object Compare(ValueType lhs, ValueType rhs, Operator op)
+        private object Compare(ValueType lhs, ValueType rhs, Operator op)
         {
             switch (lhs.Type.PrimitiveType)
             {
@@ -1714,10 +1726,12 @@ namespace Lang.Runner
                     var rhsValue = Convert.ToInt64(rhs.Value);
                     return IntegerOperations(lhsValue, rhsValue, op);
                 }
+                default:
+                    return HandleOverloadedOperator(lhs.Type, op, lhs.Value, rhs.Value);
             }
 
-            // @Future Operator overloading
-            throw new NotImplementedException($"{op} not compatible with types '{lhs.Type.GenericName}' and '{rhs.Type.GenericName}'");
+            // @Cleanup this should not be hit
+            return null;
         }
 
         private static object Shift(ValueType lhs, ValueType rhs, bool right = false, bool rotate = false)
@@ -1815,11 +1829,11 @@ namespace Lang.Runner
                 }
             }
 
-            // @Cleanup this should not be hit
+            // TODO Handle operator overloading
             return lhs.Value;
         }
 
-        private static object PerformOperation(TypeDefinition targetType, object lhsValue, object rhsValue, Operator op)
+        private object PerformOperation(TypeDefinition targetType, object lhsValue, object rhsValue, Operator op)
         {
             switch (targetType.PrimitiveType)
             {
@@ -1853,10 +1867,15 @@ namespace Lang.Runner
                         var result = DoubleOperations(lhsFloat, rhsFloat, op);
                         return CastValue(result, targetType);
                     }
+                default:
+                    return HandleOverloadedOperator(targetType, op, lhsValue, rhsValue);
             }
+        }
 
-            // @Future Operator overloading
-            throw new NotImplementedException($"{op} not compatible with types '{lhsValue.GetType()}' and '{rhsValue.GetType()}'");
+        private object HandleOverloadedOperator(TypeDefinition type, Operator op, object lhs, object rhs)
+        {
+            var operatorOverload = _programGraph.OperatorOverloads[type.GenericName][op];
+            return ExecuteFunction(operatorOverload, new []{lhs, rhs}).Value;
         }
 
         private static object CastValue(object value, TypeDefinition targetType)
