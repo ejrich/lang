@@ -102,7 +102,8 @@ namespace Lang.Translation
                             parseResult.SyntaxTrees.RemoveAt(i--);
                             break;
                         case FunctionAst function:
-                            if (function.Name == "main")
+                            var main = function.Name == "main";
+                            if (main)
                             {
                                 if (mainDefined)
                                 {
@@ -112,7 +113,7 @@ namespace Lang.Translation
                                 mainDefined = true;
                             }
 
-                            VerifyFunctionDefinition(function);
+                            VerifyFunctionDefinition(function, main);
                             parseResult.SyntaxTrees.RemoveAt(i--);
                             break;
                     }
@@ -371,7 +372,7 @@ namespace Lang.Translation
             structAst.Verified = true;
         }
 
-        private void VerifyFunctionDefinition(FunctionAst function, bool main = false)
+        private void VerifyFunctionDefinition(FunctionAst function, bool main)
         {
             // 1. Verify the return type of the function is valid
             var returnType = VerifyType(function.ReturnType);
@@ -410,7 +411,7 @@ namespace Lang.Translation
             // 2. Verify main function return type and arguments
             if (main)
             {
-                if (!(returnType == Type.Void || returnType == Type.Int))
+                if (returnType != Type.Void && returnType != Type.Int)
                 {
                     AddError("The main function should return type 'int' or 'void'", function);
                 }
