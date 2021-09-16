@@ -1580,7 +1580,7 @@ namespace Lang
                         Operator.Subtract => InstructionType.IntegerSubtract,
                         Operator.Multiply => InstructionType.IntegerMultiply,
                         Operator.Divide => integerType.Primitive.Signed ? InstructionType.IntegerDivide : InstructionType.UnsignedIntegerDivide,
-                        Operator.Modulus => integerType.Primitive.Signed ? InstructionType.IntegerDivide : InstructionType.UnsignedIntegerModulus,
+                        Operator.Modulus => integerType.Primitive.Signed ? InstructionType.IntegerModulus : InstructionType.UnsignedIntegerModulus,
                         // @Cleanup this branch should never be hit
                         _ => InstructionType.IntegerAdd
                 };
