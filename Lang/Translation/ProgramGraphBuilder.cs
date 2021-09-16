@@ -667,42 +667,65 @@ namespace Lang.Translation
                 case CallAst call:
                     if (_functions.TryGetValue(call.Function, out var function))
                     {
-                        // Handle varargs functions
-                        if (function.Arguments.Count > 0 && function.Arguments[^1].Type.Name == "...")
+                        var argumentCount = function.Varargs ? function.Arguments.Count - 1 : function.Arguments.Count;
+                        var callArgumentCount = call.Arguments.Count;
+
+                        // Verify function argument count
+                        if (function.Varargs)
                         {
-                            // TODO Handle typed varargs
-                            for (var i = 0; i < function.Arguments.Count - 1; i++)
+                            if (argumentCount > callArgumentCount)
                             {
-                                var functionType = function.Arguments[i].Type;
-                                var callType = VerifyExpression(call.Arguments[i], localVariables, errors);
-                                if (callType != null)
-                                {
-                                    if (!TypeEquals(functionType, callType))
-                                    {
-                                        errors.Add(CreateError($"Call to function '{function.Name}' expected '{PrintTypeDefinition(functionType)}', but got '{PrintTypeDefinition(callType)}'", call.Arguments[i]));
-                                    }
-                                }
+                                errors.Add(CreateError($"Call to function '{function.Name}' expected at least {argumentCount} arguments, but got {callArgumentCount}", call));
+                                return null;
                             }
-
-                            return function.ReturnType;
                         }
-
-                        // Verify function arguments
-                        if (function.Arguments.Count != call.Arguments.Count)
+                        else if (argumentCount != callArgumentCount)
                         {
-                            errors.Add(CreateError($"Call to function '{function.Name}' expected {function.Arguments.Count} arguments, but got {call.Arguments.Count}", call));
+                            errors.Add(CreateError($"Call to function '{function.Name}' expected {argumentCount} arguments, but got {callArgumentCount}", call));
                             return null;
                         }
 
-                        for (var i = 0; i < function.Arguments.Count; i++)
+                        // Verify call arguments match the types of the function arguments
+                        for (var i = 0; i < argumentCount; i++)
                         {
                             var functionType = function.Arguments[i].Type;
-                            var callType = VerifyExpression(call.Arguments[i], localVariables, errors);
+                            var argument = call.Arguments[i];
+                            var callType = VerifyExpression(argument, localVariables, errors);
                             if (callType != null)
                             {
                                 if (!TypeEquals(functionType, callType))
                                 {
-                                    errors.Add(CreateError($"Call to function '{function.Name}' expected '{PrintTypeDefinition(functionType)}', but got '{PrintTypeDefinition(callType)}'", call.Arguments[i]));
+                                    errors.Add(CreateError($"Call to function '{function.Name}' expected '{PrintTypeDefinition(functionType)}', but got '{PrintTypeDefinition(callType)}'", argument));
+                                }
+                            }
+                        }
+
+                        // Verify varargs call arguments
+                        if (function.Varargs)
+                        {
+                            var varargsType = function.Arguments[argumentCount].Type.Generics.FirstOrDefault();
+
+                            // If no generic type, simply verify the rest of the arguments do not have errors
+                            if (varargsType == null)
+                            {
+                                for (var i = argumentCount; i < callArgumentCount; i++)
+                                {
+                                    VerifyExpression(call.Arguments[i], localVariables, errors);
+                                }
+                            }
+                            else
+                            {
+                                for (var i = argumentCount; i < callArgumentCount; i++)
+                                {
+                                    var argument = call.Arguments[i];
+                                    var callType = VerifyExpression(argument, localVariables, errors);
+                                    if (callType != null)
+                                    {
+                                        if (!TypeEquals(varargsType, callType))
+                                        {
+                                            errors.Add(CreateError($"Call to function '{function.Name}' expected '{PrintTypeDefinition(varargsType)}', but got '{PrintTypeDefinition(callType)}'", argument));
+                                        }
+                                    }
                                 }
                             }
                         }

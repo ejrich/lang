@@ -154,7 +154,7 @@ sum_test() {
     sum_list[6] = 23;
 
     printf("Sum of List = %d\n", sum(sum_list));
-    printf("Sum of ... = %d\n", sum2("Hello", 4, 41, 544, 244, 42, 14, 23));
+    printf("Sum of ... = %d\n", sum2(4, 41, 544, 244, 42, 14, 23));
 }
 
 int sum(List<int> args) {
