@@ -1,9 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using Lang.Parsing;
-using LLVMSharp.Interop;
-using LLVMApi = LLVMSharp.Interop.LLVM;
+using LLVMSharp;
+using LLVMApi = LLVMSharp.LLVM;
 
 namespace Lang.Backend.LLVM
 {
@@ -46,7 +48,7 @@ namespace Lang.Backend.LLVM
 
             // 7. Compile to object file
             #if DEBUG
-            _module.TryPrintToFile(Path.Combine(objectPath, $"{projectName}.ll"), out _);
+            LLVMApi.PrintModuleToFile(_module, Path.Combine(objectPath, $"{projectName}.ll"), out _);
             #endif
             Compile(objectFile);
 
@@ -56,8 +58,8 @@ namespace Lang.Backend.LLVM
 
         private void InitLLVM(string projectName)
         {
-            _module = LLVMModuleRef.CreateWithName(projectName);
-            _builder = LLVMBuilderRef.Create(_module.Context);
+            _module = LLVMApi.ModuleCreateWithName(projectName);
+            _builder = LLVMApi.CreateBuilder();
         }
 
         private void WriteData(Data data)
@@ -70,12 +72,12 @@ namespace Lang.Backend.LLVM
         private LLVMValueRef WriteFunctionDefinition(string name, List<Argument> arguments, TypeDefinition returnType)
         {
             var argumentTypes = arguments.Select(arg => ConvertTypeDefinition(arg.Type)).ToArray();
-            var function = _module.AddFunction(name, LLVMTypeRef.CreateFunction(ConvertTypeDefinition(returnType), argumentTypes));
+            var function = LLVMApi.AddFunction(_module, name, LLVMApi.FunctionType(ConvertTypeDefinition(returnType), argumentTypes, false));
 
             for (var i = 0; i < arguments.Count; i++)
             {
-                var argument = function.GetParam((uint) i);
-                argument.Name = arguments[i].Name;
+                var argument = LLVMApi.GetParam(function, (uint) i);
+                LLVMApi.SetValueName(argument, arguments[i].Name);
             }
 
             return function;
@@ -84,17 +86,18 @@ namespace Lang.Backend.LLVM
         private void WriteFunction(FunctionAst functionAst)
         {
             // 1. Get function definition
-            var function = _module.GetNamedFunction(functionAst.Name);
-            _builder.PositionAtEnd(function.AppendBasicBlock("entry"));
+            var function = LLVMApi.GetNamedFunction(_module, functionAst.Name);
+            LLVMApi.PositionBuilderAtEnd(_builder, function.AppendBasicBlock("entry"));
             var localVariables = new Dictionary<string, LLVMValueRef>();
 
             // 2. Allocate arguments on the stack
             for (var i = 0; i < functionAst.Arguments.Count; i++)
             {
-                var argument = function.GetParam((uint) i);
-                var allocation = _builder.BuildAlloca(ConvertTypeDefinition(functionAst.Arguments[i].Type), argument.Name);
-                _builder.BuildStore(argument, allocation);
-                localVariables.Add(argument.Name, allocation);
+                var argument = LLVMApi.GetParam(function, (uint) i);
+                var argumentName = functionAst.Arguments[i].Name;
+                var allocation = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(functionAst.Arguments[i].Type), argumentName);
+                LLVMApi.BuildStore(_builder, argument, allocation);
+                localVariables.Add(argumentName, allocation);
             }
 
             // 3. Loop through function body
@@ -112,16 +115,17 @@ namespace Lang.Backend.LLVM
         {
             // 1. Define main function
             var function = WriteFunctionDefinition("main", main.Arguments, main.ReturnType);
-            _builder.PositionAtEnd(function.AppendBasicBlock("entry"));
+            LLVMApi.PositionBuilderAtEnd(_builder, LLVMApi.AppendBasicBlock(function, "entry"));
             var localVariables = new Dictionary<string, LLVMValueRef>();
 
             // 2. Allocate arguments on the stack
             for (var i = 0; i < main.Arguments.Count; i++)
             {
                 var argument = function.GetParam((uint) i);
-                var allocation = _builder.BuildAlloca(ConvertTypeDefinition(main.Arguments[i].Type), argument.Name);
-                _builder.BuildStore(argument, allocation);
-                localVariables.Add(argument.Name, allocation);
+                var argumentName = main.Arguments[i].Name;
+                var allocation = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(main.Arguments[i].Type), argumentName);
+                LLVMApi.BuildStore(_builder, argument, allocation);
+                localVariables.Add(argumentName, allocation);
             }
 
             // 2. Loop through function body
@@ -143,13 +147,16 @@ namespace Lang.Backend.LLVM
             LLVMApi.InitializeX86AsmParser();
             LLVMApi.InitializeX86AsmPrinter();
 
-            var target = LLVMTargetRef.Targets.First(_ => _.Name == "x86-64");
-            _module.Target = LLVMTargetRef.DefaultTriple;
-            var targetMachine = target.CreateTargetMachine(_module.Target, "generic", "",
-                LLVMCodeGenOptLevel.LLVMCodeGenLevelNone, LLVMRelocMode.LLVMRelocDefault, LLVMCodeModel.LLVMCodeModelDefault);
-            _module.DataLayout = targetMachine.CreateTargetDataLayout();
+            var target = LLVMApi.GetTargetFromName("x86-64");
+            var targetTriple = Marshal.PtrToStringAnsi(LLVMApi.GetDefaultTargetTriple());
+            LLVMApi.SetTarget(_module, targetTriple);
 
-            targetMachine.EmitToFile(_module, objectFile, LLVMCodeGenFileType.LLVMObjectFile);
+            var targetMachine = LLVMApi.CreateTargetMachine(target, targetTriple, "generic", "",
+                LLVMCodeGenOptLevel.LLVMCodeGenLevelNone, LLVMRelocMode.LLVMRelocDefault, LLVMCodeModel.LLVMCodeModelDefault);
+            LLVMApi.SetDataLayout(_module, Marshal.PtrToStringAnsi(LLVMApi.CreateTargetDataLayout(targetMachine).Pointer));
+
+            var file = Marshal.StringToCoTaskMemAnsi(objectFile);
+            LLVMApi.TargetMachineEmitToFile(targetMachine, _module, file, LLVMCodeGenFileType.LLVMObjectFile, out _);
         }
 
         private void WriteFunctionLine(IAst ast, IDictionary<string, LLVMValueRef> localVariables)
@@ -189,25 +196,21 @@ namespace Lang.Backend.LLVM
             var returnValue = WriteExpression(returnAst.Value, localVariables);
 
             // 2. Write expression as return value
-            _builder.BuildRet(returnValue);
+            LLVMApi.BuildRet(_builder, returnValue);
         }
 
         private void WriteDeclaration(DeclarationAst declaration, IDictionary<string, LLVMValueRef> localVariables)
         {
             // 1. Declare variable on the stack
-            var allocation = _builder.BuildAlloca(ConvertTypeDefinition(declaration.Type), declaration.Name);
-            
+            var allocation = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(declaration.Type), declaration.Name);
+
             // 2. Set value if it exists
             if (declaration.Value != null)
             {
                 var expressionValue = WriteExpression(declaration.Value, localVariables);
-                _builder.BuildStore(expressionValue, allocation);
-                localVariables.Add(declaration.Name, allocation);
+                LLVMApi.BuildStore(_builder, expressionValue, allocation);
             }
-            else
-            {
-                localVariables.Add(declaration.Name, null);
-            }
+            localVariables.Add(declaration.Name, allocation);
         }
         
         private void WriteAssignment(AssignmentAst assignment, IDictionary<string, LLVMValueRef> localVariables)
@@ -227,13 +230,13 @@ namespace Lang.Backend.LLVM
             {
                 // TODO If operator exists, create expression using the existing expression value
                 // 2a. Build expression with variable value as the LHS
-                var value = _builder.BuildLoad(variable, variableName);
+                var value = LLVMApi.BuildLoad(_builder, variable, variableName);
                 expressionValue = BuildExpression(value, expressionValue, assignment.Operator);
             }
 
             // 3. Reallocate the value of the variable
             // TODO Set struct fields
-            _builder.BuildStore(expressionValue, variable);
+            LLVMApi.BuildStore(_builder, expressionValue, variable);
         }
 
         private void WriteScope(List<IAst> scopeChildren, IDictionary<string, LLVMValueRef> localVariables)
@@ -262,67 +265,67 @@ namespace Lang.Backend.LLVM
             {
                 case ConstantAst constant:
                     var type = ConvertTypeDefinition(constant.Type);
-                    switch (type.Kind)
+                    switch (type.TypeKind)
                     {
                         case LLVMTypeKind.LLVMIntegerTypeKind:
                             // Specific case for parsing booleans
-                            if (type == LLVMTypeRef.Int1)
+                            if (type.ToString() == "i1")
                             {
-                                return LLVMValueRef.CreateConstInt(type, constant.Value == "true" ? 1 : 0);
+                                return LLVMApi.ConstInt(type, constant.Value == "true" ? 1 : 0, false);
                             }
-                            return LLVMValueRef.CreateConstInt(type, ulong.Parse(constant.Value), true);
+                            return LLVMApi.ConstInt(type, ulong.Parse(constant.Value), true);
                         case LLVMTypeKind.LLVMFloatTypeKind:
-                            return LLVMValueRef.CreateConstRealOfStringAndSize(type, constant.Value, (uint) constant.Value.Length);
+                            return LLVMApi.ConstRealOfStringAndSize(type, constant.Value, (uint) constant.Value.Length);
                         // TODO Implement more branches
                         default:
                             break;
                     }
                     break;
                 case VariableAst variable:
-                    return _builder.BuildLoad(localVariables[variable.Name]);
+                    return LLVMApi.BuildLoad(_builder, localVariables[variable.Name], variable.Name);
                 case StructFieldRefAst structField:
                     // TODO Implement me
                     break;
                 case CallAst call:
-                    var function = _module.GetNamedFunction(call.Function);
+                    var function = LLVMApi.GetNamedFunction(_module, call.Function);
                     var callArguments = new LLVMValueRef[call.Arguments.Count];
                     for (var i = 0; i < call.Arguments.Count; i++)
                     {
                         var value = WriteExpression(call.Arguments[i], localVariables);
                         callArguments[i] = value;
                     }
-                    return _builder.BuildCall(function, callArguments, "callTmp");
+                    return LLVMApi.BuildCall(_builder, function, callArguments, "callTmp");
                 case ChangeByOneAst changeByOne:
                     if (changeByOne.Variable is VariableAst changeVariable)
                     {
                         var variable = localVariables[changeVariable.Name];
-                        var value = _builder.BuildLoad(variable);
+                        var value = LLVMApi.BuildLoad(_builder, variable, changeVariable.Name);
 
                         LLVMValueRef newValue;
-                        if (value.TypeOf.Kind == LLVMTypeKind.LLVMIntegerTypeKind)
+                        if (value.TypeOf().TypeKind == LLVMTypeKind.LLVMIntegerTypeKind)
                         {
                             newValue = changeByOne.Operator == Operator.Increment
-                                ? _builder.BuildAdd(value, LLVMValueRef.CreateConstInt(value.TypeOf, 1), "inc")
-                                : _builder.BuildSub(value, LLVMValueRef.CreateConstInt(value.TypeOf, 1), "dec");
+                                ? LLVMApi.BuildAdd(_builder, value, LLVMApi.ConstInt(value.TypeOf(), 1, false), "inc")
+                                : LLVMApi.BuildSub(_builder, value, LLVMApi.ConstInt(value.TypeOf(), 1, false), "dec");
                         }
                         else
                         {
                             newValue = changeByOne.Operator == Operator.Increment
-                                ? _builder.BuildFAdd(value, LLVMValueRef.CreateConstReal(value.TypeOf, 1), "incf")
-                                : _builder.BuildFSub(value, LLVMValueRef.CreateConstReal(value.TypeOf, 1), "decf");
+                                ? LLVMApi.BuildFAdd(_builder, value, LLVMApi.ConstReal(value.TypeOf(), 1), "incf")
+                                : LLVMApi.BuildFSub(_builder, value, LLVMApi.ConstReal(value.TypeOf(), 1), "decf");
                         }
 
-                        _builder.BuildStore(newValue, variable);
+                        LLVMApi.BuildStore(_builder, newValue, variable);
                         return changeByOne.Prefix ? newValue : value;
                     }
                     else
                     {
                         // TODO Implement StructFieldRef writing
-                        return null;
+                        break;
                     }
                 case NotAst not:
                     var notValue = WriteExpression(not.Value, localVariables);
-                    return _builder.BuildNot(notValue, "not");
+                    return LLVMApi.BuildNot(_builder, notValue, "not");
                 case ExpressionAst expression:
                     var expressionValue = WriteExpression(expression.Children[0], localVariables);
                     for (var i = 1; i < expression.Children.Count; i++)
@@ -332,10 +335,14 @@ namespace Lang.Backend.LLVM
                     }
                     return expressionValue;
                 default:
-                    return null;
+                    // This branch should not be hit since we've already verified that these ASTs are handled,
+                    // but notify the user and exit just in case
+                    Console.WriteLine("Unexpected syntax tree");
+                    Environment.Exit(ErrorCodes.BuildError);
+                    break;
             }
 
-            return LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, 0);
+            return LLVMApi.ConstInt(LLVMApi.Int32Type(), 0, true);
         }
 
         private LLVMValueRef BuildExpression(LLVMValueRef lhs, LLVMValueRef rhs, Operator op)
@@ -344,17 +351,16 @@ namespace Lang.Backend.LLVM
             {
                 // TODO Get value type to determine correct instruction to use
                 case Operator.Add:
-                    return _builder.BuildAdd(lhs, rhs, "tmpadd");
+                    return LLVMApi.BuildAdd(_builder, lhs, rhs, "tmpadd");
                 case Operator.Subtract:
-                    return _builder.BuildSub(lhs, rhs, "tmpsub");
+                    return LLVMApi.BuildSub(_builder, lhs, rhs, "tmpsub");
                 case Operator.Multiply:
-                    // @Fix Stack overflow error here
-                    return _builder.BuildMul(lhs, rhs, "tmpmul");
+                    return LLVMApi.BuildMul(_builder, lhs, rhs, "tmpmul");
                 case Operator.Divide:
-                    return _builder.BuildSDiv(lhs, rhs, "tmpdiv");
+                    return LLVMApi.BuildSDiv(_builder, lhs, rhs, "tmpdiv");
                 // TODO Implement more operators
                 default:
-                    return null;
+                    throw new NotImplementedException(op.ToString());
             }
         }
 
@@ -363,14 +369,14 @@ namespace Lang.Backend.LLVM
             switch (typeDef.Name)
             {
                 case "int":
-                    return LLVMTypeRef.Int32;
+                    return LLVMTypeRef.Int32Type();
                 case "float":
-                    return LLVMTypeRef.Float;
+                    return LLVMTypeRef.FloatType();
                 case "bool":
-                    return LLVMTypeRef.Int1;
+                    return LLVMTypeRef.Int1Type();
                 // TODO Add more type inference
                 default:
-                    return LLVMTypeRef.Double;
+                    return LLVMTypeRef.DoubleType();
             }
         }
     }
