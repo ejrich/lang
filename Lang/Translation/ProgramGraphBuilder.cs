@@ -1350,6 +1350,20 @@ namespace Lang.Translation
 
                     return refType;
                 }
+                case UnaryAst unary when unary.Operator == UnaryOperator.Dereference:
+                    var reference = GetReference(unary.Value, currentFunction, scopeIdentifiers, out var canDereference);
+                    if (!canDereference)
+                    {
+                        AddError("Cannot dereference pointer to assign value", unary.Value);
+                        return null;
+                    }
+
+                    if (reference.Type != Type.Pointer)
+                    {
+                        AddError("Expected to get pointer to dereference", unary.Value);
+                        return null;
+                    }
+                    return reference.Generics[0];
                 default:
                     AddError("Expected to have a reference to a variable, field, or pointer", ast);
                     return null;

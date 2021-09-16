@@ -917,6 +917,7 @@ namespace Lang.Parsing
                     }
                 case TokenType.Increment:
                 case TokenType.Decrement:
+                case TokenType.Asterisk:
                     return ParseExpression(enumerator, errors, currentFunction);
                 case TokenType.OpenBrace:
                     return ParseScope(enumerator, errors, currentFunction);

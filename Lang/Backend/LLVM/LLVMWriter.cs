@@ -855,24 +855,19 @@ namespace Lang.Backend.LLVM
             {
                 IdentifierAst identifier => localVariables[identifier.Name],
                 StructFieldRefAst structField => BuildStructField(structField, localVariables, out loaded, out constant),
-                IndexAst index => GetListPointer(index, localVariables, out _),
+                IndexAst index => GetListPointer(index, localVariables, out loaded),
+                UnaryAst unary => WriteExpression(unary.Value, localVariables),
                 // @Cleanup This branch should never be hit
                 _ => (null, new LLVMValueRef())
             };
-            switch (assignment.Reference)
+            if (loaded && type.Type == Lang.Translation.Type.Pointer)
             {
-                case IndexAst index when index.CallsOverload:
-                case StructFieldRefAst structField when structField.Children[^1] is IndexAst indexAst && indexAst.CallsOverload:
-                    if (type.Type == Lang.Translation.Type.Pointer)
-                    {
-                        type = type.Generics[0];
-                    }
-                    break;
+                type = type.Generics[0];
             }
 
             // 2. Evaluate the expression value
             var expression = WriteExpression(assignment.Value, localVariables);
-            if (assignment.Operator != Operator.None && !constant) // TODO Test this
+            if (assignment.Operator != Operator.None && !constant)
             {
                 // 2a. Build expression with variable value as the LHS
                 var value = LLVMApi.BuildLoad(_builder, variable, "tmpvalue");
@@ -1253,6 +1248,7 @@ namespace Lang.Backend.LLVM
                         IdentifierAst identifier => localVariables[identifier.Name],
                         StructFieldRefAst structField => BuildStructField(structField, localVariables, out _, out constant),
                         IndexAst index => GetListPointer(index, localVariables, out _),
+                        // TODO Test unary deref
                         // @Cleanup This branch should never be hit
                         _ => (null, new LLVMValueRef())
                     };
@@ -1293,6 +1289,7 @@ namespace Lang.Backend.LLVM
                             IdentifierAst identifier => localVariables[identifier.Name],
                             StructFieldRefAst structField => BuildStructField(structField, localVariables, out _, out _),
                             IndexAst index => GetListPointer(index, localVariables, out _),
+                            // TODO Test unary deref?
                             // @Cleanup this branch should not be hit
                             _ => (null, new LLVMValueRef())
                         };

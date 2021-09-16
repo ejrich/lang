@@ -3,6 +3,8 @@ main() {
 
     ptr := pointers();
     printf("Pointer = %p, Value = %d\n", ptr, *ptr);
+    *ptr = 76;
+    printf("Pointer = %p, Value = %d\n", ptr, *ptr);
 
     str := string_test();
     printf("%s - Hello world %d, %d\n", str, 1, 2);
