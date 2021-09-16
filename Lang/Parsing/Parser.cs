@@ -136,14 +136,6 @@ namespace Lang.Parsing
 
                 if (token.Type == TokenType.CloseParen)
                 {
-                    if (!commaRequiredBeforeNextArgument && function.Arguments.Any())
-                    {
-                        errors.Add(new ParseError
-                        {
-                            Error = "Unexpected comma in arguments",
-                            Token = new Token { Type = TokenType.Comma, Line = token.Line }
-                        });
-                    }
                     break;
                 }
 
@@ -190,16 +182,24 @@ namespace Lang.Parsing
                         break;
                 }
             }
+            if (!commaRequiredBeforeNextArgument && function.Arguments.Any())
+            {
+                errors.Add(new ParseError
+                {
+                    Error = "Unexpected comma in arguments",
+                    Token = enumerator.Current ?? enumerator.Last
+                });
+            }
 
             // 4. Find open brace to start parsing body
             enumerator.MoveNext();
-            if (enumerator.Current.Type != TokenType.OpenBrace)
+            if (enumerator.Current?.Type != TokenType.OpenBrace)
             {
                 // Add an error to the function AST and continue until open paren
                 errors.Add(new ParseError
                 {
-                    Error = "Unexpected token in function definition",
-                    Token = enumerator.Current
+                    Error = $"Unexpected token in function definition",
+                    Token = enumerator.Current ?? enumerator.Last
                 });
                 while (enumerator.Current != null && enumerator.Current.Type != TokenType.OpenBrace)
                     enumerator.MoveNext();
@@ -399,7 +399,7 @@ namespace Lang.Parsing
                 case null:
                     errors.Add(new ParseError
                     {
-                        Error = $"Expected variable to have name",
+                        Error = "Expected variable to have name",
                         Token = enumerator.Last
                     });
                     break;
@@ -419,7 +419,7 @@ namespace Lang.Parsing
                 errors.Add(new ParseError
                 {
                     Error = "Expected '=' in declaration'",
-                    Token = enumerator.Current
+                    Token = enumerator.Current ?? enumerator.Last
                 });
             }
 
@@ -819,13 +819,13 @@ namespace Lang.Parsing
                         }
                         return typeDefinition;
                     }
-                    
+
                     if (!commaRequiredBeforeNextType)
                     {
                         switch (token.Type)
                         {
                             case TokenType.Token:
-                                typeDefinition.Generics.Add(token.Value);
+                                typeDefinition.Generics.Add(ParseType(enumerator, errors));
                                 commaRequiredBeforeNextType = true;
                                 break;
                             default:
