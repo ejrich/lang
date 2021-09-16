@@ -879,6 +879,7 @@ namespace Lang.Runner
                                 typeDef = referenceValueType.Type;
                                 if (typeDef.CArray)
                                 {
+                                    typeDef = typeDef.Generics[0];
                                     var pinnedArray = GCHandle.Alloc(referenceValueType.Value, GCHandleType.Pinned);
                                     pointer = pinnedArray.AddrOfPinnedObject();
                                 }
