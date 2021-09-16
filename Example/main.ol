@@ -287,10 +287,10 @@ u32 sleep(u32 seconds) #extern "libc"
 }
 
 compiler_directives() {
-    #if true then
-        printf("Hello world\n");
-    else then
-        printf("Hello wrong branch\n");
+    #if build_env == BuildEnv.Debug then
+        printf("Running Debug code\n");
+    #if build_env == BuildEnv.Release then
+        printf("Running Release code\n");
 }
 
 #if os == OS.Linux {

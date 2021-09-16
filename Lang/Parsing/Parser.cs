@@ -239,7 +239,7 @@ namespace Lang.Parsing
                         {
                             errors.Add(new ParseError
                             {
-                                Error = "Extern function definition should be followed by the library in use", 
+                                Error = "Extern function definition should be followed by the library in use",
                                 Token = enumerator.Current
                             });
                         }
@@ -1043,7 +1043,7 @@ namespace Lang.Parsing
                         enumerator.MoveNext();
                     break;
             }
-            
+
             // 4. Step over '=' sign
             if (!enumerator.MoveNext())
             {
@@ -1518,7 +1518,7 @@ namespace Lang.Parsing
                 {
                     callAst.Arguments.Add(ParseExpression(enumerator, errors, null, TokenType.Comma, TokenType.CloseParen));
 
-                    var currentType = enumerator.Current.Type;
+                    var currentType = enumerator.Current?.Type;
                     if (currentType == TokenType.CloseParen) break;
                     if (currentType == TokenType.SemiColon)
                     {

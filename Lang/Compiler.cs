@@ -52,6 +52,7 @@ namespace Lang
                         break;
                 }
             }
+            _programRunner.BuildSettings = buildSettings;
 
             var stopwatch = new Stopwatch();
             stopwatch.Start();
@@ -108,7 +109,7 @@ namespace Lang
             var buildTime = stopwatch.Elapsed;
 
             // 7. Log statistics
-            Console.WriteLine($"Project time: {projectTime.TotalSeconds} seconds\n" + 
+            Console.WriteLine($"Project time: {projectTime.TotalSeconds} seconds\n" +
                               $"Lexing/Parsing time: {parseTime.TotalSeconds} seconds\n" +
                               $"Project Graph time: {graphTime.TotalSeconds} seconds\n" +
                               $"Program run time: {runTime.TotalSeconds} seconds\n" +
