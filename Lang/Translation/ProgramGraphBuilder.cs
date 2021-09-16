@@ -1044,14 +1044,14 @@ namespace Lang.Translation
                 // 3a. Verify the operator is valid
                 if (assignment.Operator != Operator.None)
                 {
-                    var lValueType = VerifyType(variableTypeDefinition);
-                    var rValueType = VerifyType(valueType);
+                    var lhs = VerifyType(variableTypeDefinition);
+                    var rhs = VerifyType(valueType);
                     switch (assignment.Operator)
                     {
                         // Both need to be bool and returns bool
                         case Operator.And:
                         case Operator.Or:
-                            if (lValueType != Type.Boolean || rValueType != Type.Boolean)
+                            if (lhs != Type.Boolean || rhs != Type.Boolean)
                             {
                                 AddError($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types " +
                                     $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
@@ -1071,8 +1071,8 @@ namespace Lang.Translation
                         case Operator.Multiply:
                         case Operator.Divide:
                         case Operator.Modulus:
-                            if (!(lValueType == Type.Int && rValueType == Type.Int) &&
-                                !(lValueType == Type.Float && (rValueType == Type.Float || rValueType == Type.Int)))
+                            if (!(lhs == Type.Int && rhs == Type.Int) &&
+                                !(lhs == Type.Float && (rhs == Type.Float || rhs == Type.Int)))
                             {
                                 AddError($"Operator {PrintOperator(assignment.Operator)} not applicable to types " +
                                     $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
@@ -1082,8 +1082,8 @@ namespace Lang.Translation
                         case Operator.BitwiseAnd:
                         case Operator.BitwiseOr:
                         case Operator.Xor:
-                            if (!(lValueType == Type.Boolean && rValueType == Type.Boolean) &&
-                                !(lValueType == Type.Int && rValueType == Type.Int))
+                            if (!(lhs == Type.Boolean && rhs == Type.Boolean) &&
+                                !(lhs == Type.Int && rhs == Type.Int))
                             {
                                 AddError($"Operator {PrintOperator(assignment.Operator)} not applicable to types " +
                                     $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
@@ -1094,7 +1094,7 @@ namespace Lang.Translation
                         case Operator.ShiftRight:
                         case Operator.RotateLeft:
                         case Operator.RotateRight:
-                            if (lValueType != Type.Int || rValueType != Type.Int)
+                            if (lhs != Type.Int || rhs != Type.Int)
                             {
                                 AddError($"Operator {PrintOperator(assignment.Operator)} not applicable to types " +
                                     $"'{PrintTypeDefinition(variableTypeDefinition)}' and '{PrintTypeDefinition(valueType)}'", assignment.Value);
