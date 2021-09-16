@@ -449,12 +449,13 @@ namespace Lang.Backend
                         }
                     }
 
-                    using (var name = new MarshaledString(globalVariable.Name))
+                    if (globalVariable.FileIndex.HasValue)
                     {
-                        // var file = _debugFiles[globalVariable.FileIndex];
+                        using var name = new MarshaledString(globalVariable.Name);
+                        var file = _debugFiles[globalVariable.FileIndex.Value];
                         var debugType = _debugTypes[globalVariable.Type.TypeIndex];
-                        // var globalDebug = LLVM.DIBuilderCreateGlobalVariableExpression(_debugBuilder, _debugCompilationUnit, name.Value, (UIntPtr)name.Length, null, (UIntPtr)0, file, globalVariable.Line, debugType, 0, null, null, 0);
-                        // LLVM.GlobalSetMetadata(global, 0, globalDebug);
+                        var globalDebug = LLVM.DIBuilderCreateGlobalVariableExpression(_debugBuilder, _debugCompilationUnit, name.Value, (UIntPtr)name.Length, null, (UIntPtr)0, file, globalVariable.Line, debugType, 0, null, null, 0);
+                        LLVM.GlobalSetMetadata(global, 0, globalDebug);
                     }
 
                     LLVM.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);

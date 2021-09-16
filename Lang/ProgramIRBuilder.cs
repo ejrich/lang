@@ -201,17 +201,19 @@ namespace Lang
             {
                 var globalIndex = Program.GlobalVariables.Count;
                 declaration.AllocationIndex = globalIndex;
-                var globalVariable = new GlobalVariable {Name = declaration.Name, Index = globalIndex, Size = declaration.Type.Size};
+                var globalVariable = new GlobalVariable {Name = declaration.Name, Index = globalIndex, FileIndex = declaration.FileIndex, Line = declaration.Line};
 
                 if (declaration.Type is ArrayType arrayType)
                 {
                     globalVariable.Array = true;
                     globalVariable.ArrayLength = declaration.TypeDefinition.ConstCount.Value;
                     globalVariable.Type = arrayType.ElementType;
+                    globalVariable.Size = globalVariable.ArrayLength * arrayType.ElementType.Size;
                 }
                 else
                 {
                     globalVariable.Type = declaration.Type;
+                    globalVariable.Size = declaration.Type.Size;
                 }
 
                 Program.GlobalVariables.Add(globalVariable);
@@ -344,7 +346,7 @@ namespace Lang
             var arrayIndex = Program.GlobalVariables.Count;
             var arrayVariable = new GlobalVariable
             {
-                Name = "____array", Index = arrayIndex, Size = elementType.Size,
+                Name = "____array", Index = arrayIndex, Size = length * elementType.Size,
                 Array = true, ArrayLength = length, Type = elementType
             };
             Program.GlobalVariables.Add(arrayVariable);
