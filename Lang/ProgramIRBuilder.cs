@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Lang
@@ -249,7 +250,7 @@ namespace Lang
                             ConstantValue = new InstructionConstant {Integer = enumValue}
                         };
                     }
-                    var structFieldPointer = EmitGetStructPointer(function, structField, scope, block);
+                    var structFieldPointer = EmitGetStructPointer(function, structField, scope, block, out var loaded);
                     // if (!loaded && !constant)
                     // {
                     //     if (getStringPointer && type.TypeKind == TypeKind.String)
@@ -398,9 +399,9 @@ namespace Lang
                     // };
                     break;
                 case IndexAst index:
-                    var indexPointer = EmitGetIndexPointer(function, index, scope, block, out var loaded);
+                    var indexPointer = EmitGetIndexPointer(function, index, scope, block);
 
-                    return loaded ? indexPointer : EmitLoad(block, value: indexPointer);
+                    return index.CallsOverload ? indexPointer : EmitLoad(block, value: indexPointer);
                 case ExpressionAst expression:
                     // var expressionValue = WriteExpression(expression.Children[0], localVariables);
                     // for (var i = 1; i < expression.Children.Count; i++)
@@ -470,26 +471,33 @@ namespace Lang
             return callValue;
         }
 
-        private InstructionValue EmitGetStructPointer(FunctionIR function, StructFieldRefAst structField, ScopeAst scope, BasicBlock block)
+        private InstructionValue EmitGetStructPointer(FunctionIR function, StructFieldRefAst structField, ScopeAst scope, BasicBlock block, out bool loaded)
         {
+            loaded = false;
+            TypeDefinition type = null;
+            InstructionValue value = null;
+
             switch (structField.Children[0])
             {
-                // case IdentifierAst identifier:
-                //     (type, value) = localVariables[identifier.Name];
-                //     break;
-                // case IndexAst index:
-                //     var (indexType, indexValue) = GetIndexPointer(index, localVariables, out _);
-                //     type = indexType;
-                //     if (index.CallsOverload && !structField.Pointers[0])
-                //     {
-                //         value = _allocationQueue.Dequeue();
-                //         LLVM.BuildStore(_builder, indexValue, value);
-                //     }
-                //     else
-                //     {
-                //         value = indexValue;
-                //     }
-                //     break;
+                case IdentifierAst identifierAst:
+                    GetScopeIdentifier(scope, identifierAst.Name, out var identifier);
+                    var declaration = (DeclarationAst) identifier;
+                    type = declaration.Type;
+                    value = EmitGetPointer(block, allocationIndex: declaration.AllocationIndex);
+                    break;
+                case IndexAst index:
+                    var indexPointer = EmitGetIndexPointer(function, index, scope, block);
+                    if (index.CallsOverload && !structField.Pointers[0])
+                    {
+                        // TODO Add an allocation
+                        // value = _allocationQueue.Dequeue();
+                        // LLVM.BuildStore(_builder, indexValue, value);
+                    }
+                    else
+                    {
+                        value = indexPointer;
+                    }
+                    break;
                 // case CallAst call:
                 //     var (callType, callValue) = WriteExpression(call, localVariables);
                 //     type = callType;
@@ -505,8 +513,8 @@ namespace Lang
                 //     break;
                 default:
                     // @Cleanup this branch shouldn't be hit
-                    // Console.WriteLine("Unexpected syntax tree in struct field ref");
-                    // Environment.Exit(ErrorCodes.BuildError);
+                    Console.WriteLine("Unexpected syntax tree in struct field ref");
+                    Environment.Exit(ErrorCodes.BuildError);
                     break;
             }
 
@@ -517,7 +525,7 @@ namespace Lang
                 {
                     if (!skipPointer)
                     {
-                        // value = _builder.BuildLoad(value, "pointerval");
+                        value = EmitLoad(block, value: value);
                     }
                     // type = type.Generics[0];
                 }
@@ -549,16 +557,15 @@ namespace Lang
                 // }
 
                 var structDefinition = (StructAst) structField.Types[i-1];
-                // type = structDefinition.Fields[structField.ValueIndices[i-1]].Type;
+                type = structDefinition.Fields[structField.ValueIndices[i-1]].Type;
 
+                value = EmitGetStructPointer(block, value, structField.ValueIndices[i-1]);
                 switch (structField.Children[i])
                 {
                     case IdentifierAst identifier:
-                        // value = _builder.BuildStructGEP(value, (uint)structField.ValueIndices[i-1], identifier.Name);
                         break;
                     case IndexAst index:
-                        // value = _builder.BuildStructGEP(value, (uint)structField.ValueIndices[i-1], index.Name);
-                        // (type, value) = GetIndexPointer(index, localVariables, out _, type, value);
+                        value = EmitGetIndexPointer(function, index, scope, block, type, value);
 
                         if (index.CallsOverload)
                         {
@@ -571,17 +578,17 @@ namespace Lang
                             }
                             else if (i == structField.Pointers.Length)
                             {
-                                // loaded = true;
+                                loaded = true;
                             }
                         }
                         break;
                 }
             }
 
-            return null;
+            return value;
         }
 
-        private InstructionValue EmitGetIndexPointer(FunctionIR function, IndexAst index, ScopeAst scope, BasicBlock block, out bool loaded, TypeDefinition type = null, InstructionValue variable = null)
+        private InstructionValue EmitGetIndexPointer(FunctionIR function, IndexAst index, ScopeAst scope, BasicBlock block, TypeDefinition type = null, InstructionValue variable = null)
         {
             // 1. Get the variable pointer
             if (type == null)
@@ -598,7 +605,6 @@ namespace Lang
             // 3. Call the overload if needed
             if (index.CallsOverload)
             {
-                loaded = true;
                 var overloadName = GetOperatorOverloadName(type, Operator.Subscript);
 
                 var value = EmitLoad(block, value: variable);
@@ -617,7 +623,6 @@ namespace Lang
                 elementType = type.Generics[0];
             }
 
-            loaded = false;
             if (type.TypeKind == TypeKind.Pointer)
             {
                 var dataPointer = EmitLoad(block, value: variable);
