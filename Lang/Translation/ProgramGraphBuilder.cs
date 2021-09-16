@@ -1935,7 +1935,7 @@ namespace Lang.Translation
                         return Type.Error;
                     }
 
-                    var pointer = new PrimitiveAst {Name = typeDef.GenericName, TypeIndex = _typeIndex++, TypeKind = TypeKind.Pointer};
+                    var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeIndex = _typeIndex++, TypeKind = TypeKind.Pointer};
                     _programGraph.Types.Add(typeDef.GenericName, pointer);
                     return Type.Pointer;
                 case "...":

@@ -20,6 +20,7 @@ int main(List<string> args) {
     my_struct := create();
     printf("my_struct: field = %d, something = %f, subvalue.something = %d\n", my_struct.field, my_struct.something, my_struct.subValue.something);
     call_field := create().something;
+    printf("call_field = %f\n", call_field);
 
     prim := primitives();
     list := create_list(4);

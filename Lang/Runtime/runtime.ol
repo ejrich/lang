@@ -46,8 +46,6 @@ TypeInfo type_of(Type type) {
 
 int size_of(Type type) {
     return __type_table[type].size;
-    // type_info := __type_table[type];
-    // return type_info.size;
 }
 
 
