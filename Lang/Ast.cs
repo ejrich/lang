@@ -1,8 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
-using Lang.Translation;
 
-namespace Lang.Parsing
+namespace Lang
 {
     public interface IAst
     {
@@ -338,7 +337,7 @@ namespace Lang.Parsing
         public int FileIndex { get; set; }
         public int Line { get; init; }
         public int Column { get; init; }
-        public Type? Type { get; set; }
+        public TypeKind? Type { get; set; }
         public string Name { get; set; }
         public bool IsGeneric { get; set; }
         public bool Constant { get; set; }
@@ -361,6 +360,30 @@ namespace Lang.Parsing
                 return _genericName;
             }
         }
+    }
+
+    public interface IPrimitive
+    {
+        byte Bytes { get; }
+        bool Signed { get; }
+    }
+
+    public class IntegerType : IPrimitive
+    {
+        public byte Bytes { get; init; }
+        public bool Signed { get; init; }
+    }
+
+    public class FloatType : IPrimitive
+    {
+        public byte Bytes { get; set; }
+        public bool Signed => true;
+    }
+
+    public class EnumType : IPrimitive
+    {
+        public byte Bytes { get; init; }
+        public bool Signed { get; init; }
     }
 
     public enum Operator
@@ -416,6 +439,12 @@ namespace Lang.Parsing
         List,
         Enum,
         Struct,
-        Function
+        Function,
+        // Below not used in the backend
+        VarArgs,
+        Params,
+        Type,
+        Generic,
+        Error
     }
 }

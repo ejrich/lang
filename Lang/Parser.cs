@@ -3,12 +3,19 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 
-namespace Lang.Parsing
+namespace Lang
 {
     public class ParseResult
     {
         public List<IAst> SyntaxTrees { get; } = new();
         public List<ParseError> Errors { get; } = new();
+    }
+
+    public class ParseError
+    {
+        public int FileIndex { get; set; }
+        public string Error { get; init; }
+        public Token Token { get; init; }
     }
 
     public interface IParser
@@ -110,7 +117,7 @@ namespace Lang.Parsing
             var token = enumerator.Current!;
             switch (token!.Type)
             {
-                case TokenType.Token:
+                case TokenType.Identifier:
                     if (enumerator.Peek()?.Type == TokenType.Colon)
                     {
                         return ParseDeclaration(enumerator, errors);
@@ -153,7 +160,7 @@ namespace Lang.Parsing
             // 1b. Set the name of the function or get the name from the type
             switch (enumerator.Current?.Type)
             {
-                case TokenType.Token:
+                case TokenType.Identifier:
                     function.Name = enumerator.Current.Value;
                     enumerator.MoveNext();
                     break;
@@ -247,7 +254,7 @@ namespace Lang.Parsing
                     {
                         switch (token.Type)
                         {
-                            case TokenType.Token:
+                            case TokenType.Identifier:
                                 if (!generics.Add(token.Value))
                                 {
                                     errors.Add(new ParseError
@@ -338,7 +345,7 @@ namespace Lang.Parsing
 
                 switch (token.Type)
                 {
-                    case TokenType.Token:
+                    case TokenType.Identifier:
                     case TokenType.VarArgs:
                         if (commaRequiredBeforeNextArgument)
                         {
@@ -536,7 +543,7 @@ namespace Lang.Parsing
             enumerator.MoveNext();
             switch (enumerator.Current?.Type)
             {
-                case TokenType.Token:
+                case TokenType.Identifier:
                     structAst.Name = enumerator.Current.Value;
                     break;
                 case null:
@@ -579,7 +586,7 @@ namespace Lang.Parsing
                     {
                         switch (token.Type)
                         {
-                            case TokenType.Token:
+                            case TokenType.Identifier:
                                 if (!generics.Add(token.Value))
                                 {
                                     errors.Add(new ParseError
@@ -652,7 +659,7 @@ namespace Lang.Parsing
 
                 switch (token.Type)
                 {
-                    case TokenType.Token:
+                    case TokenType.Identifier:
                         // First get the type of the field
                         if (currentField == null)
                         {
@@ -752,7 +759,7 @@ namespace Lang.Parsing
             enumerator.MoveNext();
             switch (enumerator.Current?.Type)
             {
-                case TokenType.Token:
+                case TokenType.Identifier:
                     enumAst.Name = enumerator.Current.Value;
                     break;
                 case null:
@@ -799,7 +806,7 @@ namespace Lang.Parsing
 
                 switch (token.Type)
                 {
-                    case TokenType.Token:
+                    case TokenType.Identifier:
                         if (currentValue == null)
                         {
                             currentValue = CreateAst<EnumValueAst>(token);
@@ -902,7 +909,7 @@ namespace Lang.Parsing
                     return ParseWhile(enumerator, errors, currentFunction);
                 case TokenType.Each:
                     return ParseEach(enumerator, errors, currentFunction);
-                case TokenType.Token:
+                case TokenType.Identifier:
                     var nextToken = enumerator.Peek();
                     switch (nextToken?.Type)
                     {
@@ -1113,7 +1120,7 @@ namespace Lang.Parsing
 
             // 1. Parse the iteration variable by first iterating over the initial 'each'
             enumerator.MoveNext();
-            if (enumerator.Current?.Type == TokenType.Token)
+            if (enumerator.Current?.Type == TokenType.Identifier)
             {
                 eachAst.IterationVariable = enumerator.Current.Value;
             }
@@ -1232,7 +1239,7 @@ namespace Lang.Parsing
             }
 
             // 2. Check if type is given
-            if (enumerator.Peek()?.Type == TokenType.Token)
+            if (enumerator.Peek()?.Type == TokenType.Identifier)
             {
                 enumerator.MoveNext();
                 declaration.Type = ParseType(enumerator, errors, currentFunction);
@@ -1538,7 +1545,7 @@ namespace Lang.Parsing
                     return constant;
                 case TokenType.Null:
                     return CreateAst<NullAst>(token);
-                case TokenType.Token:
+                case TokenType.Identifier:
                     // Parse variable, call, or expression
                     switch (nextToken?.Type)
                     {
@@ -1832,7 +1839,7 @@ namespace Lang.Parsing
                 }
                 else
                 {
-                    if (token.Type == TokenType.Token && enumerator.Peek()?.Type == TokenType.Equals)
+                    if (token.Type == TokenType.Identifier && enumerator.Peek()?.Type == TokenType.Equals)
                     {
                         var argumentName = token.Value;
 
@@ -2104,7 +2111,7 @@ namespace Lang.Parsing
 
                 switch (token.Type)
                 {
-                    case TokenType.Token:
+                    case TokenType.Identifier:
                         if (commaRequiredBeforeNextArgument)
                         {
                             errors.Add(new ParseError
@@ -2356,7 +2363,7 @@ namespace Lang.Parsing
                     {
                         switch (token.Type)
                         {
-                            case TokenType.Token:
+                            case TokenType.Identifier:
                                 typeDefinition.Generics.Add(ParseType(enumerator, errors, currentFunction, depth: depth + 1));
                                 commaRequiredBeforeNextType = true;
                                 break;
@@ -2500,7 +2507,7 @@ namespace Lang.Parsing
                     {
                         switch (token.Type)
                         {
-                            case TokenType.Token:
+                            case TokenType.Identifier:
                                 if (!TryParseType(token, enumerator, errors, ref steps, out var genericType))
                                 {
                                     return false;
