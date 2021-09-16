@@ -1,4 +1,4 @@
-int Main(int argc, List<string> args)
+int Main(List<string> args)
 {
     return 0;
 }
