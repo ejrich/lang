@@ -78,7 +78,7 @@ namespace Lang.Parsing
         public int Column { get; init; }
         public bool IsEnum { get; set; }
         public bool[] Pointers { get; set; }
-        public string[] StructNames { get; set; }
+        public string[] TypeNames { get; set; }
         public int[] ValueIndices { get; set; }
         public List<IAst> Children { get; } = new();
     }
