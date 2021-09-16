@@ -624,7 +624,7 @@ namespace Lang
                             ErrorReporter.Report($"Function '{function.Name}' cannot have multiple varargs", argument.TypeDefinition);
                         }
                         function.Flags |= FunctionFlags.Varargs;
-                        function.VarargsCalls = new List<int>();
+                        function.VarargsCalls = new HashSet<int>();
                         break;
                     case TypeKind.Params:
                         if (function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params))
@@ -897,6 +897,10 @@ namespace Lang
                 if (function.Body != null)
                 {
                     ErrorReporter.Report("Extern function cannot have a body", function);
+                }
+                else if (!function.Flags.HasFlag(FunctionFlags.Varargs))
+                {
+                    _runner.InitExternFunction(function);
                 }
             }
             else if (!function.Flags.HasFlag(FunctionFlags.Compiler))
@@ -2698,48 +2702,9 @@ namespace Lang
                     }
                 }
             }
-            else if (function.Flags.HasFlag(FunctionFlags.Varargs))
+            else if (function.Flags.HasFlag(FunctionFlags.Varargs) && !function.VarargsCalls.Contains(arguments.Length))
             {
-                for (var i = 0; i < arguments.Length; i++)
-                {
-                    var argument = arguments[i];
-                    switch (argument?.PrimitiveType)
-                    {
-                        // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
-                        // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
-                        case FloatType {Bytes: 4}:
-                            arguments[i] = argument = new TypeDefinition
-                            {
-                                Name = "float64", TypeKind = TypeKind.Float, PrimitiveType = new FloatType {Bytes = 8}
-                            };
-                            break;
-                        // Enums should be called as integers
-                        case EnumType enumType:
-                            arguments[i] = argument = new TypeDefinition
-                            {
-                                Name = argument.Name, TypeKind = TypeKind.Integer,
-                                PrimitiveType = new IntegerType {Bytes = enumType.Bytes, Signed = enumType.Signed}
-                            };
-                            break;
-                    }
-                }
-                var found = false;
-                for (var index = 0; index < function.VarargsCalls.Count; index++)
-                {
-                    var varargsLength = function.VarargsCalls[index];
-                    if (varargsLength == arguments.Length)
-                    {
-                        found = true;
-                        call.VarargsIndex = index;
-                        break;
-                    }
-                }
-
-                if (!found)
-                {
-                    call.VarargsIndex = function.VarargsCalls.Count;
-                    function.VarargsCalls.Add(arguments.Length);
-                }
+                _runner.InitVarargsFunction(function, arguments.Length);
             }
 
             return function.ReturnTypeDefinition;

@@ -85,7 +85,7 @@ namespace Lang
         public TypeDefinition ReturnTypeDefinition { get; set; }
         public List<string> Generics { get; } = new();
         public List<DeclarationAst> Arguments { get; } = new();
-        public List<int> VarargsCalls { get; set; }
+        public HashSet<int> VarargsCalls { get; set; }
         public ScopeAst Body { get; set; }
     }
 
@@ -261,7 +261,6 @@ namespace Lang
         public string FunctionName { get; set; }
         public FunctionAst Function { get; set; }
         public int FunctionIndex { get; set; }
-        public int VarargsIndex { get; set; }
         public List<TypeDefinition> Generics { get; set; }
         public Dictionary<string, IAst> SpecifiedArguments { get; set; }
         public List<IAst> Arguments { get; } = new();

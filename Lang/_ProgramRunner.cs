@@ -34,6 +34,8 @@ namespace Lang
     public interface _IProgramRunner
     {
         void Init();
+        void InitExternFunction(FunctionAst function);
+        void InitVarargsFunction(FunctionAst function, int count);
         void RunProgram(FunctionIR function, IAst source);
         bool ExecuteCondition(FunctionIR function, IAst source);
     }
@@ -41,9 +43,9 @@ namespace Lang
     public unsafe class _ProgramRunner : _IProgramRunner
     {
         private ModuleBuilder _moduleBuilder;
+        private TypeBuilder _functionTypeBuilder;
         private int _version;
-        private readonly Dictionary<string, List<int>> _functionIndices = new();
-        private readonly List<(Type type, object libraryObject)> _functionLibraries = new();
+        private readonly Dictionary<string, Dictionary<int, MethodInfo>> _externFunctions = new();
 
         private int _typeCount;
         private IntPtr _typeTablePointer;
@@ -52,6 +54,23 @@ namespace Lang
         private uint _globalVariablesSize;
         private IntPtr[] _globals;
 
+        public _ProgramRunner()
+        {
+            var assemblyName = new AssemblyName("Runner");
+            var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
+            _moduleBuilder = assemblyBuilder.DefineDynamicModule("Runner");
+        }
+
+        public void InitExternFunction(FunctionAst function)
+        {
+            CreateFunction(function.Name, function.ExternLib, function.Arguments.Count);
+        }
+
+        public void InitVarargsFunction(FunctionAst function, int count)
+        {
+            CreateFunction(function.Name, function.ExternLib, count);
+        }
+
         public void Init()
         {
             // How this should work
@@ -59,53 +78,23 @@ namespace Lang
             // - When function IR is built and the function is extern, create the function ref
             // - When a global variable is added, store them in the global space
 
-            // Initialize the runner
-            if (_moduleBuilder == null)
+            if (_functionTypeBuilder != null)
             {
-                var assemblyName = new AssemblyName("Runner");
-                var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
-                _moduleBuilder = assemblyBuilder.DefineDynamicModule("Runner");
-            }
+                var library = _functionTypeBuilder.CreateType();
+                _functionTypeBuilder = null;
 
-            TypeBuilder functionTypeBuilder = null;
-            foreach (var functions in TypeTable.Functions.Values)
-            {
-                foreach (var function in functions)
+                foreach (var function in library.GetMethods(BindingFlags.Public | BindingFlags.Static))
                 {
-                    if (!function.Flags.HasFlag(FunctionFlags.Extern)) continue;
-
-                    if (!_functionIndices.TryGetValue(function.Name, out var functionIndex))
-                        _functionIndices[function.Name] = functionIndex = new List<int>();
-
-                    if (function.Flags.HasFlag(FunctionFlags.Varargs))
+                    var argumentCount = function.GetParameters().Length;
+                    if (!_externFunctions.TryGetValue(function.Name, out var functions))
                     {
-                        for (var i = functionIndex.Count; i < function.VarargsCalls.Count; i++)
-                        {
-                            functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
-                            var varargsTypes = new Type[function.VarargsCalls[i]];
-                            Array.Fill(varargsTypes, typeof(Register));
-                            CreateFunction(functionTypeBuilder, function.Name, function.ExternLib, varargsTypes);
-                            functionIndex.Add(_version);
-                        }
+                        _externFunctions[function.Name] = new Dictionary<int, MethodInfo> {{argumentCount, function}};
                     }
                     else
                     {
-                        if (!functionIndex.Any())
-                        {
-                            functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
-                            var args = function.Arguments.Select(_ => typeof(Register)).ToArray();
-                            CreateFunction(functionTypeBuilder, function.Name, function.ExternLib, args);
-                            functionIndex.Add(_version);
-                        }
+                        functions[argumentCount] = function;
                     }
                 }
-            }
-
-            if (functionTypeBuilder != null)
-            {
-                var library = functionTypeBuilder.CreateType();
-                var functionObject = Activator.CreateInstance(library);
-                _functionLibraries.Add((library, functionObject));
                 _version++;
             }
 
@@ -337,9 +326,14 @@ namespace Lang
             }
         }
 
-        private void CreateFunction(TypeBuilder typeBuilder, string name, string library, Type[] args)
+        private void CreateFunction(string name, string library, int argumentCount)
         {
-            var method = typeBuilder.DefineMethod(name, MethodAttributes.Public | MethodAttributes.Static, typeof(Register), args);
+            _functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
+
+            var args = new Type[argumentCount];
+            Array.Fill(args, typeof(Register));
+
+            var method = _functionTypeBuilder.DefineMethod(name, MethodAttributes.Public | MethodAttributes.Static, typeof(Register), args);
             var caBuilder = new CustomAttributeBuilder(typeof(DllImportAttribute).GetConstructor(new []{typeof(string)}), new []{library});
             method.SetCustomAttribute(caBuilder);
         }
@@ -624,25 +618,10 @@ namespace Lang
                                 args[i] = GetValue(instruction.Value1.Values[i], registers, stackPointer, function, arguments);
                             }
 
-                            if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Varargs))
-                            {
-                                var functionIndex = _functionIndices[instruction.String][instruction.Index];
-                                var (type, functionObject) = _functionLibraries[functionIndex];
-                                var argumentTypes = new Type[args.Length];
-                                Array.Fill(argumentTypes, typeof(Register));
-                                var functionDecl = type.GetMethod(instruction.String, argumentTypes!);
-                                var returnValue = functionDecl.Invoke(functionObject, args);
-                                registers[instruction.ValueIndex] = (Register)returnValue;
-                            }
-                            else
-                            {
-                                var functionIndex = _functionIndices[instruction.String][instruction.Index];
-                                var (type, functionObject) = _functionLibraries[functionIndex];
-                                var functionDecl = type.GetMethod(instruction.String);
-                                var returnValue = functionDecl.Invoke(functionObject, args);
-                                registers[instruction.ValueIndex] = (Register)returnValue;
-                            }
-                        }
+                            var functionDecl = _externFunctions[instruction.String][args.Length];
+                            var returnValue = functionDecl.Invoke(null, args);
+                            registers[instruction.ValueIndex] = (Register)returnValue;
+                       }
                         else if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Compiler))
                         {
                             var returnValue = new Register();

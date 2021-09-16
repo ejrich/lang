@@ -1460,7 +1460,7 @@ namespace Lang
                 }
             }
 
-            return EmitCall(function, GetFunctionName(call.Function), arguments, call.Function.ReturnType, call.VarargsIndex);
+            return EmitCall(function, GetFunctionName(call.Function), arguments, call.Function.ReturnType);
         }
 
         private InstructionValue EmitGetIndexPointer(FunctionIR function, IndexAst index, ScopeAst scope, IType type = null, InstructionValue variable = null)
@@ -1861,11 +1861,11 @@ namespace Lang
         }
 
 
-        private InstructionValue EmitCall(FunctionIR function, string name, InstructionValue[] arguments, IType returnType, int callIndex = 0)
+        private InstructionValue EmitCall(FunctionIR function, string name, InstructionValue[] arguments, IType returnType)
         {
             var callInstruction = new Instruction
             {
-                Type = InstructionType.Call, Index = callIndex, String = name,
+                Type = InstructionType.Call, String = name,
                 Value1 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Values = arguments}
             };
             return AddInstruction(function, callInstruction, returnType);
