@@ -70,7 +70,7 @@ namespace Lang
                         var argument = function.Arguments[i];
                         var allocationIndex = AddAllocation(functionIR, argument);
 
-                        EmitStore(functionIR, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i});
+                        EmitStore(functionIR, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i, Type = argument.Type});
                         functionIR.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareParameter, Index = i});
                     }
                 }
@@ -104,7 +104,7 @@ namespace Lang
                 var argument = overload.Arguments[i];
                 var allocationIndex = AddAllocation(functionIR, argument);
 
-                EmitStore(functionIR, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i});
+                EmitStore(functionIR, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i, Type = argument.Type});
             }
 
             Program.Functions[overload.Name] = functionIR;
@@ -592,7 +592,7 @@ namespace Lang
                         }
                         break;
                     case TypeKind.CArray:
-                        var cArrayPointer = AllocationValue(allocationIndex);
+                        var cArrayPointer = AllocationValue(allocationIndex, declaration.Type);
                         if (declaration.ArrayValues != null)
                         {
                             InitializeArrayValues(function, cArrayPointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
@@ -601,7 +601,7 @@ namespace Lang
                         // Initialize struct field default values
                     case TypeKind.Struct:
                     case TypeKind.String:
-                        var structPointer = AllocationValue(allocationIndex);
+                        var structPointer = AllocationValue(allocationIndex, declaration.Type);
                         InitializeStruct(function, (StructAst)declaration.Type, structPointer, scope, declaration.Assignments);
                         break;
                         // Initialize pointers to null
@@ -645,14 +645,14 @@ namespace Lang
             return index;
         }
 
-        private InstructionValue AllocationValue(int index, bool global = false, IType type = null)
+        private InstructionValue AllocationValue(int index, IType type, bool global = false)
         {
             return new InstructionValue {ValueType = InstructionValueType.Allocation, ValueIndex = index, Type = type, Global = global};
         }
 
         private InstructionValue InitializeConstArray(FunctionIR function, int allocationIndex, StructAst arrayStruct, uint length, IType elementType)
         {
-            var allocation = AllocationValue(allocationIndex);
+            var allocation = AllocationValue(allocationIndex, arrayStruct);
             return InitializeConstArray(function, allocation, arrayStruct, length, elementType);
         }
 
@@ -664,7 +664,7 @@ namespace Lang
 
             var dataIndex = AddAllocation(function, elementType, true, length);
             var dataPointerType = arrayStruct.Fields[1].Type;
-            var arrayData = AllocationValue(dataIndex);
+            var arrayData = AllocationValue(dataIndex, arrayStruct.Fields[1].Type);
             var arrayDataPointer = EmitInstruction(InstructionType.PointerCast, function, dataPointerType, arrayData, new InstructionValue {ValueType = InstructionValueType.Type, Type = dataPointerType});
             var dataPointer = EmitGetStructPointer(function, arrayPointer, arrayStruct, 1);
             EmitStore(function, dataPointer, arrayDataPointer);
@@ -1062,7 +1062,7 @@ namespace Lang
                             _stringStruct ??= (StructAst) variable.Type;
                             var dataField = _stringStruct.Fields[1];
 
-                            var stringPointer = variable.AllocationIndex.HasValue ? AllocationValue(variable.AllocationIndex.Value, global) : variable.Pointer;
+                            var stringPointer = variable.AllocationIndex.HasValue ? AllocationValue(variable.AllocationIndex.Value, variable.Type, global) : variable.Pointer;
 
                             var dataPointer = EmitGetStructPointer(function, stringPointer, _stringStruct, 1, dataField);
                             return EmitLoad(function, dataField.Type, dataPointer);
@@ -1270,11 +1270,11 @@ namespace Lang
                     switch (ident)
                     {
                         case DeclarationAst declaration:
-                            return AllocationValue(declaration.AllocationIndex, global, declaration.Type);
+                            return AllocationValue(declaration.AllocationIndex, declaration.Type, global);
                         case VariableAst variable:
                             if (variable.AllocationIndex.HasValue)
                             {
-                                return AllocationValue(variable.AllocationIndex.Value, global, variable.Type);
+                                return AllocationValue(variable.AllocationIndex.Value, variable.Type, global);
                             }
                             else
                             {
@@ -1304,10 +1304,10 @@ namespace Lang
                     switch (ident)
                     {
                         case DeclarationAst declaration:
-                            value = AllocationValue(declaration.AllocationIndex, global);
+                            value = AllocationValue(declaration.AllocationIndex, declaration.Type, global);
                             break;
                         case VariableAst variable:
-                            value = variable.AllocationIndex.HasValue ? AllocationValue(variable.AllocationIndex.Value, global) : variable.Pointer;
+                            value = variable.AllocationIndex.HasValue ? AllocationValue(variable.AllocationIndex.Value, variable.Type, global) : variable.Pointer;
                             break;
                     }
                     break;
@@ -1318,7 +1318,7 @@ namespace Lang
                         var type = structField.Types[0];
                         var allocationIndex = AddAllocation(function, type);
                         EmitStore(function, allocationIndex, value);
-                        value = AllocationValue(allocationIndex);
+                        value = AllocationValue(allocationIndex, value.Type);
                     }
                     break;
                 case CallAst call:
@@ -1328,7 +1328,7 @@ namespace Lang
                         var type = structField.Types[0];
                         var allocationIndex = AddAllocation(function, type);
                         EmitStore(function, allocationIndex, value);
-                        value = AllocationValue(allocationIndex);
+                        value = AllocationValue(allocationIndex, value.Type);
                     }
                     break;
                 default:
@@ -1381,7 +1381,7 @@ namespace Lang
                                 var nextType = structField.Types[i];
                                 var allocationIndex = AddAllocation(function, nextType);
                                 EmitStore(function, allocationIndex, value);
-                                value = AllocationValue(allocationIndex);
+                                value = AllocationValue(allocationIndex, nextType);
                             }
                             else if (i == structField.Pointers.Length)
                             {
@@ -1457,7 +1457,7 @@ namespace Lang
                 }
             }
 
-            return EmitCall(function, GetFunctionName(call.Function), arguments, call.Function.ReturnType);
+            return EmitCall(function, GetFunctionName(call.Function), arguments, call.Function.ReturnType, call.VarargsIndex);
         }
 
         private InstructionValue EmitGetIndexPointer(FunctionIR function, IndexAst index, ScopeAst scope, IType type = null, InstructionValue variable = null)
@@ -1466,7 +1466,7 @@ namespace Lang
             {
                 var declaration = (DeclarationAst) GetScopeIdentifier(scope, index.Name, out var global);
                 type = declaration.Type;
-                variable = AllocationValue(declaration.AllocationIndex, global);
+                variable = AllocationValue(declaration.AllocationIndex, declaration.Type, global);
             }
 
             var indexValue = EmitIR(function, index.Index, scope);
@@ -1814,13 +1814,13 @@ namespace Lang
 
         private InstructionValue EmitLoad(FunctionIR function, IType type, int allocationIndex, bool global = false)
         {
-            var loadInstruction = new Instruction {Type = InstructionType.Load, Value1 = AllocationValue(allocationIndex, global)};
+            var loadInstruction = new Instruction {Type = InstructionType.Load, Value1 = AllocationValue(allocationIndex, type, global)};
             return AddInstruction(function, loadInstruction, type);
         }
 
         public InstructionValue EmitGetPointer(FunctionIR function, int allocationIndex, InstructionValue index, IType type, bool getFirstPointer = false, bool global = false)
         {
-            var allocation = AllocationValue(allocationIndex, global);
+            var allocation = AllocationValue(allocationIndex, type, global);
             return EmitGetPointer(function, allocation, index, type, getFirstPointer);
         }
 
@@ -1836,7 +1836,7 @@ namespace Lang
 
         private InstructionValue EmitGetStructPointer(FunctionIR function, int allocationIndex, StructAst structDef, int fieldIndex, StructFieldAst field = null, bool global = false)
         {
-            var allocation = AllocationValue(allocationIndex, global);
+            var allocation = AllocationValue(allocationIndex, structDef, global);
             return EmitGetStructPointer(function, allocation, structDef, fieldIndex, field);
         }
 
@@ -1852,11 +1852,11 @@ namespace Lang
         }
 
 
-        private InstructionValue EmitCall(FunctionIR function, string name, InstructionValue[] arguments, IType returnType)
+        private InstructionValue EmitCall(FunctionIR function, string name, InstructionValue[] arguments, IType returnType, int callIndex = 0)
         {
             var callInstruction = new Instruction
             {
-                Type = InstructionType.Call, String = name,
+                Type = InstructionType.Call, Index = callIndex, String = name,
                 Value1 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Values = arguments}
             };
             return AddInstruction(function, callInstruction, returnType);
@@ -1864,7 +1864,7 @@ namespace Lang
 
         private void EmitStore(FunctionIR function, int allocationIndex, InstructionValue value)
         {
-            var allocation = AllocationValue(allocationIndex);
+            var allocation = AllocationValue(allocationIndex, null);
             EmitStore(function, allocation, value);
         }
 
