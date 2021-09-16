@@ -514,19 +514,19 @@ namespace Lang.Backend.LLVM
         {
             switch (op)
             {
-                // TODO Get value type to determine correct instruction to use
                 case Operator.And:
                     return LLVMApi.BuildAnd(_builder, lhs, rhs, "tmpand");
                 case Operator.Or:
                     return LLVMApi.BuildOr(_builder, lhs, rhs, "tmpor");
                 case Operator.Equality:
-                    return LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntEQ, lhs, rhs, "tmpeq");
+                    return BuildCompare(lhs, rhs, op, "tmpeq");
                 case Operator.NotEqual:
-                    return LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntNE, lhs, rhs, "tmpne");
+                    return BuildCompare(lhs, rhs, op, "tmpne");
                 case Operator.GreaterThanEqual:
-                    return LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntSGE, lhs, rhs, "tmpgte");
+                    return BuildCompare(lhs, rhs, op, "tmpgte");
                 case Operator.LessThanEqual:
-                    return LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntSLE, lhs, rhs, "tmplte");
+                    return BuildCompare(lhs, rhs, op, "tmplte");
+                // TODO Get value type to determine correct instruction to use for binary operations
                 case Operator.Add:
                     return LLVMApi.BuildAdd(_builder, lhs, rhs, "tmpadd");
                 case Operator.Subtract:
@@ -536,9 +536,9 @@ namespace Lang.Backend.LLVM
                 case Operator.Divide:
                     return LLVMApi.BuildSDiv(_builder, lhs, rhs, "tmpdiv");
                 case Operator.GreaterThan:
-                    return LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntSGT, lhs, rhs, "tmpgt");
+                    return BuildCompare(lhs, rhs, op, "tmpgt");
                 case Operator.LessThan:
-                    return LLVMApi.BuildICmp(_builder, LLVMIntPredicate.LLVMIntSLT, lhs, rhs, "tmplt");
+                    return BuildCompare(lhs, rhs, op, "tmplt");
                 case Operator.BitwiseOr:
                     return LLVMApi.BuildOr(_builder, lhs, rhs, "tmpbor");
                 case Operator.BitwiseAnd:
@@ -551,6 +551,64 @@ namespace Lang.Backend.LLVM
                     // Should never reach this branch
                     return new LLVMValueRef();
             }
+        }
+
+        private LLVMValueRef BuildCompare(LLVMValueRef lhs, LLVMValueRef rhs, Operator op, string name)
+        {
+            switch (lhs.TypeOf().TypeKind)
+            {
+                case LLVMTypeKind.LLVMIntegerTypeKind:
+                    switch (rhs.TypeOf().TypeKind)
+                    {
+                        case LLVMTypeKind.LLVMIntegerTypeKind:
+                            return LLVMApi.BuildICmp(_builder, ConvertIntOperator(op), lhs, rhs, name);
+                        case LLVMTypeKind.LLVMFloatTypeKind:
+                            lhs = LLVMApi.BuildSIToFP(_builder, lhs, rhs.TypeOf(), "tmpfloat");
+                            return LLVMApi.BuildFCmp(_builder, ConvertRealOperator(op), lhs, rhs, name);
+                    }
+                    break;
+                case LLVMTypeKind.LLVMFloatTypeKind:
+                    var predicate = ConvertRealOperator(op);
+                    switch (rhs.TypeOf().TypeKind)
+                    {
+                        case LLVMTypeKind.LLVMFloatTypeKind:
+                            return LLVMApi.BuildFCmp(_builder, predicate, lhs, rhs, name);
+                        case LLVMTypeKind.LLVMIntegerTypeKind:
+                            rhs = LLVMApi.BuildSIToFP(_builder, rhs, lhs.TypeOf(), "tmpfloat");
+                            return LLVMApi.BuildFCmp(_builder, predicate, lhs, rhs, name);
+                    }
+                    break;
+            }
+
+            throw new NotImplementedException(op.ToString());
+        }
+
+        private static LLVMIntPredicate ConvertIntOperator(Operator op)
+        {
+            return op switch
+            {
+                Operator.Equality => LLVMIntPredicate.LLVMIntEQ,
+                Operator.NotEqual => LLVMIntPredicate.LLVMIntNE,
+                Operator.GreaterThan => LLVMIntPredicate.LLVMIntSGT,
+                Operator.GreaterThanEqual => LLVMIntPredicate.LLVMIntSGE,
+                Operator.LessThan => LLVMIntPredicate.LLVMIntSLT,
+                Operator.LessThanEqual => LLVMIntPredicate.LLVMIntSLE,
+                _ => LLVMIntPredicate.LLVMIntEQ // Should never be hit
+            };
+        }
+
+        private static LLVMRealPredicate ConvertRealOperator(Operator op)
+        {
+            return op switch
+            {
+                Operator.Equality => LLVMRealPredicate.LLVMRealOEQ,
+                Operator.NotEqual => LLVMRealPredicate.LLVMRealONE,
+                Operator.GreaterThan => LLVMRealPredicate.LLVMRealOGT,
+                Operator.GreaterThanEqual => LLVMRealPredicate.LLVMRealOGE,
+                Operator.LessThan => LLVMRealPredicate.LLVMRealOLT,
+                Operator.LessThanEqual => LLVMRealPredicate.LLVMRealOLE,
+                _ => LLVMRealPredicate.LLVMRealOEQ // Should never be hit
+            };
         }
 
         private static LLVMTypeRef ConvertTypeDefinition(TypeDefinition typeDef)
