@@ -78,12 +78,7 @@ namespace Lang
                     var allocationIndex = functionIR.Allocations.Count;
                     AddAllocation(functionIR, argument, type, allocationIndex);
 
-                    var storeInstruction = new Instruction
-                    {
-                        Type = InstructionType.Store, Index = allocationIndex,
-                        Value1 = new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i}
-                    };
-                    entryBlock.Instructions.Add(storeInstruction);
+                    EmitStore(entryBlock, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i});
                 }
             }
 
@@ -137,7 +132,9 @@ namespace Lang
                 // TODO Add initialization values
                 if (declaration.Value != null)
                 {
-                    // value = CastValue(ExecuteExpression(declaration.Value, variables).Value, declaration.Type);
+                    var block = function.BasicBlocks[^1];
+                    var value = EmitIR(function, declaration.Value, scope, block); // TODO CastValue
+                    EmitStore(block, allocationIndex, value);
                 }
                 else if (declaration.ArrayValues != null)
                 {
@@ -160,6 +157,22 @@ namespace Lang
             };
             function.StackSize += type.Size;
             function.Allocations.Add(allocation);
+        }
+
+        public void EmitAssignment(FunctionIR function, AssignmentAst assignment, ScopeAst scope)
+        {
+            var block = function.BasicBlocks[^1];
+            var pointer = EmitGetReference(function, assignment.Reference, scope, block);
+
+            var value = EmitIR(function, assignment.Value, scope, block);
+            if (assignment.Operator != Operator.None)
+            {
+                var previousValue = EmitLoad(block, pointer);
+                // TODO Translate BulidExpression from LLVMBackend
+                // value = EmitExpression(block, previousValue, value);
+            }
+
+            EmitInstruction(InstructionType.Store, block, pointer, value);
         }
 
         public void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, ScopeAst scope, BasicBlock block = null)
@@ -430,6 +443,8 @@ namespace Lang
                     return EmitGetStructPointer(function, structField, scope, block, out _, out _);
                 case IndexAst index:
                     return EmitGetIndexPointer(function, index, scope, block);
+                case UnaryAst unary:
+                    return EmitIR(function, unary.Value, scope, block);
             }
             return null;
         }
@@ -730,6 +745,12 @@ namespace Lang
             var callValue = new InstructionValue {ValueIndex = block.Instructions.Count, Type = returnType};
             block.Instructions.Add(callInstruction);
             return callValue;
+        }
+
+        private void EmitStore(BasicBlock block, int allocationIndex, InstructionValue value)
+        {
+            var store = new Instruction {Type = InstructionType.Store, Index = allocationIndex, Value1 = value};
+            block.Instructions.Add(store);
         }
 
         private InstructionValue EmitInstruction(InstructionType type, BasicBlock block, InstructionValue value1, InstructionValue value2 = null)
