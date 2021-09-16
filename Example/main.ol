@@ -25,3 +25,16 @@ int bar(int a, string b, float c) {
     }
     return a + 3;
 }
+
+int baz() {
+    var a = 1;
+    each i in 1..10 {
+        a = a + i;
+    }
+    return a;
+}
+
+int fib(int n) {
+    if n == 1 then return 1;
+    return n * fib(n - 1);
+}
