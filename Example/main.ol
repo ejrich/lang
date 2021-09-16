@@ -11,6 +11,10 @@ int Main(List<string> args) {
 }
 
 int foo() {
+    {
+        var a = 0;
+        a = a + 8;
+    }
     return 8;
 }
 
