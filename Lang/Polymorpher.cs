@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Lang
 {
@@ -148,10 +149,16 @@ namespace Lang
             copy.Constant = declaration.Constant;
             copy.Type = declaration.HasGenerics ? CopyType(declaration.Type, genericTypes) : declaration.Type;
             copy.Value = CopyExpression(declaration.Value, genericTypes, generics);
-            foreach (var assignment in declaration.Assignments)
+
+            if (declaration.Assignments != null)
             {
-                copy.Assignments.Add(CopyAssignment(assignment, genericTypes, generics));
+                copy.Assignments = declaration.Assignments.Select(assignment => CopyAssignment(assignment, genericTypes, generics)).ToList();
             }
+            else if (declaration.ArrayValues != null)
+            {
+                copy.ArrayValues = declaration.ArrayValues.Select(value => CopyExpression(value, genericTypes, generics)).ToList();
+            }
+
             return copy;
         }
 

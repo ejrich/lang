@@ -68,10 +68,9 @@ struct DynamicArrayStruct {
 }
 
 array_literals() {
-    // TODO Implement this syntax
-    // a: Array<int> = [1, 2, 3, 4];
+    a: Array<int> = [1, 2, 3, 4]
 
-    // print_array("Array<int> = [1, 2, 3, 4]", a);
+    print_array("Array<int> = [1, 2, 3, 4]", a);
 }
 
 print_array(string name, Array<int> array) {
