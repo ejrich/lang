@@ -385,6 +385,7 @@ namespace Lang.Backend
                 TypeKind.Integer => GetIntegerType(type.Size),
                 TypeKind.Float => type.Size == 4 ? LLVM.FloatType() : LLVM.DoubleType(),
                 TypeKind.Pointer => GetPointerType(type.PointerType),
+                TypeKind.Type => LLVM.Int32Type(),
                 _ => null
             };
         }
@@ -1292,6 +1293,7 @@ namespace Lang.Backend
                     _debugTypes[type.TypeIndex] = LLVM.DIBuilderCreateBasicType(_debugBuilder, name.Value, (UIntPtr)name.Length, 8, (uint)DwarfTypeEncoding.Boolean, LLVMDIFlags.LLVMDIFlagZero);
                     break;
                 case TypeKind.Integer:
+                case TypeKind.Type:
                     var encoding = type.Signed ? DwarfTypeEncoding.Signed : DwarfTypeEncoding.Unsigned;
                     _debugTypes[type.TypeIndex] = LLVM.DIBuilderCreateBasicType(_debugBuilder, name.Value, (UIntPtr)name.Length, type.Size * 8, (uint)encoding, LLVMDIFlags.LLVMDIFlagZero);
                     break;

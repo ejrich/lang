@@ -90,6 +90,7 @@ namespace Lang
                             }
                             else
                             {
+                                structAst.BackendName = structAst.Name;
                                 if (!TypeTable.Add(structAst.Name, structAst))
                                 {
                                     ErrorReporter.Report($"Multiple definitions of struct '{structAst.Name}'", structAst);
@@ -277,7 +278,7 @@ namespace Lang
 
             if (enumAst.BaseTypeDefinition == null)
             {
-                // enumAst.BaseTypeDefinition = _s32Type; // TODO Remove
+                // enumAst.BaseTypeDefinition = _s32Type;
                 enumAst.BaseType = _s32Type;
             }
             else
@@ -300,8 +301,8 @@ namespace Lang
             var valueNames = new HashSet<string>();
             var values = new HashSet<int>();
 
-            var lowestAllowedValue = enumAst.BaseType.Signed ? -Math.Pow(2, 4 * enumAst.Size - 1) : 0;
-            var largestAllowedValue = enumAst.BaseType.Signed ? Math.Pow(2, 4 * enumAst.Size - 1) - 1 : Math.Pow(2, 4 * enumAst.Size) - 1;
+            var lowestAllowedValue = enumAst.BaseType.Signed ? -Math.Pow(2, 8 * enumAst.Size - 1) : 0;
+            var largestAllowedValue = enumAst.BaseType.Signed ? Math.Pow(2, 8 * enumAst.Size - 1) - 1 : Math.Pow(2, 8 * enumAst.Size) - 1;
 
             var largestValue = -1;
             foreach (var value in enumAst.Values)
@@ -772,7 +773,7 @@ namespace Lang
                     var match = true;
                     for (var i = 0; i < currentFunction.Arguments.Count; i++)
                     {
-                        if (!TypeEquals(currentFunction.Arguments[i].Type, existingFunction.Arguments[i].Type, true))
+                        if (!TypeDefinitionEquals(currentFunction.Arguments[i].TypeDefinition, existingFunction.Arguments[i].TypeDefinition))
                         {
                             match = false;
                             break;
@@ -1576,7 +1577,7 @@ namespace Lang
                 {
                     ErrorReporter.Report($"Length of C array variable '{declaration.Name}' must be initialized to a constant integer", declaration.TypeDefinition);
                 }
-                else if (declaration.TypeDefinition.Count != null)
+                else if (declaration.TypeDefinition?.Count != null)
                 {
                     var countType = VerifyConstantExpression(declaration.TypeDefinition.Count, currentFunction, scope, out var isConstant, out var count);
 
@@ -2292,7 +2293,7 @@ namespace Lang
                             // return variable.TypeDefinition;
                             return variable.Type;
                         case IType type:
-                            if (type is StructAst structAst && structAst.Generics.Any())
+                            if (type is StructAst structAst && structAst.Generics != null)
                             {
                                 ErrorReporter.Report($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
                             }
@@ -2502,7 +2503,7 @@ namespace Lang
                             }
                             else
                             {
-                                var largestAllowedValue = Math.Pow(2, 4 * newInt.Size) - 1;
+                                var largestAllowedValue = Math.Pow(2, 8 * newInt.Size) - 1;
                                 if (constant.Value.UnsignedInteger > largestAllowedValue)
                                 {
                                     ErrorReporter.Report($"Value '{constant.Value.UnsignedInteger}' out of range for type '{type.Name}'", constant);
@@ -2511,10 +2512,10 @@ namespace Lang
                         }
                         else
                         {
-                            var largestAllowedValue = Math.Pow(2, 4 * newInt.Size - 1) - 1;
+                            var largestAllowedValue = Math.Pow(2, 8 * newInt.Size - 1) - 1;
                             if (currentInt.Signed)
                             {
-                                var lowestAllowedValue = -Math.Pow(2, 4 * newInt.Size - 1);
+                                var lowestAllowedValue = -Math.Pow(2, 8 * newInt.Size - 1);
                                 if (constant.Value.Integer < lowestAllowedValue || constant.Value.Integer > largestAllowedValue)
                                 {
                                     ErrorReporter.Report($"Value '{constant.Value.Integer}' out of range for type '{type.Name}'", constant);
@@ -2817,7 +2818,7 @@ namespace Lang
                             call.Arguments[i] = typeIndex;
                             argumentTypes[i] = typeIndex.Type;*/
                         }
-                        else if (call.Arguments[i] is ConstantAst constant)
+                        else if ((argument.TypeKind == TypeKind.Integer || argument.TypeKind == TypeKind.Float) && call.Arguments[i] is ConstantAst constant)
                         {
                             VerifyConstant(constant, functionArg.Type);
                         }
@@ -3246,22 +3247,22 @@ namespace Lang
             }
             else if (argumentType.Name != "Type")
             {
-                // if (externCall && argumentType.Name == "string")
-                // {
-                //     if (callType.Name != "string" && callType.Name != "*")
-                //     {
-                //         return false;
-                //     }
-                //     else if (callType.Name == "*")
-                //     {
-                //         var pointerType = callType.Generics.FirstOrDefault();
-                //         if (pointerType?.Name != "u8" || pointerType.Generics.Any())
-                //         {
-                //             return false;
-                //         }
-                //     }
-                // }
-                if (!TypeEquals(argumentType, callType))
+                if (externCall && callType.TypeKind == TypeKind.String)
+                {
+                    if (argumentType.Name != "u8*")
+                    {
+                        return false;
+                    }
+                    // else if (callType.Name == "*")
+                    // {
+                    //     var pointerType = callType.Generics.FirstOrDefault();
+                    //     if (pointerType?.Name != "u8" || pointerType.Generics.Any())
+                    //     {
+                    //         return false;
+                    //     }
+                    // }
+                }
+                else if (!TypeEquals(argumentType, callType))
                 {
                     return false;
                 }
@@ -3811,7 +3812,8 @@ namespace Lang
                         {
                             if (!TypeTable.Types.TryGetValue(type.GenericName, out var arrayType))
                             {
-                                arrayType = new ArrayType {Name = PrintTypeDefinition(type), Size = elementType.Size, ElementType = elementType};
+                                // TODO Set the length of the type
+                                arrayType = new ArrayType {Name = PrintTypeDefinition(type), BackendName = type.GenericName, Size = elementType.Size, ElementType = elementType};
                                 TypeTable.Add(type.GenericName, arrayType);
                                 TypeTable.CreateTypeInfo(arrayType);
                             }
