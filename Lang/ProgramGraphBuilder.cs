@@ -339,7 +339,6 @@ namespace Lang
                 {
                     var type = VerifyType(structField.TypeDefinition);
 
-
                     if (type == TypeKind.Error)
                     {
                         AddError($"Undefined type '{PrintTypeDefinition(structField.TypeDefinition)}' in struct field '{structAst.Name}.{structField.Name}'", structField.TypeDefinition);
@@ -351,6 +350,11 @@ namespace Lang
                     else
                     {
                         fieldType = TypeTable.GetType(structField.TypeDefinition);
+                        if (type == TypeKind.Array || type == TypeKind.CArray)
+                        {
+                            var elementType = structField.TypeDefinition.Generics[0];
+                            structField.ArrayElementType = TypeTable.GetType(elementType);
+                        }
                     }
 
                     if (structField.Value != null)
@@ -1208,6 +1212,7 @@ namespace Lang
                     {
                         declaration.TypeDefinition.ConstCount = (uint)declaration.ArrayValues.Count;
                         var elementType = declaration.TypeDefinition.Generics[0];
+                        declaration.ArrayElementType = TypeTable.GetType(elementType);
                         foreach (var value in declaration.ArrayValues)
                         {
                             var valueType = VerifyConstantExpression(value, null, _globalScope, out var isConstant, out _);
@@ -1494,6 +1499,7 @@ namespace Lang
                     {
                         declaration.TypeDefinition.ConstCount = (uint)declaration.ArrayValues.Count;
                         var elementType = declaration.TypeDefinition.Generics[0];
+                        declaration.ArrayElementType = TypeTable.GetType(elementType);
                         foreach (var value in declaration.ArrayValues)
                         {
                             var valueType = VerifyExpression(value, currentFunction, scope);
@@ -1523,6 +1529,11 @@ namespace Lang
                 else if (type == TypeKind.Void)
                 {
                     AddError($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
+                }
+                else if (type == TypeKind.Array || type == TypeKind.CArray)
+                {
+                    var elementType = declaration.TypeDefinition.Generics[0];
+                    declaration.ArrayElementType = TypeTable.GetType(elementType);
                 }
             }
 

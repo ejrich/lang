@@ -33,13 +33,14 @@ namespace Lang
 
     public interface IDeclaration : IAst
     {
-        public string Name { get; set; }
-        public TypeDefinition TypeDefinition { get; set; }
-        public IType Type { get; set; }
-        public bool HasGenerics { get; set; }
-        public IAst Value { get; set; }
-        public Dictionary<string, AssignmentAst> Assignments { get; set; }
-        public List<IAst> ArrayValues { get; set; }
+        string Name { get; set; }
+        TypeDefinition TypeDefinition { get; set; }
+        IType Type { get; set; }
+        IType ArrayElementType { get; set; }
+        bool HasGenerics { get; set; }
+        IAst Value { get; set; }
+        Dictionary<string, AssignmentAst> Assignments { get; set; }
+        List<IAst> ArrayValues { get; set; }
     }
 
     public class ScopeAst : IAst
@@ -104,6 +105,7 @@ namespace Lang
         public uint Size { get; set; }
         public TypeDefinition TypeDefinition { get; set; }
         public IType Type { get; set; }
+        public IType ArrayElementType { get; set; }
         public bool HasGenerics { get; set; }
         public IAst Value { get; set; }
         public Dictionary<string, AssignmentAst> Assignments { get; set; }
@@ -259,6 +261,7 @@ namespace Lang
         public string Name { get; set; }
         public TypeDefinition TypeDefinition { get; set; }
         public IType Type { get; set; }
+        public IType ArrayElementType { get; set; }
         public bool HasGenerics { get; set; }
         public bool Constant { get; set; }
         public int AllocationIndex { get; set; }

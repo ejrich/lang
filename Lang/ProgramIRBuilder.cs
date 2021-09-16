@@ -138,8 +138,8 @@ namespace Lang
                 var block = function.BasicBlocks[^1];
                 if (declaration.Value != null)
                 {
-                    var value = EmitIR(function, declaration.Value, scope, block); // TODO CastValue
-                    EmitStore(block, allocationIndex, value);
+                    var value = EmitIR(function, declaration.Value, scope, block);
+                    EmitStore(block, allocationIndex, EmitCastValue(block, value, declaration.Type));
                     return;
                 }
 
@@ -155,7 +155,7 @@ namespace Lang
 
                             if (declaration.ArrayValues != null)
                             {
-                                InitializeArrayValues(function, block, arrayPointer, declaration.ArrayValues, scope);
+                                InitializeArrayValues(function, block, arrayPointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
                             }
                         }
                         else if (declaration.TypeDefinition.Count != null)
@@ -183,7 +183,7 @@ namespace Lang
                         var cArrayPointer = EmitGetPointer(block, allocationIndex: allocationIndex);
                         if (declaration.ArrayValues != null)
                         {
-                            InitializeArrayValues(function, block, cArrayPointer, declaration.ArrayValues, scope);
+                            InitializeArrayValues(function, block, cArrayPointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
                         }
                         break;
                     // Initialize struct field default values
@@ -252,7 +252,7 @@ namespace Lang
             return arrayDataPointer;
         }
 
-        private void InitializeArrayValues(FunctionIR function, BasicBlock block, InstructionValue arrayPointer, List<IAst> arrayValues, ScopeAst scope)
+        private void InitializeArrayValues(FunctionIR function, BasicBlock block, InstructionValue arrayPointer, IType elementType, List<IAst> arrayValues, ScopeAst scope)
         {
             for (var i = 0; i < arrayValues.Count; i++)
             {
@@ -260,8 +260,7 @@ namespace Lang
                 var pointer = EmitGetPointer(block, arrayPointer, index, getFirstPointer: true);
 
                 var value = EmitIR(function, arrayValues[i], scope, block);
-                // TODO Cast value
-                EmitStore(block, pointer, value);
+                EmitStore(block, pointer, EmitCastValue(block, value, elementType));
             }
         }
 
@@ -313,7 +312,7 @@ namespace Lang
 
                         if (field.ArrayValues != null)
                         {
-                            InitializeArrayValues(function, block, arrayPointer, field.ArrayValues, scope);
+                            InitializeArrayValues(function, block, arrayPointer, field.ArrayElementType, field.ArrayValues, scope);
                         }
                     }
                     else
@@ -326,7 +325,7 @@ namespace Lang
                 case TypeKind.CArray:
                     if (field.ArrayValues != null)
                     {
-                        InitializeArrayValues(function, block, pointer, field.ArrayValues, scope);
+                        InitializeArrayValues(function, block, pointer, field.ArrayElementType, field.ArrayValues, scope);
                     }
                     break;
                 // Initialize struct field default values
