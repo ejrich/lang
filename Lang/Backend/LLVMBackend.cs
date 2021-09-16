@@ -1328,7 +1328,7 @@ namespace Lang.Backend
                     var dataPointer = _builder.BuildStructGEP(iterationValue, 1, "dataptr");
                     arrayData = _builder.BuildLoad(dataPointer, "data");
 
-                    var lengthPointer= _builder.BuildStructGEP(iterationValue, 0, "lengthptr");
+                    var lengthPointer = _builder.BuildStructGEP(iterationValue, 0, "lengthptr");
                     compareTarget = _builder.BuildLoad(lengthPointer, "length");
                 }
             }

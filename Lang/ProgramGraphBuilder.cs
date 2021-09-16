@@ -1895,16 +1895,18 @@ namespace Lang
                 AddError($"Variable '{name}' not defined", ast);
                 return null;
             }
-            if (allowEnums && identifier is EnumAst enumAst)
+            switch (identifier)
             {
-                return new TypeDefinition {Name = enumAst.Name, TypeKind = TypeKind.Enum};
+                case EnumAst enumAst when allowEnums:
+                    return new TypeDefinition {Name = enumAst.Name, TypeKind = TypeKind.Enum};
+                case DeclarationAst declaration:
+                    return declaration.TypeDefinition;
+                case VariableAst variable:
+                    return variable.TypeDefinition;
+                default:
+                    AddError($"Identifier '{name}' is not a variable", ast);
+                    return null;
             }
-            if (identifier is not DeclarationAst declaration)
-            {
-                AddError($"Identifier '{name}' is not a variable", ast);
-                return null;
-            }
-            return declaration.TypeDefinition;
         }
 
         private TypeDefinition VerifyStructFieldRef(StructFieldRefAst structField, IFunction currentFunction, ScopeAst scope)
@@ -1924,6 +1926,9 @@ namespace Lang
                             return VerifyEnumValue(enumAst, structField);
                         case DeclarationAst declaration:
                             refType = declaration.TypeDefinition;
+                            break;
+                        case VariableAst variable:
+                            refType = variable.TypeDefinition;
                             break;
                         default:
                             AddError($"Cannot reference static field of type '{identifier.Name}'", structField);
@@ -2067,27 +2072,35 @@ namespace Lang
             };
             if (each.Iteration != null)
             {
-                var variableTypeDefinition = VerifyExpression(each.Iteration, currentFunction, scope);
-                if (variableTypeDefinition == null) return;
-                var iterator = new DeclarationAst {Name = each.IterationVariable, TypeDefinition = variableTypeDefinition.Generics.FirstOrDefault()};
+                var iterationTypeDefinition = VerifyExpression(each.Iteration, currentFunction, scope);
+                if (iterationTypeDefinition == null) return;
+                var iterator = new VariableAst {Name = each.IterationVariable, TypeDefinition = iterationTypeDefinition.Generics.FirstOrDefault()};
 
                 if (each.IndexVariable != null)
                 {
-                    var indexVariable = new DeclarationAst {Name = each.IndexVariable, TypeDefinition = _s32Type, Type = TypeTable.Types["s32"]};
-                    each.Body.Identifiers.TryAdd(each.IndexVariable, indexVariable);
+                    each.IndexVariableVariable = new VariableAst {Name = each.IndexVariable, TypeDefinition = _s32Type, Type = TypeTable.Types["s32"]};
+                    each.Body.Identifiers.TryAdd(each.IndexVariable, each.IndexVariableVariable);
                 }
 
-                switch (variableTypeDefinition.TypeKind)
+                switch (iterationTypeDefinition.TypeKind)
                 {
-                    case TypeKind.Array:
                     case TypeKind.CArray:
+                        each.CArrayLength = iterationTypeDefinition.ConstCount.Value;
+                        // Same logic as below with special case for constant length
+                        each.IteratorType = iterator.TypeDefinition;
+                        each.IterationVariableVariable = iterator;
+                        iterator.Type = TypeTable.GetType(iterator.TypeDefinition);
+                        each.Body.Identifiers.TryAdd(each.IterationVariable, iterator);
+                        break;
+                    case TypeKind.Array:
                     case TypeKind.Params:
                         each.IteratorType = iterator.TypeDefinition;
+                        each.IterationVariableVariable = iterator;
                         iterator.Type = TypeTable.GetType(iterator.TypeDefinition);
                         each.Body.Identifiers.TryAdd(each.IterationVariable, iterator);
                         break;
                     default:
-                        AddError($"Type {PrintTypeDefinition(variableTypeDefinition)} cannot be used as an iterator", each.Iteration);
+                        AddError($"Type {PrintTypeDefinition(iterationTypeDefinition)} cannot be used as an iterator", each.Iteration);
                         break;
                 }
             }
@@ -2105,8 +2118,8 @@ namespace Lang
                 {
                     AddError($"Expected range to end with 'int', but got '{PrintTypeDefinition(end)}'", each.RangeEnd);
                 }
-                var iterType = new DeclarationAst {Name = each.IterationVariable, TypeDefinition = _s32Type, Type = TypeTable.Types["s32"]};
-                each.Body.Identifiers.TryAdd(each.IterationVariable, iterType);
+                each.IterationVariableVariable = new VariableAst {Name = each.IterationVariable, TypeDefinition = _s32Type, Type = TypeTable.Types["s32"]};
+                each.Body.Identifiers.TryAdd(each.IterationVariable, each.IterationVariableVariable);
             }
 
             // 2. Verify the scope of the each block
@@ -2225,6 +2238,8 @@ namespace Lang
                     {
                         case DeclarationAst declaration:
                             return declaration.TypeDefinition;
+                        case VariableAst variable:
+                            return variable.TypeDefinition;
                         case IType type:
                             if (type is StructAst structAst && structAst.Generics.Any())
                             {
