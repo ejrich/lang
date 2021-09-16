@@ -3293,10 +3293,9 @@ namespace Lang
                     break;
                 case TypeKind.Struct:
                     index.CallsOverload = true;
-                    index.OverloadType = typeDef;
                     overloaded = true;
-                    elementType = VerifyOperatorOverloadType(typeDef, Operator.Subscript, currentFunction, index, out var returnType);
-                    index.OverloadReturnType = returnType;
+                    elementType = VerifyOperatorOverloadType(typeDef, Operator.Subscript, currentFunction, index, out var overload);
+                    index.Overload = overload;
                     break;
                 case TypeKind.Array:
                 case TypeKind.CArray:
@@ -3328,15 +3327,14 @@ namespace Lang
             return elementType;
         }
 
-        private TypeDefinition VerifyOperatorOverloadType(TypeDefinition type, Operator op, IFunction currentFunction, IAst ast, out IType returnType)
+        private TypeDefinition VerifyOperatorOverloadType(TypeDefinition type, Operator op, IFunction currentFunction, IAst ast, out OperatorOverloadAst overload)
         {
-            if (_programGraph.OperatorOverloads.TryGetValue(type.GenericName, out var overloads) && overloads.TryGetValue(op, out var overload))
+            if (_programGraph.OperatorOverloads.TryGetValue(type.GenericName, out var overloads) && overloads.TryGetValue(op, out overload))
             {
                 if (!overload.Verified && overload != currentFunction)
                 {
                     VerifyOperatorOverload(overload);
                 }
-                returnType = overload.ReturnType;
                 return overload.ReturnTypeDefinition; // TODO Switch with ReturnType
             }
             else if (_polymorphicOperatorOverloads.TryGetValue(type.Name, out var polymorphicOverloads) && polymorphicOverloads.TryGetValue(op, out var polymorphicOverload))
@@ -3359,13 +3357,13 @@ namespace Lang
                 });
 
                 VerifyOperatorOverload(polymorphedOverload);
-                returnType = polymorphedOverload.ReturnType;
+                overload = polymorphedOverload;
                 return polymorphedOverload.ReturnTypeDefinition; // TODO Switch with ReturnType
             }
             else
             {
                 AddError($"Type '{PrintTypeDefinition(type)}' does not contain an overload for operator '{PrintOperator(op)}'", ast);
-                returnType = null;
+                overload = null;
                 return null;
             }
         }

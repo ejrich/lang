@@ -681,8 +681,8 @@ namespace Lang.Backend
                                 BuildAllocations(index.Index);
                                 if (index.CallsOverload && !structField.Pointers[i])
                                 {
-                                    var overload = _programGraph.OperatorOverloads[index.OverloadType.GenericName][Operator.Subscript];
-                                    var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(overload.ReturnTypeDefinition), overload.ReturnTypeDefinition.GenericName);
+                                    var overloadType = index.Overload.ReturnTypeDefinition;
+                                    var iterationValue = _builder.BuildAlloca(ConvertTypeDefinition(overloadType), overloadType.GenericName);
                                     _allocationQueue.Enqueue(iterationValue);
                                 }
                                 break;
