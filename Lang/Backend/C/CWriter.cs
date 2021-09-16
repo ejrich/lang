@@ -1,12 +1,22 @@
 ﻿using System.IO;
 using System.Text;
 using Lang.Parsing;
+using LLVMSharp.Interop;
 
 namespace Lang.Backend.C
 {
     public class CWriter : IWriter
     {
         private const string ObjectDirectory = "obj";
+
+        private readonly LLVMModuleRef _module;
+        private readonly LLVMBuilderRef _builder;
+
+        public CWriter()
+        {
+            _module = LLVMModuleRef.CreateWithName("ol");
+            _builder = LLVMBuilderRef.Create(_module.Context);
+        }
 
         public string WriteTranslatedFile(ProgramGraph programGraph, string projectName, string projectPath)
         {
