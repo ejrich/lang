@@ -1702,6 +1702,11 @@ namespace Lang.Parsing
                     directive.Type = DirectiveType.If;
                     directive.Value = ParseConditional(enumerator, errors, true);
                     break;
+                case "assert":
+                    directive.Type = DirectiveType.Assert;
+                    enumerator.MoveNext();
+                    directive.Value = ParseExpression(enumerator, errors);
+                    break;
                 default:
                     errors.Add(new ParseError {Error = $"Unsupported top-level compiler directive '{token.Value}'", Token = token});
                     return null;
@@ -1727,6 +1732,11 @@ namespace Lang.Parsing
                     directive.Type = DirectiveType.If;
                     directive.Value = ParseConditional(enumerator, errors);
                     _currentFunction.HasDirectives = true;
+                    break;
+                case "assert":
+                    directive.Type = DirectiveType.Assert;
+                    enumerator.MoveNext();
+                    directive.Value = ParseExpression(enumerator, errors);
                     break;
                 default:
                     errors.Add(new ParseError {Error = $"Unsupported compiler directive '{token.Value}'", Token = token});

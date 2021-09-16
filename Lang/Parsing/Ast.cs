@@ -324,6 +324,7 @@ namespace Lang.Parsing
     {
         None,
         Run,
-        If
+        If,
+        Assert
     }
 }
