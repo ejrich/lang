@@ -655,10 +655,11 @@ namespace Lang.Translation
                 case Type.Int:
                 case Type.Float:
                 case Type.Boolean:
+                case Type.Pointer:
                     // Valid types
                     break;
                 default:
-                    errors.Add(CreateError($"Expected condition to be int, float, or bool, but got '{PrintTypeDefinition(conditionalType)}'", whileAst.Condition));
+                    errors.Add(CreateError($"Expected condition to be bool, int, float, or pointer, but got '{PrintTypeDefinition(conditionalType)}'", whileAst.Condition));
                     break;
             }
 
@@ -1184,6 +1185,11 @@ namespace Lang.Translation
         {
             // 1. Load the struct definition in typeDefinition
             var genericName = structType.GenericName;
+            if (structType.Name == "*")
+            {
+                genericName = structType.Generics[0].GenericName;
+                structField.IsPointer = true;
+            }
             structField.StructName = genericName;
             if (!_types.TryGetValue(genericName, out var typeDefinition))
             {
