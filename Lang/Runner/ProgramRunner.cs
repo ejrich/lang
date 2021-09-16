@@ -21,6 +21,7 @@ namespace Lang.Runner
         private int _version;
 
         private ProgramGraph _programGraph;
+        private int _typeCount;
 
         private readonly Dictionary<string, List<int>> _functionIndices = new();
         private readonly List<(Type type, object libraryObject)> _functionLibraries = new();
@@ -151,6 +152,16 @@ namespace Lang.Runner
                 {
                     ExecuteDeclaration(variable, _globalVariables);
                 }
+            }
+
+            if (_typeCount != programGraph.Types.Count)
+            {
+                _typeCount = programGraph.Types.Count;
+                Console.WriteLine("Updating types");
+                // Reallocate array
+                // Copy memory using Buffer.MemoryCopy()
+                // Set length
+                // Create TypeInfo pointers
             }
         }
 
