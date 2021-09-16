@@ -1552,7 +1552,24 @@ namespace Lang.Parsing
                 }
                 else
                 {
-                    callAst.Arguments.Add(ParseExpression(enumerator, errors, null, TokenType.Comma, TokenType.CloseParen));
+                    if (token.Type == TokenType.Token && enumerator.Peek()?.Type == TokenType.Equals)
+                    {
+                        var argumentName = token.Value;
+
+                        enumerator.MoveNext();
+                        enumerator.MoveNext();
+
+                        callAst.SpecifiedArguments ??= new Dictionary<string, IAst>();
+                        var argument = ParseExpression(enumerator, errors, null, TokenType.Comma, TokenType.CloseParen);
+                        if (!callAst.SpecifiedArguments.TryAdd(argumentName, argument))
+                        {
+                            errors.Add(new ParseError {Error = $"Specified argument '{token.Value}' is already in the call", Token = token});
+                        }
+                    }
+                    else
+                    {
+                        callAst.Arguments.Add(ParseExpression(enumerator, errors, null, TokenType.Comma, TokenType.CloseParen));
+                    }
 
                     var currentType = enumerator.Current?.Type;
                     if (currentType == TokenType.CloseParen) break;

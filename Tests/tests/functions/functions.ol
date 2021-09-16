@@ -20,11 +20,17 @@ function_overloads() {
 }
 
 default_arguments() {
+    // Standard behavior
     foo(3);
-    foo(7, 10);
-    // foo(7, c = false); // TODO Make this work
-    foo(8, 9, false);
+    foo(4, 10);
+    foo(7, 9, false);
 
+    // Specifying arguments, can also move around non-default argument
+    foo(5, c = false);
+    foo(6, b = 7);
+    foo(b = 7, a = 7);
+
+    // Also works with params
     foo_params(3);
     foo_params(7, 10);
     foo_params(8, 9, 3.1, 2.8, 5.6);
