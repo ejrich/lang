@@ -1,11 +1,21 @@
 {
   "configurations": {
-    "launch - netcoredbg": {
+    "launch - Example": {
       "adapter": "netcoredbg",
       "configuration": {
         "request": "launch",
         "program": "${workspaceRoot}/Lang/bin/Debug/net5.0/Lang.dll",
         "args": ["-S", "${workspaceRoot}/Example/Example.olproj"],
+        "stopAtEntry": false,
+        "cwd": "${workspaceRoot}"
+      }
+    },
+    "launch - Tests": {
+      "adapter": "netcoredbg",
+      "configuration": {
+        "request": "launch",
+        "program": "${workspaceRoot}/Lang/bin/Debug/net5.0/Lang.dll",
+        "args": ["-S", "${workspaceRoot}/Tests/tests.olproj"],
         "stopAtEntry": false,
         "cwd": "${workspaceRoot}"
       }

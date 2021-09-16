@@ -1385,8 +1385,18 @@ namespace Lang.Backend.LLVM
                         value = LLVMApi.BuildStructGEP(_builder, value, (uint)structField.ValueIndices[i-1], index.Name);
                         type = type.Generics[0];
                         var (_, indexValue) = WriteExpression(index.Index, localVariables);
-                        var listData = LLVMApi.BuildStructGEP(_builder, value, 1, "listdata");
-                        var dataPointer = LLVMApi.BuildLoad(_builder, listData, "dataptr");
+
+                        LLVMValueRef dataPointer;
+                        if (type.CArray)
+                        {
+                            // TODO Make sure this works
+                            dataPointer = value;
+                        }
+                        else
+                        {
+                            var listData = LLVMApi.BuildStructGEP(_builder, value, 1, "listdata");
+                            dataPointer = LLVMApi.BuildLoad(_builder, listData, "dataptr");
+                        }
                         value = LLVMApi.BuildGEP(_builder, dataPointer, new [] {indexValue}, "indexptr");
                         break;
                 }
@@ -1405,8 +1415,17 @@ namespace Lang.Backend.LLVM
 
             // 3. Build the pointer with the first index of 0
             var elementType = type.Generics[0];
-            var listData = LLVMApi.BuildStructGEP(_builder, variable, 1, "listdata");
-            var dataPointer = LLVMApi.BuildLoad(_builder, listData, "dataptr");
+            LLVMValueRef dataPointer;
+            if (type.CArray)
+            {
+                // TODO Make sure this works
+                dataPointer = variable;
+            }
+            else
+            {
+                var listData = LLVMApi.BuildStructGEP(_builder, variable, 1, "listdata");
+                dataPointer = LLVMApi.BuildLoad(_builder, listData, "dataptr");
+            }
             return (elementType, LLVMApi.BuildGEP(_builder, dataPointer, new [] {indexValue}, "indexptr"));
         }
 
@@ -1750,7 +1769,7 @@ namespace Lang.Backend.LLVM
             if (type.CArray)
             {
                 var elementType = LLVMApi.GetTypeByName(_module, listType.GenericName);
-                var count = type.Count == null ? 0 : 12;
+                var count = type.Count == null ? 0 : 12; // TODO Implement this
                 return LLVMApi.ArrayType(elementType, (uint)count);
             }
 
