@@ -97,7 +97,7 @@ namespace Lang.Runner
                             var size = 0;
                             if (field.Type.Count != null)
                             {
-                                size = (int)ExecuteExpression(field.Type.Count, null).Value;
+                                size = (int)field.Type.ConstCount.Value;
                             }
 
                             var caBuilder = new CustomAttributeBuilder(typeof(MarshalAsAttribute).GetConstructor(new []{typeof(UnmanagedType)}), new object[]{UnmanagedType.ByValArray}, new []{sizeConstField}, new object[]{size});
@@ -516,18 +516,16 @@ namespace Lang.Runner
             object list;
             if (type.CArray)
             {
-                var length = 0;
-                if (type.Count != null)
-                {
-                    length = (int)ExecuteExpression(type.Count, variables).Value;
-                }
-                // list = Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * length);
-                list = Array.CreateInstance(genericType, length);
+                list = Array.CreateInstance(genericType, type.ConstCount.Value);
             }
             else
             {
                 list = Activator.CreateInstance(listType);
-                if (type.Count != null)
+                if (type.ConstCount != null)
+                {
+                    InitializeConstList(list, listType, genericType, (int)type.ConstCount.Value);
+                }
+                else if (type.Count != null)
                 {
                     var length = (int)ExecuteExpression(type.Count, variables).Value;
                     InitializeConstList(list, listType, genericType, length);

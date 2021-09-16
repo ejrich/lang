@@ -460,11 +460,11 @@ namespace Lang.Backend.LLVM
                     }
                     else if (declaration.Type.Name == "List" && !declaration.Type.CArray)
                     {
-                        if (declaration.Type.Count is ConstantAst constant)
+                        if (declaration.Type.ConstCount != null)
                         {
                             var listType = declaration.Type.Generics[0];
                             var targetType = ConvertTypeDefinition(listType);
-                            var arrayType = LLVMTypeRef.ArrayType(targetType, uint.Parse(constant.Value));
+                            var arrayType = LLVMTypeRef.ArrayType(targetType, declaration.Type.ConstCount.Value);
                             var listData = LLVMApi.BuildAlloca(_builder, arrayType, "listdata");
                             _allocationQueue.Enqueue(listData);
                         }
@@ -688,9 +688,9 @@ namespace Lang.Backend.LLVM
             else if (declaration.Type.Name == "List" && !declaration.Type.CArray)
             {
                 var listType = declaration.Type.Generics[0];
-                if (declaration.Type.Count is ConstantAst constant)
+                if (declaration.Type.ConstCount != null)
                 {
-                    InitializeConstList(variable, int.Parse(constant.Value), listType);
+                    InitializeConstList(variable, declaration.Type.ConstCount.Value, listType);
                 }
                 else if (declaration.Type.Count != null)
                 {
@@ -720,7 +720,7 @@ namespace Lang.Backend.LLVM
         }
 
         private void InitializeStruct(TypeDefinition typeDef, LLVMValueRef variable,
-            IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables = null, List<AssignmentAst> values = null)
+            IDictionary<string, (TypeDefinition type, LLVMValueRef value)> localVariables, List<AssignmentAst> values = null)
         {
             var assignments = values?.ToDictionary(_ => (_.Reference as IdentifierAst)!.Name);
             var structDef = _types[typeDef.GenericName] as StructAst;
@@ -743,8 +743,7 @@ namespace Lang.Backend.LLVM
                 else if (structField.Type.Name == "List")
                 {
                     if (structField.Type.CArray) continue;
-                    var count = (ConstantAst)structField.Type.Count;
-                    InitializeConstList(field, int.Parse(count.Value), structField.Type.Generics[0]);
+                    InitializeConstList(field, structField.Type.ConstCount.Value, structField.Type.Generics[0]);
                 }
                 else switch (type.TypeKind)
                 {
@@ -752,7 +751,7 @@ namespace Lang.Backend.LLVM
                         LLVMApi.BuildStore(_builder, LLVMApi.ConstNull(type), field);
                         break;
                     case LLVMTypeKind.LLVMStructTypeKind:
-                        InitializeStruct(structField.Type, field);
+                        InitializeStruct(structField.Type, field, localVariables);
                         break;
                     default:
                         switch (structField.DefaultValue)
@@ -777,7 +776,7 @@ namespace Lang.Backend.LLVM
             }
         }
 
-        private void InitializeConstList(LLVMValueRef list, int length, TypeDefinition listType)
+        private void InitializeConstList(LLVMValueRef list, uint length, TypeDefinition listType)
         {
             // 1. Set the count field
             var countValue = LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (ulong)length, false);
@@ -1127,7 +1126,7 @@ namespace Lang.Backend.LLVM
                         // Rollup the rest of the arguments into a list
                         var paramsType = functionDef.Arguments[^1].Type.Generics[0];
                         var paramsPointer = _allocationQueue.Dequeue();
-                        InitializeConstList(paramsPointer, call.Arguments.Count - functionDef.Arguments.Count + 1, paramsType);
+                        InitializeConstList(paramsPointer, (uint)(call.Arguments.Count - functionDef.Arguments.Count + 1), paramsType);
 
                         var listData = LLVMApi.BuildStructGEP(_builder, paramsPointer, 1, "listdata");
                         var dataPointer = LLVMApi.BuildLoad(_builder, listData, "dataptr");
@@ -1817,13 +1816,7 @@ namespace Lang.Backend.LLVM
             if (type.CArray)
             {
                 var elementType = ConvertTypeDefinition(listType);
-                uint length = 0;
-                if (type.Count != null)
-                {
-                    var constant = (ConstantAst)type.Count;
-                    length = uint.Parse(constant.Value);
-                }
-                return LLVMApi.ArrayType(elementType, length);
+                return LLVMApi.ArrayType(elementType, type.ConstCount.Value);
             }
 
             return LLVMApi.GetTypeByName(_module, $"List.{listType.GenericName}");
