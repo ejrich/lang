@@ -10,6 +10,7 @@ namespace Lang
         public List<string> SourceFiles { get; set; }
         public List<string> Dependencies { get; } = new();
         public List<string> Packages { get; } = new();
+        public List<string> Exclude { get; } = new();
     }
 
     public enum Linker

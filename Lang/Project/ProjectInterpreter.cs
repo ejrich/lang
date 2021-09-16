@@ -22,7 +22,8 @@ namespace Lang.Project
             Name,
             Dependencies,
             Packages,
-            Linker
+            Linker,
+            Exclude
         }
 
         public ProjectFile LoadProject(string projectPath)
@@ -41,7 +42,7 @@ namespace Lang.Project
             var projectFile = LoadProjectFile(projectPath);
 
             // 3. Recurse through the directories and load the files to build
-            projectFile.SourceFiles = GetSourceFiles(new DirectoryInfo(projectFile.Path)).ToList();
+            projectFile.SourceFiles = GetSourceFiles(new DirectoryInfo(projectFile.Path), projectFile.Exclude).ToList();
 
             // 4. Load runtime and dependency files
             var libraryDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Runtime");
@@ -53,11 +54,11 @@ namespace Lang.Project
 
         private static string GetProjectPathInDirectory(string directory)
         {
-            // a. Search for an project file in the current directory
+            // 1. Search for an project file in the current directory
             var projectPath = Directory.EnumerateFiles(directory, ProjectFilePattern)
                 .FirstOrDefault();
 
-            // b. If no project file, throw and exit
+            // 2. If no project file, throw and exit
             if (projectPath == null)
             {
                 Console.WriteLine($"Project file not found in directory: \"{directory}\"");
@@ -97,6 +98,9 @@ namespace Lang.Project
                         case ProjectFileSection.Linker:
                             projectFile.Linker = (Linker) Enum.Parse(typeof(Linker), line, true);
                             break;
+                        case ProjectFileSection.Exclude:
+                            projectFile.Exclude.Add(Path.Combine(projectFile.Path, line));
+                            break;
                     }
                 }
                 else
@@ -107,6 +111,7 @@ namespace Lang.Project
                         "#dependencies" => ProjectFileSection.Dependencies,
                         "#packages" => ProjectFileSection.Packages,
                         "#linker" => ProjectFileSection.Linker,
+                        "#exclude" => ProjectFileSection.Exclude,
                         _ => ProjectFileSection.None,
                     };
                 }
@@ -115,8 +120,13 @@ namespace Lang.Project
             return projectFile;
         }
 
-        private static IEnumerable<string> GetSourceFiles(DirectoryInfo directory)
+        private static IEnumerable<string> GetSourceFiles(DirectoryInfo directory, List<string> excluded = null)
         {
+            if (excluded?.Contains(directory.FullName) ?? false)
+            {
+                yield break;
+            }
+
             foreach (var sourceFile in directory.GetFiles(SourceFilePattern))
             {
                 yield return sourceFile.FullName;
@@ -127,7 +137,7 @@ namespace Lang.Project
                 if (subDirectory.Name == "bin" || subDirectory.Name == "obj")
                     continue;
 
-                foreach (var sourceFile in GetSourceFiles(subDirectory))
+                foreach (var sourceFile in GetSourceFiles(subDirectory, excluded))
                 {
                     yield return sourceFile;
                 }
