@@ -5,6 +5,7 @@ int Main(List<string> args) {
     */
     //hello := "This is an \"escaped\" string literal";
     a := 4.2;
+    a++;
     baz := foo();// + bar(3 + 1, "Hello", 1.2);
     //b := 6 * (4 - 1);
     c := 2;
