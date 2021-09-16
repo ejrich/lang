@@ -72,7 +72,7 @@ namespace Lang.Translation
                             graph.Functions.Add(function);
                         }
                         break;
-                    // TODO Handle more type of ASTs
+                    // @Future Handle more type of ASTs
                 }
             }
 

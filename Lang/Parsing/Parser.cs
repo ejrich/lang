@@ -414,7 +414,6 @@ namespace Lang.Parsing
                             return ParseAssignment(enumerator, errors);
                         case TokenType.Period:
                             return ParseStructFieldExpression(enumerator, errors);
-                        // TODO Handle other things
                         default:
                             // Peek again for an '=', this is likely an operator assignment
                             if (enumerator.Peek(1)?.Type == TokenType.Equals)
