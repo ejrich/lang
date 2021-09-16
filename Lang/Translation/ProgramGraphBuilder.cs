@@ -205,11 +205,29 @@ namespace Lang.Translation
                     case ConstantAst constant:
                         if (!TypeEquals(structField.Type, constant.Type))
                         {
-                            errors.Add(CreateError($"Type of field {structAst.Name}.{structField.Name} is '{type}', but default value is type '{PrintTypeDefinition(constant.Type)}'", structField.DefaultValue));
+                            errors.Add(CreateError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(constant.Type)}'", constant));
                         }
                         break;
                     case StructFieldRefAst structFieldRef:
-                        // TODO Verify me
+                        if (_types.TryGetValue(structFieldRef.Name, out var fieldType))
+                        {
+                            if (fieldType is EnumAst enumAst)
+                            {
+                                var enumType = VerifyEnumValue(structFieldRef, enumAst, errors);
+                                if (enumType != null && !TypeEquals(structField.Type, enumType))
+                                {
+                                    errors.Add(CreateError($"Type of field {structAst.Name}.{structField.Name} is '{PrintTypeDefinition(structField.Type)}', but default value is type '{PrintTypeDefinition(enumType)}'", structFieldRef));
+                                }
+                            }
+                            else
+                            {
+                                errors.Add(CreateError($"Default value must be constant or enum value, but got field of '{structFieldRef.Name}'", structFieldRef));
+                            }
+                        }
+                        else
+                        {
+                            errors.Add(CreateError($"Type '{structFieldRef.Name}' not defined", structFieldRef));
+                        }
                         break;
                 }
             }
@@ -1494,20 +1512,10 @@ namespace Lang.Translation
             // Check by primitive type
             switch (a?.PrimitiveType)
             {
-                case IntegerType aInt:
-                    if (b?.PrimitiveType is IntegerType bInt)
-                    {
-                        if (!checkPrimitives) return true;
-                        return aInt.Bytes == bInt.Bytes && aInt.Signed == bInt.Signed;
-                    }
-                    return false;
-                case FloatType aFloat:
-                    if (b?.PrimitiveType is FloatType bFloat)
-                    {
-                        if (!checkPrimitives) return true;
-                        return aFloat.Bytes == bFloat.Bytes;
-                    }
-                    return false;
+                case IntegerType:
+                    return b?.PrimitiveType is IntegerType;
+                case FloatType:
+                    return b?.PrimitiveType is FloatType;
                 case null:
                     if (b?.PrimitiveType != null) return false;
                     break;

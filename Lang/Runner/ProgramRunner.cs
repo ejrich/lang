@@ -217,7 +217,7 @@ namespace Lang.Runner
 
                 if (assignments.TryGetValue(field.Name, out var assignment))
                 {
-                    var expression = ExecuteExpression(assignment.Variable, programGraph, variables);
+                    var expression = ExecuteExpression(assignment.Value, programGraph, variables);
                     var value = CastValue(expression, field.Type);
 
                     fieldInstance!.SetValue(instance, value);
