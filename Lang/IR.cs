@@ -38,6 +38,7 @@ namespace Lang
 
         // Used for Load and Store
         public int AllocationIndex { get; set; }
+        public string CallFunction { get; set; }
 
         public InstructionValue Value1 { get; set; }
         public InstructionValue Value2 { get; set; }
@@ -50,8 +51,12 @@ namespace Lang
         public int ValueIndex { get; set; }
         public TypeDefinition Type { get; set; }
 
+        // For constant values
         public InstructionConstant ConstantValue { get; set; }
         public string ConstantString { get; set; }
+
+        // For calls
+        public InstructionValue[] Arguments { get; set; }
     }
 
     [StructLayout(LayoutKind.Explicit)]
@@ -103,5 +108,6 @@ namespace Lang
         Constant,
         Null,
         Type,
+        CallArguments
     }
 }
