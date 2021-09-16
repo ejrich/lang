@@ -642,27 +642,23 @@ namespace Lang.Backend.LLVM
             var signed = lhs.type.PrimitiveType.Signed || rhs.type.PrimitiveType.Signed;
             // TODO Implement 2a
             // 2a. If both are unsigned, expand to larger type and perform unsigned operations
+            // 3. Handle compares, since the lhs and rhs should not be cast to the target type 
             switch (op)
             {
                 case Operator.Equality:
-                    return BuildCompare(lhs.value, rhs.value, op, signed);
                 case Operator.NotEqual:
-                    return BuildCompare(lhs.value, rhs.value, op, signed);
                 case Operator.GreaterThanEqual:
-                    return BuildCompare(lhs.value, rhs.value, op, signed);
                 case Operator.LessThanEqual:
-                    return BuildCompare(lhs.value, rhs.value, op, signed);
                 case Operator.GreaterThan:
-                    return BuildCompare(lhs.value, rhs.value, op, signed);
                 case Operator.LessThan:
-                    return BuildCompare(lhs.value, rhs.value, op, signed);
+                    return BuildCompare(lhs, rhs, op, signed);
             }
 
-            // 3. Cast any unsigned values to signed
-            lhs.value = CastValue(lhs.value, targetType);
-            rhs.value = CastValue(rhs.value, targetType);
+            // 3. Cast lhs and rhs to the target types
+            lhs.value = CastValue(lhs, targetType);
+            rhs.value = CastValue(rhs, targetType);
 
-            // 4. Handle different operators
+            // 4. Handle the rest of the simple operators
             switch (op)
             {
                 case Operator.BitwiseAnd:
@@ -671,18 +667,13 @@ namespace Lang.Backend.LLVM
                     return LLVMApi.BuildOr(_builder, lhs.value, rhs.value, "tmpbor");
                 case Operator.Xor:
                     return LLVMApi.BuildXor(_builder, lhs.value, rhs.value, "tmpxor");
-                case Operator.Add:
-                case Operator.Subtract:
-                case Operator.Multiply:
-                case Operator.Divide:
-                case Operator.Modulus:
-                    return BuildBinaryOperation(lhs.value, rhs.value, op, signed);
-                default:
-                    // @Cleanup This branch should never be hit
-                    return new LLVMValueRef();
             }
+
+            // 5. Handle binary operations
+            return BuildBinaryOperation(lhs.value, rhs.value, op, signed);
         }
 
+        // @Cleanup This should be removed eventually once the new function is fully implemented
         private LLVMValueRef BuildExpression(LLVMValueRef lhs, LLVMValueRef rhs, Operator op)
         {
             return op switch
@@ -711,6 +702,13 @@ namespace Lang.Backend.LLVM
             };
         }
 
+        private LLVMValueRef BuildCompare((TypeDefinition type, LLVMValueRef value) lhs, (TypeDefinition type, LLVMValueRef value) rhs, Operator op, bool signed = true)
+        {
+            // TODO Actually implement me
+            return BuildCompare(lhs.value, rhs.value, op, signed);
+        }
+
+        // @Cleanup This should be removed eventually once the new function is implemented
         private LLVMValueRef BuildCompare(LLVMValueRef lhs, LLVMValueRef rhs, Operator op, bool signed = true)
         {
             var lhsType = lhs.TypeOf();
@@ -843,9 +841,15 @@ namespace Lang.Backend.LLVM
             throw new NotImplementedException($"{op} not compatible with types '{lhs.TypeOf().TypeKind}' and '{rhs.TypeOf().TypeKind}'");
         }
 
-        private LLVMValueRef CastValue(LLVMValueRef value, TypeDefinition typeDef)
+        private LLVMValueRef CastValue((TypeDefinition type, LLVMValueRef value) value, TypeDefinition targetType)
         {
-            return CastValue(value, ConvertTypeDefinition(typeDef), typeDef.PrimitiveType?.Signed);
+            // TODO Implement better type casting
+            return CastValue(value.value, targetType);
+        }
+
+        private LLVMValueRef CastValue(LLVMValueRef value, TypeDefinition targetType)
+        {
+            return CastValue(value, ConvertTypeDefinition(targetType), targetType.PrimitiveType?.Signed);
         }
 
         private LLVMValueRef CastValue(LLVMValueRef value, LLVMTypeRef targetType, bool? signed = true)
