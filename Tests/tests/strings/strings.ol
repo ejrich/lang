@@ -29,13 +29,13 @@ string_compare() {
 
 string_indexing() {
     a := "Hello world!";
-    a[2] = 'e'; // TODO Fix this
+    a[2] = 'e';
 
-    printf("%s %c\n", a, a[2]);
+    printf("%s\n", a);
     assert(a == "Heelo world!");
 
     b: StringStruct = {foo = 12; bar = "Hey what's up";}
-    b.bar[2] = 'e'; // TODO Fix this
+    b.bar[2] = 'e';
 
     printf("%s\n", b.bar);
     assert(b.bar == "Hee what's up");

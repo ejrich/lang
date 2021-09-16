@@ -207,7 +207,7 @@ namespace Lang.Backend
             var argumentType = LLVM.GetTypeByName(_module, "ArgumentType");
             foreach (var (_, (type, typeInfo)) in typePointers)
             {
-                var typeNameString = BuildGlobalString(type.Name);
+                var typeNameString = BuildString(type.Name);
 
                 var typeKind = LLVM.ConstInt(LLVMTypeRef.Int32Type(), (uint)type.TypeKind, false);
                 var typeSize = LLVM.ConstInt(LLVMTypeRef.Int32Type(), type.Size, false);
@@ -221,7 +221,7 @@ namespace Lang.Backend
                     {
                         var field = structAst.Fields[i];
 
-                        var fieldNameString = BuildGlobalString(field.Name);
+                        var fieldNameString = BuildString(field.Name);
                         var fieldOffset = LLVM.ConstInt(LLVMTypeRef.Int32Type(), field.Offset, false);
 
                         var typeField = LLVM.ConstStruct(new [] {fieldNameString, fieldOffset, typePointers[field.Type.GenericName].typeInfo}, false);
@@ -254,7 +254,7 @@ namespace Lang.Backend
                     {
                         var value = enumAst.Values[i];
 
-                        var enumValueNameString = BuildGlobalString(value.Name);
+                        var enumValueNameString = BuildString(value.Name);
                         var enumValue = LLVM.ConstInt(LLVMTypeRef.Int32Type(), (uint)value.Value, false);
 
                         enumValueRefs[i] = LLVM.ConstStruct(new [] {enumValueNameString, enumValue}, false);
@@ -288,7 +288,7 @@ namespace Lang.Backend
                     {
                         var argument = function.Arguments[i];
 
-                        var argNameString = BuildGlobalString(argument.Name);
+                        var argNameString = BuildString(argument.Name);
                         var argumentTypeInfo = argument.Type.Name switch
                         {
                             "Type" => typePointers["s32"].typeInfo,
@@ -330,18 +330,6 @@ namespace Lang.Backend
             LLVM.SetInitializer(typeTable, LLVM.ConstStruct(new [] {typeCount, typeArrayGlobal}, false));
 
             return globals;
-        }
-
-        private LLVMValueRef BuildGlobalString(string value)
-        {
-            var stringValue = LLVM.ConstString(value, (uint)value.Length, false);
-            var stringGlobal = LLVM.AddGlobal(_module, stringValue.TypeOf(), "str");
-            SetPrivateConstant(stringGlobal);
-            LLVM.SetInitializer(stringGlobal, stringValue);
-            var stringPointer = LLVM.ConstBitCast(stringGlobal, _u8PointerType);
-
-            var length = LLVM.ConstInt(LLVMTypeRef.Int32Type(), (uint)value.Length, false);
-            return LLVM.ConstNamedStruct(_stringType, new [] {length, stringPointer});
         }
 
         private void SetPrivateConstant(LLVMValueRef variable)
@@ -1465,17 +1453,20 @@ namespace Lang.Backend
                 case "bool":
                     return LLVM.ConstInt(type, constant.Value == "true" ? (ulong)1 : 0, false);
                 case "string":
-                    return BuildString(constant.Value, getStringPointer);
+                    return BuildString(constant.Value, getStringPointer, constant.Type.Constant);
                 default:
                     return _zeroInt;
             }
         }
 
-        private LLVMValueRef BuildString(string value, bool getStringPointer = false)
+        private LLVMValueRef BuildString(string value, bool getStringPointer = false, bool constant = true)
         {
             var stringValue = LLVM.ConstString(value, (uint)value.Length, false);
             var stringGlobal = LLVM.AddGlobal(_module, stringValue.TypeOf(), "str");
-            SetPrivateConstant(stringGlobal);
+            if (constant)
+            {
+                SetPrivateConstant(stringGlobal);
+            }
             LLVM.SetInitializer(stringGlobal, stringValue);
             var stringPointer = LLVM.ConstBitCast(stringGlobal, _u8PointerType);
 
