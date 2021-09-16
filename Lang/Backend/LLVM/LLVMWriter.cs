@@ -1107,8 +1107,7 @@ namespace Lang.Backend.LLVM
                         var enumName = structField.TypeNames[0];
                         var enumDef = (EnumAst)_types[enumName];
                         var value = enumDef.Values[structField.ValueIndices[0]].Value;
-                        var typeDef = new TypeDefinition {Name = "int", PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
-                        return (typeDef, LLVMApi.ConstInt(LLVMTypeRef.Int32Type(), (ulong)value, false));
+                        return (enumDef.BaseType, LLVMApi.ConstInt(GetIntegerType(enumDef.BaseType.PrimitiveType), (ulong)value, false));
                     }
                     var (type, field) = BuildStructField(structField, localVariables);
                     return (type, LLVMApi.BuildLoad(_builder, field, "field"));
@@ -1222,7 +1221,14 @@ namespace Lang.Backend.LLVM
                             _ => (null, new LLVMValueRef())
                         };
                         var pointerType = new TypeDefinition {Name = "*"};
-                        pointerType.Generics.Add(valueType);
+                        if (valueType.CArray)
+                        {
+                            pointerType.Generics.Add(valueType.Generics[0]);
+                        }
+                        else
+                        {
+                            pointerType.Generics.Add(valueType);
+                        }
                         return (pointerType, pointer);
                     }
 

@@ -1355,7 +1355,14 @@ namespace Lang.Translation
                             if (unary.Value is IdentifierAst || unary.Value is StructFieldRefAst || unary.Value is IndexAst || type == Type.Pointer)
                             {
                                 var pointerType = new TypeDefinition {Name = "*"};
-                                pointerType.Generics.Add(valueType);
+                                if (valueType.CArray)
+                                {
+                                    pointerType.Generics.Add(valueType.Generics[0]);
+                                }
+                                else
+                                {
+                                    pointerType.Generics.Add(valueType);
+                                }
                                 return pointerType;
                             }
                             AddError("Can only reference variables, structs, or struct fields", unary.Value);
