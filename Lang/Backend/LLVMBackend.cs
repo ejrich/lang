@@ -565,7 +565,7 @@ namespace Lang.Backend
             var defaultTriple = LLVMTargetRef.DefaultTriple;
             _module.Target = defaultTriple;
 
-            var targetMachine = target.CreateTargetMachine(defaultTriple, "generic", "", LLVMCodeGenOptLevel.LLVMCodeGenLevelAggressive, LLVMRelocMode.LLVMRelocDefault, LLVMCodeModel.LLVMCodeModelDefault);
+            var targetMachine = target.CreateTargetMachine(defaultTriple, "generic", string.Empty, LLVMCodeGenOptLevel.LLVMCodeGenLevelAggressive, LLVMRelocMode.LLVMRelocDefault, LLVMCodeModel.LLVMCodeModelDefault);
             _module.DataLayout = Marshal.PtrToStringAnsi(targetMachine.CreateTargetDataLayout().Handle);
 
             if (outputIntermediate)
@@ -1597,7 +1597,7 @@ namespace Lang.Backend
             }
 
             var stackPointer = _builder.BuildLoad(_stackPointer, "stackPointer");
-            _builder.BuildCall(function, new []{stackPointer}, "");
+            _builder.BuildCall(function, new []{stackPointer}, string.Empty);
         }
 
         private LLVMValueRef BuildConstant(LLVMTypeRef type, ConstantAst constant, bool getStringPointer = false)
