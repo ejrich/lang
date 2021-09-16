@@ -1265,33 +1265,6 @@ namespace Lang
             {
                 value.ConstantValue = constant.Value;
             }
-            // switch (constant.Type.TypeKind)
-            // {
-            //     case TypeKind.Boolean:
-            //         value.ConstantValue = constant.Value;
-            //         break;
-            //     case TypeKind.String:
-            //         value.ConstantString = constant.Value;
-            //         value.UseRawString = useRawString;
-            //         break;
-            //     case TypeKind.Integer:
-            //         if (constant.TypeDefinition.Character)
-            //         {
-            //             value.ConstantValue = new Constant {UnsignedInteger = (byte)constant.Value[0]};
-            //         }
-            //         else if (constant.TypeDefinition.PrimitiveType.Signed)
-            //         {
-            //             value.ConstantValue = new Constant {Integer = long.Parse(constant.Value)};
-            //         }
-            //         else
-            //         {
-            //             value.ConstantValue = new Constant {UnsignedInteger = ulong.Parse(constant.Value)};
-            //         }
-            //         break;
-            //     case TypeKind.Float:
-            //         value.ConstantValue = new Constant {Double = double.Parse(constant.Value)};
-            //         break;
-            // }
             return value;
         }
 
