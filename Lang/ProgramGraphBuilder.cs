@@ -330,7 +330,6 @@ namespace Lang
         private void VerifyStruct(StructAst structAst)
         {
             // 1. Verify struct fields have valid types
-            var errorCount = _programGraph.Errors.Count;
             var fieldNames = new HashSet<string>();
             foreach (var structField in structAst.Fields)
             {
@@ -340,96 +339,72 @@ namespace Lang
                     AddError($"Struct '{structAst.Name}' already contains field '{structField.Name}'", structField);
                 }
 
-                // Verify the null values
-                if (structField.Value is NullAst nullAst)
+                IType fieldType = null;
+
+                if (structField.Type != null)
                 {
-                    // Verify null can be assigned
-                    if (structField.Type == null)
-                    {
-                        AddError("Cannot assign null value without declaring a type", structField.Value);
-                    }
-                    else
-                    {
-                        var type = VerifyType(structField.Type);
-                        if (type == TypeKind.Error)
-                        {
-                            AddError($"Undefined type '{PrintTypeDefinition(structField.Type)}' in struct field '{structAst.Name}.{structField.Name}'", structField.Type);
-                        }
-                        else if (type != TypeKind.Pointer)
-                        {
-                            AddError("Cannot assign null to non-pointer type", structField.Value);
-                        }
+                    var type = VerifyType(structField.Type);
 
-                        nullAst.TargetType = structField.Type;
-                    }
-                }
-                // Verify struct field default values
-                else if (structField.Value != null)
-                {
-                    var valueType = VerifyConstantExpression(structField.Value, null, _globalIdentifiers, out var isConstant, out _);
+                    var fieldTypeName = structField.Type.CArray ? structField.Type.Generics[0].GenericName : structField.Type.GenericName;
+                    _programGraph.Types.TryGetValue(fieldTypeName, out fieldType);
 
-                    // Verify the assignment value matches the type definition if it has been defined
-                    if (structField.Type == null)
+                    if (type == TypeKind.Error)
                     {
-                        if (!isConstant)
-                        {
-                            AddError("Default values in structs must be constant", structField.Value);
-                        }
-                        if (VerifyType(valueType) == TypeKind.Void)
-                        {
-                            AddError($"Struct field '{structAst.Name}.{structField.Name}' cannot be assigned type 'void'", structField.Value);
-                        }
-                        structField.Type = valueType;
+                        AddError($"Undefined type '{PrintTypeDefinition(structField.Type)}' in struct field '{structAst.Name}.{structField.Name}'", structField.Type);
                     }
-                    else
+                    else if (type == TypeKind.Void)
                     {
-                        var type = VerifyType(structField.Type);
-                        if (type == TypeKind.Error)
-                        {
-                            AddError($"Undefined type in structField '{PrintTypeDefinition(structField.Type)}'", structField.Type);
-                        }
-                        else if (type == TypeKind.Void)
-                        {
-                            AddError($"Struct field '{structAst.Name}.{structField.Name}' cannot be assigned type 'void'", structField.Type);
-                        }
+                        AddError($"Struct field '{structAst.Name}.{structField.Name}' cannot be assigned type 'void'", structField.Type);
+                    }
 
-                        // Verify the type is correct
-                        if (valueType != null)
+                    if (structField.Value != null)
+                    {
+                        if (structField.Value is NullAst nullAst)
                         {
-                            if (!TypeEquals(structField.Type, valueType))
+                            if (type != TypeKind.Pointer)
                             {
-                                AddError($"Expected struct field value to be type '{PrintTypeDefinition(structField.Type)}', but got '{PrintTypeDefinition(valueType)}'", structField.Value);
+                                AddError("Cannot assign null to non-pointer type", structField.Value);
                             }
-                            else if (!isConstant)
+
+                            nullAst.TargetType = structField.Type;
+                        }
+                        else
+                        {
+                            var valueType = VerifyConstantExpression(structField.Value, null, _globalIdentifiers, out var isConstant, out _);
+
+                            // Verify the type is correct
+                            if (valueType != null)
                             {
-                                AddError("Default values in structs must be constant", structField.Value);
-                            }
-                            else if (structField.Type.PrimitiveType != null && structField.Value is ConstantAst constant)
-                            {
-                                VerifyConstant(constant, structField.Type);
+                                if (!TypeEquals(structField.Type, valueType))
+                                {
+                                    AddError($"Expected struct field value to be type '{PrintTypeDefinition(structField.Type)}', but got '{PrintTypeDefinition(valueType)}'", structField.Value);
+                                }
+                                else if (!isConstant)
+                                {
+                                    AddError("Default values in structs must be constant", structField.Value);
+                                }
+                                else if (structField.Type.PrimitiveType != null && structField.Value is ConstantAst constant)
+                                {
+                                    VerifyConstant(constant, structField.Type);
+                                }
                             }
                         }
                     }
-                }
-                // Verify object initializers
-                else if (structField.Assignments != null)
-                {
-                    if (structField.Type == null)
+                    else if (structField.Assignments != null)
                     {
-                        // TODO Is this still right?
-                        AddError("Struct literals are not yet supported", structField);
-                    }
-                    else
-                    {
-                        var type = VerifyType(structField.Type);
                         if (type != TypeKind.Struct && type != TypeKind.String)
                         {
                             AddError($"Can only use object initializer with struct type, got '{PrintTypeDefinition(structField.Type)}'", structField.Type);
                         }
-                        else
+                        // Catch circular references
+                        else if (fieldType != null && fieldType != structAst)
                         {
-                            var structDef = _programGraph.Types[structField.Type.GenericName] as StructAst;
-                            var fields = structDef!.Fields.ToDictionary(_ => _.Name);
+                            var structDef = fieldType as StructAst;
+                            if (!structDef.Verified)
+                            {
+                                VerifyStruct(structDef);
+                            }
+                            var fields = structDef.Fields.ToDictionary(_ => _.Name);
                             // TODO Make this a dictionary to begin with?
                             foreach (var assignment in structField.Assignments)
                             {
@@ -467,23 +442,15 @@ namespace Lang
                             }
                         }
                     }
-                }
-                // Verify array initializer
-                else if (structField.ArrayValues != null)
-                {
-                    if (structField.Type == null)
+                    else if (structField.ArrayValues != null)
                     {
-                        AddError($"Declaration for struct field '{structAst.Name}.{structField.Name}' with array initializer must have the type declared", structField);
-                    }
-                    else
-                    {
-                        var type = VerifyType(structField.Type);
                         if (type != TypeKind.Error && type != TypeKind.Array)
                         {
                             AddError($"Cannot use array initializer to declare non-array type '{PrintTypeDefinition(structField.Type)}'", structField.Type);
                         }
                         else
                         {
+                            structField.Type.ConstCount = (uint)structField.ArrayValues.Count;
                             var elementType = structField.Type.Generics[0];
                             foreach (var value in structField.ArrayValues)
                             {
@@ -506,24 +473,8 @@ namespace Lang
                             }
                         }
                     }
-                }
-                // Verify the field type
-                else
-                {
-                    var type = VerifyType(structField.Type);
-                    if (type == TypeKind.Error)
-                    {
-                        AddError($"Undefined type '{PrintTypeDefinition(structField.Type)}' in struct field '{structAst.Name}.{structField.Name}'", structField.Type);
-                    }
-                    else if (type == TypeKind.Void)
-                    {
-                        AddError($"Struct field '{structAst.Name}.{structField.Name}' cannot be assigned type 'void'", structField.Type);
-                    }
-                }
 
-                // Check type count
-                if (structField.Type != null)
-                {
+                    // Check type count
                     if (structField.Type.CArray && structField.Type.Count == null)
                     {
                         AddError($"C array of field '{structAst.Name}.{structField.Name}' must be initialized with a constant size", structField.Type);
@@ -550,37 +501,63 @@ namespace Lang
                         }
                     }
                 }
+                else
+                {
+                    if (structField.Value != null)
+                    {
+                        if (structField.Value is NullAst nullAst)
+                        {
+                            AddError("Cannot assign null value without declaring a type", structField.Value);
+                        }
+                        else
+                        {
+                            var valueType = VerifyConstantExpression(structField.Value, null, _globalIdentifiers, out var isConstant, out _);
+
+                            if (!isConstant)
+                            {
+                                AddError("Default values in structs must be constant", structField.Value);
+                            }
+                            if (VerifyType(valueType) == TypeKind.Void)
+                            {
+                                AddError($"Struct field '{structAst.Name}.{structField.Name}' cannot be assigned type 'void'", structField.Value);
+                            }
+                            structField.Type = valueType;
+                            _programGraph.Types.TryGetValue(valueType?.GenericName, out fieldType);
+                        }
+                    }
+                    else if (structField.Assignments != null)
+                    {
+                        // TODO Is this still right?
+                        AddError("Struct literals are not yet supported", structField);
+                    }
+                    else if (structField.ArrayValues != null)
+                    {
+                        AddError($"Declaration for struct field '{structAst.Name}.{structField.Name}' with array initializer must have the type declared", structField);
+                    }
+                }
 
                 // Check for circular dependencies
                 if (structAst.Name == structField.Type.Name)
                 {
                     AddError($"Struct '{structAst.Name}' contains circular reference in field '{structField.Name}'", structField);
                 }
-            }
 
-            // 2. Calculate the size of the struct and set field offsets
-            if (!structAst.Generics.Any() && errorCount == _programGraph.Errors.Count)
-            {
-                foreach (var field in structAst.Fields)
+                // Set the size and offset
+                if (fieldType != null)
                 {
-                    // 2a. Get the type from type dictionary
-                    var fieldTypeName = field.Type.CArray ? field.Type.Generics[0].GenericName :field.Type.GenericName;
-                    if (_programGraph.Types.TryGetValue(fieldTypeName, out var type))
+                    if (fieldType is StructAst fieldStruct)
                     {
-                        // 2b. If the type is a struct and the size hasn't been calculated, verify the struct and calculate the size
-                        if (type is StructAst fieldStruct)
+                        if (!fieldStruct.Verified && fieldStruct != structAst)
                         {
-                            if (!fieldStruct.Verified)
-                            {
-                                VerifyStruct(fieldStruct);
-                            }
+                            VerifyStruct(fieldStruct);
                         }
-                        field.Offset = structAst.Size;
-                        field.Size = field.Type.CArray ? type.Size * field.Type.ConstCount.Value : type.Size;
-                        structAst.Size += field.Size;
                     }
+                    structField.Offset = structAst.Size;
+                    structField.Size = structField.Type.CArray ? fieldType.Size * structField.Type.ConstCount.Value : fieldType.Size;
+                    structAst.Size += fieldType.Size;
                 }
             }
+
             structAst.Verified = true;
         }
 
@@ -1206,6 +1183,7 @@ namespace Lang
                     }
                     else
                     {
+                        declaration.Type.ConstCount = (uint)declaration.ArrayValues.Count;
                         var elementType = declaration.Type.Generics[0];
                         foreach (var value in declaration.ArrayValues)
                         {
