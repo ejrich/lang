@@ -45,6 +45,7 @@ namespace Lang.Parsing
         public int Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
+        public int TypeIndex { get; set; }
         public List<string> Generics { get; } = new();
         public List<StructFieldAst> Fields { get; } = new();
         public List<IAst> Children => null;
@@ -82,6 +83,7 @@ namespace Lang.Parsing
         public int Line { get; init; }
         public int Column { get; init; }
         public string Name { get; set; }
+        public int TypeIndex { get; set; }
         public List<EnumValueAst> Values { get; } = new();
         public List<IAst> Children => null;
     }
@@ -103,6 +105,17 @@ namespace Lang.Parsing
         public int Line { get; init; }
         public int Column { get; init; }
         public IAst Value { get; set; }
+        public List<IAst> Children => null;
+    }
+
+    public class PrimitiveAst : IAst
+    {
+        public int FileIndex { get; set; }
+        public int Line { get; init; }
+        public int Column { get; init; }
+        public string Name { get; set; }
+        public int TypeIndex { get; set; }
+        public IPrimitive Primitive { get; set; }
         public List<IAst> Children => null;
     }
 
@@ -263,6 +276,7 @@ namespace Lang.Parsing
         public bool IsGeneric { get; set; }
         public bool Constant { get; set; }
         public int GenericIndex { get; set; }
+        public int TypeIndex { get; set; }
         public IPrimitive PrimitiveType { get; set; }
         public List<TypeDefinition> Generics { get; } = new();
         public IAst Count { get; set; }
