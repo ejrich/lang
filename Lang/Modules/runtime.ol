@@ -143,15 +143,7 @@ int __start(int argc, u8** argv) {
 
     each i in 1..argc then args[i-1] = convert_c_string(argv[i]);
 
-    #assert type_of(main).type == TypeKind.Function;
-    #if type_of(main).return_type.type == TypeKind.Void {
-        #if type_of(main).arguments.length == 0 then main();
-        else then main(args);
-    }
-    else {
-        #if type_of(main).arguments.length == 0 then exit_code = main();
-        else then exit_code = main(args);
-    }
+    #if true then main();
 
     return exit_code;
 }
