@@ -8,7 +8,6 @@ int main() {
         while file {
             if file.d_type == FileType.DT_DIR && file.d_reclen == 32 {
                 dir_name := get_file_name(file);
-
                 test_dir = format_string("%/%", tests_dir, dir_name);
 
                 if !run_test(test_dir) then failed_test_count++;
@@ -68,6 +67,9 @@ string format_string(string format, Params<string> args) {
         format_index++;
     }
 
+    end := buffer + str.length;
+    *end = 0;
+
     return str;
 }
 
@@ -77,8 +79,7 @@ bool run_test(string test_dir) {
     command := format_string("% %", executable, test_dir);
     printf("Compiling: %s", command);
     exit_code := run_command(command);
-    // return true;
-    // free(command.data);
+    free(command.data);
 
     if exit_code {
         printf(" -- Test Failed\n");
@@ -89,7 +90,7 @@ bool run_test(string test_dir) {
     dir := opendir(bin_dir.data);
     if dir == null {
         printf(" -- Test Failed: Unable to open directory '%s'\n", bin_dir.data);
-        // free(bin_dir.data);
+        free(bin_dir.data);
         return false;
     }
 
@@ -98,7 +99,7 @@ bool run_test(string test_dir) {
     while !found_executable && file != null {
         if file.d_type == FileType.DT_REG {
             file_name := get_file_name(file);
-            command = format_string("./%s/%s", bin_dir, file_name);
+            command = format_string("./%/%", bin_dir, file_name);
             found_executable = true;
         }
 
@@ -109,13 +110,13 @@ bool run_test(string test_dir) {
 
     if !found_executable {
         printf(" -- Test Failed: Executable not found in directory '%s'\n", bin_dir.data);
-        // free(bin_dir.data);
+        free(bin_dir.data);
         return false;
     }
 
     printf("\nRunning: %s", command);
     exit_code = run_command(command);
-    // free(command.data);
+    free(command.data);
 
     if exit_code {
         printf(" -- Test Failed\n");
@@ -126,8 +127,7 @@ bool run_test(string test_dir) {
 }
 
 int run_command(string command) {
-    handle := popen(command, "r");
-    if handle == null {
+    handle := popen(command, "r"); if handle == null {
         printf(" -- Test Failed: Unable to run '%s'\n", command);
         return -1;
     }
@@ -140,4 +140,4 @@ int run_command(string command) {
     return (status & 0xFF00) >> 8;
 }
 
-// #run main();
+#run main();
