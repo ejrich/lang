@@ -316,9 +316,7 @@ namespace Lang.Parsing
                     case TokenType.Literal:
                         if (currentField != null && parsingFieldDefault)
                         {
-                            var constant = new ConstantAst {Type = InferType(token, out var error), Value = token.Value};
-                            if (error != null)
-                                errors.Add(error);
+                            var constant = new ConstantAst {Type = InferType(token, errors), Value = token.Value};
                             currentField.DefaultValue = constant;
                             parsingFieldDefault = false;
                         }
@@ -902,10 +900,8 @@ namespace Lang.Parsing
                 case TokenType.Number:
                 case TokenType.Boolean:
                 case TokenType.Literal:
-                    // Parse constant or expression
-                    var constant = new ConstantAst {Type = InferType(token, out var error), Value = token.Value};
-                    if (error != null)
-                        errors.Add(error);
+                    // Parse constant
+                    var constant = new ConstantAst {Type = InferType(token, errors), Value = token.Value};
                     return constant;
                 case TokenType.Token:
                     // Parse variable, call, or expression
@@ -942,6 +938,7 @@ namespace Lang.Parsing
                         return null;
                     }
                 case TokenType.OpenParen:
+                    // Parse subexpression
                     if (enumerator.MoveNext())
                     {
                         return ParseExpression(enumerator, errors, TokenType.CloseParen);
@@ -1095,34 +1092,31 @@ namespace Lang.Parsing
             return typeDefinition;
         }
 
-        private static Type InferType(Token token, out ParseError error)
+        private static TypeDefinition InferType(Token token, List<ParseError> errors)
         {
-            error = null;
-
             switch (token.Type)
             {
                 case TokenType.Literal:
-                    return Type.String;
+                    return new TypeDefinition {Name = "string"};
                 case TokenType.Number:
                     if (int.TryParse(token.Value, out _))
                     {
-                        return Type.Int;
+                        return new TypeDefinition {Name = "int"};
                     }
                     else if (float.TryParse(token.Value, out _))
                     {
-                        return Type.Float;
+                        return new TypeDefinition {Name = "float"};
                     }
                     else
                     {
-                        return Type.Other;
+                        errors.Add(new ParseError {Error = $"Unable to determine type of token '{token.Value}'", Token = token});
+                        return null;
                     }
                 case TokenType.Boolean:
-                    return Type.Boolean;
-                // TODO This isn't right, but works for now
-                case TokenType.Token:
-                    return Type.Other;
+                    return new TypeDefinition {Name = "bool"};
                 default:
-                    return Type.Other;
+                    errors.Add(new ParseError {Error = $"Unable to determine type of token '{token.Value}'", Token = token});
+                    return null;
             }
         }
 

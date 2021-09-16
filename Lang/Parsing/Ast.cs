@@ -60,7 +60,7 @@ namespace Lang.Parsing
 
     public class ConstantAst : IAst
     {
-        public Type Type { get; init; }
+        public TypeDefinition Type { get; init; }
         public string Value { get; init; }
         public List<IAst> Children => null;
     }
