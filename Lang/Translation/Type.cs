@@ -10,6 +10,7 @@ namespace Lang.Translation
         Void,
         Pointer,
         VarArgs,
+        Params,
         Other,
         Error
     }
