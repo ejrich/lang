@@ -19,7 +19,6 @@ namespace Lang.Translation
         private BuildSettings _buildSettings;
         private readonly Dictionary<string, StructAst> _polymorphicStructs = new();
         private readonly Dictionary<string, IAst> _globalIdentifiers = new();
-        private int _typeIndex;
 
         public ProgramGraphBuilder(IProgramRunner programRunner)
         {
@@ -77,7 +76,7 @@ namespace Lang.Translation
                             }
                             else
                             {
-                                structAst.TypeIndex = _typeIndex++;
+                                structAst.TypeIndex = _programGraph.TypeCount++;
                                 structAst.TypeKind = structAst.Name == "string" ? TypeKind.String : TypeKind.Struct;
                                 _programGraph.Types.Add(structAst.Name, structAst);
                             }
@@ -216,7 +215,7 @@ namespace Lang.Translation
         {
             var primitiveAst = new PrimitiveAst
             {
-                Name = name, TypeIndex = _typeIndex++, TypeKind = typeKind,
+                Name = name, TypeIndex = _programGraph.TypeCount++, TypeKind = typeKind,
                 Size = primitive?.Bytes ?? size, Primitive = primitive
             };
             _globalIdentifiers.Add(name, primitiveAst);
@@ -230,7 +229,7 @@ namespace Lang.Translation
             {
                 AddError($"Multiple definitions of enum '{enumAst.Name}'", enumAst);
             }
-            enumAst.TypeIndex = _typeIndex++;
+            enumAst.TypeIndex = _programGraph.TypeCount++;
             _globalIdentifiers.Add(enumAst.Name, enumAst);
 
             if (enumAst.BaseType == null)
@@ -494,7 +493,7 @@ namespace Lang.Translation
             }
 
             // 4. Load the function into the dictionary
-            function.TypeIndex = _typeIndex++;
+            function.TypeIndex = _programGraph.TypeCount++;
             if (!_programGraph.Functions.TryGetValue(function.Name, out var functions))
             {
                 _programGraph.Functions[function.Name] = functions = new List<FunctionAst>();
@@ -2192,7 +2191,7 @@ namespace Lang.Translation
                         return Type.Error;
                     }
 
-                    var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeIndex = _typeIndex++, TypeKind = TypeKind.Pointer, Size = 8};
+                    var pointer = new PrimitiveAst {Name = PrintTypeDefinition(typeDef), TypeIndex = _programGraph.TypeCount++, TypeKind = TypeKind.Pointer, Size = 8};
                     _programGraph.Types.Add(typeDef.GenericName, pointer);
                     return Type.Pointer;
                 case "...":
@@ -2294,7 +2293,7 @@ namespace Lang.Translation
 
         private void CreatePolymorphedStruct(StructAst structAst, string name, string genericName, TypeKind typeKind, params TypeDefinition[] genericTypes)
         {
-            var polyStruct = new StructAst {Name = name, TypeIndex = _typeIndex++, TypeKind = typeKind, Verified = true};
+            var polyStruct = new StructAst {Name = name, TypeIndex = _programGraph.TypeCount++, TypeKind = typeKind, Verified = true};
             foreach (var field in structAst.Fields)
             {
                 if (field.HasGeneric)
