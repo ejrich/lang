@@ -41,7 +41,7 @@ namespace Lang.Backend.LLVM
             }
 
             // 5. Write Function bodies
-            foreach (var function in programGraph.Functions)
+            foreach (var function in programGraph.Functions.Where(func => !func.Extern))
             {
                 _currentFunction = function;
                 WriteFunction(function);
@@ -89,10 +89,28 @@ namespace Lang.Backend.LLVM
         private LLVMValueRef WriteFunctionDefinition(string name, List<Argument> arguments, TypeDefinition returnType)
         {
             _functionTypes.Add(name, returnType);
-            var argumentTypes = arguments.Select(arg => ConvertTypeDefinition(arg.Type)).ToArray();
-            var function = LLVMApi.AddFunction(_module, name, LLVMApi.FunctionType(ConvertTypeDefinition(returnType), argumentTypes, false));
+            var varargs = false;
+            var argumentTypes = new List<LLVMTypeRef>();
 
-            for (var i = 0; i < arguments.Count; i++)
+            // 1. Determine argument types and varargs
+            foreach (var argument in arguments)
+            {
+                if (argument.Type.Name == "...")
+                {
+                    varargs = true;
+                }
+                else
+                {
+                    argumentTypes.Add(ConvertTypeDefinition(argument.Type));
+                }
+            }
+
+            // 2. Declare function
+            var function = LLVMApi.AddFunction(_module, name, LLVMApi.FunctionType(ConvertTypeDefinition(returnType), argumentTypes.ToArray(), varargs));
+
+            // 3. Set argument names
+            var argumentCount = varargs ? arguments.Count - 1 : arguments.Count;
+            for (var i = 0; i < argumentCount; i++)
             {
                 var argument = LLVMApi.GetParam(function, (uint) i);
                 LLVMApi.SetValueName(argument, arguments[i].Name);
@@ -111,22 +129,43 @@ namespace Lang.Backend.LLVM
             // 2. Allocate arguments on the stack
             for (var i = 0; i < functionAst.Arguments.Count; i++)
             {
-                var argument = LLVMApi.GetParam(function, (uint) i);
-                var arg = functionAst.Arguments[i];
-                var allocation = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(arg.Type), arg.Name);
-                LLVMApi.BuildStore(_builder, argument, allocation);
-                localVariables.Add(arg.Name, (arg.Type, allocation));
+                if (functionAst.Arguments[i].Type.Name == "...")
+                {
+                    // TODO Initialize varargs
+                }
+                else
+                {
+                    var argument = LLVMApi.GetParam(function, (uint) i);
+                    var arg = functionAst.Arguments[i];
+                    var allocation = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(arg.Type), arg.Name);
+                    LLVMApi.BuildStore(_builder, argument, allocation);
+                    localVariables.Add(arg.Name, (arg.Type, allocation));
+                }
             }
 
             // 3. Loop through function body
+            var returned = false;
             foreach (var ast in functionAst.Children)
             {
                 // 3a. Recursively write out lines
                 WriteFunctionLine(ast, localVariables, function);
+                if (ast is ReturnAst)
+                {
+                    returned = true;
+                    break;
+                }
+            }
+ 
+            // 4. Write returns for void functions
+            if (!returned && functionAst.ReturnType.Name == "void")
+            {
+                LLVMApi.BuildRetVoid(_builder);
             }
 
-            // 4. Verify the function
+            // 5. Verify the function
+            #if DEBUG
             function.VerifyFunction(LLVMVerifierFailureAction.LLVMPrintMessageAction);
+            #endif
         }
 
         private void WriteMainFunction(FunctionAst main)
@@ -576,7 +615,7 @@ namespace Lang.Backend.LLVM
                         callArguments[i] = value.value;
                     }
                     var functionType = _functionTypes[call.Function];
-                    return (functionType, LLVMApi.BuildCall(_builder, function, callArguments, "callTmp"));
+                    return (functionType, LLVMApi.BuildCall(_builder, function, callArguments, string.Empty));
                 case ChangeByOneAst changeByOne:
                 {
                     var (variableType, pointer) = changeByOne.Variable switch
