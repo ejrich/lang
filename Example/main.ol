@@ -256,3 +256,11 @@ default_args(int val = 5) {
 int SDL_Init(u32 flags) #extern
 SDL_CreateWindow(string title, int x, int y, int w, int h, u32 flags) #extern
 u32 sleep(u32 seconds) #extern
+
+compiler_directives() {
+    #if true {
+        printf("Hello world");
+    } else {
+        printf("Hello wrong branch");
+    }
+}
