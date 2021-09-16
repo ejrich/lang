@@ -1699,7 +1699,6 @@ namespace Lang.Translation
 
                     if (call.SpecifiedArguments != null)
                     {
-                        // TODO Move args around if needed
                         var specifiedArgsMatch = true;
                         foreach (var (name, argument) in call.SpecifiedArguments)
                         {
