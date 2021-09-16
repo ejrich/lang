@@ -1,4 +1,4 @@
-int main() {
+main() {
     tests_dir := "Tests/tests"; #const
     dir := opendir(tests_dir);
     command_buffer = malloc(1000);
@@ -24,11 +24,10 @@ int main() {
 
     if failed_test_count {
         printf("\n%d Test(s) Failed\n", failed_test_count);
-        return -1;
+        exit(-1);
     }
     else {
         printf("\nAll Tests Passed\n");
-        return 0;
     }
 }
 

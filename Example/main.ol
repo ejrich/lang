@@ -1,9 +1,9 @@
-int main(Array<string> args) { //#print_ir {
+main() { //#print_ir {
     // Return positive exit code
     /*
         Multi line comment
     */
-    each arg, i in args then printf("Arg %d: \"%s\" -- length = %d\n", i, arg, arg.length);
+    // each arg, i in args then printf("Arg %d: \"%s\" -- length = %d\n", i, arg, arg.length);
     hello := "This is an \"escaped\" string literal\nWith a new line!";
     a := 4.2;
     a++;
@@ -84,8 +84,6 @@ int main(Array<string> args) { //#print_ir {
     type_casts();
 
     break_and_continue();
-
-    return 0;
 }
 
 // TODO Make these work
@@ -322,7 +320,7 @@ u32 sleep(u32 seconds) #extern "libc"
 
 #run {
     args: Array<string> = ["Hello world"]
-    main(args);
+    main();
 
     build();
 }
