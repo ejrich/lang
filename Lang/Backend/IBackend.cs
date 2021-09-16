@@ -7,7 +7,6 @@ namespace Lang.Backend
         /// </summary>
         /// <param name="projectPath">The path to the project</param>
         /// <param name="programGraph">Graph of the program</param>
-        /// <param name="buildSettings">Build settings from the cli args</param>
-        string Build(ProjectFile project, ProgramGraph programGraph, BuildSettings buildSettings);
+        string Build(ProjectFile project, ProgramGraph programGraph);
     }
 }

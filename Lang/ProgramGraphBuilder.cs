@@ -23,7 +23,7 @@ namespace Lang
 
     public interface IProgramGraphBuilder
     {
-        ProgramGraph CreateProgramGraph(ParseResult parseResult, ProjectFile project, BuildSettings buildSettings);
+        ProgramGraph CreateProgramGraph(ParseResult parseResult, ProjectFile project);
     }
 
     public class ProgramGraphBuilder : IProgramGraphBuilder
@@ -33,7 +33,6 @@ namespace Lang
         private readonly IProgramIRBuilder _irBuilder;
 
         private readonly ProgramGraph _programGraph = new();
-        private BuildSettings _buildSettings;
         private readonly Dictionary<string, StructAst> _polymorphicStructs = new();
         private readonly Dictionary<string, List<FunctionAst>> _polymorphicFunctions = new();
         private readonly Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads = new();
@@ -47,11 +46,10 @@ namespace Lang
             _irBuilder = irBuilder;
         }
 
-        public ProgramGraph CreateProgramGraph(ParseResult parseResult, ProjectFile project, BuildSettings buildSettings)
+        public ProgramGraph CreateProgramGraph(ParseResult parseResult, ProjectFile project)
         {
             _programGraph.Dependencies = project.Dependencies;
 
-            _buildSettings = buildSettings;
             var mainDefined = false;
             bool verifyAdditional;
 

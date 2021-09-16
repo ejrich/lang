@@ -11,7 +11,6 @@ namespace Lang.Backend
     {
         private const string ObjectDirectory = "obj";
 
-        private ProgramGraph _programGraph;
         private LLVMModuleRef _module;
         private LLVMContextRef _context;
         private LLVMBuilderRef _builder;
@@ -35,8 +34,6 @@ namespace Lang.Backend
 
         public string Build(ProjectFile project, ProgramGraph programGraph, BuildSettings buildSettings)
         {
-            _programGraph = programGraph;
-
             // 1. Verify obj directory exists
             var objectPath = Path.Combine(project.Path, ObjectDirectory);
             if (!Directory.Exists(objectPath))

@@ -5,11 +5,11 @@ using Lang.Backend;
 
 namespace Lang
 {
-    public class BuildSettings
+    public static class BuildSettings
     {
-        public bool Release { get; set; }
-        public bool OutputAssembly { get; set; }
-        public string ProjectPath { get; set; }
+        public static bool Release { get; set; }
+        public static bool OutputAssembly { get; set; }
+        public static string ProjectPath { get; set; }
     }
 
     public static class ErrorCodes
@@ -46,20 +46,19 @@ namespace Lang
         public void Compile(string[] args)
         {
             // 1. Load cli args into build settings
-            var buildSettings = new BuildSettings();
             foreach (var arg in args)
             {
                 switch (arg)
                 {
                     case "-R":
                     case "--release":
-                        buildSettings.Release = true;
+                        BuildSettings.Release = true;
                         break;
                     case "-S":
-                        buildSettings.OutputAssembly = true;
+                        BuildSettings.OutputAssembly = true;
                         break;
                     default:
-                        buildSettings.ProjectPath ??= arg;
+                        BuildSettings.ProjectPath ??= arg;
                         break;
                 }
             }
@@ -67,7 +66,7 @@ namespace Lang
             var stopwatch = new Stopwatch();
             stopwatch.Start();
             // 2. Load files in project
-            var project = _projectInterpreter.LoadProject(buildSettings.ProjectPath);
+            var project = _projectInterpreter.LoadProject(BuildSettings.ProjectPath);
 
             // 3. Parse source files to tokens
             var parseResult = _parser.Parse(project.SourceFiles);
@@ -89,7 +88,7 @@ namespace Lang
             }
 
             // 4. Build program graph
-            var programGraph = _graphBuilder.CreateProgramGraph(parseResult, project, buildSettings);
+            var programGraph = _graphBuilder.CreateProgramGraph(parseResult, project);
             var frontEndTime = stopwatch.Elapsed;
 
             if (programGraph.Errors.Any())
@@ -104,7 +103,7 @@ namespace Lang
 
             // 5. Build program
             stopwatch.Restart();
-            var objectFile = _backend.Build(project, programGraph, buildSettings);
+            var objectFile = _backend.Build(project, programGraph);
             stopwatch.Stop();
             var buildTime = stopwatch.Elapsed;
 
