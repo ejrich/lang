@@ -410,7 +410,7 @@ namespace Lang
             }
             else if (declaration.ArrayValues != null)
             {
-                value = null; // TODO Implement me
+                value = InitializeArray(declaration.Type, variables, arrayValues: declaration.ArrayValues);
             }
             else
             {
@@ -434,20 +434,17 @@ namespace Lang
 
         private object GetUninitializedValue(TypeDefinition typeDef, IDictionary<string, ValueType> variables, List<AssignmentAst> values)
         {
-            switch (typeDef.PrimitiveType)
+            switch (typeDef.TypeKind)
             {
-                case IntegerType integerType:
+                case TypeKind.Integer:
                     return 0;
-                case FloatType floatType:
-                    return floatType.Bytes == 4 ? 0f : 0.0;
+                case TypeKind.Float:
+                    return typeDef.PrimitiveType.Bytes == 4 ? 0f : 0.0;
+                case TypeKind.Array:
+                    return InitializeArray(typeDef, variables);
+                case TypeKind.Pointer:
+                    return IntPtr.Zero;
                 default:
-                    switch (typeDef.Name)
-                    {
-                        case "Array":
-                            return InitializeArray(typeDef, variables);
-                        case "*":
-                            return IntPtr.Zero;
-                    }
                     var instanceType = _types[typeDef.GenericName];
                     var type = _programGraph.Types[typeDef.GenericName];
                     if (type is StructAst structAst)
@@ -512,7 +509,7 @@ namespace Lang
             return instance;
         }
 
-        private object InitializeArray(TypeDefinition type, IDictionary<string, ValueType> variables, bool structField = false)
+        private object InitializeArray(TypeDefinition type, IDictionary<string, ValueType> variables, bool structField = false, List<IAst> arrayValues = null)
         {
             var arrayType = _types[type.GenericName];
             var genericType = GetTypeFromDefinition(type.Generics[0]);
@@ -522,6 +519,11 @@ namespace Lang
             {
                 array = structField ? Array.CreateInstance(genericType, type.ConstCount.Value) :
                     Marshal.AllocHGlobal(Marshal.SizeOf(genericType) * (int)type.ConstCount.Value);
+
+                if (arrayValues != null)
+                {
+                    // TODO Implement me
+                }
             }
             else
             {
@@ -534,6 +536,11 @@ namespace Lang
                 {
                     var length = (int)ExecuteExpression(type.Count, variables).Value;
                     InitializeConstArray(array, arrayType, genericType, length);
+                }
+
+                if (arrayValues != null)
+                {
+                    // TODO Implement me
                 }
             }
 
