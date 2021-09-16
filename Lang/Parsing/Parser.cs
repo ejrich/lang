@@ -1,5 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
+using Microsoft.VisualBasic;
 
 namespace Lang.Parsing
 {
@@ -42,6 +44,8 @@ namespace Lang.Parsing
             {
                 return _tokens.Count > _index + steps ? _tokens[_index + steps] : null;
             }
+
+            public Token Last => _tokens[^1];
         }
 
         public Parser(ILexer lexer) => _lexer = lexer;
@@ -202,12 +206,14 @@ namespace Lang.Parsing
             }
 
             // 5. Parse function body
+            var closed = false;
             while (enumerator.MoveNext())
             {
                 var token = enumerator.Current;
 
                 if (token.Type == TokenType.CloseBrace)
                 {
+                    closed = true;
                     break;
                 }
 
@@ -215,6 +221,15 @@ namespace Lang.Parsing
                 if (ast != null)
                     function.Children.Add(ast);
             }
+            if (!closed)
+            {
+                errors.Add(new ParseError
+                {
+                    Error = "Function not closed by '}'",
+                    Token = enumerator.Current ?? enumerator.Last
+                });
+            }
+
             return function;
         }
 
@@ -222,7 +237,7 @@ namespace Lang.Parsing
         {
             var token = enumerator.Current;
 
-            switch (token.Type)
+            switch (token?.Type)
             {
                 case TokenType.Return:
                     return ParseReturn(enumerator, errors);
@@ -231,7 +246,14 @@ namespace Lang.Parsing
                 case TokenType.If:
                     return ParseConditional(enumerator, errors);
                 case TokenType.Token:
-                    // TODO Handle assignments and other things
+                    // TODO Handle calls, assignments, and other things
+                    return null;
+                case null:
+                    errors.Add(new ParseError
+                    {
+                        Error = "End of file reached without closing scope",
+                        Token = enumerator.Last
+                    });
                     return null;
                 default:
                     errors.Add(new ParseError
@@ -281,22 +303,29 @@ namespace Lang.Parsing
                     }
                     break;
                 }
+                case null:
+                    errors.Add(new ParseError
+                    {
+                        Error = "Expected if to contain conditional expression",
+                        Token = enumerator.Last
+                    });
+                    break;
                 default:
                     errors.Add(new ParseError
                     {
-                        Error = $"Unexpected token '{enumerator.Current?.Value}'",
+                        Error = $"Unexpected token '{enumerator.Current.Value}'",
                         Token = enumerator.Current
                     });
                     break;
             }
 
             // 3. Parse else block if necessary
-            if (enumerator.Peek().Type == TokenType.Else)
+            if (enumerator.Peek()?.Type == TokenType.Else)
             {
                 // First clear the else and then determine how to parse else block
                 enumerator.MoveNext();
                 enumerator.MoveNext();
-                switch (enumerator.Current.Type)
+                switch (enumerator.Current?.Type)
                 {
                     case TokenType.Then:
                     {
@@ -329,6 +358,13 @@ namespace Lang.Parsing
                         // Nest another conditional in else children
                         conditionalAst.ElseChildren.Add(ParseConditional(enumerator, errors));
                         break;
+                    case null:
+                        errors.Add(new ParseError
+                        {
+                            Error = "Expected body of else branch",
+                            Token = enumerator.Last
+                        });
+                        break;
                     default:
                         errors.Add(new ParseError
                         {
@@ -348,7 +384,7 @@ namespace Lang.Parsing
 
             // 1. Expect to get variable name
             enumerator.MoveNext();
-            switch (enumerator.Current.Type)
+            switch (enumerator.Current?.Type)
             {
                 case TokenType.Token:
                     declaration.Name = enumerator.Current.Value;
@@ -360,6 +396,13 @@ namespace Lang.Parsing
                         Token = enumerator.Current
                     });
                     return declaration;
+                case null:
+                    errors.Add(new ParseError
+                    {
+                        Error = $"Expected variable to have name",
+                        Token = enumerator.Last
+                    });
+                    break;
                 default:
                     errors.Add(new ParseError
                     {
@@ -371,11 +414,11 @@ namespace Lang.Parsing
 
             // 2. Expect to get equals sign
             enumerator.MoveNext();
-            if (enumerator.Current.Type != TokenType.Equals)
+            if (enumerator.Current?.Type != TokenType.Equals)
             {
                 errors.Add(new ParseError
                 {
-                    Error = $"Expected '=' in declaration'",
+                    Error = "Expected '=' in declaration'",
                     Token = enumerator.Current
                 });
             }
@@ -383,6 +426,16 @@ namespace Lang.Parsing
             // 3. Parse expression, constant, or another token as the value
             enumerator.MoveNext();
             var token = enumerator.Current;
+
+            if (token == null)
+            {
+                errors.Add(new ParseError
+                {
+                    Error = "Expected declaration to have value",
+                    Token = enumerator.Last
+                });
+                return declaration;
+            }
 
             // 3a. Constant or variable case
             if (enumerator.Peek()?.Type == TokenType.SemiColon)
@@ -406,7 +459,7 @@ namespace Lang.Parsing
                     default:
                         errors.Add(new ParseError
                         {
-                            Error = $"Expected token '{token.Value}'",
+                            Error = $"Unexpected token '{token.Value}'",
                             Token = token
                         });
                         break;
@@ -437,22 +490,6 @@ namespace Lang.Parsing
 
                 if (endToken.Contains(token.Type))
                 {
-                    if (!expression.Children.Any())
-                    {
-                        errors.Add(new ParseError
-                        {
-                            Error = "Expression should contain elements",
-                            Token = token
-                        });
-                    }
-                    else if (!operatorRequired && expression.Children.Any())
-                    {
-                        errors.Add(new ParseError
-                        {
-                            Error = "Value required after operator",
-                            Token = token
-                        });
-                    }
                     break;
                 }
 
@@ -492,10 +529,17 @@ namespace Lang.Parsing
                             break;
                         case TokenType.Token:
                             // Parse variable, call, or expression
-                            switch (nextToken.Type)
+                            switch (nextToken?.Type)
                             {
                                 case TokenType.OpenParen:
                                     expression.Children.Add(ParseCall(enumerator, errors));
+                                    break;
+                                case null:
+                                    errors.Add(new ParseError
+                                    {
+                                        Error = $"Expected token to follow '{token.Value}'",
+                                        Token = token
+                                    });
                                     break;
                                 default:
                                     expression.Children.Add(new VariableAst {Name = token.Value});
@@ -504,8 +548,18 @@ namespace Lang.Parsing
                             operatorRequired = true;
                             break;
                         case TokenType.OpenParen:
-                            enumerator.MoveNext();
-                            expression.Children.Add(ParseExpression(enumerator, errors, TokenType.CloseParen));
+                            if (enumerator.MoveNext())
+                            {
+                                expression.Children.Add(ParseExpression(enumerator, errors, TokenType.CloseParen));
+                            }
+                            else
+                            {
+                                errors.Add(new ParseError
+                                {
+                                    Error = $"Expected token to follow '{token.Value}'",
+                                    Token = token
+                                });
+                            }
                             operatorRequired = true;
                             break;
                         default:
@@ -518,6 +572,23 @@ namespace Lang.Parsing
                 }
 
             } while (enumerator.MoveNext());
+
+            if (!expression.Children.Any())
+            {
+                errors.Add(new ParseError
+                {
+                    Error = "Expression should contain elements",
+                    Token = enumerator.Current ?? enumerator.Last
+                });
+            }
+            else if (!operatorRequired && expression.Children.Any())
+            {
+                errors.Add(new ParseError
+                {
+                    Error = "Value required after operator",
+                    Token = enumerator.Current ?? enumerator.Last
+                });
+            }
 
             return expression;
         }
@@ -539,14 +610,6 @@ namespace Lang.Parsing
 
                 if (enumerator.Current.Type == TokenType.CloseParen)
                 {
-                    if (!commaRequired && callAst.Arguments.Any())
-                    {
-                        errors.Add(new ParseError
-                        {
-                            Error = "Unexpected comma in call",
-                            Token = new Token {Type = TokenType.Comma, Line = token.Line}
-                        });
-                    }
                     break;
                 }
 
@@ -574,7 +637,7 @@ namespace Lang.Parsing
                         case TokenType.Boolean:
                         case TokenType.Literal:
                             // Parse constant or expression
-                            switch (nextToken.Type)
+                            switch (nextToken?.Type)
                             {
                                 case TokenType.Comma:
                                 case TokenType.CloseParen:
@@ -587,6 +650,13 @@ namespace Lang.Parsing
                                         errors.Add(error);
                                     commaRequired = true;
                                     callAst.Arguments.Add(constant);
+                                    break;
+                                case null:
+                                    errors.Add(new ParseError
+                                    {
+                                        Error = $"Expected to have a token following '{token.Value}'",
+                                        Token = token
+                                    });
                                     break;
                                 default:
                                     callAst.Arguments.Add(ParseExpression(enumerator, errors, TokenType.Comma, TokenType.CloseParen));
@@ -601,7 +671,7 @@ namespace Lang.Parsing
                             break;
                         case TokenType.Token:
                             // Parse variable, call, or expression
-                            switch (nextToken.Type)
+                            switch (nextToken?.Type)
                             {
                                 case TokenType.Comma:
                                 case TokenType.CloseParen:
@@ -611,6 +681,13 @@ namespace Lang.Parsing
                                 case TokenType.OpenParen:
                                     callAst.Arguments.Add(ParseCall(enumerator, errors));
                                     commaRequired = true;
+                                    break;
+                                case null:
+                                    errors.Add(new ParseError
+                                    {
+                                        Error = $"Expected to have a token following '{token.Value}'",
+                                        Token = token
+                                    });
                                     break;
                                 default:
                                     callAst.Arguments.Add(ParseExpression(enumerator, errors, TokenType.Comma, TokenType.CloseParen));
@@ -632,6 +709,15 @@ namespace Lang.Parsing
                             break;
                     }
                 }
+            }
+
+            if (!commaRequired && callAst.Arguments.Any())
+            {
+                errors.Add(new ParseError
+                {
+                    Error = "Unexpected comma in call",
+                    Token = enumerator.Current ?? enumerator.Last
+                });
             }
 
             return callAst;
@@ -688,6 +774,13 @@ namespace Lang.Parsing
                             Token = token
                         });
                     }
+                    break;
+                case null:
+                    errors.Add(new ParseError
+                    {
+                        Error = "Return does not have value",
+                        Token = token ?? enumerator.Last
+                    });
                     break;
                 default:
                     returnAst.Value = ParseExpression(enumerator, errors);
@@ -762,6 +855,15 @@ namespace Lang.Parsing
                                 break;
                         }
                     }
+                }
+
+                if (!typeDefinition.Generics.Any())
+                {
+                    errors.Add(new ParseError
+                    {
+                        Error = "Expected type to contain generics",
+                        Token = enumerator.Current ?? enumerator.Last
+                    });
                 }
             }
 
