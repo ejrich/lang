@@ -85,7 +85,7 @@ namespace Lang
         public TypeDefinition ReturnTypeDefinition { get; set; }
         public List<string> Generics { get; } = new();
         public List<DeclarationAst> Arguments { get; } = new();
-        public List<List<TypeDefinition>> VarargsCalls { get; set; }
+        public List<int> VarargsCalls { get; set; }
         public ScopeAst Body { get; set; }
     }
 
