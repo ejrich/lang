@@ -365,12 +365,12 @@ namespace Lang.Parsing
                         if (commaRequiredBeforeNextArgument)
                         {
                             function.Arguments.Add(currentArgument);
-                            currentArgument = null;
                         }
                         else
                         {
                             errors.Add(new ParseError {Error = "Unexpected comma in arguments", Token = token});
                         }
+                        currentArgument = null;
                         commaRequiredBeforeNextArgument = false;
                         break;
                     case TokenType.Equals:
@@ -2043,7 +2043,6 @@ namespace Lang.Parsing
                 switch (token.Type)
                 {
                     case TokenType.Token:
-                    case TokenType.VarArgs:
                         if (commaRequiredBeforeNextArgument)
                         {
                             errors.Add(new ParseError
@@ -2075,12 +2074,12 @@ namespace Lang.Parsing
                         if (commaRequiredBeforeNextArgument)
                         {
                             overload.Arguments.Add(currentArgument);
-                            currentArgument = null;
                         }
                         else
                         {
                             errors.Add(new ParseError {Error = "Unexpected comma in arguments", Token = token});
                         }
+                        currentArgument = null;
                         commaRequiredBeforeNextArgument = false;
                         break;
                     default:
