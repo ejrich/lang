@@ -370,8 +370,8 @@ namespace Lang.Translation
                     }
                 }
             }
-            
-            // 4. Load the function into the dictionary 
+
+            // 4. Load the function into the dictionary
             if (!_programGraph.Functions.TryAdd(function.Name, function))
             {
                 errors.Add(CreateError($"Multiple definitions of function '{function.Name}'", function));
@@ -1661,7 +1661,7 @@ namespace Lang.Translation
                         errors.Add(CreateError($"Params type should have 1 generic type, but got {typeDef.Generics.Count}", typeDef));
                         return Type.Error;
                     }
-                    return VerifyList(typeDef, errors) ? Type.Params : Type.Error; 
+                    return VerifyList(typeDef, errors) ? Type.Params : Type.Error;
                 }
                 default:
                     if (typeDef.Generics.Any())
