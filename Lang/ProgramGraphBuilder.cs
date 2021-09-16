@@ -20,7 +20,7 @@ namespace Lang
     {
         private readonly IPolymorpher _polymorpher;
         private readonly IProgramIRBuilder _irBuilder;
-        private readonly _IProgramRunner _runner;
+        private readonly IProgramRunner _runner;
 
         private readonly ProgramGraph _programGraph = new();
         private readonly Dictionary<string, StructAst> _polymorphicStructs = new();
@@ -29,7 +29,7 @@ namespace Lang
         private readonly ScopeAst _globalScope = new();
         private readonly TypeDefinition _s32Type = new() {Name = "s32", TypeKind = TypeKind.Integer, PrimitiveType = new IntegerType {Bytes = 4, Signed = true}};
 
-        public ProgramGraphBuilder(IPolymorpher polymorpher, IProgramIRBuilder irBuilder, _IProgramRunner runner)
+        public ProgramGraphBuilder(IPolymorpher polymorpher, IProgramIRBuilder irBuilder, IProgramRunner runner)
         {
             _polymorpher = polymorpher;
             _irBuilder = irBuilder;
