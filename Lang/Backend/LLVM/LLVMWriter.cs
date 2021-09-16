@@ -324,6 +324,8 @@ namespace Lang.Backend.LLVM
 
                     switch (each.Iteration)
                     {
+                        // @PotentialBug I can't really think of other cases that would fall under here, but this may
+                        // become an issue if there are some new ways to creates lists
                         case CallAst call:
                             var function = _functions[call.Function];
                             var iterationValue = LLVMApi.BuildAlloca(_builder, ConvertTypeDefinition(function.ReturnType), "iterval");
