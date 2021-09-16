@@ -6,14 +6,14 @@ struct Array<T> {
     T* data;
 }
 
-ARRAY_BLOCK_SIZE := 10;
+ARRAY_BLOCK_SIZE := 10; #const
 
 array_insert<T>(Array<T>* array, T value) {
     // Reallocate the array if necessary
     if (array.length % ARRAY_BLOCK_SIZE == 0) {
         // @Future add custom allocators
         new_blocks := array.length / ARRAY_BLOCK_SIZE + 1;
-        new_data := malloc(lize_of(T) * new_blocks * ARRAY_BLOCK_SIZE);
+        new_data := malloc(size_of(T) * new_blocks * ARRAY_BLOCK_SIZE);
         array.data = cast(s32*, new_data);
     }
 
