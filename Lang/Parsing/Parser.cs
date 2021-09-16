@@ -1687,8 +1687,23 @@ namespace Lang.Parsing
 
             if (!enumerator.MoveNext())
             {
-                errors.Add(new ParseError { Error = "Expected compiler directive to have a value", Token = enumerator.Last});
+                errors.Add(new ParseError {Error = "Expected compiler directive to have a value", Token = enumerator.Last});
                 return null;
+            }
+
+            var token = enumerator.Current;
+            switch (token.Value)
+            {
+                case "run":
+                    directive.Directive = Directive.Run;
+                    enumerator.MoveNext();
+                    break;
+                case "if":
+                    directive.Directive = Directive.If;
+                    break;
+                default:
+                    errors.Add(new ParseError {Error = $"Unsupported top-level compiler directive '{token.Value}'", Token = token});
+                    return null;
             }
 
             var ast = ParseLine(enumerator, errors);
@@ -1704,8 +1719,19 @@ namespace Lang.Parsing
 
             if (!enumerator.MoveNext())
             {
-                errors.Add(new ParseError { Error = "Expected compiler directive to have a value", Token = enumerator.Last});
+                errors.Add(new ParseError {Error = "Expected compiler directive to have a value", Token = enumerator.Last});
                 return null;
+            }
+
+            var token = enumerator.Current;
+            switch (token.Value)
+            {
+                case "if":
+                    directive.Directive = Directive.If;
+                    break;
+                default:
+                    errors.Add(new ParseError {Error = $"Unsupported compiler directive '{token.Value}'", Token = token});
+                    return null;
             }
 
             var ast = ParseLine(enumerator, errors);
