@@ -309,6 +309,11 @@ namespace Lang.Parsing
                 case TokenType.Plus:
                     return ChangeTypeIfSame(currentToken, type, TokenType.Increment);
                 case TokenType.Minus:
+                    if (type == TokenType.Number)
+                    {
+                        currentToken.Type = type;
+                        return true;
+                    }
                     return ChangeTypeIfSame(currentToken, type, TokenType.Decrement);
                 case TokenType.Period:
                     return ChangeTypeIfSame(currentToken, type, TokenType.Range);

@@ -575,7 +575,7 @@ namespace Lang.Backend.LLVM
                         return LLVMApi.ConstInt(type, constant.Value == "true" ? 1 : 0, false);
                     }
                     var primitive = constant.Type.PrimitiveType as IntegerType;
-                    return LLVMApi.ConstInt(type, ulong.Parse(constant.Value), true);
+                    return LLVMApi.ConstInt(type, (ulong)long.Parse(constant.Value), false);
                 case LLVMTypeKind.LLVMFloatTypeKind:
                 case LLVMTypeKind.LLVMDoubleTypeKind:
                     return LLVMApi.ConstRealOfStringAndSize(type, constant.Value, (uint) constant.Value.Length);

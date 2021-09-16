@@ -272,7 +272,9 @@ namespace Lang.Translation
                     // TODO Implement this in other parts of these functions
                     else if (declaration.Type.PrimitiveType != null && declaration.Value is ConstantAst constant)
                     {
+                        constant.Type.Name = declaration.Type.Name;
                         constant.Type.PrimitiveType = declaration.Type.PrimitiveType;
+                        VerifyConstant(constant, errors);
                     }
                 }
             }
@@ -544,6 +546,36 @@ namespace Lang.Translation
                     errors.Add(CreateError($"Unexpected Ast '{ast}'", ast));
                     return null;
             }
+        }
+
+        private TypeDefinition VerifyConstant(ConstantAst constant, List<TranslationError> errors)
+        {
+            var type = constant.Type;
+            switch (type.PrimitiveType)
+            {
+                case IntegerType integer:
+                    if (!integer.Signed && constant.Value[0] == '-')
+                    {
+                        errors.Add(CreateError($"Unsigned type '{PrintTypeDefinition(constant.Type)}' cannot be negative", constant));
+                        break;
+                    }
+
+                    var success = integer.Bytes switch
+                    {
+                        1 => integer.Signed ? sbyte.TryParse(constant.Value, out _) : byte.TryParse(constant.Value, out _),
+                        2 => integer.Signed ? short.TryParse(constant.Value, out _) : ushort.TryParse(constant.Value, out _),
+                        4 => integer.Signed ? int.TryParse(constant.Value, out _) : uint.TryParse(constant.Value, out _),
+                        8 => integer.Signed ? long.TryParse(constant.Value, out _) : ulong.TryParse(constant.Value, out _),
+                        _ => integer.Signed ? int.TryParse(constant.Value, out _) : uint.TryParse(constant.Value, out _),
+                    };
+                    if (!success)
+                    {
+                        errors.Add(CreateError($"Value '{constant.Value}' out of range for type '{PrintTypeDefinition(constant.Type)}'", constant));
+                    }
+                    break;
+            }
+
+            return type;
         }
 
         private TypeDefinition VerifyExpressionType(ExpressionAst expression, IDictionary<string, TypeDefinition> localVariables, List<TranslationError> errors)
