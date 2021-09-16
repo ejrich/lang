@@ -15,6 +15,7 @@ namespace Lang.Backend.LLVM
 
         private LLVMModuleRef _module;
         private LLVMBuilderRef _builder;
+        private LLVMPassManagerRef _passManager;
         private FunctionAst _currentFunction;
         private LLVMValueRef _stackPointer;
         private bool _stackPointerExists;
@@ -24,10 +25,10 @@ namespace Lang.Backend.LLVM
         private readonly Dictionary<string, IAst> _types = new();
         private readonly Queue<LLVMValueRef> _allocationQueue = new();
 
-        public string WriteFile(ProgramGraph programGraph, string projectName, string projectPath)
+        public string WriteFile(ProgramGraph programGraph, string projectName, string projectPath, bool optimize)
         {
             // 1. Initialize the LLVM module and builder
-            InitLLVM(projectName);
+            InitLLVM(projectName, optimize);
 
             // 2. Verify obj directory exists
             var objectPath = Path.Combine(projectPath, ObjectDirectory);
@@ -73,10 +74,22 @@ namespace Lang.Backend.LLVM
             return objectFile;
         }
 
-        private void InitLLVM(string projectName)
+        private void InitLLVM(string projectName, bool optimize)
         {
             _module = LLVMApi.ModuleCreateWithName(projectName);
             _builder = LLVMApi.CreateBuilder();
+            _passManager = LLVMApi.CreateFunctionPassManagerForModule(_module);
+            if (optimize)
+            {
+                LLVMApi.AddBasicAliasAnalysisPass(_passManager);
+                LLVMApi.AddPromoteMemoryToRegisterPass(_passManager);
+                LLVMApi.AddInstructionCombiningPass(_passManager);
+                LLVMApi.AddReassociatePass(_passManager);
+                LLVMApi.AddGVNPass(_passManager);
+                LLVMApi.AddCFGSimplificationPass(_passManager);
+
+                LLVMApi.InitializeFunctionPassManager(_passManager);
+            }
         }
 
         private IDictionary<string, (TypeDefinition type, LLVMValueRef value)> WriteData(Data data)
@@ -207,6 +220,7 @@ namespace Lang.Backend.LLVM
             _stackSaved = false;
 
             // 7. Verify the function
+            LLVMApi.RunFunctionPassManager(_passManager, function);
             #if DEBUG
             function.VerifyFunction(LLVMVerifierFailureAction.LLVMPrintMessageAction);
             #endif

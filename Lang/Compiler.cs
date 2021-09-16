@@ -75,7 +75,7 @@ namespace Lang
 
             // 4. Build program and link binaries
             stopwatch.Restart();
-            _backend.Build(programGraph, project.Name, project.Path, project.Dependencies);
+            _backend.Build(programGraph, project, false);
             stopwatch.Stop();
             var buildTime = stopwatch.Elapsed;
 
