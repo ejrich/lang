@@ -160,17 +160,15 @@ namespace Lang
                         }
                         else if (declaration.TypeDefinition.Count != null)
                         {
-                            // TODO Implement me
-                            // BuildStackSave();
-                            // var (_, count) = WriteExpression(declaration.TypeDefinition.Count, localVariables);
+                            function.SaveStack = true;
+                            var count = EmitIR(function, declaration.TypeDefinition.Count, scope, block);
+                            var countPointer = EmitGetStructPointer(block, pointer, arrayStruct, 0);
+                            EmitStore(block, countPointer, count);
 
-                            // var countPointer = _builder.BuildStructGEP(variable, 0, "countptr");
-                            // LLVM.BuildStore(_builder, count, countPointer);
-
-                            // var targetType = ConvertTypeDefinition(elementType);
-                            // var arrayData = _builder.BuildArrayAlloca(targetType, count, "arraydata");
-                            // var dataPointer = _builder.BuildStructGEP(variable, 1, "dataptr");
-                            // LLVM.BuildStore(_builder, arrayData, dataPointer);
+                            var elementType = new InstructionValue {ValueType = InstructionValueType.Type, Type = declaration.ArrayElementType};
+                            var arrayData = EmitInstruction(InstructionType.AllocateArray, block, count, elementType);
+                            var dataPointer = EmitGetStructPointer(block, pointer, arrayStruct, 0);
+                            EmitStore(block, dataPointer, arrayData);
                         }
                         else
                         {
@@ -959,9 +957,9 @@ namespace Lang
                  field = structDef.Fields[fieldIndex];
             }
 
-            var loadInstruction = new Instruction {Type = InstructionType.GetStructPointer, Index = fieldIndex, Value1 = value};
+            var structPointerInstruction = new Instruction {Type = InstructionType.GetStructPointer, Index = fieldIndex, Value1 = value};
             var loadValue = new InstructionValue {ValueIndex = block.Instructions.Count, Type = field.Type};
-            block.Instructions.Add(loadInstruction);
+            block.Instructions.Add(structPointerInstruction);
             return loadValue;
         }
 
