@@ -469,7 +469,7 @@ namespace Lang
                     }
 
                     // Check type count
-                    if (structField.Type.CArray && structField.Type.Count == null)
+                    if (structField.Type.CArray && structField.Type.Count == null && structField.Type.ConstCount == null)
                     {
                         AddError($"C array of field '{structAst.Name}.{structField.Name}' must be initialized with a constant size", structField.Type);
                     }
@@ -1221,7 +1221,7 @@ namespace Lang
             // 7. Verify the type definition count if necessary
             if (declaration.Type != null)
             {
-                if (declaration.Type.CArray && declaration.Type.Count == null)
+                if (declaration.Type.CArray && declaration.Type.Count == null && declaration.Type.ConstCount == null)
                 {
                     AddError($"Length of C array variable '{declaration.Name}' must be initialized to a constant integer", declaration.Type);
                 }
