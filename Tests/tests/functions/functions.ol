@@ -84,14 +84,17 @@ T add_int<T>(T a, int b) {
     return value;
 }
 
-struct RCG<I> {I a;} // TODO Remove when done
-baz<T, U>(List<T> list, U* b, RCG<T> c) {
+baz<T, U>(List<T> list, U* b) {
     #assert U == float || U == s32;
     #if U == float then printf("b = %.2f\n", *b);
     else {
         if T == s32 then printf("T is an int\n");
         else then printf("T is not an int\n");
     }
+}
+
+struct RCG<I> {I a;} // TODO Remove when done
+foobar<T, U>(List<T> list, U* b, RCG<T> c) {
 }
 
 struct Thing {
