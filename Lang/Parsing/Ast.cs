@@ -32,6 +32,7 @@ namespace Lang.Parsing
         public bool Params { get; set; }
         public bool Verified { get; set; }
         public bool HasDirectives { get; set; }
+        public bool CallsCompiler { get; set; }
         public TypeDefinition ReturnType { get; set; }
         public List<Argument> Arguments { get; } = new();
         public List<List<TypeDefinition>> VarargsCalls { get; set; }
