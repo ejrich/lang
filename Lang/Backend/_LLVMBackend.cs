@@ -440,7 +440,7 @@ namespace Lang.Backend
             var argumentTypes = new LLVMTypeRef[argumentCount];
             LLVMValueRef functionPointer;
 
-            if (_emitDebug)
+            if (_emitDebug && function.Instructions != null)
             {
                 // Get the argument types and create debug symbols
                 var debugArgumentTypes = new LLVMMetadataRef[argumentCount + 1];
@@ -517,6 +517,12 @@ namespace Lang.Backend
             if (function.SaveStack)
             {
                 BuildStackSave();
+            }
+
+            LLVMMetadataRef debugBlock = null;
+            if (_emitDebug)
+            {
+                debugBlock = _debugFunctions[function.Index];
             }
 
             // Write the instructions
@@ -1010,6 +1016,20 @@ namespace Lang.Backend
                             var mask = _builder.BuildAShr(lhs, maskShift);
 
                             values[instruction.ValueIndex] = result.IsUndef ? mask : _builder.BuildOr(result, mask);
+                            break;
+                        }
+                        case InstructionType.DebugSetLocation:
+                        {
+                            var location = LLVM.DIBuilderCreateDebugLocation(_context, instruction.Source.Line, instruction.Source.Column, debugBlock, null);
+                            LLVM.SetCurrentDebugLocation2(_builder, location);
+                            break;
+                        }
+                        case InstructionType.DebugDeclareParameter:
+                        {
+                            break;
+                        }
+                        case InstructionType.DebugDeclareVariable:
+                        {
                             break;
                         }
                     }
