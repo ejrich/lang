@@ -1360,12 +1360,26 @@ namespace Lang.Parsing
                                 Error = $"Expected token to follow '{token.Value}'", Token = token
                             });
                             return null;
+                        case TokenType.Asterisk:
+                            switch (enumerator.Peek(1)?.Type)
+                            {
+                                case TokenType.Comma:
+                                case TokenType.CloseParen:
+                                    if (TryParseType(enumerator, errors, out var typeDefinition))
+                                    {
+                                        return typeDefinition;
+                                    }
+                                    break;
+                            }
+                            break;
                         case TokenType.LessThan:
+                        {
                             if (TryParseType(enumerator, errors, out var typeDefinition))
                             {
                                 return typeDefinition;
                             }
                             break;
+                        }
                     }
                     var identifier = CreateAst<IdentifierAst>(token);
                     identifier.Name = token.Value;
