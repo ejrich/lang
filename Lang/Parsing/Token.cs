@@ -5,14 +5,14 @@
         public TokenType Type { get; set; }
         public string Value { get; set; }
         public int Line { get; init; }
-        public int Column { get; init; }
+        public int Column { get; set; }
         public bool Error { get; set; }
     }
 
     public enum TokenType
     {
         Token,
-        Comment,
+        Comment, // Ignored by parser
         Number,
         Boolean,
         Literal,
@@ -28,6 +28,9 @@
         Equality,
         Increment,
         Decrement,
+        In,
+        Range,
+        NumberRange, // Ignored by parser
         OpenParen = '(',
         CloseParen = ')',
         OpenBrace = '{',

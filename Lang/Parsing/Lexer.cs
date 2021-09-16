@@ -24,7 +24,8 @@ namespace Lang.Parsing
             { "else", TokenType.Else },
             { "then", TokenType.Then },
             { "while", TokenType.While },
-            { "each", TokenType.Each }, // TODO Implement each blocks
+            { "each", TokenType.Each },
+            { "in", TokenType.In }
         };
 
         public List<Token> LoadFileTokens(string filePath, out List<ParseError> errors)
@@ -126,7 +127,25 @@ namespace Lang.Parsing
                 {
                     if (currentToken != null)
                     {
-                        CheckForReservedTokensAndErrors(currentToken, errors);
+                        // Number ranges should have the number yielded first
+                        if (currentToken.Type == TokenType.NumberRange)
+                        {
+                            var number = currentToken.Value[..^2];
+                            yield return new Token
+                            {
+                                Type = TokenType.Number,
+                                Value = number,
+                                Line = currentToken.Line,
+                                Column = currentToken.Column
+                            };
+                            currentToken.Type = TokenType.Range;
+                            currentToken.Value = "..";
+                            currentToken.Column += number.Length;
+                        }
+                        else
+                        {
+                            CheckForReservedTokensAndErrors(currentToken, errors, character);
+                        }
 
                         yield return currentToken;
                     }
@@ -145,7 +164,25 @@ namespace Lang.Parsing
                 {
                     if (currentToken != null)
                     {
-                        CheckForReservedTokensAndErrors(currentToken, errors, character);
+                        // Number ranges should have the number yielded first
+                        if (currentToken.Type == TokenType.NumberRange)
+                        {
+                            var number = currentToken.Value[..^2];
+                            yield return new Token
+                            {
+                                Type = TokenType.Number,
+                                Value = number,
+                                Line = currentToken.Line,
+                                Column = currentToken.Column
+                            };
+                            currentToken.Type = TokenType.Range;
+                            currentToken.Value = "..";
+                            currentToken.Column += number.Length;
+                        }
+                        else
+                        {
+                            CheckForReservedTokensAndErrors(currentToken, errors, character);
+                        }
 
                         yield return currentToken;
                     }
@@ -153,7 +190,7 @@ namespace Lang.Parsing
                     currentToken = new Token
                     {
                         Type = tokenType,
-                        Value = $"{character}",
+                        Value = character.ToString(),
                         Line = line,
                         Column = column
                     };
@@ -209,6 +246,12 @@ namespace Lang.Parsing
                         case TokenType.Period:
                             if (currentToken.Value.Contains('.'))
                             {
+                                // Handle number ranges
+                                if (currentToken.Value[^1] == '.')
+                                {
+                                    currentToken.Type = TokenType.NumberRange;
+                                    return true;
+                                }
                                 currentToken.Error = true;
                                 return false;
                             }
@@ -244,6 +287,8 @@ namespace Lang.Parsing
                     return ChangeTypeIfSame(currentToken, type, TokenType.Increment);
                 case TokenType.Minus:
                     return ChangeTypeIfSame(currentToken, type, TokenType.Decrement);
+                case TokenType.Period:
+                    return ChangeTypeIfSame(currentToken, type, TokenType.Range);
                 // TODO More validation eventually
                 default:
                     return false;
