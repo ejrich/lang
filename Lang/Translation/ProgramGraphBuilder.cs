@@ -1115,6 +1115,19 @@ namespace Lang.Translation
         {
             if (typeDef == null) return Type.Error;
 
+            if (typeDef.IsGeneric)
+            {
+                var hasError = false;
+                foreach (var generic in typeDef.Generics)
+                {
+                    if (VerifyType(generic, errors) == Type.Error)
+                    {
+                        hasError = true;
+                    }
+                }
+                return hasError ? Type.Error : Type.Other;
+            }
+
             var hasGenerics = typeDef.Generics.Any();
             var hasCount = typeDef.Count != null;
             switch (typeDef.Name)
