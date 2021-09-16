@@ -45,7 +45,7 @@ bool run_test(u8* test_dir) {
     sprintf(bin_dir.data, "%s/bin", test_dir);
     dir := opendir(bin_dir.data);
     if dir == null {
-        printf(" -- Test Failed, unable to open directory '%s'\n", bin_dir.data);
+        printf(" -- Test Failed: Unable to open directory '%s'\n", bin_dir.data);
         return false;
     }
 
@@ -63,7 +63,7 @@ bool run_test(u8* test_dir) {
     closedir(dir);
 
     if !found_executable {
-        printf(" -- Test Failed, executable not found in directory '%s'\n", bin_dir.data);
+        printf(" -- Test Failed: Executable not found in directory '%s'\n", bin_dir.data);
         return false;
     }
 
@@ -81,7 +81,7 @@ bool run_test(u8* test_dir) {
 int run_command(u8* command) {
     handle := popen(command, "r");
     if handle == null {
-        printf("Failed popen: %s\n", command);
+        printf(" -- Test Failed: Unable to run '%s'\n", command);
         return -1;
     }
 
