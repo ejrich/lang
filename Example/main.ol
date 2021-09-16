@@ -57,7 +57,7 @@ MyStruct create() {
     s1: MyStruct;
     s2: OtherStruct;
     s2.something = 8;
-    s1.field = 1;
+    s1.field++;
     s1.subValue.something = s2.something;
     return s1;
 }
