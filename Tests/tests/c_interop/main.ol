@@ -24,11 +24,11 @@ c_arrays() {
         printf("Array value %d = %d\n", i, array[i]);
     }
 
-    each x in array then printf("Array value: %d\n", x);
+    each x in array printf("Array value: %d\n", x);
 
     init_array: CArray<int> = [1, 2, 3, 4, 5]
 
-    each x in init_array then printf("Initialized array value: %d\n", x);
+    each x in init_array printf("Initialized array value: %d\n", x);
 }
 
 c_array_structs() {
@@ -41,9 +41,9 @@ c_array_structs() {
         printf("Struct array value %d = %d\n", i, array_struct.array[i - 1]);
     }
 
-    each x in array_struct.array then printf("Struct array value: %d\n", x);
+    each x in array_struct.array printf("Struct array value: %d\n", x);
 
-    each x in array_struct.init_array then printf("Struct init_array value: %d\n", x);
+    each x in array_struct.init_array printf("Struct init_array value: %d\n", x);
 }
 
 struct_array_size := 5; #const

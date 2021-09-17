@@ -3,7 +3,7 @@ main() { //#print_ir {
     /*
         Multi line comment
     */
-    each arg, i in command_line_arguments then printf("Arg %d: \"%s\" -- length = %d\n", i, arg, arg.length);
+    each arg, i in command_line_arguments printf("Arg %d: \"%s\" -- length = %d\n", i, arg, arg.length);
     hello := "This is an \"escaped\" string literal\nWith a new line!";
     a := 4.2;
     a++;
@@ -42,8 +42,8 @@ main() { //#print_ir {
 
     state := current_state(7);
     printf("Current state - %d\n", state);
-    if state == State.Running then printf("The state is Running\n");
-    else if state != State.Running then printf("The state is not Running\n");
+    if state == State.Running printf("The state is Running\n");
+    else if state != State.Running printf("The state is not Running\n");
 
     null_val: int* = null;
     null_val = null;
@@ -95,12 +95,12 @@ global_a := 7;
 global_b: int = 456; #const
 
 set_global(int a) {
-    if a > 10 then global_a = a * 90;
+    if a > 10 global_a = a * 90;
 }
 
 bool test(int a) {
-    if a == 3 then return true;
-    else then return false;
+    if a == 3 return true;
+    else return false;
 }
 
 int foo() {
@@ -117,7 +117,7 @@ int foo() {
 }
 
 int bar(int a, string b, float c) {
-    if a == 4 then return a;
+    if a == 4 return a;
     else if a == 5 {
         return 9;
     }
@@ -133,7 +133,7 @@ int test_each() {
 }
 
 int factorial(int n) {
-    if n == 0 then return 1;
+    if n == 0 return 1;
     return n * factorial(n - 1);
 }
 
@@ -242,13 +242,13 @@ sum_test() {
 
 int sum(Array<int> args) {
     sum := 0;
-    each i in args then sum += i;
+    each i in args sum += i;
     return sum;
 }
 
 int sum(Params<int> args) {
     sum := 0;
-    each i in args then sum += i;
+    each i in args sum += i;
     return sum;
 }
 
@@ -289,14 +289,14 @@ State current_state(int a) {
     state: StateStruct;
     printf("State is %d\n", state.state);
 
-    if a > 5 then return State.Running;
-    else if a == 5 then return State.Starting;
+    if a > 5 return State.Running;
+    else if a == 5 return State.Starting;
     return State.Stopped;
 }
 
 null_test(int* value_ptr) {
-    if value_ptr == null then printf("Pointer is null\n");
-    else then printf("Pointer value is %d\n", *value_ptr);
+    if value_ptr == null printf("Pointer is null\n");
+    else printf("Pointer value is %d\n", *value_ptr);
 }
 
 default_args(int val = 5) {
@@ -329,9 +329,9 @@ compiler_directives() {
     const_value := 7; #const
     printf("Constant value = %d\n", const_value);
     #assert factorial(6) == 720;
-    #if build_env == BuildEnv.Debug then
+    #if build_env == BuildEnv.Debug
         printf("Running Debug code\n");
-    #if build_env == BuildEnv.Release then
+    #if build_env == BuildEnv.Release
         printf("Running Release code\n");
 }
 
@@ -350,14 +350,14 @@ build() {
 print_type_info(Type type) {
     type_info := type_of(type);
     printf("Type Name = %s, Type Kind = %d, Type Size = %d, Field Count = %d\n", type_info.name, type_info.type, type_info.size, type_info.fields.length);
-    each field in type_info.fields then
+    each field in type_info.fields
         printf("Field name = %s, Field offset = %d, Field type name = %s\n", field.name, field.offset, field.type_info.name);
-    each enum_value in type_info.enum_values then
+    each enum_value in type_info.enum_values
         printf("Enum value name = %s, Value = %d\n", enum_value.name, enum_value.value);
 
     if type_info.type == TypeKind.Function {
         printf("Return type = %s\n", type_info.return_type.name);
-        each arg in type_info.arguments then
+        each arg in type_info.arguments
             printf("Argument name = %s, Argument type name = %s, Argument type kind = %d\n", arg.name, arg.type_info.name, arg.type_info.type);
     }
 }
@@ -376,15 +376,15 @@ break_and_continue() {
     while a < 100 {
         a += 10;
         b += 4;
-        if (b > 10) then break;
+        if b > 10 break;
     }
 
     each i in 1..10 {
-        if (i > 5) then break;
-        if (i > 3) {
+        if i > 5 break;
+        if i > 3 {
             printf("Special Value = %d\n", i);
             continue;
         }
         printf("Value = %d\n", i);
-    }
+   }
 }

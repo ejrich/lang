@@ -828,30 +828,28 @@ namespace Lang
 
             // 1. Parse the conditional expression by first iterating over the initial 'if'
             enumerator.MoveNext();
-            conditionalAst.Condition = ParseExpression(enumerator, currentFunction, null, TokenType.OpenBrace, TokenType.Then);
+            conditionalAst.Condition = ParseConditionExpression(enumerator, currentFunction);
 
             // 2. Determine how many lines to parse
             switch (enumerator.Current?.Type)
             {
                 case TokenType.Then:
-                {
                     // Parse single AST
                     conditionalAst.IfBlock = CreateAst<ScopeAst>(enumerator.Current);
                     enumerator.MoveNext();
                     conditionalAst.IfBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator) : ParseLine(enumerator, currentFunction));
                     break;
-                }
                 case TokenType.OpenBrace:
-                {
                     // Parse until close brace
                     conditionalAst.IfBlock = ParseScope(enumerator, currentFunction, topLevel);
                     break;
-                }
                 case null:
-                    ErrorReporter.Report("Expected if to contain conditional expression", enumerator.Last);
+                    ErrorReporter.Report("Expected if to contain conditional expression and body", enumerator.Last);
                     break;
                 default:
-                    ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}'", enumerator.Current);
+                    // Parse single AST
+                    conditionalAst.IfBlock = CreateAst<ScopeAst>(enumerator.Current);
+                    conditionalAst.IfBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator) : ParseLine(enumerator, currentFunction));
                     break;
             }
 
@@ -864,30 +862,22 @@ namespace Lang
                 switch (enumerator.Current?.Type)
                 {
                     case TokenType.Then:
-                    {
                         // Parse single AST
                         conditionalAst.ElseBlock = CreateAst<ScopeAst>(enumerator.Current);
                         enumerator.MoveNext();
                         conditionalAst.ElseBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator) : ParseLine(enumerator, currentFunction));
                         break;
-                    }
                     case TokenType.OpenBrace:
-                    {
                         // Parse until close brace
                         conditionalAst.ElseBlock = ParseScope(enumerator, currentFunction, topLevel);
-                        break;
-                    }
-                    case TokenType.If:
-                        // Nest another conditional in else children
-                        conditionalAst.ElseBlock = CreateAst<ScopeAst>(enumerator.Current);
-                        var conditional = ParseConditional(enumerator, currentFunction);
-                        conditionalAst.ElseBlock.Children.Add(conditional);
                         break;
                     case null:
                         ErrorReporter.Report("Expected body of else branch", enumerator.Last);
                         break;
                     default:
-                        ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}'", enumerator.Current);
+                        // Parse single AST
+                        conditionalAst.ElseBlock = CreateAst<ScopeAst>(enumerator.Current);
+                        conditionalAst.ElseBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator) : ParseLine(enumerator, currentFunction));
                         break;
                 }
             }
@@ -901,30 +891,28 @@ namespace Lang
 
             // 1. Parse the conditional expression by first iterating over the initial 'while'
             enumerator.MoveNext();
-            whileAst.Condition = ParseExpression(enumerator, currentFunction, null, TokenType.OpenBrace, TokenType.Then);
+            whileAst.Condition = ParseConditionExpression(enumerator, currentFunction);
 
             // 2. Determine how many lines to parse
             switch (enumerator.Current?.Type)
             {
                 case TokenType.Then:
-                {
                     // Parse single AST
                     whileAst.Body = CreateAst<ScopeAst>(enumerator.Current);
                     enumerator.MoveNext();
                     whileAst.Body.Children.Add(ParseLine(enumerator, currentFunction));
                     break;
-                }
                 case TokenType.OpenBrace:
-                {
                     // Parse until close brace
                     whileAst.Body = ParseScope(enumerator, currentFunction);
                     break;
-                }
                 case null:
                     ErrorReporter.Report("Expected while loop to contain body", enumerator.Last);
                     break;
                 default:
-                    ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}'", enumerator.Current);
+                    // Parse single AST
+                    whileAst.Body = CreateAst<ScopeAst>(enumerator.Current);
+                    whileAst.Body.Children.Add(ParseLine(enumerator, currentFunction));
                     break;
             }
 
@@ -973,7 +961,7 @@ namespace Lang
 
             // 3. Determine the iterator
             enumerator.MoveNext();
-            var expression = ParseExpression(enumerator, currentFunction, null, TokenType.OpenBrace, TokenType.Then, TokenType.Range);
+            var expression = ParseConditionExpression(enumerator, currentFunction);
 
             // 3a. Check if the next token is a range
             switch (enumerator.Current?.Type)
@@ -992,48 +980,103 @@ namespace Lang
                         return eachAst;
                     }
 
-                    eachAst.RangeEnd = ParseExpression(enumerator, currentFunction, null, TokenType.OpenBrace, TokenType.Then);
+                    eachAst.RangeEnd = ParseConditionExpression(enumerator, currentFunction);
                     if (enumerator.Current == null)
                     {
                         ErrorReporter.Report("Expected each block to have iteration and body", enumerator.Last);
                         return eachAst;
                     }
                     break;
-                case TokenType.OpenBrace:
-                case TokenType.Then:
-                    eachAst.Iteration = expression;
-                    break;
                 case null:
                     ErrorReporter.Report("Expected each block to have iteration and body", enumerator.Last);
                     return eachAst;
                 default:
-                    ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in each block", enumerator.Current);
-                    return eachAst;
+                    eachAst.Iteration = expression;
+                    break;
             }
 
             // 4. Determine how many lines to parse
             switch (enumerator.Current?.Type)
             {
                 case TokenType.Then:
-                {
                     // Parse single AST
                     eachAst.Body = CreateAst<ScopeAst>(enumerator.Current);
                     enumerator.MoveNext();
                     eachAst.Body.Children.Add(ParseLine(enumerator, currentFunction));
                     break;
-                }
                 case TokenType.OpenBrace:
-                {
                     // Parse until close brace
                     eachAst.Body = ParseScope(enumerator, currentFunction);
                     break;
-                }
                 default:
-                    ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}'", enumerator.Current);
+                    eachAst.Body = CreateAst<ScopeAst>(enumerator.Current);
+                    eachAst.Body.Children.Add(ParseLine(enumerator, currentFunction));
                     break;
             }
 
             return eachAst;
+        }
+
+        private static IAst ParseConditionExpression(TokenEnumerator enumerator, IFunction currentFunction)
+        {
+            var expression = CreateAst<ExpressionAst>(enumerator.Current);
+            var operatorRequired = false;
+
+            do
+            {
+                var token = enumerator.Current;
+
+                if (token.Type == TokenType.Then || token.Type == TokenType.OpenBrace)
+                {
+                    break;
+                }
+
+                if (operatorRequired)
+                {
+                    if (token.Type == TokenType.Increment || token.Type == TokenType.Decrement)
+                    {
+                        // Create subexpression to hold the operation
+                        // This case would be `var b = 4 + a++`, where we have a value before the operator
+                        var changeByOneAst = CreateAst<ChangeByOneAst>(token);
+                        changeByOneAst.Positive = token.Type == TokenType.Increment;
+                        changeByOneAst.Value = expression.Children[^1];
+                        expression.Children[^1] = changeByOneAst;
+                        continue;
+                    }
+                    if (token.Type == TokenType.Number && token.Value[0] == '-')
+                    {
+                        token.Value = token.Value[1..];
+                        expression.Operators.Add(Operator.Subtract);
+                        var constant = ParseConstant(token);
+                        expression.Children.Add(constant);
+                        continue;
+                    }
+                    if (token.Type == TokenType.Period)
+                    {
+                        var structFieldRef = ParseStructFieldRef(enumerator, expression.Children[^1], currentFunction);
+                        expression.Children[^1] = structFieldRef;
+                        continue;
+                    }
+                    var op = ConvertOperator(token);
+                    if (op != Operator.None)
+                    {
+                        expression.Operators.Add(op);
+                        operatorRequired = false;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                else
+                {
+                    var ast = ParseNextExpressionUnit(enumerator, currentFunction, out operatorRequired);
+                    if (ast != null)
+                        expression.Children.Add(ast);
+                }
+            } while (enumerator.MoveNext());
+
+            return CheckExpression(enumerator, expression, operatorRequired);
         }
 
         private static DeclarationAst ParseDeclaration(TokenEnumerator enumerator, IFunction currentFunction = null)
@@ -1304,6 +1347,11 @@ namespace Lang
                 }
             } while (enumerator.MoveNext());
 
+            return CheckExpression(enumerator, expression, operatorRequired);
+        }
+
+        private static IAst CheckExpression(TokenEnumerator enumerator, ExpressionAst expression, bool operatorRequired)
+        {
             if (!expression.Children.Any())
             {
                 ErrorReporter.Report("Expression should contain elements", enumerator.Current ?? enumerator.Last);
@@ -1489,7 +1537,7 @@ namespace Lang
                     ErrorReporter.Report($"Unexpected token '{token.Value}' in expression", token);
                     operatorRequired = false;
                     return null;
-            }
+           }
         }
 
         private static void SetOperatorPrecedence(ExpressionAst expression)

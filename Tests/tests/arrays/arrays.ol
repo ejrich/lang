@@ -21,7 +21,7 @@ constant_size_arrays() {
     // Sizes can be constant variables
     array_size := 8; #const
     b: Array<int>[array_size];
-    each arg, i in b then arg = i * 8;
+    each arg, i in b arg = i * 8;
 
     print_array("Array<int>[array_size]", b);
 }
@@ -32,13 +32,13 @@ variable_size_arrays() {
     size -= 3;
 
     a: Array<int>[size];
-    each arg, i in a then arg = (i + 1) * 6;
+    each arg, i in a arg = (i + 1) * 6;
 
     print_array("Array<int>[size]", a);
 
     random_size := rand() % 10;
     b: Array<int>[random_size];
-    each arg in b then arg = rand() % 100;
+    each arg in b arg = rand() % 100;
 
     print_array("Array<int>[random_size]", b);
 }
