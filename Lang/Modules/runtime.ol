@@ -11,14 +11,14 @@ ARRAY_BLOCK_SIZE := 10; #const
 array_insert<T>(Array<T>* array, T value) {
     // Reallocate the array if necessary
     length := array.length;
-    if (length % ARRAY_BLOCK_SIZE == 0) {
+    if length % ARRAY_BLOCK_SIZE == 0 {
         // @Future add custom allocators
         new_blocks := length / ARRAY_BLOCK_SIZE + 1;
         element_size := size_of(T);
 
         new_data := malloc(element_size * new_blocks * ARRAY_BLOCK_SIZE);
 
-        if (length > 0) {
+        if length > 0 {
             memcpy(new_data, array.data, length * element_size);
             free(array.data);
         }
@@ -52,10 +52,10 @@ struct string {
 }
 
 operator == (string a, string b) {
-    if (a.length != b.length) then return false;
+    if a.length != b.length return false;
 
     each i in 0..a.length-1 {
-        if a[i] != b[i] then return false;
+        if a[i] != b[i] return false;
     }
 
     return true;
@@ -67,7 +67,7 @@ operator != (string a, string b) {
 
 string convert_c_string(u8* string_pointer) {
     length := 0;
-    while string_pointer[length] then length++;
+    while string_pointer[length] length++;
     str: string = { length = length; data = string_pointer; }
     return str;
 }
@@ -143,7 +143,7 @@ int __start(int argc, u8** argv) {
         array_insert(&command_line_arguments, argument);
     }
 
-    #if true then main();
+    #if true main();
 
     return exit_code;
 }
@@ -152,16 +152,16 @@ command_line_arguments: Array<string>;
 exit_code := 0;
 
 assert(bool assertion, int exit_code = 1) {
-    if assertion then return;
+    if assertion return;
 
     printf("Assertion failed\n");
     exit(exit_code);
 }
 
 assert(bool assertion, string message, int exit_code = 1) {
-    if assertion then return;
+    if assertion return;
 
-    if message.length == 0 then printf("Assertion failed\n");
-    else then printf("Assertion failed: %s\n", message);
+    if message.length == 0 printf("Assertion failed\n");
+    else printf("Assertion failed: %s\n", message);
     exit(exit_code);
 }

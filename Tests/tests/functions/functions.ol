@@ -23,13 +23,13 @@ function_overloads() {
 
 int sum(Array<int> args) {
     sum := 0;
-    each i in args then sum += i;
+    each i in args sum += i;
     return sum;
 }
 
 int sum(Params<int> args) {
     sum := 0;
-    each i in args then sum += i;
+    each i in args sum += i;
     return sum;
 }
 
@@ -56,7 +56,7 @@ foo(int a, s16 b = 8, bool c = true) {
 
 foo_params(int a, int b = 8, Params<float> args) {
     sum: float;
-    each i in args then sum += i;
+    each i in args sum += i;
     printf("a = %d, b = %d, sum = %.2f\n", a, b, sum);
 }
 
@@ -90,10 +90,10 @@ T add_int<T>(T a, int b) {
 
 baz<T, U>(Array<T> list, U* b) {
     #assert U == float || U == s32;
-    #if U == float then printf("b = %.2f\n", *b);
+    #if U == float printf("b = %.2f\n", *b);
     else {
-        if T == s32 then printf("T is an int\n");
-        else then printf("T is not an int\n");
+        if T == s32 printf("T is an int\n");
+        else printf("T is not an int\n");
     }
 }
 

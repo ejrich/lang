@@ -258,8 +258,8 @@ struct ArrayStruct<T> {
 }
 
 operator [] <T>(ArrayStruct<T> a, int index) : T* {
-    if index < 0 then return &a.list[0];
-    if index >= a.max then return &a.list[a.max - 1];
+    if index < 0 return &a.list[0];
+    if index >= a.max return &a.list[a.max - 1];
     return &a.list[index];
 }
 
