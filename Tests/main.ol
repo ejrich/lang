@@ -11,7 +11,7 @@ main() {
                 dir_name := get_file_name(file);
                 test_dir = format_string("%/%", tests_dir, dir_name);
 
-                if !run_test(test_dir) then failed_test_count++;
+                if !run_test(test_dir) failed_test_count++;
             }
 
             file = readdir(dir);
@@ -35,14 +35,14 @@ string get_file_name(dirent* file) {
     name: string = { data = &file.d_name; }
 
     each i in 0..D_NAME_LENGTH-1 {
-        if file.d_name[i] != 0 then name.length++;
-        else then return name;
+        if file.d_name[i] != 0 name.length++;
+        else return name;
     }
     return name;
 }
 
 string format_string(string format, Params<string> args) {
-    if format.length == 0 then return "";
+    if format.length == 0 return "";
 
     // @Cleanup This is not good, figure out a better way to do this
     str: string = {data = cast(u8*, malloc(100));}
