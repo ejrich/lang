@@ -98,6 +98,7 @@ enum TypeKind {
     Enum;
     Struct;
     Type;
+    Any;
     Function;
 }
 
@@ -119,12 +120,18 @@ struct ArgumentType {
 
 __type_table: Array<TypeInfo*>;
 
+// TODO Make type_of and size_of compile time constants
 TypeInfo* type_of(Type type) {
     return __type_table[type];
 }
 
 u32 size_of(Type type) {
     return __type_table[type].size;
+}
+
+struct Any {
+    type: TypeInfo*;
+    data: void*;
 }
 
 
