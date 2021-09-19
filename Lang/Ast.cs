@@ -482,6 +482,7 @@ namespace Lang
         Enum,
         Struct,
         Type,
+        Any,
         Function
     }
 }

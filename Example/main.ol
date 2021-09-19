@@ -84,6 +84,8 @@ main() { //#print_ir {
     type_casts();
 
     break_and_continue();
+
+    // any_args();
 }
 
 // TODO Make these work
@@ -387,4 +389,24 @@ break_and_continue() {
         }
         printf("Value = %d\n", i);
    }
+}
+
+any_args() {
+    print("Integer value = %d\n", 8);
+    print("Float value = %.2f\n", 3.14);
+
+    foo := 9;
+    print("Other value\n", &foo);
+}
+
+print(string format, Any arg) {
+    if arg.type.type == TypeKind.Integer {
+        value := cast(int*, arg.data);
+        printf(format, *value);
+    }
+    else if arg.type.type == TypeKind.Float {
+        value := cast(float*, arg.data);
+        printf(format, *value);
+    }
+    else printf(format);
 }

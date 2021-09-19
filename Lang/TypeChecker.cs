@@ -36,6 +36,7 @@ namespace Lang
         private IType _typeType;
         private IType _stringType;
         private IType _rawStringType;
+        private IType _anyType;
 
         public TypeChecker(IPolymorpher polymorpher, IProgramIRBuilder irBuilder, IProgramRunner runner)
         {
@@ -98,7 +99,15 @@ namespace Lang
 
                                 if (structAst.Name == "string")
                                 {
+                                    _stringType = structAst;
                                     structAst.TypeKind = TypeKind.String;
+                                    VerifyStruct(structAst);
+                                    asts.RemoveAt(i--);
+                                }
+                                else if (structAst.Name == "Any")
+                                {
+                                    _anyType = structAst;
+                                    structAst.TypeKind = TypeKind.Any;
                                     VerifyStruct(structAst);
                                     asts.RemoveAt(i--);
                                 }
@@ -2992,7 +3001,7 @@ namespace Lang
                     return false;
                 }
             }
-            else if (argumentType.TypeKind != TypeKind.Type)
+            else if (argumentType.TypeKind != TypeKind.Type && argumentType.TypeKind != TypeKind.Any)
             {
                 if (externCall && callType.TypeKind == TypeKind.String)
                 {
@@ -3480,7 +3489,7 @@ namespace Lang
                     {
                         ErrorReporter.Report("Type 'string' cannot have generics", type);
                     }
-                    return _stringType ??= TypeTable.Types["string"];
+                    return _stringType;
                 case "Array":
                     if (type.Generics.Count != 1)
                     {
@@ -3594,6 +3603,12 @@ namespace Lang
                         ErrorReporter.Report("Type 'Type' cannot have generics", type);
                     }
                     return _typeType;
+                case "Any":
+                    if (hasGenerics)
+                    {
+                        ErrorReporter.Report("Type 'Any' cannot have generics", type);
+                    }
+                    return _anyType;
                 default:
                     if (hasGenerics)
                     {
