@@ -10,6 +10,21 @@ namespace Lang
         public static Dictionary<string, IType> Types { get; } = new();
         public static Dictionary<string, List<FunctionAst>> Functions { get; } = new();
 
+        public static IType VoidType;
+        public static IType BoolType;
+        public static IType S8Type;
+        public static IType U8Type;
+        public static IType S16Type;
+        public static IType U16Type;
+        public static PrimitiveAst S32Type;
+        public static IType U32Type;
+        public static IType S64Type;
+        public static IType U64Type;
+        public static IType Float64Type;
+        public static IType TypeType;
+        public static StructAst StringType;
+        public static StructAst AnyType;
+
         public static bool Add(string name, IType type)
         {
             if (Types.TryAdd(name, type))

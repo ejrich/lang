@@ -6,7 +6,6 @@ namespace Lang
 {
     public interface IProgramIRBuilder
     {
-        void Init();
         void AddFunction(FunctionAst function);
         void AddOperatorOverload(OperatorOverloadAst overload);
         FunctionIR CreateRunnableFunction(IAst ast, ScopeAst globalScope);
@@ -16,20 +15,6 @@ namespace Lang
 
     public class ProgramIRBuilder : IProgramIRBuilder
     {
-        private IType _boolType;
-        private IType _u8Type;
-        private IType _s32Type;
-        private IType _float64Type;
-        private StructAst _stringStruct;
-
-        public void Init()
-        {
-            _boolType = TypeTable.Types["bool"];
-            _u8Type = TypeTable.Types["u8"];
-            _s32Type = TypeTable.Types["s32"];
-            _float64Type = TypeTable.Types["float64"];
-        }
-
         public void AddFunction(FunctionAst function)
         {
             var functionName = GetFunctionName(function);
@@ -173,9 +158,9 @@ namespace Lang
             // For condition expressions in regular functions, the result is notted to jump to the else block
             var returnValue = value.Type.TypeKind switch
             {
-                TypeKind.Integer => EmitInstruction(InstructionType.IntegerNotEquals, function, _boolType, value, GetDefaultConstant(value.Type)),
-                TypeKind.Float => EmitInstruction(InstructionType.FloatNotEquals, function, _boolType, value, GetDefaultConstant(value.Type)),
-                TypeKind.Pointer => EmitInstruction(InstructionType.IsNotNull, function, _boolType, value),
+                TypeKind.Integer => EmitInstruction(InstructionType.IntegerNotEquals, function, TypeTable.BoolType, value, GetDefaultConstant(value.Type)),
+                TypeKind.Float => EmitInstruction(InstructionType.FloatNotEquals, function, TypeTable.BoolType, value, GetDefaultConstant(value.Type)),
+                TypeKind.Pointer => EmitInstruction(InstructionType.IsNotNull, function, TypeTable.BoolType, value),
                 // Will be type bool
                 _ => value
             };
@@ -901,14 +886,14 @@ namespace Lang
             switch (value.Type.TypeKind)
             {
                 case TypeKind.Integer:
-                    return EmitInstruction(InstructionType.IntegerEquals, function, _boolType, value, GetDefaultConstant(value.Type));
+                    return EmitInstruction(InstructionType.IntegerEquals, function, TypeTable.BoolType, value, GetDefaultConstant(value.Type));
                 case TypeKind.Float:
-                    return EmitInstruction(InstructionType.FloatEquals, function, _boolType, value, GetDefaultConstant(value.Type));
+                    return EmitInstruction(InstructionType.FloatEquals, function, TypeTable.BoolType, value, GetDefaultConstant(value.Type));
                 case TypeKind.Pointer:
-                    return EmitInstruction(InstructionType.IsNull, function, _boolType, value);
+                    return EmitInstruction(InstructionType.IsNull, function, TypeTable.BoolType, value);
                 // Will be type bool
                 default:
-                    return EmitInstruction(InstructionType.Not, function, _boolType, value);
+                    return EmitInstruction(InstructionType.Not, function, TypeTable.BoolType, value);
             }
         }
 
@@ -920,7 +905,7 @@ namespace Lang
                 function.Instructions.Add(new Instruction {Type = InstructionType.DebugSetLocation, Source = each});
             }
 
-            var indexVariable = AddAllocation(function, _s32Type);
+            var indexVariable = AddAllocation(function, TypeTable.S32Type);
             InstructionType compareType;
             InstructionValue compareTarget;
             InstructionValue arrayData = null;
@@ -934,7 +919,7 @@ namespace Lang
                     each.IndexVariable.AllocationIndex = indexVariable;
                     if (!BuildSettings.Release)
                     {
-                        function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = each.IndexVariable.Name, Source = each.IndexVariable, Value1 = new InstructionValue {ValueType = InstructionValueType.Allocation, ValueIndex = indexVariable, Type = _s32Type}});
+                        function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = each.IndexVariable.Name, Source = each.IndexVariable, Value1 = new InstructionValue {ValueType = InstructionValueType.Allocation, ValueIndex = indexVariable, Type = TypeTable.S32Type}});
                     }
                 }
                 EmitStore(function, indexVariable, GetConstantInteger(0));
@@ -956,7 +941,7 @@ namespace Lang
                     EmitStore(function, iterationVariable, iteration);
 
                     var lengthPointer = EmitGetStructPointer(function, iterationVariable, arrayDef, 0);
-                    compareTarget = EmitLoad(function, _s32Type, lengthPointer);
+                    compareTarget = EmitLoad(function, TypeTable.S32Type, lengthPointer);
 
                     var dataField = arrayDef.Fields[1];
                     var dataPointer = EmitGetStructPointer(function, iterationVariable, arrayDef, 1, dataField);
@@ -973,7 +958,7 @@ namespace Lang
                 each.IterationVariable.AllocationIndex = indexVariable;
                 if (!BuildSettings.Release)
                 {
-                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = each.IterationVariable.Name, Source = each.IterationVariable, Value1 = new InstructionValue {ValueType = InstructionValueType.Allocation, ValueIndex = indexVariable, Type = _s32Type}});
+                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = each.IterationVariable.Name, Source = each.IterationVariable, Value1 = new InstructionValue {ValueType = InstructionValueType.Allocation, ValueIndex = indexVariable, Type = TypeTable.S32Type}});
                 }
 
                 // Get the end of the range
@@ -981,8 +966,8 @@ namespace Lang
             }
 
             var conditionBlock = AddBasicBlock(function);
-            var indexValue = EmitLoad(function, _s32Type, indexVariable);
-            var condition = EmitInstruction(compareType, function, _boolType, indexValue, compareTarget);
+            var indexValue = EmitLoad(function, TypeTable.S32Type, indexVariable);
+            var condition = EmitInstruction(compareType, function, TypeTable.BoolType, indexValue, compareTarget);
             if (each.Iteration != null)
             {
                 var iterationVariable = EmitGetPointer(function, arrayData, indexValue, each.IterationVariable.Type, cArrayIteration);
@@ -1002,7 +987,7 @@ namespace Lang
             eachBodyBlock = EmitScopeChildren(function, eachBodyBlock, each.Body, returnType, afterBlock, eachIncrementBlock);
 
             AddBasicBlock(function, eachIncrementBlock);
-            var nextValue = EmitInstruction(InstructionType.IntegerAdd, function, _s32Type, indexValue, GetConstantInteger(1));
+            var nextValue = EmitInstruction(InstructionType.IntegerAdd, function, TypeTable.S32Type, indexValue, GetConstantInteger(1));
             EmitStore(function, indexVariable, nextValue);
             var jumpToCondition = new Instruction {Type = InstructionType.Jump, Value1 = BasicBlockValue(conditionBlock)};
             function.Instructions.Add(jumpToCondition);
@@ -1066,10 +1051,9 @@ namespace Lang
 
                         if (useRawString && declaration.Type.TypeKind == TypeKind.String)
                         {
-                            _stringStruct ??= (StructAst) declaration.Type;
-                            var dataField = _stringStruct.Fields[1];
+                            var dataField = TypeTable.StringType.Fields[1];
 
-                            var dataPointer = EmitGetStructPointer(function, declaration.AllocationIndex, _stringStruct, 1, dataField, global);
+                            var dataPointer = EmitGetStructPointer(function, declaration.AllocationIndex, TypeTable.StringType, 1, dataField, global);
                             return EmitLoadPointer(function, dataField.Type, dataPointer);
                         }
                         return EmitLoad(function, declaration.Type, declaration.AllocationIndex, global, returnValue);
@@ -1078,12 +1062,11 @@ namespace Lang
                     {
                         if (useRawString && variable.Type.TypeKind == TypeKind.String)
                         {
-                            _stringStruct ??= (StructAst) variable.Type;
-                            var dataField = _stringStruct.Fields[1];
+                            var dataField = TypeTable.StringType.Fields[1];
 
                             var stringPointer = variable.AllocationIndex.HasValue ? AllocationValue(variable.AllocationIndex.Value, variable.Type, global) : variable.Pointer;
 
-                            var dataPointer = EmitGetStructPointer(function, stringPointer, _stringStruct, 1, dataField);
+                            var dataPointer = EmitGetStructPointer(function, stringPointer, TypeTable.StringType, 1, dataField);
                             return EmitLoadPointer(function, dataField.Type, dataPointer);
                         }
                         else if (variable.AllocationIndex.HasValue)
@@ -1121,10 +1104,9 @@ namespace Lang
                     {
                         if (useRawString && structFieldPointer.Type.TypeKind == TypeKind.String)
                         {
-                            _stringStruct ??= (StructAst) TypeTable.Types["string"];
-                            var dataField = _stringStruct.Fields[1];
+                            var dataField = TypeTable.StringType.Fields[1];
 
-                            var dataPointer = EmitGetStructPointer(function, structFieldPointer, _stringStruct, 1, dataField);
+                            var dataPointer = EmitGetStructPointer(function, structFieldPointer, TypeTable.StringType, 1, dataField);
                             return EmitLoad(function, dataField.Type, dataPointer);
                         }
                         return EmitLoad(function, structFieldPointer.Type, structFieldPointer, returnValue);
@@ -1453,7 +1435,7 @@ namespace Lang
                     var argument = EmitIR(function, call.Arguments[i], scope, true);
                     if (argument.Type?.TypeKind == TypeKind.Float && argument.Type.Size == 4)
                     {
-                        argument = EmitCastValue(function, argument, _float64Type);
+                        argument = EmitCastValue(function, argument, TypeTable.Float64Type);
                     }
                     arguments[i] = argument;
                 }
@@ -1462,8 +1444,49 @@ namespace Lang
             {
                 for (var i = 0; i < argumentCount; i++)
                 {
+                    var functionArg = call.Function.Arguments[i];
                     var argument = EmitIR(function, call.Arguments[i], scope, call.Function.Flags.HasFlag(FunctionFlags.Extern));
-                    arguments[i] = EmitCastValue(function, argument, call.Function.Arguments[i].Type);
+                    if (functionArg.Type.TypeKind == TypeKind.Any)
+                    {
+                        if (argument.Type.TypeKind == TypeKind.Any)
+                        {
+                            arguments[i] = argument;
+                        }
+                        else
+                        {
+                            // Allocate the Any struct
+                            var allocationIndex = AddAllocation(function, TypeTable.AnyType);
+                            var allocationValue = AllocationValue(allocationIndex, TypeTable.AnyType);
+
+                            // Set the TypeInfo pointer
+                            var typeInfoPointer = EmitGetStructPointer(function, allocationValue, TypeTable.AnyType, 0);
+                            EmitStore(function, typeInfoPointer, new InstructionValue {ValueType = InstructionValueType.TypeInfo, ValueIndex = argument.Type.TypeIndex});
+
+                            // Set the data pointer
+                            var dataPointer = EmitGetStructPointer(function, allocationValue, TypeTable.AnyType, 1);
+                            // a. For pointers, set the value with the existing pointer
+                            if (argument.Type.TypeKind == TypeKind.Pointer)
+                            {
+                                EmitStore(function, dataPointer, argument);
+                            }
+                            // b. Otherwise, allocate the value, store the value, and set the value with the allocated pointer
+                            else
+                            {
+                                var dataAllocationIndex = AddAllocation(function, argument.Type);
+                                var dataAllocationValue = AllocationValue(dataAllocationIndex, argument.Type);
+
+                                EmitStore(function, dataAllocationValue, argument);
+                                // TODO Cast to void*
+                                EmitStore(function, dataPointer, dataAllocationValue);
+                            }
+
+                            arguments[i] = EmitLoad(function, TypeTable.AnyType, allocationValue);
+                        }
+                    }
+                    else
+                    {
+                        arguments[i] = EmitCastValue(function, argument, functionArg.Type);
+                    }
                 }
             }
 
@@ -1510,7 +1533,7 @@ namespace Lang
                 var dataField = structAst.Fields[1];
                 if (type.TypeKind == TypeKind.String)
                 {
-                    elementType = _u8Type;
+                    elementType = TypeTable.U8Type;
                 }
                 else
                 {
@@ -1663,11 +1686,11 @@ namespace Lang
                         case TypeKind.Float:
                             if (lhs.Type.Size > rhs.Type.Size)
                             {
-                                rhs = EmitCastValue(function, rhs, _float64Type);
+                                rhs = EmitCastValue(function, rhs, TypeTable.Float64Type);
                             }
                             else if (lhs.Type.Size < rhs.Type.Size)
                             {
-                                lhs = EmitCastValue(function, lhs, _float64Type);
+                                lhs = EmitCastValue(function, lhs, TypeTable.Float64Type);
                             }
                             return EmitInstruction(GetFloatCompareInstructionType(op), function, type, lhs, rhs);
                     }
@@ -1784,12 +1807,12 @@ namespace Lang
 
         private InstructionValue GetConstantInteger(int value)
         {
-            return new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new Constant {Integer = value}};
+            return new InstructionValue {ValueType = InstructionValueType.Constant, Type = TypeTable.S32Type, ConstantValue = new Constant {Integer = value}};
         }
 
         private InstructionValue GetConstantInteger(uint value)
         {
-            return new InstructionValue {ValueType = InstructionValueType.Constant, Type = _s32Type, ConstantValue = new Constant {Integer = value}};
+            return new InstructionValue {ValueType = InstructionValueType.Constant, Type = TypeTable.S32Type, ConstantValue = new Constant {Integer = value}};
         }
 
         private IAst GetScopeIdentifier(ScopeAst scope, string name, out bool global)

@@ -21,6 +21,7 @@ namespace Lang.Backend
         private LLVMTypeRef _stringType;
         private LLVMTypeRef _u8PointerType;
         private LLVMTypeRef[] _types;
+        private LLVMValueRef[] _typeInfos;
         private LLVMValueRef[] _globals;
         private Queue<(LLVMValueRef, FunctionIR)> _functionsToWrite = new();
 
@@ -45,7 +46,7 @@ namespace Lang.Backend
 
             // 3. Declare types
             _types = new LLVMTypeRef[TypeTable.Count];
-            var typeInfos = new LLVMValueRef[TypeTable.Count];
+            _typeInfos = new LLVMValueRef[TypeTable.Count];
 
             const string typeInfoStructName = "TypeInfo";
             TypeTable.Types.Remove(typeInfoStructName, out var typeInfoStruct); // Remove and add back in later
@@ -53,7 +54,7 @@ namespace Lang.Backend
             {
                 var typeInfo = _module.AddGlobal(typeInfoType, "____type_info");
                 SetPrivateConstant(typeInfo);
-                typeInfos[typeInfoStruct.TypeIndex] = typeInfo;
+                _typeInfos[typeInfoStruct.TypeIndex] = typeInfo;
             }
 
             if (_emitDebug)
@@ -62,7 +63,7 @@ namespace Lang.Backend
                 {
                     var typeInfo = _module.AddGlobal(typeInfoType, "____type_info");
                     SetPrivateConstant(typeInfo);
-                    typeInfos[type.TypeIndex] = typeInfo;
+                    _typeInfos[type.TypeIndex] = typeInfo;
                     switch (type)
                     {
                         case StructAst structAst:
@@ -102,7 +103,7 @@ namespace Lang.Backend
                 {
                     var typeInfo = _module.AddGlobal(typeInfoType, "____type_info");
                     SetPrivateConstant(typeInfo);
-                    typeInfos[type.TypeIndex] = typeInfo;
+                    _typeInfos[type.TypeIndex] = typeInfo;
                     switch (type)
                     {
                         case StructAst structAst:
@@ -169,7 +170,7 @@ namespace Lang.Backend
                             var fieldNameString = GetString(field.Name);
                             var fieldOffset = LLVM.ConstInt(LLVM.Int32Type(), field.Offset, 0);
 
-                            var typeField = LLVMValueRef.CreateConstNamedStruct(typeFieldType, new LLVMValueRef[] {fieldNameString, fieldOffset, typeInfos[field.Type.TypeIndex]});
+                            var typeField = LLVMValueRef.CreateConstNamedStruct(typeFieldType, new LLVMValueRef[] {fieldNameString, fieldOffset, _typeInfos[field.Type.TypeIndex]});
 
                             typeFields[i] = typeField;
                         }
@@ -215,14 +216,14 @@ namespace Lang.Backend
                         });
                         break;
                     case PrimitiveAst primitive when primitive.TypeKind == TypeKind.Pointer:
-                        typeInfoFieldValues[7] = typeInfos[primitive.PointerType.TypeIndex];
+                        typeInfoFieldValues[7] = _typeInfos[primitive.PointerType.TypeIndex];
                         break;
                     case ArrayType arrayType:
-                        typeInfoFieldValues[8] = typeInfos[arrayType.ElementType.TypeIndex];
+                        typeInfoFieldValues[8] = _typeInfos[arrayType.ElementType.TypeIndex];
                         break;
                 }
 
-                LLVM.SetInitializer(typeInfos[type.TypeIndex], LLVMValueRef.CreateConstNamedStruct(typeInfoType, typeInfoFieldValues));
+                LLVM.SetInitializer(_typeInfos[type.TypeIndex], LLVMValueRef.CreateConstNamedStruct(typeInfoType, typeInfoFieldValues));
             }
 
             foreach (var (name, functions) in TypeTable.Functions)
@@ -232,9 +233,9 @@ namespace Lang.Backend
                     var function = functions[i];
                     var typeInfo = _module.AddGlobal(typeInfoType, "____type_info");
                     SetPrivateConstant(typeInfo);
-                    typeInfos[function.TypeIndex] = typeInfo;
+                    _typeInfos[function.TypeIndex] = typeInfo;
 
-                    var returnType = typeInfos[function.ReturnType.TypeIndex];
+                    var returnType = _typeInfos[function.ReturnType.TypeIndex];
 
                     var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
                     var argumentValues = new LLVMValueRef[argumentCount];
@@ -243,7 +244,7 @@ namespace Lang.Backend
                         var argument = function.Arguments[arg];
 
                         var argNameString = GetString(argument.Name);
-                        var argumentTypeInfo = typeInfos[argument.Type.TypeIndex];
+                        var argumentTypeInfo = _typeInfos[argument.Type.TypeIndex];
                         var argumentValue = LLVMValueRef.CreateConstNamedStruct(argumentType, new LLVMValueRef[] {argNameString, argumentTypeInfo});
 
                         argumentValues[arg] = argumentValue;
@@ -313,12 +314,12 @@ namespace Lang.Backend
             }
 
             // 5. Write type table
-            var typeArray = LLVMValueRef.CreateConstArray(LLVM.PointerType(typeInfoType, 0), typeInfos);
+            var typeArray = LLVMValueRef.CreateConstArray(LLVM.PointerType(typeInfoType, 0), _typeInfos);
             var typeArrayGlobal = _module.AddGlobal(LLVM.TypeOf(typeArray), "____type_array");
             SetPrivateConstant(typeArrayGlobal);
             LLVM.SetInitializer(typeArrayGlobal, typeArray);
 
-            var typeCount = LLVM.ConstInt(LLVM.Int32Type(), (ulong)typeInfos.Length, 0);
+            var typeCount = LLVM.ConstInt(LLVM.Int32Type(), (ulong)_typeInfos.Length, 0);
             var typeInfoArrayType = _module.GetTypeByName("Array.*.TypeInfo");
             LLVM.SetInitializer(typeTable, LLVMValueRef.CreateConstNamedStruct(typeInfoArrayType, new LLVMValueRef[] {typeCount, typeArrayGlobal}));
 
@@ -1098,6 +1099,8 @@ namespace Lang.Backend
                         return LLVM.ConstNull(_u8PointerType);
                     }
                     return LLVM.ConstNull(_types[value.Type.TypeIndex]);
+                case InstructionValueType.TypeInfo:
+                    return _typeInfos[value.ValueIndex];
             }
             return null;
         }
