@@ -1341,6 +1341,9 @@ namespace Lang
                     return GetConstant(value);
                 case InstructionValueType.Null:
                     return new Register {Pointer = IntPtr.Zero};
+                case InstructionValueType.TypeInfo:
+                    var typeInfoPointer = TypeTable.TypeInfos[value.ValueIndex];
+                    return new Register {Pointer = typeInfoPointer};
             }
 
             return new Register();

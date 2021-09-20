@@ -22,21 +22,7 @@ namespace Lang
         private readonly Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads = new();
         private readonly ScopeAst _globalScope = new();
 
-        private IType _voidType;
-        private IType _boolType;
-        private IType _s8Type;
-        private IType _u8Type;
-        private IType _s16Type;
-        private IType _u16Type;
-        private PrimitiveAst _s32Type;
-        private IType _u32Type;
-        private IType _s64Type;
-        private IType _u64Type;
-        private IType _float64Type;
-        private IType _typeType;
-        private IType _stringType;
         private IType _rawStringType;
-        private IType _anyType;
 
         public TypeChecker(IPolymorpher polymorpher, IProgramIRBuilder irBuilder, IProgramRunner runner)
         {
@@ -51,21 +37,21 @@ namespace Lang
             bool verifyAdditional;
 
             // Add primitive types to global identifiers
-            _voidType = AddPrimitive("void", TypeKind.Void, 1);
-            _boolType = AddPrimitive("bool", TypeKind.Boolean, 1);
-            _s8Type = AddPrimitive("s8", TypeKind.Integer, 1, true);
-            _u8Type = AddPrimitive("u8", TypeKind.Integer, 1);
-            _s16Type = AddPrimitive("s16", TypeKind.Integer, 2, true);
-            _u16Type = AddPrimitive("u16", TypeKind.Integer, 2);
-            _s32Type = AddPrimitive("s32", TypeKind.Integer, 4, true);
-            _u32Type = AddPrimitive("u32", TypeKind.Integer, 4);
-            _s64Type = AddPrimitive("s64", TypeKind.Integer, 8, true);
-            _u64Type = AddPrimitive("u64", TypeKind.Integer, 8);
+            TypeTable.VoidType = AddPrimitive("void", TypeKind.Void, 1);
+            TypeTable.BoolType = AddPrimitive("bool", TypeKind.Boolean, 1);
+            TypeTable.S8Type = AddPrimitive("s8", TypeKind.Integer, 1, true);
+            TypeTable.U8Type = AddPrimitive("u8", TypeKind.Integer, 1);
+            TypeTable.S16Type = AddPrimitive("s16", TypeKind.Integer, 2, true);
+            TypeTable.U16Type = AddPrimitive("u16", TypeKind.Integer, 2);
+            TypeTable.S32Type = AddPrimitive("s32", TypeKind.Integer, 4, true);
+            TypeTable.U32Type = AddPrimitive("u32", TypeKind.Integer, 4);
+            TypeTable.S64Type = AddPrimitive("s64", TypeKind.Integer, 8, true);
+            TypeTable.U64Type = AddPrimitive("u64", TypeKind.Integer, 8);
             AddPrimitive("float", TypeKind.Float, 4, true);
-            _float64Type = AddPrimitive("float64", TypeKind.Float, 8, true);
-            _typeType = AddPrimitive("Type", TypeKind.Type, 4, true);
+            TypeTable.Float64Type = AddPrimitive("float64", TypeKind.Float, 8, true);
+            TypeTable.TypeType = AddPrimitive("Type", TypeKind.Type, 4, true);
 
-            _irBuilder.Init();
+            // _irBuilder.Init();
 
             var functionNames = new HashSet<string>();
             do
@@ -99,14 +85,14 @@ namespace Lang
 
                                 if (structAst.Name == "string")
                                 {
-                                    _stringType = structAst;
+                                    TypeTable.StringType = structAst;
                                     structAst.TypeKind = TypeKind.String;
                                     VerifyStruct(structAst);
                                     asts.RemoveAt(i--);
                                 }
                                 else if (structAst.Name == "Any")
                                 {
-                                    _anyType = structAst;
+                                    TypeTable.AnyType = structAst;
                                     structAst.TypeKind = TypeKind.Any;
                                     VerifyStruct(structAst);
                                     asts.RemoveAt(i--);
@@ -301,7 +287,7 @@ namespace Lang
 
             if (enumAst.BaseTypeDefinition == null)
             {
-                enumAst.BaseType = _s32Type;
+                enumAst.BaseType = TypeTable.S32Type;
             }
             else
             {
@@ -309,7 +295,7 @@ namespace Lang
                 if (baseType?.TypeKind != TypeKind.Integer)
                 {
                     ErrorReporter.Report($"Base type of enum must be an integer, but got '{PrintTypeDefinition(enumAst.BaseTypeDefinition)}'", enumAst.BaseTypeDefinition);
-                    enumAst.BaseType = _s32Type;
+                    enumAst.BaseType = TypeTable.S32Type;
                     enumAst.Size = 4;
                 }
                 else
@@ -593,7 +579,7 @@ namespace Lang
             // 1. Verify the return type of the function is valid
             if (function.ReturnTypeDefinition == null)
             {
-                function.ReturnType = _voidType;
+                function.ReturnType = TypeTable.VoidType;
             }
             else
             {
@@ -1965,7 +1951,7 @@ namespace Lang
             {
                 structField.IsConstant = true;
                 structField.ConstantValue = arrayType.Length;
-                return _s32Type;
+                return TypeTable.S32Type;
             }
             if (structType is not StructAst structDefinition)
             {
@@ -2053,7 +2039,7 @@ namespace Lang
 
                 if (each.IndexVariable != null)
                 {
-                    each.IndexVariable.Type = _s32Type;
+                    each.IndexVariable.Type = TypeTable.S32Type;
                     each.Body.Identifiers.TryAdd(each.IndexVariable.Name, each.IndexVariable);
                 }
 
@@ -2089,7 +2075,7 @@ namespace Lang
                     ErrorReporter.Report($"Expected range to end with 'int', but got '{endType.Name}'", each.RangeEnd);
                 }
 
-                each.IterationVariable.Type = _s32Type;
+                each.IterationVariable.Type = TypeTable.S32Type;
                 each.Body.Identifiers.TryAdd(each.IterationVariable.Name, each.IterationVariable);
             }
 
@@ -2617,7 +2603,7 @@ namespace Lang
                         {
                             if (argument.TypeKind != TypeKind.Type)
                             {
-                                var typeIndex = new ConstantAst {Type = _s32Type, Value = new Constant {Integer = argument.TypeIndex}};
+                                var typeIndex = new ConstantAst {Type = TypeTable.S32Type, Value = new Constant {Integer = argument.TypeIndex}};
                                 call.Arguments[i] = typeIndex;
                                 argumentTypes[i] = typeIndex.Type;
                             }
@@ -2653,7 +2639,7 @@ namespace Lang
                                 {
                                     if (argument.TypeKind != TypeKind.Type)
                                     {
-                                        var typeIndex = new ConstantAst {Type = _s32Type, Value = new Constant {Integer = argument.TypeIndex}};
+                                        var typeIndex = new ConstantAst {Type = TypeTable.S32Type, Value = new Constant {Integer = argument.TypeIndex}};
                                         call.Arguments[i] = typeIndex;
                                         argumentTypes[i] = typeIndex.Type;
                                     }
@@ -2676,7 +2662,7 @@ namespace Lang
                     // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
                     if (argumentType.TypeKind == TypeKind.Float && argumentType.Size == 4)
                     {
-                        argumentTypes[i] = _float64Type;
+                        argumentTypes[i] = TypeTable.Float64Type;
                     }
                 }
                 var found = false;
@@ -3112,7 +3098,7 @@ namespace Lang
                     }
 
                     nullAst.TargetType = expression.Type;
-                    expression.Type = _boolType;
+                    expression.Type = TypeTable.BoolType;
                     expression.ResultingTypes.Add(expression.Type);
                     continue;
                 }
@@ -3150,7 +3136,7 @@ namespace Lang
                             if (type != TypeKind.Boolean || nextType != TypeKind.Boolean)
                             {
                                 ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{expression.Type.Name}' and '{nextExpressionType.Name}'", expression.Children[i]);
-                                expression.Type = _boolType;
+                                expression.Type = TypeTable.BoolType;
                             }
                             break;
                         // Requires same types and returns bool
@@ -3173,7 +3159,7 @@ namespace Lang
                             {
                                 ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{expression.Type.Name}' and '{nextExpressionType.Name}'", expression.Children[i]);
                             }
-                            expression.Type = _boolType;
+                            expression.Type = TypeTable.BoolType;
                             break;
                         // Requires same types and returns more precise type
                         case Operator.Add:
@@ -3242,7 +3228,7 @@ namespace Lang
                                 else if (!(type == TypeKind.Boolean || type == TypeKind.Integer))
                                 {
                                     // If the type can't be determined, default to int
-                                    expression.Type = _s32Type;
+                                    expression.Type = TypeTable.S32Type;
                                 }
                             }
                             break;
@@ -3262,7 +3248,7 @@ namespace Lang
                                     else
                                     {
                                         // If the type can't be determined, default to int
-                                        expression.Type = _s32Type;
+                                        expression.Type = TypeTable.S32Type;
                                     }
                                 }
                             }
@@ -3284,20 +3270,20 @@ namespace Lang
             {
                 return size switch
                 {
-                    1 => _s8Type,
-                    2 => _s16Type,
-                    8 => _s64Type,
-                    _ => _s32Type
+                    1 => TypeTable.S8Type,
+                    2 => TypeTable.S16Type,
+                    8 => TypeTable.S64Type,
+                    _ => TypeTable.S32Type
                 };
             }
             else
             {
                 return size switch
                 {
-                    1 => _u8Type,
-                    2 => _u16Type,
-                    8 => _u64Type,
-                    _ => _u32Type
+                    1 => TypeTable.U8Type,
+                    2 => TypeTable.U16Type,
+                    8 => TypeTable.U64Type,
+                    _ => TypeTable.U32Type
                 };
             }
         }
@@ -3343,7 +3329,7 @@ namespace Lang
                     elementType = pointerType.PointerType;
                     break;
                 case TypeKind.String:
-                    elementType = _u8Type;
+                    elementType = TypeTable.U8Type;
                     break;
                 case null:
                     break;
@@ -3428,7 +3414,7 @@ namespace Lang
                     }
                     var aPointer = (PrimitiveAst)a;
                     var bPointer = (PrimitiveAst)b;
-                    return aPointer.PointerType == bPointer.PointerType || aPointer.PointerType == _voidType || bPointer.PointerType == _voidType;
+                    return aPointer.PointerType == bPointer.PointerType || aPointer.PointerType == TypeTable.VoidType || bPointer.PointerType == TypeTable.VoidType;
             }
 
             return false;
@@ -3483,13 +3469,13 @@ namespace Lang
                     {
                         ErrorReporter.Report("Type 'bool' cannot have generics", type);
                     }
-                    return _boolType;
+                    return TypeTable.BoolType;
                 case "string":
                     if (hasGenerics)
                     {
                         ErrorReporter.Report("Type 'string' cannot have generics", type);
                     }
-                    return _stringType;
+                    return TypeTable.StringType;
                 case "Array":
                     if (type.Generics.Count != 1)
                     {
@@ -3541,7 +3527,7 @@ namespace Lang
                     {
                         ErrorReporter.Report("Type 'void' cannot have generics", type);
                     }
-                    return _voidType;
+                    return TypeTable.VoidType;
                 case "*":
                     if (type.Generics.Count != 1)
                     {
@@ -3602,13 +3588,13 @@ namespace Lang
                     {
                         ErrorReporter.Report("Type 'Type' cannot have generics", type);
                     }
-                    return _typeType;
+                    return TypeTable.TypeType;
                 case "Any":
                     if (hasGenerics)
                     {
                         ErrorReporter.Report("Type 'Any' cannot have generics", type);
                     }
-                    return _anyType;
+                    return TypeTable.AnyType;
                 default:
                     if (hasGenerics)
                     {

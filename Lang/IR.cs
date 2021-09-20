@@ -190,6 +190,7 @@ namespace Lang
         Constant,
         Null,
         Type,
+        TypeInfo,
         BasicBlock,
         CallArguments,
         ConstantStruct,
