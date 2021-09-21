@@ -15,6 +15,9 @@ namespace Lang
 
     public class ProgramIRBuilder : IProgramIRBuilder
     {
+        private IType _typeInfoPointerType;
+        private IType _voidPointerType;
+
         public void AddFunction(FunctionAst function)
         {
             var functionName = GetFunctionName(function);
@@ -1396,24 +1399,48 @@ namespace Lang
             {
                 for (var i = 0; i < argumentCount - 1; i++)
                 {
+                    var functionArg = call.Function.Arguments[i];
                     var argument = EmitIR(function, call.Arguments[i], scope);
-                    arguments[i] = EmitCastValue(function, argument, call.Function.Arguments[i].Type);
+                    if (functionArg.Type.TypeKind == TypeKind.Any)
+                    {
+                        arguments[i] = GetAnyValue(function, argument);
+                    }
+                    else
+                    {
+                        arguments[i] = EmitCastValue(function, argument, functionArg.Type);
+                    }
                 }
 
                 // Rollup the rest of the arguments into an array
                 var paramsType = call.Function.Arguments[^1].Type;
-                var elementType = call.Function.ParamsElementType;
+                var paramsElementType = call.Function.ParamsElementType;
                 var paramsAllocationIndex = AddAllocation(function, paramsType);
-                var dataPointer = InitializeConstArray(function, paramsAllocationIndex, (StructAst)paramsType, (uint)(call.Arguments.Count - call.Function.Arguments.Count + 1), elementType);
+                var dataPointer = InitializeConstArray(function, paramsAllocationIndex, (StructAst)paramsType, (uint)(call.Arguments.Count - call.Function.Arguments.Count + 1), paramsElementType);
 
                 uint paramsIndex = 0;
-                for (var i = call.Function.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
+                if (paramsElementType.TypeKind == TypeKind.Any)
                 {
-                    var index = GetConstantInteger(paramsIndex);
-                    var pointer = EmitGetPointer(function, dataPointer, index, elementType, true);
+                    for (var i = call.Function.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
+                    {
+                        var index = GetConstantInteger(paramsIndex);
+                        var pointer = EmitGetPointer(function, dataPointer, index, paramsElementType, true);
 
-                    var value = EmitIR(function, call.Arguments[i], scope);
-                    EmitStore(function, pointer, EmitCastValue(function, value, elementType));
+                        var argument = EmitIR(function, call.Arguments[i], scope);
+                        var anyValue = GetAnyValue(function, argument);
+                        EmitStore(function, pointer, anyValue);
+                    }
+                }
+                else
+                {
+                    for (var i = call.Function.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
+                    {
+                        var index = GetConstantInteger(paramsIndex);
+                        var pointer = EmitGetPointer(function, dataPointer, index, paramsElementType, true);
+
+                        var argument = EmitIR(function, call.Arguments[i], scope);
+                        var value = EmitCastValue(function, argument, paramsElementType);
+                        EmitStore(function, pointer, value);
+                    }
                 }
 
                 var paramsValue = EmitLoad(function, paramsType, paramsAllocationIndex);
@@ -1448,40 +1475,7 @@ namespace Lang
                     var argument = EmitIR(function, call.Arguments[i], scope, call.Function.Flags.HasFlag(FunctionFlags.Extern));
                     if (functionArg.Type.TypeKind == TypeKind.Any)
                     {
-                        if (argument.Type.TypeKind == TypeKind.Any)
-                        {
-                            arguments[i] = argument;
-                        }
-                        else
-                        {
-                            // Allocate the Any struct
-                            var allocationIndex = AddAllocation(function, TypeTable.AnyType);
-                            var allocationValue = AllocationValue(allocationIndex, TypeTable.AnyType);
-
-                            // Set the TypeInfo pointer
-                            var typeInfoPointer = EmitGetStructPointer(function, allocationValue, TypeTable.AnyType, 0);
-                            EmitStore(function, typeInfoPointer, new InstructionValue {ValueType = InstructionValueType.TypeInfo, ValueIndex = argument.Type.TypeIndex});
-
-                            // Set the data pointer
-                            var dataPointer = EmitGetStructPointer(function, allocationValue, TypeTable.AnyType, 1);
-                            // a. For pointers, set the value with the existing pointer
-                            if (argument.Type.TypeKind == TypeKind.Pointer)
-                            {
-                                EmitStore(function, dataPointer, argument);
-                            }
-                            // b. Otherwise, allocate the value, store the value, and set the value with the allocated pointer
-                            else
-                            {
-                                var dataAllocationIndex = AddAllocation(function, argument.Type);
-                                var dataAllocationValue = AllocationValue(dataAllocationIndex, argument.Type);
-
-                                EmitStore(function, dataAllocationValue, argument);
-                                // TODO Cast to void*
-                                EmitStore(function, dataPointer, dataAllocationValue);
-                            }
-
-                            arguments[i] = EmitLoad(function, TypeTable.AnyType, allocationValue);
-                        }
+                        arguments[i] = GetAnyValue(function, argument);
                     }
                     else
                     {
@@ -1492,6 +1486,46 @@ namespace Lang
 
             var functionName = GetFunctionName(call.Function);
             return EmitCall(function, functionName, arguments, call.Function.ReturnType, call.ExternIndex);
+        }
+
+        private InstructionValue GetAnyValue(FunctionIR function, InstructionValue argument)
+        {
+            if (argument.Type.TypeKind == TypeKind.Any)
+            {
+                return argument;
+            }
+
+            // Allocate the Any struct
+            var allocationIndex = AddAllocation(function, TypeTable.AnyType);
+            var allocationValue = AllocationValue(allocationIndex, TypeTable.AnyType);
+
+            // Set the TypeInfo pointer
+            var typeInfoPointer = EmitGetStructPointer(function, allocationValue, TypeTable.AnyType, 0);
+            _typeInfoPointerType ??= TypeTable.Types["*.TypeInfo"];
+            EmitStore(function, typeInfoPointer, new InstructionValue {ValueType = InstructionValueType.TypeInfo, ValueIndex = argument.Type.TypeIndex, Type = _typeInfoPointerType});
+
+            // Set the data pointer
+            var dataPointer = EmitGetStructPointer(function, allocationValue, TypeTable.AnyType, 1);
+            _voidPointerType ??= TypeTable.Types["*.void"];
+            var voidPointer = new InstructionValue {ValueType = InstructionValueType.Type, Type = _voidPointerType};
+            // a. For pointers, set the value with the existing pointer
+            if (argument.Type.TypeKind == TypeKind.Pointer)
+            {
+                var voidPointerValue = EmitInstruction(InstructionType.PointerCast, function, _voidPointerType, argument, voidPointer);
+                EmitStore(function, dataPointer, voidPointerValue);
+            }
+            // b. Otherwise, allocate the value, store the value, and set the value with the allocated pointer
+            else
+            {
+                var dataAllocationIndex = AddAllocation(function, argument.Type);
+                var dataAllocationValue = AllocationValue(dataAllocationIndex, argument.Type);
+
+                EmitStore(function, dataAllocationValue, argument);
+                var voidPointerValue = EmitInstruction(InstructionType.PointerCast, function, _voidPointerType, dataAllocationValue, voidPointer);
+                EmitStore(function, dataPointer, voidPointerValue);
+            }
+
+            return EmitLoad(function, TypeTable.AnyType, allocationValue);
         }
 
         private InstructionValue EmitGetIndexPointer(FunctionIR function, IndexAst index, ScopeAst scope, IType type = null, InstructionValue variable = null)
