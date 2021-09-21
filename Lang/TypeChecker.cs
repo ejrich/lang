@@ -2355,10 +2355,8 @@ namespace Lang
 
         private void VerifyConstantIfNecessary(IAst ast, IType targetType)
         {
-            if (ast is ConstantAst constant && (constant.Type.TypeKind == TypeKind.Integer || constant.Type.TypeKind == TypeKind.Float))
+            if (ast is ConstantAst constant && constant.Type != targetType && (constant.Type.TypeKind == TypeKind.Integer || constant.Type.TypeKind == TypeKind.Float) && targetType.TypeKind != TypeKind.Any)
             {
-                if (constant.Type == targetType) return;
-
                 switch (targetType.TypeKind)
                 {
                     case TypeKind.Integer:

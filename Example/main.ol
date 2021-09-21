@@ -85,7 +85,7 @@ main() { //#print_ir {
 
     break_and_continue();
 
-    // any_args();
+    any_args();
 }
 
 // TODO Make these work
@@ -396,7 +396,10 @@ any_args() {
     print("Float value = %.2f\n", 3.14);
 
     foo := 9;
-    print("Other value\n", &foo);
+    print("Pointer value = %p\n", &foo);
+
+    my_struct: MyStruct;
+    print("Other value\n", my_struct);
 }
 
 print(string format, Any arg) {
@@ -407,6 +410,9 @@ print(string format, Any arg) {
     else if arg.type.type == TypeKind.Float {
         value := cast(float*, arg.data);
         printf(format, *value);
+    }
+    else if arg.type.type == TypeKind.Pointer {
+        printf(format, arg.data);
     }
     else printf(format);
 }
