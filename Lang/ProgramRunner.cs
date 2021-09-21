@@ -397,8 +397,9 @@ namespace Lang
                                 break;
                             case TypeKind.String:
                             case TypeKind.Array:
-                            case TypeKind.Struct:
                             case TypeKind.CArray:
+                            case TypeKind.Struct:
+                            case TypeKind.Any:
                                 // For structs, the pointer is kept in its original state, and any loads will copy the bytes if necessary
                                 register.Pointer = pointer.Pointer;
                                 break;
@@ -459,8 +460,9 @@ namespace Lang
                                 break;
                             case TypeKind.String:
                             case TypeKind.Array:
-                            case TypeKind.Struct:
                             case TypeKind.CArray:
+                            case TypeKind.Struct:
+                            case TypeKind.Any:
                                 var copyBytes = instruction.Value2.Type.Size;
                                 Buffer.MemoryCopy(value.Pointer.ToPointer(), pointer.Pointer.ToPointer(), copyBytes, copyBytes);
                                 break;
