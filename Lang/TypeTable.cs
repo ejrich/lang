@@ -50,7 +50,7 @@ namespace Lang
             // Add function to type infos
             if (ErrorReporter.Errors.Count == 0)
             {
-                var typeInfo = new TypeInfo {Name = Allocator.MakeString(function.Name), Type = TypeKind.Function};
+                var typeInfo = new FunctionTypeInfo {Name = Allocator.MakeString(function.Name), Type = TypeKind.Function};
                 typeInfo.ReturnType = TypeInfos[function.ReturnType.TypeIndex];
 
                 var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
@@ -75,7 +75,7 @@ namespace Lang
                     typeInfo.Arguments.Data = argumentTypesPointer;
                 }
 
-                var typeInfoPointer = Allocator.Allocate(TypeInfoSize);
+                var typeInfoPointer = Allocator.Allocate(FunctionTypeInfoSize);
                 TypeInfos.Add(typeInfoPointer);
                 Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
             }
@@ -102,19 +102,76 @@ namespace Lang
 
         public static List<IntPtr> TypeInfos { get; } = new();
 
-        private const int TypeInfoSize = 80;
+        private const int TypeInfoSize = 20;
         [StructLayout(LayoutKind.Explicit, Size=TypeInfoSize)]
         public struct TypeInfo
         {
             [FieldOffset(0)] public String Name;
             [FieldOffset(12)] public TypeKind Type;
             [FieldOffset(16)] public uint Size;
+        }
+
+        // TODO Use Marshal.SizeOf instead
+        private const int IntegerTypeInfoSize = 21;
+        [StructLayout(LayoutKind.Explicit, Size=IntegerTypeInfoSize)]
+        public struct IntegerTypeInfo
+        {
+            [FieldOffset(0)] public String Name;
+            [FieldOffset(12)] public TypeKind Type;
+            [FieldOffset(16)] public uint Size;
+            [FieldOffset(20)] public bool Signed;
+        }
+
+        private const int PointerTypeInfoSize = 28;
+        [StructLayout(LayoutKind.Explicit, Size=TypeInfoSize)]
+        public struct PointerTypeInfo
+        {
+            [FieldOffset(0)] public String Name;
+            [FieldOffset(12)] public TypeKind Type;
+            [FieldOffset(16)] public uint Size;
+            [FieldOffset(20)] public IntPtr PointerType;
+        }
+
+        private const int CArrayTypeInfoSize = 32;
+        [StructLayout(LayoutKind.Explicit, Size=CArrayTypeInfoSize)]
+        public struct CArrayTypeInfo
+        {
+            [FieldOffset(0)] public String Name;
+            [FieldOffset(12)] public TypeKind Type;
+            [FieldOffset(16)] public uint Size;
+            [FieldOffset(20)] public uint Length;
+            [FieldOffset(24)] public IntPtr ElementType;
+        }
+
+        private const int EnumTypeInfoSize = 32;
+        [StructLayout(LayoutKind.Explicit, Size=EnumTypeInfoSize)]
+        public struct EnumTypeInfo
+        {
+            [FieldOffset(0)] public String Name;
+            [FieldOffset(12)] public TypeKind Type;
+            [FieldOffset(16)] public uint Size;
+            [FieldOffset(20)] public Array Values;
+        }
+
+        private const int StructTypeInfoSize = 32;
+        [StructLayout(LayoutKind.Explicit, Size=StructTypeInfoSize)]
+        public struct StructTypeInfo
+        {
+            [FieldOffset(0)] public String Name;
+            [FieldOffset(12)] public TypeKind Type;
+            [FieldOffset(16)] public uint Size;
             [FieldOffset(20)] public Array Fields;
-            [FieldOffset(32)] public Array EnumValues;
-            [FieldOffset(44)] public IntPtr ReturnType;
-            [FieldOffset(52)] public Array Arguments;
-            [FieldOffset(64)] public IntPtr PointerType;
-            [FieldOffset(72)] public IntPtr ElementType;
+        }
+
+        private const int FunctionTypeInfoSize = 40;
+        [StructLayout(LayoutKind.Explicit, Size=FunctionTypeInfoSize)]
+        public struct FunctionTypeInfo
+        {
+            [FieldOffset(0)] public String Name;
+            [FieldOffset(12)] public TypeKind Type;
+            [FieldOffset(16)] public uint Size;
+            [FieldOffset(20)] public IntPtr ReturnType;
+            [FieldOffset(28)] public Array Arguments;
         }
 
         [StructLayout(LayoutKind.Explicit, Size=12)]
@@ -151,59 +208,96 @@ namespace Lang
 
         public static void CreateTypeInfo(IType type)
         {
-            var typeInfo = new TypeInfo {Name = Allocator.MakeString(type.Name), Type = type.TypeKind, Size = type.Size};
+            var typeInfoPointer = IntPtr.Zero;
+            var name = Allocator.MakeString(type.Name);
 
-            switch (type)
+            switch (type.TypeKind)
             {
-                case StructAst structAst when structAst.Fields.Count > 0:
-                    typeInfo.Fields.Length = structAst.Fields.Count;
-                    var typeFields = new TypeField[typeInfo.Fields.Length];
-
-                    for (var i = 0; i < typeInfo.Fields.Length; i++)
-                    {
-                        var field = structAst.Fields[i];
-                        var typeField = new TypeField {Name = Allocator.MakeString(field.Name), Offset = field.Offset, TypeInfo = TypeInfos[field.Type.TypeIndex]};
-                        typeFields[i] = typeField;
-                    }
-
-                    var typeFieldsArraySize = typeInfo.Fields.Length * TypeFieldSize;
-                    var typeFieldsPointer = Allocator.Allocate(typeFieldsArraySize);
-                    fixed (TypeField* pointer = &typeFields[0])
-                    {
-                        Buffer.MemoryCopy(pointer, typeFieldsPointer.ToPointer(), typeFieldsArraySize, typeFieldsArraySize);
-                    }
-                    typeInfo.Fields.Data = typeFieldsPointer;
+                case TypeKind.Void:
+                case TypeKind.Boolean:
+                case TypeKind.Type:
+                case TypeKind.Float:
+                    typeInfoPointer = Allocator.Allocate(TypeInfoSize);
+                    var typeInfo = new TypeInfo {Name = name, Type = type.TypeKind, Size = type.Size};
+                    Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
                     break;
-                case EnumAst enumAst:
-                    typeInfo.EnumValues.Length = enumAst.Values.Count;
-                    var enumValues = new EnumValue[typeInfo.EnumValues.Length];
+                case TypeKind.Integer:
+                    typeInfoPointer = Allocator.Allocate(IntegerTypeInfoSize);
+                    var integerType = (PrimitiveAst)type;
+                    var integerTypeInfo = new IntegerTypeInfo {Name = name, Type = type.TypeKind, Size = type.Size, Signed = integerType.Signed};
+                    Marshal.StructureToPtr(integerTypeInfo, typeInfoPointer, false);
+                    break;
+                case TypeKind.Pointer:
+                    typeInfoPointer = Allocator.Allocate(PointerTypeInfoSize);
+                    var pointerType = (PrimitiveAst)type;
+                    var pointerTypeInfo = new PointerTypeInfo {Name = name, Type = type.TypeKind, Size = type.Size, PointerType = TypeInfos[pointerType.PointerType.TypeIndex]};
+                    Marshal.StructureToPtr(pointerTypeInfo, typeInfoPointer, false);
+                    break;
+                case TypeKind.CArray:
+                    typeInfoPointer = Allocator.Allocate(CArrayTypeInfoSize);
+                    var arrayType = (ArrayType)type;
+                    var arrayTypeInfo = new CArrayTypeInfo {Name = name, Type = type.TypeKind, Size = type.Size, ElementType = TypeInfos[arrayType.ElementType.TypeIndex]};
+                    Marshal.StructureToPtr(arrayTypeInfo, typeInfoPointer, false);
+                    break;
+                case TypeKind.Enum:
+                    typeInfoPointer = Allocator.Allocate(EnumTypeInfoSize);
+                    var enumType = (EnumAst)type;
+                    var enumTypeInfo = new EnumTypeInfo {Name = name, Type = type.TypeKind, Size = type.Size};
 
-                    for (var i = 0; i < typeInfo.EnumValues.Length; i++)
+                    enumTypeInfo.Values.Length = enumType.Values.Count;
+                    var enumValues = new EnumValue[enumTypeInfo.Values.Length];
+
+                    for (var i = 0; i < enumTypeInfo.Values.Length; i++)
                     {
-                        var value = enumAst.Values[i];
+                        var value = enumType.Values[i];
                         var enumValue = new EnumValue {Name = Allocator.MakeString(value.Name), Value = value.Value};
                         enumValues[i] = enumValue;
                     }
 
-                    var enumValuesArraySize = typeInfo.EnumValues.Length * EnumValueSize;
+                    var enumValuesArraySize = enumTypeInfo.Values.Length * EnumValueSize;
                     var enumValuesPointer = Allocator.Allocate(enumValuesArraySize);
                     fixed (EnumValue* pointer = &enumValues[0])
                     {
                         Buffer.MemoryCopy(pointer, enumValuesPointer.ToPointer(), enumValuesArraySize, enumValuesArraySize);
                     }
-                    typeInfo.EnumValues.Data = enumValuesPointer;
+                    enumTypeInfo.Values.Data = enumValuesPointer;
+
+                    Marshal.StructureToPtr(enumTypeInfo, typeInfoPointer, false);
                     break;
-                case PrimitiveAst primitive when primitive.TypeKind == TypeKind.Pointer:
-                    typeInfo.PointerType = TypeInfos[primitive.PointerType.TypeIndex];
-                    break;
-                case ArrayType arrayType:
-                    typeInfo.ElementType = TypeInfos[arrayType.ElementType.TypeIndex];
+                case TypeKind.String:
+                case TypeKind.Array:
+                case TypeKind.Struct:
+                case TypeKind.Any:
+                    typeInfoPointer = Allocator.Allocate(StructTypeInfoSize);
+                    var structType = (StructAst)type;
+                    var structTypeInfo = new StructTypeInfo {Name = name, Type = type.TypeKind, Size = type.Size};
+
+                    if (structType.Fields.Count > 0)
+                    {
+                        structTypeInfo.Fields.Length = structType.Fields.Count;
+                        var typeFields = new TypeField[structTypeInfo.Fields.Length];
+
+                        for (var i = 0; i < structTypeInfo.Fields.Length; i++)
+                        {
+                            var field = structType.Fields[i];
+                            var typeField = new TypeField {Name = Allocator.MakeString(field.Name), Offset = field.Offset, TypeInfo = TypeInfos[field.Type.TypeIndex]};
+                            typeFields[i] = typeField;
+                        }
+
+                        var typeFieldsArraySize = structTypeInfo.Fields.Length * TypeFieldSize;
+                        var typeFieldsPointer = Allocator.Allocate(typeFieldsArraySize);
+                        fixed (TypeField* pointer = &typeFields[0])
+                        {
+                            Buffer.MemoryCopy(pointer, typeFieldsPointer.ToPointer(), typeFieldsArraySize, typeFieldsArraySize);
+                        }
+                        structTypeInfo.Fields.Data = typeFieldsPointer;
+                    }
+
+                    Marshal.StructureToPtr(structTypeInfo, typeInfoPointer, false);
                     break;
             }
 
-            var typeInfoPointer = Allocator.Allocate(TypeInfoSize);
             TypeInfos[type.TypeIndex] = typeInfoPointer;
-            Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
         }
     }
 }
