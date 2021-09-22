@@ -70,11 +70,6 @@ namespace Lang
                 }
             }
 
-            if (function.Flags.HasFlag(FunctionFlags.Params))
-            {
-                function.ParamsElementType = TypeTable.GetType(function.Arguments[^1].TypeDefinition.Generics[0]);
-            }
-
             function.Body = CopyScope(baseFunction.Body, genericTypeDefs, baseFunction.Generics);
 
             return function;

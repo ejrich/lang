@@ -22,6 +22,7 @@ namespace Lang
         private readonly Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads = new();
         private readonly ScopeAst _globalScope = new();
 
+        private StructAst _baseArrayType;
         private IType _rawStringType;
 
         public TypeChecker(IPolymorpher polymorpher, IProgramIRBuilder irBuilder, IProgramRunner runner)
@@ -68,6 +69,10 @@ namespace Lang
                         case StructAst structAst:
                             if (structAst.Generics != null)
                             {
+                                if (structAst.Name == "Array")
+                                {
+                                    _baseArrayType = structAst;
+                                }
                                 if (_polymorphicStructs.ContainsKey(structAst.Name))
                                 {
                                     ErrorReporter.Report($"Multiple definitions of polymorphic struct '{structAst.Name}'", structAst);
@@ -627,7 +632,11 @@ namespace Lang
                         ErrorReporter.Report($"Function '{function.Name}' cannot have multiple varargs", argument.TypeDefinition);
                     }
                     function.Flags |= FunctionFlags.Params;
-                    function.ParamsElementType = TypeTable.GetType(argument.TypeDefinition.Generics[0]);
+                    if (!isGeneric)
+                    {
+                        var paramsArrayType = (StructAst)argument.Type;
+                        function.ParamsElementType = paramsArrayType.GenericTypes[0];
+                    }
                 }
                 else if (argument.Type == null && !isGeneric)
                 {
@@ -2953,7 +2962,12 @@ namespace Lang
                         {
                             if (argument.Type == null)
                             {
-                                argument.Type = VerifyType(argument.TypeDefinition, scope, out _, out _, out _, allowParams: true);
+                                argument.Type = VerifyType(argument.TypeDefinition, scope, out _, out _, out var isParams, allowParams: true);
+                                if (isParams)
+                                {
+                                    var paramsArrayType = (StructAst)argument.Type;
+                                    polymorphedFunction.ParamsElementType = paramsArrayType.GenericTypes[0];
+                                }
                             }
                         }
 
@@ -3565,7 +3579,6 @@ namespace Lang
                     isVarargs = true;
                     return null;
                 case "Params":
-                    isParams = true;
                     if (!allowParams)
                     {
                         return null;
@@ -3575,11 +3588,23 @@ namespace Lang
                         ErrorReporter.Report($"Params can only be declared as a top level type, such as 'Params<int>'", type);
                         return null;
                     }
+                    if (type.Generics.Count == 0)
+                    {
+                        isParams = true;
+                        const string backendName = "Array.Any";
+                        if (TypeTable.Types.TryGetValue(backendName, out var arrayType))
+                        {
+                            return arrayType;
+                        }
+
+                        return CreateArrayStruct("Array<Any>", backendName, TypeTable.AnyType);
+                    }
                     if (type.Generics.Count != 1)
                     {
                         ErrorReporter.Report($"Type 'Params' should have 1 generic type, but got {type.Generics.Count}", type);
                         return null;
                     }
+                    isParams = true;
                     return VerifyArray(type, scope, depth, out isGeneric);
                 case "Type":
                     if (hasGenerics)
@@ -3664,19 +3689,19 @@ namespace Lang
                 return null;
             }
 
-            var genericName = $"Array.{elementTypeDef.GenericName}";
-            if (TypeTable.Types.TryGetValue(genericName, out var arrayType))
+            var backendName = $"Array.{elementType.BackendName}";
+            if (TypeTable.Types.TryGetValue(backendName, out var arrayType))
             {
                 return arrayType;
             }
-            if (!_polymorphicStructs.TryGetValue("Array", out var structDef))
-            {
-                ErrorReporter.Report($"No polymorphic structs with name '{typeDef.Name}'", typeDef);
-                return null;
-            }
 
-            var arrayStruct = _polymorpher.CreatePolymorphedStruct(structDef, $"Array<{PrintTypeDefinition(elementTypeDef)}>", genericName, TypeKind.Array, new []{elementType}, elementTypeDef);
-            TypeTable.Add(genericName, arrayStruct);
+            return CreateArrayStruct($"Array<{elementType.Name}>", backendName, elementType, elementTypeDef);
+        }
+
+        private IType CreateArrayStruct(string name, string backendName, IType elementType, TypeDefinition elementTypeDef = null)
+        {
+            var arrayStruct = _polymorpher.CreatePolymorphedStruct(_baseArrayType, name, backendName, TypeKind.Array, new []{elementType}, elementTypeDef);
+            TypeTable.Add(backendName, arrayStruct);
             VerifyStruct(arrayStruct);
             return arrayStruct;
         }
