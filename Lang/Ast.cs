@@ -98,10 +98,11 @@ namespace Lang
         public uint Column { get; init; }
         public string Name { get; set; }
         public string BackendName { get; set; }
-        public string BaseName { get; set; }
         public int TypeIndex { get; set; }
         public TypeKind TypeKind { get; set; }
         public uint Size { get; set; }
+        public string BaseStructName { get; set; }
+        public TypeDefinition BaseType { get; set; }
         public bool Verified { get; set; }
         public bool Verifying { get; set; }
         public List<string> Generics { get; set; }

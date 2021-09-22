@@ -17,7 +17,7 @@ namespace Lang
             var polyStruct = CopyAst(baseStruct);
             polyStruct.Name = name;
             polyStruct.BackendName = backendName;
-            polyStruct.BaseName = baseStruct.Name;
+            polyStruct.BaseStructName = baseStruct.Name;
             polyStruct.TypeKind = typeKind;
             polyStruct.GenericTypes = genericTypes;
 
@@ -137,7 +137,7 @@ namespace Lang
                     var structDef = (StructAst)type;
                     if (structDef.GenericTypes != null)
                     {
-                        typeDef.Name = structDef.BaseName;
+                        typeDef.Name = structDef.BaseStructName;
                         foreach (var genericType in structDef.GenericTypes)
                         {
                             typeDef.Generics.Add(GetTypeDefinition(genericType));

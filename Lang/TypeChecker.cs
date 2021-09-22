@@ -3064,7 +3064,7 @@ namespace Lang
                         case TypeKind.Array:
                         case TypeKind.Struct:
                             var structDef = (StructAst)callType;
-                            if (structDef.GenericTypes == null || argumentType.Generics.Count != structDef.GenericTypes.Length || argumentType.Name != structDef.BaseName)
+                            if (structDef.GenericTypes == null || argumentType.Generics.Count != structDef.GenericTypes.Length || argumentType.Name != structDef.BaseStructName)
                             {
                                 return false;
                             }
@@ -3370,7 +3370,7 @@ namespace Lang
                 }
                 return overload;
             }
-            else if (_polymorphicOperatorOverloads.TryGetValue(type.BaseName, out var polymorphicOverloads) && polymorphicOverloads.TryGetValue(op, out var polymorphicOverload))
+            else if (_polymorphicOperatorOverloads.TryGetValue(type.BaseStructName, out var polymorphicOverloads) && polymorphicOverloads.TryGetValue(op, out var polymorphicOverload))
             {
                 var polymorphedOverload = _polymorpher.CreatePolymorphedOperatorOverload(polymorphicOverload, type.GenericTypes.ToArray());
                 if (overloads == null)
