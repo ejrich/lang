@@ -379,11 +379,13 @@ namespace Lang
                 }
                 else
                 {
+                    // Copy fields from the base struct into the new struct
                     foreach (var field in baseTypeStruct.Fields)
                     {
                         fieldNames.Add(field.Name);
                         structAst.Fields.Insert(i++, field);
                     }
+                    structAst.Size = baseTypeStruct.Size;
                 }
             }
 
@@ -2372,8 +2374,8 @@ namespace Lang
                             }
                             break;
                         case null:
-                            // Don't need to report additional errors
-                            return null;
+                            ErrorReporter.Report($"Unable to cast to invalid type '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast);
+                            break;
                         default:
                             if (valueType != null)
                             {
