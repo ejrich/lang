@@ -18,6 +18,7 @@ namespace Lang
             polyStruct.Name = name;
             polyStruct.BackendName = backendName;
             polyStruct.BaseStructName = baseStruct.Name;
+            polyStruct.BaseType = baseStruct.BaseType;
             polyStruct.TypeKind = typeKind;
             polyStruct.GenericTypes = genericTypes;
 

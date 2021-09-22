@@ -90,6 +90,7 @@ struct IntegerTypeInfo : TypeInfo {
     signed: bool;
 }
 
+/*
 struct PointerTypeInfo : TypeInfo {
     pointer_type: TypeInfo*;
 }
@@ -112,6 +113,7 @@ struct FunctionTypeInfo : TypeInfo {
     return_type: TypeInfo*;
     arguments: Array<ArgumentType>;
 }
+*/
 
 enum TypeKind {
     Void;

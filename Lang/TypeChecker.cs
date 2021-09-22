@@ -356,12 +356,41 @@ namespace Lang
 
         private void VerifyStruct(StructAst structAst)
         {
-            // 1. Verify struct fields have valid types
+            // Verify struct fields have valid types
             var fieldNames = new HashSet<string>();
             structAst.Verifying = true;
-            foreach (var structField in structAst.Fields)
+            var i = 0;
+
+            if (structAst.BaseType != null)
             {
-                // 1a. Check if the field has been previously defined
+                var baseType = VerifyType(structAst.BaseType, _globalScope, out var isGeneric, out var isVarargs, out var isParams);
+
+                if (isVarargs || isParams || isGeneric)
+                {
+                    ErrorReporter.Report($"Struct base type must be a struct", structAst.BaseType);
+                }
+                else if (baseType == null)
+                {
+                    ErrorReporter.Report($"Undefined type '{PrintTypeDefinition(structAst.BaseType)}' as the base type of struct '{structAst.Name}'", structAst.BaseType);
+                }
+                else if (baseType is not StructAst baseTypeStruct)
+                {
+                    ErrorReporter.Report($"Base type '{PrintTypeDefinition(structAst.BaseType)}' of struct '{structAst.Name}' is not a struct", structAst.BaseType);
+                }
+                else
+                {
+                    foreach (var field in baseTypeStruct.Fields)
+                    {
+                        fieldNames.Add(field.Name);
+                        structAst.Fields.Insert(i++, field);
+                    }
+                }
+            }
+
+            for (; i < structAst.Fields.Count; i++)
+            {
+                var structField = structAst.Fields[i];
+                // Check if the field has been previously defined
                 if (!fieldNames.Add(structField.Name))
                 {
                     ErrorReporter.Report($"Struct '{structAst.Name}' already contains field '{structField.Name}'", structField);
