@@ -86,6 +86,33 @@ struct TypeInfo {
     element_type: TypeInfo*;
 }
 
+struct IntegerTypeInfo : TypeInfo {
+    signed: bool;
+}
+
+struct PointerTypeInfo : TypeInfo {
+    pointer_type: TypeInfo*;
+}
+
+struct EnumTypeInfo : TypeInfo {
+    base_type: TypeInfo*;
+    values: Array<EnumValue>;
+}
+
+struct CArrayTypeInfo : TypeInfo {
+    length: int;
+    element_type: TypeInfo*;
+}
+
+struct StructTypeInfo : TypeInfo {
+    fields: Array<TypeField>;
+}
+
+struct FunctionTypeInfo : TypeInfo {
+    return_type: TypeInfo*;
+    arguments: Array<ArgumentType>;
+}
+
 enum TypeKind {
     Void;
     Boolean;

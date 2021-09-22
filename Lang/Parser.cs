@@ -489,8 +489,16 @@ namespace Lang
                 structAst.Generics = generics.ToList();
             }
 
-            // 3. Parse over the open brace
+            // 3. Get any inherited structs
             enumerator.MoveNext();
+            if (enumerator.Current?.Type == TokenType.Colon)
+            {
+                enumerator.MoveNext();
+                structAst.BaseType = ParseType(enumerator);
+                enumerator.MoveNext();
+            }
+
+            // 4. Parse over the open brace
             if (enumerator.Current?.Type != TokenType.OpenBrace)
             {
                 ErrorReporter.Report("Expected '{' token in struct definition", enumerator.Current ?? enumerator.Last);
@@ -498,7 +506,7 @@ namespace Lang
                     enumerator.MoveNext();
             }
 
-            // 4. Iterate through fields
+            // 5. Iterate through fields
             while (enumerator.MoveNext())
             {
                 if (enumerator.Current.Type == TokenType.CloseBrace)
@@ -509,7 +517,7 @@ namespace Lang
                 structAst.Fields.Add(ParseStructField(enumerator));
             }
 
-            // 5. Mark field types as generic if necessary
+            // 6. Mark field types as generic if necessary
             if (structAst.Generics != null)
             {
                 for (var i = 0; i < structAst.Generics.Count; i++)
