@@ -143,14 +143,15 @@ namespace Lang
             [FieldOffset(24)] public IntPtr ElementType;
         }
 
-        private const int EnumTypeInfoSize = 32;
+        private const int EnumTypeInfoSize = 40;
         [StructLayout(LayoutKind.Explicit, Size=EnumTypeInfoSize)]
         public struct EnumTypeInfo
         {
             [FieldOffset(0)] public String Name;
             [FieldOffset(12)] public TypeKind Type;
             [FieldOffset(16)] public uint Size;
-            [FieldOffset(20)] public Array Values;
+            [FieldOffset(20)] public IntPtr BaseType;
+            [FieldOffset(28)] public Array Values;
         }
 
         private const int StructTypeInfoSize = 32;
@@ -242,7 +243,7 @@ namespace Lang
                 case TypeKind.Enum:
                     typeInfoPointer = Allocator.Allocate(EnumTypeInfoSize);
                     var enumType = (EnumAst)type;
-                    var enumTypeInfo = new EnumTypeInfo {Name = name, Type = type.TypeKind, Size = type.Size};
+                    var enumTypeInfo = new EnumTypeInfo {Name = name, Type = type.TypeKind, Size = type.Size, BaseType = TypeInfos[enumType.BaseType.TypeIndex]};
 
                     enumTypeInfo.Values.Length = enumType.Values.Count;
                     var enumValues = new EnumValue[enumTypeInfo.Values.Length];
