@@ -89,6 +89,7 @@ namespace Lang.Backend
                             break;
                         case EnumAst enumAst:
                             _types[enumAst.TypeIndex] = GetIntegerType(enumAst.BaseType.Size);
+                            // TODO Use CreateAndSetTypeInfo
                             CreateTypeInfo(enumTypeInfoType, enumAst.TypeIndex);
                             CreateDebugEnumType(enumAst);
                             break;
@@ -349,9 +350,7 @@ namespace Lang.Backend
 
                     var fields = new LLVMValueRef[]{typeNameString, typeKind, _zeroInt, returnType, arguments};
 
-                    var functionTypeInfo = CreateTypeInfo(functionTypeInfoType, function.TypeIndex);
-                    var typeInfoStruct = LLVMValueRef.CreateConstNamedStruct(functionTypeInfoType, fields);
-                    LLVM.SetInitializer(functionTypeInfo, typeInfoStruct);
+                    CreateAndSetTypeInfo(functionTypeInfoType, fields, function.TypeIndex);
                 }
             }
 
@@ -481,6 +480,14 @@ namespace Lang.Backend
         private void SetTypeInfo(LLVMTypeRef typeInfoType, LLVMValueRef[] fields, int typeIndex)
         {
             var typeInfo = _typeInfos[typeIndex];
+
+            var typeInfoStruct = LLVMValueRef.CreateConstNamedStruct(typeInfoType, fields);
+            LLVM.SetInitializer(typeInfo, typeInfoStruct);
+        }
+
+        private void CreateAndSetTypeInfo(LLVMTypeRef typeInfoType, LLVMValueRef[] fields, int typeIndex)
+        {
+            var typeInfo = CreateTypeInfo(typeInfoType, typeIndex);
 
             var typeInfoStruct = LLVMValueRef.CreateConstNamedStruct(typeInfoType, fields);
             LLVM.SetInitializer(typeInfo, typeInfoStruct);
