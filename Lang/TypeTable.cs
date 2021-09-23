@@ -111,7 +111,6 @@ namespace Lang
             [FieldOffset(16)] public uint Size;
         }
 
-        // TODO Use Marshal.SizeOf instead
         private const int IntegerTypeInfoSize = 21;
         [StructLayout(LayoutKind.Explicit, Size=IntegerTypeInfoSize)]
         public struct IntegerTypeInfo
