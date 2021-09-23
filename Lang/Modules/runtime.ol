@@ -78,12 +78,6 @@ struct TypeInfo {
     name: string;
     type: TypeKind;
     size: u32;
-    // fields: Array<TypeField>;
-    // enum_values: Array<EnumValue>;
-    // return_type: TypeInfo*;
-    // arguments: Array<ArgumentType>;
-    // pointer_type: TypeInfo*;
-    // element_type: TypeInfo*;
 }
 
 struct IntegerTypeInfo : TypeInfo {
