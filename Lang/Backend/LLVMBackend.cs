@@ -49,6 +49,22 @@ namespace Lang.Backend
             _types = new LLVMTypeRef[TypeTable.Count];
             _typeInfos = new LLVMValueRef[TypeTable.Count];
 
+            const string structTypeInfoName = "StructTypeInfo";
+            TypeTable.Types.Remove(structTypeInfoName, out var structTypeInfo); // Remove and add back in later
+            var structTypeInfoType = _types[structTypeInfo.TypeIndex] = _context.CreateNamedStruct(structTypeInfoName);
+            CreateTypeInfo(structTypeInfoType, structTypeInfo.TypeIndex);
+
+            const string typeInfoName = "TypeInfo";
+            var (typeInfoType, typeInfo) = CreateTypeInfoType(typeInfoName, structTypeInfoType);
+            const string integerTypeInfoName = "IntegerTypeInfo";
+            var (integerTypeInfoType, integerTypeInfo) = CreateTypeInfoType(integerTypeInfoName, structTypeInfoType);
+            const string pointerTypeInfoName = "PointerTypeInfo";
+            var (pointerTypeInfoType, pointerTypeInfo) = CreateTypeInfoType(pointerTypeInfoName, structTypeInfoType);
+            const string arrayTypeInfoName = "CArrayTypeInfo";
+            var (arrayTypeInfoType, arrayTypeInfo) = CreateTypeInfoType(arrayTypeInfoName, structTypeInfoType);
+            const string enumTypeInfoName = "EnumTypeInfo";
+            var (enumTypeInfoType, enumTypeInfo) = CreateTypeInfoType(enumTypeInfoName, structTypeInfoType);
+
             if (_emitDebug)
             {
                 foreach (var (name, type) in TypeTable.Types)
@@ -57,6 +73,7 @@ namespace Lang.Backend
                     {
                         case StructAst structAst:
                             _types[structAst.TypeIndex] = _context.CreateNamedStruct(name);
+                            CreateTypeInfo(structTypeInfoType, structAst.TypeIndex);
 
                             if (structAst.Fields.Any())
                             {
@@ -72,14 +89,29 @@ namespace Lang.Backend
                             break;
                         case EnumAst enumAst:
                             _types[enumAst.TypeIndex] = GetIntegerType(enumAst.BaseType.Size);
+                            CreateTypeInfo(enumTypeInfoType, enumAst.TypeIndex);
                             CreateDebugEnumType(enumAst);
                             break;
                         case PrimitiveAst primitive:
                             _types[primitive.TypeIndex] = GetPrimitiveType(primitive);
+                            switch (primitive.TypeKind)
+                            {
+                                case TypeKind.Integer:
+                                    CreateTypeInfo(integerTypeInfoType, primitive.TypeIndex);
+                                    break;
+                                case TypeKind.Pointer:
+                                    CreateTypeInfo(pointerTypeInfoType, primitive.TypeIndex);
+                                    break;
+                                default:
+                                    CreateTypeInfo(typeInfoType, primitive.TypeIndex);
+                                    break;
+                            }
                             CreateDebugBasicType(primitive, name);
                             break;
                         case ArrayType arrayType:
                             _types[arrayType.TypeIndex] = LLVM.ArrayType(_types[arrayType.ElementType.TypeIndex], arrayType.Length);
+                            CreateTypeInfo(arrayTypeInfoType, arrayType.TypeIndex);
+
                             var elementType = _debugTypes[arrayType.ElementType.TypeIndex];
                             _debugTypes[arrayType.TypeIndex] = LLVM.DIBuilderCreateArrayType(_debugBuilder, arrayType.Length, 0, elementType, null, 0);
                             break;
@@ -94,26 +126,42 @@ namespace Lang.Backend
                     {
                         case StructAst structAst:
                             _types[structAst.TypeIndex] = _context.CreateNamedStruct(name);
+                            CreateTypeInfo(structTypeInfoType, structAst.TypeIndex);
                             break;
                         case EnumAst enumAst:
                             _types[enumAst.TypeIndex] = GetIntegerType(enumAst.BaseType.Size);
+                            CreateTypeInfo(enumTypeInfoType, enumAst.TypeIndex);
                             break;
                         case PrimitiveAst primitive:
                             _types[primitive.TypeIndex] = GetPrimitiveType(primitive);
+                            switch (primitive.TypeKind)
+                            {
+                                case TypeKind.Integer:
+                                    CreateTypeInfo(integerTypeInfoType, primitive.TypeIndex);
+                                    break;
+                                case TypeKind.Pointer:
+                                    CreateTypeInfo(pointerTypeInfoType, primitive.TypeIndex);
+                                    break;
+                                default:
+                                    CreateTypeInfo(typeInfoType, primitive.TypeIndex);
+                                    break;
+                            }
                             break;
                         case ArrayType arrayType:
                             _types[arrayType.TypeIndex] = LLVM.ArrayType(_types[arrayType.ElementType.TypeIndex], arrayType.Length);
+                            CreateTypeInfo(arrayTypeInfoType, arrayType.TypeIndex);
                             break;
                     }
                 }
             }
 
-            var typeInfoType = _module.GetTypeByName("TypeInfo");
-            var integerTypeInfoType = _module.GetTypeByName("IntegerTypeInfo");
-            var pointerTypeInfoType = _module.GetTypeByName("PointerTypeInfo");
-            var arrayTypeInfoType = _module.GetTypeByName("CArrayTypeInfo");
-            var enumTypeInfoType = _module.GetTypeByName("EnumTypeInfo");
-            var structTypeInfoType = _module.GetTypeByName("StructTypeInfo");
+            TypeTable.Types[typeInfoName] = typeInfo;
+            TypeTable.Types[integerTypeInfoName] = integerTypeInfo;
+            TypeTable.Types[pointerTypeInfoName] = pointerTypeInfo;
+            TypeTable.Types[arrayTypeInfoName] = arrayTypeInfo;
+            TypeTable.Types[enumTypeInfoName] = enumTypeInfo;
+            TypeTable.Types[structTypeInfoName] = structTypeInfo;
+
             var functionTypeInfoType = _module.GetTypeByName("FunctionTypeInfo");
 
             var typeFieldType = _module.GetTypeByName("TypeField");
@@ -122,11 +170,9 @@ namespace Lang.Backend
 
             var enumValueType = _module.GetTypeByName("EnumValue");
             var enumValueArrayType = _module.GetTypeByName("Array.EnumValue");
-            var defaultEnumValues = LLVMValueRef.CreateConstNamedStruct(enumValueArrayType, new LLVMValueRef[] {_zeroInt, LLVM.ConstNull(LLVM.PointerType(enumValueType, 0))});
 
             var argumentType = _module.GetTypeByName("ArgumentType");
             var argumentArrayType = _module.GetTypeByName("Array.ArgumentType");
-            var defaultArguments = LLVMValueRef.CreateConstNamedStruct(argumentArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(argumentType, 0))});
 
             _stringType = _module.GetTypeByName("string");
             _u8PointerType = LLVM.PointerType(LLVM.Int8Type(), 0);
@@ -299,11 +345,13 @@ namespace Lang.Backend
                     });
 
                     var typeNameString = GetString(name);
-
                     var typeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Function, 0);
 
                     var fields = new LLVMValueRef[]{typeNameString, typeKind, _zeroInt, returnType, arguments};
-                    SetTypeInfo(functionTypeInfoType, fields, function.TypeIndex);
+
+                    var functionTypeInfo = CreateTypeInfo(functionTypeInfoType, function.TypeIndex);
+                    var typeInfoStruct = LLVMValueRef.CreateConstNamedStruct(functionTypeInfoType, fields);
+                    LLVM.SetInitializer(functionTypeInfo, typeInfoStruct);
                 }
             }
 
@@ -414,6 +462,30 @@ namespace Lang.Backend
             LLVM.AddModuleFlag(_module, LLVMModuleFlagBehavior.LLVMModuleFlagBehaviorWarning, name.Value, (UIntPtr)name.Length, value);
         }
 
+        private (LLVMTypeRef, IType) CreateTypeInfoType(string typeName, LLVMTypeRef typeInfoType)
+        {
+            TypeTable.Types.Remove(typeName, out var typeInfo); // Remove and add back in later
+            var typeInfoStruct = _types[typeInfo.TypeIndex] = _context.CreateNamedStruct(typeName);
+
+            CreateTypeInfo(typeInfoType, typeInfo.TypeIndex);
+            return (typeInfoStruct, typeInfo);
+        }
+
+        private LLVMValueRef CreateTypeInfo(LLVMTypeRef typeInfoType, int typeIndex)
+        {
+            var typeInfo = _module.AddGlobal(typeInfoType, "____type_info");
+            SetPrivateConstant(typeInfo);
+            return _typeInfos[typeIndex] = typeInfo;
+        }
+
+        private void SetTypeInfo(LLVMTypeRef typeInfoType, LLVMValueRef[] fields, int typeIndex)
+        {
+            var typeInfo = _typeInfos[typeIndex];
+
+            var typeInfoStruct = LLVMValueRef.CreateConstNamedStruct(typeInfoType, fields);
+            LLVM.SetInitializer(typeInfo, typeInfoStruct);
+        }
+
         private LLVMTypeRef GetPrimitiveType(PrimitiveAst type)
         {
             return type.TypeKind switch
@@ -448,16 +520,6 @@ namespace Lang.Backend
             }
 
             return LLVM.PointerType(_types[pointerType.TypeIndex], 0);
-        }
-
-        private void SetTypeInfo(LLVMTypeRef typeInfoType, LLVMValueRef[] fields, int typeIndex)
-        {
-            var typeInfo = _module.AddGlobal(typeInfoType, "____type_info");
-            SetPrivateConstant(typeInfo);
-            _typeInfos[typeIndex] = LLVMValueRef.CreateConstBitCast(typeInfo, _typeInfoPointerType);
-
-            var typeInfoStruct = LLVMValueRef.CreateConstNamedStruct(typeInfoType, fields);
-            LLVM.SetInitializer(typeInfo, typeInfoStruct);
         }
 
         private void SetPrivateConstant(LLVMValueRef variable)
