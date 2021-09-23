@@ -360,21 +360,6 @@ type_information() {
 
 print_type_info(Type type) {
     type_info := type_of(type);
-
-    /*
-    printf("Type Name = %s, Type Kind = %d, Type Size = %d, Field Count = %d\n", type_info.name, type_info.type, type_info.size, type_info.fields.length);
-    each field in type_info.fields
-        printf("Field name = %s, Field offset = %d, Field type name = %s\n", field.name, field.offset, field.type_info.name);
-    each enum_value in type_info.enum_values
-        printf("Enum value name = %s, Value = %d\n", enum_value.name, enum_value.value);
-
-    if type_info.type == TypeKind.Function {
-        printf("Return type = %s\n", type_info.return_type.name);
-        each arg in type_info.arguments
-            printf("Argument name = %s, Argument type name = %s, Argument type kind = %d\n", arg.name, arg.type_info.name, arg.type_info.type);
-    }
-    */
-
     printf("Type Name = %s, Type Kind = %d, Type Size = %d\n", type_info.name, type_info.type, type_info.size);
 
     if type_info.type == TypeKind.Struct {
