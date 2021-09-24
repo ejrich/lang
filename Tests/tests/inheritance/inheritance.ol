@@ -46,11 +46,36 @@ BaseStruct* returns_base(bool use_struct_a) {
 }
 
 set_values() {
+    a: StructA = {foo = 88;}
 
+    s: StructWithBase = {b = &a;}
+
+    assert(s.b == &a);
+    assert(s.b.foo == a.foo);
 }
 
-set_array_elements() {
+struct StructWithBase {
+    foo: int;
+    b: BaseStruct*;
+}
 
+set_array_elements() #print_ir {
+    a: StructA;
+    b: BaseStruct;
+
+    array: Array<BaseStruct*>[1];
+    array[0] = &a;
+    assert(array[0] == &a);
+
+    array[0] = &b;
+    assert(array[0] == &b);
+
+    carray: CArray<BaseStruct*>[1];
+    carray[0] = &a;
+    assert(carray[0] == &a);
+
+    carray[0] = &b;
+    assert(carray[0] == &b);
 }
 
 #run main();

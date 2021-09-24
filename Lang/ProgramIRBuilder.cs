@@ -798,6 +798,9 @@ namespace Lang
                 value = EmitExpression(function, previousValue, value, assignment.Operator, type);
             }
 
+            // TODO Get this to work
+            // var castValue = EmitCastValue(function, value, pointer.Type);
+            // EmitStore(function, pointer, castValue);
             EmitStore(function, pointer, value);
         }
 
