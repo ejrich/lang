@@ -1481,7 +1481,7 @@ namespace Lang
                     {
                         if (!TypeEquals(declaration.Type, valueType))
                         {
-                            ErrorReporter.Report($"Expected declaration value to be type '{declaration.Type}', but got '{valueType.Name}'", declaration.TypeDefinition);
+                            ErrorReporter.Report($"Expected declaration value to be type '{declaration.Type.Name}', but got '{valueType.Name}'", declaration.TypeDefinition);
                         }
                         else
                         {
@@ -3198,8 +3198,9 @@ namespace Lang
                                     ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{expression.Type.Name}' and '{nextExpressionType.Name}'", expression.Children[i]);
                                 }
                             }
-                            else if (!(type == TypeKind.Integer || type == TypeKind.Float) &&
-                                !(nextType == TypeKind.Integer || nextType == TypeKind.Float))
+                            else if ((!(type == TypeKind.Integer || type == TypeKind.Float) &&
+                                !(nextType == TypeKind.Integer || nextType == TypeKind.Float)) &&
+                                !(type == TypeKind.Pointer && nextType == TypeKind.Pointer))
                             {
                                 ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{expression.Type.Name}' and '{nextExpressionType.Name}'", expression.Children[i]);
                             }
