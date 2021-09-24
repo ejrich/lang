@@ -494,7 +494,7 @@ namespace Lang
             if (enumerator.Current?.Type == TokenType.Colon)
             {
                 enumerator.MoveNext();
-                structAst.BaseType = ParseType(enumerator);
+                structAst.BaseTypeDefinition = ParseType(enumerator);
                 enumerator.MoveNext();
             }
 

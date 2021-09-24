@@ -361,21 +361,21 @@ namespace Lang
             structAst.Verifying = true;
             var i = 0;
 
-            if (structAst.BaseType != null)
+            if (structAst.BaseTypeDefinition != null)
             {
-                var baseType = VerifyType(structAst.BaseType, _globalScope, out var isGeneric, out var isVarargs, out var isParams);
+                var baseType = VerifyType(structAst.BaseTypeDefinition, _globalScope, out var isGeneric, out var isVarargs, out var isParams);
 
                 if (isVarargs || isParams || isGeneric)
                 {
-                    ErrorReporter.Report($"Struct base type must be a struct", structAst.BaseType);
+                    ErrorReporter.Report($"Struct base type must be a struct", structAst.BaseTypeDefinition);
                 }
                 else if (baseType == null)
                 {
-                    ErrorReporter.Report($"Undefined type '{PrintTypeDefinition(structAst.BaseType)}' as the base type of struct '{structAst.Name}'", structAst.BaseType);
+                    ErrorReporter.Report($"Undefined type '{PrintTypeDefinition(structAst.BaseTypeDefinition)}' as the base type of struct '{structAst.Name}'", structAst.BaseTypeDefinition);
                 }
                 else if (baseType is not StructAst baseTypeStruct)
                 {
-                    ErrorReporter.Report($"Base type '{PrintTypeDefinition(structAst.BaseType)}' of struct '{structAst.Name}' is not a struct", structAst.BaseType);
+                    ErrorReporter.Report($"Base type '{PrintTypeDefinition(structAst.BaseTypeDefinition)}' of struct '{structAst.Name}' is not a struct", structAst.BaseTypeDefinition);
                 }
                 else
                 {
@@ -386,6 +386,7 @@ namespace Lang
                         structAst.Fields.Insert(i++, field);
                     }
                     structAst.Size = baseTypeStruct.Size;
+                    structAst.BaseStruct = baseTypeStruct;
                 }
             }
 
@@ -3427,37 +3428,58 @@ namespace Lang
             }
         }
 
-        private bool TypeEquals(IType a, IType b, bool checkPrimitives = false)
+        private bool TypeEquals(IType target, IType source, bool checkPrimitives = false)
         {
-            if (a == null || b == null) return false;
-            if (a == b) return true;
+            if (target == null || source == null) return false;
+            if (target == source) return true;
 
-            switch (a.TypeKind)
+            switch (target.TypeKind)
             {
                 case TypeKind.Integer:
-                    if (b.TypeKind == TypeKind.Integer)
+                    if (source.TypeKind == TypeKind.Integer)
                     {
                         if (!checkPrimitives) return true;
-                        var ap = (PrimitiveAst)a;
-                        var bp = (PrimitiveAst)b;
-                        return a.Size == b.Size && ap.Signed == bp.Signed;
+                        var ap = (PrimitiveAst)target;
+                        var bp = (PrimitiveAst)source;
+                        return target.Size == source.Size && ap.Signed == bp.Signed;
                     }
                     return false;
                 case TypeKind.Float:
-                    if (b.TypeKind == TypeKind.Float)
+                    if (source.TypeKind == TypeKind.Float)
                     {
                         if (!checkPrimitives) return true;
-                        return a.Size == b.Size;
+                        return target.Size == source.Size;
                     }
                     return false;
                 case TypeKind.Pointer:
-                    if (b.TypeKind != TypeKind.Pointer)
+                    if (source.TypeKind != TypeKind.Pointer)
                     {
                         return false;
                     }
-                    var aPointer = (PrimitiveAst)a;
-                    var bPointer = (PrimitiveAst)b;
-                    return aPointer.PointerType == bPointer.PointerType || aPointer.PointerType == TypeTable.VoidType || bPointer.PointerType == TypeTable.VoidType;
+                    var targetPointer = (PrimitiveAst)target;
+                    var targetPointerType = targetPointer.PointerType;
+                    var sourcePointer = (PrimitiveAst)source;
+                    var sourcePointerType = sourcePointer.PointerType;
+
+                    if (targetPointerType == TypeTable.VoidType || sourcePointerType == TypeTable.VoidType)
+                    {
+                        return true;
+                    }
+
+                    if (targetPointerType is StructAst targetStruct && sourcePointerType is StructAst sourceStruct)
+                    {
+                        var sourceBaseStruct = sourceStruct.BaseStruct;
+                        while (sourceBaseStruct != null)
+                        {
+                            if (targetStruct == sourceBaseStruct)
+                            {
+                                return true;
+                            }
+                            sourceBaseStruct = sourceBaseStruct.BaseStruct;
+                        }
+                    }
+
+                    return false;
             }
 
             return false;

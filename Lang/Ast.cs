@@ -102,7 +102,8 @@ namespace Lang
         public TypeKind TypeKind { get; set; }
         public uint Size { get; set; }
         public string BaseStructName { get; set; }
-        public TypeDefinition BaseType { get; set; }
+        public TypeDefinition BaseTypeDefinition { get; set; }
+        public StructAst BaseStruct { get; set; }
         public bool Verified { get; set; }
         public bool Verifying { get; set; }
         public List<string> Generics { get; set; }
