@@ -180,7 +180,7 @@ namespace Lang.Backend
                         argumentValues[arg] = argumentValue;
                     }
 
-                    var argumentArray = LLVMValueRef.CreateConstArray(typeInfoType, argumentValues);
+                    var argumentArray = LLVMValueRef.CreateConstArray(argumentType, argumentValues);
                     var argumentArrayGlobal = _module.AddGlobal(LLVM.TypeOf(argumentArray), "____type_fields");
                     SetPrivateConstant(argumentArrayGlobal);
                     LLVM.SetInitializer(argumentArrayGlobal, argumentArray);
