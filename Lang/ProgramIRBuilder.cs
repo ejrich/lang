@@ -810,7 +810,8 @@ namespace Lang
             }
             else
             {
-                var instruction = new Instruction {Type = InstructionType.Return, Value1 = EmitIR(function, returnAst.Value, scope, returnValue: true)};
+                var returnValue = EmitIR(function, returnAst.Value, scope, returnValue: true);
+                var instruction = new Instruction {Type = InstructionType.Return, Value1 = EmitCastValue(function, returnValue, returnType)};
                 function.Instructions.Add(instruction);
             }
         }
