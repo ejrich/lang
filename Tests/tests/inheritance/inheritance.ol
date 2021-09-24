@@ -59,7 +59,7 @@ struct StructWithBase {
     b: BaseStruct*;
 }
 
-set_array_elements() #print_ir {
+set_array_elements() {
     a: StructA;
     b: BaseStruct;
 
