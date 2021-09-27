@@ -95,22 +95,36 @@ namespace Lang
 
         private static IAst ParseTopLevelAst(TokenEnumerator enumerator)
         {
-            var token = enumerator.Current!;
-            switch (token!.Type)
+            var attributes = ParseAttributes(enumerator);
+
+            var token = enumerator.Current;
+            switch (token.Type)
             {
                 case TokenType.Identifier:
                     if (enumerator.Peek()?.Type == TokenType.Colon)
                     {
+                        if (attributes != null)
+                        {
+                            ErrorReporter.Report($"Global variables cannot have attributes", token);
+                        }
                         return ParseDeclaration(enumerator);
                     }
-                    return ParseFunction(enumerator);
+                    return ParseFunction(enumerator, attributes);
                 case TokenType.Struct:
-                    return ParseStruct(enumerator);
+                    return ParseStruct(enumerator, attributes);
                 case TokenType.Enum:
-                    return ParseEnum(enumerator);
+                    return ParseEnum(enumerator, attributes);
                 case TokenType.Pound:
+                    if (attributes != null)
+                    {
+                        ErrorReporter.Report($"Compiler directives cannot have attributes", token);
+                    }
                     return ParseTopLevelDirective(enumerator);
                 case TokenType.Operator:
+                    if (attributes != null)
+                    {
+                        ErrorReporter.Report($"Operator overloads cannot have attributes", token);
+                    }
                     return ParseOperatorOverload(enumerator);
                 default:
                     ErrorReporter.Report($"Unexpected token '{token.Value}'", token);
@@ -118,10 +132,33 @@ namespace Lang
             }
         }
 
-        private static FunctionAst ParseFunction(TokenEnumerator enumerator)
+        private static List<string> ParseAttributes(TokenEnumerator enumerator)
+        {
+            if (enumerator.Current.Type != TokenType.OpenBracket)
+            {
+                return null;
+            }
+
+            var attributes = new List<string>();
+            var commaRequired = false;
+            while (enumerator.MoveNext())
+            {
+                var token = enumerator.Current;
+                if (token.Type == TokenType.CloseBracket)
+                {
+                    enumerator.MoveNext();
+                    break;
+                }
+            }
+
+            return attributes;
+        }
+
+        private static FunctionAst ParseFunction(TokenEnumerator enumerator, List<string> attributes)
         {
             // 1. Determine return type and name of the function
             var function = CreateAst<FunctionAst>(enumerator.Current);
+            function.Attributes = attributes;
 
             // 1a. Check if the return type is void
             if (enumerator.Peek()?.Type != TokenType.OpenParen)
@@ -411,9 +448,10 @@ namespace Lang
             return function;
         }
 
-        private static StructAst ParseStruct(TokenEnumerator enumerator)
+        private static StructAst ParseStruct(TokenEnumerator enumerator, List<string> attributes)
         {
             var structAst = CreateAst<StructAst>(enumerator.Current);
+            structAst.Attributes = attributes;
 
             // 1. Determine name of struct
             enumerator.MoveNext();
@@ -596,9 +634,10 @@ namespace Lang
             return structField;
         }
 
-        private static EnumAst ParseEnum(TokenEnumerator enumerator)
+        private static EnumAst ParseEnum(TokenEnumerator enumerator, List<string> attributes)
         {
             var enumAst = CreateAst<EnumAst>(enumerator.Current);
+            enumAst.Attributes = attributes;
 
             // 1. Determine name of enum
             enumerator.MoveNext();

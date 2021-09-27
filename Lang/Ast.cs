@@ -89,6 +89,7 @@ namespace Lang
         public List<DeclarationAst> Arguments { get; } = new();
         public List<IType[]> VarargsCallTypes { get; set; }
         public ScopeAst Body { get; set; }
+        public List<string> Attributes { get; set; }
     }
 
     public class StructAst : IAst, IType
@@ -101,6 +102,7 @@ namespace Lang
         public int TypeIndex { get; set; }
         public TypeKind TypeKind { get; set; }
         public uint Size { get; set; }
+        public List<string> Attributes { get; set; }
         public string BaseStructName { get; set; }
         public TypeDefinition BaseTypeDefinition { get; set; }
         public StructAst BaseStruct { get; set; }
@@ -152,6 +154,7 @@ namespace Lang
         public int TypeIndex { get; set; }
         public uint Size { get; set; } = 4;
         public TypeKind TypeKind { get; set; } = TypeKind.Enum;
+        public List<string> Attributes { get; set; }
         public TypeDefinition BaseTypeDefinition { get; set; }
         public PrimitiveAst BaseType { get; set; }
         public List<EnumValueAst> Values { get; } = new();
