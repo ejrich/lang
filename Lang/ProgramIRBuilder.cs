@@ -783,25 +783,22 @@ namespace Lang
 
         private void EmitAssignment(FunctionIR function, AssignmentAst assignment, ScopeAst scope)
         {
-            var pointer = EmitGetReference(function, assignment.Reference, scope, out var loaded);
+            var (pointer, type) = EmitGetReference(function, assignment.Reference, scope, out var loaded);
+            if (loaded && type.TypeKind == TypeKind.Pointer)
+            {
+                var pointerType = (PrimitiveAst)type;
+                type = pointerType.PointerType;
+            }
 
             var value = EmitIR(function, assignment.Value, scope);
             if (assignment.Operator != Operator.None)
             {
-                var type = pointer.Type;
-                if (loaded && pointer.Type.TypeKind == TypeKind.Pointer)
-                {
-                    var pointerType = (PrimitiveAst)type;
-                    type = pointerType.PointerType;
-                }
                 var previousValue = EmitLoad(function, type, pointer);
                 value = EmitExpression(function, previousValue, value, assignment.Operator, type);
             }
 
-            // TODO Get this to work
-            // var castValue = EmitCastValue(function, value, pointer.Type);
-            // EmitStore(function, pointer, castValue);
-            EmitStore(function, pointer, value);
+            var castValue = EmitCastValue(function, value, type);
+            EmitStore(function, pointer, castValue);
         }
 
         public void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, ScopeAst scope)
@@ -1122,9 +1119,8 @@ namespace Lang
                 case CallAst call:
                     return EmitCall(function, call, scope);
                 case ChangeByOneAst changeByOne:
-                    var pointer = EmitGetReference(function, changeByOne.Value, scope, out loaded);
-                    var pointerType = pointer.Type;
-                    if (loaded && pointer.Type.TypeKind == TypeKind.Pointer)
+                    var (pointer, pointerType) = EmitGetReference(function, changeByOne.Value, scope, out loaded);
+                    if (loaded && pointerType.TypeKind == TypeKind.Pointer)
                     {
                         var pointerTypeDef = (PrimitiveAst)pointerType;
                         pointerType = pointerTypeDef.PointerType;
@@ -1162,7 +1158,7 @@ namespace Lang
                             value = EmitIR(function, unary.Value, scope);
                             return EmitLoad(function, unary.Type, value);
                         case UnaryOperator.Reference:
-                            value = EmitGetReference(function, unary.Value, scope, out _);
+                            (value, _) = EmitGetReference(function, unary.Value, scope, out _);
                             if (value.Type.TypeKind == TypeKind.CArray)
                             {
                                 return EmitInstruction(InstructionType.PointerCast, function, unary.Type, value, new InstructionValue {ValueType = InstructionValueType.Type, Type = unary.Type});
@@ -1257,7 +1253,7 @@ namespace Lang
             return value;
         }
 
-        private InstructionValue EmitGetReference(FunctionIR function, IAst ast, ScopeAst scope, out bool loaded)
+        private (InstructionValue, IType) EmitGetReference(FunctionIR function, IAst ast, ScopeAst scope, out bool loaded)
         {
             loaded = false;
             switch (ast)
@@ -1267,27 +1263,34 @@ namespace Lang
                     switch (ident)
                     {
                         case DeclarationAst declaration:
-                            return AllocationValue(declaration.AllocationIndex, declaration.Type, global);
+                        {
+                            var allocation = AllocationValue(declaration.AllocationIndex, declaration.Type, global);
+                            return (allocation, declaration.Type);
+                        }
                         case VariableAst variable:
                             if (variable.AllocationIndex.HasValue)
                             {
-                                return AllocationValue(variable.AllocationIndex.Value, variable.Type, global);
+                                var allocation = AllocationValue(variable.AllocationIndex.Value, variable.Type, global);
+                                return (allocation, variable.Type);
                             }
                             else
                             {
-                                return variable.Pointer;
+                                return (variable.Pointer, variable.Type);
                             }
                     }
                     break;
                 case StructFieldRefAst structField:
-                    return EmitGetStructRefPointer(function, structField, scope, out loaded);
+                    var structFieldPointer = EmitGetStructRefPointer(function, structField, scope, out loaded);
+                    return (structFieldPointer, structFieldPointer.Type);
                 case IndexAst index:
                     loaded = index.CallsOverload;
-                    return EmitGetIndexPointer(function, index, scope);
+                    var indexPointer = EmitGetIndexPointer(function, index, scope);
+                    return (indexPointer, indexPointer.Type);
                 case UnaryAst unary:
-                    return EmitIR(function, unary.Value, scope);
+                    var pointer = EmitIR(function, unary.Value, scope);
+                    return (pointer, unary.Type);
             }
-            return null;
+            return (null, null);
         }
 
         private InstructionValue EmitGetStructRefPointer(FunctionIR function, StructFieldRefAst structField, ScopeAst scope, out bool loaded)
