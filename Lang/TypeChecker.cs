@@ -52,8 +52,6 @@ namespace Lang
             TypeTable.Float64Type = AddPrimitive("float64", TypeKind.Float, 8, true);
             TypeTable.TypeType = AddPrimitive("Type", TypeKind.Type, 4, true);
 
-            // _irBuilder.Init();
-
             var functionNames = new HashSet<string>();
             do
             {
@@ -1883,7 +1881,7 @@ namespace Lang
                         return null;
                     }
                     var pointerType = (PrimitiveAst)reference;
-                    return pointerType.PointerType;
+                    return unary.Type = pointerType.PointerType;
                 }
                 default:
                     ErrorReporter.Report("Expected to have a reference to a variable, field, or pointer", ast);
