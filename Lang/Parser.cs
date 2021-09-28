@@ -198,6 +198,22 @@ namespace Lang
                 enumerator.MoveNext();
             }
 
+            // 1b. Handle multiple return values
+            if (enumerator.Current?.Type == TokenType.Comma)
+            {
+                while (enumerator.Current?.Type == TokenType.Comma)
+                {
+                    if (!enumerator.MoveNext())
+                    {
+                        break;
+                    }
+                    // TODO Implement me
+                    //function.ReturnTypes.Add(ParseType(enumerator));
+                    ParseType(enumerator);
+                    enumerator.MoveNext();
+                }
+            }
+
             // 1b. Set the name of the function or get the name from the type
             switch (enumerator.Current?.Type)
             {
@@ -1291,10 +1307,10 @@ namespace Lang
             }
         }
 
-        private static AssignmentAst ParseAssignment(TokenEnumerator enumerator, IFunction currentFunction, ExpressionAst reference = null)
+        private static AssignmentAst ParseAssignment(TokenEnumerator enumerator, IFunction currentFunction, IAst reference = null)
         {
             // 1. Set the variable
-            var assignment = CreateAst<AssignmentAst>(enumerator.Current);
+            var assignment = reference == null ? CreateAst<AssignmentAst>(enumerator.Current) : CreateAst<AssignmentAst>(reference);
             assignment.Reference = reference;
 
             // 2. When the original reference is null, set the l-value to an identifier
@@ -1339,16 +1355,16 @@ namespace Lang
                 }
             }
             // 3, Get the operator on the reference expression if the expression ends with an operator
-            else
+            else if (reference is ExpressionAst expression)
             {
-                if (reference.Children.Count == 1)
+                if (expression.Children.Count == 1)
                 {
-                    assignment.Reference = reference.Children[0];
+                    assignment.Reference = expression.Children[0];
                 }
-                if (reference.Operators.Any() && reference.Children.Count == reference.Operators.Count)
+                if (expression.Operators.Any() && expression.Children.Count == expression.Operators.Count)
                 {
-                    assignment.Operator = reference.Operators.Last();
-                    reference.Operators.RemoveAt(reference.Operators.Count - 1);
+                    assignment.Operator = expression.Operators.Last();
+                    expression.Operators.RemoveAt(expression.Operators.Count - 1);
                 }
             }
 
@@ -1384,6 +1400,14 @@ namespace Lang
                 if (token.Type == TokenType.Equals)
                 {
                     return ParseAssignment(enumerator, currentFunction, expression);
+                }
+                else if (token.Type == TokenType.Comma)
+                {
+                    if (expression.Children.Count == 1)
+                    {
+                        return ParseCompoundExpression(enumerator, currentFunction, expression.Children[0]);
+                    }
+                    return ParseCompoundExpression(enumerator, currentFunction, expression);
                 }
 
                 if (operatorRequired)
@@ -1459,10 +1483,90 @@ namespace Lang
             return expression;
         }
 
+        private static IAst ParseCompoundExpression(TokenEnumerator enumerator, IFunction currentFunction, IAst initial)
+        {
+            var compoundExpression = CreateAst<CompoundExpressionAst>(initial);
+            compoundExpression.Children.Add(initial);
+            var firstToken = enumerator.Current;
+
+            if (!enumerator.MoveNext())
+            {
+                ErrorReporter.Report("Expected compound expression to contain multiple values", firstToken);
+                return compoundExpression;
+            }
+
+            while (enumerator.Current != null)
+            {
+                var token = enumerator.Current;
+                if (token.Type == TokenType.SemiColon)
+                {
+                    break;
+                }
+
+                switch (token.Type)
+                {
+                    case TokenType.Equals:
+                        if (compoundExpression.Children.Count == 1)
+                        {
+                            ErrorReporter.Report("Expected compound expression to contain multiple values", firstToken);
+                        }
+                        return ParseAssignment(enumerator, currentFunction, compoundExpression);
+                    case TokenType.Colon:
+                        var compoundDeclaration = CreateAst<CompoundDeclarationAst>(compoundExpression);
+                        compoundDeclaration.Variables = compoundExpression.Children;
+
+                        // TODO Add specifying types
+                        if (!enumerator.MoveNext())
+                        {
+                            ErrorReporter.Report("Expected declaration to contain type and/or value", enumerator.Last);
+                            return null;
+                        }
+
+                        switch (enumerator.Current.Type)
+                        {
+                            case TokenType.Equals:
+                                ParseDeclarationValue(compoundDeclaration, enumerator, currentFunction);
+                                break;
+                            case TokenType.SemiColon:
+                                // TODO Add specifying types
+                                if (compoundDeclaration.Type == null)
+                                {
+                                    ErrorReporter.Report("Expected token declaration to have type and/or value", token);
+                                }
+                                break;
+                            default:
+                                ErrorReporter.Report($"Unexpected token '{token.Value}' in declaration", token);
+                                // Parse until there is an equals sign
+                                while (enumerator.Current != null && enumerator.Current.Type != TokenType.Equals)
+                                    enumerator.MoveNext();
+
+                                ParseDeclarationValue(compoundDeclaration, enumerator, currentFunction);
+                                break;
+                        }
+
+                        return compoundDeclaration;
+                    default:
+                        compoundExpression.Children.Add(ParseExpression(enumerator, currentFunction, null, TokenType.Comma, TokenType.Colon, TokenType.Equals));
+                        if (enumerator.Current?.Type == TokenType.Comma)
+                        {
+                            enumerator.MoveNext();
+                        }
+                        break;
+                }
+            }
+
+            if (compoundExpression.Children.Count == 1)
+            {
+                ErrorReporter.Report("Expected compound expression to contain multiple values", firstToken);
+            }
+
+            return compoundExpression;
+        }
+
         private static IAst ParseStructFieldRef(TokenEnumerator enumerator, IAst initialAst, IFunction currentFunction)
         {
             // 1. Initialize and move over the dot operator
-            var structFieldRef = new StructFieldRefAst {FileIndex = initialAst.FileIndex, Line = initialAst.Line, Column = initialAst.Column};
+            var structFieldRef = CreateAst<StructFieldRefAst>(initialAst);
             structFieldRef.Children.Add(initialAst);
 
             // 2. Parse expression units until the operator is not '.'
@@ -1537,11 +1641,7 @@ namespace Lang
                             {
                                 if (enumerator.Current?.Type == TokenType.OpenParen)
                                 {
-                                    var callAst = new CallAst
-                                    {
-                                        FileIndex = typeDefinition.FileIndex, Line = typeDefinition.Line,
-                                        Column = typeDefinition.Column
-                                    };
+                                    var callAst = CreateAst<CallAst>(typeDefinition);
                                     callAst.FunctionName = typeDefinition.Name;
                                     callAst.Generics = typeDefinition.Generics;
                                     enumerator.MoveNext();
@@ -1654,12 +1754,7 @@ namespace Lang
 
         private static ExpressionAst CreateSubExpression(ExpressionAst expression, int parentPrecedence, int i, out int end)
         {
-            var subExpression = new ExpressionAst
-            {
-                FileIndex = expression.Children[i].FileIndex,
-                Line = expression.Children[i].Line,
-                Column = expression.Children[i].Column
-            };
+            var subExpression = CreateAst<ExpressionAst>(expression.Children[i]);
 
             subExpression.Children.Add(expression.Children[i]);
             subExpression.Operators.Add(expression.Operators[i]);
@@ -2549,6 +2644,16 @@ namespace Lang
             castAst.Value = ParseExpression(enumerator, currentFunction, null, TokenType.CloseParen);
 
             return castAst;
+        }
+
+        private static T CreateAst<T>(IAst source) where T : IAst, new()
+        {
+            return new()
+            {
+                FileIndex = source.FileIndex,
+                Line = source.Line,
+                Column = source.Column
+            };
         }
 
         private static T CreateAst<T>(Token token) where T : IAst, new()

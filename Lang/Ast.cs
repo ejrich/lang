@@ -48,7 +48,6 @@ namespace Lang
 
     public interface IDeclaration : IAst
     {
-        string Name { get; set; }
         TypeDefinition TypeDefinition { get; set; }
         IType Type { get; set; }
         IType ArrayElementType { get; set; }
@@ -171,14 +170,6 @@ namespace Lang
         public bool Defined { get; set; }
     }
 
-    public class ReturnAst : IAst
-    {
-        public int FileIndex { get; set; }
-        public uint Line { get; init; }
-        public uint Column { get; init; }
-        public IAst Value { get; set; }
-    }
-
     public class PrimitiveAst : IAst, IType
     {
         public int FileIndex { get; set; }
@@ -202,6 +193,14 @@ namespace Lang
         public uint Size { get; set; }
         public uint Length { get; set; }
         public IType ElementType { get; set; }
+    }
+
+    public class ReturnAst : IAst
+    {
+        public int FileIndex { get; set; }
+        public uint Line { get; init; }
+        public uint Column { get; init; }
+        public IAst Value { get; set; }
     }
 
     public class ConstantAst : IAst
@@ -240,6 +239,14 @@ namespace Lang
         public List<Operator> Operators { get; } = new();
         public List<IType> ResultingTypes { get; } = new();
         public Dictionary<int, OperatorOverloadAst> OperatorOverloads { get; } = new();
+        public List<IAst> Children { get; } = new();
+    }
+
+    public class CompoundExpressionAst : IAst
+    {
+        public int FileIndex { get; set; }
+        public uint Line { get; init; }
+        public uint Column { get; init; }
         public List<IAst> Children { get; } = new();
     }
 
@@ -289,6 +296,23 @@ namespace Lang
         public bool HasGenerics { get; set; }
         public bool Constant { get; set; }
         public int AllocationIndex { get; set; }
+        public IAst Value { get; set; }
+        public Dictionary<string, AssignmentAst> Assignments { get; set; }
+        public List<IAst> ArrayValues { get; set; }
+    }
+
+    public class CompoundDeclarationAst : IDeclaration
+    {
+        public int FileIndex { get; set; }
+        public uint Line { get; init; }
+        public uint Column { get; init; }
+        public List<IAst> Variables { get; set; }
+        public string[] VariableNames { get; set; }
+        public TypeDefinition TypeDefinition { get; set; }
+        public IType Type { get; set; }
+        public IType ArrayElementType { get; set; }
+        public bool HasGenerics { get; set; }
+        public bool Constant { get; set; }
         public IAst Value { get; set; }
         public Dictionary<string, AssignmentAst> Assignments { get; set; }
         public List<IAst> ArrayValues { get; set; }
