@@ -306,8 +306,7 @@ namespace Lang
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
-        public List<IAst> Variables { get; set; }
-        public string[] VariableNames { get; set; }
+        public VariableAst[] Variables { get; set; }
         public TypeDefinition TypeDefinition { get; set; }
         public IType Type { get; set; }
         public IType ArrayElementType { get; set; }

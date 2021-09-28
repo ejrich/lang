@@ -1118,6 +1118,9 @@ namespace Lang
                 case DeclarationAst declaration:
                     VerifyDeclaration(declaration, currentFunction, scope);
                     break;
+                case CompoundDeclarationAst compoundDeclaration:
+                    VerifyCompoundDeclaration(compoundDeclaration, currentFunction, scope);
+                    break;
                 case AssignmentAst assignment:
                     VerifyAssignment(assignment, currentFunction, scope);
                     break;
@@ -1410,7 +1413,6 @@ namespace Lang
             if (GetScopeIdentifier(scope, declaration.Name, out _))
             {
                 ErrorReporter.Report($"Identifier '{declaration.Name}' already defined", declaration);
-                return;
             }
 
             if (declaration.TypeDefinition != null)
@@ -1601,6 +1603,175 @@ namespace Lang
             }
 
             scope.Identifiers.TryAdd(declaration.Name, declaration);
+        }
+
+        private void VerifyCompoundDeclaration(CompoundDeclarationAst declaration, IFunction currentFunction, ScopeAst scope)
+        {
+            // 1. Verify the variables are already defined
+            for (var i = 0; i < declaration.Variables.Length; i++)
+            {
+                var variable = declaration.Variables[i];
+                if (GetScopeIdentifier(scope, variable.Name, out _))
+                {
+                    ErrorReporter.Report($"Identifier '{variable.Name}' already defined", variable);
+                }
+                else
+                {
+                    scope.Identifiers.TryAdd(variable.Name, variable);
+                }
+            }
+
+            if (declaration.TypeDefinition != null)
+            {
+                declaration.Type = VerifyType(declaration.TypeDefinition, scope, out _, out var isVarargs, out var isParams, initialArrayLength: declaration.ArrayValues?.Count);
+                if (isVarargs || isParams)
+                {
+                    ErrorReporter.Report($"Variable type cannot be varargs or Params", declaration.TypeDefinition);
+                }
+                else if (declaration.Type == null)
+                {
+                    ErrorReporter.Report($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                }
+                else if (declaration.Type.TypeKind == TypeKind.Void)
+                {
+                    ErrorReporter.Report($"Variable cannot be assigned type 'void'", declaration.TypeDefinition);
+                }
+                else if (declaration.Type.TypeKind == TypeKind.Array)
+                {
+                    var arrayStruct = (StructAst)declaration.Type;
+                    declaration.ArrayElementType = arrayStruct.GenericTypes[0];
+                }
+                else if (declaration.Type.TypeKind == TypeKind.CArray)
+                {
+                    var arrayType = (ArrayType)declaration.Type;
+                    declaration.ArrayElementType = arrayType.ElementType;
+                }
+            }
+
+            // 2. Verify the null values
+            if (declaration.Value is NullAst nullAst)
+            {
+                // 2a. Verify null can be assigned
+                if (declaration.TypeDefinition == null)
+                {
+                    ErrorReporter.Report("Cannot assign null value without declaring a type", declaration.Value);
+                }
+                else
+                {
+                    if (declaration.Type != null && declaration.Type.TypeKind != TypeKind.Pointer)
+                    {
+                        ErrorReporter.Report("Cannot assign null to non-pointer type", declaration.Value);
+                    }
+
+                    nullAst.TargetType = declaration.Type;
+                    foreach (var variable in declaration.Variables)
+                    {
+                        variable.Type = declaration.Type;
+                    }
+                }
+            }
+            // 3. Verify declaration values
+            else if (declaration.Value != null)
+            {
+                var valueTypes = VerifyCompoundExpression(declaration.Value, currentFunction, scope);
+
+                if (valueTypes != null)
+                {
+                    // Verify the assignment value matches the type definition if it has been defined
+                    if (declaration.TypeDefinition == null)
+                    {
+                        for (var i = 0; i < declaration.Variables.Length; i++)
+                        {
+                            var valueIndex = i >= valueTypes.Count ? valueTypes.Count - 1 : i;
+                            var valueType = valueTypes[valueIndex];
+
+                            var type = VerifyType(valueType);
+                            if (type == TypeKind.Void)
+                            {
+                                ErrorReporter.Report($"Variables '{string.Join(", ", declaration.VariableNames)}' cannot be assigned type 'void'", declaration.Value);
+                            }
+                            else if (type != TypeKind.Error)
+                            {
+                                var variableName = declaration.VariableNames[i];
+                                if (variableName != null)
+                                {
+                                    scopeIdentifiers.Add(variableName, valueType);
+                                }
+                            }
+                        }
+                    }
+                    else if (declaration.Type != null)
+                    {
+                        for (var i = 0; i < declaration.Variables.Length; i++)
+                        {
+                            var valueIndex = i >= valueTypes.Count ? valueTypes.Count - 1 : i;
+                            var valueType = valueTypes[valueIndex];
+
+                            // Verify the type is correct
+                            if (valueType != null)
+                            {
+                                if (!TypeEquals(declaration.Type, valueType))
+                                {
+                                    ErrorReporter.Report($"Expected declaration value to be type '{PrintTypeDefinition(declaration.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", declaration.Type);
+                                }
+                                else if (type != TypeKind.Error)
+                                {
+                                    var variableName = declaration.VariableNames[i];
+                                    if (variableName != null)
+                                    {
+                                        scopeIdentifiers.Add(variableName, declaration.Type);
+                                    }
+                                }
+                            }
+                        }
+
+                        if (declaration.Type.PrimitiveType != null && declaration.Value is ConstantAst constant)
+                        {
+                            VerifyConstant(constant, declaration.Type);
+                        }
+                    }
+                }
+            }
+            else if (declaration.Assignments != null)
+            {
+                ErrorReporter.Report("Compound declarations cannot have struct assignments", declaration);
+            }
+            else if (declaration.ArrayValues != null)
+            {
+                ErrorReporter.Report("Compound declarations cannot have array initializations", declaration);
+            }
+            // 4. Set the type of the variables
+            else
+            {
+                foreach (var variable in declaration.Variables)
+                {
+                    variable.Type = declaration.Type;
+                }
+            }
+
+            // 5. Verify the type definition count if necessary
+            if (declaration.Type?.TypeKind == TypeKind.Array && declaration.TypeDefinition?.Count != null)
+            {
+                var countType = VerifyConstantExpression(declaration.TypeDefinition.Count, currentFunction, scope, out var isConstant, out var arrayLength);
+
+                if (countType != null)
+                {
+                    if (countType.TypeKind != TypeKind.Integer || arrayLength < 0)
+                    {
+                        ErrorReporter.Report($"Expected count of variables '{string.Join(", ", declaration.Variables.Select(v => v.Name))}' to be a positive integer", declaration.TypeDefinition.Count);
+                    }
+                    if (isConstant)
+                    {
+                        declaration.TypeDefinition.ConstCount = arrayLength;
+                    }
+                }
+            }
+
+            // 6. Verify constant values
+            if (declaration.Value == null && declaration.Constant)
+            {
+                ErrorReporter.Report($"Constant variables '{string.Join(", ", declaration.Variables.Select(v => v.Name))}' should be assigned a constant value", declaration);
+            }
         }
 
         private StructFieldRefAst GetOSVersion()
