@@ -60,10 +60,13 @@ namespace Lang.Backend
             var (arrayTypeInfoType, arrayTypeInfo) = CreateStructAndTypeInfo("CArrayTypeInfo", structTypeInfoType);
             var (enumTypeInfoType, enumTypeInfo) = CreateStructAndTypeInfo("EnumTypeInfo", structTypeInfoType);
             var (stringStruct, stringType) = CreateStructAndTypeInfo("string", structTypeInfoType);
+            var (stringArrayStruct, stringArrayType) = CreateStructAndTypeInfo("Array.string", structTypeInfoType);
             var (enumValueType, enumValueStruct) = CreateStructAndTypeInfo("EnumValue", structTypeInfoType);
             var (enumValueArrayType, enumValueArray) = CreateStructAndTypeInfo("Array.EnumValue", structTypeInfoType);
 
             _stringType = stringStruct;
+            var defaultAttributes = LLVMValueRef.CreateConstNamedStruct(stringArrayStruct, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(stringStruct, 0))});
+
             var structQueue = new Queue<StructAst>();
 
             if (_emitDebug)
@@ -91,7 +94,7 @@ namespace Lang.Backend
                             break;
                         case EnumAst enumAst:
                         {
-                            DeclareEnum(enumAst, enumValueType, enumValueArrayType, enumTypeInfoType);
+                            DeclareEnum(enumAst, enumValueType, enumValueArrayType, enumTypeInfoType, stringArrayStruct, defaultAttributes);
                             CreateDebugEnumType(enumAst);
                             break;
                         }
@@ -124,7 +127,7 @@ namespace Lang.Backend
                             structQueue.Enqueue(structAst);
                             break;
                         case EnumAst enumAst:
-                            DeclareEnum(enumAst, enumValueType, enumValueArrayType, enumTypeInfoType);
+                            DeclareEnum(enumAst, enumValueType, enumValueArrayType, enumTypeInfoType, stringArrayStruct, defaultAttributes);
                             break;
                         case PrimitiveAst primitive:
                             DeclarePrimitive(primitive, integerTypeInfoType, pointerTypeInfoType, typeInfoType);
@@ -140,24 +143,26 @@ namespace Lang.Backend
             var typeFieldArrayType = _module.GetTypeByName("Array.TypeField");
             var defaultFields = LLVMValueRef.CreateConstNamedStruct(typeFieldArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(typeFieldType, 0))});
 
-            SetStructTypeFields(typeInfo, typeFieldType, typeFieldArrayType, defaultFields, structTypeInfoType);
-            SetStructTypeFields(integerTypeInfo, typeFieldType, typeFieldArrayType, defaultFields, structTypeInfoType);
-            SetStructTypeFields(pointerTypeInfo, typeFieldType, typeFieldArrayType, defaultFields, structTypeInfoType);
-            SetStructTypeFields(arrayTypeInfo, typeFieldType, typeFieldArrayType, defaultFields, structTypeInfoType);
-            SetStructTypeFields(enumTypeInfo, typeFieldType, typeFieldArrayType, defaultFields, structTypeInfoType);
-            SetStructTypeFields((StructAst)structTypeInfo, typeFieldType, typeFieldArrayType, defaultFields, structTypeInfoType);
-            SetStructTypeFields(stringType, typeFieldType, typeFieldArrayType, defaultFields, structTypeInfoType);
-            SetStructTypeFields(enumValueStruct, typeFieldType, typeFieldArrayType, defaultFields, structTypeInfoType);
-            SetStructTypeFields(enumValueArray, typeFieldType, typeFieldArrayType, defaultFields, structTypeInfoType);
+            SetStructTypeFields(typeInfo, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(integerTypeInfo, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(pointerTypeInfo, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(arrayTypeInfo, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(enumTypeInfo, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields((StructAst)structTypeInfo, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(stringType, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(stringArrayType, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(enumValueStruct, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(enumValueArray, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
 
             while (structQueue.TryDequeue(out var structAst))
             {
-                SetStructTypeFields(structAst, typeFieldType, typeFieldArrayType, defaultFields, structTypeInfoType);
+                SetStructTypeFields(structAst, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
             }
 
             var functionTypeInfoType = _module.GetTypeByName("FunctionTypeInfo");
             var argumentType = _module.GetTypeByName("ArgumentType");
             var argumentArrayType = _module.GetTypeByName("Array.ArgumentType");
+            var functionTypeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Function, 0);
 
             foreach (var (name, functions) in TypeTable.Functions)
             {
@@ -191,10 +196,34 @@ namespace Lang.Backend
                         argumentArrayGlobal
                     });
 
-                    var typeNameString = GetString(name);
-                    var typeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Function, 0);
+                    LLVMValueRef attributes;
+                    if (function.Attributes != null)
+                    {
+                        var attributeRefs = new LLVMValueRef[function.Attributes.Count];
 
-                    var fields = new LLVMValueRef[]{typeNameString, typeKind, _zeroInt, returnType, arguments};
+                        for (var attributeIndex = 0; attributeIndex < attributeRefs.Length; attributeIndex++)
+                        {
+                            attributeRefs[attributeIndex] = GetString(function.Attributes[attributeIndex]);
+                        }
+
+                        var attributesArray = LLVMValueRef.CreateConstArray(_stringType, attributeRefs);
+                        var attributesArrayGlobal = _module.AddGlobal(LLVM.TypeOf(attributesArray), "____enum_attributes");
+                        SetPrivateConstant(attributesArrayGlobal);
+                        LLVM.SetInitializer(attributesArrayGlobal, attributesArray);
+
+                        attributes = LLVMValueRef.CreateConstNamedStruct(stringArrayStruct, new LLVMValueRef[]
+                        {
+                            LLVM.ConstInt(LLVM.Int32Type(), (ulong)attributeRefs.Length, 0), attributesArrayGlobal
+                        });
+                    }
+                    else
+                    {
+                        attributes = defaultAttributes;
+                    }
+
+                    var typeNameString = GetString(name);
+
+                    var fields = new LLVMValueRef[]{typeNameString, functionTypeKind, _zeroInt, returnType, arguments, attributes};
 
                     CreateAndSetTypeInfo(functionTypeInfoType, fields, function.TypeIndex);
                 }
@@ -324,7 +353,7 @@ namespace Lang.Backend
             return _typeInfos[typeIndex] = typeInfo;
         }
 
-        private void DeclareEnum(EnumAst enumAst, LLVMTypeRef enumValueType, LLVMTypeRef enumValueArrayType, LLVMTypeRef enumTypeInfoType)
+        private void DeclareEnum(EnumAst enumAst, LLVMTypeRef enumValueType, LLVMTypeRef enumValueArrayType, LLVMTypeRef enumTypeInfoType, LLVMTypeRef stringArrayType, LLVMValueRef defaultAttributes)
         {
             _types[enumAst.TypeIndex] = GetIntegerType(enumAst.BaseType.Size);
 
@@ -351,11 +380,35 @@ namespace Lang.Backend
 
             var valuesArray = LLVMValueRef.CreateConstNamedStruct(enumValueArrayType, new LLVMValueRef[]
             {
-                LLVM.ConstInt(LLVM.Int32Type(), (ulong)enumAst.Values.Count, 0),
-                enumValuesArrayGlobal
+                LLVM.ConstInt(LLVM.Int32Type(), (ulong)enumValueRefs.Length, 0), enumValuesArrayGlobal
             });
 
-            var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, _typeInfos[enumAst.BaseType.TypeIndex], valuesArray};
+            LLVMValueRef attributes;
+            if (enumAst.Attributes != null)
+            {
+                var attributeRefs = new LLVMValueRef[enumAst.Attributes.Count];
+
+                for (var i = 0; i < attributeRefs.Length; i++)
+                {
+                    attributeRefs[i] = GetString(enumAst.Attributes[i]);
+                }
+
+                var attributesArray = LLVMValueRef.CreateConstArray(_stringType, attributeRefs);
+                var attributesArrayGlobal = _module.AddGlobal(LLVM.TypeOf(attributesArray), "____enum_attributes");
+                SetPrivateConstant(attributesArrayGlobal);
+                LLVM.SetInitializer(attributesArrayGlobal, attributesArray);
+
+                attributes = LLVMValueRef.CreateConstNamedStruct(stringArrayType, new LLVMValueRef[]
+                {
+                    LLVM.ConstInt(LLVM.Int32Type(), (ulong)attributeRefs.Length, 0), attributesArrayGlobal
+                });
+            }
+            else
+            {
+                attributes = defaultAttributes;
+            }
+
+            var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, _typeInfos[enumAst.BaseType.TypeIndex], valuesArray, attributes};
             CreateAndSetTypeInfo(enumTypeInfoType, fields, enumAst.TypeIndex);
         }
 
@@ -413,7 +466,7 @@ namespace Lang.Backend
             CreateAndSetTypeInfo(arrayTypeInfoType, fields, arrayType.TypeIndex);
         }
 
-        private void SetStructTypeFields(StructAst structAst, LLVMTypeRef typeFieldType, LLVMTypeRef typeFieldArrayType, LLVMValueRef defaultFields, LLVMTypeRef structTypeInfoType)
+        private void SetStructTypeFields(StructAst structAst, LLVMTypeRef typeFieldType, LLVMTypeRef typeFieldArrayType, LLVMValueRef defaultFields, LLVMTypeRef stringArrayType, LLVMValueRef defaultAttributes, LLVMTypeRef structTypeInfoType)
         {
             var typeName = GetString(structAst.Name);
 
@@ -464,12 +517,37 @@ namespace Lang.Backend
                 structTypeInfoFields = defaultFields;
             }
 
+            LLVMValueRef attributes;
+            if (structAst.Attributes != null)
+            {
+                var attributeRefs = new LLVMValueRef[structAst.Attributes.Count];
+
+                for (var i = 0; i < attributeRefs.Length; i++)
+                {
+                    attributeRefs[i] = GetString(structAst.Attributes[i]);
+                }
+
+                var attributesArray = LLVMValueRef.CreateConstArray(_stringType, attributeRefs);
+                var attributesArrayGlobal = _module.AddGlobal(LLVM.TypeOf(attributesArray), "____enum_attributes");
+                SetPrivateConstant(attributesArrayGlobal);
+                LLVM.SetInitializer(attributesArrayGlobal, attributesArray);
+
+                attributes = LLVMValueRef.CreateConstNamedStruct(stringArrayType, new LLVMValueRef[]
+                {
+                    LLVM.ConstInt(LLVM.Int32Type(), (ulong)attributeRefs.Length, 0), attributesArrayGlobal
+                });
+            }
+            else
+            {
+                attributes = defaultAttributes;
+            }
+
             if (_emitDebug)
             {
                 CreateDebugStructType(structAst);
             }
 
-            var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, structTypeInfoFields};
+            var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, structTypeInfoFields, attributes};
             var typeInfoStruct = LLVMValueRef.CreateConstNamedStruct(structTypeInfoType, fields);
 
             var typeInfo = _typeInfos[structAst.TypeIndex];

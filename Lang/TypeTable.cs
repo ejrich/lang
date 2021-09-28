@@ -75,6 +75,25 @@ namespace Lang
                     typeInfo.Arguments.Data = argumentTypesPointer;
                 }
 
+                if (function.Attributes != null)
+                {
+                    typeInfo.Attributes.Length = function.Attributes.Count;
+                    var attributes = new String[typeInfo.Attributes.Length];
+
+                    for (var i = 0; i < attributes.Length; i++)
+                    {
+                        attributes[i] = Allocator.MakeString(function.Attributes[i]);
+                    }
+
+                    var attributesArraySize = attributes.Length * Allocator.StringSize;
+                    var attributesPointer = Allocator.Allocate(attributesArraySize);
+                    fixed (String* pointer = &attributes[0])
+                    {
+                        Buffer.MemoryCopy(pointer, attributesPointer.ToPointer(), attributesArraySize, attributesArraySize);
+                    }
+                    typeInfo.Attributes.Data = attributesPointer;
+                }
+
                 var typeInfoPointer = Allocator.Allocate(FunctionTypeInfoSize);
                 TypeInfos.Add(typeInfoPointer);
                 Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
@@ -265,6 +284,25 @@ namespace Lang
                     }
                     enumTypeInfo.Values.Data = enumValuesPointer;
 
+                    if (enumType.Attributes != null)
+                    {
+                        enumTypeInfo.Attributes.Length = enumType.Attributes.Count;
+                        var attributes = new String[enumTypeInfo.Attributes.Length];
+
+                        for (var i = 0; i < attributes.Length; i++)
+                        {
+                            attributes[i] = Allocator.MakeString(enumType.Attributes[i]);
+                        }
+
+                        var attributesArraySize = attributes.Length * Allocator.StringSize;
+                        var attributesPointer = Allocator.Allocate(attributesArraySize);
+                        fixed (String* pointer = &attributes[0])
+                        {
+                            Buffer.MemoryCopy(pointer, attributesPointer.ToPointer(), attributesArraySize, attributesArraySize);
+                        }
+                        enumTypeInfo.Attributes.Data = attributesPointer;
+                    }
+
                     Marshal.StructureToPtr(enumTypeInfo, typeInfoPointer, false);
                     break;
                 case TypeKind.String:
@@ -294,6 +332,25 @@ namespace Lang
                             Buffer.MemoryCopy(pointer, typeFieldsPointer.ToPointer(), typeFieldsArraySize, typeFieldsArraySize);
                         }
                         structTypeInfo.Fields.Data = typeFieldsPointer;
+                    }
+
+                    if (structType.Attributes != null)
+                    {
+                        enumTypeInfo.Attributes.Length = structType.Attributes.Count;
+                        var attributes = new String[enumTypeInfo.Attributes.Length];
+
+                        for (var i = 0; i < attributes.Length; i++)
+                        {
+                            attributes[i] = Allocator.MakeString(structType.Attributes[i]);
+                        }
+
+                        var attributesArraySize = attributes.Length * Allocator.StringSize;
+                        var attributesPointer = Allocator.Allocate(attributesArraySize);
+                        fixed (String* pointer = &attributes[0])
+                        {
+                            Buffer.MemoryCopy(pointer, attributesPointer.ToPointer(), attributesArraySize, attributesArraySize);
+                        }
+                        enumTypeInfo.Attributes.Data = attributesPointer;
                     }
 
                     Marshal.StructureToPtr(structTypeInfo, typeInfoPointer, false);
