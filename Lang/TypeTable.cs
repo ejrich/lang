@@ -142,7 +142,7 @@ namespace Lang
             [FieldOffset(24)] public IntPtr ElementType;
         }
 
-        private const int EnumTypeInfoSize = 40;
+        private const int EnumTypeInfoSize = 52;
         [StructLayout(LayoutKind.Explicit, Size=EnumTypeInfoSize)]
         public struct EnumTypeInfo
         {
@@ -151,9 +151,10 @@ namespace Lang
             [FieldOffset(16)] public uint Size;
             [FieldOffset(20)] public IntPtr BaseType;
             [FieldOffset(28)] public Array Values;
+            [FieldOffset(40)] public Array Attributes;
         }
 
-        private const int StructTypeInfoSize = 32;
+        private const int StructTypeInfoSize = 44;
         [StructLayout(LayoutKind.Explicit, Size=StructTypeInfoSize)]
         public struct StructTypeInfo
         {
@@ -161,9 +162,10 @@ namespace Lang
             [FieldOffset(12)] public TypeKind Type;
             [FieldOffset(16)] public uint Size;
             [FieldOffset(20)] public Array Fields;
+            [FieldOffset(32)] public Array Attributes;
         }
 
-        private const int FunctionTypeInfoSize = 40;
+        private const int FunctionTypeInfoSize = 52;
         [StructLayout(LayoutKind.Explicit, Size=FunctionTypeInfoSize)]
         public struct FunctionTypeInfo
         {
@@ -172,6 +174,7 @@ namespace Lang
             [FieldOffset(16)] public uint Size;
             [FieldOffset(20)] public IntPtr ReturnType;
             [FieldOffset(28)] public Array Arguments;
+            [FieldOffset(40)] public Array Attributes;
         }
 
         [StructLayout(LayoutKind.Explicit, Size=12)]
