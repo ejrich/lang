@@ -50,7 +50,7 @@ namespace Lang.Backend
             _typeInfos = new LLVMValueRef[TypeTable.Count];
 
             const string structTypeInfoName = "StructTypeInfo";
-            TypeTable.Types.Remove(structTypeInfoName, out var structTypeInfo); // Remove and add back in later
+            TypeTable.Types.Remove(structTypeInfoName, out var structTypeInfo);
             var structTypeInfoType = _types[structTypeInfo.TypeIndex] = _context.CreateNamedStruct(structTypeInfoName);
             CreateTypeInfo(structTypeInfoType, structTypeInfo.TypeIndex);
 
@@ -60,12 +60,12 @@ namespace Lang.Backend
             var (arrayTypeInfoType, arrayTypeInfo) = CreateStructAndTypeInfo("CArrayTypeInfo", structTypeInfoType);
             var (enumTypeInfoType, enumTypeInfo) = CreateStructAndTypeInfo("EnumTypeInfo", structTypeInfoType);
             var (stringStruct, stringType) = CreateStructAndTypeInfo("string", structTypeInfoType);
-            var (stringArrayStruct, stringArrayType) = CreateStructAndTypeInfo("Array.string", structTypeInfoType);
-            var (enumValueType, enumValueStruct) = CreateStructAndTypeInfo("EnumValue", structTypeInfoType);
-            var (enumValueArrayType, enumValueArray) = CreateStructAndTypeInfo("Array.EnumValue", structTypeInfoType);
+            var (stringArray, stringArrayType) = CreateStructAndTypeInfo("Array.string", structTypeInfoType);
+            var (enumValue, enumValueType) = CreateStructAndTypeInfo("EnumValue", structTypeInfoType);
+            var (enumValueArray, enumValueArrayType) = CreateStructAndTypeInfo("Array.EnumValue", structTypeInfoType);
 
             _stringType = stringStruct;
-            var defaultAttributes = LLVMValueRef.CreateConstNamedStruct(stringArrayStruct, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(stringStruct, 0))});
+            var defaultAttributes = LLVMValueRef.CreateConstNamedStruct(stringArray, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(stringStruct, 0))});
 
             var structQueue = new Queue<StructAst>();
 
@@ -94,7 +94,7 @@ namespace Lang.Backend
                             break;
                         case EnumAst enumAst:
                         {
-                            DeclareEnum(enumAst, enumValueType, enumValueArrayType, enumTypeInfoType, stringArrayStruct, defaultAttributes);
+                            DeclareEnum(enumAst, enumValue, enumValueArray, enumTypeInfoType, stringArray, defaultAttributes);
                             CreateDebugEnumType(enumAst);
                             break;
                         }
@@ -127,7 +127,7 @@ namespace Lang.Backend
                             structQueue.Enqueue(structAst);
                             break;
                         case EnumAst enumAst:
-                            DeclareEnum(enumAst, enumValueType, enumValueArrayType, enumTypeInfoType, stringArrayStruct, defaultAttributes);
+                            DeclareEnum(enumAst, enumValue, enumValueArray, enumTypeInfoType, stringArray, defaultAttributes);
                             break;
                         case PrimitiveAst primitive:
                             DeclarePrimitive(primitive, integerTypeInfoType, pointerTypeInfoType, typeInfoType);
@@ -139,24 +139,24 @@ namespace Lang.Backend
                 }
             }
 
-            var typeFieldType = _module.GetTypeByName("TypeField");
-            var typeFieldArrayType = _module.GetTypeByName("Array.TypeField");
-            var defaultFields = LLVMValueRef.CreateConstNamedStruct(typeFieldArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(typeFieldType, 0))});
+            var typeField = _module.GetTypeByName("TypeField");
+            var typeFieldArray = _module.GetTypeByName("Array.TypeField");
+            var defaultFields = LLVMValueRef.CreateConstNamedStruct(typeFieldArray, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(typeField, 0))});
 
-            SetStructTypeFields(typeInfo, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
-            SetStructTypeFields(integerTypeInfo, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
-            SetStructTypeFields(pointerTypeInfo, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
-            SetStructTypeFields(arrayTypeInfo, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
-            SetStructTypeFields(enumTypeInfo, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
-            SetStructTypeFields((StructAst)structTypeInfo, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
-            SetStructTypeFields(stringType, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
-            SetStructTypeFields(stringArrayType, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
-            SetStructTypeFields(enumValueStruct, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
-            SetStructTypeFields(enumValueArray, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(typeInfo, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(integerTypeInfo, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(pointerTypeInfo, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(arrayTypeInfo, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(enumTypeInfo, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields((StructAst)structTypeInfo, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(stringType, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(stringArrayType, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(enumValueType, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(enumValueArrayType, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
 
             while (structQueue.TryDequeue(out var structAst))
             {
-                SetStructTypeFields(structAst, typeFieldType, typeFieldArrayType, defaultFields, stringArrayStruct, defaultAttributes, structTypeInfoType);
+                SetStructTypeFields(structAst, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
             }
 
             var functionTypeInfoType = _module.GetTypeByName("FunctionTypeInfo");
@@ -211,7 +211,7 @@ namespace Lang.Backend
                         SetPrivateConstant(attributesArrayGlobal);
                         LLVM.SetInitializer(attributesArrayGlobal, attributesArray);
 
-                        attributes = LLVMValueRef.CreateConstNamedStruct(stringArrayStruct, new LLVMValueRef[]
+                        attributes = LLVMValueRef.CreateConstNamedStruct(stringArray, new LLVMValueRef[]
                         {
                             LLVM.ConstInt(LLVM.Int32Type(), (ulong)attributeRefs.Length, 0), attributesArrayGlobal
                         });
@@ -474,7 +474,7 @@ namespace Lang.Backend
             var typeSize = LLVM.ConstInt(LLVM.Int32Type(), structAst.Size, 0);
             LLVMValueRef structTypeInfoFields;
 
-            if (structAst.Fields.Count > 0)
+            if (structAst.Fields.Any())
             {
                 var structFields = new LLVMTypeRef[structAst.Fields.Count];
                 var typeFields = new LLVMValueRef[structAst.Fields.Count];
@@ -528,6 +528,11 @@ namespace Lang.Backend
                     LLVM.ConstInt(LLVM.Int32Type(), (ulong)structAst.Fields.Count, 0),
                     typeFieldArrayGlobal
                 });
+
+                if (_emitDebug)
+                {
+                    CreateDebugStructType(structAst);
+                }
             }
             else
             {
@@ -557,11 +562,6 @@ namespace Lang.Backend
             else
             {
                 attributes = defaultAttributes;
-            }
-
-            if (_emitDebug)
-            {
-                CreateDebugStructType(structAst);
             }
 
             var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, structTypeInfoFields, attributes};
