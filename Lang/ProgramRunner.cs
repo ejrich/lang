@@ -23,13 +23,6 @@ namespace Lang
         [FieldOffset(0)] public IntPtr Pointer;
     }
 
-    [StructLayout(LayoutKind.Explicit, Size=12)]
-    public struct String
-    {
-        [FieldOffset(0)] public int Length;
-        [FieldOffset(4)] public IntPtr Data;
-    }
-
     public interface IProgramRunner
     {
         void Init();

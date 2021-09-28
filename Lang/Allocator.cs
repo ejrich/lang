@@ -87,6 +87,8 @@ namespace Lang
             return stringPointer;
         }
 
+        public const int StringSize = 12;
+
         public static String MakeString(string value)
         {
             var s = AllocateString(value);
@@ -109,5 +111,12 @@ namespace Lang
 
             return pointer;
         }
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size=Allocator.StringSize)]
+    public struct String
+    {
+        [FieldOffset(0)] public int Length;
+        [FieldOffset(4)] public IntPtr Data;
     }
 }
