@@ -1513,7 +1513,23 @@ namespace Lang
                         return ParseAssignment(enumerator, currentFunction, compoundExpression);
                     case TokenType.Colon:
                         var compoundDeclaration = CreateAst<CompoundDeclarationAst>(compoundExpression);
-                        compoundDeclaration.Variables = compoundExpression.Children;
+                        compoundDeclaration.Variables = new VariableAst[compoundExpression.Children.Count];
+
+                        // Copy the initial expression to variables
+                        for (var i = 0; i < compoundExpression.Children.Count; i++)
+                        {
+                            var variable = compoundExpression.Children[i];
+                            if (variable is not IdentifierAst identifier)
+                            {
+                                ErrorReporter.Report("Declaration should contain a variable", variable);
+                            }
+                            else
+                            {
+                                var variableAst = CreateAst<VariableAst>(identifier);
+                                variableAst.Name = identifier.Name;
+                                compoundDeclaration.Variables[i] = variableAst;
+                            }
+                        }
 
                         // TODO Add specifying types
                         if (!enumerator.MoveNext())
