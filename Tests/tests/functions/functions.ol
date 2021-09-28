@@ -4,6 +4,8 @@ main() {
     default_arguments();
 
     polymorphic_functions();
+
+    multiple_return_values();
 }
 
 function_overloads() {
@@ -122,6 +124,31 @@ foobar<T, U>(PolyStruct<T> c, Params<U> args) {
             printf("Compare with casting: c.a == arg = %d, arg = %.2f\n", c.a == cast(T, arg), arg);
         }
     }
+}
+
+multiple_return_values() {
+    a: int;
+    b: bool;
+
+    a, b = number_is_correct(12);
+    printf("Number = %d, Correct = %d\n", a, b);
+
+    c, d := number_is_correct(6);
+    printf("Number = %d, Correct = %d\n", c, d);
+
+    // TODO Implement me
+    // e, f: int;
+}
+
+int, bool number_is_correct(int a) {
+    if a > 10 {
+        return a, true;
+    }
+    return a * 10, false;
+}
+
+int, int, bool hello_world() {
+    return 1, 2, true;
 }
 
 #run main();
