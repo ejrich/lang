@@ -607,7 +607,14 @@ namespace Lang
 
         private static StructFieldAst ParseStructField(TokenEnumerator enumerator)
         {
+            var attributes = ParseAttributes(enumerator);
             var structField = CreateAst<StructFieldAst>(enumerator.Current);
+            structField.Attributes = attributes;
+
+            if (enumerator.Current.Type != TokenType.Identifier)
+            {
+                ErrorReporter.Report($"Expected name of struct field, but got '{enumerator.Current.Value}'", enumerator.Current);
+            }
             structField.Name = enumerator.Current.Value;
 
             // 1. Expect to get colon

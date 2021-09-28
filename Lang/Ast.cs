@@ -128,6 +128,7 @@ namespace Lang
         public IAst Value { get; set; }
         public Dictionary<string, AssignmentAst> Assignments { get; set; }
         public List<IAst> ArrayValues { get; set; }
+        public List<string> Attributes { get; set; }
     }
 
     public class StructFieldRefAst : IAst

@@ -130,6 +130,7 @@ struct TypeField {
     name: string;
     offset: u32;
     type_info: TypeInfo*;
+    attributes: Array<string>;
 }
 
 struct EnumValue {

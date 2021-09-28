@@ -482,20 +482,37 @@ namespace Lang.Backend
                 for (var i = 0; i < structAst.Fields.Count; i++)
                 {
                     var field = structAst.Fields[i];
-                    if (field.Type.TypeKind == TypeKind.CArray)
-                    {
-                        var arrayType = (ArrayType)field.Type;
-                        structFields[i] = LLVM.ArrayType(_types[field.ArrayElementType.TypeIndex], arrayType.Length);
-                    }
-                    else
-                    {
-                        structFields[i] = _types[field.Type.TypeIndex];
-                    }
+                    structFields[i] = _types[field.Type.TypeIndex];
 
                     var fieldNameString = GetString(field.Name);
                     var fieldOffset = LLVM.ConstInt(LLVM.Int32Type(), field.Offset, 0);
 
-                    var typeField = LLVMValueRef.CreateConstNamedStruct(typeFieldType, new LLVMValueRef[] {fieldNameString, fieldOffset, _typeInfos[field.Type.TypeIndex]});
+                    LLVMValueRef fieldAttributes;
+                    if (field.Attributes != null)
+                    {
+                        var attributeRefs = new LLVMValueRef[field.Attributes.Count];
+
+                        for (var attributeIndex = 0; attributeIndex < attributeRefs.Length; attributeIndex++)
+                        {
+                            attributeRefs[attributeIndex] = GetString(field.Attributes[attributeIndex]);
+                        }
+
+                        var attributesArray = LLVMValueRef.CreateConstArray(_stringType, attributeRefs);
+                        var attributesArrayGlobal = _module.AddGlobal(LLVM.TypeOf(attributesArray), "____enum_attributes");
+                        SetPrivateConstant(attributesArrayGlobal);
+                        LLVM.SetInitializer(attributesArrayGlobal, attributesArray);
+
+                        fieldAttributes = LLVMValueRef.CreateConstNamedStruct(stringArrayType, new LLVMValueRef[]
+                        {
+                            LLVM.ConstInt(LLVM.Int32Type(), (ulong)attributeRefs.Length, 0), attributesArrayGlobal
+                        });
+                    }
+                    else
+                    {
+                        fieldAttributes = defaultAttributes;
+                    }
+
+                    var typeField = LLVMValueRef.CreateConstNamedStruct(typeFieldType, new LLVMValueRef[] {fieldNameString, fieldOffset, _typeInfos[field.Type.TypeIndex], fieldAttributes});
 
                     typeFields[i] = typeField;
                 }
