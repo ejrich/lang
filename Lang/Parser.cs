@@ -146,10 +146,41 @@ namespace Lang
                 var token = enumerator.Current;
                 if (token.Type == TokenType.CloseBracket)
                 {
-                    enumerator.MoveNext();
                     break;
                 }
+
+                switch (token.Type)
+                {
+                    case TokenType.Identifier:
+                        if (commaRequired)
+                        {
+                            ErrorReporter.Report("Expected comma between attributes", token);
+                        }
+                        attributes.Add(token.Value);
+                        commaRequired = true;
+                        break;
+                    case TokenType.Comma:
+                        if (!commaRequired)
+                        {
+                            ErrorReporter.Report("Expected attribute after comma or at beginning of attribute list", token);
+                        }
+                        commaRequired = false;
+                        break;
+                    default:
+                        ErrorReporter.Report($"Unexpected token '{token.Value}' in attribute list", token);
+                        break;
+                }
             }
+
+            if (attributes.Count == 0)
+            {
+                ErrorReporter.Report("Expected attribute(s) to be in attribute list", enumerator.Current ?? enumerator.Last);
+            }
+            else if (!commaRequired)
+            {
+                ErrorReporter.Report("Expected attribute after comma in attribute list", enumerator.Current ?? enumerator.Last);
+            }
+            enumerator.MoveNext();
 
             return attributes;
         }
