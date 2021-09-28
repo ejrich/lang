@@ -203,13 +203,14 @@ namespace Lang
             [FieldOffset(4)] public IntPtr Data;
         }
 
-        private const int TypeFieldSize = 24;
+        private const int TypeFieldSize = 36;
         [StructLayout(LayoutKind.Explicit, Size=TypeFieldSize)]
         public struct TypeField
         {
             [FieldOffset(0)] public String Name;
             [FieldOffset(12)] public uint Offset;
             [FieldOffset(16)] public IntPtr TypeInfo;
+            [FieldOffset(24)] public Array Attributes;
         }
 
         private const int EnumValueSize = 16;
@@ -322,6 +323,26 @@ namespace Lang
                         {
                             var field = structType.Fields[i];
                             var typeField = new TypeField {Name = Allocator.MakeString(field.Name), Offset = field.Offset, TypeInfo = TypeInfos[field.Type.TypeIndex]};
+
+                            if (field.Attributes != null)
+                            {
+                                typeField.Attributes.Length = field.Attributes.Count;
+                                var attributes = new String[typeField.Attributes.Length];
+
+                                for (var attributeIndex = 0; attributeIndex < attributes.Length; attributeIndex++)
+                                {
+                                    attributes[attributeIndex] = Allocator.MakeString(field.Attributes[attributeIndex]);
+                                }
+
+                                var attributesArraySize = attributes.Length * Allocator.StringSize;
+                                var attributesPointer = Allocator.Allocate(attributesArraySize);
+                                fixed (String* pointer = &attributes[0])
+                                {
+                                    Buffer.MemoryCopy(pointer, attributesPointer.ToPointer(), attributesArraySize, attributesArraySize);
+                                }
+                                typeField.Attributes.Data = attributesPointer;
+                            }
+
                             typeFields[i] = typeField;
                         }
 
@@ -336,8 +357,8 @@ namespace Lang
 
                     if (structType.Attributes != null)
                     {
-                        enumTypeInfo.Attributes.Length = structType.Attributes.Count;
-                        var attributes = new String[enumTypeInfo.Attributes.Length];
+                        structTypeInfo.Attributes.Length = structType.Attributes.Count;
+                        var attributes = new String[structTypeInfo.Attributes.Length];
 
                         for (var i = 0; i < attributes.Length; i++)
                         {
@@ -350,7 +371,7 @@ namespace Lang
                         {
                             Buffer.MemoryCopy(pointer, attributesPointer.ToPointer(), attributesArraySize, attributesArraySize);
                         }
-                        enumTypeInfo.Attributes.Data = attributesPointer;
+                        structTypeInfo.Attributes.Data = attributesPointer;
                     }
 
                     Marshal.StructureToPtr(structTypeInfo, typeInfoPointer, false);
