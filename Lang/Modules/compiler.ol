@@ -1,13 +1,13 @@
 //------------------- Compiler module --------------------
 
-enum OS {
+enum OS : u8 {
     None;
     Linux;
     Windows; // Not supported
     Mac;     // Not supported
 }
 
-enum BuildEnv {
+enum BuildEnv : u8 {
     None;
     Debug;
     Release;
