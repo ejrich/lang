@@ -207,7 +207,7 @@ namespace Lang.Backend
                         }
 
                         var attributesArray = LLVMValueRef.CreateConstArray(_stringType, attributeRefs);
-                        var attributesArrayGlobal = _module.AddGlobal(LLVM.TypeOf(attributesArray), "____enum_attributes");
+                        var attributesArrayGlobal = _module.AddGlobal(LLVM.TypeOf(attributesArray), "____function_attributes");
                         SetPrivateConstant(attributesArrayGlobal);
                         LLVM.SetInitializer(attributesArrayGlobal, attributesArray);
 
@@ -498,7 +498,7 @@ namespace Lang.Backend
                         }
 
                         var attributesArray = LLVMValueRef.CreateConstArray(_stringType, attributeRefs);
-                        var attributesArrayGlobal = _module.AddGlobal(LLVM.TypeOf(attributesArray), "____enum_attributes");
+                        var attributesArrayGlobal = _module.AddGlobal(LLVM.TypeOf(attributesArray), "____field_attributes");
                         SetPrivateConstant(attributesArrayGlobal);
                         LLVM.SetInitializer(attributesArrayGlobal, attributesArray);
 
@@ -545,7 +545,7 @@ namespace Lang.Backend
                 }
 
                 var attributesArray = LLVMValueRef.CreateConstArray(_stringType, attributeRefs);
-                var attributesArrayGlobal = _module.AddGlobal(LLVM.TypeOf(attributesArray), "____enum_attributes");
+                var attributesArrayGlobal = _module.AddGlobal(LLVM.TypeOf(attributesArray), "____struct_attributes");
                 SetPrivateConstant(attributesArrayGlobal);
                 LLVM.SetInitializer(attributesArrayGlobal, attributesArray);
 
