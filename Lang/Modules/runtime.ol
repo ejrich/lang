@@ -96,15 +96,18 @@ struct CArrayTypeInfo : TypeInfo {
 struct EnumTypeInfo : TypeInfo {
     base_type: TypeInfo*;
     values: Array<EnumValue>;
+    attributes: Array<string>;
 }
 
 struct StructTypeInfo : TypeInfo {
     fields: Array<TypeField>;
+    attributes: Array<string>;
 }
 
 struct FunctionTypeInfo : TypeInfo {
     return_type: TypeInfo*;
     arguments: Array<ArgumentType>;
+    attributes: Array<string>;
 }
 
 enum TypeKind {
