@@ -1803,6 +1803,12 @@ namespace Lang
 
         private void VerifyAssignment(AssignmentAst assignment, IFunction currentFunction, ScopeAst scope)
         {
+            if (assignment.Reference is CompoundExpressionAst compoundReference)
+            {
+                // TODO Implement me
+                return;
+            }
+
             // 1. Verify the variable is already defined, that it is not a constant, and the r-value
             var variableType = GetReference(assignment.Reference, currentFunction, scope, out _);
             var valueType = VerifyExpression(assignment.Value, currentFunction, scope);
