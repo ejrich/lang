@@ -104,6 +104,10 @@ struct StructTypeInfo : TypeInfo {
     attributes: Array<string>;
 }
 
+struct CompoundTypeInfo : TypeInfo {
+    types: Array<TypeInfo>;
+}
+
 struct FunctionTypeInfo : TypeInfo {
     return_type: TypeInfo*;
     arguments: Array<ArgumentType>;
@@ -123,6 +127,7 @@ enum TypeKind {
     Struct;
     Type;
     Any;
+    Compound;
     Function;
 }
 
