@@ -1744,16 +1744,8 @@ namespace Lang
             {
                 ErrorReporter.Report("Compound declarations cannot have array initializations", declaration);
             }
-            // 4. Set the type of the variables
-            else
-            {
-                foreach (var variable in declaration.Variables)
-                {
-                    variable.Type = declaration.Type;
-                }
-            }
 
-            // 5. Verify the type definition count if necessary
+            // 4. Verify the type definition count if necessary
             if (declaration.Type?.TypeKind == TypeKind.Array && declaration.TypeDefinition?.Count != null)
             {
                 var countType = VerifyConstantExpression(declaration.TypeDefinition.Count, currentFunction, scope, out var isConstant, out var arrayLength);
@@ -1771,7 +1763,7 @@ namespace Lang
                 }
             }
 
-            // 6. Verify constant values
+            // 5. Verify constant values
             if (declaration.Value == null && declaration.Constant)
             {
                 ErrorReporter.Report($"Constant variables '{string.Join(", ", declaration.Variables.Select(v => v.Name))}' should be assigned a constant value", declaration);
