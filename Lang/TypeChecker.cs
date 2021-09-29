@@ -1414,6 +1414,10 @@ namespace Lang
             {
                 ErrorReporter.Report($"Identifier '{declaration.Name}' already defined", declaration);
             }
+            else
+            {
+                scope.Identifiers.TryAdd(declaration.Name, declaration);
+            }
 
             if (declaration.TypeDefinition != null)
             {
@@ -1601,8 +1605,6 @@ namespace Lang
                         break;
                 }
             }
-
-            scope.Identifiers.TryAdd(declaration.Name, declaration);
         }
 
         private void VerifyCompoundDeclaration(CompoundDeclarationAst declaration, IFunction currentFunction, ScopeAst scope)
@@ -1673,62 +1675,61 @@ namespace Lang
             // 3. Verify declaration values
             else if (declaration.Value != null)
             {
-                var valueTypes = VerifyCompoundExpression(declaration.Value, currentFunction, scope);
+                var valueType = VerifyExpression(declaration.Value, currentFunction, scope);
 
-                if (valueTypes != null)
+                if (valueType != null)
                 {
                     // Verify the assignment value matches the type definition if it has been defined
                     if (declaration.TypeDefinition == null)
                     {
                         for (var i = 0; i < declaration.Variables.Length; i++)
                         {
-                            var valueIndex = i >= valueTypes.Count ? valueTypes.Count - 1 : i;
-                            var valueType = valueTypes[valueIndex];
+                            // TODO Implement me
+                            // var valueIndex = i >= valueType.Count ? valueType.Count - 1 : i;
+                            // var valueType = valueType[valueIndex];
 
-                            var type = VerifyType(valueType);
-                            if (type == TypeKind.Void)
-                            {
-                                ErrorReporter.Report($"Variables '{string.Join(", ", declaration.VariableNames)}' cannot be assigned type 'void'", declaration.Value);
-                            }
-                            else if (type != TypeKind.Error)
-                            {
-                                var variableName = declaration.VariableNames[i];
-                                if (variableName != null)
-                                {
-                                    scopeIdentifiers.Add(variableName, valueType);
-                                }
-                            }
+                            // var type = VerifyType(valueType);
+                            // if (type == TypeKind.Void)
+                            // {
+                            //     ErrorReporter.Report($"Variables '{string.Join(", ", declaration.VariableNames)}' cannot be assigned type 'void'", declaration.Value);
+                            // }
+                            // else if (type != TypeKind.Error)
+                            // {
+                            //     var variableName = declaration.VariableNames[i];
+                            //     if (variableName != null)
+                            //     {
+                            //         scopeIdentifiers.Add(variableName, valueType);
+                            //     }
+                            // }
                         }
                     }
                     else if (declaration.Type != null)
                     {
                         for (var i = 0; i < declaration.Variables.Length; i++)
                         {
-                            var valueIndex = i >= valueTypes.Count ? valueTypes.Count - 1 : i;
-                            var valueType = valueTypes[valueIndex];
+                            // TODO Implement me
+                            // var valueIndex = i >= valueType.Count ? valueType.Count - 1 : i;
+                            // var valueType = valueType[valueIndex];
 
-                            // Verify the type is correct
-                            if (valueType != null)
-                            {
-                                if (!TypeEquals(declaration.Type, valueType))
-                                {
-                                    ErrorReporter.Report($"Expected declaration value to be type '{PrintTypeDefinition(declaration.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", declaration.Type);
-                                }
-                                else if (type != TypeKind.Error)
-                                {
-                                    var variableName = declaration.VariableNames[i];
-                                    if (variableName != null)
-                                    {
-                                        scopeIdentifiers.Add(variableName, declaration.Type);
-                                    }
-                                }
-                            }
+                            // // Verify the type is correct
+                            // if (valueType != null)
+                            // {
+                            //     if (!TypeEquals(declaration.Type, valueType))
+                            //     {
+                            //         ErrorReporter.Report($"Expected declaration value to be type '{PrintTypeDefinition(declaration.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", declaration.Type);
+                            //     }
+                            //     else if (type != TypeKind.Error)
+                            //     {
+                            //         var variableName = declaration.VariableNames[i];
+                            //         if (variableName != null)
+                            //         {
+                            //             scopeIdentifiers.Add(variableName, declaration.Type);
+                            //         }
+                            //     }
+                            // }
                         }
 
-                        if (declaration.Type.PrimitiveType != null && declaration.Value is ConstantAst constant)
-                        {
-                            VerifyConstant(constant, declaration.Type);
-                        }
+                        VerifyConstantIfNecessary(declaration.Value, declaration.Type);
                     }
                 }
             }
@@ -3687,6 +3688,45 @@ namespace Lang
                 }
                 isGeneric = true;
                 return null;
+            }
+
+            if (type.Compound)
+            {
+                if (TypeTable.Types.TryGetValue(type.GenericName, out var compoundType))
+                {
+                    return compoundType;
+                }
+
+                var types = new IType[type.Generics.Count];
+                var error = false;
+                uint size = 0;
+                for (var i = 0; i < types.Length; i++)
+                {
+                    var subType = VerifyType(type.Generics[i], scope, out var hasGeneric, out _, out _);
+                    if (subType == null && !hasGeneric)
+                    {
+                        error = true;
+                    }
+                    else if (hasGeneric)
+                    {
+                        isGeneric = true;
+                    }
+                    else
+                    {
+                        size += subType.Size;
+                        types[i] = subType;
+                    }
+                }
+
+                if (error || isGeneric)
+                {
+                    return null;
+                }
+
+                compoundType = new CompoundType {Name = string.Join(", ", types.Select(t => t.Name)), BackendName = type.GenericName, Size = size, Types = types};
+                TypeTable.Add(type.GenericName, compoundType);
+                TypeTable.CreateTypeInfo(compoundType);
+                return compoundType;
             }
 
             if (type.Count != null && type.Name != "Array" && type.Name != "CArray")

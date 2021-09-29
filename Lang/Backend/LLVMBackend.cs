@@ -93,25 +93,22 @@ namespace Lang.Backend
                             }
                             break;
                         case EnumAst enumAst:
-                        {
                             DeclareEnum(enumAst, enumValue, enumValueArray, enumTypeInfoType, stringArray, defaultAttributes);
                             CreateDebugEnumType(enumAst);
                             break;
-                        }
                         case PrimitiveAst primitive:
-                        {
                             DeclarePrimitive(primitive, integerTypeInfoType, pointerTypeInfoType, typeInfoType);
                             CreateDebugBasicType(primitive, name);
                             break;
-                        }
                         case ArrayType arrayType:
-                        {
                             DeclareArrayType(arrayType, arrayTypeInfoType);
 
                             var elementType = _debugTypes[arrayType.ElementType.TypeIndex];
                             _debugTypes[arrayType.TypeIndex] = LLVM.DIBuilderCreateArrayType(_debugBuilder, arrayType.Length, 0, elementType, null, 0);
                             break;
-                        }
+                        case CompoundType compoundType:
+                            // TODO Implement me
+                            break;
                     }
                 }
             }
@@ -134,6 +131,9 @@ namespace Lang.Backend
                             break;
                         case ArrayType arrayType:
                             DeclareArrayType(arrayType, arrayTypeInfoType);
+                            break;
+                        case CompoundType compoundType:
+                            // TODO Implement me
                             break;
                     }
                 }

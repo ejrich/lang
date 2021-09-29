@@ -376,6 +376,9 @@ namespace Lang
 
                     Marshal.StructureToPtr(structTypeInfo, typeInfoPointer, false);
                     break;
+                case TypeKind.Compound:
+                    // TODO Implement me
+                    break;
             }
 
             TypeInfos[type.TypeIndex] = typeInfoPointer;
