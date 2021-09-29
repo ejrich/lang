@@ -1485,7 +1485,7 @@ namespace Lang
                     {
                         if (!TypeEquals(declaration.Type, valueType))
                         {
-                            ErrorReporter.Report($"Expected declaration value to be type '{declaration.Type.Name}', but got '{valueType.Name}'", declaration.TypeDefinition);
+                            ErrorReporter.Report($"Expected declaration value to be type '{declaration.Type.Name}', but got '{valueType.Name}'", declaration.Value);
                         }
                         else
                         {
@@ -1636,17 +1636,25 @@ namespace Lang
                 }
                 else if (declaration.Type.TypeKind == TypeKind.Void)
                 {
-                    ErrorReporter.Report($"Variable cannot be assigned type 'void'", declaration.TypeDefinition);
+                    ErrorReporter.Report($"Variables '{string.Join(", ", declaration.Variables.Select(v => v.Name))}' cannot be assigned type 'void'", declaration.TypeDefinition);
                 }
-                else if (declaration.Type.TypeKind == TypeKind.Array)
+                else
                 {
-                    var arrayStruct = (StructAst)declaration.Type;
-                    declaration.ArrayElementType = arrayStruct.GenericTypes[0];
-                }
-                else if (declaration.Type.TypeKind == TypeKind.CArray)
-                {
-                    var arrayType = (ArrayType)declaration.Type;
-                    declaration.ArrayElementType = arrayType.ElementType;
+                    if (declaration.Type.TypeKind == TypeKind.Array)
+                    {
+                        var arrayStruct = (StructAst)declaration.Type;
+                        declaration.ArrayElementType = arrayStruct.GenericTypes[0];
+                    }
+                    else if (declaration.Type.TypeKind == TypeKind.CArray)
+                    {
+                        var arrayType = (ArrayType)declaration.Type;
+                        declaration.ArrayElementType = arrayType.ElementType;
+                    }
+
+                    foreach (var variable in declaration.Variables)
+                    {
+                        variable.Type = declaration.Type;
+                    }
                 }
             }
 
@@ -1666,10 +1674,6 @@ namespace Lang
                     }
 
                     nullAst.TargetType = declaration.Type;
-                    foreach (var variable in declaration.Variables)
-                    {
-                        variable.Type = declaration.Type;
-                    }
                 }
             }
             // 3. Verify declaration values
@@ -1682,54 +1686,53 @@ namespace Lang
                     // Verify the assignment value matches the type definition if it has been defined
                     if (declaration.TypeDefinition == null)
                     {
-                        for (var i = 0; i < declaration.Variables.Length; i++)
+                        if (valueType.TypeKind == TypeKind.Void)
                         {
-                            // TODO Implement me
-                            // var valueIndex = i >= valueType.Count ? valueType.Count - 1 : i;
-                            // var valueType = valueType[valueIndex];
-
-                            // var type = VerifyType(valueType);
-                            // if (type == TypeKind.Void)
-                            // {
-                            //     ErrorReporter.Report($"Variables '{string.Join(", ", declaration.VariableNames)}' cannot be assigned type 'void'", declaration.Value);
-                            // }
-                            // else if (type != TypeKind.Error)
-                            // {
-                            //     var variableName = declaration.VariableNames[i];
-                            //     if (variableName != null)
-                            //     {
-                            //         scopeIdentifiers.Add(variableName, valueType);
-                            //     }
-                            // }
+                            ErrorReporter.Report($"Variables '{string.Join(", ", declaration.Variables.Select(v => v.Name))}' cannot be assigned type 'void'", declaration.Value);
                         }
+                        else if (valueType.TypeKind == TypeKind.Compound)
+                        {
+                            var compoundType = (CompoundType)valueType;
+                            var count = declaration.Variables.Length;
+                            if (count > compoundType.Types.Length)
+                            {
+                                ErrorReporter.Report($"Compound declaration expected to have {compoundType.Types.Length} or fewer variables", declaration);
+                                count = compoundType.Types.Length;
+                            }
+
+                            for (var i = 0; i < count; i++)
+                            {
+                                var type = compoundType.Types[i];
+                                var variable = declaration.Variables[i];
+                                if (type.TypeKind == TypeKind.Void)
+                                {
+                                    ErrorReporter.Report($"Variable '{variable.Name}' cannot be assigned type 'void'", declaration.Value);
+                                }
+                                else
+                                {
+                                    variable.Type = type;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            foreach (var variable in declaration.Variables)
+                            {
+                                variable.Type = valueType;
+                            }
+                        }
+                        declaration.Type = valueType;
                     }
                     else if (declaration.Type != null)
                     {
-                        for (var i = 0; i < declaration.Variables.Length; i++)
+                        if (!TypeEquals(declaration.Type, valueType))
                         {
-                            // TODO Implement me
-                            // var valueIndex = i >= valueType.Count ? valueType.Count - 1 : i;
-                            // var valueType = valueType[valueIndex];
-
-                            // // Verify the type is correct
-                            // if (valueType != null)
-                            // {
-                            //     if (!TypeEquals(declaration.Type, valueType))
-                            //     {
-                            //         ErrorReporter.Report($"Expected declaration value to be type '{PrintTypeDefinition(declaration.TypeDefinition)}', but got '{PrintTypeDefinition(valueType)}'", declaration.Type);
-                            //     }
-                            //     else if (type != TypeKind.Error)
-                            //     {
-                            //         var variableName = declaration.VariableNames[i];
-                            //         if (variableName != null)
-                            //         {
-                            //             scopeIdentifiers.Add(variableName, declaration.Type);
-                            //         }
-                            //     }
-                            // }
+                            ErrorReporter.Report($"Expected declaration value to be type '{declaration.Type.Name}', but got '{valueType.Name}'", declaration.Value);
                         }
-
-                        VerifyConstantIfNecessary(declaration.Value, declaration.Type);
+                        else
+                        {
+                            VerifyConstantIfNecessary(declaration.Value, declaration.Type);
+                        }
                     }
                 }
             }
