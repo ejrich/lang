@@ -195,6 +195,16 @@ namespace Lang
         public IType ElementType { get; set; }
     }
 
+    public class CompoundType : IType
+    {
+        public string Name { get; set; }
+        public string BackendName { get; set; }
+        public int TypeIndex { get; set; }
+        public TypeKind TypeKind { get; set; } = TypeKind.Compound;
+        public uint Size { get; set; }
+        public IType[] Types { get; set; }
+    }
+
     public class ReturnAst : IAst
     {
         public int FileIndex { get; set; }
@@ -438,6 +448,7 @@ namespace Lang
         public uint Column { get; init; }
         public string Name { get; set; }
         public bool IsGeneric { get; set; }
+        public bool Compound { get; set; }
         public int GenericIndex { get; set; }
         public int TypeIndex { get; set; }
         public List<TypeDefinition> Generics { get; } = new();
@@ -450,7 +461,16 @@ namespace Lang
             get
             {
                 if (_genericName == null)
-                    return _genericName = Generics.Aggregate(Name, (current, generic) => current + $".{generic.GenericName}");
+                {
+                    if (Compound)
+                    {
+                        return _genericName = string.Join("-", Generics.Select(g => g.GenericName));
+                    }
+                    else
+                    {
+                        return _genericName = Generics.Aggregate(Name, (current, generic) => current + $".{generic.GenericName}");
+                    }
+                }
                 return _genericName;
             }
         }
@@ -512,6 +532,7 @@ namespace Lang
         Struct,
         Type,
         Any,
+        Compound,
         Function
     }
 }

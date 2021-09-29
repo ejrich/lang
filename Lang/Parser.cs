@@ -201,15 +201,18 @@ namespace Lang
             // 1b. Handle multiple return values
             if (enumerator.Current?.Type == TokenType.Comma)
             {
+                var returnType = CreateAst<TypeDefinition>(function.ReturnTypeDefinition);
+                returnType.Compound = true;
+                returnType.Generics.Add(function.ReturnTypeDefinition);
+                function.ReturnTypeDefinition = returnType;
+
                 while (enumerator.Current?.Type == TokenType.Comma)
                 {
                     if (!enumerator.MoveNext())
                     {
                         break;
                     }
-                    // TODO Implement me
-                    //function.ReturnTypes.Add(ParseType(enumerator));
-                    ParseType(enumerator);
+                    returnType.Generics.Add(ParseType(enumerator));
                     enumerator.MoveNext();
                 }
             }
