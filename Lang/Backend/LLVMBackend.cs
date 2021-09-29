@@ -55,10 +55,12 @@ namespace Lang.Backend
             CreateTypeInfo(structTypeInfoType, structTypeInfo.TypeIndex);
 
             var (typeInfoType, typeInfo) = CreateStructAndTypeInfo("TypeInfo", structTypeInfoType);
+            var (typeInfoArrayType, typeInfoArray) = CreateStructAndTypeInfo("Array.*.TypeInfo", structTypeInfoType);
             var (integerTypeInfoType, integerTypeInfo) = CreateStructAndTypeInfo("IntegerTypeInfo", structTypeInfoType);
             var (pointerTypeInfoType, pointerTypeInfo) = CreateStructAndTypeInfo("PointerTypeInfo", structTypeInfoType);
             var (arrayTypeInfoType, arrayTypeInfo) = CreateStructAndTypeInfo("CArrayTypeInfo", structTypeInfoType);
             var (enumTypeInfoType, enumTypeInfo) = CreateStructAndTypeInfo("EnumTypeInfo", structTypeInfoType);
+            var (compoundTypeInfoType, compoundTypeInfo) = CreateStructAndTypeInfo("CompoundTypeInfo", structTypeInfoType);
             var (stringStruct, stringType) = CreateStructAndTypeInfo("string", structTypeInfoType);
             var (stringArray, stringArrayType) = CreateStructAndTypeInfo("Array.string", structTypeInfoType);
             var (enumValue, enumValueType) = CreateStructAndTypeInfo("EnumValue", structTypeInfoType);
@@ -107,7 +109,29 @@ namespace Lang.Backend
                             _debugTypes[arrayType.TypeIndex] = LLVM.DIBuilderCreateArrayType(_debugBuilder, arrayType.Length, 0, elementType, null, 0);
                             break;
                         case CompoundType compoundType:
-                            // TODO Implement me
+                            DeclareCompoundType(compoundType, typeInfoType, typeInfoArrayType, compoundTypeInfoType);
+
+                            using (var typeName = new MarshaledString(compoundType.Name))
+                            {
+                                var file = _debugFiles[0];
+                                var types = new LLVMMetadataRef[compoundType.Types.Length];
+
+                                uint offset = 0;
+                                for (var i = 0; i < types.Length; i++)
+                                {
+                                    var subType = compoundType.Types[i];
+                                    var size = subType.Size * 8;
+                                    using var subTypeName = new MarshaledString(subType.Name);
+
+                                    types[i] = LLVM.DIBuilderCreateMemberType(_debugBuilder, file, subTypeName.Value, (UIntPtr)subTypeName.Length, file, 0, size, 0, offset, LLVMDIFlags.LLVMDIFlagZero, _debugTypes[subType.TypeIndex]);
+                                    offset += size;
+                                }
+
+                                fixed (LLVMMetadataRef* typesPointer = types)
+                                {
+                                    _debugTypes[compoundType.TypeIndex] = LLVM.DIBuilderCreateStructType(_debugBuilder, null, typeName.Value, (UIntPtr)typeName.Length, file, 0, compoundType.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, (LLVMOpaqueMetadata**)typesPointer, (uint)types.Length, 0, null, null, UIntPtr.Zero);
+                                }
+                            }
                             break;
                     }
                 }
@@ -133,7 +157,7 @@ namespace Lang.Backend
                             DeclareArrayType(arrayType, arrayTypeInfoType);
                             break;
                         case CompoundType compoundType:
-                            // TODO Implement me
+                            DeclareCompoundType(compoundType, typeInfoType, typeInfoArrayType, compoundTypeInfoType);
                             break;
                     }
                 }
@@ -144,11 +168,13 @@ namespace Lang.Backend
             var defaultFields = LLVMValueRef.CreateConstNamedStruct(typeFieldArray, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(typeField, 0))});
 
             SetStructTypeFields(typeInfo, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(typeInfoArray, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
             SetStructTypeFields(integerTypeInfo, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
             SetStructTypeFields(pointerTypeInfo, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
             SetStructTypeFields(arrayTypeInfo, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
             SetStructTypeFields(enumTypeInfo, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
             SetStructTypeFields((StructAst)structTypeInfo, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(compoundTypeInfo, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
             SetStructTypeFields(stringType, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
             SetStructTypeFields(stringArrayType, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
             SetStructTypeFields(enumValueType, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
@@ -278,7 +304,6 @@ namespace Lang.Backend
             LLVM.SetInitializer(typeArrayGlobal, typeArray);
 
             var typeCount = LLVM.ConstInt(LLVM.Int32Type(), (ulong)_typeInfos.Length, 0);
-            var typeInfoArrayType = _module.GetTypeByName("Array.*.TypeInfo");
             LLVM.SetInitializer(typeTable, LLVMValueRef.CreateConstNamedStruct(typeInfoArrayType, new LLVMValueRef[] {typeCount, typeArrayGlobal}));
 
             // 6. Write the program beginning at the entrypoint
@@ -464,6 +489,38 @@ namespace Lang.Backend
 
             var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, arrayLength, _typeInfos[arrayType.ElementType.TypeIndex]};
             CreateAndSetTypeInfo(arrayTypeInfoType, fields, arrayType.TypeIndex);
+        }
+
+        private void DeclareCompoundType(CompoundType compoundType, LLVMTypeRef typeInfoType, LLVMTypeRef typeInfoArrayType, LLVMTypeRef compoundTypeInfoType)
+        {
+            var types = new LLVMTypeRef[compoundType.Types.Length];
+            var typeInfos = new LLVMValueRef[compoundType.Types.Length];
+
+            for (var i = 0; i < types.Length; i++)
+            {
+                var type = compoundType.Types[i];
+                types[i] = _types[type.TypeIndex];
+                typeInfos[i] = _typeInfos[type.TypeIndex];
+            }
+
+            _types[compoundType.TypeIndex] = LLVMTypeRef.CreateStruct(types, false);
+
+            var typesArray = LLVMValueRef.CreateConstArray(typeInfoType, typeInfos);
+            var typesArrayGlobal = _module.AddGlobal(LLVM.TypeOf(typesArray), "____enum_values");
+            SetPrivateConstant(typesArrayGlobal);
+            LLVM.SetInitializer(typesArrayGlobal, typesArray);
+
+            var typeInfoArray = LLVMValueRef.CreateConstNamedStruct(typeInfoArrayType, new LLVMValueRef[]
+            {
+                LLVM.ConstInt(LLVM.Int32Type(), (ulong)typeInfos.Length, 0), typesArrayGlobal
+            });
+
+            var typeName = GetString(compoundType.Name);
+            var typeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Compound, 0);
+            var typeSize = LLVM.ConstInt(LLVM.Int32Type(), compoundType.Size, 0);
+
+            var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, typeInfoArray};
+            CreateAndSetTypeInfo(compoundTypeInfoType, fields, compoundType.TypeIndex);
         }
 
         private void SetStructTypeFields(StructAst structAst, LLVMTypeRef typeFieldType, LLVMTypeRef typeFieldArrayType, LLVMValueRef defaultFields, LLVMTypeRef stringArrayType, LLVMValueRef defaultAttributes, LLVMTypeRef structTypeInfoType)

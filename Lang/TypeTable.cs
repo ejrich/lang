@@ -184,6 +184,16 @@ namespace Lang
             [FieldOffset(32)] public Array Attributes;
         }
 
+        private const int CompoundTypeInfoSize = 32;
+        [StructLayout(LayoutKind.Explicit, Size=CompoundTypeInfoSize)]
+        public struct CompoundTypeInfo
+        {
+            [FieldOffset(0)] public String Name;
+            [FieldOffset(12)] public TypeKind Type;
+            [FieldOffset(16)] public uint Size;
+            [FieldOffset(20)] public Array Types;
+        }
+
         private const int FunctionTypeInfoSize = 52;
         [StructLayout(LayoutKind.Explicit, Size=FunctionTypeInfoSize)]
         public struct FunctionTypeInfo
@@ -247,25 +257,25 @@ namespace Lang
                 case TypeKind.Integer:
                     typeInfoPointer = Allocator.Allocate(IntegerTypeInfoSize);
                     var integerType = (PrimitiveAst)type;
-                    var integerTypeInfo = new IntegerTypeInfo {Name = name, Type = type.TypeKind, Size = type.Size, Signed = integerType.Signed};
+                    var integerTypeInfo = new IntegerTypeInfo {Name = name, Type = TypeKind.Integer, Size = type.Size, Signed = integerType.Signed};
                     Marshal.StructureToPtr(integerTypeInfo, typeInfoPointer, false);
                     break;
                 case TypeKind.Pointer:
                     typeInfoPointer = Allocator.Allocate(PointerTypeInfoSize);
                     var pointerType = (PrimitiveAst)type;
-                    var pointerTypeInfo = new PointerTypeInfo {Name = name, Type = type.TypeKind, Size = type.Size, PointerType = TypeInfos[pointerType.PointerType.TypeIndex]};
+                    var pointerTypeInfo = new PointerTypeInfo {Name = name, Type = TypeKind.Pointer, Size = type.Size, PointerType = TypeInfos[pointerType.PointerType.TypeIndex]};
                     Marshal.StructureToPtr(pointerTypeInfo, typeInfoPointer, false);
                     break;
                 case TypeKind.CArray:
                     typeInfoPointer = Allocator.Allocate(CArrayTypeInfoSize);
                     var arrayType = (ArrayType)type;
-                    var arrayTypeInfo = new CArrayTypeInfo {Name = name, Type = type.TypeKind, Size = type.Size, ElementType = TypeInfos[arrayType.ElementType.TypeIndex]};
+                    var arrayTypeInfo = new CArrayTypeInfo {Name = name, Type = TypeKind.CArray, Size = type.Size, ElementType = TypeInfos[arrayType.ElementType.TypeIndex]};
                     Marshal.StructureToPtr(arrayTypeInfo, typeInfoPointer, false);
                     break;
                 case TypeKind.Enum:
                     typeInfoPointer = Allocator.Allocate(EnumTypeInfoSize);
                     var enumType = (EnumAst)type;
-                    var enumTypeInfo = new EnumTypeInfo {Name = name, Type = type.TypeKind, Size = type.Size, BaseType = TypeInfos[enumType.BaseType.TypeIndex]};
+                    var enumTypeInfo = new EnumTypeInfo {Name = name, Type = TypeKind.Enum, Size = type.Size, BaseType = TypeInfos[enumType.BaseType.TypeIndex]};
 
                     enumTypeInfo.Values.Length = enumType.Values.Count;
                     var enumValues = new EnumValue[enumTypeInfo.Values.Length];
@@ -377,7 +387,28 @@ namespace Lang
                     Marshal.StructureToPtr(structTypeInfo, typeInfoPointer, false);
                     break;
                 case TypeKind.Compound:
-                    // TODO Implement me
+                    typeInfoPointer = Allocator.Allocate(CompoundTypeInfoSize);
+                    var compoundType = (CompoundType)type;
+                    var compoundTypeInfo = new CompoundTypeInfo {Name = name, Type = TypeKind.Compound, Size = type.Size};
+
+                    compoundTypeInfo.Types.Length = compoundType.Types.Length;
+                    var types = new IntPtr[compoundTypeInfo.Types.Length];
+
+                    for (var i = 0; i < compoundTypeInfo.Types.Length; i++)
+                    {
+                        var subType = compoundType.Types[i];
+                        types[i] = TypeInfos[subType.TypeIndex];
+                    }
+
+                    var typesArraySize = types.Length * sizeof(IntPtr);
+                    var typesPointer = Allocator.Allocate(typesArraySize);
+                    fixed (IntPtr* pointer = &types[0])
+                    {
+                        Buffer.MemoryCopy(pointer, typesPointer.ToPointer(), typesArraySize, typesArraySize);
+                    }
+                    compoundTypeInfo.Types.Data = typesPointer;
+
+                    Marshal.StructureToPtr(compoundTypeInfo, typeInfoPointer, false);
                     break;
             }
 
