@@ -1803,15 +1803,82 @@ namespace Lang
 
         private void VerifyAssignment(AssignmentAst assignment, IFunction currentFunction, ScopeAst scope)
         {
+            var valueType = VerifyExpression(assignment.Value, currentFunction, scope);
+
             if (assignment.Reference is CompoundExpressionAst compoundReference)
             {
-                // TODO Implement me
+                var referenceTypes = new IType[compoundReference.Children.Count];
+                for (var i = 0; i < referenceTypes.Length; i++)
+                {
+                    referenceTypes[i] = GetReference(compoundReference.Children[i], currentFunction, scope, out _);
+                }
+
+                if (assignment.Operator != Operator.None)
+                {
+                    ErrorReporter.Report("Unable to perform operator assignment on a compound expression", assignment);
+                }
+
+                if (assignment.Value is NullAst)
+                {
+                    for (var i = 0; i < referenceTypes.Length; i++)
+                    {
+                        var referenceType = referenceTypes[i];
+                        if (referenceType != null && referenceType.TypeKind != TypeKind.Pointer)
+                        {
+                            ErrorReporter.Report("Cannot assign null to non-pointer type", compoundReference.Children[i]);
+                        }
+                    }
+                }
+                else if (valueType != null)
+                {
+                    if (valueType.TypeKind == TypeKind.Compound)
+                    {
+                        var compoundType = (CompoundType)valueType;
+                        var count = referenceTypes.Length;
+                        if (count > compoundType.Types.Length)
+                        {
+                            ErrorReporter.Report($"Compound assignment expected to have {compoundType.Types.Length} or fewer references", compoundReference);
+                            count = compoundType.Types.Length;
+                        }
+
+                        for (var i = 0; i < count; i++)
+                        {
+                            var type = compoundType.Types[i];
+                            var referenceType = referenceTypes[i];
+                            if (referenceType != null)
+                            {
+                                if (!TypeEquals(referenceType, type, true))
+                                {
+                                    ErrorReporter.Report($"Expected assignment value to be type '{referenceType.Name}', but got '{type.Name}'", compoundReference.Children[i]);
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        for (var i = 0; i < referenceTypes.Length; i++)
+                        {
+                            var referenceType = referenceTypes[i];
+                            if (referenceType != null)
+                            {
+                                if (!TypeEquals(referenceType, valueType, true))
+                                {
+                                    ErrorReporter.Report($"Expected assignment value to be type '{referenceType.Name}', but got '{valueType.Name}'", assignment.Value);
+                                }
+                                else
+                                {
+                                    VerifyConstantIfNecessary(assignment.Value, referenceType);
+                                }
+                            }
+                        }
+                    }
+                }
+
                 return;
             }
 
             // 1. Verify the variable is already defined, that it is not a constant, and the r-value
             var variableType = GetReference(assignment.Reference, currentFunction, scope, out _);
-            var valueType = VerifyExpression(assignment.Value, currentFunction, scope);
 
             if (variableType == null) return;
 
@@ -1827,11 +1894,9 @@ namespace Lang
                     ErrorReporter.Report("Cannot assign null to non-pointer type", assignment.Value);
                 }
                 nullAst.TargetType = variableType;
-                return;
             }
-
             // 3. Verify the assignment value matches the variable type definition
-            if (valueType != null)
+            else if (valueType != null)
             {
                 // 3a. Verify the operator is valid
                 if (assignment.Operator != Operator.None)
@@ -2557,6 +2622,36 @@ namespace Lang
                     }
                     return cast.TargetType;
                 }
+                case CompoundExpressionAst compoundExpression:
+                    var types = new IType[compoundExpression.Children.Count];
+
+                    var error = false;
+                    uint size = 0;
+                    for (var i = 0; i < types.Length; i++)
+                    {
+                        var type = VerifyExpression(compoundExpression.Children[i], currentFunction, scope);
+                        if (type == null)
+                        {
+                            error = true;
+                        }
+                        else
+                        {
+                            size += type.Size;
+                            types[i] = type;
+                        }
+                    }
+                    if (error)
+                    {
+                        return null;
+                    }
+
+                    var compoundTypeName = string.Join("-", types.Select(t => t.BackendName));
+                    if (TypeTable.Types.TryGetValue(compoundTypeName, out var compoundType))
+                    {
+                        return compoundType;
+                    }
+
+                    return CreateCompoundType(types, compoundTypeName, size);
                 case null:
                     return null;
                 default:
@@ -3724,10 +3819,7 @@ namespace Lang
                     return null;
                 }
 
-                compoundType = new CompoundType {Name = string.Join(", ", types.Select(t => t.Name)), BackendName = type.GenericName, Size = size, Types = types};
-                TypeTable.Add(type.GenericName, compoundType);
-                TypeTable.CreateTypeInfo(compoundType);
-                return compoundType;
+                return CreateCompoundType(types, type.GenericName, size);
             }
 
             if (type.Count != null && type.Name != "Array" && type.Name != "CArray")
@@ -3968,6 +4060,14 @@ namespace Lang
             TypeTable.Add(backendName, arrayStruct);
             VerifyStruct(arrayStruct);
             return arrayStruct;
+        }
+
+        private IType CreateCompoundType(IType[] types, string backendName, uint size)
+        {
+            var compoundType = new CompoundType {Name = string.Join(", ", types.Select(t => t.Name)), BackendName = backendName, Size = size, Types = types};
+            TypeTable.Add(backendName, compoundType);
+            TypeTable.CreateTypeInfo(compoundType);
+            return compoundType;
         }
 
         private static string PrintTypeDefinition(TypeDefinition type)
