@@ -306,6 +306,7 @@ namespace Lang
         public bool HasGenerics { get; set; }
         public bool Constant { get; set; }
         public int AllocationIndex { get; set; }
+        public InstructionValue Allocation { get; set; }
         public IAst Value { get; set; }
         public Dictionary<string, AssignmentAst> Assignments { get; set; }
         public List<IAst> ArrayValues { get; set; }

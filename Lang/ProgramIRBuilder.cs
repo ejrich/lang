@@ -63,6 +63,10 @@ namespace Lang
                     }
                 }
 
+                if (function.ReturnType.TypeKind == TypeKind.Compound)
+                {
+                }
+
                 EmitScopeChildren(functionIR, entryBlock, function.Body, function.ReturnType, null, null);
 
                 if (function.Flags.HasFlag(FunctionFlags.ReturnVoidAtEnd))
