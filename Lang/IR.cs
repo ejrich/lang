@@ -19,6 +19,7 @@ namespace Lang
         public uint StackSize { get; set; }
         public int ValueCount { get; set; }
         public bool SaveStack { get; set; }
+        public InstructionValue CompoundReturnAllocation { get; set; }
         public IFunction Source { get; set; }
         public List<Allocation> Allocations { get; set; }
         public List<Instruction> Instructions { get; set; }
