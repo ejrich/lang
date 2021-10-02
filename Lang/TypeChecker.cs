@@ -902,13 +902,20 @@ namespace Lang
 
         private bool GetScopeIdentifier(ScopeAst scope, string name, out IAst ast)
         {
+            return GetScopeIdentifier(scope, name, out ast, out _);
+        }
+
+        private bool GetScopeIdentifier(ScopeAst scope, string name, out IAst ast, out bool global)
+        {
             do {
                 if (scope.Identifiers.TryGetValue(name, out ast))
                 {
+                    global = scope.Parent == null;
                     return true;
                 }
                 scope = scope.Parent;
             } while (scope != null);
+            global = false;
             return false;
         }
 
@@ -2157,7 +2164,7 @@ namespace Lang
             switch (structField.Children[0])
             {
                 case IdentifierAst identifier:
-                    if (!GetScopeIdentifier(scope, identifier.Name, out var value))
+                    if (!GetScopeIdentifier(scope, identifier.Name, out var value, out var global))
                     {
                         ErrorReporter.Report($"Identifier '{identifier.Name}' not defined", structField);
                         return null;
@@ -2168,12 +2175,18 @@ namespace Lang
                             return VerifyEnumValue(enumAst, structField);
                         case DeclarationAst declaration:
                             refType = declaration.Type;
+                            if (declaration.Constant && refType?.TypeKind == TypeKind.String)
+                            {
+                                structField.GlobalConstant = global;
+                                structField.ConstantName = declaration.Name;
+                                return VerifyConstantStringField(structField);
+                            }
                             break;
                         case VariableAst variable:
                             refType = variable.Type;
                             break;
                         default:
-                            ErrorReporter.Report($"Cannot reference static field of type '{identifier.Name}'", structField);
+                            ErrorReporter.Report($"Cannot reference field of type '{identifier.Name}'", structField);
                             return null;
                     }
                     break;
@@ -2211,6 +2224,35 @@ namespace Lang
                 }
             }
             return refType;
+        }
+
+        private IType VerifyConstantStringField(StructFieldRefAst structField)
+        {
+            if (structField.Children.Count > 2)
+            {
+                ErrorReporter.Report("Type 'string' does not contain field", structField);
+                return null;
+            }
+            else
+            {
+                switch (structField.Children[1])
+                {
+                    case IdentifierAst identifier:
+                        if (identifier.Name == "length")
+                        {
+                            structField.ConstantStringLength = true;
+                            return TypeTable.S32Type;
+                        }
+                        if (identifier.Name == "data")
+                        {
+                            structField.RawConstantString = true;
+                            return _rawStringType;
+                        }
+                        ErrorReporter.Report($"Type 'string' does not contain field '{identifier.Name}'", identifier);
+                        break;
+                }
+            }
+            return null;
         }
 
         private IType VerifyStructField(string fieldName, IType structType, StructFieldRefAst structField, int fieldIndex, IAst ast)
