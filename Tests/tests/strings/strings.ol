@@ -11,7 +11,7 @@ basics() {
     b := "Hello world!"; #const
 
     printf("a: length = %d, value = %s\n", a.length, a);
-    printf("b: length = %d, value = %s\n", b.length, b);
+    printf("b: length = %d, value = %s\n", b.length, b.data);
 }
 
 string_compare() {

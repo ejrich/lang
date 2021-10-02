@@ -258,8 +258,9 @@ namespace Lang.Backend
             // 4. Declare variables
             LLVMValueRef typeTable = null;
             _globals = new LLVMValueRef[Program.GlobalVariables.Count];
-            foreach (var globalVariable in Program.GlobalVariables)
+            for (var i = 0; i < Program.GlobalVariables.Count; i++)
             {
+                var globalVariable = Program.GlobalVariables[i];
                 LLVMValueRef global;
                 if (globalVariable.Array)
                 {
@@ -287,7 +288,7 @@ namespace Lang.Backend
                 }
 
                 LLVM.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
-                _globals[globalVariable.Index] = global;
+                _globals[i] = global;
 
                 if (globalVariable.Name == "__type_table")
                 {

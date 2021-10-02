@@ -137,6 +137,10 @@ namespace Lang
         public uint Column { get; init; }
         public bool IsEnum { get; set; }
         public bool IsConstant { get; set; }
+        public bool GlobalConstant { get; set; }
+        public string ConstantName { get; set; }
+        public bool ConstantStringLength { get; set; }
+        public bool RawConstantString { get; set; }
         public uint ConstantValue { get; set; }
         public bool[] Pointers { get; set; }
         public IType[] Types { get; set; }
@@ -305,7 +309,6 @@ namespace Lang
         public IType ArrayElementType { get; set; }
         public bool HasGenerics { get; set; }
         public bool Constant { get; set; }
-        public int AllocationIndex { get; set; }
         public InstructionValue Allocation { get; set; }
         public IAst Value { get; set; }
         public Dictionary<string, AssignmentAst> Assignments { get; set; }
@@ -377,7 +380,6 @@ namespace Lang
         public uint Column { get; init; }
         public string Name { get; set; }
         public IType Type { get; set; }
-        public int? AllocationIndex { get; set; }
         public InstructionValue Pointer { get; set; }
     }
 
