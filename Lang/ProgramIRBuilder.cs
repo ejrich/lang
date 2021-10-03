@@ -815,9 +815,30 @@ namespace Lang
             }
             else
             {
-                var returnValue = EmitIR(function, returnAst.Value, scope, returnValue: true);
-                var instruction = new Instruction {Type = InstructionType.Return, Value1 = EmitCastValue(function, returnValue, returnType)};
-                function.Instructions.Add(instruction);
+                if (returnType is CompoundType compoundReturnType && returnAst.Value is CompoundExpressionAst compoundExpression)
+                {
+                    uint offset = 0;
+                    for (var i = 0; i < compoundReturnType.Types.Length; i++)
+                    {
+                        var type = compoundReturnType.Types[i];
+                        var expression = compoundExpression.Children[i];
+                        var pointer = EmitGetStructPointer(function, function.CompoundReturnAllocation, i, offset, type);
+
+                        var value = EmitIR(function, expression, scope, returnValue: true);
+                        var castValue = EmitCastValue(function, value, type);
+                        EmitStore(function, pointer, castValue);
+                        offset += type.Size;
+                    }
+
+                    var returnValue = EmitLoad(function, compoundReturnType, function.CompoundReturnAllocation);
+                    EmitInstruction(InstructionType.Return, function, null, returnValue);
+                }
+                else
+                {
+                    var returnValue = EmitIR(function, returnAst.Value, scope, returnValue: true);
+                    var castValue = EmitCastValue(function, returnValue, returnType);
+                    EmitInstruction(InstructionType.Return, function, null, castValue);
+                }
             }
         }
 
@@ -1919,10 +1940,14 @@ namespace Lang
                  field = structDef.Fields[fieldIndex];
             }
 
-            var instruction = new Instruction {Type = InstructionType.GetStructPointer, Index = fieldIndex, Offset = field.Offset, Value1 = value};
-            return AddInstruction(function, instruction, field.Type);
+            return EmitGetStructPointer(function, value, fieldIndex, field.Offset, field.Type);
         }
 
+        private InstructionValue EmitGetStructPointer(FunctionIR function, InstructionValue value, int fieldIndex, uint offset, IType type)
+        {
+            var instruction = new Instruction {Type = InstructionType.GetStructPointer, Index = fieldIndex, Offset = offset, Value1 = value};
+            return AddInstruction(function, instruction, type);
+        }
 
         private InstructionValue EmitCall(FunctionIR function, string name, InstructionValue[] arguments, IType returnType, int callIndex = 0)
         {

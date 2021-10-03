@@ -430,6 +430,11 @@ print(string format, Any arg) {
 }
 
 multiple_return_values() {
+    number_is_correct(12);
+
+    number_is_correct(6);
+
+    hello_world();
 /*
     a: int;
     b: bool;
@@ -442,6 +447,7 @@ multiple_return_values() {
 
     // TODO Implement me
     // e, f: int;
+*/
 }
 
 int, bool number_is_correct(int a) {
@@ -453,5 +459,4 @@ int, bool number_is_correct(int a) {
 
 int, int, bool hello_world() {
     return 1, 2, true;
-*/
 }
