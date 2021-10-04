@@ -1769,12 +1769,6 @@ namespace Lang
                     }
                 }
             }
-
-            // 5. Verify constant values
-            if (declaration.Value == null && declaration.Constant)
-            {
-                ErrorReporter.Report($"Constant variables '{string.Join(", ", declaration.Variables.Select(v => v.Name))}' should be assigned a constant value", declaration);
-            }
         }
 
         private StructFieldRefAst GetOSVersion()

@@ -125,6 +125,9 @@ namespace Lang
                 case DeclarationAst declaration:
                     EmitDeclaration(function, declaration, globalScope);
                     break;
+                case CompoundDeclarationAst compoundDeclaration:
+                    EmitCompoundDeclaration(function, compoundDeclaration, globalScope);
+                    break;
                 case AssignmentAst assignment:
                     EmitAssignment(function, assignment, globalScope);
                     break;
@@ -493,6 +496,9 @@ namespace Lang
                     case DeclarationAst declaration:
                         EmitDeclaration(function, declaration, scope);
                         break;
+                    case CompoundDeclarationAst compoundDeclaration:
+                        EmitCompoundDeclaration(function, compoundDeclaration, scope);
+                        break;
                     case AssignmentAst assignment:
                         EmitAssignment(function, assignment, scope);
                         break;
@@ -614,6 +620,15 @@ namespace Lang
                         EmitStore(function, allocation, zero);
                         break;
                 }
+            }
+        }
+
+        private void EmitCompoundDeclaration(FunctionIR function, CompoundDeclarationAst declaration, ScopeAst scope)
+        {
+            var pointers = new InstructionValue[declaration.Variables.Length];
+
+            if (declaration.Type != null)
+            {
             }
         }
 
@@ -788,22 +803,90 @@ namespace Lang
 
         private void EmitAssignment(FunctionIR function, AssignmentAst assignment, ScopeAst scope)
         {
-            var (pointer, type) = EmitGetReference(function, assignment.Reference, scope, out var loaded);
-            if (loaded && type.TypeKind == TypeKind.Pointer)
+            if (assignment.Reference is CompoundExpressionAst compoundReference)
             {
-                var pointerType = (PrimitiveAst)type;
-                type = pointerType.PointerType;
-            }
+                var pointers = new InstructionValue[compoundReference.Children.Count];
+                var types = new IType[compoundReference.Children.Count];
 
-            var value = EmitIR(function, assignment.Value, scope);
-            if (assignment.Operator != Operator.None)
+                for (var i = 0; i < pointers.Length; i++)
+                {
+                    var (pointer, type) = EmitGetReference(function, compoundReference.Children[i], scope, out var loaded);
+                    if (loaded && type.TypeKind == TypeKind.Pointer)
+                    {
+                        var pointerType = (PrimitiveAst)type;
+                        type = pointerType.PointerType;
+                    }
+                    pointers[i] = pointer;
+                    types[i] = type;
+                }
+
+                if (assignment.Value is NullAst)
+                {
+                    for (var i = 0; i < pointers.Length; i++)
+                    {
+                        var nullValue = new InstructionValue {ValueType = InstructionValueType.Null, Type = types[i]};
+                        EmitStore(function, pointers[i], nullValue);
+                    }
+                }
+                else if (assignment.Value is CompoundExpressionAst compoundExpression)
+                {
+                    for (var i = 0; i < pointers.Length; i++)
+                    {
+                        var value = EmitIR(function, compoundExpression.Children[i], scope);
+                        var castValue = EmitCastValue(function, value, types[i]);
+                        EmitStore(function, pointers[i], castValue);
+                    }
+                }
+                else
+                {
+                    var value = EmitIR(function, assignment.Value, scope);
+                    if (value.Type.TypeKind == TypeKind.Compound)
+                    {
+                        var compoundType = (CompoundType)value.Type;
+                        var allocation = AddAllocation(function, compoundType);
+                        EmitStore(function, allocation, value);
+
+                        uint offset = 0;
+                        for (var i = 0; i < pointers.Length; i++)
+                        {
+                            var type = compoundType.Types[i];
+                            var pointer = EmitGetStructPointer(function, allocation, i, offset, type);
+
+                            var subValue = EmitLoad(function, type, pointer);
+                            var castValue = EmitCastValue(function, subValue, types[i]);
+                            EmitStore(function, pointers[i], castValue);
+                            offset += type.Size;
+                        }
+                    }
+                    else
+                    {
+                        for (var i = 0; i < pointers.Length; i++)
+                        {
+                            var castValue = EmitCastValue(function, value, types[i]);
+                            EmitStore(function, pointers[i], castValue);
+                        }
+                    }
+                }
+            }
+            else
             {
-                var previousValue = EmitLoad(function, type, pointer);
-                value = EmitExpression(function, previousValue, value, assignment.Operator, type);
-            }
+                var (pointer, type) = EmitGetReference(function, assignment.Reference, scope, out var loaded);
+                if (loaded && type.TypeKind == TypeKind.Pointer)
+                {
+                    var pointerType = (PrimitiveAst)type;
+                    type = pointerType.PointerType;
+                }
 
-            var castValue = EmitCastValue(function, value, type);
-            EmitStore(function, pointer, castValue);
+                var value = EmitIR(function, assignment.Value, scope);
+                if (assignment.Operator != Operator.None)
+                {
+                    var previousValue = EmitLoad(function, type, pointer);
+                    value = EmitExpression(function, previousValue, value, assignment.Operator, type);
+                }
+
+                var castValue = EmitCastValue(function, value, type);
+                EmitStore(function, pointer, castValue);
+            }
         }
 
         public void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, ScopeAst scope)
