@@ -1701,10 +1701,25 @@ namespace Lang
                         {
                             var compoundType = (CompoundType)valueType;
                             var count = declaration.Variables.Length;
-                            if (count > compoundType.Types.Length)
+
+                            if (declaration.Value is CompoundExpressionAst)
                             {
-                                ErrorReporter.Report($"Compound declaration expected to have {compoundType.Types.Length} or fewer variables", declaration);
-                                count = compoundType.Types.Length;
+                                if (count != compoundType.Types.Length)
+                                {
+                                    ErrorReporter.Report($"Compound declaration expected to have {compoundType.Types.Length} variables", declaration);
+                                    if (count > compoundType.Types.Length)
+                                    {
+                                        count = compoundType.Types.Length;
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                if (count > compoundType.Types.Length)
+                                {
+                                    ErrorReporter.Report($"Compound declaration expected to have {compoundType.Types.Length} or fewer variables", declaration);
+                                    count = compoundType.Types.Length;
+                                }
                             }
 
                             for (var i = 0; i < count; i++)
