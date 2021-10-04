@@ -1851,10 +1851,25 @@ namespace Lang
                     {
                         var compoundType = (CompoundType)valueType;
                         var count = referenceTypes.Length;
-                        if (count > compoundType.Types.Length)
+
+                        if (assignment.Value is CompoundExpressionAst)
                         {
-                            ErrorReporter.Report($"Compound assignment expected to have {compoundType.Types.Length} or fewer references", compoundReference);
-                            count = compoundType.Types.Length;
+                            if (count != compoundType.Types.Length)
+                            {
+                                ErrorReporter.Report($"Compound assignment expected to have {compoundType.Types.Length} references", compoundReference);
+                                if (count > compoundType.Types.Length)
+                                {
+                                    count = compoundType.Types.Length;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if (count > compoundType.Types.Length)
+                            {
+                                ErrorReporter.Report($"Compound assignment expected to have {compoundType.Types.Length} or fewer references", compoundReference);
+                                count = compoundType.Types.Length;
+                            }
                         }
 
                         for (var i = 0; i < count; i++)
