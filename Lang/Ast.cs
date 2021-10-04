@@ -325,7 +325,6 @@ namespace Lang
         public IType Type { get; set; }
         public IType ArrayElementType { get; set; }
         public bool HasGenerics { get; set; }
-        public bool Constant { get; set; }
         public IAst Value { get; set; }
         public Dictionary<string, AssignmentAst> Assignments { get; set; }
         public List<IAst> ArrayValues { get; set; }

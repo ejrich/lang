@@ -430,24 +430,21 @@ print(string format, Any arg) {
 }
 
 multiple_return_values() {
-    number_is_correct(12);
-
-    number_is_correct(6);
-
-    hello_world();
-/*
     a: int;
     b: bool;
 
     a, b = number_is_correct(12);
     printf("Number = %d, Correct = %d\n", a, b);
 
+/*
     c, d := number_is_correct(6);
     printf("Number = %d, Correct = %d\n", c, d);
+*/
 
     // TODO Implement me
     // e, f: int;
-*/
+
+    hello_world();
 }
 
 int, bool number_is_correct(int a) {
