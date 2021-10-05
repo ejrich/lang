@@ -1534,27 +1534,33 @@ namespace Lang
                             }
                         }
 
-                        // TODO Add specifying types
                         if (!enumerator.MoveNext())
                         {
                             ErrorReporter.Report("Expected declaration to contain type and/or value", enumerator.Last);
                             return null;
                         }
 
-                        switch (enumerator.Current.Type)
+                        if (enumerator.Current.Type == TokenType.Identifier)
+                        {
+                            compoundDeclaration.TypeDefinition = ParseType(enumerator);
+                            enumerator.MoveNext();
+                        }
+
+                        switch (enumerator.Current?.Type)
                         {
                             case TokenType.Equals:
                                 ParseDeclarationValue(compoundDeclaration, enumerator, currentFunction);
                                 break;
                             case TokenType.SemiColon:
-                                // TODO Add specifying types
-                                if (compoundDeclaration.Type == null)
+                                if (compoundDeclaration.TypeDefinition == null)
                                 {
                                     ErrorReporter.Report("Expected token declaration to have type and/or value", token);
                                 }
                                 break;
+                            case null:
+                                break;
                             default:
-                                ErrorReporter.Report($"Unexpected token '{token.Value}' in declaration", token);
+                                ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in declaration", enumerator.Current);
                                 // Parse until there is an equals sign
                                 while (enumerator.Current != null && enumerator.Current.Type != TokenType.Equals)
                                     enumerator.MoveNext();

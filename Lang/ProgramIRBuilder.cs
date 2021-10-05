@@ -556,7 +556,7 @@ namespace Lang
 
                 if (!BuildSettings.Release)
                 {
-                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = declaration.Name, Source = declaration, Value1 = allocation});
+                    DeclareVariable(function, declaration);
                 }
 
                 if (declaration.Value != null)
@@ -625,7 +625,7 @@ namespace Lang
 
         private void EmitCompoundDeclaration(FunctionIR function, CompoundDeclarationAst declaration, ScopeAst scope)
         {
-            var pointers = new InstructionValue[declaration.Variables.Length];
+            var variableCount = declaration.Variables.Length;
 
             if (declaration.Type.TypeKind == TypeKind.Compound)
             {
@@ -634,11 +634,11 @@ namespace Lang
                 {
                     if (!BuildSettings.Release)
                     {
-                        for (var i = 0; i < pointers.Length; i++)
+                        for (var i = 0; i < variableCount; i++)
                         {
                             var variable = declaration.Variables[i];
                             var allocation = variable.Pointer = AddAllocation(function, variable.Type);
-                            function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = variable.Name, Source = variable, Value1 = allocation});
+                            DeclareVariable(function, variable);
 
                             var value = EmitIR(function, compoundExpression.Children[i], scope);
                             EmitStore(function, allocation, value);
@@ -646,7 +646,7 @@ namespace Lang
                     }
                     else
                     {
-                        for (var i = 0; i < pointers.Length; i++)
+                        for (var i = 0; i < variableCount; i++)
                         {
                             var variable = declaration.Variables[i];
                             var allocation = variable.Pointer = AddAllocation(function, variable.Type);
@@ -665,18 +665,19 @@ namespace Lang
                     uint offset = 0;
                     if (!BuildSettings.Release)
                     {
-                        for (var i = 0; i < pointers.Length; i++)
+                        for (var i = 0; i < variableCount; i++)
                         {
                             var variable = declaration.Variables[i];
                             var type = compoundType.Types[i];
                             variable.Pointer = EmitGetStructPointer(function, allocation, i, offset, type);
-                            function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = variable.Name, Source = variable, Value1 = allocation});
                             offset += type.Size;
+
+                            DeclareVariable(function, variable);
                         }
                     }
                     else
                     {
-                        for (var i = 0; i < pointers.Length; i++)
+                        for (var i = 0; i < variableCount; i++)
                         {
                             var variable = declaration.Variables[i];
                             var type = compoundType.Types[i];
@@ -690,21 +691,20 @@ namespace Lang
             {
                 if (!BuildSettings.Release)
                 {
-                    for (var i = 0; i < pointers.Length; i++)
+                    for (var i = 0; i < variableCount; i++)
                     {
-                        var allocation = AddAllocation(function, declaration.Type);
-
                         var variable = declaration.Variables[i];
-                        function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = variable.Name, Source = variable, Value1 = allocation});
+                        variable.Pointer = AddAllocation(function, declaration.Type);
 
-                        pointers[i] = allocation;
+                        DeclareVariable(function, variable);
                     }
                 }
                 else
                 {
-                    for (var i = 0; i < pointers.Length; i++)
+                    for (var i = 0; i < variableCount; i++)
                     {
-                        pointers[i] = AddAllocation(function, declaration.Type);
+                        var variable = declaration.Variables[i];
+                        variable.Pointer = AddAllocation(function, declaration.Type);
                     }
                 }
 
@@ -712,9 +712,9 @@ namespace Lang
                 {
                     var value = EmitAndCast(function, declaration.Value, scope, declaration.Type);
 
-                    foreach (var pointer in pointers)
+                    foreach (var variable in declaration.Variables)
                     {
-                        EmitStore(function, pointer, value);
+                        EmitStore(function, variable.Pointer, value);
                     }
                     return;
                 }
@@ -729,16 +729,16 @@ namespace Lang
                             var length = declaration.TypeDefinition.ConstCount.Value;
                             if (declaration.ArrayValues == null)
                             {
-                                foreach (var pointer in pointers)
+                                foreach (var variable in declaration.Variables)
                                 {
-                                    var arrayPointer = InitializeConstArray(function, pointer, arrayStruct, length, declaration.ArrayElementType);
+                                    var arrayPointer = InitializeConstArray(function, variable.Pointer, arrayStruct, length, declaration.ArrayElementType);
                                 }
                             }
                             else
                             {
-                                foreach (var pointer in pointers)
+                                foreach (var variable in declaration.Variables)
                                 {
-                                    var arrayPointer = InitializeConstArray(function, pointer, arrayStruct, length, declaration.ArrayElementType);
+                                    var arrayPointer = InitializeConstArray(function, variable.Pointer, arrayStruct, length, declaration.ArrayElementType);
                                     InitializeArrayValues(function, arrayPointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
                                 }
                             }
@@ -746,24 +746,24 @@ namespace Lang
                         else if (declaration.TypeDefinition.Count != null)
                         {
                             function.SaveStack = true;
-                            foreach (var pointer in pointers)
+                            foreach (var variable in declaration.Variables)
                             {
                                 var count = EmitIR(function, declaration.TypeDefinition.Count, scope);
-                                var countPointer = EmitGetStructPointer(function, pointer, arrayStruct, 0);
+                                var countPointer = EmitGetStructPointer(function, variable.Pointer, arrayStruct, 0);
                                 EmitStore(function, countPointer, count);
 
                                 var elementType = new InstructionValue {ValueType = InstructionValueType.Type, Type = declaration.ArrayElementType};
                                 var arrayData = EmitInstruction(InstructionType.AllocateArray, function, arrayStruct.Fields[1].Type, count, elementType);
-                                var dataPointer = EmitGetStructPointer(function, pointer, arrayStruct, 1);
+                                var dataPointer = EmitGetStructPointer(function, variable.Pointer, arrayStruct, 1);
                                 EmitStore(function, dataPointer, arrayData);
                             }
                         }
                         else
                         {
                             var lengthValue = GetConstantInteger(0);
-                            foreach (var pointer in pointers)
+                            foreach (var variable in declaration.Variables)
                             {
-                                var lengthPointer = EmitGetStructPointer(function, pointer, arrayStruct, 0);
+                                var lengthPointer = EmitGetStructPointer(function, variable.Pointer, arrayStruct, 0);
                                 EmitStore(function, lengthPointer, lengthValue);
                             }
                         }
@@ -771,34 +771,34 @@ namespace Lang
                     case TypeKind.CArray:
                         if (declaration.ArrayValues != null)
                         {
-                            foreach (var pointer in pointers)
+                            foreach (var variable in declaration.Variables)
                             {
-                                InitializeArrayValues(function, pointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
+                                InitializeArrayValues(function, variable.Pointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
                             }
                         }
                         break;
                         // Initialize struct field default values
                     case TypeKind.Struct:
                     case TypeKind.String:
-                        foreach (var pointer in pointers)
+                        foreach (var variable in declaration.Variables)
                         {
-                            InitializeStruct(function, (StructAst)declaration.Type, pointer, scope, declaration.Assignments);
+                            InitializeStruct(function, (StructAst)declaration.Type, variable.Pointer, scope, declaration.Assignments);
                         }
                         break;
                         // Initialize pointers to null
                     case TypeKind.Pointer:
                         var nullValue = new InstructionValue {ValueType = InstructionValueType.Null, Type = declaration.Type};
-                        foreach (var pointer in pointers)
+                        foreach (var variable in declaration.Variables)
                         {
-                            EmitStore(function, pointer, nullValue);
+                            EmitStore(function, variable.Pointer, nullValue);
                         }
                         break;
                         // Or initialize to default
                     default:
                         var zero = GetDefaultConstant(declaration.Type);
-                        foreach (var pointer in pointers)
+                        foreach (var variable in declaration.Variables)
                         {
-                            EmitStore(function, pointer, zero);
+                            EmitStore(function, variable.Pointer, zero);
                         }
                         break;
                 }
@@ -845,6 +845,18 @@ namespace Lang
         private InstructionValue AllocationValue(int index, IType type, bool global = false)
         {
             return new InstructionValue {ValueType = InstructionValueType.Allocation, ValueIndex = index, Type = type, Global = global};
+        }
+
+        private void DeclareVariable(FunctionIR function, DeclarationAst variable)
+        {
+            var instruction = new Instruction {Type = InstructionType.DebugDeclareVariable, String = variable.Name, Source = variable, Value1 = variable.Allocation};
+            function.Instructions.Add(instruction);
+        }
+
+        private void DeclareVariable(FunctionIR function, VariableAst variable)
+        {
+            var instruction = new Instruction {Type = InstructionType.DebugDeclareVariable, String = variable.Name, Source = variable, Value1 = variable.Pointer};
+            function.Instructions.Add(instruction);
         }
 
         private InstructionValue InitializeConstArray(FunctionIR function, InstructionValue arrayPointer, StructAst arrayStruct, uint length, IType elementType)
@@ -1202,7 +1214,7 @@ namespace Lang
                     each.IndexVariable.Pointer = indexVariable;
                     if (!BuildSettings.Release)
                     {
-                        function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = each.IndexVariable.Name, Source = each.IndexVariable, Value1 = indexVariable});
+                        DeclareVariable(function, each.IndexVariable);
                     }
                 }
                 EmitStore(function, indexVariable, GetConstantInteger(0));
@@ -1241,7 +1253,7 @@ namespace Lang
                 each.IterationVariable.Pointer = indexVariable;
                 if (!BuildSettings.Release)
                 {
-                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = each.IterationVariable.Name, Source = each.IterationVariable, Value1 = indexVariable});
+                    DeclareVariable(function, each.IterationVariable);
                 }
 
                 // Get the end of the range
@@ -1258,7 +1270,7 @@ namespace Lang
 
                 if (!BuildSettings.Release)
                 {
-                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareVariable, String = each.IterationVariable.Name, Source = each.IterationVariable, Value1 = iterationVariable});
+                    DeclareVariable(function, each.IterationVariable);
                 }
             }
             var conditionJump = new Instruction {Type = InstructionType.ConditionalJump, Value1 = condition};
