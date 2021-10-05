@@ -439,10 +439,8 @@ multiple_return_values() {
     c, d := number_is_correct(6);
     printf("Number = %d, Correct = %d\n", c, d);
 
-    // TODO Implement me
-    // e, f: int;
-
-    hello_world();
+    e, f: int;
+    e, f, b = hello_world();
 }
 
 int, bool number_is_correct(int a) {
