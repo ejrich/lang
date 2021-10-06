@@ -138,6 +138,8 @@ multiple_return_values() {
 
     e, f: int;
     e, f, b = hello_world();
+
+    g, h := hello_world();
 }
 
 int, bool number_is_correct(int a) {
