@@ -95,7 +95,7 @@ namespace Lang
             if (!Directory.Exists(directory))
             {
                 Console.WriteLine($"Path \"{directory}\" does not exist");
-                Environment.Exit(ErrorCodes.ProjectFileNotFound);
+                Environment.Exit(ErrorCodes.ArgumentsError);
             }
 
             // 1. Search for an project file in the current directory
@@ -106,7 +106,7 @@ namespace Lang
             if (projectPath == null)
             {
                 Console.WriteLine($"Project file not found in directory: \"{directory}\"");
-                Environment.Exit(ErrorCodes.ProjectFileNotFound);
+                Environment.Exit(ErrorCodes.ArgumentsError);
             }
 
             return projectPath;

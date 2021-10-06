@@ -47,7 +47,7 @@ namespace Lang
         public void Compile(string[] args)
         {
             // 1. Load cli args into build settings
-            string projectPath = null;
+            string entryPoint = null;
             foreach (var arg in args)
             {
                 switch (arg)
@@ -60,15 +60,24 @@ namespace Lang
                         BuildSettings.OutputAssembly = true;
                         break;
                     default:
-                        projectPath ??= arg;
+                        if (arg.StartsWith("-"))
+                        {
+                            ErrorReporter.Report($"Unrecognized compiler flag '{arg}'");
+                        }
+                        else
+                        {
+                            entryPoint ??= arg;
+                        }
                         break;
                 }
             }
 
+            ErrorReporter.ListErrorsAndExit(ErrorCodes.ArgumentsError);
+
             var stopwatch = new Stopwatch();
             stopwatch.Start();
             // 2. Load files in project
-            var sourceFiles = _projectInterpreter.LoadProject(projectPath);
+            var sourceFiles = _projectInterpreter.LoadProject(entryPoint);
 
             // 3. Parse source files to tokens
             var asts = _parser.Parse(sourceFiles);
