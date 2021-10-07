@@ -1,10 +1,8 @@
-using System.Collections.Generic;
-
 namespace Lang.Backend.Assembly
 {
     public class AssemblyBackend : IBackend
     {
-        public string Build(List<string> sourceFiles)
+        public string Build()
         {
             throw new System.NotImplementedException();
         }

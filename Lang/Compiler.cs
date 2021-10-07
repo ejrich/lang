@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
+using System.IO;
 using Lang.Backend;
 
 namespace Lang
@@ -13,6 +13,7 @@ namespace Lang
         public static bool Release { get; set; }
         public static bool OutputAssembly { get; set; }
         public static string Path { get; set; }
+        public static List<string> Files { get; set; }
         public static HashSet<string> Dependencies { get; } = new();
     }
 
@@ -46,8 +47,11 @@ namespace Lang
 
         public void Compile(string[] args)
         {
+            var stopwatch = new Stopwatch();
+            stopwatch.Start();
+
             // 1. Load cli args into build settings
-            string entryPoint = null;
+            var entrypointDefined = false;
             foreach (var arg in args)
             {
                 switch (arg)
@@ -64,64 +68,50 @@ namespace Lang
                         {
                             ErrorReporter.Report($"Unrecognized compiler flag '{arg}'");
                         }
+                        else if (entrypointDefined)
+                        {
+                            ErrorReporter.Report($"Multiple program entrypoints defined '{arg}'");
+                        }
                         else
                         {
-                            entryPoint ??= arg;
+                            if (!File.Exists(arg))
+                            {
+                                ErrorReporter.Report($"Entrypoint file does not exist or is not a file '{arg}'");
+                            }
+                            else
+                            {
+                                BuildSettings.Files = new List<string> {arg};
+                                BuildSettings.Path = Path.GetDirectoryName(Path.GetFullPath(arg));
+                            }
+                            entrypointDefined = true;
                         }
                         break;
                 }
             }
+            if (!entrypointDefined)
+            {
+                ErrorReporter.Report("Program entrypoint not defined");
+            }
 
             ErrorReporter.ListErrorsAndExit(ErrorCodes.ArgumentsError);
 
-            var stopwatch = new Stopwatch();
-            stopwatch.Start();
             // 2. Load files in project
-            var sourceFiles = _projectInterpreter.LoadProject(entryPoint);
+            // var sourceFiles = _projectInterpreter.LoadProject(entryPoint);
 
-            // 3. Parse source files to tokens
-            var asts = _parser.Parse(sourceFiles);
+            // 3. Parse source files to asts
+            var asts = _parser.Parse();
 
-            if (ErrorReporter.Errors.Any())
-            {
-                var currentFile = Int32.MinValue;
-                foreach (var parseError in ErrorReporter.Errors)
-                {
-                    if (currentFile != parseError.FileIndex)
-                    {
-                        if (currentFile != Int32.MinValue) Console.WriteLine();
-                        currentFile = parseError.FileIndex.Value;
-                        Console.WriteLine($"Failed to parse file: \"{sourceFiles[currentFile].Replace(BuildSettings.Path, string.Empty)}\":");
-                    }
-                    Console.WriteLine($"    {parseError.Message} at line {parseError.Line}:{parseError.Column}");
-                }
-                Environment.Exit(ErrorCodes.ParsingError);
-            }
+            ErrorReporter.ListErrorsAndExit(ErrorCodes.ParsingError);
 
             // 4. Check types and build the program ir
             _typeChecker.CheckTypes(asts);
             var frontEndTime = stopwatch.Elapsed;
 
-            if (ErrorReporter.Errors.Any())
-            {
-                Console.WriteLine($"{ErrorReporter.Errors.Count} compilation error(s):\n");
-                foreach (var error in ErrorReporter.Errors)
-                {
-                    if (error.FileIndex.HasValue)
-                    {
-                        Console.WriteLine($"    {sourceFiles[error.FileIndex.Value].Replace(BuildSettings.Path, string.Empty)}: {error.Message} at line {error.Line}:{error.Column}");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"    {error.Message}");
-                    }
-                }
-                Environment.Exit(ErrorCodes.CompilationError);
-            }
+            ErrorReporter.ListErrorsAndExit(ErrorCodes.CompilationError);
 
             // 5. Build program
             stopwatch.Restart();
-            var objectFile = _backend.Build(sourceFiles);
+            var objectFile = _backend.Build();
             stopwatch.Stop();
             var buildTime = stopwatch.Elapsed;
 

@@ -43,6 +43,8 @@ namespace Lang
         {
             if (Errors.Count > 0)
             {
+                Console.WriteLine($"{Errors.Count} compilation error(s):\n");
+
                 if (sourceFiles == null)
                 {
                     foreach (var error in Errors)
@@ -52,6 +54,17 @@ namespace Lang
                 }
                 else
                 {
+                    foreach (var error in Errors)
+                    {
+                        if (error.FileIndex.HasValue)
+                        {
+                            Console.WriteLine($"{sourceFiles[error.FileIndex.Value].Replace(BuildSettings.Path, string.Empty)}: {error.Message} at line {error.Line}:{error.Column}");
+                        }
+                        else
+                        {
+                            Console.WriteLine(error.Message);
+                        }
+                    }
                 }
 
                 Environment.Exit(errorCode);

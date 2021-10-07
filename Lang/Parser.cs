@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 
 namespace Lang
 {
     public interface IParser
     {
-        List<IAst> Parse(List<string> projectFiles);
+        List<IAst> Parse();
     }
 
     public class Parser : IParser
@@ -55,14 +56,16 @@ namespace Lang
 
         public Parser(ILexer lexer) => _lexer = lexer;
 
-        public List<IAst> Parse(List<string> projectFiles)
+        public List<IAst> Parse()
         {
             var asts = new List<IAst>();
+            var libraryDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Modules");
+            // TODO Add runtime lib
 
             var success = true;
-            for (var fileIndex = 0; fileIndex < projectFiles.Count; fileIndex++)
+            for (var fileIndex = 0; fileIndex < BuildSettings.Files.Count; fileIndex++)
             {
-                var file = projectFiles[fileIndex];
+                var file = BuildSettings.Files[fileIndex];
                 var syntaxTrees = ParseFile(file, fileIndex);
                 if (success && ErrorReporter.Errors.Any())
                 {
