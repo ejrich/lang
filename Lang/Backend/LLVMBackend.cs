@@ -35,7 +35,7 @@ namespace Lang.Backend
         private readonly LLVMTypeRef _u8PointerType = LLVM.PointerType(LLVM.Int8Type(), 0);
         private readonly LLVMValueRef _zeroInt = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), 0, false);
 
-        public string Build(List<string> sourceFiles)
+        public string Build()
         {
             // 1. Verify obj directory exists
             var objectPath = Path.Combine(BuildSettings.Path, ObjectDirectory);
@@ -43,7 +43,7 @@ namespace Lang.Backend
                 Directory.CreateDirectory(objectPath);
 
             // 2. Initialize the LLVM module and builder
-            InitLLVM(objectPath, sourceFiles);
+            InitLLVM(objectPath);
 
             // 3. Declare types
             _types = new LLVMTypeRef[TypeTable.Count];
@@ -322,7 +322,7 @@ namespace Lang.Backend
             return objectFile;
         }
 
-        private void InitLLVM(string objectPath, List<string> sourceFiles)
+        private void InitLLVM(string objectPath)
         {
             _module = LLVMModuleRef.CreateWithName(BuildSettings.Name);
             _context = _module.Context;
@@ -344,7 +344,7 @@ namespace Lang.Backend
             {
                 _emitDebug = true;
                 _debugBuilder = _module.CreateDIBuilder();
-                _debugFiles = sourceFiles.Select(file => _debugBuilder.CreateFile(Path.GetFileName(file), Path.GetDirectoryName(file))).ToList();
+                _debugFiles = BuildSettings.Files.Select(file => _debugBuilder.CreateFile(Path.GetFileName(file), Path.GetDirectoryName(file))).ToList();
                 _debugCompilationUnit = _debugBuilder.CreateCompileUnit(LLVMDWARFSourceLanguage.LLVMDWARFSourceLanguageC, _debugFiles[0], "ol", 0, string.Empty, 0, string.Empty, LLVMDWARFEmissionKind.LLVMDWARFEmissionFull, 0, 0, 0, string.Empty, string.Empty);
 
                 AddModuleFlag("Dwarf Version", 4);
