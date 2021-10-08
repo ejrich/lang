@@ -64,7 +64,6 @@ namespace Lang
         {
             _libraryDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Modules");
             AddModule("runtime");
-            // TODO Add runtime lib
 
             var asts = new List<IAst>();
             var success = true;
