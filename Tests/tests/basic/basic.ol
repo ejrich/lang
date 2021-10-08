@@ -1,11 +1,48 @@
 #import compiler
 
-main() { //#print_ir {
-    // Return positive exit code
-    /*
-        Multi line comment
-    */
-    each arg, i in command_line_arguments printf("Arg %d: \"%s\" -- length = %d\n", i, arg, arg.length);
+main() {
+    basic();
+
+    ptr := pointers();
+    printf("Pointer = %p, Value = %d\n", ptr, *ptr);
+    *ptr = 76;
+    printf("Pointer = %p, Value = %d\n", ptr, *ptr);
+
+    str := string_test();
+    printf("%s - Hello world %d, %d\n", str, 1, 2);
+
+    sum_test();
+
+    // Don't run this at compile time
+    // overflow_test();
+
+    globals();
+
+    poly_test();
+
+    enums();
+
+    nulls();
+
+    default_args(8);
+    default_args();
+
+    arrays();
+
+    compiler_directives();
+
+    type_information();
+
+    type_casts();
+
+    shifts();
+
+    break_and_continue();
+
+    any_args();
+}
+
+basic() {
     hello := "This is an \"escaped\" string literal\nWith a new line!";
     a := 4.2;
     a++;
@@ -17,83 +54,19 @@ main() { //#print_ir {
     f := test(3);
     g := test_each();
     h := 3 > a;
+    i := b % 8;
+    j := a % 2;
+    printf("Modulus outputs: i = %d, j = %.2f\n", i, j);
     fac6 := factorial(6);
     printf("%d! = %d\n", 6, fac6);
     my_struct := create();
-    printf("my_struct: field = %d, something = %f, subvalue.something = %d, subvalue.foo = %d\n", my_struct.field, my_struct.something, my_struct.subValue.something, my_struct.subValue.foo);
+    printf("my_struct: field = %d, something = %f, subvalue.something = %d\n", my_struct.field, my_struct.something, my_struct.subValue.something);
     call_field := create().something;
     printf("call_field = %f\n", call_field);
 
     prim := primitives();
-    array := create_array(4);
-    ptr := pointers();
-    printf("Pointer = %p, Value = %d\n", ptr, *ptr);
-    str := string_test();
-    printf("%s - Hello world %d, %d, %d\n", str, 1, 2, b);
-    sum_test();
-    // overflow_test();
-
-    printf("Initial array values %d, %p\n", global_array.length, global_array.data);
-    printf("Initial PolyStruct values %d, %.2f\n", global_poly_struct.field1, global_poly_struct.field2);
-    printf("Initial MyStruct values %d, %.2f, {%d, %d}\n", global_struct.field, global_struct.something, global_struct.subValue.something, global_struct.subValue.foo);
-    set_global(8);
-    printf("'global_a' = %d\n", global_a);
-    printf("'global_b' = %d\n", global_b);
-
-    poly_test();
-
-    state := current_state(7);
-    printf("Current state - %d\n", state);
-    if state == State.Running printf("The state is Running\n");
-    else if state != State.Running printf("The state is not Running\n");
-
-    null_val: int* = null;
-    null_val = null;
-    test_int := 7;
-    null_test(&test_int);
-    null_test(null);
-
-    default_args(8);
-    default_args();
-    default_args_enum(State.Stopping);
-    default_args_enum();
-
-    sdl_video := 0x20;
-    x := 0xfeABD4;
-    // sdl := SDL_Init(sdl_video);
-    // SDL_CreateWindow("Hello world", 805240832, 805240832, 400, 300, 0);
-    // sleep(5);
-
-    z := 1;
-    each i in create_array(5) {
-        printf("Value %d = %d\n", z++, i);
-    }
-
-    compiler_directives();
-    open_window();
-
-    print_type_info(MyStruct);
-    print_type_info(u8);
-    print_type_info(Array<string>);
-    print_type_info(PolyStruct<int*, float>);
-    print_type_info(PolyStruct<Array<int>, float>);
-    print_type_info(s32*);
-    print_type_info(State);
-    print_type_info(my_struct.subValue);
-    print_type_info(string);
-    print_type_info(bar);
-
-    type_casts();
-
-    break_and_continue();
-
-    any_args();
-
-    multiple_return_values();
 }
 
-// TODO Make these work
-// global_c := global_b;
 global_struct: MyStruct;
 global_poly_struct: PolyStruct<int, float64>;
 global_array: Array<int> = [1, 2, 3, 5]
@@ -146,12 +119,11 @@ int factorial(int n) {
 struct MyStruct {
     field: u8;
     something := 4.2;
-    subValue: OtherStruct = { foo = 8; }
+    subValue: OtherStruct;
 }
 
 struct OtherStruct {
     something := 5;
-    foo: int;
 }
 
 MyStruct create() {
@@ -175,6 +147,7 @@ int primitives() {
     h: s8 = -128;
     //h = 12 + 23;
     i: float64 = -1.23456;
+    x := 0xfeABD4;
     j := g + i;
     k := e > e;
     return d;
@@ -182,7 +155,7 @@ int primitives() {
 
 struct ArrayStruct {
     something := 5;
-    array: Array<float64> = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    array: Array<float64>[6];
 }
 
 Array<int> create_array(int count) {
@@ -202,10 +175,7 @@ manipulate_array_struct() {
     s: ArrayStruct;
     s.array[0] = 8.9;
     ++s.array[0];
-    each i in s.array {
-        printf("%.2f, ", i);
-    }
-    printf("\n");
+    printf("%.2f\n", s.array[0]);
 }
 
 struct Node {
@@ -240,10 +210,9 @@ string string_test() {
 
 sum_test() {
     sum_array: Array<int> = [4, 41, 544, 244, 42, 14, 23]
-    // print_type_info(sum); // Does not compile
 
-    printf("Sum of Array  = %d\n", sum(sum_array));
-    printf("Sum of Params = %d\n", sum(4, 41, 544, 244, 42, 14, 23));
+    printf("Sum of Array   = %d\n", sum(sum_array));
+    printf("Sum of Params = %d\n", sum2(4, 41, 544, 244, 42, 14, 23));
 }
 
 int sum(Array<int> args) {
@@ -252,7 +221,7 @@ int sum(Array<int> args) {
     return sum;
 }
 
-int sum(Params<int> args) {
+int sum2(Params<int> args) {
     sum := 0;
     each i in args sum += i;
     return sum;
@@ -266,6 +235,16 @@ overflow_test() {
     a := 4;
 }
 
+globals() {
+    printf("Initial array values %d, %p\n", global_array.length, global_array.data);
+    printf("Initial PolyStruct values %d, %.2f\n", global_poly_struct.field1, global_poly_struct.field2);
+    printf("Initial MyStruct values %d, %.2f, {%d}\n", global_struct.field, global_struct.something, global_struct.subValue.something);
+
+    set_global(8);
+    printf("'global_a' = %d\n", global_a);
+    printf("'global_b' = %d\n", global_b);
+}
+
 struct PolyStruct<T, U> {
     field1: T;
     field2: U;
@@ -276,6 +255,13 @@ poly_test() {
     a.field1 = 87;
     a.field2 = 3.14159;
     printf("%d, %f\n", a.field1, a.field2);
+}
+
+enums() {
+    state := current_state(7);
+    printf("Current state - %d\n", state);
+    if state == State.Running printf("The state is Running\n");
+    else if state != State.Running printf("The state is not Running\n");
 }
 
 enum State {
@@ -300,6 +286,14 @@ State current_state(int a) {
     return State.Stopped;
 }
 
+nulls() {
+    null_val: int* = null;
+    null_val = null;
+    test_int := 7;
+    null_test(&test_int);
+    null_test(null);
+}
+
 null_test(int* value_ptr) {
     if value_ptr == null printf("Pointer is null\n");
     else printf("Pointer value is %d\n", *value_ptr);
@@ -309,8 +303,13 @@ default_args(int val = 5) {
     printf("Value = %d\n", val);
 }
 
-default_args_enum(State val = State.Running) {
-    printf("Enum value = %d, Running = %d\n", val, val == State.Running);
+arrays() {
+    array := create_array(4);
+
+    z := 1;
+    each i in create_array(5) {
+        printf("Value %d = %d\n", z++, i);
+    }
 }
 
 open_window() {
@@ -318,17 +317,6 @@ open_window() {
         XOpenDisplay("Hello");
         printf("Opening X11 window\n");
     }
-}
-
-int SDL_Init(u32 flags) #extern "SDL2"
-SDL_CreateWindow(string title, int x, int y, int w, int h, u32 flags) #extern "SDL2"
-u32 sleep(u32 seconds) #extern "libc"
-
-#run {
-    array_insert(&command_line_arguments, "Hello world");
-    main();
-
-    build();
 }
 
 compiler_directives() {
@@ -339,11 +327,16 @@ compiler_directives() {
         printf("Running Debug code\n");
     #if build_env == BuildEnv.Release
         printf("Running Release code\n");
+
+    open_window();
+}
+
+#run {
+    build();
+    main();
 }
 
 build() {
-    set_executable_name("Example");
-
     if os == OS.Linux {
         set_linker(LinkerType.Dynamic);
         add_dependency("X11");
@@ -354,6 +347,20 @@ build() {
 
 #if os == OS.Linux {
     XOpenDisplay(string name) #extern "X11"
+}
+
+type_information() {
+    print_type_info(MyStruct);
+    print_type_info(u8);
+    print_type_info(Array<string>);
+    print_type_info(PolyStruct<int*, float>);
+    print_type_info(PolyStruct<Array<int>, float>);
+    print_type_info(s32*);
+    print_type_info(State);
+
+    my_struct := create();
+    print_type_info(my_struct.subValue);
+    print_type_info(bar);
 }
 
 print_type_info(Type type) {
@@ -387,6 +394,23 @@ type_casts() {
     c := cast(float64, a);
     d := cast(u8, State.Running);
     printf("a = %llu, b = %d, c = %f, d = %d\n", a, b, c, d);
+}
+
+shifts() {
+    // Standard shifting
+    a := 34 << 3;
+    b := 12345 >> 5;
+    printf("a = %d, b = %d\n", a, b);
+
+    // Shifting negative numbers
+    c := -13 << 2;
+    d := -13 >> 2;
+    printf("c = %d, d = %d\n", c, d);
+
+    // Rotating
+    e: u32 = 123456789 <<< 7;
+    f := 34 >>> 32; // Full rotation
+    printf("e = %u, f = %d\n", e, f);
 }
 
 break_and_continue() {
@@ -434,27 +458,4 @@ print(string format, Any arg) {
     else printf(format);
 }
 
-multiple_return_values() {
-    a: int;
-    b: bool;
-
-    a, b = number_is_correct(12);
-    printf("Number = %d, Correct = %d\n", a, b);
-
-    c, d := number_is_correct(6);
-    printf("Number = %d, Correct = %d\n", c, d);
-
-    e, f: int;
-    e, f, b = hello_world();
-}
-
-int, bool number_is_correct(int a) {
-    if a > 10 {
-        return a, true;
-    }
-    return a * 10, false;
-}
-
-int, int, bool hello_world() {
-    return 1, 2, true;
-}
+#run main();
