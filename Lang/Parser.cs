@@ -8,7 +8,7 @@ namespace Lang
 {
     public interface IParser
     {
-        List<IAst> Parse();
+        List<IAst> Parse(string entrypoint);
     }
 
     public class Parser : IParser
@@ -60,10 +60,11 @@ namespace Lang
             _lexer = lexer;
         }
 
-        public List<IAst> Parse()
+        public List<IAst> Parse(string entrypoint)
         {
             _libraryDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Modules");
             AddModule("runtime");
+            AddFile(entrypoint);
 
             var asts = new List<IAst>();
             var success = true;
