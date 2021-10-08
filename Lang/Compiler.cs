@@ -30,15 +30,13 @@ namespace Lang
 
     public class Compiler : ICompiler
     {
-        private readonly IProjectInterpreter _projectInterpreter;
         private readonly IParser _parser;
         private readonly ITypeChecker _typeChecker;
         private readonly IBackend _backend;
         private readonly ILinker _linker;
 
-        public Compiler(IProjectInterpreter projectInterpreter, IParser parser, ITypeChecker typeChecker, IBackend backend, ILinker linker)
+        public Compiler(IParser parser, ITypeChecker typeChecker, IBackend backend, ILinker linker)
         {
-            _projectInterpreter = projectInterpreter;
             _parser = parser;
             _typeChecker = typeChecker;
             _backend = backend;
