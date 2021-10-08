@@ -1,3 +1,5 @@
+#import compiler
+
 main() { //#print_ir {
     // Return positive exit code
     /*

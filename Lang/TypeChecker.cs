@@ -4122,6 +4122,11 @@ namespace Lang
 
         private IType CreateArrayStruct(string name, string backendName, IType elementType, TypeDefinition elementTypeDef = null)
         {
+            if (_baseArrayType == null)
+            {
+                return null;
+            }
+
             var arrayStruct = _polymorpher.CreatePolymorphedStruct(_baseArrayType, name, backendName, TypeKind.Array, new []{elementType}, elementTypeDef);
             TypeTable.Add(backendName, arrayStruct);
             VerifyStruct(arrayStruct);
