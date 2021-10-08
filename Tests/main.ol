@@ -1,3 +1,4 @@
+#import compiler
 #import "files.ol"
 
 main() {
@@ -13,7 +14,7 @@ main() {
                 dir_name := get_file_name(file);
                 test_dir = format_string("%/%", tests_dir, dir_name);
 
-                if !run_test(test_dir) failed_test_count++;
+                if !run_test(test_dir, dir_name) failed_test_count++;
             }
 
             file = readdir(dir);
@@ -71,10 +72,10 @@ string format_string(string format, Params<string> args) {
     return str;
 }
 
-bool run_test(string test_dir) {
+bool run_test(string test_dir, string test) {
     executable := "./Lang/bin/Debug/net5.0/Lang"; #const
 
-    command := format_string("% %", executable, test_dir);
+    command := format_string("% %/%.ol", executable, test_dir, test);
     printf("Compiling: %s", command);
     compiler_exit_code := run_command(command);
     free(command.data);
@@ -139,4 +140,7 @@ int run_command(string command) {
     return (status & 0xFF00) >> 8;
 }
 
-// #run main();
+#run {
+    set_executable_name("tests");
+    // main();
+}
