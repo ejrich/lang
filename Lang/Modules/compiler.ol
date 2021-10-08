@@ -18,3 +18,12 @@ os: OS; #const
 build_env: BuildEnv; #const
 
 add_dependency(string library) #compiler
+
+enum LinkerType : u8 {
+    Static;
+    Dynamic;
+}
+
+set_linker(LinkerType linker) #compiler
+
+set_executable_name(string name) #compiler

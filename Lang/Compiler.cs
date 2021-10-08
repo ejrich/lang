@@ -17,7 +17,7 @@ namespace Lang
         public static HashSet<string> Dependencies { get; } = new();
     }
 
-    public enum LinkerType
+    public enum LinkerType : byte
     {
         Static,
         Dynamic

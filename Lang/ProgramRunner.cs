@@ -310,6 +310,16 @@ namespace Lang
             BuildSettings.Dependencies.Add(lib);
         }
 
+        private void SetLinker(byte linker)
+        {
+            BuildSettings.Linker = (LinkerType)linker;
+        }
+
+        private void SetExecutableName(String name)
+        {
+            BuildSettings.Name = Marshal.PtrToStringAnsi(name.Data);
+        }
+
         private Register ExecuteFunction(FunctionIR function, Register[] arguments)
         {
             var instructionPointer = 0;
@@ -540,10 +550,25 @@ namespace Lang
                             switch (instruction.String)
                             {
                                 case "add_dependency":
+                                {
                                     var value = GetValue(instruction.Value1.Values[0], registers, stackPointer, function, arguments);
                                     var library = Marshal.PtrToStructure<String>(value.Pointer);
                                     AddDependency(library);
                                     break;
+                                }
+                                case "set_linker":
+                                {
+                                    var value = GetValue(instruction.Value1.Values[0], registers, stackPointer, function, arguments);
+                                    SetLinker(value.Byte);
+                                    break;
+                                }
+                                case "set_executable_name":
+                                {
+                                    var value = GetValue(instruction.Value1.Values[0], registers, stackPointer, function, arguments);
+                                    var name = Marshal.PtrToStructure<String>(value.Pointer);
+                                    SetExecutableName(name);
+                                    break;
+                                }
                                 default:
                                     ErrorReporter.Report($"Undefined compiler function '{callingFunction.Source.Name}'", callingFunction.Source);
                                     break;
