@@ -13,7 +13,7 @@ namespace Lang
         public static bool Release { get; set; }
         public static bool OutputAssembly { get; set; }
         public static string Path { get; set; }
-        public static List<string> Files { get; set; }
+        public static List<string> Files { get; } = new();
         public static HashSet<string> Dependencies { get; } = new();
     }
 
@@ -49,7 +49,7 @@ namespace Lang
             stopwatch.Start();
 
             // 1. Load cli args into build settings
-            var entrypointDefined = false;
+            string entrypoint = null;
             foreach (var arg in args)
             {
                 switch (arg)
@@ -66,7 +66,7 @@ namespace Lang
                         {
                             ErrorReporter.Report($"Unrecognized compiler flag '{arg}'");
                         }
-                        else if (entrypointDefined)
+                        else if (entrypoint != null)
                         {
                             ErrorReporter.Report($"Multiple program entrypoints defined '{arg}'");
                         }
@@ -80,16 +80,14 @@ namespace Lang
                             else
                             {
                                 BuildSettings.Name = Path.GetFileNameWithoutExtension(arg);
-                                var path = Path.GetFullPath(arg);
-                                BuildSettings.Files = new List<string> {path};
-                                BuildSettings.Path = Path.GetDirectoryName(path);
+                                entrypoint = Path.GetFullPath(arg);
+                                BuildSettings.Path = Path.GetDirectoryName(entrypoint);
                             }
-                            entrypointDefined = true;
                         }
                         break;
                 }
             }
-            if (!entrypointDefined)
+            if (entrypoint == null)
             {
                 ErrorReporter.Report("Program entrypoint not defined");
             }
@@ -97,7 +95,7 @@ namespace Lang
             ErrorReporter.ListErrorsAndExit(ErrorCodes.ArgumentsError);
 
             // 2. Parse source files to asts
-            var asts = _parser.Parse();
+            var asts = _parser.Parse(entrypoint);
 
             ErrorReporter.ListErrorsAndExit(ErrorCodes.ParsingError);
 
