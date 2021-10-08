@@ -14,6 +14,7 @@ namespace Lang
     public class Parser : IParser
     {
         private readonly ILexer _lexer;
+        private string _libraryDirectory;
 
         private class TokenEnumerator
         {
@@ -54,14 +55,18 @@ namespace Lang
             public Token Last => _tokens[^1];
         }
 
-        public Parser(ILexer lexer) => _lexer = lexer;
+        public Parser(ILexer lexer)
+        {
+            _lexer = lexer;
+        }
 
         public List<IAst> Parse()
         {
-            var asts = new List<IAst>();
-            var libraryDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Modules");
+            _libraryDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Modules");
+            AddModule("runtime");
             // TODO Add runtime lib
 
+            var asts = new List<IAst>();
             var success = true;
             for (var fileIndex = 0; fileIndex < BuildSettings.Files.Count; fileIndex++)
             {
@@ -80,6 +85,50 @@ namespace Lang
             return asts;
         }
 
+        private void AddModule(string module, Token token = null)
+        {
+            var filePath = Path.Combine(_libraryDirectory, $"{module}.ol");
+            if (File.Exists(filePath))
+            {
+                if (!BuildFileExists(filePath))
+                {
+                    BuildSettings.Files.Add(filePath);
+                }
+            }
+            else
+            {
+                ErrorReporter.Report($"Undefined module '{module}'", token);
+            }
+        }
+
+        private void AddFile(string file, Token token = null)
+        {
+            var filePath = Path.Combine(BuildSettings.Path, file);
+            if (File.Exists(filePath))
+            {
+                if (!BuildFileExists(filePath))
+                {
+                    BuildSettings.Files.Add(filePath);
+                }
+            }
+            else
+            {
+                ErrorReporter.Report($"Undefined file '{file}'", token);
+            }
+        }
+
+        private bool BuildFileExists(string file)
+        {
+            for (var i = 0; i < BuildSettings.Files.Count; i++)
+            {
+                if (BuildSettings.Files[i] == file)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private List<IAst> ParseFile(string file, int fileIndex)
         {
             // 1. Load file tokens
@@ -90,13 +139,17 @@ namespace Lang
             var enumerator = new TokenEnumerator(tokens);
             while (enumerator.MoveNext())
             {
-                syntaxTrees.Add(ParseTopLevelAst(enumerator));
+                var ast = ParseTopLevelAst(enumerator);
+                if (ast != null)
+                {
+                    syntaxTrees.Add(ast);
+                }
             }
 
             return syntaxTrees;
         }
 
-        private static IAst ParseTopLevelAst(TokenEnumerator enumerator)
+        private IAst ParseTopLevelAst(TokenEnumerator enumerator)
         {
             var attributes = ParseAttributes(enumerator);
 
@@ -188,7 +241,7 @@ namespace Lang
             return attributes;
         }
 
-        private static FunctionAst ParseFunction(TokenEnumerator enumerator, List<string> attributes)
+        private FunctionAst ParseFunction(TokenEnumerator enumerator, List<string> attributes)
         {
             // 1. Determine return type and name of the function
             var function = CreateAst<FunctionAst>(enumerator.Current);
@@ -833,7 +886,7 @@ namespace Lang
             return hasGeneric;
         }
 
-        private static IAst ParseLine(TokenEnumerator enumerator, IFunction currentFunction)
+        private IAst ParseLine(TokenEnumerator enumerator, IFunction currentFunction)
         {
             var token = enumerator.Current;
 
@@ -905,7 +958,7 @@ namespace Lang
             }
         }
 
-        private static ScopeAst ParseScope(TokenEnumerator enumerator, IFunction currentFunction, bool topLevel = false)
+        private ScopeAst ParseScope(TokenEnumerator enumerator, IFunction currentFunction, bool topLevel = false)
         {
             var scopeAst = CreateAst<ScopeAst>(enumerator.Current);
 
@@ -929,7 +982,7 @@ namespace Lang
             return scopeAst;
         }
 
-        private static ConditionalAst ParseConditional(TokenEnumerator enumerator, IFunction currentFunction, bool topLevel = false)
+        private ConditionalAst ParseConditional(TokenEnumerator enumerator, IFunction currentFunction, bool topLevel = false)
         {
             var conditionalAst = CreateAst<ConditionalAst>(enumerator.Current);
 
@@ -992,7 +1045,7 @@ namespace Lang
             return conditionalAst;
         }
 
-        private static WhileAst ParseWhile(TokenEnumerator enumerator, IFunction currentFunction)
+        private WhileAst ParseWhile(TokenEnumerator enumerator, IFunction currentFunction)
         {
             var whileAst = CreateAst<WhileAst>(enumerator.Current);
 
@@ -1026,7 +1079,7 @@ namespace Lang
             return whileAst;
         }
 
-        private static EachAst ParseEach(TokenEnumerator enumerator, IFunction currentFunction)
+        private EachAst ParseEach(TokenEnumerator enumerator, IFunction currentFunction)
         {
             var eachAst = CreateAst<EachAst>(enumerator.Current);
 
@@ -1983,7 +2036,7 @@ namespace Lang
             return index;
         }
 
-        private static IAst ParseTopLevelDirective(TokenEnumerator enumerator)
+        private IAst ParseTopLevelDirective(TokenEnumerator enumerator)
         {
             var directive = CreateAst<CompilerDirectiveAst>(enumerator.Current);
 
@@ -2012,6 +2065,22 @@ namespace Lang
                     enumerator.MoveNext();
                     directive.Value = ParseExpression(enumerator, null);
                     break;
+                case "import":
+                    enumerator.MoveNext();
+                    token = enumerator.Current;
+                    switch (token?.Type)
+                    {
+                        case TokenType.Identifier:
+                            AddModule(token.Value, token);
+                            break;
+                        case TokenType.Literal:
+                            AddFile(token.Value, token);
+                            break;
+                        default:
+                            ErrorReporter.Report($"Expected module or source file, but got '{token.Value}'", token);
+                            break;
+                    }
+                    return null;
                 default:
                     ErrorReporter.Report($"Unsupported top-level compiler directive '{token.Value}'", token);
                     return null;
@@ -2020,7 +2089,7 @@ namespace Lang
             return directive;
         }
 
-        private static IAst ParseCompilerDirective(TokenEnumerator enumerator, IFunction currentFunction)
+        private IAst ParseCompilerDirective(TokenEnumerator enumerator, IFunction currentFunction)
         {
             var directive = CreateAst<CompilerDirectiveAst>(enumerator.Current);
 
@@ -2052,7 +2121,7 @@ namespace Lang
             return directive;
         }
 
-        private static OperatorOverloadAst ParseOperatorOverload(TokenEnumerator enumerator)
+        private OperatorOverloadAst ParseOperatorOverload(TokenEnumerator enumerator)
         {
             var overload = CreateAst<OperatorOverloadAst>(enumerator.Current);
             if (!enumerator.MoveNext())

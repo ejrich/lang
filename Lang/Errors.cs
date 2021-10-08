@@ -15,9 +15,9 @@ namespace Lang
     public class Error
     {
         public string Message { get; init; }
-        public int? FileIndex { get; init; }
-        public uint Line { get; init; }
-        public uint Column { get; init; }
+        public int? FileIndex { get; set; }
+        public uint Line { get; set; }
+        public uint Column { get; set; }
     }
 
     public static class ErrorReporter
@@ -26,7 +26,31 @@ namespace Lang
 
         public static void Report(string message, Token token)
         {
-            Report(message, token.FileIndex, token.Line, token.Column);
+            if (token != null)
+            {
+                Report(message, token.FileIndex, token.Line, token.Column);
+            }
+            else
+            {
+                Report(message);
+            }
+        }
+
+        public static void Report(string message, IAst ast)
+        {
+            if (ast != null)
+            {
+                Report(message, ast.FileIndex, ast.Line, ast.Column);
+            }
+            else
+            {
+                Report(message);
+            }
+        }
+
+        public static void Report(string message)
+        {
+            Errors.Add(new Error {Message = message});
         }
 
         public static void Report(string message, int fileIndex, uint line, uint column)
@@ -34,36 +58,21 @@ namespace Lang
             Errors.Add(new Error {Message = message, FileIndex = fileIndex, Line = line, Column = column});
         }
 
-        public static void Report(string message, IAst ast = null)
-        {
-            Errors.Add(new Error {Message = message, FileIndex = ast?.FileIndex, Line = ast?.Line ?? 0, Column = ast?.Column ?? 0});
-        }
-
-        public static void ListErrorsAndExit(int errorCode, List<string> sourceFiles = null)
+        public static void ListErrorsAndExit(int errorCode)
         {
             if (Errors.Count > 0)
             {
                 Console.WriteLine($"{Errors.Count} compilation error(s):\n");
 
-                if (sourceFiles == null)
+                foreach (var error in Errors)
                 {
-                    foreach (var error in Errors)
+                    if (error.FileIndex.HasValue)
+                    {
+                        Console.WriteLine($"{BuildSettings.Files[error.FileIndex.Value].Replace(BuildSettings.Path, string.Empty)}: {error.Message} at line {error.Line}:{error.Column}");
+                    }
+                    else
                     {
                         Console.WriteLine(error.Message);
-                    }
-                }
-                else
-                {
-                    foreach (var error in Errors)
-                    {
-                        if (error.FileIndex.HasValue)
-                        {
-                            Console.WriteLine($"{sourceFiles[error.FileIndex.Value].Replace(BuildSettings.Path, string.Empty)}: {error.Message} at line {error.Line}:{error.Column}");
-                        }
-                        else
-                        {
-                            Console.WriteLine(error.Message);
-                        }
                     }
                 }
 

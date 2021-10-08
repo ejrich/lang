@@ -1,3 +1,5 @@
+#import "files.ol"
+
 main() {
     tests_dir := "Tests/tests"; #const
     dir := opendir(tests_dir);

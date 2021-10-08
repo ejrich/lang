@@ -73,15 +73,18 @@ namespace Lang
                             ErrorReporter.Report($"Multiple program entrypoints defined '{arg}'");
                         }
                         else
+
                         {
-                            if (!File.Exists(arg))
+                            if (!File.Exists(arg) || !arg.EndsWith(".ol"))
                             {
-                                ErrorReporter.Report($"Entrypoint file does not exist or is not a file '{arg}'");
+                                ErrorReporter.Report($"Entrypoint file does not exist or is not an .ol file '{arg}'");
                             }
                             else
                             {
-                                BuildSettings.Files = new List<string> {arg};
-                                BuildSettings.Path = Path.GetDirectoryName(Path.GetFullPath(arg));
+                                BuildSettings.Name = Path.GetFileNameWithoutExtension(arg);
+                                var path = Path.GetFullPath(arg);
+                                BuildSettings.Files = new List<string> {path};
+                                BuildSettings.Path = Path.GetDirectoryName(path);
                             }
                             entrypointDefined = true;
                         }
@@ -95,33 +98,30 @@ namespace Lang
 
             ErrorReporter.ListErrorsAndExit(ErrorCodes.ArgumentsError);
 
-            // 2. Load files in project
-            // var sourceFiles = _projectInterpreter.LoadProject(entryPoint);
-
-            // 3. Parse source files to asts
+            // 2. Parse source files to asts
             var asts = _parser.Parse();
 
             ErrorReporter.ListErrorsAndExit(ErrorCodes.ParsingError);
 
-            // 4. Check types and build the program ir
+            // 3. Check types and build the program ir
             _typeChecker.CheckTypes(asts);
             var frontEndTime = stopwatch.Elapsed;
 
             ErrorReporter.ListErrorsAndExit(ErrorCodes.CompilationError);
 
-            // 5. Build program
+            // 4. Build program
             stopwatch.Restart();
             var objectFile = _backend.Build();
             stopwatch.Stop();
             var buildTime = stopwatch.Elapsed;
 
-            // 6. Link binaries
+            // 5. Link binaries
             stopwatch.Restart();
             _linker.Link(objectFile);
             stopwatch.Stop();
             var linkTime = stopwatch.Elapsed;
 
-            // 7. Log statistics
+            // 6. Log statistics
             Console.WriteLine($"Front-end time: {frontEndTime.TotalSeconds} seconds\n" +
                               $"LLVM build time: {buildTime.TotalSeconds} seconds\n" +
                               $"Linking time: {linkTime.TotalSeconds} seconds");

@@ -10,9 +10,9 @@ require'lspconfig'.omnisharp.setup {
 EOF
 
 map <leader><F8> :Dispatch dotnet build --no-restore<CR>
-map <leader><F5> :Dispatch ./Lang/bin/Debug/net5.0/Lang -S Example/Example.olproj<CR>
+map <leader><F5> :Dispatch ./Lang/bin/Debug/net5.0/Lang -S Example/main.ol<CR>
 map <leader><F10> :Dispatch ./Example/bin/Example<CR>
-map <leader>t<F5> :Dispatch ./Lang/bin/Debug/net5.0/Lang -S Tests/tests.olproj<CR>
+map <leader>t<F5> :Dispatch ./Lang/bin/Debug/net5.0/Lang -S Tests/main.ol<CR>
 map <leader>t<F10> :Dispatch ./Tests/bin/tests<CR>
 
 au BufEnter *.cs :setlocal commentstring=//\ %s
