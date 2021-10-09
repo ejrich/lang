@@ -95,6 +95,7 @@ namespace Lang
             ErrorReporter.ListErrorsAndExit(ErrorCodes.ArgumentsError);
 
             // 2. Parse source files to asts
+            ThreadPool.Init();
             var asts = _parser.Parse(entrypoint);
 
             ErrorReporter.ListErrorsAndExit(ErrorCodes.ParsingError);
