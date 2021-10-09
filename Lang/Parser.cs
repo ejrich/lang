@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 
 namespace Lang
 {
@@ -136,10 +137,7 @@ namespace Lang
             while (enumerator.MoveNext())
             {
                 var ast = ParseTopLevelAst(enumerator, directory);
-                if (ast != null)
-                {
-                    asts.Add(ast);
-                }
+                asts.Add(ast);
             }
         }
 
@@ -2060,22 +2058,27 @@ namespace Lang
                     directive.Value = ParseExpression(enumerator, null);
                     break;
                 case "import":
-                    // TODO Move these to the type checker with out of order stuff
                     enumerator.MoveNext();
                     token = enumerator.Current;
                     switch (token?.Type)
                     {
                         case TokenType.Identifier:
+                            directive.Type = DirectiveType.ImportModule;
+                            directive.Import = token.Value;
+                            // TODO If not global scope, differ this
                             AddModule(token.Value, token);
                             break;
                         case TokenType.Literal:
+                            directive.Type = DirectiveType.ImportFile;
+                            directive.Import = token.Value;
+                            // TODO If not global scope, differ this
                             AddFile(token.Value, directory, token);
                             break;
                         default:
                             ErrorReporter.Report($"Expected module name or source file, but got '{token.Value}'", token);
                             break;
                     }
-                    return null;
+                    break;
                 default:
                     ErrorReporter.Report($"Unsupported top-level compiler directive '{token.Value}'", token);
                     return null;
