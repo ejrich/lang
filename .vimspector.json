@@ -6,7 +6,7 @@
         "request": "launch",
         "program": "${workspaceRoot}/Lang/bin/Debug/net5.0/Lang.dll",
         "args": ["-S", "${workspaceRoot}/Example/main.ol"],
-        //"args": ["-S", "${workspaceRoot}/Tests/tests/inheritance"],
+        //"args": ["-S", "${workspaceRoot}/Tests/tests/basic/basic.ol"],
         "stopAtEntry": false,
         "cwd": "${workspaceRoot}"
       }
