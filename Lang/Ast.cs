@@ -400,6 +400,7 @@ namespace Lang
         public uint Column { get; init; }
         public DirectiveType Type { get; set; }
         public IAst Value { get; set; }
+        public string Import { get; set; }
     }
 
     public class CastAst : IAst
@@ -517,7 +518,9 @@ namespace Lang
         None,
         Run,
         If,
-        Assert
+        Assert,
+        ImportModule,
+        ImportFile
     }
 
     public enum TypeKind

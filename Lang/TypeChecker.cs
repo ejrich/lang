@@ -206,6 +206,10 @@ namespace Lang
                                     }
                                     asts.RemoveAt(i--);
                                     break;
+                                case DirectiveType.ImportModule:
+                                case DirectiveType.ImportFile:
+                                    asts.RemoveAt(i--);
+                                    break;
                             }
                             break;
                     }
