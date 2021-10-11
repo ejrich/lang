@@ -1,3 +1,4 @@
+using System;
 using Lang;
 using Lang.Backend;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,5 +19,5 @@ var container = serviceCollection.BuildServiceProvider();
 
 var compiler = container.GetService<ICompiler>();
 compiler.Compile(args);
-ThreadPool.Stop();
 Allocator.Free();
+Environment.Exit(0);
