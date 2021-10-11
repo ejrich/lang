@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
@@ -5,9 +6,9 @@ namespace Lang
 {
     public static class Program
     {
-        public static int FunctionCount { get; set; }
+        public static int FunctionCount;
         public static FunctionIR EntryPoint { get; set; }
-        public static Dictionary<string, FunctionIR> Functions { get; } = new();
+        public static ConcurrentDictionary<string, FunctionIR> Functions { get; } = new();
         public static Dictionary<string, InstructionValue> Constants { get; } = new();
         public static uint GlobalVariablesSize { get; set; }
         public static List<GlobalVariable> GlobalVariables { get; } = new();

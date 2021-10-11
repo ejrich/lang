@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace Lang
 {
@@ -22,7 +23,7 @@ namespace Lang
         {
             var functionName = GetFunctionName(function);
 
-            var functionIR = new FunctionIR {Index = Program.FunctionCount++, Source = function};
+            var functionIR = new FunctionIR {Index = GetFunctionIndex(), Source = function};
 
             if (functionName == "main")
             {
@@ -88,7 +89,7 @@ namespace Lang
 
             var functionIR = new FunctionIR
             {
-                Index = Program.FunctionCount++, Source = overload, Allocations = new(), Instructions = new(), BasicBlocks = new()
+                Index = GetFunctionIndex(), Source = overload, Allocations = new(), Instructions = new(), BasicBlocks = new()
             };
             var entryBlock = AddBasicBlock(functionIR);
 
@@ -108,6 +109,17 @@ namespace Lang
             {
                 PrintFunction(overload.Name, functionIR);
             }
+        }
+
+        private int GetFunctionIndex()
+        {
+            int index;
+            do {
+                index = Program.FunctionCount;
+            }
+            while (Interlocked.CompareExchange(ref Program.FunctionCount, index + 1, index) != index);
+
+            return index;
         }
 
         public FunctionIR CreateRunnableFunction(IAst ast, ScopeAst globalScope)
