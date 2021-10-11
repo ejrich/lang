@@ -96,7 +96,11 @@ namespace Lang
 
             // 2. Parse source files to asts
             ThreadPool.Init();
+            stopwatch.Restart();
             var asts = _parser.Parse(entrypoint);
+            // TODO Remove when done testing
+            var parseTime = stopwatch.Elapsed;
+            Console.WriteLine($"Parse time: {parseTime.TotalSeconds} seconds\n");
 
             ErrorReporter.ListErrorsAndExit(ErrorCodes.ParsingError);
 

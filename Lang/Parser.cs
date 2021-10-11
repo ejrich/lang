@@ -16,6 +16,9 @@ namespace Lang
         private readonly ILexer _lexer;
         private string _libraryDirectory;
 
+        // private List<List<IAst>> _asts = new();
+        private List<IAst> _asts = new();
+
         private class TokenEnumerator
         {
             private readonly List<Token> _tokens;
@@ -69,11 +72,44 @@ namespace Lang
             var asts = new List<IAst>();
             for (var fileIndex = 0; fileIndex < BuildSettings.Files.Count; fileIndex++)
             {
+#if false
                 var file = BuildSettings.Files[fileIndex];
                 ParseFile(file, fileIndex, asts);
             }
 
             return asts;
+#else
+                // TODO Handle multiple files case
+                ThreadPool.QueueWork(ParseFile, new ParseData {FileIndex = fileIndex});
+            }
+
+            ThreadPool.CompleteWork();
+
+            return _asts;
+#endif
+        }
+
+        private class ParseData
+        {
+            public int FileIndex;
+        }
+
+        private void ParseFile(object data)
+        {
+            var parseData = (ParseData)data;
+
+            // 1. Load file tokens
+            var file = BuildSettings.Files[parseData.FileIndex];
+            var tokens = _lexer.LoadFileTokens(file, parseData.FileIndex);
+            var directory = Path.GetDirectoryName(file);
+
+            // 2. Iterate through tokens, tracking different ASTs
+            var enumerator = new TokenEnumerator(tokens);
+            while (enumerator.MoveNext())
+            {
+                var ast = ParseTopLevelAst(enumerator, directory);
+                _asts.Add(ast);
+            }
         }
 
         private void AddModule(string module, Token token = null)
