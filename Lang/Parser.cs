@@ -16,7 +16,6 @@ namespace Lang
         private readonly ILexer _lexer;
         private string _libraryDirectory;
 
-        // private List<List<IAst>> _asts = new();
         private List<IAst> _asts = new();
 
         private class TokenEnumerator
@@ -69,24 +68,55 @@ namespace Lang
             AddModule("runtime");
             AddFile(entrypoint);
 
-            var asts = new List<IAst>();
-            for (var fileIndex = 0; fileIndex < BuildSettings.Files.Count; fileIndex++)
-            {
-#if false
-                var file = BuildSettings.Files[fileIndex];
-                ParseFile(file, fileIndex, asts);
-            }
-
-            return asts;
-#else
-                // TODO Handle multiple files case
-                ThreadPool.QueueWork(ParseFile, new ParseData {FileIndex = fileIndex});
-            }
-
             ThreadPool.CompleteWork();
 
             return _asts;
-#endif
+        }
+
+        private void AddModule(string module, Token token = null)
+        {
+            var file = Path.Combine(_libraryDirectory, $"{module}.ol");
+            if (File.Exists(file))
+            {
+                QueueFileIfNotExists(file);
+            }
+            else
+            {
+                ErrorReporter.Report($"Undefined module '{module}'", token);
+            }
+        }
+
+        private void AddFile(string file, string directory, Token token)
+        {
+            var filePath = Path.Combine(directory, file);
+            AddFile(filePath, token);
+        }
+
+        private void AddFile(string file, Token token = null)
+        {
+            if (File.Exists(file))
+            {
+                QueueFileIfNotExists(file);
+            }
+            else
+            {
+                ErrorReporter.Report($"File '{file}' does not exist", token);
+            }
+        }
+
+        private void QueueFileIfNotExists(string file)
+        {
+            for (var i = 0; i < BuildSettings.Files.Count; i++)
+            {
+                if (BuildSettings.Files[i] == file)
+                {
+                    return;
+                }
+            }
+
+            var fileIndex = BuildSettings.Files.Count;
+            BuildSettings.Files.Add(file);
+            ThreadPool.QueueWork(ParseFile, new ParseData {FileIndex = fileIndex});
         }
 
         private class ParseData
@@ -108,75 +138,12 @@ namespace Lang
             while (enumerator.MoveNext())
             {
                 var ast = ParseTopLevelAst(enumerator, directory);
+                // TODO Handle some race conditions
                 _asts.Add(ast);
             }
         }
 
-        private void AddModule(string module, Token token = null)
-        {
-            var filePath = Path.Combine(_libraryDirectory, $"{module}.ol");
-            if (File.Exists(filePath))
-            {
-                if (!BuildFileExists(filePath))
-                {
-                    BuildSettings.Files.Add(filePath);
-                }
-            }
-            else
-            {
-                ErrorReporter.Report($"Undefined module '{module}'", token);
-            }
-        }
-
-        private void AddFile(string file, string directory, Token token)
-        {
-            var filePath = Path.Combine(directory, file);
-            AddFile(filePath, token);
-        }
-
-        private void AddFile(string file, Token token = null)
-        {
-            if (File.Exists(file))
-            {
-                if (!BuildFileExists(file))
-                {
-                    BuildSettings.Files.Add(file);
-                }
-            }
-            else
-            {
-                ErrorReporter.Report($"File '{file}' does not exist", token);
-            }
-        }
-
-        private bool BuildFileExists(string file)
-        {
-            for (var i = 0; i < BuildSettings.Files.Count; i++)
-            {
-                if (BuildSettings.Files[i] == file)
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private void ParseFile(string file, int fileIndex, List<IAst> asts)
-        {
-            // 1. Load file tokens
-            var tokens = _lexer.LoadFileTokens(file, fileIndex);
-            var directory = Path.GetDirectoryName(file);
-
-            // 2. Iterate through tokens, tracking different ASTs
-            var enumerator = new TokenEnumerator(tokens);
-            while (enumerator.MoveNext())
-            {
-                var ast = ParseTopLevelAst(enumerator, directory);
-                asts.Add(ast);
-            }
-        }
-
-        private IAst ParseTopLevelAst(TokenEnumerator enumerator, string directory)
+        private IAst ParseTopLevelAst(TokenEnumerator enumerator, string directory, bool global = true)
         {
             var attributes = ParseAttributes(enumerator);
 
@@ -202,7 +169,7 @@ namespace Lang
                     {
                         ErrorReporter.Report($"Compiler directives cannot have attributes", token);
                     }
-                    return ParseTopLevelDirective(enumerator, directory);
+                    return ParseTopLevelDirective(enumerator, directory, global);
                 case TokenType.Operator:
                     if (attributes != null)
                     {
@@ -998,7 +965,7 @@ namespace Lang
                     break;
                 }
 
-                scopeAst.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory) : ParseLine(enumerator, currentFunction));
+                scopeAst.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory, false) : ParseLine(enumerator, currentFunction));
             }
 
             if (!closed)
@@ -1024,7 +991,7 @@ namespace Lang
                     // Parse single AST
                     conditionalAst.IfBlock = CreateAst<ScopeAst>(enumerator.Current);
                     enumerator.MoveNext();
-                    conditionalAst.IfBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory) : ParseLine(enumerator, currentFunction));
+                    conditionalAst.IfBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory, false) : ParseLine(enumerator, currentFunction));
                     break;
                 case TokenType.OpenBrace:
                     // Parse until close brace
@@ -1036,7 +1003,7 @@ namespace Lang
                 default:
                     // Parse single AST
                     conditionalAst.IfBlock = CreateAst<ScopeAst>(enumerator.Current);
-                    conditionalAst.IfBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory) : ParseLine(enumerator, currentFunction));
+                    conditionalAst.IfBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory, false) : ParseLine(enumerator, currentFunction));
                     break;
             }
 
@@ -1052,7 +1019,7 @@ namespace Lang
                         // Parse single AST
                         conditionalAst.ElseBlock = CreateAst<ScopeAst>(enumerator.Current);
                         enumerator.MoveNext();
-                        conditionalAst.ElseBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory) : ParseLine(enumerator, currentFunction));
+                        conditionalAst.ElseBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory, false) : ParseLine(enumerator, currentFunction));
                         break;
                     case TokenType.OpenBrace:
                         // Parse until close brace
@@ -1064,7 +1031,7 @@ namespace Lang
                     default:
                         // Parse single AST
                         conditionalAst.ElseBlock = CreateAst<ScopeAst>(enumerator.Current);
-                        conditionalAst.ElseBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory) : ParseLine(enumerator, currentFunction));
+                        conditionalAst.ElseBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory, false) : ParseLine(enumerator, currentFunction));
                         break;
                 }
             }
@@ -2063,7 +2030,7 @@ namespace Lang
             return index;
         }
 
-        private IAst ParseTopLevelDirective(TokenEnumerator enumerator, string directory)
+        private IAst ParseTopLevelDirective(TokenEnumerator enumerator, string directory, bool global)
         {
             var directive = CreateAst<CompilerDirectiveAst>(enumerator.Current);
 
@@ -2100,14 +2067,18 @@ namespace Lang
                         case TokenType.Identifier:
                             directive.Type = DirectiveType.ImportModule;
                             directive.Import = token.Value;
-                            // TODO If not global scope, differ this
-                            AddModule(token.Value, token);
+                            if (global)
+                            {
+                                AddModule(token.Value, token);
+                            }
                             break;
                         case TokenType.Literal:
                             directive.Type = DirectiveType.ImportFile;
                             directive.Import = token.Value;
-                            // TODO If not global scope, differ this
-                            AddFile(token.Value, directory, token);
+                            if (global)
+                            {
+                                AddFile(token.Value, directory, token);
+                            }
                             break;
                         default:
                             ErrorReporter.Report($"Expected module name or source file, but got '{token.Value}'", token);
