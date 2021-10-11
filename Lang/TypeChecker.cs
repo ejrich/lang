@@ -181,6 +181,7 @@ namespace Lang
                                     {
                                         var condition = _irBuilder.CreateRunnableCondition(conditional.Condition, _globalScope);
                                         _runner.Init();
+                                        ThreadPool.CompleteWork();
 
                                         if (_runner.ExecuteCondition(condition, conditional.Condition))
                                         {
@@ -198,6 +199,7 @@ namespace Lang
                                     {
                                         var condition = _irBuilder.CreateRunnableCondition(directive.Value, _globalScope);
                                         _runner.Init();
+                                        ThreadPool.CompleteWork();
 
                                         if (!_runner.ExecuteCondition(condition, directive.Value))
                                         {
@@ -236,6 +238,7 @@ namespace Lang
                                     var function = _irBuilder.CreateRunnableFunction(directive.Value, _globalScope);
 
                                     _runner.Init();
+                                    ThreadPool.CompleteWork();
                                     _runner.RunProgram(function, directive.Value);
                                 }
                                 break;
@@ -272,6 +275,8 @@ namespace Lang
                     VerifyFunction(function);
                 }
             }
+
+            ThreadPool.CompleteWork();
         }
 
         private PrimitiveAst AddPrimitive(string name, TypeKind typeKind, uint size = 0, bool signed = false)
@@ -988,8 +993,13 @@ namespace Lang
 
             if (!ErrorReporter.Errors.Any())
             {
-                _irBuilder.AddFunction(function);
+                ThreadPool.QueueWork(WriteFunctionJob, function);
             }
+        }
+
+        private void WriteFunctionJob(object function)
+        {
+            _irBuilder.AddFunction((FunctionAst)function);
         }
 
         private void VerifyOperatorOverload(OperatorOverloadAst overload)
@@ -1030,8 +1040,13 @@ namespace Lang
 
             if (!ErrorReporter.Errors.Any())
             {
-                _irBuilder.AddOperatorOverload(overload);
+                ThreadPool.QueueWork(WriteOverloadJob, overload);
             }
+        }
+
+        private void WriteOverloadJob(object overload)
+        {
+            _irBuilder.AddOperatorOverload((OperatorOverloadAst)overload);
         }
 
         private void ResolveCompilerDirectives(List<IAst> asts, IFunction function)
@@ -1065,6 +1080,7 @@ namespace Lang
                                 {
                                     var condition = _irBuilder.CreateRunnableCondition(conditional.Condition, _globalScope);
                                     _runner.Init();
+                                    ThreadPool.CompleteWork();
 
                                     if (_runner.ExecuteCondition(condition, conditional.Condition))
                                     {
@@ -1081,6 +1097,7 @@ namespace Lang
                                 {
                                     var condition = _irBuilder.CreateRunnableCondition(directive.Value, _globalScope);
                                     _runner.Init();
+                                    ThreadPool.CompleteWork();
 
                                     if (!_runner.ExecuteCondition(condition, directive.Value))
                                     {
