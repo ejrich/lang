@@ -81,4 +81,38 @@ namespace Lang
             _count = 0;
         }
     }
+
+    public class LinkedList<T>
+    {
+        private class Node
+        {
+            public T Data;
+            public Node Next;
+        }
+
+        private Node _head;
+        private Node _end;
+
+        public void Add(T data)
+        {
+            var node = new Node {Data = data};
+
+            if (_head == null)
+            {
+                _head = node;
+                _end = node;
+            }
+            else
+            {
+                Node originalEnd;
+                do
+                {
+                    originalEnd = _end;
+                }
+                while (Interlocked.CompareExchange(ref _end, node, originalEnd) != originalEnd);
+
+                originalEnd.Next = node;
+            }
+        }
+    }
 }
