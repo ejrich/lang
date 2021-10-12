@@ -9,6 +9,7 @@ namespace Lang
     public interface IParser
     {
         List<IAst> Parse(string entrypoint);
+        SafeLinkedList<IAst> _Parse(string entrypoint);
     }
 
     public class Parser : IParser
@@ -17,6 +18,7 @@ namespace Lang
         private string _libraryDirectory;
 
         private List<IAst> _asts = new();
+        private SafeLinkedList<IAst> __asts = new();
 
         private class TokenEnumerator
         {
@@ -73,6 +75,18 @@ namespace Lang
             return _asts;
         }
 
+        // TODO Use this method
+        public SafeLinkedList<IAst> _Parse(string entrypoint)
+        {
+            _libraryDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Modules");
+            AddModule("runtime");
+            AddFile(entrypoint);
+
+            ThreadPool.CompleteWork();
+
+            return __asts;
+        }
+
         private void AddModule(string module, Token token = null)
         {
             var file = Path.Combine(_libraryDirectory, $"{module}.ol");
@@ -116,11 +130,12 @@ namespace Lang
 
             var fileIndex = BuildSettings.Files.Count;
             BuildSettings.Files.Add(file);
-            ThreadPool.QueueWork(ParseFile, new ParseData {FileIndex = fileIndex});
+            ThreadPool.QueueWork(ParseFile, new ParseData {File = file, FileIndex = fileIndex});
         }
 
         private class ParseData
         {
+            public string File;
             public int FileIndex;
         }
 
@@ -129,9 +144,8 @@ namespace Lang
             var parseData = (ParseData)data;
 
             // 1. Load file tokens
-            var file = BuildSettings.Files[parseData.FileIndex];
-            var tokens = _lexer.LoadFileTokens(file, parseData.FileIndex);
-            var directory = Path.GetDirectoryName(file);
+            var tokens = _lexer.LoadFileTokens(parseData.File, parseData.FileIndex);
+            var directory = Path.GetDirectoryName(parseData.File);
 
             // 2. Iterate through tokens, tracking different ASTs
             var enumerator = new TokenEnumerator(tokens);
@@ -140,6 +154,23 @@ namespace Lang
                 var ast = ParseTopLevelAst(enumerator, directory);
                 // TODO Handle some race conditions
                 _asts.Add(ast);
+            }
+        }
+
+        private void _ParseFile(object data)
+        {
+            var parseData = (ParseData)data;
+
+            // 1. Load file tokens
+            var tokens = _lexer.LoadFileTokens(parseData.File, parseData.FileIndex);
+            var directory = Path.GetDirectoryName(parseData.File);
+
+            // 2. Iterate through tokens, tracking different ASTs
+            var enumerator = new TokenEnumerator(tokens);
+            while (enumerator.MoveNext())
+            {
+                var ast = ParseTopLevelAst(enumerator, directory);
+                __asts.Add(ast);
             }
         }
 
