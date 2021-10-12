@@ -82,37 +82,37 @@ namespace Lang
         }
     }
 
-    public class LinkedList<T>
+    public class SafeLinkedList<T>
     {
-        private class Node
-        {
-            public T Data;
-            public Node Next;
-        }
-
-        private Node _head;
-        private Node _end;
+        public Node<T> Head;
+        private Node<T> _end;
 
         public void Add(T data)
         {
-            var node = new Node {Data = data};
+            var node = new Node<T> {Data = data};
 
-            if (_head == null)
+            if (Head == null)
             {
-                _head = node;
+                Head = node;
                 _end = node;
             }
             else
             {
-                Node originalEnd;
-                do
+                var originalEnd = _end;
+
+                while (Interlocked.CompareExchange(ref _end, node, originalEnd) != originalEnd)
                 {
                     originalEnd = _end;
                 }
-                while (Interlocked.CompareExchange(ref _end, node, originalEnd) != originalEnd);
 
                 originalEnd.Next = node;
             }
         }
+    }
+
+    public class Node<T>
+    {
+        public T Data;
+        public Node<T> Next;
     }
 }
