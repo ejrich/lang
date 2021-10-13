@@ -7,8 +7,7 @@ namespace Lang
 {
     public interface ITypeChecker
     {
-        void CheckTypes(List<IAst> asts);
-        void _CheckTypes(SafeLinkedList<IAst> asts);
+        void CheckTypes(SafeLinkedList<IAst> asts);
     }
 
     public class TypeChecker : ITypeChecker
@@ -33,8 +32,7 @@ namespace Lang
             _runner = runner;
         }
 
-        // TODO Remove
-        public void CheckTypes(List<IAst> asts)
+        public void CheckTypes(SafeLinkedList<IAst> asts)
         {
             var mainDefined = false;
             bool verifyAdditional;
@@ -54,254 +52,8 @@ namespace Lang
             TypeTable.Float64Type = AddPrimitive("float64", TypeKind.Float, 8, true);
             TypeTable.TypeType = AddPrimitive("Type", TypeKind.Type, 4, true);
 
-            var functionNames = new HashSet<string>();
-            do
-            {
-                // 1. Verify enum and struct definitions
-                for (var i = 0; i < asts.Count; i++)
-                {
-                    switch (asts[i])
-                    {
-                        case EnumAst enumAst:
-                            VerifyEnum(enumAst);
-                            asts.RemoveAt(i--);
-                            break;
-                        case StructAst structAst:
-                            if (structAst.Generics != null)
-                            {
-                                if (structAst.Name == "Array")
-                                {
-                                    _baseArrayType = structAst;
-                                }
-                                if (_polymorphicStructs.ContainsKey(structAst.Name))
-                                {
-                                    ErrorReporter.Report($"Multiple definitions of polymorphic struct '{structAst.Name}'", structAst);
-                                }
-                                _polymorphicStructs[structAst.Name] = structAst;
-                                asts.RemoveAt(i--);
-                            }
-                            else
-                            {
-                                structAst.BackendName = structAst.Name;
-                                if (!TypeTable.Add(structAst.Name, structAst))
-                                {
-                                    ErrorReporter.Report($"Multiple definitions of struct '{structAst.Name}'", structAst);
-                                }
-
-                                if (structAst.Name == "string")
-                                {
-                                    TypeTable.StringType = structAst;
-                                    structAst.TypeKind = TypeKind.String;
-                                    VerifyStruct(structAst);
-                                    asts.RemoveAt(i--);
-                                }
-                                else if (structAst.Name == "Any")
-                                {
-                                    TypeTable.AnyType = structAst;
-                                    structAst.TypeKind = TypeKind.Any;
-                                    VerifyStruct(structAst);
-                                    asts.RemoveAt(i--);
-                                }
-                                else
-                                {
-                                    structAst.TypeKind = TypeKind.Struct;
-                                }
-                            }
-
-                            _globalScope.Identifiers[structAst.Name] = structAst;
-                            break;
-                    }
-                }
-
-                // 2. Verify global variables and function return types/arguments
-                for (var i = 0; i < asts.Count; i++)
-                {
-                    switch (asts[i])
-                    {
-                        case DeclarationAst globalVariable:
-                            VerifyGlobalVariable(globalVariable);
-                            asts.RemoveAt(i--);
-                            break;
-                    }
-                }
-
-                // 3. Verify function return types/arguments
-                for (var i = 0; i < asts.Count; i++)
-                {
-                    switch (asts[i])
-                    {
-                        case FunctionAst function:
-                            var main = function.Name == "main";
-                            if (main)
-                            {
-                                if (mainDefined)
-                                {
-                                    ErrorReporter.Report("Only one main function can be defined", function);
-                                }
-
-                                mainDefined = true;
-                            }
-
-                            VerifyFunctionDefinition(function, functionNames, main);
-                            asts.RemoveAt(i--);
-                            break;
-                        case OperatorOverloadAst overload:
-                            VerifyOperatorOverloadDefinition(overload);
-                            asts.RemoveAt(i--);
-                            break;
-                    }
-                }
-
-                // 4. Verify struct bodies
-                for (var i = 0; i < asts.Count; i++)
-                {
-                    switch (asts[i])
-                    {
-                        case StructAst structAst:
-                            if (!structAst.Verified)
-                            {
-                                VerifyStruct(structAst);
-                            }
-                            asts.RemoveAt(i--);
-                            break;
-                    }
-                }
-
-                // 5. Verify and run top-level static ifs
-                verifyAdditional = false;
-                var additionalAsts = new List<IAst>();
-                for (int i = 0; i < asts.Count; i++)
-                {
-                    switch (asts[i])
-                    {
-                        case CompilerDirectiveAst directive:
-                            switch (directive.Type)
-                            {
-                                case DirectiveType.If:
-                                    var conditional = directive.Value as ConditionalAst;
-                                    if (VerifyCondition(conditional.Condition, null, _globalScope))
-                                    {
-                                        var condition = _irBuilder.CreateRunnableCondition(conditional.Condition, _globalScope);
-                                        _runner.Init();
-                                        ThreadPool.CompleteWork();
-
-                                        if (_runner.ExecuteCondition(condition, conditional.Condition))
-                                        {
-                                            additionalAsts.AddRange(conditional.IfBlock.Children);
-                                        }
-                                        else if (conditional.ElseBlock != null)
-                                        {
-                                            additionalAsts.AddRange(conditional.ElseBlock.Children);
-                                        }
-                                    }
-                                    asts.RemoveAt(i--);
-                                    break;
-                                case DirectiveType.Assert:
-                                    if (VerifyCondition(directive.Value, null, _globalScope))
-                                    {
-                                        var condition = _irBuilder.CreateRunnableCondition(directive.Value, _globalScope);
-                                        _runner.Init();
-                                        ThreadPool.CompleteWork();
-
-                                        if (!_runner.ExecuteCondition(condition, directive.Value))
-                                        {
-                                            ErrorReporter.Report("Assertion failed", directive.Value);
-                                        }
-                                    }
-                                    asts.RemoveAt(i--);
-                                    break;
-                                case DirectiveType.ImportModule:
-                                case DirectiveType.ImportFile:
-                                    asts.RemoveAt(i--);
-                                    break;
-                            }
-                            break;
-                    }
-                }
-                if (additionalAsts.Any())
-                {
-                    asts.AddRange(additionalAsts);
-                    verifyAdditional = true;
-                }
-            } while (verifyAdditional);
-
-            // 6. Execute any other compiler directives
-            foreach (var ast in asts)
-            {
-                switch (ast)
-                {
-                    case CompilerDirectiveAst directive:
-                        switch (directive.Type)
-                        {
-                            case DirectiveType.Run:
-                                VerifyAst(directive.Value, null, _globalScope, false);
-                                if (!ErrorReporter.Errors.Any())
-                                {
-                                    var function = _irBuilder.CreateRunnableFunction(directive.Value, _globalScope);
-
-                                    _runner.Init();
-                                    ThreadPool.CompleteWork();
-                                    _runner.RunProgram(function, directive.Value);
-                                }
-                                break;
-                            default:
-                                ErrorReporter.Report($"Compiler directive '{directive.Type}' not supported", directive);
-                                break;
-                        }
-                        break;
-                }
-            }
-
-            if (!mainDefined)
-            {
-                ErrorReporter.Report("'main' function of the program is not defined");
-            }
-
-            // 7. Verify operator overload bodies
-            foreach (var overloads in _operatorOverloads.Values)
-            {
-                foreach (var overload in overloads.Values)
-                {
-                    if (overload.Flags.HasFlag(FunctionFlags.Verified)) continue;
-                    VerifyOperatorOverload(overload);
-                }
-            }
-
-            // 8. Verify function bodies
-            foreach (var name in functionNames)
-            {
-                var functions = TypeTable.Functions[name];
-                foreach (var function in functions)
-                {
-                    if (function.Flags.HasFlag(FunctionFlags.Verified)) continue;
-                    VerifyFunction(function);
-                }
-            }
-
-            ThreadPool.CompleteWork();
-        }
-
-        public void _CheckTypes(SafeLinkedList<IAst> asts)
-        {
-            var mainDefined = false;
-            bool verifyAdditional;
-
-            // Add primitive types to global identifiers
-            TypeTable.VoidType = AddPrimitive("void", TypeKind.Void, 1);
-            TypeTable.BoolType = AddPrimitive("bool", TypeKind.Boolean, 1);
-            TypeTable.S8Type = AddPrimitive("s8", TypeKind.Integer, 1, true);
-            TypeTable.U8Type = AddPrimitive("u8", TypeKind.Integer, 1);
-            TypeTable.S16Type = AddPrimitive("s16", TypeKind.Integer, 2, true);
-            TypeTable.U16Type = AddPrimitive("u16", TypeKind.Integer, 2);
-            TypeTable.S32Type = AddPrimitive("s32", TypeKind.Integer, 4, true);
-            TypeTable.U32Type = AddPrimitive("u32", TypeKind.Integer, 4);
-            TypeTable.S64Type = AddPrimitive("s64", TypeKind.Integer, 8, true);
-            TypeTable.U64Type = AddPrimitive("u64", TypeKind.Integer, 8);
-            AddPrimitive("float", TypeKind.Float, 4, true);
-            TypeTable.Float64Type = AddPrimitive("float64", TypeKind.Float, 8, true);
-            TypeTable.TypeType = AddPrimitive("Type", TypeKind.Type, 4, true);
-
-            var functionNames = new HashSet<string>();
+            var runQueue = new List<CompilerDirectiveAst>();
+            var functionQueue = new List<FunctionAst>();
             var node = asts.Head;
             Node<IAst> previous = null;
             do
@@ -404,7 +156,7 @@ namespace Lang
                                 mainDefined = true;
                             }
 
-                            VerifyFunctionDefinition(function, functionNames, main);
+                            VerifyFunctionDefinition(function, functionQueue, main);
                             RemoveNode(asts, previous, node);
                             break;
                         case OperatorOverloadAst overload:
@@ -453,7 +205,7 @@ namespace Lang
                             switch (directive.Type)
                             {
                                 case DirectiveType.Run:
-                                    // TODO Add to queue to run
+                                    runQueue.Add(directive);
                                     break;
                                 case DirectiveType.If:
                                     var conditional = directive.Value as ConditionalAst;
@@ -468,18 +220,19 @@ namespace Lang
                                             if (conditional.IfBlock.Children.Any())
                                             {
                                                 verifyAdditional = true;
-                                                // TODO Add asts
+                                                foreach (var ast in conditional.IfBlock.Children)
+                                                {
+                                                    asts.Add(ast);
+                                                }
                                             }
-                                            additionalAsts.AddRange(conditional.IfBlock.Children);
                                         }
-                                        else if (conditional.ElseBlock != null)
+                                        else if (conditional.ElseBlock != null && conditional.ElseBlock.Children.Any())
                                         {
-                                            if (conditional.ElseBlock.Children.Any())
+                                            verifyAdditional = true;
+                                            foreach (var ast in conditional.ElseBlock.Children)
                                             {
-                                                verifyAdditional = true;
-                                                // TODO Add asts
+                                                asts.Add(ast);
                                             }
-                                            additionalAsts.AddRange(conditional.ElseBlock.Children);
                                         }
                                     }
                                     break;
@@ -504,40 +257,20 @@ namespace Lang
                     }
                     node = node.Next;
                 }
-                // if (additionalAsts.Any())
-                // {
-                //     asts.AddRange(additionalAsts);
-                //     verifyAdditional = true;
-                // }
             } while (verifyAdditional);
 
             // 6. Execute any other compiler directives
-            node = asts.Head;
-            while (node != null)
+            foreach (var runDirective in runQueue)
             {
-                switch (node.Data)
+                VerifyAst(runDirective.Value, null, _globalScope, false);
+                if (!ErrorReporter.Errors.Any())
                 {
-                    case CompilerDirectiveAst directive:
-                        switch (directive.Type)
-                        {
-                            case DirectiveType.Run:
-                                VerifyAst(directive.Value, null, _globalScope, false);
-                                if (!ErrorReporter.Errors.Any())
-                                {
-                                    var function = _irBuilder.CreateRunnableFunction(directive.Value, _globalScope);
+                    var function = _irBuilder.CreateRunnableFunction(runDirective.Value, _globalScope);
 
-                                    _runner.Init();
-                                    ThreadPool.CompleteWork();
-                                    _runner.RunProgram(function, directive.Value);
-                                }
-                                break;
-                            default:
-                                ErrorReporter.Report($"Compiler directive '{directive.Type}' not supported", directive);
-                                break;
-                        }
-                        break;
+                    _runner.Init();
+                    ThreadPool.CompleteWork();
+                    _runner.RunProgram(function, runDirective.Value);
                 }
-                node = node.Next;
             }
 
             if (!mainDefined)
@@ -556,12 +289,10 @@ namespace Lang
             }
 
             // 8. Verify function bodies
-            foreach (var name in functionNames)
+            foreach (var function in functionQueue)
             {
-                var functions = TypeTable.Functions[name];
-                foreach (var function in functions)
+                if (!function.Flags.HasFlag(FunctionFlags.Verified))
                 {
-                    if (function.Flags.HasFlag(FunctionFlags.Verified)) continue;
                     VerifyFunction(function);
                 }
             }
@@ -920,7 +651,7 @@ namespace Lang
             structAst.Verified = true;
         }
 
-        private void VerifyFunctionDefinition(FunctionAst function, HashSet<string> functionNames, bool main)
+        private void VerifyFunctionDefinition(FunctionAst function, List<FunctionAst> functionQueue, bool main)
         {
             // 1. Verify the return type of the function is valid
             if (function.ReturnTypeDefinition == null)
@@ -1070,7 +801,7 @@ namespace Lang
             }
             else
             {
-                functionNames.Add(function.Name);
+                functionQueue.Add(function);
                 var functions = TypeTable.AddFunction(function.Name, function);
                 if (functions.Count > 1)
                 {
