@@ -8,8 +8,7 @@ namespace Lang
 {
     public interface IParser
     {
-        List<IAst> Parse(string entrypoint);
-        SafeLinkedList<IAst> _Parse(string entrypoint);
+        SafeLinkedList<IAst> Parse(string entrypoint);
     }
 
     public class Parser : IParser
@@ -64,19 +63,7 @@ namespace Lang
             _lexer = lexer;
         }
 
-        public List<IAst> Parse(string entrypoint)
-        {
-            _libraryDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Modules");
-            AddModule("runtime");
-            AddFile(entrypoint);
-
-            ThreadPool.CompleteWork();
-
-            return _asts;
-        }
-
-        // TODO Use this method
-        public SafeLinkedList<IAst> _Parse(string entrypoint)
+        public SafeLinkedList<IAst> Parse(string entrypoint)
         {
             _libraryDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Modules");
             AddModule("runtime");
@@ -140,24 +127,6 @@ namespace Lang
         }
 
         private void ParseFile(object data)
-        {
-            var parseData = (ParseData)data;
-
-            // 1. Load file tokens
-            var tokens = _lexer.LoadFileTokens(parseData.File, parseData.FileIndex);
-            var directory = Path.GetDirectoryName(parseData.File);
-
-            // 2. Iterate through tokens, tracking different ASTs
-            var enumerator = new TokenEnumerator(tokens);
-            while (enumerator.MoveNext())
-            {
-                var ast = ParseTopLevelAst(enumerator, directory);
-                // TODO Handle some race conditions
-                _asts.Add(ast);
-            }
-        }
-
-        private void _ParseFile(object data)
         {
             var parseData = (ParseData)data;
 

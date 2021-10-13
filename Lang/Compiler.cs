@@ -97,13 +97,11 @@ namespace Lang
             // 2. Parse source files to asts
             ThreadPool.Init();
             var asts = _parser.Parse(entrypoint);
-            // var asts = _parser._Parse(entrypoint);
 
             ErrorReporter.ListErrorsAndExit(ErrorCodes.ParsingError);
 
             // 3. Check types and build the program ir
             _typeChecker.CheckTypes(asts);
-            // _typeChecker._CheckTypes(asts);
             var frontEndTime = stopwatch.Elapsed;
 
             ErrorReporter.ListErrorsAndExit(ErrorCodes.CompilationError);
