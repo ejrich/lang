@@ -98,15 +98,20 @@ namespace Lang
             }
             else
             {
-                var originalEnd = _end;
-
-                while (Interlocked.CompareExchange(ref _end, node, originalEnd) != originalEnd)
-                {
-                    originalEnd = _end;
-                }
-
-                originalEnd.Next = node;
+                ReplaceEnd(node);
             }
+        }
+
+        public void ReplaceEnd(Node<T> node)
+        {
+            var originalEnd = _end;
+
+            while (Interlocked.CompareExchange(ref _end, node, originalEnd) != originalEnd)
+            {
+                originalEnd = _end;
+            }
+
+            originalEnd.Next = node;
         }
     }
 
