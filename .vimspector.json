@@ -5,8 +5,8 @@
       "configuration": {
         "request": "launch",
         "program": "${workspaceRoot}/Lang/bin/Debug/net5.0/Lang.dll",
-        //"args": ["-S", "${workspaceRoot}/Example/main.ol"],
-        "args": ["-S", "${workspaceRoot}/Tests/tests/imports/imports.ol"],
+        "args": ["-S", "${workspaceRoot}/Example/main.ol"],
+        //"args": ["-S", "${workspaceRoot}/Tests/tests/imports/imports.ol"],
         "stopAtEntry": false,
         "cwd": "${workspaceRoot}"
       }
