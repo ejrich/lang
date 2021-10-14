@@ -30,14 +30,12 @@ namespace Lang
 
     public class Compiler : ICompiler
     {
-        private readonly IParser _parser;
         private readonly ITypeChecker _typeChecker;
         private readonly IBackend _backend;
         private readonly ILinker _linker;
 
-        public Compiler(IParser parser, ITypeChecker typeChecker, IBackend backend, ILinker linker)
+        public Compiler(ITypeChecker typeChecker, IBackend backend, ILinker linker)
         {
-            _parser = parser;
             _typeChecker = typeChecker;
             _backend = backend;
             _linker = linker;
@@ -96,7 +94,7 @@ namespace Lang
 
             // 2. Parse source files to asts
             ThreadPool.Init();
-            var asts = _parser.Parse(entrypoint);
+            var asts = Parser.Parse(entrypoint);
 
             ErrorReporter.ListErrorsAndExit(ErrorCodes.ParsingError);
 

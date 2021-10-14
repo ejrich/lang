@@ -5,14 +5,9 @@ using System.Linq;
 
 namespace Lang
 {
-    public interface ILexer
+    public static class Lexer
     {
-        List<Token> LoadFileTokens(string filePath, int fileIndex);
-    }
-
-    public class Lexer : ILexer
-    {
-        private readonly IDictionary<char, char> _escapableCharacters = new Dictionary<char, char>
+        private static readonly IDictionary<char, char> _escapableCharacters = new Dictionary<char, char>
         {
             {'"', '"'},
             {'\\', '\\'},
@@ -25,7 +20,7 @@ namespace Lang
             {'v', '\v'}
         };
 
-        private readonly IDictionary<string, TokenType> _reservedTokens = new Dictionary<string, TokenType>
+        private static readonly IDictionary<string, TokenType> _reservedTokens = new Dictionary<string, TokenType>
         {
             {"return", TokenType.Return},
             {"true", TokenType.Boolean},
@@ -45,7 +40,7 @@ namespace Lang
             {"continue", TokenType.Continue}
         };
 
-        public List<Token> LoadFileTokens(string filePath, int fileIndex)
+        public static List<Token> LoadFileTokens(string filePath, int fileIndex)
         {
             using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
             using var reader = new StreamReader(fileStream);
@@ -53,7 +48,7 @@ namespace Lang
             return GetTokens(reader, fileIndex).ToList();
         }
 
-        private IEnumerable<Token> GetTokens(StreamReader reader, int fileIndex)
+        private static IEnumerable<Token> GetTokens(StreamReader reader, int fileIndex)
         {
             var lexerStatus = new LexerStatus();
 
@@ -246,7 +241,7 @@ namespace Lang
             if (!lexerStatus.ReadingComment && currentToken != null) yield return currentToken;
         }
 
-        private void CheckForReservedTokensAndErrors(Token token, char character = default)
+        private static void CheckForReservedTokensAndErrors(Token token, char character = default)
         {
             // Check tokens for reserved keywords
             if (token.Type == TokenType.Identifier)

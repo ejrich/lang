@@ -401,6 +401,7 @@ namespace Lang
         public DirectiveType Type { get; set; }
         public IAst Value { get; set; }
         public string Import { get; set; }
+        public string ImportPath { get; set; }
     }
 
     public class CastAst : IAst

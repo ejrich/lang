@@ -54,11 +54,11 @@ namespace Lang
 
             var runQueue = new List<CompilerDirectiveAst>();
             var functionQueue = new List<FunctionAst>();
-            var node = asts.Head;
-            Node<IAst> previous = null;
             do
             {
                 // 1. Verify enum and struct definitions
+                var node = asts.Head;
+                Node<IAst> previous = null;
                 while (node != null)
                 {
                     switch (node.Data)
@@ -193,7 +193,6 @@ namespace Lang
 
                 // 5. Verify and run top-level static ifs
                 verifyAdditional = false;
-                var additionalAsts = new List<IAst>();
                 node = asts.Head;
                 previous = null;
                 while (node != null)
@@ -247,6 +246,19 @@ namespace Lang
                                         {
                                             ErrorReporter.Report("Assertion failed", directive.Value);
                                         }
+                                    }
+                                    break;
+                                case DirectiveType.ImportModule:
+                                    if (directive.ImportPath != null)
+                                    {
+                                        Parser.AddModule(directive);
+                                    }
+                                    break;
+                                case DirectiveType.ImportFile:
+                                    Console.WriteLine(directive.ImportPath);
+                                    if (directive.ImportPath != null)
+                                    {
+                                        Parser.AddFile(directive);
                                     }
                                     break;
                             }
@@ -306,6 +318,10 @@ namespace Lang
             {
                 asts.Head = current.Next;
             }
+            // else if (current.Next == null)
+            // {
+            //     asts.ReplaceEnd(previous);
+            // }
             else
             {
                 previous.Next = current.Next;
