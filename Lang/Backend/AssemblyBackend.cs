@@ -1,4 +1,4 @@
-namespace Lang.Backend.Assembly
+namespace Lang.Backend
 {
     public class AssemblyBackend : IBackend
     {
