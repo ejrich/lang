@@ -7,7 +7,7 @@ namespace Lang
 {
     public interface ITypeChecker
     {
-        void CheckTypes(SafeLinkedList<IAst> asts);
+        void CheckTypes();
     }
 
     public class TypeChecker : ITypeChecker
@@ -32,10 +32,9 @@ namespace Lang
             _runner = runner;
         }
 
-        public void CheckTypes(SafeLinkedList<IAst> asts)
+        public void CheckTypes()
         {
             var mainDefined = false;
-            bool verifyAdditional;
 
             // Add primitive types to global identifiers
             TypeTable.VoidType = AddPrimitive("void", TypeKind.Void, 1);
@@ -57,7 +56,7 @@ namespace Lang
             do
             {
                 // 1. Verify enum and struct definitions
-                var node = asts.Head;
+                var node = Parser.Asts.Head;
                 Node<IAst> previous = null;
                 while (node != null)
                 {
@@ -65,7 +64,7 @@ namespace Lang
                     {
                         case EnumAst enumAst:
                             VerifyEnum(enumAst);
-                            RemoveNode(asts, previous, node);
+                            RemoveNode(previous, node);
                             break;
                         case StructAst structAst:
                             if (structAst.Generics != null)
@@ -79,7 +78,7 @@ namespace Lang
                                     ErrorReporter.Report($"Multiple definitions of polymorphic struct '{structAst.Name}'", structAst);
                                 }
                                 _polymorphicStructs[structAst.Name] = structAst;
-                                RemoveNode(asts, previous, node);
+                                RemoveNode(previous, node);
                             }
                             else
                             {
@@ -94,14 +93,14 @@ namespace Lang
                                     TypeTable.StringType = structAst;
                                     structAst.TypeKind = TypeKind.String;
                                     VerifyStruct(structAst);
-                                    RemoveNode(asts, previous, node);
+                                    RemoveNode(previous, node);
                                 }
                                 else if (structAst.Name == "Any")
                                 {
                                     TypeTable.AnyType = structAst;
                                     structAst.TypeKind = TypeKind.Any;
                                     VerifyStruct(structAst);
-                                    RemoveNode(asts, previous, node);
+                                    RemoveNode(previous, node);
                                 }
                                 else
                                 {
@@ -120,7 +119,7 @@ namespace Lang
                 }
 
                 // 2. Verify global variables and function return types/arguments
-                node = asts.Head;
+                node = Parser.Asts.Head;
                 previous = null;
                 while (node != null)
                 {
@@ -128,7 +127,7 @@ namespace Lang
                     {
                         case DeclarationAst globalVariable:
                             VerifyGlobalVariable(globalVariable);
-                            RemoveNode(asts, previous, node);
+                            RemoveNode(previous, node);
                             break;
                         default:
                             previous = node;
@@ -138,7 +137,7 @@ namespace Lang
                 }
 
                 // 3. Verify function return types/arguments
-                node = asts.Head;
+                node = Parser.Asts.Head;
                 previous = null;
                 while (node != null)
                 {
@@ -157,11 +156,11 @@ namespace Lang
                             }
 
                             VerifyFunctionDefinition(function, functionQueue, main);
-                            RemoveNode(asts, previous, node);
+                            RemoveNode(previous, node);
                             break;
                         case OperatorOverloadAst overload:
                             VerifyOperatorOverloadDefinition(overload);
-                            RemoveNode(asts, previous, node);
+                            RemoveNode(previous, node);
                             break;
                         default:
                             previous = node;
@@ -171,7 +170,7 @@ namespace Lang
                 }
 
                 // 4. Verify struct bodies
-                node = asts.Head;
+                node = Parser.Asts.Head;
                 previous = null;
                 while (node != null)
                 {
@@ -182,7 +181,7 @@ namespace Lang
                             {
                                 VerifyStruct(structAst);
                             }
-                            RemoveNode(asts, previous, node);
+                            RemoveNode(previous, node);
                             break;
                         default:
                             previous = node;
@@ -192,15 +191,15 @@ namespace Lang
                 }
 
                 // 5. Verify and run top-level static ifs
-                verifyAdditional = false;
-                node = asts.Head;
+                // verifyAdditional = false;
+                node = Parser.Asts.Head;
                 previous = null;
                 while (node != null)
                 {
                     switch (node.Data)
                     {
                         case CompilerDirectiveAst directive:
-                            RemoveNode(asts, previous, node);
+                            RemoveNode(previous, node);
                             switch (directive.Type)
                             {
                                 case DirectiveType.Run:
@@ -218,19 +217,17 @@ namespace Lang
                                         {
                                             if (conditional.IfBlock.Children.Any())
                                             {
-                                                verifyAdditional = true;
                                                 foreach (var ast in conditional.IfBlock.Children)
                                                 {
-                                                    asts.Add(ast);
+                                                    Parser.Asts.Add(ast);
                                                 }
                                             }
                                         }
                                         else if (conditional.ElseBlock != null && conditional.ElseBlock.Children.Any())
                                         {
-                                            verifyAdditional = true;
                                             foreach (var ast in conditional.ElseBlock.Children)
                                             {
-                                                asts.Add(ast);
+                                                Parser.Asts.Add(ast);
                                             }
                                         }
                                     }
@@ -252,13 +249,14 @@ namespace Lang
                                     if (directive.ImportPath != null)
                                     {
                                         Parser.AddModule(directive);
+                                        ThreadPool.CompleteWork();
                                     }
                                     break;
                                 case DirectiveType.ImportFile:
-                                    Console.WriteLine(directive.ImportPath);
                                     if (directive.ImportPath != null)
                                     {
                                         Parser.AddFile(directive);
+                                        ThreadPool.CompleteWork();
                                     }
                                     break;
                             }
@@ -269,7 +267,7 @@ namespace Lang
                     }
                     node = node.Next;
                 }
-            } while (verifyAdditional);
+            } while (Parser.Asts.Head != null);
 
             // 6. Execute any other compiler directives
             foreach (var runDirective in runQueue)
@@ -312,16 +310,21 @@ namespace Lang
             ThreadPool.CompleteWork();
         }
 
-        private void RemoveNode(SafeLinkedList<IAst> asts, Node<IAst> previous, Node<IAst> current)
+        private void RemoveNode(Node<IAst> previous, Node<IAst> current)
         {
             if (previous == null)
             {
-                asts.Head = current.Next;
+                Parser.Asts.Head = current.Next;
+                if (current.Next == null)
+                {
+                    Parser.Asts.ReplaceEnd(null);
+                }
             }
-            // else if (current.Next == null)
-            // {
-            //     asts.ReplaceEnd(previous);
-            // }
+            else if (current.Next == null)
+            {
+                Parser.Asts.ReplaceEnd(previous);
+                previous.Next = null;
+            }
             else
             {
                 previous.Next = current.Next;
