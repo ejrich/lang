@@ -85,7 +85,7 @@ namespace Lang
     public class SafeLinkedList<T>
     {
         public Node<T> Head;
-        private Node<T> _end;
+        public Node<T> End;
 
         public void Add(T data)
         {
@@ -94,24 +94,25 @@ namespace Lang
             if (Head == null)
             {
                 Head = node;
-                _end = node;
+                End = node;
             }
             else
             {
-                ReplaceEnd(node);
+                var originalEnd = ReplaceEnd(node);
+                originalEnd.Next = node;
             }
         }
 
-        public void ReplaceEnd(Node<T> node)
+        public Node<T> ReplaceEnd(Node<T> node)
         {
-            var originalEnd = _end;
+            var originalEnd = End;
 
-            while (Interlocked.CompareExchange(ref _end, node, originalEnd) != originalEnd)
+            while (Interlocked.CompareExchange(ref End, node, originalEnd) != originalEnd)
             {
-                originalEnd = _end;
+                originalEnd = End;
             }
 
-            originalEnd.Next = node;
+            return originalEnd;
         }
     }
 

@@ -10,11 +10,18 @@ run_specified_function() {
     baz();
 }
 
-#if true {
+int pick_one() {
+    value := rand();
+    return value % 2;
+}
+
+#if pick_one() {
     #import "a.ol"
 }
 else {
     #import "b.ol"
 }
+
+int rand() #extern "libc"
 
 #run main();

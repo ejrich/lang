@@ -10,8 +10,7 @@ namespace Lang
     {
         private static string _libraryDirectory;
 
-        private static List<IAst> _asts = new();
-        private static SafeLinkedList<IAst> __asts = new();
+        public static SafeLinkedList<IAst> Asts = new();
 
         private class TokenEnumerator
         {
@@ -52,15 +51,13 @@ namespace Lang
             public Token Last => _tokens[^1];
         }
 
-        public static SafeLinkedList<IAst> Parse(string entrypoint)
+        public static void Parse(string entrypoint)
         {
             _libraryDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Modules");
             AddModule("runtime");
             AddFile(entrypoint);
 
             ThreadPool.CompleteWork();
-
-            return __asts;
         }
 
         private static void AddModule(string module, Token token = null)
@@ -152,7 +149,7 @@ namespace Lang
             while (enumerator.MoveNext())
             {
                 var ast = ParseTopLevelAst(enumerator, directory);
-                __asts.Add(ast);
+                Asts.Add(ast);
             }
         }
 
