@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Lang
+namespace ol
 {
     public interface ITypeChecker
     {

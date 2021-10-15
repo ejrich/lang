@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
-namespace Lang
+namespace ol
 {
     public unsafe static class TypeTable
     {

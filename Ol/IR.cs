@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
-namespace Lang
+namespace ol
 {
     public static class Program
     {

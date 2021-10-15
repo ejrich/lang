@@ -4,7 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 
-namespace Lang
+namespace ol
 {
     public static class Parser
     {

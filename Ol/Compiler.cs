@@ -2,9 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using Lang.Backend;
 
-namespace Lang
+namespace ol
 {
     public static class BuildSettings
     {

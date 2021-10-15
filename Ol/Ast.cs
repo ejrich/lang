@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Lang
+namespace ol
 {
     public interface IAst
     {

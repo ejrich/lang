@@ -1,4 +1,4 @@
-namespace Lang.Backend
+namespace ol
 {
     public interface IBackend
     {

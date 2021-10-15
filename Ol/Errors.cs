@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Lang
+namespace ol
 {
     public static class ErrorCodes
     {
