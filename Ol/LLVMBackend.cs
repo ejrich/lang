@@ -5,7 +5,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using LLVMSharp.Interop;
 
-namespace Lang.Backend
+namespace ol
 {
     public unsafe class LLVMBackend : IBackend
     {

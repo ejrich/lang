@@ -1,7 +1,7 @@
 using System;
 using System.Threading;
 
-namespace Lang
+namespace ol
 {
     public static class ThreadPool
     {

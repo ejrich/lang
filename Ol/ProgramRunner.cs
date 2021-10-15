@@ -4,7 +4,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
 
-namespace Lang
+namespace ol
 {
     [StructLayout(LayoutKind.Explicit, Size=8)]
     public struct Register

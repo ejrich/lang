@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace Lang
+namespace ol
 {
     public class MemoryBlock
     {
