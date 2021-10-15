@@ -2,7 +2,7 @@
 #import "files.ol"
 
 main() {
-    tests_dir := "Tests/tests"; #const
+    tests_dir := "test/tests"; #const
     dir := opendir(tests_dir);
     command_buffer = malloc(1000);
     failed_test_count := 0;
@@ -73,7 +73,7 @@ string format_string(string format, Params<string> args) {
 }
 
 bool run_test(string test_dir, string test) {
-    executable := "./Ol/bin/Debug/net5.0/ol"; #const
+    executable := "./ol/bin/Debug/net5.0/ol"; #const
 
     command := format_string("% %/%.ol", executable, test_dir, test);
     printf("Compiling: %s", command);
