@@ -191,7 +191,7 @@ namespace Lang
                 }
 
                 // 5. Verify and run top-level static ifs
-                // verifyAdditional = false;
+                var parsingAdditional = false;
                 node = Parser.Asts.Head;
                 previous = null;
                 while (node != null)
@@ -249,14 +249,14 @@ namespace Lang
                                     if (directive.ImportPath != null)
                                     {
                                         Parser.AddModule(directive);
-                                        ThreadPool.CompleteWork();
+                                        parsingAdditional = true;
                                     }
                                     break;
                                 case DirectiveType.ImportFile:
                                     if (directive.ImportPath != null)
                                     {
                                         Parser.AddFile(directive);
-                                        ThreadPool.CompleteWork();
+                                        parsingAdditional = true;
                                     }
                                     break;
                             }
@@ -266,6 +266,10 @@ namespace Lang
                             break;
                     }
                     node = node.Next;
+                }
+                if (parsingAdditional)
+                {
+                    ThreadPool.CompleteWork();
                 }
             } while (Parser.Asts.Head != null);
 
