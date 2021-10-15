@@ -73,7 +73,7 @@ string format_string(string format, Params<string> args) {
 }
 
 bool run_test(string test_dir, string test) {
-    executable := "./Lang/bin/Debug/net5.0/Lang"; #const
+    executable := "./Ol/bin/Debug/net5.0/ol"; #const
 
     command := format_string("% %/%.ol", executable, test_dir, test);
     printf("Compiling: %s", command);
