@@ -22,12 +22,12 @@ enum FileType : u8 {
     DT_WHT = 14;
 }
 
-DIR* opendir(string dirname) #extern "libc"
-int closedir(DIR* dir) #extern "libc"
-dirent* readdir(DIR* dir) #extern "libc"
+DIR* opendir(string dirname) #extern "c"
+int closedir(DIR* dir) #extern "c"
+dirent* readdir(DIR* dir) #extern "c"
 
 struct FILE {}
 
-FILE* popen(string command, string type) #extern "libc"
-int pclose(FILE* stream) #extern "libc"
-u8* fgets(u8* buffer, int n, FILE* stream) #extern "libc"
+FILE* popen(string command, string type) #extern "c"
+int pclose(FILE* stream) #extern "c"
+u8* fgets(u8* buffer, int n, FILE* stream) #extern "c"
