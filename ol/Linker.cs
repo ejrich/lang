@@ -56,6 +56,9 @@ namespace ol
 
         private string DefaultObjects(DirectoryInfo libDirectory)
         {
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Runtime/runtime.o");
+
+            /*
             var files = libDirectory.GetFiles();
             if (_crtObjects.All(o => files.Any(f => f.Name == o)))
             {
@@ -77,6 +80,7 @@ namespace ol
             Console.WriteLine($"Unable to locate crt object files, valid locations are {libDirectory.FullName} or {platformDirectory.FullName}");
             Environment.Exit(ErrorCodes.LinkError);
             return null;
+            */
         }
 
         private static string DetermineLinker(LinkerType linkerType, DirectoryInfo libDirectory)
