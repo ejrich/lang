@@ -304,12 +304,6 @@ namespace ol
             }
         }
 
-        private void AddDependency(String library)
-        {
-            var lib = Marshal.PtrToStringAnsi(library.Data);
-            BuildSettings.Dependencies.Add(lib);
-        }
-
         private void SetLinker(byte linker)
         {
             BuildSettings.Linker = (LinkerType)linker;
@@ -549,13 +543,6 @@ namespace ol
                             var returnValue = new Register();
                             switch (instruction.String)
                             {
-                                case "add_dependency":
-                                {
-                                    var value = GetValue(instruction.Value1.Values[0], registers, stackPointer, function, arguments);
-                                    var library = Marshal.PtrToStructure<String>(value.Pointer);
-                                    AddDependency(library);
-                                    break;
-                                }
                                 case "set_linker":
                                 {
                                     var value = GetValue(instruction.Value1.Values[0], registers, stackPointer, function, arguments);

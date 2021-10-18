@@ -83,6 +83,6 @@ print_array(string name, Array<int> array) {
     printf("\n");
 }
 
-int rand() #extern "libc"
+int rand() #extern "c"
 
 #run main();

@@ -22,6 +22,6 @@ else {
     #import "b.ol"
 }
 
-int rand() #extern "libc"
+int rand() #extern "c"
 
 #run main();

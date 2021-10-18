@@ -17,8 +17,6 @@ enum BuildEnv : u8 {
 os: OS; #const
 build_env: BuildEnv; #const
 
-add_dependency(string library) #compiler
-
 enum LinkerType : u8 {
     Static;
     Dynamic;

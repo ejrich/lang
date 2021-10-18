@@ -166,11 +166,11 @@ struct Any {
 
 
 // Basic functions
-printf(string format, ... args) #extern "libc"
-exit(int exit_code) #extern "libc"
-void* malloc(int size) #extern "libc"
-free(void* data) #extern "libc"
-void* memcpy(void* dest, void* src, int length) #extern "libc"
+printf(string format, ... args) #extern "c"
+exit(int exit_code) #extern "c"
+void* malloc(int size) #extern "c"
+free(void* data) #extern "c"
+void* memcpy(void* dest, void* src, int length) #extern "c"
 
 
 // Runtime functions

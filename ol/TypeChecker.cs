@@ -1014,6 +1014,7 @@ namespace ol
                 {
                     _runner.InitExternFunction(function);
                 }
+                BuildSettings.Dependencies.Add(function.ExternLib);
             }
             else if (!function.Flags.HasFlag(FunctionFlags.Compiler))
             {

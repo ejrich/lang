@@ -339,7 +339,6 @@ compiler_directives() {
 build() {
     if os == OS.Linux {
         set_linker(LinkerType.Dynamic);
-        add_dependency("X11");
     }
 }
 

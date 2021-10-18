@@ -30,17 +30,14 @@ namespace ol
             // 3. Run the linker
             var executableFile = Path.Combine(binaryPath, BuildSettings.Name);
             var dependencyList = string.Join(' ', BuildSettings.Dependencies.Select(d => $"-l{d}"));
-            var buildProcess = new Process
-            {
-                StartInfo =
-                {
-                    FileName = "ld",
-                    Arguments = $"{linker} -o {executableFile} {objectFile} {defaultObjects} " +
-                                $"-L{gccDirectory} --start-group {dependencyList} -lgcc -lgcc_eh -lc --end-group"
-                }
-            };
+            var linkerArguments = $"{linker} -o {executableFile} {objectFile} {defaultObjects} --start-group {dependencyList} --end-group";
+
+            var buildProcess = new Process {StartInfo = {FileName = "ld", Arguments = linkerArguments}};
             buildProcess.Start();
             buildProcess.WaitForExit();
+
+            Console.WriteLine($"Linking: ld {linkerArguments}\n");
+
             if (buildProcess.ExitCode != 0)
             {
                 Console.WriteLine("Unable to link executable, please see output");
