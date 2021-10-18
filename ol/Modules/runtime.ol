@@ -175,7 +175,6 @@ void* memcpy(void* dest, void* src, int length) #extern "c"
 
 // Runtime functions
 int __start(int argc, u8** argv) {
-    printf("%d, %p\n", argc, argv); // TODO Remove
     each i in 1..argc-1 {
         argument := convert_c_string(argv[i]);
         array_insert(&command_line_arguments, argument);

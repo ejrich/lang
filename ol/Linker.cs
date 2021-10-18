@@ -24,13 +24,14 @@ namespace ol
             // 2. Determine lib directories
             var libDirectory = DetermineLibDirectory();
             var linker = DetermineLinker(BuildSettings.Linker, libDirectory);
-            var gccDirectory = DetermineGCCDirectory(libDirectory);
+            // var gccDirectory = DetermineGCCDirectory(libDirectory);
             var defaultObjects = DefaultObjects(libDirectory);
 
             // 3. Run the linker
             var executableFile = Path.Combine(binaryPath, BuildSettings.Name);
             var dependencyList = string.Join(' ', BuildSettings.Dependencies.Select(d => $"-l{d}"));
-            var linkerArguments = $"{linker} -o {executableFile} {objectFile} {defaultObjects} -L{gccDirectory} --start-group {dependencyList} -lgcc -lgcc_eh --end-group";
+            var linkerArguments = $"{linker} -o {executableFile} {objectFile} {defaultObjects} --start-group {dependencyList} --end-group";
+            // var linkerArguments = $"{linker} -o {executableFile} {objectFile} {defaultObjects} -L{gccDirectory} --start-group {dependencyList} -lgcc -lgcc_eh --end-group";
 
             var buildProcess = new Process {StartInfo = {FileName = "ld", Arguments = linkerArguments}};
             buildProcess.Start();
@@ -50,9 +51,9 @@ namespace ol
             return new("/usr/lib");
         }
 
-        private readonly string[] _crtObjects = {
-            "crt1.o", "crti.o", "crtn.o"
-        };
+        // private readonly string[] _crtObjects = {
+        //     "crt1.o", "crti.o", "crtn.o"
+        // };
 
         private string DefaultObjects(DirectoryInfo libDirectory)
         {
