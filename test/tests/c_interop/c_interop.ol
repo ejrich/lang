@@ -6,6 +6,8 @@ main() {
     c_array_structs();
 
     function_calls();
+
+    unions();
 }
 
 c_arrays() {
@@ -78,6 +80,38 @@ CArray<int>[5] returns_c_array_from_struct() {
     }
 
     return array_struct.array;
+}
+
+union Event {
+    type: int;
+    key_event: KeyEvent;
+    button_event: ButtonEvent;
+}
+
+struct KeyEvent {
+    type: int;
+    foo: int;
+    bar: float64;
+}
+
+struct ButtonEvent {
+    type: int;
+    foo: int;
+    bar: float;
+    baz: float;
+}
+
+unions() {
+    event: Event;
+
+    event.type = 5;
+
+    assert(event.type == event.key_event.type);
+    assert(event.type == event.button_event.type);
+
+    event.key_event.foo = 6;
+
+    assert(event.key_event.foo == event.button_event.foo);
 }
 
 #run main();
