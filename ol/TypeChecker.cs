@@ -828,15 +828,33 @@ namespace ol
             }
             else
             {
-                functionQueue.Add(function);
                 var functions = TypeTable.AddFunction(function.Name, function);
-                if (functions.Count > 1)
+
+                if (function.Flags.HasFlag(FunctionFlags.Extern))
                 {
-                    if (function.Flags.HasFlag(FunctionFlags.Extern))
+                    if (functions.Count > 1)
                     {
                         ErrorReporter.Report($"Multiple definitions of extern function '{function.Name}'", function);
                     }
-                    else if (OverloadExistsForFunction(function, functions, false))
+                    else if (!function.Flags.HasFlag(FunctionFlags.Varargs))
+                    {
+                        _runner.InitExternFunction(function);
+                    }
+                    BuildSettings.Dependencies.Add(function.ExternLib);
+                    function.Flags |= FunctionFlags.Verified;
+                }
+                else if (!function.Flags.HasFlag(FunctionFlags.Compiler))
+                {
+                    if (functions.Count > 1 && OverloadExistsForFunction(function, functions, false))
+                    {
+                        ErrorReporter.Report($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
+                    }
+                    function.Flags |= FunctionFlags.Verified;
+                }
+                else
+                {
+                    functionQueue.Add(function);
+                    if (functions.Count > 1 && OverloadExistsForFunction(function, functions, false))
                     {
                         ErrorReporter.Report($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
                     }
@@ -1007,47 +1025,31 @@ namespace ol
                 }
             }
 
-            // 2. For extern functions, simply verify there is no body and return
-            if (function.Flags.HasFlag(FunctionFlags.Extern))
+            // 3. Resolve the compiler directives in the function
+            if (function.Flags.HasFlag(FunctionFlags.HasDirectives))
             {
-                if (function.Body != null)
-                {
-                    ErrorReporter.Report("Extern function cannot have a body", function);
-                }
-                else if (!function.Flags.HasFlag(FunctionFlags.Varargs))
-                {
-                    _runner.InitExternFunction(function);
-                }
-                BuildSettings.Dependencies.Add(function.ExternLib);
+                ResolveCompilerDirectives(function.Body.Children, function);
             }
-            else if (!function.Flags.HasFlag(FunctionFlags.Compiler))
+
+            // 4. Loop through function body and verify all ASTs
+            var returned = VerifyScope(function.Body, function, _globalScope, false);
+
+            // 5. Verify the main function doesn't call the compiler
+            if (function.Name == "main" && function.Flags.HasFlag(FunctionFlags.CallsCompiler))
             {
-                // 3. Resolve the compiler directives in the function
-                if (function.Flags.HasFlag(FunctionFlags.HasDirectives))
+                ErrorReporter.Report("The main function cannot call the compiler", function);
+            }
+
+            // 6. Verify the function returns on all paths
+            if (!returned)
+            {
+                if (function.ReturnType?.TypeKind != TypeKind.Void)
                 {
-                    ResolveCompilerDirectives(function.Body.Children, function);
+                    ErrorReporter.Report($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnTypeDefinition)}' on all paths", function);
                 }
-
-                // 4. Loop through function body and verify all ASTs
-                var returned = VerifyScope(function.Body, function, _globalScope, false);
-
-                // 5. Verify the main function doesn't call the compiler
-                if (function.Name == "main" && function.Flags.HasFlag(FunctionFlags.CallsCompiler))
+                else
                 {
-                    ErrorReporter.Report("The main function cannot call the compiler", function);
-                }
-
-                // 6. Verify the function returns on all paths
-                if (!returned)
-                {
-                    if (function.ReturnType?.TypeKind != TypeKind.Void)
-                    {
-                        ErrorReporter.Report($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnTypeDefinition)}' on all paths", function);
-                    }
-                    else
-                    {
-                        function.Flags |= FunctionFlags.ReturnVoidAtEnd;
-                    }
+                    function.Flags |= FunctionFlags.ReturnVoidAtEnd;
                 }
             }
             function.Flags |= FunctionFlags.Verified;
