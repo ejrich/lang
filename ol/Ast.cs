@@ -199,6 +199,31 @@ namespace ol
         public IType ElementType { get; set; }
     }
 
+    // TODO Union generics? I don't think so
+    public class UnionAst : IAst, IType
+    {
+        public int FileIndex { get; set; }
+        public uint Line { get; init; }
+        public uint Column { get; init; }
+        public string Name { get; set; }
+        public string BackendName { get; set; }
+        public int TypeIndex { get; set; }
+        public TypeKind TypeKind { get; set; } = TypeKind.Union;
+        public uint Size { get; set; }
+        public List<UnionFieldAst> Fields { get; } = new();
+    }
+
+    public class UnionFieldAst : IAst
+    {
+        public int FileIndex { get; set; }
+        public uint Line { get; init; }
+        public uint Column { get; init; }
+        public string Name { get; set; }
+        public uint Size { get; set; }
+        public TypeDefinition TypeDefinition { get; set; }
+        public IType Type { get; set; }
+    }
+
     public class CompoundType : IType
     {
         public string Name { get; set; }
@@ -536,6 +561,7 @@ namespace ol
         CArray,
         Enum,
         Struct,
+        Union,
         Type,
         Any,
         Compound,

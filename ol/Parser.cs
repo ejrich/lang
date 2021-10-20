@@ -174,6 +174,12 @@ namespace ol
                     return ParseStruct(enumerator, attributes);
                 case TokenType.Enum:
                     return ParseEnum(enumerator, attributes);
+                case TokenType.Union:
+                    if (attributes != null)
+                    {
+                        ErrorReporter.Report($"Compiler directives cannot have attributes", token);
+                    }
+                    return ParseUnion(enumerator);
                 case TokenType.Pound:
                     if (attributes != null)
                     {
@@ -868,6 +874,111 @@ namespace ol
             }
 
             return enumAst;
+        }
+
+        private static UnionAst ParseUnion(TokenEnumerator enumerator)
+        {
+            var union = CreateAst<UnionAst>(enumerator.Current);
+
+            // 1. Determine name of enum
+            enumerator.MoveNext();
+            switch (enumerator.Current?.Type)
+            {
+                case TokenType.Identifier:
+                    union.Name = union.BackendName = enumerator.Current.Value;
+                    break;
+                case null:
+                    ErrorReporter.Report("Expected union to have name", enumerator.Last);
+                    break;
+                default:
+                    ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in union definition", enumerator.Current);
+                    break;
+            }
+
+            // 2. Parse over the open brace
+            enumerator.MoveNext();
+            if (enumerator.Current?.Type != TokenType.OpenBrace)
+            {
+                ErrorReporter.Report("Expected '{' token in union definition", enumerator.Current ?? enumerator.Last);
+                while (enumerator.Current != null && enumerator.Current.Type != TokenType.OpenBrace)
+                    enumerator.MoveNext();
+            }
+
+            // 3. Iterate through fields
+            while (enumerator.MoveNext())
+            {
+                var token = enumerator.Current;
+
+                if (token.Type == TokenType.CloseBrace)
+                {
+                    break;
+                }
+
+                union.Fields.Add(ParseUnionField(enumerator));
+            }
+
+            return union;
+        }
+
+        private static UnionFieldAst ParseUnionField(TokenEnumerator enumerator)
+        {
+            var field = CreateAst<UnionFieldAst>(enumerator.Current);
+
+            if (enumerator.Current.Type != TokenType.Identifier)
+            {
+                ErrorReporter.Report($"Expected name of union field, but got '{enumerator.Current.Value}'", enumerator.Current);
+            }
+            field.Name = enumerator.Current.Value;
+
+            // 1. Expect to get colon
+            enumerator.MoveNext();
+            if (enumerator.Current?.Type != TokenType.Colon)
+            {
+                var errorToken = enumerator.Current ?? enumerator.Last;
+                ErrorReporter.Report($"Unexpected token in struct field '{errorToken.Value}'", errorToken);
+                // Parse to a ; or }
+                while (enumerator.MoveNext())
+                {
+                    var tokenType = enumerator.Current.Type;
+                    if (tokenType == TokenType.SemiColon || tokenType == TokenType.CloseBrace)
+                    {
+                        break;
+                    }
+                }
+                return field;
+            }
+
+            // 2. Check if type is given
+            if (enumerator.Peek()?.Type == TokenType.Identifier)
+            {
+                enumerator.MoveNext();
+                field.TypeDefinition = ParseType(enumerator, null);
+            }
+
+            // 3. Get the value or return
+            enumerator.MoveNext();
+            var token = enumerator.Current;
+            switch (token?.Type)
+            {
+                case TokenType.SemiColon:
+                case null:
+                    if (field.TypeDefinition == null)
+                    {
+                        ErrorReporter.Report("Expected union field to have a type", token);
+                    }
+                    break;
+                default:
+                    ErrorReporter.Report($"Unexpected token '{token.Value}' in declaration", token);
+                    // Parse until there is a semicolon or closing brace
+                    while (token != null && (token.Type != TokenType.Equals || token.Type != TokenType.CloseBrace))
+                    {
+                        enumerator.MoveNext();
+                        token = enumerator.Current;
+                    }
+                    break;
+            }
+
+            return field;
         }
 
         private static bool SearchForGeneric(string generic, int index, TypeDefinition type)

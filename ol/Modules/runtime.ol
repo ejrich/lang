@@ -125,6 +125,7 @@ enum TypeKind {
     CArray;
     Enum;
     Struct;
+    Union;
     Type;
     Any;
     Compound;

@@ -111,6 +111,10 @@ namespace ol
 
                             _globalScope.Identifiers[structAst.Name] = structAst;
                             break;
+                        case UnionAst union:
+                            // TODO Implement me
+                            RemoveNode(previous, node);
+                            break;
                         default:
                             previous = node;
                             break;
@@ -1292,7 +1296,7 @@ namespace ol
                 }
                 else if (declaration.Type == null)
                 {
-                    ErrorReporter.Report($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                    ErrorReporter.Report($"Undefined type '{PrintTypeDefinition(declaration.TypeDefinition)}' in declaration", declaration.TypeDefinition);
                 }
                 else if (declaration.Type.TypeKind == TypeKind.Void)
                 {
@@ -1513,7 +1517,7 @@ namespace ol
                 }
                 else if (declaration.Type == null)
                 {
-                    ErrorReporter.Report($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                    ErrorReporter.Report($"Undefined type '{PrintTypeDefinition(declaration.TypeDefinition)}' in declaration", declaration.TypeDefinition);
                 }
                 else if (declaration.Type.TypeKind == TypeKind.Void)
                 {
@@ -1717,7 +1721,7 @@ namespace ol
                 }
                 else if (declaration.Type == null)
                 {
-                    ErrorReporter.Report($"Undefined type in declaration '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                    ErrorReporter.Report($"Undefined type '{PrintTypeDefinition(declaration.TypeDefinition)}' in declaration", declaration.TypeDefinition);
                 }
                 else if (declaration.Type.TypeKind == TypeKind.Void)
                 {
