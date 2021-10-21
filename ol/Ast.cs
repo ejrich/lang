@@ -210,6 +210,8 @@ namespace ol
         public int TypeIndex { get; set; }
         public TypeKind TypeKind { get; set; } = TypeKind.Union;
         public uint Size { get; set; }
+        public bool Verified { get; set; }
+        public bool Verifying { get; set; }
         public List<UnionFieldAst> Fields { get; } = new();
     }
 
@@ -219,7 +221,6 @@ namespace ol
         public uint Line { get; init; }
         public uint Column { get; init; }
         public string Name { get; set; }
-        public uint Size { get; set; }
         public TypeDefinition TypeDefinition { get; set; }
         public IType Type { get; set; }
     }

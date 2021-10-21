@@ -1678,6 +1678,12 @@ namespace ol
                         value = EmitGetPointer(function, value, indexValue, elementType, true);
                     }
                 }
+                else if (type is UnionAst union)
+                {
+                    // TODO Implement me
+                    var fieldIndex = structField.ValueIndices[i-1];
+                    var field = union.Fields[fieldIndex];
+                }
                 else
                 {
                     var structDefinition = (StructAst) type;

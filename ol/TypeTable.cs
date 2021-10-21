@@ -184,6 +184,16 @@ namespace ol
             [FieldOffset(32)] public Array Attributes;
         }
 
+        private const int UnionTypeInfoSize = 32;
+        [StructLayout(LayoutKind.Explicit, Size=UnionTypeInfoSize)]
+        public struct UnionTypeInfo
+        {
+            [FieldOffset(0)] public String Name;
+            [FieldOffset(12)] public TypeKind Type;
+            [FieldOffset(16)] public uint Size;
+            [FieldOffset(20)] public Array Fields;
+        }
+
         private const int CompoundTypeInfoSize = 32;
         [StructLayout(LayoutKind.Explicit, Size=CompoundTypeInfoSize)]
         public struct CompoundTypeInfo
@@ -221,6 +231,14 @@ namespace ol
             [FieldOffset(12)] public uint Offset;
             [FieldOffset(16)] public IntPtr TypeInfo;
             [FieldOffset(24)] public Array Attributes;
+        }
+
+        private const int UnionFieldSize = 20;
+        [StructLayout(LayoutKind.Explicit, Size=UnionFieldSize)]
+        public struct UnionField
+        {
+            [FieldOffset(0)] public String Name;
+            [FieldOffset(12)] public IntPtr TypeInfo;
         }
 
         private const int EnumValueSize = 16;
@@ -411,7 +429,28 @@ namespace ol
                     Marshal.StructureToPtr(compoundTypeInfo, typeInfoPointer, false);
                     break;
                 case TypeKind.Union:
-                    // TODO Implement me
+                    typeInfoPointer = Allocator.Allocate(UnionTypeInfoSize);
+                    var union = (UnionAst)type;
+                    var unionTypeInfo = new UnionTypeInfo {Name = name, Type = TypeKind.Union, Size = type.Size};
+
+                    unionTypeInfo.Fields.Length = union.Fields.Count;
+                    var unionFields = new UnionField[unionTypeInfo.Fields.Length];
+
+                    for (var i = 0; i < unionTypeInfo.Fields.Length; i++)
+                    {
+                        var field = union.Fields[i];
+                        unionFields[i] = new UnionField {Name = Allocator.MakeString(field.Name), TypeInfo = TypeInfos[field.Type.TypeIndex]};
+                    }
+
+                    var unionFieldsArraySize = unionTypeInfo.Fields.Length * UnionFieldSize;
+                    var unionFieldsPointer = Allocator.Allocate(unionFieldsArraySize);
+                    fixed (UnionField* pointer = &unionFields[0])
+                    {
+                        Buffer.MemoryCopy(pointer, unionFieldsPointer.ToPointer(), unionFieldsArraySize, unionFieldsArraySize);
+                    }
+                    structTypeInfo.Fields.Data = unionFieldsPointer;
+
+                    Marshal.StructureToPtr(unionTypeInfo, typeInfoPointer, false);
                     break;
             }
 

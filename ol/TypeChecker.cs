@@ -658,23 +658,27 @@ namespace ol
                     }
                 }
 
-                // Check for circular dependencies
+                // Check for circular dependencies and set the size and offset
                 if (structAst == structField.Type)
                 {
                     ErrorReporter.Report($"Struct '{structAst.Name}' contains circular reference in field '{structField.Name}'", structField);
                 }
-
-                // Set the size and offset
-                if (structField.Type != null)
+                else if (structField.Type != null)
                 {
                     if (structField.Type is StructAst fieldStruct)
                     {
-                        if (!fieldStruct.Verified && fieldStruct != structAst)
+                        if (!fieldStruct.Verified)
                         {
                             VerifyStruct(fieldStruct);
                         }
                     }
-                    structField.Type = structField.Type;
+                    else if (structField.Type is UnionAst fieldUnion)
+                    {
+                        if (!fieldUnion.Verified)
+                        {
+                            VerifyUnion(fieldUnion);
+                        }
+                    }
                     structField.Offset = structAst.Size;
                     structField.Size = structField.Type.Size;
                     structAst.Size += structField.Type.Size;
@@ -685,9 +689,88 @@ namespace ol
             structAst.Verified = true;
         }
 
-        private void VerifyUnion(UnionAst unionAst)
+        private void VerifyUnion(UnionAst union)
         {
-            // TODO Implement me
+            var fieldNames = new HashSet<string>();
+            union.Verifying = true;
+
+            if (union.Fields.Count == 0)
+            {
+                ErrorReporter.Report($"Union '{union.Name}' must have 1 or more fields", union);
+            }
+            else
+            {
+                for (var i = 0; i < union.Fields.Count; i++)
+                {
+                    var field = union.Fields[i];
+                    // Check if the field has been previously defined
+                    if (!fieldNames.Add(field.Name))
+                    {
+                        ErrorReporter.Report($"Union '{union.Name}' already contains field '{field.Name}'", field);
+                    }
+
+                    field.Type = VerifyType(field.TypeDefinition, _globalScope, out var isGeneric, out var isVarargs, out var isParams);
+
+                    if (isVarargs || isParams)
+                    {
+                        ErrorReporter.Report($"Union field '{union.Name}.{field.Name}' cannot be varargs or Params", field.TypeDefinition);
+                    }
+                    else if (field.Type == null)
+                    {
+                        ErrorReporter.Report($"Undefined type '{PrintTypeDefinition(field.TypeDefinition)}' in union field '{union.Name}.{field.Name}'", field.TypeDefinition);
+                    }
+                    else if (field.Type.TypeKind == TypeKind.Void)
+                    {
+                        ErrorReporter.Report($"Union field '{union.Name}.{field.Name}' cannot be assigned type 'void'", field.TypeDefinition);
+                    }
+
+                    // Check type count
+                    if (field.Type?.TypeKind == TypeKind.Array && field.TypeDefinition.Count != null)
+                    {
+                        // Verify the count is a constant
+                        var countType = VerifyConstantExpression(field.TypeDefinition.Count, null, _globalScope, out var isConstant, out var arrayLength);
+
+                        if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
+                        {
+                            ErrorReporter.Report($"Expected size of '{union.Name}.{field.Name}' to be a constant, positive integer", field.TypeDefinition.Count);
+                        }
+                        else
+                        {
+                            field.TypeDefinition.ConstCount = arrayLength;
+                        }
+                    }
+
+                    // Check for circular dependencies and set the size
+                    if (union == field.Type)
+                    {
+                        ErrorReporter.Report($"Union '{union.Name}' contains circular reference in field '{field.Name}'", field);
+                    }
+                    else if (field.Type != null)
+                    {
+                        if (field.Type is StructAst fieldStruct)
+                        {
+                            if (!fieldStruct.Verified)
+                            {
+                                VerifyStruct(fieldStruct);
+                            }
+                        }
+                        else if (field.Type is UnionAst fieldUnion)
+                        {
+                            if (!fieldUnion.Verified)
+                            {
+                                VerifyUnion(fieldUnion);
+                            }
+                        }
+                        if (field.Type.Size > union.Size)
+                        {
+                            union.Size = field.Type.Size;
+                        }
+                    }
+                }
+            }
+
+            TypeTable.CreateTypeInfo(union);
+            union.Verified = true;
         }
 
         private void VerifyFunctionDefinition(FunctionAst function, List<FunctionAst> functionQueue, bool main)
@@ -2379,7 +2462,6 @@ namespace ol
 
         private IType VerifyStructField(string fieldName, IType structType, StructFieldRefAst structField, int fieldIndex, IAst ast)
         {
-            // 1. Load the struct definition
             if (structType.TypeKind == TypeKind.Pointer)
             {
                 var pointerType = (PrimitiveAst)structType;
@@ -2387,37 +2469,57 @@ namespace ol
                 structField.Pointers[fieldIndex] = true;
             }
 
-            structField.Types[fieldIndex] = structType;
             if (structType is ArrayType arrayType && fieldName == "length")
             {
                 structField.IsConstant = true;
                 structField.ConstantValue = arrayType.Length;
                 return TypeTable.S32Type;
             }
-            if (structType is not StructAst structDefinition)
-            {
-                ErrorReporter.Report($"Type '{structType.Name}' does not contain field '{fieldName}'", ast);
-                return null;
-            }
 
-            // 2. Get the field definition and set the field index
-            StructFieldAst field = null;
-            for (var i = 0; i < structDefinition.Fields.Count; i++)
+            structField.Types[fieldIndex] = structType;
+            if (structType is StructAst structDefinition)
             {
-                if (structDefinition.Fields[i].Name == fieldName)
+                StructFieldAst field = null;
+                for (var i = 0; i < structDefinition.Fields.Count; i++)
                 {
-                    structField.ValueIndices[fieldIndex] = i;
-                    field = structDefinition.Fields[i];
-                    break;
+                    if (structDefinition.Fields[i].Name == fieldName)
+                    {
+                        structField.ValueIndices[fieldIndex] = i;
+                        field = structDefinition.Fields[i];
+                        break;
+                    }
                 }
+                if (field == null)
+                {
+                    ErrorReporter.Report($"Struct '{structType.Name}' does not contain field '{fieldName}'", ast);
+                    return null;
+                }
+
+                return field.Type;
             }
-            if (field == null)
+            else if (structType is UnionAst union)
             {
-                ErrorReporter.Report($"Struct '{structType.Name}' does not contain field '{fieldName}'", ast);
-                return null;
+                UnionFieldAst field = null;
+                for (var i = 0; i < union.Fields.Count; i++)
+                {
+                    if (union.Fields[i].Name == fieldName)
+                    {
+                        structField.ValueIndices[fieldIndex] = i;
+                        field = union.Fields[i];
+                        break;
+                    }
+                }
+                if (field == null)
+                {
+                    ErrorReporter.Report($"Struct '{structType.Name}' does not contain field '{fieldName}'", ast);
+                    return null;
+                }
+
+                return field.Type;
             }
 
-            return field.Type;
+            ErrorReporter.Report($"Type '{structType.Name}' does not contain field '{fieldName}'", ast);
+            return null;
         }
 
         private bool VerifyConditional(ConditionalAst conditional, IFunction currentFunction, ScopeAst scope, bool canBreak)
@@ -4192,6 +4294,10 @@ namespace ol
                         if (typeValue is StructAst structAst && !structAst.Verifying)
                         {
                             VerifyStruct(structAst);
+                        }
+                        else if (typeValue is UnionAst union && !union.Verifying)
+                        {
+                            VerifyUnion(union);
                         }
                         return typeValue;
                     }
