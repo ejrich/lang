@@ -842,14 +842,16 @@ namespace ol
                     }
                     BuildSettings.Dependencies.Add(function.ExternLib);
                     function.Flags |= FunctionFlags.Verified;
+                    _irBuilder.AddFunctionDefinition(function);
                 }
-                else if (!function.Flags.HasFlag(FunctionFlags.Compiler))
+                else if (function.Flags.HasFlag(FunctionFlags.Compiler))
                 {
                     if (functions.Count > 1 && OverloadExistsForFunction(function, functions, false))
                     {
                         ErrorReporter.Report($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
                     }
                     function.Flags |= FunctionFlags.Verified;
+                    _irBuilder.AddFunctionDefinition(function);
                 }
                 else
                 {

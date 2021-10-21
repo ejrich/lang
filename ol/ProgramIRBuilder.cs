@@ -8,6 +8,7 @@ namespace ol
     public interface IProgramIRBuilder
     {
         void AddFunction(FunctionAst function);
+        void AddFunctionDefinition(FunctionAst function);
         void AddOperatorOverload(OperatorOverloadAst overload);
         FunctionIR CreateRunnableFunction(IAst ast, ScopeAst globalScope);
         FunctionIR CreateRunnableCondition(IAst ast, ScopeAst globalScope);
@@ -23,9 +24,12 @@ namespace ol
         {
             var functionName = GetFunctionName(function);
 
-            var functionIR = new FunctionIR {Index = GetFunctionIndex(), Source = function};
+            var functionIR = new FunctionIR
+            {
+                Index = GetFunctionIndex(), Source = function, Allocations = new(), Instructions = new(), BasicBlocks = new()
+            };
 
-            if (functionName == "main")
+            if (functionName == "__start")
             {
                 Program.EntryPoint = functionIR;
             }
@@ -34,53 +38,54 @@ namespace ol
                 Program.Functions[functionName] = functionIR;
             }
 
-            if (!function.Flags.HasFlag(FunctionFlags.Extern) && !function.Flags.HasFlag(FunctionFlags.Compiler))
+            var entryBlock = AddBasicBlock(functionIR);
+
+            if (BuildSettings.Release)
             {
-                functionIR.Allocations = new();
-                functionIR.Instructions = new();
-                functionIR.BasicBlocks = new();
-
-                var entryBlock = AddBasicBlock(functionIR);
-
-                if (BuildSettings.Release)
+                for (var i = 0; i < function.Arguments.Count; i++)
                 {
-                    for (var i = 0; i < function.Arguments.Count; i++)
-                    {
-                        var argument = function.Arguments[i];
-                        var allocation = AddAllocation(functionIR, argument);
+                    var argument = function.Arguments[i];
+                    var allocation = AddAllocation(functionIR, argument);
 
-                        EmitStore(functionIR, allocation, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i, Type = argument.Type});
-                    }
-                }
-                else
-                {
-                    for (var i = 0; i < function.Arguments.Count; i++)
-                    {
-                        var argument = function.Arguments[i];
-                        var allocation = AddAllocation(functionIR, argument);
-
-                        EmitStore(functionIR, allocation, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i, Type = argument.Type});
-                        functionIR.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareParameter, Index = i});
-                    }
-                }
-
-                if (function.ReturnType.TypeKind == TypeKind.Compound)
-                {
-                    functionIR.CompoundReturnAllocation = AddAllocation(functionIR, function.ReturnType);
-                }
-
-                EmitScopeChildren(functionIR, entryBlock, function.Body, function.ReturnType, null, null);
-
-                if (function.Flags.HasFlag(FunctionFlags.ReturnVoidAtEnd))
-                {
-                    functionIR.Instructions.Add(new Instruction {Type = InstructionType.ReturnVoid});
-                }
-
-                if (function.Flags.HasFlag(FunctionFlags.PrintIR))
-                {
-                    PrintFunction(function.Name, functionIR);
+                    EmitStore(functionIR, allocation, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i, Type = argument.Type});
                 }
             }
+            else
+            {
+                for (var i = 0; i < function.Arguments.Count; i++)
+                {
+                    var argument = function.Arguments[i];
+                    var allocation = AddAllocation(functionIR, argument);
+
+                    EmitStore(functionIR, allocation, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i, Type = argument.Type});
+                    functionIR.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareParameter, Index = i});
+                }
+            }
+
+            if (function.ReturnType.TypeKind == TypeKind.Compound)
+            {
+                functionIR.CompoundReturnAllocation = AddAllocation(functionIR, function.ReturnType);
+            }
+
+            EmitScopeChildren(functionIR, entryBlock, function.Body, function.ReturnType, null, null);
+
+            if (function.Flags.HasFlag(FunctionFlags.ReturnVoidAtEnd))
+            {
+                functionIR.Instructions.Add(new Instruction {Type = InstructionType.ReturnVoid});
+            }
+
+            if (function.Flags.HasFlag(FunctionFlags.PrintIR))
+            {
+                PrintFunction(function.Name, functionIR);
+            }
+        }
+
+        public void AddFunctionDefinition(FunctionAst function)
+        {
+            var functionIR = new FunctionIR {Index = GetFunctionIndex(), Source = function};
+
+            var functionName = GetFunctionName(function);
+            Program.Functions[functionName] = functionIR;
         }
 
         public void AddOperatorOverload(OperatorOverloadAst overload)
@@ -2177,12 +2182,7 @@ namespace ol
 
         private string GetFunctionName(FunctionAst function)
         {
-            return function.Name switch
-            {
-                "main" => "__main",
-                "__start" => "main",
-                _ => function.OverloadIndex > 0 ? $"{function.Name}.{function.OverloadIndex}" : function.Name
-            };
+            return function.OverloadIndex > 0 ? $"{function.Name}.{function.OverloadIndex}" : function.Name;
         }
 
         private InstructionValue EmitLoad(FunctionIR function, IType type, InstructionValue value, bool returnValue = false)
