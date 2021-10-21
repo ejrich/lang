@@ -104,6 +104,10 @@ struct StructTypeInfo : TypeInfo {
     attributes: Array<string>;
 }
 
+struct UnionTypeInfo : TypeInfo {
+    fields: Array<UnionField>;
+}
+
 struct CompoundTypeInfo : TypeInfo {
     types: Array<TypeInfo>;
 }
@@ -137,6 +141,11 @@ struct TypeField {
     offset: u32;
     type_info: TypeInfo*;
     attributes: Array<string>;
+}
+
+struct UnionField {
+    name: string;
+    type_info: TypeInfo*;
 }
 
 struct EnumValue {
