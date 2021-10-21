@@ -308,7 +308,7 @@ namespace ol
             LLVM.SetInitializer(typeTable, LLVMValueRef.CreateConstNamedStruct(typeInfoArrayType, new LLVMValueRef[] {typeCount, typeArrayGlobal}));
 
             // 6. Write the program beginning at the entrypoint
-            WriteFunctionDefinition("main", Program.EntryPoint);
+            WriteFunctionDefinition("__start", Program.EntryPoint);
             while (_functionsToWrite.Any())
             {
                 var (functionPointer, function) = _functionsToWrite.Dequeue();
