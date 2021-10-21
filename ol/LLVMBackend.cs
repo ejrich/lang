@@ -61,15 +61,19 @@ namespace ol
             var (arrayTypeInfoType, arrayTypeInfo) = CreateStructAndTypeInfo("CArrayTypeInfo", structTypeInfoType);
             var (enumTypeInfoType, enumTypeInfo) = CreateStructAndTypeInfo("EnumTypeInfo", structTypeInfoType);
             var (compoundTypeInfoType, compoundTypeInfo) = CreateStructAndTypeInfo("CompoundTypeInfo", structTypeInfoType);
-            var (stringStruct, stringType) = CreateStructAndTypeInfo("string", structTypeInfoType);
-            var (stringArray, stringArrayType) = CreateStructAndTypeInfo("Array.string", structTypeInfoType);
-            var (enumValue, enumValueType) = CreateStructAndTypeInfo("EnumValue", structTypeInfoType);
-            var (enumValueArray, enumValueArrayType) = CreateStructAndTypeInfo("Array.EnumValue", structTypeInfoType);
+            var (stringType, stringStruct) = CreateStructAndTypeInfo("string", structTypeInfoType);
+            var (stringArrayType, stringArray) = CreateStructAndTypeInfo("Array.string", structTypeInfoType);
+            var (enumValueType, enumValue) = CreateStructAndTypeInfo("EnumValue", structTypeInfoType);
+            var (enumValueArrayType, enumValueArray) = CreateStructAndTypeInfo("Array.EnumValue", structTypeInfoType);
+            var (unionTypeInfoType, unionTypeInfo) = CreateStructAndTypeInfo("UnionTypeInfo", structTypeInfoType);
+            var (unionFieldType, unionField) = CreateStructAndTypeInfo("UnionField", structTypeInfoType);
+            var (unionFieldArrayType, unionFieldArray) = CreateStructAndTypeInfo("Array.UnionField", structTypeInfoType);
 
-            _stringType = stringStruct;
-            var defaultAttributes = LLVMValueRef.CreateConstNamedStruct(stringArray, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(stringStruct, 0))});
+            _stringType = stringType;
+            var defaultAttributes = LLVMValueRef.CreateConstNamedStruct(stringArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(stringType, 0))});
 
-            var structQueue = new Queue<StructAst>();
+            var structQueue = new List<StructAst>();
+            var unionQueue = new List<UnionAst>();
 
             if (_emitDebug)
             {
@@ -80,7 +84,7 @@ namespace ol
                         case StructAst structAst:
                             _types[structAst.TypeIndex] = _context.CreateNamedStruct(name);
                             CreateTypeInfo(structTypeInfoType, structAst.TypeIndex);
-                            structQueue.Enqueue(structAst);
+                            structQueue.Add(structAst);
 
                             if (structAst.Fields.Any())
                             {
@@ -95,7 +99,7 @@ namespace ol
                             }
                             break;
                         case EnumAst enumAst:
-                            DeclareEnum(enumAst, enumValue, enumValueArray, enumTypeInfoType, stringArray, defaultAttributes);
+                            DeclareEnum(enumAst, enumValueType, enumValueArrayType, enumTypeInfoType, stringArrayType, defaultAttributes);
                             CreateDebugEnumType(enumAst);
                             break;
                         case PrimitiveAst primitive:
@@ -107,6 +111,16 @@ namespace ol
 
                             var elementType = _debugTypes[arrayType.ElementType.TypeIndex];
                             _debugTypes[arrayType.TypeIndex] = LLVM.DIBuilderCreateArrayType(_debugBuilder, arrayType.Length, 0, elementType, null, 0);
+                            break;
+                        case UnionAst union:
+                            DeclareUnion(union, unionTypeInfoType);
+                            unionQueue.Add(union);
+
+                            using (var structName = new MarshaledString(union.Name))
+                            {
+                                var file = _debugFiles[union.FileIndex];
+                                _debugTypes[union.TypeIndex] = LLVM.DIBuilderCreateForwardDecl(_debugBuilder, (uint)DwarfTag.Union_type, structName.Value, (UIntPtr)structName.Length, null, file, union.Line, 0, union.Size * 8, 0, null, UIntPtr.Zero);
+                            }
                             break;
                         case CompoundType compoundType:
                             DeclareCompoundType(compoundType, typeInfoType, typeInfoArrayType, compoundTypeInfoType);
@@ -145,16 +159,20 @@ namespace ol
                         case StructAst structAst:
                             _types[structAst.TypeIndex] = _context.CreateNamedStruct(name);
                             CreateTypeInfo(structTypeInfoType, structAst.TypeIndex);
-                            structQueue.Enqueue(structAst);
+                            structQueue.Add(structAst);
                             break;
                         case EnumAst enumAst:
-                            DeclareEnum(enumAst, enumValue, enumValueArray, enumTypeInfoType, stringArray, defaultAttributes);
+                            DeclareEnum(enumAst, enumValueType, enumValueArrayType, enumTypeInfoType, stringArrayType, defaultAttributes);
                             break;
                         case PrimitiveAst primitive:
                             DeclarePrimitive(primitive, integerTypeInfoType, pointerTypeInfoType, typeInfoType);
                             break;
                         case ArrayType arrayType:
                             DeclareArrayType(arrayType, arrayTypeInfoType);
+                            break;
+                        case UnionAst union:
+                            DeclareUnion(union, unionTypeInfoType);
+                            unionQueue.Add(union);
                             break;
                         case CompoundType compoundType:
                             DeclareCompoundType(compoundType, typeInfoType, typeInfoArrayType, compoundTypeInfoType);
@@ -167,22 +185,75 @@ namespace ol
             var typeFieldArray = _module.GetTypeByName("Array.TypeField");
             var defaultFields = LLVMValueRef.CreateConstNamedStruct(typeFieldArray, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(typeField, 0))});
 
-            SetStructTypeFields(typeInfo, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
-            SetStructTypeFields(typeInfoArray, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
-            SetStructTypeFields(integerTypeInfo, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
-            SetStructTypeFields(pointerTypeInfo, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
-            SetStructTypeFields(arrayTypeInfo, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
-            SetStructTypeFields(enumTypeInfo, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
-            SetStructTypeFields((StructAst)structTypeInfo, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
-            SetStructTypeFields(compoundTypeInfo, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
-            SetStructTypeFields(stringType, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
-            SetStructTypeFields(stringArrayType, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
-            SetStructTypeFields(enumValueType, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
-            SetStructTypeFields(enumValueArrayType, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(typeInfo, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(typeInfoArray, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(integerTypeInfo, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(pointerTypeInfo, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(arrayTypeInfo, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(enumTypeInfo, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(unionTypeInfo, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields((StructAst)structTypeInfo, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(compoundTypeInfo, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(stringStruct, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(stringArray, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(enumValue, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(enumValueArray, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(unionField, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(unionFieldArray, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
 
-            while (structQueue.TryDequeue(out var structAst))
+            foreach (var structAst in structQueue)
             {
-                SetStructTypeFields(structAst, typeField, typeFieldArray, defaultFields, stringArray, defaultAttributes, structTypeInfoType);
+                SetStructTypeFields(structAst, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
+            }
+
+            foreach (var union in unionQueue)
+            {
+                var typeName = GetString(union.Name);
+
+                var typeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Union, 0);
+                var typeSize = LLVM.ConstInt(LLVM.Int32Type(), union.Size, 0);
+                var unionFields = new LLVMValueRef[union.Fields.Count];
+
+                for (var i = 0; i < union.Fields.Count; i++)
+                {
+                    var field = union.Fields[i];
+
+                    var fieldNameString = GetString(field.Name);
+
+                    unionFields[i] = LLVMValueRef.CreateConstNamedStruct(unionFieldType, new LLVMValueRef[] {fieldNameString, _typeInfos[field.Type.TypeIndex]});
+                }
+
+                var fieldArray = LLVMValueRef.CreateConstArray(unionFieldType, unionFields);
+                var unionFieldArrayGlobal = _module.AddGlobal(LLVM.TypeOf(fieldArray), "____union_fields");
+                SetPrivateConstant(unionFieldArrayGlobal);
+                LLVM.SetInitializer(unionFieldArrayGlobal, fieldArray);
+
+                var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, };
+                var typeInfoStruct = LLVMValueRef.CreateConstNamedStruct(unionTypeInfoType, fields);
+
+                LLVM.SetInitializer(_typeInfos[union.TypeIndex], typeInfoStruct);
+
+                if (_emitDebug)
+                {
+                    using var unionName = new MarshaledString(union.Name);
+
+                    var file = _debugFiles[union.FileIndex];
+                    var debugFields = new LLVMMetadataRef[union.Fields.Count];
+
+                    var structDecl = _debugTypes[union.TypeIndex];
+                    for (var i = 0; i < fields.Length; i++)
+                    {
+                        var field = union.Fields[i];
+                        using var fieldName = new MarshaledString(field.Name);
+
+                        debugFields[i] = LLVM.DIBuilderCreateMemberType(_debugBuilder, structDecl, fieldName.Value, (UIntPtr)fieldName.Length, file, field.Line, field.Type.Size * 8, 0, 0, LLVMDIFlags.LLVMDIFlagZero, _debugTypes[field.Type.TypeIndex]);
+                    }
+
+                    fixed (LLVMMetadataRef* fieldsPointer = debugFields)
+                    {
+                        _debugTypes[union.TypeIndex] = LLVM.DIBuilderCreateStructType(_debugBuilder, null, unionName.Value, (UIntPtr)unionName.Length, file, union.Line, union.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, (LLVMOpaqueMetadata**)fieldsPointer, (uint)fields.Length, 0, null, null, UIntPtr.Zero);
+                    }
+                }
             }
 
             var functionTypeInfoType = _module.GetTypeByName("FunctionTypeInfo");
@@ -237,7 +308,7 @@ namespace ol
                         SetPrivateConstant(attributesArrayGlobal);
                         LLVM.SetInitializer(attributesArrayGlobal, attributesArray);
 
-                        attributes = LLVMValueRef.CreateConstNamedStruct(stringArray, new LLVMValueRef[]
+                        attributes = LLVMValueRef.CreateConstNamedStruct(stringArrayType, new LLVMValueRef[]
                         {
                             LLVM.ConstInt(LLVM.Int32Type(), (ulong)attributeRefs.Length, 0), attributesArrayGlobal
                         });
@@ -492,7 +563,16 @@ namespace ol
             CreateAndSetTypeInfo(arrayTypeInfoType, fields, arrayType.TypeIndex);
         }
 
-        private void DeclareCompoundType(CompoundType compoundType, LLVMTypeRef typeInfoType, LLVMTypeRef typeInfoArrayType, LLVMTypeRef compoundTypeInfoType)
+        private void DeclareUnion(UnionAst union, LLVMTypeRef unionTypeInfo)
+        {
+            var type = _types[union.TypeIndex] = _context.CreateNamedStruct(union.Name);
+
+            type.StructSetBody(new []{LLVMTypeRef.CreateArray(LLVM.Int8Type(), union.Size)}, false);
+
+            CreateTypeInfo(unionTypeInfo, union.TypeIndex);
+        }
+
+        private void DeclareCompoundType(CompoundType compoundType, LLVMTypeRef typeInfo, LLVMTypeRef typeInfoArray, LLVMTypeRef compoundTypeInfo)
         {
             var types = new LLVMTypeRef[compoundType.Types.Length];
             var typeInfos = new LLVMValueRef[compoundType.Types.Length];
@@ -506,12 +586,12 @@ namespace ol
 
             _types[compoundType.TypeIndex] = LLVMTypeRef.CreateStruct(types, false);
 
-            var typesArray = LLVMValueRef.CreateConstArray(typeInfoType, typeInfos);
+            var typesArray = LLVMValueRef.CreateConstArray(typeInfo, typeInfos);
             var typesArrayGlobal = _module.AddGlobal(LLVM.TypeOf(typesArray), "____enum_values");
             SetPrivateConstant(typesArrayGlobal);
             LLVM.SetInitializer(typesArrayGlobal, typesArray);
 
-            var typeInfoArray = LLVMValueRef.CreateConstNamedStruct(typeInfoArrayType, new LLVMValueRef[]
+            var array = LLVMValueRef.CreateConstNamedStruct(typeInfoArray, new LLVMValueRef[]
             {
                 LLVM.ConstInt(LLVM.Int32Type(), (ulong)typeInfos.Length, 0), typesArrayGlobal
             });
@@ -520,8 +600,8 @@ namespace ol
             var typeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Compound, 0);
             var typeSize = LLVM.ConstInt(LLVM.Int32Type(), compoundType.Size, 0);
 
-            var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, typeInfoArray};
-            CreateAndSetTypeInfo(compoundTypeInfoType, fields, compoundType.TypeIndex);
+            var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, array};
+            CreateAndSetTypeInfo(compoundTypeInfo, fields, compoundType.TypeIndex);
         }
 
         private void SetStructTypeFields(StructAst structAst, LLVMTypeRef typeFieldType, LLVMTypeRef typeFieldArrayType, LLVMValueRef defaultFields, LLVMTypeRef stringArrayType, LLVMValueRef defaultAttributes, LLVMTypeRef structTypeInfoType)
@@ -840,6 +920,13 @@ namespace ol
                         {
                             var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
                             values[instruction.ValueIndex] = _builder.BuildStructGEP(pointer, (uint)instruction.Index);
+                            break;
+                        }
+                        case InstructionType.GetUnionPointer:
+                        {
+                            var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
+                            var targetType = _types[instruction.Value2.Type.TypeIndex];
+                            values[instruction.ValueIndex] = _builder.BuildBitCast(pointer, LLVM.PointerType(targetType, 0));
                             break;
                         }
                         case InstructionType.Call:
@@ -1566,6 +1653,7 @@ namespace ol
             Pointer_type = 0x0F,
             Structure_type = 0x13,
             Subroutine_type = 0x15,
+            Union_type = 0x17,
             File_type = 0x29,
             Subprogram = 0x2E,
             Auto_variable = 0x100,
