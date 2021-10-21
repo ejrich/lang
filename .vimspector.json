@@ -4,9 +4,9 @@
       "adapter": "netcoredbg",
       "configuration": {
         "request": "launch",
-        "program": "${workspaceRoot}/Lang/bin/Debug/net5.0/Lang.dll",
-        "args": ["-S", "${workspaceRoot}/Example/main.ol"],
-        //"args": ["-S", "${workspaceRoot}/Tests/tests/imports/imports.ol"],
+        "program": "${workspaceRoot}/ol/bin/Debug/net5.0/ol.dll",
+        "args": ["-S", "${workspaceRoot}/example/main.ol"],
+        //"args": ["-S", "${workspaceRoot}/test/tests/imports/imports.ol"],
         "stopAtEntry": false,
         "cwd": "${workspaceRoot}"
       }
@@ -15,7 +15,7 @@
       "adapter": "vscode-cpptools",
       "configuration": {
         "request": "launch",
-        "program": "${workspaceRoot}/Example/bin/Example",
+        "program": "${workspaceRoot}/example/bin/Example",
         "cwd": "${workspaceRoot}",
         "externalConsole": true,
         "MIMode": "gdb"
