@@ -112,8 +112,11 @@ namespace ol
                             _globalScope.Identifiers[structAst.Name] = structAst;
                             break;
                         case UnionAst union:
-                            // TODO Implement me
-                            RemoveNode(previous, node);
+                            if (!TypeTable.Add(union.Name, union))
+                            {
+                                ErrorReporter.Report($"Multiple definitions of type '{union.Name}'", union);
+                            }
+                            previous = node;
                             break;
                         default:
                             previous = node;
@@ -131,6 +134,10 @@ namespace ol
                     {
                         case DeclarationAst globalVariable:
                             VerifyGlobalVariable(globalVariable);
+                            RemoveNode(previous, node);
+                            break;
+                        case UnionAst union:
+                            VerifyUnion(union);
                             RemoveNode(previous, node);
                             break;
                         default:
@@ -676,6 +683,11 @@ namespace ol
 
             TypeTable.CreateTypeInfo(structAst);
             structAst.Verified = true;
+        }
+
+        private void VerifyUnion(UnionAst unionAst)
+        {
+            // TODO Implement me
         }
 
         private void VerifyFunctionDefinition(FunctionAst function, List<FunctionAst> functionQueue, bool main)

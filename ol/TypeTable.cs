@@ -410,6 +410,9 @@ namespace ol
 
                     Marshal.StructureToPtr(compoundTypeInfo, typeInfoPointer, false);
                     break;
+                case TypeKind.Union:
+                    // TODO Implement me
+                    break;
             }
 
             TypeInfos[type.TypeIndex] = typeInfoPointer;
