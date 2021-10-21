@@ -199,7 +199,6 @@ namespace ol
         public IType ElementType { get; set; }
     }
 
-    // TODO Union generics? I don't think so
     public class UnionAst : IAst, IType
     {
         public int FileIndex { get; set; }

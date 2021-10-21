@@ -231,6 +231,9 @@ namespace ol
                         case InstructionType.GetStructPointer:
                             text += $"{PrintInstructionValue(instruction.Value1)} {instruction.Index} => v{instruction.ValueIndex}";
                             break;
+                        case InstructionType.GetUnionPointer:
+                            text += $"{PrintInstructionValue(instruction.Value1)}, {instruction.Value2.Type.Name}* => v{instruction.ValueIndex}";
+                            break;
                         case InstructionType.Call:
                             text += $"{instruction.String} {PrintInstructionValue(instruction.Value1)} => v{instruction.ValueIndex}";
                             break;
@@ -364,6 +367,9 @@ namespace ol
                         // Initialize pointers to null
                         case TypeKind.Pointer:
                             globalVariable.InitialValue = new InstructionValue {ValueType = InstructionValueType.Null, Type = globalVariable.Type};
+                            break;
+                        // Don't initialize unions
+                        case TypeKind.Union:
                             break;
                         // Or initialize to default
                         default:
@@ -622,16 +628,19 @@ namespace ol
                             InitializeArrayValues(function, allocation, declaration.ArrayElementType, declaration.ArrayValues, scope);
                         }
                         break;
-                        // Initialize struct field default values
+                    // Initialize struct field default values
                     case TypeKind.Struct:
                     case TypeKind.String:
                         InitializeStruct(function, (StructAst)declaration.Type, allocation, scope, declaration.Assignments);
                         break;
-                        // Initialize pointers to null
+                    // Initialize pointers to null
                     case TypeKind.Pointer:
                         EmitStore(function, allocation, new InstructionValue {ValueType = InstructionValueType.Null, Type = declaration.Type});
                         break;
-                        // Or initialize to default
+                    // Don't initialize unions
+                    case TypeKind.Union:
+                        break;
+                    // Or initialize to default
                     default:
                         var zero = GetDefaultConstant(declaration.Type);
                         EmitStore(function, allocation, zero);
@@ -975,6 +984,9 @@ namespace ol
                 // Initialize pointers to null
                 case TypeKind.Pointer:
                     EmitStore(function, pointer, new InstructionValue {ValueType = InstructionValueType.Null, Type = field.Type});
+                    break;
+                // Don't initialize unions
+                case TypeKind.Union:
                     break;
                 // Or initialize to default
                 default:
@@ -1680,9 +1692,10 @@ namespace ol
                 }
                 else if (type is UnionAst union)
                 {
-                    // TODO Implement me
                     var fieldIndex = structField.ValueIndices[i-1];
                     var field = union.Fields[fieldIndex];
+                    var fieldType = new InstructionValue {ValueType = InstructionValueType.Type, Type = field.Type};
+                    value = EmitInstruction(InstructionType.GetUnionPointer, function, field.Type, value, fieldType);
                 }
                 else
                 {

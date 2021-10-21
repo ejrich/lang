@@ -867,6 +867,7 @@ namespace ol
                         registers[instruction.ValueIndex] = register;
                         break;
                     }
+                    case InstructionType.GetUnionPointer:
                     case InstructionType.PointerCast:
                     {
                         // These instructions are for LLVM, so this is a no-op

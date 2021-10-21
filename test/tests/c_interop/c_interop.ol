@@ -112,6 +112,8 @@ unions() {
     event.key_event.foo = 6;
 
     assert(event.key_event.foo == event.button_event.foo);
+
+    printf("Union assertions passed\n");
 }
 
 #run main();

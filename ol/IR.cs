@@ -114,6 +114,7 @@ namespace ol
         Store,
         GetPointer,
         GetStructPointer,
+        GetUnionPointer,
         Call,
         IntegerExtend,
         UnsignedIntegerToIntegerExtend,
