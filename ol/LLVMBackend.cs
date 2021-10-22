@@ -241,7 +241,7 @@ namespace ol
                     var debugFields = new LLVMMetadataRef[union.Fields.Count];
 
                     var structDecl = _debugTypes[union.TypeIndex];
-                    for (var i = 0; i < fields.Length; i++)
+                    for (var i = 0; i < debugFields.Length; i++)
                     {
                         var field = union.Fields[i];
                         using var fieldName = new MarshaledString(field.Name);
@@ -251,7 +251,7 @@ namespace ol
 
                     fixed (LLVMMetadataRef* fieldsPointer = debugFields)
                     {
-                        _debugTypes[union.TypeIndex] = LLVM.DIBuilderCreateStructType(_debugBuilder, null, unionName.Value, (UIntPtr)unionName.Length, file, union.Line, union.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, (LLVMOpaqueMetadata**)fieldsPointer, (uint)fields.Length, 0, null, null, UIntPtr.Zero);
+                        _debugTypes[union.TypeIndex] = LLVM.DIBuilderCreateStructType(_debugBuilder, null, unionName.Value, (UIntPtr)unionName.Length, file, union.Line, union.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, (LLVMOpaqueMetadata**)fieldsPointer, (uint)debugFields.Length, 0, null, null, UIntPtr.Zero);
                     }
                 }
             }
