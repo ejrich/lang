@@ -1505,6 +1505,13 @@ namespace ol
                 case IndexAst index:
                     var indexPointer = EmitGetIndexPointer(function, index, scope);
 
+                    if (useRawString && indexPointer.Type.TypeKind == TypeKind.String)
+                    {
+                        var dataField = TypeTable.StringType.Fields[1];
+
+                        var dataPointer = EmitGetStructPointer(function, indexPointer, TypeTable.StringType, 1, dataField);
+                        return EmitLoadPointer(function, dataField.Type, dataPointer);
+                    }
                     return index.CallsOverload ? indexPointer : EmitLoad(function, indexPointer.Type, indexPointer);
                 case ExpressionAst expression:
                     var expressionValue = EmitIR(function, expression.Children[0], scope);
