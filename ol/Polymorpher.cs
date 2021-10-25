@@ -338,6 +338,14 @@ namespace ol
                 case CallAst call:
                     var callCopy = CopyAst(call);
                     callCopy.FunctionName = call.FunctionName;
+                    if (call.Generics != null)
+                    {
+                        callCopy.Generics = new List<TypeDefinition>(call.Generics.Count);
+                        foreach (var generic in call.Generics)
+                        {
+                            callCopy.Generics.Add(CopyType(generic, genericTypes));
+                        }
+                    }
                     if (call.SpecifiedArguments != null)
                     {
                         callCopy.SpecifiedArguments = new Dictionary<string, IAst>();

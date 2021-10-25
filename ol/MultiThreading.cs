@@ -13,13 +13,16 @@ namespace ol
 
         private static QueueItem[] _queue = new QueueItem[256];
 
-        public static void Init()
+        public static void Init(bool noThreads)
         {
-            var threadCount = Environment.ProcessorCount - 1;
-            for (var i = 0; i < threadCount; i++)
+            if (!noThreads)
             {
-                var workerThread = new Thread(ThreadWorker);
-                workerThread.Start();
+                var threadCount = Environment.ProcessorCount - 1;
+                for (var i = 0; i < threadCount; i++)
+                {
+                    var workerThread = new Thread(ThreadWorker);
+                    workerThread.Start();
+                }
             }
         }
 

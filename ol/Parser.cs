@@ -1852,6 +1852,15 @@ namespace ol
                                     var callAst = CreateAst<CallAst>(typeDefinition);
                                     callAst.FunctionName = typeDefinition.Name;
                                     callAst.Generics = typeDefinition.Generics;
+
+                                    foreach (var generic in callAst.Generics)
+                                    {
+                                        for (var i = 0; i < currentFunction.Generics.Count; i++)
+                                        {
+                                            SearchForGeneric(currentFunction.Generics[i], i, generic);
+                                        }
+                                    }
+
                                     enumerator.MoveNext();
                                     ParseArguments(callAst, enumerator, currentFunction);
                                     return callAst;
@@ -2649,7 +2658,7 @@ namespace ol
         private static bool TryParseType(TokenEnumerator enumerator, out TypeDefinition typeDef)
         {
             var steps = 0;
-            if (TryParseType(enumerator.Current, enumerator, ref steps, out typeDef))
+            if (TryParseType(enumerator.Current, enumerator, ref steps, out typeDef, out _, out _))
             {
                 enumerator.Move(steps);
                 return true;
@@ -2657,10 +2666,12 @@ namespace ol
             return false;
         }
 
-        private static bool TryParseType(Token name, TokenEnumerator enumerator, ref int steps, out TypeDefinition typeDefinition)
+        private static bool TryParseType(Token name, TokenEnumerator enumerator, ref int steps, out TypeDefinition typeDefinition, out bool endsWithShift, out bool endsWithRotate, int depth = 0)
         {
             typeDefinition = CreateAst<TypeDefinition>(name);
             typeDefinition.Name = name.Value;
+            endsWithShift = false;
+            endsWithRotate = false;
 
             // Alias int to s32
             if (typeDefinition.Name == "int")
@@ -2686,15 +2697,37 @@ namespace ol
                         }
                         break;
                     }
+                    else if (token.Type == TokenType.ShiftRight)
+                    {
+                        if ((depth % 3 != 1 && !endsWithShift) || (!commaRequiredBeforeNextType && typeDefinition.Generics.Any()))
+                        {
+                            return false;
+                        }
+                        endsWithShift = true;
+                        break;
+                    }
+                    else if (token.Type == TokenType.RotateRight)
+                    {
+                        if ((depth % 3 != 2 && !endsWithRotate) || (!commaRequiredBeforeNextType && typeDefinition.Generics.Any()))
+                        {
+                            return false;
+                        }
+                        endsWithRotate = true;
+                        break;
+                    }
 
                     if (!commaRequiredBeforeNextType)
                     {
                         switch (token.Type)
                         {
                             case TokenType.Identifier:
-                                if (!TryParseType(token, enumerator, ref steps, out var genericType))
+                                if (!TryParseType(token, enumerator, ref steps, out var genericType, out endsWithShift, out endsWithRotate, depth + 1))
                                 {
                                     return false;
+                                }
+                                if (endsWithShift || endsWithRotate)
+                                {
+                                    steps--;
                                 }
                                 typeDefinition.Generics.Add(genericType);
                                 commaRequiredBeforeNextType = true;
@@ -2729,6 +2762,8 @@ namespace ol
                 pointerType.Generics.Add(typeDefinition);
                 typeDefinition = pointerType;
                 steps++;
+                endsWithShift = false;
+                endsWithRotate = false;
             }
 
             return true;

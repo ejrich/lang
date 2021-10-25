@@ -1,5 +1,6 @@
 struct Token {
     type: TokenType;
+    value: string;
 }
 
 enum TokenType {
@@ -20,7 +21,8 @@ enum TokenType {
 get_file_tokens(string file) {
     initial_size := file.length;
 
-
+    tokens: LinkedList<Token*>;
+    add(&tokens, null);
 }
 
 Token* get_token() {
