@@ -1,6 +1,8 @@
+#import "parser.ol"
+
 main() {
-    if command_line_arguments.length == 0 {
-        printf("Please provide an input file\n");
+    if command_line_arguments.length != 2 {
+        printf("Please provide an input file and the library name\n");
         exit_code = 1;
         return;
     }
@@ -13,17 +15,55 @@ main() {
 
         printf("Parsing file '%s', size %d\n", command_line_arguments[0], size);
 
-        file_contents: string = {length = size; data = malloc(size + 1);}
+        file_contents: string = {length = size; data = allocate(size + 1);}
 
         fread(file_contents.data, 1, size, file);
         fclose(file);
 
-        free(file_contents.data);
+        parse(file_contents, command_line_arguments[1]);
+
+        each arena in arenas
+            free(arena.pointer);
     }
     else {
         printf("Input file '%s' not found\n", command_line_arguments[0]);
         exit_code = 2;
     }
+}
+
+T* new<T>() {
+    pointer := allocate(size_of(T));
+    return cast(T*, pointer);
+}
+
+arena_size := 20000; #const
+arenas: Array<Arena>;
+
+struct Arena {
+    pointer: void*;
+    cursor: int;
+    size: int;
+}
+
+void* allocate(int size) {
+    if size > arena_size
+        return allocate_arena(size = size);
+
+    each arena in arenas {
+        if size <= arena.size - arena.cursor {
+            pointer := arena.pointer + arena.cursor;
+            arena.cursor += size;
+            return pointer;
+        }
+    }
+
+    return allocate_arena(size);
+}
+
+void* allocate_arena(int cursor = 0, int size = arena_size) {
+    arena: Arena = {pointer = malloc(size); cursor = cursor; size = size;}
+    array_insert(&arenas, arena);
+    return arena.pointer + cursor;
 }
 
 struct FILE {}
