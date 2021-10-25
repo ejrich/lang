@@ -32,6 +32,7 @@ main() {
 }
 
 struct LinkedList<T> {
+    count: int;
     head: Node<T>*;
     end: Node<T>*;
 }
@@ -43,6 +44,7 @@ struct Node<T> {
 
 add<T>(LinkedList<T>* list, T data) {
     node := new<Node<T>>();
+    list.count++;
 
     if list.head == null {
         list.head = node;

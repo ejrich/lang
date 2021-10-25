@@ -62,6 +62,7 @@ LinkedList<Token*> get_file_tokens(string file) {
                 current_token.value.length++;
             }
             else {
+                check_reserved_tokens(current_token);
                 add(&tokens, current_token);
                 current_token = null;
 
@@ -70,6 +71,7 @@ LinkedList<Token*> get_file_tokens(string file) {
             }
         }
     }
+    printf("%d\n", tokens.count);
 
     return tokens;
 }
@@ -105,7 +107,7 @@ TokenType get_token_type(u8 char) {
 }
 
 eat_until_newline(int* i, string file) {
-    index := *i + 1;
+    index := *i;
     while file[index] != '\n' {
         index++;
     }

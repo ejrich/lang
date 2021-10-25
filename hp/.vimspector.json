@@ -1,0 +1,15 @@
+{
+  "configurations": {
+    "Launch - Debug Example": {
+      "adapter": "vscode-cpptools",
+      "configuration": {
+        "request": "launch",
+        "program": "${workspaceRoot}/bin/hp",
+        "args": ["Xlib.h", "X11"],
+        "cwd": "${workspaceRoot}",
+        "externalConsole": true,
+        "MIMode": "gdb"
+      }
+    }
+  }
+}
