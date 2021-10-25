@@ -143,7 +143,22 @@ namespace ol
                 if (currentToken?.Type == TokenType.Apostrophe)
                 {
                     currentToken.Type = TokenType.Character;
-                    currentToken.Value = $"{character}";
+                    if (character == '\\')
+                    {
+                        character = (char)reader.Read();
+                        if (_escapableCharacters.TryGetValue(character, out var escapedCharacter))
+                        {
+                            currentToken.Value = $"{escapedCharacter}";
+                        }
+                        else
+                        {
+                            ErrorReporter.Report($"Unknown escaped character '\\{character}'", currentToken);
+                        }
+                    }
+                    else
+                    {
+                        currentToken.Value = $"{character}";
+                    }
                     continue;
                 }
 
