@@ -861,6 +861,18 @@ namespace ol
                             ErrorReporter.Report($"Unexpected token '{token.Value}' in enum", token);
                         }
                         break;
+                    case TokenType.Character:
+                        if (currentValue != null && parsingValueDefault)
+                        {
+                            currentValue.Value = token.Value[0];
+                            currentValue.Defined = true;
+                            parsingValueDefault = false;
+                        }
+                        else
+                        {
+                            ErrorReporter.Report($"Unexpected token '{token.Value}' in enum", token);
+                        }
+                        break;
                     default:
                         ErrorReporter.Report($"Unexpected token '{token.Value}' in enum", token);
                         break;
