@@ -3586,7 +3586,7 @@ namespace ol
             {
                 // Return false if the generic types have been determined,
                 // the type cannot be inferred from a null argument if the generics haven't been determined yet
-                if (argumentType.Name != "*" || genericTypes.Any(generic => generic == null))
+                if (argumentType.Name != "*" && genericTypes.Any(generic => generic == null))
                 {
                     return false;
                 }

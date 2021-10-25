@@ -47,6 +47,7 @@ namespace ol
 
             // 1. Load cli args into build settings
             string entrypoint = null;
+            var noThreads = false;
             foreach (var arg in args)
             {
                 switch (arg)
@@ -57,6 +58,9 @@ namespace ol
                         break;
                     case "-S":
                         BuildSettings.OutputAssembly = true;
+                        break;
+                    case "-noThreads":
+                        noThreads = true;
                         break;
                     default:
                         if (arg.StartsWith("-"))
@@ -92,7 +96,7 @@ namespace ol
             ErrorReporter.ListErrorsAndExit(ErrorCodes.ArgumentsError);
 
             // 2. Parse source files to asts
-            ThreadPool.Init();
+            ThreadPool.Init(noThreads);
             Parser.Parse(entrypoint);
 
             ErrorReporter.ListErrorsAndExit(ErrorCodes.ParsingError);

@@ -31,6 +31,29 @@ main() {
     }
 }
 
+struct LinkedList<T> {
+    head: Node<T>*;
+    end: Node<T>*;
+}
+
+struct Node<T> {
+    data: T;
+    next: Node<T>*;
+}
+
+add<T>(LinkedList<T>* list, T data) {
+    node := new<Node<T>>();
+
+    if list.head == null {
+        list.head = node;
+        list.end  = node;
+    }
+    else {
+        list.end.next = node;
+        list.end = node;
+    }
+}
+
 T* new<T>() {
     pointer := allocate(size_of(T));
     return cast(T*, pointer);
