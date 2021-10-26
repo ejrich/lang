@@ -261,7 +261,7 @@ namespace ol
             var argumentArrayType = _module.GetTypeByName("Array.ArgumentType");
             var functionTypeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Function, 0);
 
-            foreach (var (name, functions) in TypeTable.Functions)
+            foreach (var (_, functions) in TypeTable.Functions)
             {
                 for (var i = 0; i < functions.Count; i++)
                 {
@@ -318,7 +318,7 @@ namespace ol
                         attributes = defaultAttributes;
                     }
 
-                    var typeNameString = GetString(name);
+                    var typeNameString = GetString(function.Name);
 
                     var fields = new LLVMValueRef[]{typeNameString, functionTypeKind, _zeroInt, returnType, arguments, attributes};
 

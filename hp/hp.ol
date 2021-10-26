@@ -7,7 +7,7 @@ main() {
         return;
     }
 
-    file := fopen(command_line_arguments[0], "r");
+    file := fopen(command_line_arguments[0], "rb");
     if file {
         fseek(file, 0, 2);
         size := ftell(file);
@@ -32,9 +32,9 @@ main() {
 }
 
 struct LinkedList<T> {
-    count: int;
     head: Node<T>*;
     end: Node<T>*;
+    count: int;
 }
 
 struct Node<T> {
@@ -44,6 +44,8 @@ struct Node<T> {
 
 add<T>(LinkedList<T>* list, T data) {
     node := new<Node<T>>();
+    node.data = data;
+    node.next = null;
     list.count++;
 
     if list.head == null {
@@ -87,6 +89,7 @@ void* allocate(int size) {
 
 void* allocate_arena(int cursor = 0, int size = arena_size) {
     arena: Arena = {pointer = malloc(size); cursor = cursor; size = size;}
+    memset(arena.pointer, 0, size);
     array_insert(&arenas, arena);
     return arena.pointer + cursor;
 }
@@ -98,3 +101,4 @@ int fseek(FILE* file, s64 offset, int origin) #extern "c"
 s64 ftell(FILE* file) #extern "c"
 int fread(void* buffer, u32 size, u32 length, FILE* file) #extern "c"
 int fclose(FILE* file) #extern "c"
+memset(void* ptr, int value, int num) #extern "c"
