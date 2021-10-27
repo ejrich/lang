@@ -42,11 +42,20 @@ struct Node<T> {
     next: Node<T>*;
 }
 
-add<T>(LinkedList<T>* list, T data) {
+add<T>(LinkedList<T>* list, T data) #print_ir {
     node := new<Node<T>>();
     node.data = data;
     node.next = null;
     list.count++;
+
+    a := *data;
+    b := *node.data;
+    c := data.value;
+    d := node.data.value;
+    e := data.value[0];
+    f := node.data.value[0];
+    // printf("%p %p\n", data, node.data);
+    // printf("%p %p\n", data.value.data, node.data.value.data);
 
     if list.head == null {
         list.head = node;
