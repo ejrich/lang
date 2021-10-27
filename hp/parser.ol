@@ -8,11 +8,11 @@ parse(string file_contents, string library) {
     if lib_file {
         node := tokens.head;
 
-        new_line := "\n"; #const
         while node {
             value := node.data.value;
+            char := value.data;
             fwrite(value.data, 1, value.length, lib_file);
-            fwrite(new_line.data, 1, 1, lib_file);
+            fputc('\n', lib_file);
             node = node.next;
         }
 
@@ -23,4 +23,5 @@ parse(string file_contents, string library) {
     }
 }
 
+fputc(u8 char, FILE* file) #extern "c"
 fwrite(void* ptr, int size, int count, FILE* file) #extern "c"
