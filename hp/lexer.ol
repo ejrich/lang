@@ -18,7 +18,6 @@ enum TokenType {
 }
 
 LinkedList<Token*> get_file_tokens(string file) {
-    // printf("%s\n", file);
     initial_size := file.length;
 
     tokens: LinkedList<Token*>;
@@ -31,7 +30,6 @@ LinkedList<Token*> get_file_tokens(string file) {
 
         if character == '#' {
             if current_token {
-                print(current_token);
                 add(&tokens, current_token);
                 current_token = null;
             }
@@ -41,7 +39,6 @@ LinkedList<Token*> get_file_tokens(string file) {
         else if character == ' ' || character == '\n' {
             if current_token {
                 check_reserved_tokens(current_token);
-                print(current_token);
                 add(&tokens, current_token);
                 current_token = null;
             }
@@ -53,7 +50,6 @@ LinkedList<Token*> get_file_tokens(string file) {
                     current_token = token;
                 }
                 else {
-                    print(token);
                     add(&tokens, token);
                 }
             }
@@ -64,19 +60,16 @@ LinkedList<Token*> get_file_tokens(string file) {
                 }
                 else {
                     check_reserved_tokens(current_token);
-                    print(current_token);
                     add(&tokens, current_token);
                     current_token = null;
 
                     token := get_token(character, i, file);
-                    print(token);
                     add(&tokens, token);
                 }
             }
         }
         i++;
     }
-    printf("%d\n", tokens.count);
 
     return tokens;
 }
@@ -119,12 +112,3 @@ eat_until_newline(int* i, string file) {
 
     *i = index;
 }
-
-print(Token* token) {
-    // printf("%d\n", token.value.length);
-    // each i in 0..token.value.length-1 {
-    //     putchar(token.value[i]);
-    // }
-    // putchar('\n');
-}
-putchar(u8 char) #extern "c"
