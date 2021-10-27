@@ -7,22 +7,13 @@ parse(string file_contents, string library) {
 
     if lib_file {
         node := tokens.head;
-        i := 0;
 
         new_line := "\n"; #const
         while node {
-            if node.data {
-                a := node.data;
-                value := node.data.value;
-                fwrite(value.data, 1, value.length, lib_file);
-                fwrite(new_line.data, 1, 1, lib_file);
-            }
-            else {
-                printf("%p %p\n", node, tokens.end);
-            }
+            value := node.data.value;
+            fwrite(value.data, 1, value.length, lib_file);
+            fwrite(new_line.data, 1, 1, lib_file);
             node = node.next;
-            i++;
-            if node == tokens.end printf("Hello world\n");
         }
 
         fclose(lib_file);

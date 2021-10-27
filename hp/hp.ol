@@ -15,7 +15,7 @@ main() {
 
         printf("Parsing file '%s', size %d\n", command_line_arguments[0], size);
 
-        file_contents: string = {length = size; data = allocate(size + 1);}
+        file_contents: string = {length = size; data = allocate(size);}
 
         fread(file_contents.data, 1, size, file);
         fclose(file);
@@ -63,7 +63,7 @@ T* new<T>() {
     return cast(T*, pointer);
 }
 
-arena_size := 20000; #const
+arena_size := 100000; #const
 arenas: Array<Arena>;
 
 struct Arena {
@@ -74,7 +74,7 @@ struct Arena {
 
 void* allocate(int size) {
     if size > arena_size
-        return allocate_arena(size = size);
+        return allocate_arena(size, size);
 
     each arena in arenas {
         if size <= arena.size - arena.cursor {
@@ -87,11 +87,11 @@ void* allocate(int size) {
     return allocate_arena(size);
 }
 
-void* allocate_arena(int cursor = 0, int size = arena_size) {
+void* allocate_arena(int cursor, int size = arena_size) {
     arena: Arena = {pointer = malloc(size); cursor = cursor; size = size;}
     memset(arena.pointer, 0, size);
     array_insert(&arenas, arena);
-    return arena.pointer + cursor;
+    return arena.pointer;
 }
 
 struct FILE {}
