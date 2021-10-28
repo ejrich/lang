@@ -34,7 +34,6 @@ main() {
 struct LinkedList<T> {
     head: Node<T>*;
     end: Node<T>*;
-    count: int;
 }
 
 struct Node<T> {
@@ -46,7 +45,6 @@ add<T>(LinkedList<T>* list, T data) {
     node := new<Node<T>>();
     node.data = data;
     node.next = null;
-    list.count++;
 
     if list.head == null {
         list.head = node;
@@ -63,7 +61,7 @@ T* new<T>() {
     return cast(T*, pointer);
 }
 
-arena_size := 100000; #const
+arena_size := 80000; #const
 arenas: Array<Arena>;
 
 struct Arena {

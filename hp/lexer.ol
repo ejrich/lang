@@ -7,7 +7,8 @@ enum TokenType {
     Identifier;
     Struct;
     Enum;
-    TypeDef;
+    Typedef;
+    Extern;
     Star = '*';
     OpenParen = '(';
     CloseParen = ')';
@@ -81,7 +82,8 @@ check_reserved_tokens(Token* token) {
 
     if token.value == "struct" token.type = TokenType.Struct;
     else if token.value == "enum" token.type = TokenType.Enum;
-    else if token.value == "typedef" token.type = TokenType.TypeDef;
+    else if token.value == "typedef" token.type = TokenType.Typedef;
+    else if token.value == "extern" token.type = TokenType.Extern;
 }
 
 Token get_token(u8 char, int i, string file) {
