@@ -2795,6 +2795,10 @@ namespace ol
                     else
                     {
                         var valueType = VerifyExpression(unary.Value, currentFunction, scope);
+                        if (valueType == null)
+                        {
+                            return null;
+                        }
                         switch (unary.Operator)
                         {
                             case UnaryOperator.Not:
@@ -3556,9 +3560,13 @@ namespace ol
 
         private bool VerifyArgument(IAst argumentAst, IType callType, IType argumentType, bool externCall = false)
         {
+            if (argumentType == null)
+            {
+                return false;
+            }
             if (argumentAst is NullAst)
             {
-                if (argumentType?.TypeKind != TypeKind.Pointer)
+                if (argumentType.TypeKind != TypeKind.Pointer)
                 {
                     return false;
                 }

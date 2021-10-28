@@ -51,6 +51,15 @@ struct string {
     data: u8*;
 }
 
+bool string_is_null(string value) {
+    return value.data == null;
+}
+
+bool string_is_empty(string value) {
+    if value.length == 0 return true;
+    return value.data == null;
+}
+
 operator == (string a, string b) {
     if a.length != b.length return false;
 
