@@ -10,7 +10,6 @@ parse(string file_contents, string library) {
 
         while node {
             value := node.data.value;
-            char := value.data;
             fwrite(value.data, 1, value.length, lib_file);
             fputc('\n', lib_file);
             node = node.next;
