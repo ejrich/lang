@@ -572,7 +572,7 @@ namespace ol
         {
             var type = _types[union.TypeIndex] = _context.CreateNamedStruct(union.Name);
 
-            type.StructSetBody(new []{LLVMTypeRef.CreateArray(LLVM.Int8Type(), union.Size)}, false);
+            type.StructSetBody(new []{LLVMTypeRef.CreateArray(LLVM.Int8Type(), union.Size)}, true);
 
             CreateTypeInfo(unionTypeInfo, union.TypeIndex);
         }
@@ -659,7 +659,7 @@ namespace ol
 
                     typeFields[i] = typeField;
                 }
-                _types[structAst.TypeIndex].StructSetBody(structFields, false);
+                _types[structAst.TypeIndex].StructSetBody(structFields, true);
 
                 var typeFieldArray = LLVMValueRef.CreateConstArray(typeFieldType, typeFields);
                 var typeFieldArrayGlobal = _module.AddGlobal(LLVM.TypeOf(typeFieldArray), "____type_fields");

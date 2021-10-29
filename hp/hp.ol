@@ -7,7 +7,7 @@ main() {
         return;
     }
 
-    file := fopen(command_line_arguments[0], "rb");
+    file := fopen(command_line_arguments[0], "r");
     if file {
         fseek(file, 0, 2);
         size := ftell(file);
@@ -57,7 +57,8 @@ add<T>(LinkedList<T>* list, T data) {
 }
 
 T* new<T>() {
-    pointer := allocate(size_of(T));
+    size := size_of(T);
+    pointer := allocate(size);
     return cast(T*, pointer);
 }
 

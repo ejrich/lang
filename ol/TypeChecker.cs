@@ -2875,7 +2875,7 @@ namespace ol
                             }
                             break;
                         case TypeKind.Pointer:
-                            if (valueType?.TypeKind != TypeKind.Pointer)
+                            if (valueType != null && valueType.TypeKind != TypeKind.Pointer)
                             {
                                 ErrorReporter.Report($"Unable to cast type '{valueType.Name}' to '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast.Value);
                             }
