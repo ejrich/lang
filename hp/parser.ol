@@ -10,22 +10,15 @@ parse(string file_contents, string library) {
 
         while node {
             type := node.data.type;
-            value := node.data.value;
-            char := value[0];
-            printf("%d %c\n", type, char);
-            fwrite(value.data, 1, value.length, lib_file);
-            fputc('\n', lib_file);
-            node = node.next;
-
-            // if type == TokenType.Typedef {
-            //     node = parse_typedef(node, lib_file, library);
-            // }
-            // else if type == TokenType.Extern {
-            //     node = parse_extern(node, lib_file, library);
-            // }
-            // else {
-            //     node = node.next;
-            // }
+            if type == TokenType.Typedef {
+                node = parse_typedef(node, lib_file, library);
+            }
+            else if type == TokenType.Extern {
+                node = parse_extern(node, lib_file, library);
+            }
+            else {
+                node = node.next;
+            }
         }
 
         fclose(lib_file);
