@@ -77,6 +77,7 @@ namespace ol
 
             if (_emitDebug)
             {
+                CreateTemporaryDebugStructType((StructAst)structTypeInfo);
                 foreach (var (name, type) in TypeTable.Types)
                 {
                     switch (type)
@@ -88,10 +89,7 @@ namespace ol
 
                             if (structAst.Fields.Any())
                             {
-                                using var structName = new MarshaledString(structAst.Name);
-
-                                var file = _debugFiles[structAst.FileIndex];
-                                _debugTypes[structAst.TypeIndex] = LLVM.DIBuilderCreateForwardDecl(_debugBuilder, (uint)DwarfTag.Structure_type, structName.Value, (UIntPtr)structName.Length, null, file, structAst.Line, 0, structAst.Size * 8, 0, null, UIntPtr.Zero);
+                                CreateTemporaryDebugStructType(structAst);
                             }
                             else
                             {
@@ -119,7 +117,7 @@ namespace ol
                             using (var structName = new MarshaledString(union.Name))
                             {
                                 var file = _debugFiles[union.FileIndex];
-                                _debugTypes[union.TypeIndex] = LLVM.DIBuilderCreateForwardDecl(_debugBuilder, (uint)DwarfTag.Union_type, structName.Value, (UIntPtr)structName.Length, null, file, union.Line, 0, union.Size * 8, 0, null, UIntPtr.Zero);
+                                _debugTypes[union.TypeIndex] = LLVM.DIBuilderCreateReplaceableCompositeType(_debugBuilder, (uint)DwarfTag.Union_type, structName.Value, (UIntPtr)structName.Length, null, file, union.Line, 0, union.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, UIntPtr.Zero);
                             }
                             break;
                         case CompoundType compoundType:
@@ -251,7 +249,9 @@ namespace ol
 
                     fixed (LLVMMetadataRef* fieldsPointer = debugFields)
                     {
-                        _debugTypes[union.TypeIndex] = LLVM.DIBuilderCreateStructType(_debugBuilder, null, unionName.Value, (UIntPtr)unionName.Length, file, union.Line, union.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, (LLVMOpaqueMetadata**)fieldsPointer, (uint)debugFields.Length, 0, null, null, UIntPtr.Zero);
+                         var debugUnion = LLVM.DIBuilderCreateStructType(_debugBuilder, null, unionName.Value, (UIntPtr)unionName.Length, file, union.Line, union.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, (LLVMOpaqueMetadata**)fieldsPointer, (uint)debugFields.Length, 0, null, null, UIntPtr.Zero);
+                         LLVM.MetadataReplaceAllUsesWith(_debugTypes[union.TypeIndex], debugUnion);
+                        _debugTypes[union.TypeIndex] = debugUnion;
                     }
                 }
             }
@@ -440,6 +440,11 @@ namespace ol
             var typeStruct = _types[typeInfo.TypeIndex] = _context.CreateNamedStruct(typeName);
 
             CreateTypeInfo(typeInfoType, typeInfo.TypeIndex);
+
+            if (_emitDebug)
+            {
+                CreateTemporaryDebugStructType((StructAst)typeInfo);
+            }
             return (typeStruct, (StructAst)typeInfo);
         }
 
@@ -1571,6 +1576,14 @@ namespace ol
             }
         }
 
+        private void CreateTemporaryDebugStructType(StructAst structAst)
+        {
+            using var structName = new MarshaledString(structAst.Name);
+
+            var file = _debugFiles[structAst.FileIndex];
+            _debugTypes[structAst.TypeIndex] = LLVM.DIBuilderCreateReplaceableCompositeType(_debugBuilder, (uint)DwarfTag.Structure_type, structName.Value, (UIntPtr)structName.Length, null, file, structAst.Line, 0, structAst.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, UIntPtr.Zero);
+        }
+
         private void CreateDebugStructType(StructAst structAst)
         {
             using var structName = new MarshaledString(structAst.Name);
@@ -1592,7 +1605,12 @@ namespace ol
 
             fixed (LLVMMetadataRef* fieldsPointer = fields)
             {
-                _debugTypes[structAst.TypeIndex] = LLVM.DIBuilderCreateStructType(_debugBuilder, null, structName.Value, (UIntPtr)structName.Length, file, structAst.Line, structAst.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, (LLVMOpaqueMetadata**)fieldsPointer, (uint)fields.Length, 0, null, null, UIntPtr.Zero);
+                var debugStruct = LLVM.DIBuilderCreateStructType(_debugBuilder, null, structName.Value, (UIntPtr)structName.Length, file, structAst.Line, structAst.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, (LLVMOpaqueMetadata**)fieldsPointer, (uint)fields.Length, 0, null, null, UIntPtr.Zero);
+                if (fields.Length > 0)
+                {
+                    LLVM.MetadataReplaceAllUsesWith(_debugTypes[structAst.TypeIndex], debugStruct);
+                }
+                _debugTypes[structAst.TypeIndex] = debugStruct;
             }
         }
 
