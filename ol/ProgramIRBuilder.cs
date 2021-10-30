@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
 using System.Threading;
 
 namespace ol
@@ -19,6 +20,7 @@ namespace ol
     {
         private IType _typeInfoPointerType;
         private IType _voidPointerType;
+        private static Mutex _printFunctionMutex = new();
 
         public void AddFunction(FunctionAst function)
         {
@@ -200,19 +202,24 @@ namespace ol
 
         private void PrintFunction(string name, FunctionIR function)
         {
+            _printFunctionMutex.WaitOne();
+
             Console.WriteLine($"\nIR for function '{name}'");
 
             var blockIndex = 0;
-            var i = 0;
+            var instructionIndex = 0;
+            var file = Path.GetFileName(BuildSettings.Files[function.Source.FileIndex]);
+            var line = function.Source.Line;
+            var column = function.Source.Column;
             while (blockIndex < function.BasicBlocks.Count)
             {
                 var instructionToStopAt = blockIndex < function.BasicBlocks.Count - 1 ? function.BasicBlocks[blockIndex + 1].Location : function.Instructions.Count;
                 Console.WriteLine($"\n--------------- Basic Block {blockIndex} ---------------\n");
-                while (i < instructionToStopAt)
+                while (instructionIndex < instructionToStopAt)
                 {
-                    var instruction = function.Instructions[i++];
+                    var instruction = function.Instructions[instructionIndex++];
 
-                    var text = $"\t{instruction.Type} ";
+                    var text = $"{file} {line}:{column}\t\t{instruction.Type} ";
                     switch (instruction.Type)
                     {
                         case InstructionType.Jump:
@@ -249,6 +256,9 @@ namespace ol
                             text += $"{PrintInstructionValue(instruction.Value1)} => v{instruction.ValueIndex}";
                             break;
                         case InstructionType.DebugSetLocation:
+                            line = instruction.Source.Line;
+                            column = instruction.Source.Column;
+                            continue;
                         case InstructionType.DebugPushLexicalBlock:
                         case InstructionType.DebugPopLexicalBlock:
                         case InstructionType.DebugDeclareParameter:
@@ -262,6 +272,7 @@ namespace ol
                 }
                 blockIndex++;
             }
+            _printFunctionMutex.ReleaseMutex();
         }
 
         private string PrintInstructionValue(InstructionValue value)

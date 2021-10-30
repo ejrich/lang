@@ -1324,9 +1324,10 @@ namespace ol
                     {
                         // Create subexpression to hold the operation
                         // This case would be `var b = 4 + a++`, where we have a value before the operator
-                        var changeByOneAst = CreateAst<ChangeByOneAst>(token);
+                        var source = expression.Children[^1];
+                        var changeByOneAst = CreateAst<ChangeByOneAst>(source);
                         changeByOneAst.Positive = token.Type == TokenType.Increment;
-                        changeByOneAst.Value = expression.Children[^1];
+                        changeByOneAst.Value = source;
                         expression.Children[^1] = changeByOneAst;
                         continue;
                     }
@@ -1602,9 +1603,10 @@ namespace ol
                     {
                         // Create subexpression to hold the operation
                         // This case would be `var b = 4 + a++`, where we have a value before the operator
-                        var changeByOneAst = CreateAst<ChangeByOneAst>(token);
+                        var source = expression.Children[^1];
+                        var changeByOneAst = CreateAst<ChangeByOneAst>(source);
                         changeByOneAst.Positive = token.Type == TokenType.Increment;
-                        changeByOneAst.Value = expression.Children[^1];
+                        changeByOneAst.Value = source;
                         expression.Children[^1] = changeByOneAst;
                         continue;
                     }
