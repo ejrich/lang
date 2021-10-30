@@ -3508,11 +3508,9 @@ namespace ol
 
                     if (match && genericTypes.All(t => t != null) && (function.Flags.HasFlag(FunctionFlags.Varargs) || callArgIndex == call.Arguments.Count))
                     {
-                        var genericName = $"{function.Name}.{i}.{string.Join('.', genericTypes.Select(t => t.BackendName))}";
                         var name = $"{function.Name}<{string.Join(", ", genericTypes.Select(t => t.Name))}>";
-                        call.FunctionName = genericName;
 
-                        if (TypeTable.Functions.TryGetValue(genericName, out var implementations))
+                        if (TypeTable.Functions.TryGetValue(name, out var implementations))
                         {
                             if (implementations.Count > 1)
                             {
@@ -3539,7 +3537,7 @@ namespace ol
                             }
                         }
 
-                        TypeTable.AddFunction(genericName, polymorphedFunction);
+                        TypeTable.AddFunction(name, polymorphedFunction);
                         VerifyFunction(polymorphedFunction);
 
                         return polymorphedFunction;

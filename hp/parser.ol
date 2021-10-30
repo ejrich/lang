@@ -69,7 +69,7 @@ Node<Token>* parse_extern(Node<Token>* node, FILE* file, string library) {
             else if type == TokenType.Star argument.pointer = true;
             else if type == TokenType.Comma {
                 // TODO Fix in LLVMBackend
-                // array_insert(&function.arguments, argument);
+                array_insert(&function.arguments, argument);
 
                 // Reset argument fields
                 argument.type_name.length = 0;
