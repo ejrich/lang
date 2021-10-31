@@ -1072,6 +1072,7 @@ namespace ol
             }
             else
             {
+                overload.Name = $"operator.{overload.Operator}.{overload.Type.GenericName}";
                 if (!_operatorOverloads.TryGetValue(overload.Type.GenericName, out var overloads))
                 {
                     _operatorOverloads[overload.Type.GenericName] = overloads = new Dictionary<Operator, OperatorOverloadAst>();

@@ -83,6 +83,7 @@ namespace ol
             var overload = CopyAst(baseOverload);
             overload.Operator = baseOverload.Operator;
             overload.Type = CopyType(baseOverload.Type, genericTypeDefs);
+            overload.Name = $"operator.{overload.Operator}.{overload.Type.GenericName}";
             overload.Flags = baseOverload.Flags;
             overload.ReturnTypeDefinition = baseOverload.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? CopyType(baseOverload.ReturnTypeDefinition, genericTypeDefs) : baseOverload.ReturnTypeDefinition;
 
@@ -240,7 +241,7 @@ namespace ol
         private AssignmentAst CopyAssignment(AssignmentAst assignment, TypeDefinition[] genericTypes, List<string> generics)
         {
             var copy = CopyAst(assignment);
-            copy.Reference = assignment.Reference;
+            copy.Reference = CopyExpression(assignment.Reference, genericTypes, generics);
             copy.Operator = assignment.Operator;
             copy.Value = CopyExpression(assignment.Value, genericTypes, generics);
             return copy;

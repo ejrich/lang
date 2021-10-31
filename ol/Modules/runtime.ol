@@ -8,7 +8,7 @@ struct Array<T> {
 
 ARRAY_BLOCK_SIZE := 10; #const
 
-array_insert<T>(Array<T>* array, T value) #print_ir {
+array_insert<T>(Array<T>* array, T value) {
     // Reallocate the array if necessary
     length := array.length;
     if length % ARRAY_BLOCK_SIZE == 0 {

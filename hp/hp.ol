@@ -31,12 +31,6 @@ main() {
     }
 }
 
-// #run {
-//     array_insert(&command_line_arguments, "Xlib.h");
-//     array_insert(&command_line_arguments, "X11");
-//     main();
-// }
-
 struct LinkedList<T> {
     head: Node<T>*;
     end: Node<T>*;
