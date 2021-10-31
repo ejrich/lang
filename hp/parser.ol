@@ -68,7 +68,6 @@ Node<Token>* parse_extern(Node<Token>* node, FILE* file, string library) {
             }
             else if type == TokenType.Star argument.pointer = true;
             else if type == TokenType.Comma {
-                // TODO Fix in LLVMBackend
                 array_insert(&function.arguments, argument);
 
                 // Reset argument fields
@@ -79,8 +78,7 @@ Node<Token>* parse_extern(Node<Token>* node, FILE* file, string library) {
                 argument.name.data = null;
             }
             else if type == TokenType.CloseParen {
-                // TODO Fix in LLVMBackend
-                // array_insert(&function.arguments, argument);
+                array_insert(&function.arguments, argument);
                 // Move over ')' and ';'
                 node = node.next;
                 node = node.next;
