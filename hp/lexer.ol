@@ -24,6 +24,8 @@ enum TokenType {
     CloseParen = ')';
     OpenBrace = '{';
     CloseBrace = '}';
+    OpenBracket = '[';
+    CloseBracket = ']';
     SemiColon = ';';
     Comma = ',';
 }
@@ -121,6 +123,8 @@ TokenType get_token_type(u8 char) {
     if char == ')' return TokenType.CloseParen;
     if char == '{' return TokenType.OpenBrace;
     if char == '}' return TokenType.CloseBrace;
+    if char == '[' return TokenType.OpenBracket;
+    if char == ']' return TokenType.CloseBracket;
     if char == ';' return TokenType.SemiColon;
     if char == ',' return TokenType.Comma;
 
