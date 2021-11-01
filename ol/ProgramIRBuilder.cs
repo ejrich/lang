@@ -92,8 +92,6 @@ namespace ol
 
         public void AddOperatorOverload(OperatorOverloadAst overload)
         {
-            overload.Name = $"operator.{overload.Operator}.{overload.Type.GenericName}";
-
             var functionIR = new FunctionIR
             {
                 Index = GetFunctionIndex(), Source = overload, Allocations = new(), Instructions = new(), BasicBlocks = new()
