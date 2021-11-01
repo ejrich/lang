@@ -14,9 +14,25 @@ parse(string file_contents, string library) {
                 node = parse_typedef(node, lib_file, library);
             }
             else if type == TokenType.Extern {
-                node = parse_extern(node, lib_file, library);
+                node = parse_function(node.next, lib_file, library);
+            }
+            else if type == TokenType.Static {
+                node = node.next;
+                while node.data.type != TokenType.CloseBrace {
+                    node = node.next;
+                }
+                node = node.next;
+            }
+            else if type == TokenType.Extension node = node.next;
+            else if type == TokenType.Attribute {
+                node = node.next;
+                while node.data.type != TokenType.SemiColon {
+                    node = node.next;
+                }
+                node = node.next;
             }
             else {
+                // node = parse_function(node, lib_file, library);
                 node = node.next;
             }
         }
@@ -42,6 +58,7 @@ TypeDefinition, Node<Token>* parse_type(Node<Token>* node) {
 
     if type == TokenType.Signed {
         if node.next.data.type == TokenType.Long {
+            node = node.next;
             if node.next.data.type == TokenType.Long {
                 node = node.next;
             }
@@ -52,9 +69,10 @@ TypeDefinition, Node<Token>* parse_type(Node<Token>* node) {
             return check_for_pointers("s64", node.next);
         }
         if node.next.data.type == TokenType.Int {
-            return check_for_pointers("s32", node.next);
+            return check_for_pointers("s32", node.next.next);
         }
         if node.next.data.type == TokenType.Short {
+            node = node.next;
             if node.next.data.type == TokenType.Int {
                 node = node.next;
             }
@@ -62,11 +80,14 @@ TypeDefinition, Node<Token>* parse_type(Node<Token>* node) {
             return check_for_pointers("s16", node.next);
         }
         if node.next.data.type == TokenType.Char {
-            return check_for_pointers("s8", node.next);
+            return check_for_pointers("s8", node.next.next);
         }
+
+        return check_for_pointers("s32", node.next);
     }
     else if type == TokenType.Unsigned {
         if node.next.data.type == TokenType.Long {
+            node = node.next;
             if node.next.data.type == TokenType.Long {
                 node = node.next;
             }
@@ -77,9 +98,10 @@ TypeDefinition, Node<Token>* parse_type(Node<Token>* node) {
             return check_for_pointers("u64", node.next);
         }
         if node.next.data.type == TokenType.Int {
-            return check_for_pointers("u32", node.next);
+            return check_for_pointers("u32", node.next.next);
         }
         if node.next.data.type == TokenType.Short {
+            node = node.next;
             if node.next.data.type == TokenType.Int {
                 node = node.next;
             }
@@ -87,8 +109,10 @@ TypeDefinition, Node<Token>* parse_type(Node<Token>* node) {
             return check_for_pointers("u16", node.next);
         }
         if node.next.data.type == TokenType.Char {
-            return check_for_pointers("u8", node.next);
+            return check_for_pointers("u8", node.next.next);
         }
+
+        return check_for_pointers("u32", node.next);
     }
     else if type == TokenType.Long {
         if node.next.data.type == TokenType.Long {
@@ -146,102 +170,98 @@ struct Function {
     arguments: Array<Argument>;
 }
 
-Node<Token>* parse_extern(Node<Token>* node, FILE* file, string library) {
+Node<Token>* parse_function(Node<Token>* node, FILE* file, string library) {
+    function: Function;
+    function.return_type, node = parse_type(node);
+    function.name = node.data.value;
+
+    // Move over '('
+    node = node.next;
     node = node.next;
 
-    if node {
-        function: Function;
-        function.return_type, node = parse_type(node);
-        function.name = node.data.value;
+    new_arg := true;
+    argument: Argument;
 
-        // Move over '('
-        node = node.next;
-        node = node.next;
+    while node {
+        type := node.data.type;
 
-        new_arg := true;
-        argument: Argument;
-
-        while node {
-            type := node.data.type;
-
-            if type == TokenType.Struct node = node.next;
-            else if type == TokenType.Identifier {
-                if new_arg {
-                    argument.type, node = parse_type(node);
-                    new_arg = false;
-                }
-                else {
-                    argument.name = node.data.value;
-                    node = node.next;
-                }
-            }
-            else if type == TokenType.OpenBracket {
-                argument.array_length, node = get_array_length(node.next);
-            }
-            else if type == TokenType.Comma {
-                array_insert(&function.arguments, argument);
-
-                // Reset argument fields
-                new_arg = true;
-                argument.name.length = 0;
-                // TODO Free
-                argument.name.data = null;
-                argument.array_length.length = 0;
-                argument.array_length.data = null;
-
-                node = node.next;
-            }
-            else if type == TokenType.CloseParen {
-                if !new_arg
-                    array_insert(&function.arguments, argument);
-                // Move over ')' and ';'
-                node = node.next;
-                node = node.next;
-                break;
-            }
-            else if new_arg {
+        if type == TokenType.Struct node = node.next;
+        else if type == TokenType.Identifier {
+            if new_arg {
                 argument.type, node = parse_type(node);
                 new_arg = false;
             }
             else {
+                argument.name = node.data.value;
                 node = node.next;
             }
         }
-
-        // Print function definition to file
-        if function.return_type.name != "void" || function.return_type.pointer_count > 0 {
-            print_type(function.return_type, file);
-            fputc(' ', file);
+        else if type == TokenType.OpenBracket {
+            argument.array_length, node = get_array_length(node.next);
         }
+        else if type == TokenType.Comma {
+            array_insert(&function.arguments, argument);
 
-        print_string(function.name, file);
-        fputc('(', file);
+            // Reset argument fields
+            new_arg = true;
+            argument.name.length = 0;
+            // TODO Free
+            argument.name.data = null;
+            argument.array_length.length = 0;
+            argument.array_length.data = null;
 
-        each arg, i in function.arguments {
-            if !string_is_empty(arg.array_length) {
-                print_string("CArray<", file);
-                print_type(arg.type, file);
-                print_string(">[", file);
-                print_string(arg.array_length, file);
-                print_string("]", file);
-            }
-            else print_type(arg.type, file);
-            fputc(' ', file);
-
-            if string_is_empty(arg.name) {
-                fputc('a' + i, file);
-            }
-            else {
-                print_string(arg.name, file);
-            }
-
-            if i < function.arguments.length - 1 {
-                print_string(", ", file);
-            }
+            node = node.next;
         }
-
-        fprintf(file, ") #extern \"%s\"\n\n", library);
+        else if type == TokenType.CloseParen {
+            if !new_arg
+                array_insert(&function.arguments, argument);
+            // Move over ')' and ';'
+            node = node.next;
+            node = node.next;
+            break;
+        }
+        else if new_arg {
+            argument.type, node = parse_type(node);
+            new_arg = false;
+        }
+        else {
+            node = node.next;
+        }
     }
+
+    // Print function definition to file
+    if function.return_type.name != "void" || function.return_type.pointer_count > 0 {
+        print_type(function.return_type, file);
+        fputc(' ', file);
+    }
+
+    print_string(function.name, file);
+    fputc('(', file);
+
+    each arg, i in function.arguments {
+        if !string_is_empty(arg.array_length) {
+            print_string("CArray<", file);
+            print_type(arg.type, file);
+            print_string(">[", file);
+            print_string(arg.array_length, file);
+            print_string("]", file);
+        }
+        else print_type(arg.type, file);
+        fputc(' ', file);
+
+        if string_is_empty(arg.name) {
+            fputc('a' + i, file);
+        }
+        else {
+            print_string(arg.name, file);
+        }
+
+        if i < function.arguments.length - 1 {
+            print_string(", ", file);
+        }
+    }
+
+    fprintf(file, ") #extern \"%s\"\n\n", library);
 
     return node;
 }
@@ -262,6 +282,11 @@ Node<Token>* parse_typedef(Node<Token>* node, FILE* file, string library) {
             return parse_enum(node, file, library);
         }
         else {
+            type_def, next_node := parse_type(node);
+            node = next_node;
+
+            name := node.data.value;
+            node = node.next;
             // TODO Handle type aliasing
         }
     }
