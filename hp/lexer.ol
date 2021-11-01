@@ -19,6 +19,9 @@ enum TokenType {
     Float;
     Double;
     Const;
+    Static;
+    Attribute;
+    Extension;
     Star = '*';
     OpenParen = '(';
     CloseParen = ')';
@@ -106,6 +109,9 @@ check_reserved_tokens(Token* token) {
     else if token.value == "float" token.type = TokenType.Float;
     else if token.value == "double" token.type = TokenType.Double;
     else if token.value == "const" token.type = TokenType.Const;
+    else if token.value == "static" token.type = TokenType.Static;
+    else if token.value == "__extension__" token.type = TokenType.Extension;
+    else if token.value == "__attribute__" token.type = TokenType.Attribute;
 }
 
 Token get_token(u8 char, int i, string file) {
