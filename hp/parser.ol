@@ -238,7 +238,7 @@ Node<Token>* parse_typedef(Node<Token>* node, FILE* file, string library) {
             return parse_struct(node, file, library);
         }
         else if type == TokenType.Union {
-            return parse_union(node, file, library);
+            return parse_struct(node, file, library, "union");
         }
         else if type == TokenType.Enum {
             return parse_enum(node, file, library);
@@ -257,10 +257,11 @@ struct Struct {
 
 struct StructField {
     type: TypeDefinition;
+    array_length: string;
     names: Array<string>;
 }
 
-Node<Token>* parse_struct(Node<Token>* node, FILE* file, string library) {
+Node<Token>* parse_struct(Node<Token>* node, FILE* file, string library, string type_name = "struct") {
     node = node.next;
 
     if node {
@@ -278,7 +279,6 @@ Node<Token>* parse_struct(Node<Token>* node, FILE* file, string library) {
         struct_field: StructField;
 
         while node {
-            // TODO Implement me
             type := node.data.type;
 
             if type == TokenType.Struct node = node.next;
@@ -292,6 +292,9 @@ Node<Token>* parse_struct(Node<Token>* node, FILE* file, string library) {
                     node = node.next;
                 }
             }
+            else if type == TokenType.OpenBracket {
+                struct_field.array_length, node = get_array_length(node.next);
+            }
             else if type == TokenType.SemiColon {
                 array_insert(&struct_def.fields, struct_field);
 
@@ -300,6 +303,8 @@ Node<Token>* parse_struct(Node<Token>* node, FILE* file, string library) {
                 struct_field.names.length = 0;
                 // TODO Free
                 struct_field.names.data = null;
+                struct_field.array_length.length = 0;
+                struct_field.array_length.data = null;
 
                 node = node.next;
             }
@@ -328,7 +333,8 @@ Node<Token>* parse_struct(Node<Token>* node, FILE* file, string library) {
         node = node.next;
 
         // Print struct definition to file
-        print_string("struct ", file);
+        print_string(type_name, file);
+        fputc(' ', file);
         print_string(struct_def.name, file);
         print_string(" {", file);
 
@@ -341,7 +347,14 @@ Node<Token>* parse_struct(Node<Token>* node, FILE* file, string library) {
                 print_string("    ", file);
                 print_string(name, file);
                 print_string(": ", file);
-                print_type(field.type, file);
+                if !string_is_empty(field.array_length) {
+                    print_string("CArray<", file);
+                    print_type(field.type, file);
+                    print_string(">[", file);
+                    print_string(field.array_length, file);
+                    print_string("]", file);
+                }
+                else print_type(field.type, file);
 
                 print_string(";\n", file);
             }
@@ -356,14 +369,15 @@ Node<Token>* parse_struct(Node<Token>* node, FILE* file, string library) {
     return node;
 }
 
-Node<Token>* parse_union(Node<Token>* node, FILE* file, string library) {
-    node = node.next;
+string, Node<Token>* get_array_length(Node<Token>* node) {
+    array_length := node.data.value;
 
-    if node {
-        // TODO Implement me
+    node = node.next;
+    while node.data.type != TokenType.CloseBracket {
+        node = node.next;
     }
 
-    return node;
+    return array_length, node.next;
 }
 
 struct Enum {
@@ -394,7 +408,6 @@ Node<Token>* parse_enum(Node<Token>* node, FILE* file, string library) {
         enum_value: Enum_Value;
 
         while node {
-            // TODO Implement me
             type := node.data.type;
 
             if type == TokenType.Identifier {
