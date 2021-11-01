@@ -1,18 +1,775 @@
-# 0 "_Xlib.h"
+# 0 "Xlib.h"
 # 0 "<built-in>"
 # 0 "<command-line>"
 # 1 "/usr/include/stdc-predef.h" 1 3 4
 # 0 "<command-line>" 2
-# 1 "_Xlib.h"
-# 62 "_Xlib.h"
+# 1 "Xlib.h"
+# 38 "Xlib.h"
+# 1 "/usr/include/sys/types.h" 1 3 4
+# 25 "/usr/include/sys/types.h" 3 4
+# 1 "/usr/include/features.h" 1 3 4
+# 473 "/usr/include/features.h" 3 4
+# 1 "/usr/include/sys/cdefs.h" 1 3 4
+# 462 "/usr/include/sys/cdefs.h" 3 4
+# 1 "/usr/include/bits/wordsize.h" 1 3 4
+# 463 "/usr/include/sys/cdefs.h" 2 3 4
+# 1 "/usr/include/bits/long-double.h" 1 3 4
+# 464 "/usr/include/sys/cdefs.h" 2 3 4
+# 474 "/usr/include/features.h" 2 3 4
+# 497 "/usr/include/features.h" 3 4
+# 1 "/usr/include/gnu/stubs.h" 1 3 4
+# 10 "/usr/include/gnu/stubs.h" 3 4
+# 1 "/usr/include/gnu/stubs-64.h" 1 3 4
+# 11 "/usr/include/gnu/stubs.h" 2 3 4
+# 498 "/usr/include/features.h" 2 3 4
+# 26 "/usr/include/sys/types.h" 2 3 4
+
+
+
+# 1 "/usr/include/bits/types.h" 1 3 4
+# 27 "/usr/include/bits/types.h" 3 4
+# 1 "/usr/include/bits/wordsize.h" 1 3 4
+# 28 "/usr/include/bits/types.h" 2 3 4
+# 1 "/usr/include/bits/timesize.h" 1 3 4
+# 29 "/usr/include/bits/types.h" 2 3 4
+
+
+
+# 31 "/usr/include/bits/types.h" 3 4
+typedef unsigned char __u_char;
+typedef unsigned short int __u_short;
+typedef unsigned int __u_int;
+typedef unsigned long int __u_long;
+
+
+typedef signed char __int8_t;
+typedef unsigned char __uint8_t;
+typedef signed short int __int16_t;
+typedef unsigned short int __uint16_t;
+typedef signed int __int32_t;
+typedef unsigned int __uint32_t;
+
+typedef signed long int __int64_t;
+typedef unsigned long int __uint64_t;
+
+
+
+
+
+
+typedef __int8_t __int_least8_t;
+typedef __uint8_t __uint_least8_t;
+typedef __int16_t __int_least16_t;
+typedef __uint16_t __uint_least16_t;
+typedef __int32_t __int_least32_t;
+typedef __uint32_t __uint_least32_t;
+typedef __int64_t __int_least64_t;
+typedef __uint64_t __uint_least64_t;
+
+
+
+typedef long int __quad_t;
+typedef unsigned long int __u_quad_t;
+
+
+
+
+
+
+
+typedef long int __intmax_t;
+typedef unsigned long int __uintmax_t;
+# 141 "/usr/include/bits/types.h" 3 4
+# 1 "/usr/include/bits/typesizes.h" 1 3 4
+# 142 "/usr/include/bits/types.h" 2 3 4
+# 1 "/usr/include/bits/time64.h" 1 3 4
+# 143 "/usr/include/bits/types.h" 2 3 4
+
+
+typedef unsigned long int __dev_t;
+typedef unsigned int __uid_t;
+typedef unsigned int __gid_t;
+typedef unsigned long int __ino_t;
+typedef unsigned long int __ino64_t;
+typedef unsigned int __mode_t;
+typedef unsigned long int __nlink_t;
+typedef long int __off_t;
+typedef long int __off64_t;
+typedef int __pid_t;
+typedef struct { int __val[2]; } __fsid_t;
+typedef long int __clock_t;
+typedef unsigned long int __rlim_t;
+typedef unsigned long int __rlim64_t;
+typedef unsigned int __id_t;
+typedef long int __time_t;
+typedef unsigned int __useconds_t;
+typedef long int __suseconds_t;
+typedef long int __suseconds64_t;
+
+typedef int __daddr_t;
+typedef int __key_t;
+
+
+typedef int __clockid_t;
+
+
+typedef void * __timer_t;
+
+
+typedef long int __blksize_t;
+
+
+
+
+typedef long int __blkcnt_t;
+typedef long int __blkcnt64_t;
+
+
+typedef unsigned long int __fsblkcnt_t;
+typedef unsigned long int __fsblkcnt64_t;
+
+
+typedef unsigned long int __fsfilcnt_t;
+typedef unsigned long int __fsfilcnt64_t;
+
+
+typedef long int __fsword_t;
+
+typedef long int __ssize_t;
+
+
+typedef long int __syscall_slong_t;
+
+typedef unsigned long int __syscall_ulong_t;
+
+
+
+typedef __off64_t __loff_t;
+typedef char *__caddr_t;
+
+
+typedef long int __intptr_t;
+
+
+typedef unsigned int __socklen_t;
+
+
+
+
+typedef int __sig_atomic_t;
+# 30 "/usr/include/sys/types.h" 2 3 4
+
+
+
+typedef __u_char u_char;
+typedef __u_short u_short;
+typedef __u_int u_int;
+typedef __u_long u_long;
+typedef __quad_t quad_t;
+typedef __u_quad_t u_quad_t;
+typedef __fsid_t fsid_t;
+
+
+typedef __loff_t loff_t;
+
+
+
+
+typedef __ino_t ino_t;
+# 59 "/usr/include/sys/types.h" 3 4
+typedef __dev_t dev_t;
+
+
+
+
+typedef __gid_t gid_t;
+
+
+
+
+typedef __mode_t mode_t;
+
+
+
+
+typedef __nlink_t nlink_t;
+
+
+
+
+typedef __uid_t uid_t;
+
+
+
+
+
+typedef __off_t off_t;
+# 97 "/usr/include/sys/types.h" 3 4
+typedef __pid_t pid_t;
+
+
+
+
+
+typedef __id_t id_t;
+
+
+
+
+typedef __ssize_t ssize_t;
+
+
+
+
+
+typedef __daddr_t daddr_t;
+typedef __caddr_t caddr_t;
+
+
+
+
+
+typedef __key_t key_t;
+
+
+
+
+# 1 "/usr/include/bits/types/clock_t.h" 1 3 4
+
+
+
+
+
+
+typedef __clock_t clock_t;
+# 127 "/usr/include/sys/types.h" 2 3 4
+
+# 1 "/usr/include/bits/types/clockid_t.h" 1 3 4
+
+
+
+
+
+
+typedef __clockid_t clockid_t;
+# 129 "/usr/include/sys/types.h" 2 3 4
+# 1 "/usr/include/bits/types/time_t.h" 1 3 4
+
+
+
+
+
+
+typedef __time_t time_t;
+# 130 "/usr/include/sys/types.h" 2 3 4
+# 1 "/usr/include/bits/types/timer_t.h" 1 3 4
+
+
+
+
+
+
+typedef __timer_t timer_t;
+# 131 "/usr/include/sys/types.h" 2 3 4
+# 144 "/usr/include/sys/types.h" 3 4
+# 1 "/usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0/include/stddef.h" 1 3 4
+# 209 "/usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0/include/stddef.h" 3 4
+typedef long unsigned int size_t;
+# 145 "/usr/include/sys/types.h" 2 3 4
+
+
+
+typedef unsigned long int ulong;
+typedef unsigned short int ushort;
+typedef unsigned int uint;
+
+
+
+
+# 1 "/usr/include/bits/stdint-intn.h" 1 3 4
+# 24 "/usr/include/bits/stdint-intn.h" 3 4
+typedef __int8_t int8_t;
+typedef __int16_t int16_t;
+typedef __int32_t int32_t;
+typedef __int64_t int64_t;
+# 156 "/usr/include/sys/types.h" 2 3 4
+
+
+typedef __uint8_t u_int8_t;
+typedef __uint16_t u_int16_t;
+typedef __uint32_t u_int32_t;
+typedef __uint64_t u_int64_t;
+
+
+typedef int register_t __attribute__ ((__mode__ (__word__)));
+# 176 "/usr/include/sys/types.h" 3 4
+# 1 "/usr/include/endian.h" 1 3 4
+# 24 "/usr/include/endian.h" 3 4
+# 1 "/usr/include/bits/endian.h" 1 3 4
+# 35 "/usr/include/bits/endian.h" 3 4
+# 1 "/usr/include/bits/endianness.h" 1 3 4
+# 36 "/usr/include/bits/endian.h" 2 3 4
+# 25 "/usr/include/endian.h" 2 3 4
+# 35 "/usr/include/endian.h" 3 4
+# 1 "/usr/include/bits/byteswap.h" 1 3 4
+# 33 "/usr/include/bits/byteswap.h" 3 4
+static __inline __uint16_t
+__bswap_16 (__uint16_t __bsx)
+{
+
+  return __builtin_bswap16 (__bsx);
+
+
+
+}
+
+
+
+
+
+
+static __inline __uint32_t
+__bswap_32 (__uint32_t __bsx)
+{
+
+  return __builtin_bswap32 (__bsx);
+
+
+
+}
+# 69 "/usr/include/bits/byteswap.h" 3 4
+__extension__ static __inline __uint64_t
+__bswap_64 (__uint64_t __bsx)
+{
+
+  return __builtin_bswap64 (__bsx);
+
+
+
+}
+# 36 "/usr/include/endian.h" 2 3 4
+# 1 "/usr/include/bits/uintn-identity.h" 1 3 4
+# 32 "/usr/include/bits/uintn-identity.h" 3 4
+static __inline __uint16_t
+__uint16_identity (__uint16_t __x)
+{
+  return __x;
+}
+
+static __inline __uint32_t
+__uint32_identity (__uint32_t __x)
+{
+  return __x;
+}
+
+static __inline __uint64_t
+__uint64_identity (__uint64_t __x)
+{
+  return __x;
+}
+# 37 "/usr/include/endian.h" 2 3 4
+# 177 "/usr/include/sys/types.h" 2 3 4
+
+
+# 1 "/usr/include/sys/select.h" 1 3 4
+# 30 "/usr/include/sys/select.h" 3 4
+# 1 "/usr/include/bits/select.h" 1 3 4
+# 31 "/usr/include/sys/select.h" 2 3 4
+
+
+# 1 "/usr/include/bits/types/sigset_t.h" 1 3 4
+
+
+
+# 1 "/usr/include/bits/types/__sigset_t.h" 1 3 4
+
+
+
+
+typedef struct
+{
+  unsigned long int __val[(1024 / (8 * sizeof (unsigned long int)))];
+} __sigset_t;
+# 5 "/usr/include/bits/types/sigset_t.h" 2 3 4
+
+
+typedef __sigset_t sigset_t;
+# 34 "/usr/include/sys/select.h" 2 3 4
+
+
+
+# 1 "/usr/include/bits/types/struct_timeval.h" 1 3 4
+
+
+
+
+
+
+
+struct timeval
+{
+  __time_t tv_sec;
+  __suseconds_t tv_usec;
+};
+# 38 "/usr/include/sys/select.h" 2 3 4
+
+# 1 "/usr/include/bits/types/struct_timespec.h" 1 3 4
+# 10 "/usr/include/bits/types/struct_timespec.h" 3 4
+struct timespec
+{
+  __time_t tv_sec;
+
+
+
+  __syscall_slong_t tv_nsec;
+# 26 "/usr/include/bits/types/struct_timespec.h" 3 4
+};
+# 40 "/usr/include/sys/select.h" 2 3 4
+
+
+
+typedef __suseconds_t suseconds_t;
+
+
+
+
+
+typedef long int __fd_mask;
+# 59 "/usr/include/sys/select.h" 3 4
+typedef struct
+  {
+
+
+
+
+
+
+    __fd_mask __fds_bits[1024 / (8 * (int) sizeof (__fd_mask))];
+
+
+  } fd_set;
+
+
+
+
+
+
+typedef __fd_mask fd_mask;
+# 91 "/usr/include/sys/select.h" 3 4
+
+# 101 "/usr/include/sys/select.h" 3 4
+extern int select (int __nfds, fd_set *__restrict __readfds,
+     fd_set *__restrict __writefds,
+     fd_set *__restrict __exceptfds,
+     struct timeval *__restrict __timeout);
+# 113 "/usr/include/sys/select.h" 3 4
+extern int pselect (int __nfds, fd_set *__restrict __readfds,
+      fd_set *__restrict __writefds,
+      fd_set *__restrict __exceptfds,
+      const struct timespec *__restrict __timeout,
+      const __sigset_t *__restrict __sigmask);
+# 126 "/usr/include/sys/select.h" 3 4
+
+# 180 "/usr/include/sys/types.h" 2 3 4
+
+
+
+
+
+typedef __blksize_t blksize_t;
+
+
+
+
+
+
+typedef __blkcnt_t blkcnt_t;
+
+
+
+typedef __fsblkcnt_t fsblkcnt_t;
+
+
+
+typedef __fsfilcnt_t fsfilcnt_t;
+# 227 "/usr/include/sys/types.h" 3 4
+# 1 "/usr/include/bits/pthreadtypes.h" 1 3 4
+# 23 "/usr/include/bits/pthreadtypes.h" 3 4
+# 1 "/usr/include/bits/thread-shared-types.h" 1 3 4
+# 44 "/usr/include/bits/thread-shared-types.h" 3 4
+# 1 "/usr/include/bits/pthreadtypes-arch.h" 1 3 4
+# 21 "/usr/include/bits/pthreadtypes-arch.h" 3 4
+# 1 "/usr/include/bits/wordsize.h" 1 3 4
+# 22 "/usr/include/bits/pthreadtypes-arch.h" 2 3 4
+# 45 "/usr/include/bits/thread-shared-types.h" 2 3 4
+
+
+
+
+typedef struct __pthread_internal_list
+{
+  struct __pthread_internal_list *__prev;
+  struct __pthread_internal_list *__next;
+} __pthread_list_t;
+
+typedef struct __pthread_internal_slist
+{
+  struct __pthread_internal_slist *__next;
+} __pthread_slist_t;
+# 74 "/usr/include/bits/thread-shared-types.h" 3 4
+# 1 "/usr/include/bits/struct_mutex.h" 1 3 4
+# 22 "/usr/include/bits/struct_mutex.h" 3 4
+struct __pthread_mutex_s
+{
+  int __lock;
+  unsigned int __count;
+  int __owner;
+
+  unsigned int __nusers;
+
+
+
+  int __kind;
+
+  short __spins;
+  short __elision;
+  __pthread_list_t __list;
+# 53 "/usr/include/bits/struct_mutex.h" 3 4
+};
+# 75 "/usr/include/bits/thread-shared-types.h" 2 3 4
+# 87 "/usr/include/bits/thread-shared-types.h" 3 4
+# 1 "/usr/include/bits/struct_rwlock.h" 1 3 4
+# 23 "/usr/include/bits/struct_rwlock.h" 3 4
+struct __pthread_rwlock_arch_t
+{
+  unsigned int __readers;
+  unsigned int __writers;
+  unsigned int __wrphase_futex;
+  unsigned int __writers_futex;
+  unsigned int __pad3;
+  unsigned int __pad4;
+
+  int __cur_writer;
+  int __shared;
+  signed char __rwelision;
+
+
+
+
+  unsigned char __pad1[7];
+
+
+  unsigned long int __pad2;
+
+
+  unsigned int __flags;
+# 55 "/usr/include/bits/struct_rwlock.h" 3 4
+};
+# 88 "/usr/include/bits/thread-shared-types.h" 2 3 4
+
+
+
+
+struct __pthread_cond_s
+{
+  __extension__ union
+  {
+    __extension__ unsigned long long int __wseq;
+    struct
+    {
+      unsigned int __low;
+      unsigned int __high;
+    } __wseq32;
+  };
+  __extension__ union
+  {
+    __extension__ unsigned long long int __g1_start;
+    struct
+    {
+      unsigned int __low;
+      unsigned int __high;
+    } __g1_start32;
+  };
+  unsigned int __g_refs[2] ;
+  unsigned int __g_size[2];
+  unsigned int __g1_orig_size;
+  unsigned int __wrefs;
+  unsigned int __g_signals[2];
+};
+
+typedef unsigned int __tss_t;
+typedef unsigned long int __thrd_t;
+
+typedef struct
+{
+  int __data ;
+} __once_flag;
+# 24 "/usr/include/bits/pthreadtypes.h" 2 3 4
+
+
+
+typedef unsigned long int pthread_t;
+
+
+
+
+typedef union
+{
+  char __size[4];
+  int __align;
+} pthread_mutexattr_t;
+
+
+
+
+typedef union
+{
+  char __size[4];
+  int __align;
+} pthread_condattr_t;
+
+
+
+typedef unsigned int pthread_key_t;
+
+
+
+typedef int pthread_once_t;
+
+
+union pthread_attr_t
+{
+  char __size[56];
+  long int __align;
+};
+
+typedef union pthread_attr_t pthread_attr_t;
+
+
+
+
+typedef union
+{
+  struct __pthread_mutex_s __data;
+  char __size[40];
+  long int __align;
+} pthread_mutex_t;
+
+
+typedef union
+{
+  struct __pthread_cond_s __data;
+  char __size[48];
+  __extension__ long long int __align;
+} pthread_cond_t;
+
+
+
+
+
+typedef union
+{
+  struct __pthread_rwlock_arch_t __data;
+  char __size[56];
+  long int __align;
+} pthread_rwlock_t;
+
+typedef union
+{
+  char __size[8];
+  long int __align;
+} pthread_rwlockattr_t;
+
+
+
+
+
+typedef volatile int pthread_spinlock_t;
+
+
+
+
+typedef union
+{
+  char __size[32];
+  long int __align;
+} pthread_barrier_t;
+
+typedef union
+{
+  char __size[4];
+  int __align;
+} pthread_barrierattr_t;
+# 228 "/usr/include/sys/types.h" 2 3 4
+
+
+
+# 39 "Xlib.h" 2
+
+
+
+
+
+# 1 "/usr/include/X11/X.h" 1 3 4
+# 66 "/usr/include/X11/X.h" 3 4
+typedef unsigned long XID;
+
+
+
+typedef unsigned long Mask;
+
+
+
+typedef unsigned long Atom;
+
+typedef unsigned long VisualID;
+typedef unsigned long Time;
+# 96 "/usr/include/X11/X.h" 3 4
+typedef XID Window;
+typedef XID Drawable;
+
+
+typedef XID Font;
+
+typedef XID Pixmap;
+typedef XID Cursor;
+typedef XID Colormap;
+typedef XID GContext;
+typedef XID KeySym;
+
+typedef unsigned char KeyCode;
+# 45 "Xlib.h" 2
+
+
+# 1 "/usr/include/X11/Xfuncproto.h" 1 3 4
+# 48 "Xlib.h" 2
+# 1 "/usr/include/X11/Xosdefs.h" 1 3 4
+# 49 "Xlib.h" 2
+
+
+# 1 "/usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0/include/stddef.h" 1 3 4
+# 143 "/usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0/include/stddef.h" 3 4
+typedef long int ptrdiff_t;
+# 321 "/usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0/include/stddef.h" 3 4
+typedef int wchar_t;
+# 415 "/usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0/include/stddef.h" 3 4
+typedef struct {
+  long long __max_align_ll __attribute__((__aligned__(__alignof__(long long))));
+  long double __max_align_ld __attribute__((__aligned__(__alignof__(long double))));
+# 426 "/usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0/include/stddef.h" 3 4
+} max_align_t;
+# 52 "Xlib.h" 2
+# 62 "Xlib.h"
+
+# 62 "Xlib.h"
 extern int
 _Xmblen(
     char *str,
     int len
     );
-# 80 "_Xlib.h"
+# 80 "Xlib.h"
 typedef char *XPointer;
-# 148 "_Xlib.h"
+# 148 "Xlib.h"
 typedef struct _XExtData {
  int number;
  struct _XExtData *next;
@@ -344,7 +1101,7 @@ typedef struct {
   int max_keypermod;
   KeyCode *modifiermap;
 } XModifierKeymap;
-# 487 "_Xlib.h"
+# 487 "Xlib.h"
 typedef struct _XDisplay Display;
 
 
@@ -967,7 +1724,7 @@ typedef struct {
     int delta;
     XFontSet font_set;
 } XwcTextItem;
-# 1121 "_Xlib.h"
+# 1121 "Xlib.h"
 typedef struct {
     int charset_count;
     char **charset_list;
@@ -1019,7 +1776,7 @@ typedef struct {
     unsigned short count_styles;
     XIMStyle *supported_styles;
 } XIMStyles;
-# 1233 "_Xlib.h"
+# 1233 "Xlib.h"
 typedef void *XVaNestedList;
 
 typedef struct {
@@ -1033,7 +1790,7 @@ typedef struct {
 } XICCallback;
 
 typedef unsigned long XIMFeedback;
-# 1257 "_Xlib.h"
+# 1257 "Xlib.h"
 typedef struct _XIMText {
     unsigned short length;
     XIMFeedback *feedback;
@@ -1060,7 +1817,7 @@ typedef unsigned long XIMResetState;
 
 
 typedef unsigned long XIMStringConversionFeedback;
-# 1291 "_Xlib.h"
+# 1291 "Xlib.h"
 typedef struct _XIMStringConversionText {
     unsigned short length;
     XIMStringConversionFeedback *feedback;
@@ -1156,7 +1913,7 @@ typedef struct {
     char **supported_values;
 } XIMValuesList;
 
-_XFUNCPROTOBEGIN
+
 
 
 
@@ -1166,7 +1923,11 @@ extern int _Xdebug;
 
 extern XFontStruct *XLoadQueryFont(
     Display* ,
-    _Xconst char*
+
+# 1396 "Xlib.h" 3 4
+   const
+# 1396 "Xlib.h"
+           char*
 );
 
 extern XFontStruct *XQueryFont(
@@ -1254,7 +2015,11 @@ extern XImage *XGetSubImage(
 
 
 extern Display *XOpenDisplay(
-    _Xconst char*
+
+# 1484 "Xlib.h" 3 4
+   const
+# 1484 "Xlib.h"
+           char*
 );
 
 extern void XrmInitialize(
@@ -1282,11 +2047,23 @@ extern int XGetAtomNames(
 );
 extern char *XGetDefault(
     Display* ,
-    _Xconst char* ,
-    _Xconst char*
+
+# 1512 "Xlib.h" 3 4
+   const
+# 1512 "Xlib.h"
+           char* ,
+
+# 1513 "Xlib.h" 3 4
+   const
+# 1513 "Xlib.h"
+           char*
 );
 extern char *XDisplayName(
-    _Xconst char*
+
+# 1516 "Xlib.h" 3 4
+   const
+# 1516 "Xlib.h"
+           char*
 );
 extern char *XKeysymToString(
     KeySym
@@ -1308,7 +2085,11 @@ extern int (*XSetAfterFunction(
 );
 extern Atom XInternAtom(
     Display* ,
-    _Xconst char* ,
+
+# 1538 "Xlib.h" 3 4
+   const
+# 1538 "Xlib.h"
+           char* ,
     int
 );
 extern int XInternAtoms(
@@ -1343,8 +2124,16 @@ extern Cursor XCreateGlyphCursor(
     Font ,
     unsigned int ,
     unsigned int ,
-    XColor _Xconst * ,
-    XColor _Xconst *
+    XColor
+# 1573 "Xlib.h" 3 4
+          const
+# 1573 "Xlib.h"
+                  * ,
+    XColor
+# 1574 "Xlib.h" 3 4
+          const
+# 1574 "Xlib.h"
+                  *
 );
 extern Cursor XCreateFontCursor(
     Display* ,
@@ -1352,7 +2141,11 @@ extern Cursor XCreateFontCursor(
 );
 extern Font XLoadFont(
     Display* ,
-    _Xconst char*
+
+# 1582 "Xlib.h" 3 4
+   const
+# 1582 "Xlib.h"
+           char*
 );
 extern GC XCreateGC(
     Display* ,
@@ -1377,7 +2170,11 @@ extern Pixmap XCreatePixmap(
 extern Pixmap XCreateBitmapFromData(
     Display* ,
     Drawable ,
-    _Xconst char* ,
+
+# 1607 "Xlib.h" 3 4
+   const
+# 1607 "Xlib.h"
+           char* ,
     unsigned int ,
     unsigned int
 );
@@ -1427,13 +2224,21 @@ extern Colormap *XListInstalledColormaps(
 );
 extern char **XListFonts(
     Display* ,
-    _Xconst char* ,
+
+# 1657 "Xlib.h" 3 4
+   const
+# 1657 "Xlib.h"
+           char* ,
     int ,
     int*
 );
 extern char **XListFontsWithInfo(
     Display* ,
-    _Xconst char* ,
+
+# 1663 "Xlib.h" 3 4
+   const
+# 1663 "Xlib.h"
+           char* ,
     int ,
     int* ,
     XFontStruct**
@@ -1456,7 +2261,11 @@ extern XHostAddress *XListHosts(
     int* ,
     int*
 );
-_X_DEPRECATED
+
+# 1686 "Xlib.h" 3 4
+__attribute__((deprecated))
+
+# 1687 "Xlib.h"
 extern KeySym XKeycodeToKeysym(
     Display* ,
 
@@ -1481,7 +2290,11 @@ extern KeySym *XGetKeyboardMapping(
     int*
 );
 extern KeySym XStringToKeysym(
-    _Xconst char*
+
+# 1711 "Xlib.h" 3 4
+   const
+# 1711 "Xlib.h"
+           char*
 );
 extern long XMaxRequestSize(
     Display*
@@ -1520,7 +2333,11 @@ extern void XUnlockDisplay(
 
 extern XExtCodes *XInitExtension(
     Display* ,
-    _Xconst char*
+
+# 1750 "Xlib.h" 3 4
+   const
+# 1750 "Xlib.h"
+           char*
 );
 
 extern XExtCodes *XAddExtension(
@@ -1771,7 +2588,11 @@ extern int XAllocColorPlanes(
 extern int XAllocNamedColor(
     Display* ,
     Colormap ,
-    _Xconst char* ,
+
+# 2001 "Xlib.h" 3 4
+   const
+# 2001 "Xlib.h"
+           char* ,
     XColor* ,
     XColor*
 );
@@ -1855,7 +2676,11 @@ extern int XChangeProperty(
     Atom ,
     int ,
     int ,
-    _Xconst unsigned char* ,
+
+# 2085 "Xlib.h" 3 4
+   const
+# 2085 "Xlib.h"
+           unsigned char* ,
     int
 );
 
@@ -2108,7 +2933,11 @@ extern int XDrawImageString(
     GC ,
     int ,
     int ,
-    _Xconst char* ,
+
+# 2338 "Xlib.h" 3 4
+   const
+# 2338 "Xlib.h"
+           char* ,
     int
 );
 
@@ -2118,7 +2947,11 @@ extern int XDrawImageString16(
     GC ,
     int ,
     int ,
-    _Xconst XChar2b* ,
+
+# 2348 "Xlib.h" 3 4
+   const
+# 2348 "Xlib.h"
+           XChar2b* ,
     int
 );
 
@@ -2190,7 +3023,11 @@ extern int XDrawString(
     GC ,
     int ,
     int ,
-    _Xconst char* ,
+
+# 2420 "Xlib.h" 3 4
+   const
+# 2420 "Xlib.h"
+           char* ,
     int
 );
 
@@ -2200,7 +3037,11 @@ extern int XDrawString16(
     GC ,
     int ,
     int ,
-    _Xconst XChar2b* ,
+
+# 2430 "Xlib.h" 3 4
+   const
+# 2430 "Xlib.h"
+           XChar2b* ,
     int
 );
 
@@ -2358,8 +3199,16 @@ extern int XFreePixmap(
 extern int XGeometry(
     Display* ,
     int ,
-    _Xconst char* ,
-    _Xconst char* ,
+
+# 2588 "Xlib.h" 3 4
+   const
+# 2588 "Xlib.h"
+           char* ,
+
+# 2589 "Xlib.h" 3 4
+   const
+# 2589 "Xlib.h"
+           char* ,
     unsigned int ,
     unsigned int ,
     unsigned int ,
@@ -2373,9 +3222,21 @@ extern int XGeometry(
 
 extern int XGetErrorDatabaseText(
     Display* ,
-    _Xconst char* ,
-    _Xconst char* ,
-    _Xconst char* ,
+
+# 2603 "Xlib.h" 3 4
+   const
+# 2603 "Xlib.h"
+           char* ,
+
+# 2604 "Xlib.h" 3 4
+   const
+# 2604 "Xlib.h"
+           char* ,
+
+# 2605 "Xlib.h" 3 4
+   const
+# 2605 "Xlib.h"
+           char* ,
     char* ,
     int
 );
@@ -2566,7 +3427,11 @@ extern int XKillClient(
 extern int XLookupColor(
     Display* ,
     Colormap ,
-    _Xconst char* ,
+
+# 2796 "Xlib.h" 3 4
+   const
+# 2796 "Xlib.h"
+           char* ,
     XColor* ,
     XColor*
 );
@@ -2633,12 +3498,20 @@ extern int XNoOp(
 extern int XParseColor(
     Display* ,
     Colormap ,
-    _Xconst char* ,
+
+# 2863 "Xlib.h" 3 4
+   const
+# 2863 "Xlib.h"
+           char* ,
     XColor*
 );
 
 extern int XParseGeometry(
-    _Xconst char* ,
+
+# 2868 "Xlib.h" 3 4
+   const
+# 2868 "Xlib.h"
+           char* ,
     int* ,
     int* ,
     unsigned int* ,
@@ -2752,7 +3625,11 @@ extern int XQueryColors(
 
 extern int XQueryExtension(
     Display* ,
-    _Xconst char* ,
+
+# 2982 "Xlib.h" 3 4
+   const
+# 2982 "Xlib.h"
+           char* ,
     int* ,
     int* ,
     int*
@@ -2778,7 +3655,11 @@ extern int XQueryPointer(
 extern int XQueryTextExtents(
     Display* ,
     XID ,
-    _Xconst char* ,
+
+# 3008 "Xlib.h" 3 4
+   const
+# 3008 "Xlib.h"
+           char* ,
     int ,
     int* ,
     int* ,
@@ -2789,7 +3670,11 @@ extern int XQueryTextExtents(
 extern int XQueryTextExtents16(
     Display* ,
     XID ,
-    _Xconst XChar2b* ,
+
+# 3019 "Xlib.h" 3 4
+   const
+# 3019 "Xlib.h"
+           XChar2b* ,
     int ,
     int* ,
     int* ,
@@ -2814,7 +3699,11 @@ extern int XRaiseWindow(
 extern int XReadBitmapFile(
     Display* ,
     Drawable ,
-    _Xconst char* ,
+
+# 3044 "Xlib.h" 3 4
+   const
+# 3044 "Xlib.h"
+           char* ,
     unsigned int* ,
     unsigned int* ,
     Pixmap* ,
@@ -2823,7 +3712,11 @@ extern int XReadBitmapFile(
 );
 
 extern int XReadBitmapFileData(
-    _Xconst char* ,
+
+# 3053 "Xlib.h" 3 4
+   const
+# 3053 "Xlib.h"
+           char* ,
     unsigned int* ,
     unsigned int* ,
     unsigned char** ,
@@ -2836,7 +3729,11 @@ extern int XRebindKeysym(
     KeySym ,
     KeySym* ,
     int ,
-    _Xconst unsigned char* ,
+
+# 3066 "Xlib.h" 3 4
+   const
+# 3066 "Xlib.h"
+           unsigned char* ,
     int
 );
 
@@ -2979,7 +3876,11 @@ extern int XSetDashes(
     Display* ,
     GC ,
     int ,
-    _Xconst char* ,
+
+# 3209 "Xlib.h" 3 4
+   const
+# 3209 "Xlib.h"
+           char* ,
     int
 );
 
@@ -3028,7 +3929,11 @@ extern int XSetGraphicsExposures(
 extern int XSetIconName(
     Display* ,
     Window ,
-    _Xconst char*
+
+# 3258 "Xlib.h" 3 4
+   const
+# 3258 "Xlib.h"
+           char*
 );
 
 extern int XSetInputFocus(
@@ -3060,7 +3965,11 @@ extern int XSetPlaneMask(
 
 extern int XSetPointerMapping(
     Display* ,
-    _Xconst unsigned char* ,
+
+# 3290 "Xlib.h" 3 4
+   const
+# 3290 "Xlib.h"
+           unsigned char* ,
     int
 );
 
@@ -3151,14 +4060,22 @@ extern int XSetWindowColormap(
 
 extern int XStoreBuffer(
     Display* ,
-    _Xconst char* ,
+
+# 3381 "Xlib.h" 3 4
+   const
+# 3381 "Xlib.h"
+           char* ,
     int ,
     int
 );
 
 extern int XStoreBytes(
     Display* ,
-    _Xconst char* ,
+
+# 3388 "Xlib.h" 3 4
+   const
+# 3388 "Xlib.h"
+           char* ,
     int
 );
 
@@ -3178,13 +4095,21 @@ extern int XStoreColors(
 extern int XStoreName(
     Display* ,
     Window ,
-    _Xconst char*
+
+# 3408 "Xlib.h" 3 4
+   const
+# 3408 "Xlib.h"
+           char*
 );
 
 extern int XStoreNamedColor(
     Display* ,
     Colormap ,
-    _Xconst char* ,
+
+# 3414 "Xlib.h" 3 4
+   const
+# 3414 "Xlib.h"
+           char* ,
     unsigned long ,
     int
 );
@@ -3196,7 +4121,11 @@ extern int XSync(
 
 extern int XTextExtents(
     XFontStruct* ,
-    _Xconst char* ,
+
+# 3426 "Xlib.h" 3 4
+   const
+# 3426 "Xlib.h"
+           char* ,
     int ,
     int* ,
     int* ,
@@ -3206,7 +4135,11 @@ extern int XTextExtents(
 
 extern int XTextExtents16(
     XFontStruct* ,
-    _Xconst XChar2b* ,
+
+# 3436 "Xlib.h" 3 4
+   const
+# 3436 "Xlib.h"
+           XChar2b* ,
     int ,
     int* ,
     int* ,
@@ -3216,13 +4149,21 @@ extern int XTextExtents16(
 
 extern int XTextWidth(
     XFontStruct* ,
-    _Xconst char* ,
+
+# 3446 "Xlib.h" 3 4
+   const
+# 3446 "Xlib.h"
+           char* ,
     int
 );
 
 extern int XTextWidth16(
     XFontStruct* ,
-    _Xconst XChar2b* ,
+
+# 3452 "Xlib.h" 3 4
+   const
+# 3452 "Xlib.h"
+           XChar2b* ,
     int
 );
 
@@ -3323,7 +4264,11 @@ extern int XWindowEvent(
 
 extern int XWriteBitmapFile(
     Display* ,
-    _Xconst char* ,
+
+# 3553 "Xlib.h" 3 4
+   const
+# 3553 "Xlib.h"
+           char* ,
     Pixmap ,
     unsigned int ,
     unsigned int ,
@@ -3340,8 +4285,16 @@ extern char *XSetLocaleModifiers(
 extern XOM XOpenOM(
     Display* ,
     struct _XrmHashBucketRec* ,
-    _Xconst char* ,
-    _Xconst char*
+
+# 3570 "Xlib.h" 3 4
+   const
+# 3570 "Xlib.h"
+           char* ,
+
+# 3571 "Xlib.h" 3 4
+   const
+# 3571 "Xlib.h"
+           char*
 );
 
 extern int XCloseOM(
@@ -3351,12 +4304,28 @@ extern int XCloseOM(
 extern char *XSetOMValues(
     XOM ,
     ...
-) _X_SENTINEL(0);
+)
+# 3581 "Xlib.h" 3 4
+ __attribute__ ((__sentinel__(
+# 3581 "Xlib.h"
+ 0
+# 3581 "Xlib.h" 3 4
+ )))
+# 3581 "Xlib.h"
+               ;
 
 extern char *XGetOMValues(
     XOM ,
     ...
-) _X_SENTINEL(0);
+)
+# 3586 "Xlib.h" 3 4
+ __attribute__ ((__sentinel__(
+# 3586 "Xlib.h"
+ 0
+# 3586 "Xlib.h" 3 4
+ )))
+# 3586 "Xlib.h"
+               ;
 
 extern Display *XDisplayOfOM(
     XOM
@@ -3369,7 +4338,15 @@ extern char *XLocaleOfOM(
 extern XOC XCreateOC(
     XOM ,
     ...
-) _X_SENTINEL(0);
+)
+# 3599 "Xlib.h" 3 4
+ __attribute__ ((__sentinel__(
+# 3599 "Xlib.h"
+ 0
+# 3599 "Xlib.h" 3 4
+ )))
+# 3599 "Xlib.h"
+               ;
 
 extern void XDestroyOC(
     XOC
@@ -3382,16 +4359,36 @@ extern XOM XOMOfOC(
 extern char *XSetOCValues(
     XOC ,
     ...
-) _X_SENTINEL(0);
+)
+# 3612 "Xlib.h" 3 4
+ __attribute__ ((__sentinel__(
+# 3612 "Xlib.h"
+ 0
+# 3612 "Xlib.h" 3 4
+ )))
+# 3612 "Xlib.h"
+               ;
 
 extern char *XGetOCValues(
     XOC ,
     ...
-) _X_SENTINEL(0);
+)
+# 3617 "Xlib.h" 3 4
+ __attribute__ ((__sentinel__(
+# 3617 "Xlib.h"
+ 0
+# 3617 "Xlib.h" 3 4
+ )))
+# 3617 "Xlib.h"
+               ;
 
 extern XFontSet XCreateFontSet(
     Display* ,
-    _Xconst char* ,
+
+# 3621 "Xlib.h" 3 4
+   const
+# 3621 "Xlib.h"
+           char* ,
     char*** ,
     int* ,
     char**
@@ -3434,25 +4431,41 @@ extern XFontSetExtents *XExtentsOfFontSet(
 
 extern int XmbTextEscapement(
     XFontSet ,
-    _Xconst char* ,
+
+# 3664 "Xlib.h" 3 4
+   const
+# 3664 "Xlib.h"
+           char* ,
     int
 );
 
 extern int XwcTextEscapement(
     XFontSet ,
-    _Xconst wchar_t* ,
+
+# 3670 "Xlib.h" 3 4
+   const
+# 3670 "Xlib.h"
+           wchar_t* ,
     int
 );
 
 extern int Xutf8TextEscapement(
     XFontSet ,
-    _Xconst char* ,
+
+# 3676 "Xlib.h" 3 4
+   const
+# 3676 "Xlib.h"
+           char* ,
     int
 );
 
 extern int XmbTextExtents(
     XFontSet ,
-    _Xconst char* ,
+
+# 3682 "Xlib.h" 3 4
+   const
+# 3682 "Xlib.h"
+           char* ,
     int ,
     XRectangle* ,
     XRectangle*
@@ -3460,7 +4473,11 @@ extern int XmbTextExtents(
 
 extern int XwcTextExtents(
     XFontSet ,
-    _Xconst wchar_t* ,
+
+# 3690 "Xlib.h" 3 4
+   const
+# 3690 "Xlib.h"
+           wchar_t* ,
     int ,
     XRectangle* ,
     XRectangle*
@@ -3468,7 +4485,11 @@ extern int XwcTextExtents(
 
 extern int Xutf8TextExtents(
     XFontSet ,
-    _Xconst char* ,
+
+# 3698 "Xlib.h" 3 4
+   const
+# 3698 "Xlib.h"
+           char* ,
     int ,
     XRectangle* ,
     XRectangle*
@@ -3476,7 +4497,11 @@ extern int Xutf8TextExtents(
 
 extern int XmbTextPerCharExtents(
     XFontSet ,
-    _Xconst char* ,
+
+# 3706 "Xlib.h" 3 4
+   const
+# 3706 "Xlib.h"
+           char* ,
     int ,
     XRectangle* ,
     XRectangle* ,
@@ -3488,7 +4513,11 @@ extern int XmbTextPerCharExtents(
 
 extern int XwcTextPerCharExtents(
     XFontSet ,
-    _Xconst wchar_t* ,
+
+# 3718 "Xlib.h" 3 4
+   const
+# 3718 "Xlib.h"
+           wchar_t* ,
     int ,
     XRectangle* ,
     XRectangle* ,
@@ -3500,7 +4529,11 @@ extern int XwcTextPerCharExtents(
 
 extern int Xutf8TextPerCharExtents(
     XFontSet ,
-    _Xconst char* ,
+
+# 3730 "Xlib.h" 3 4
+   const
+# 3730 "Xlib.h"
+           char* ,
     int ,
     XRectangle* ,
     XRectangle* ,
@@ -3547,7 +4580,11 @@ extern void XmbDrawString(
     GC ,
     int ,
     int ,
-    _Xconst char* ,
+
+# 3777 "Xlib.h" 3 4
+   const
+# 3777 "Xlib.h"
+           char* ,
     int
 );
 
@@ -3558,7 +4595,11 @@ extern void XwcDrawString(
     GC ,
     int ,
     int ,
-    _Xconst wchar_t* ,
+
+# 3788 "Xlib.h" 3 4
+   const
+# 3788 "Xlib.h"
+           wchar_t* ,
     int
 );
 
@@ -3569,7 +4610,11 @@ extern void Xutf8DrawString(
     GC ,
     int ,
     int ,
-    _Xconst char* ,
+
+# 3799 "Xlib.h" 3 4
+   const
+# 3799 "Xlib.h"
+           char* ,
     int
 );
 
@@ -3580,7 +4625,11 @@ extern void XmbDrawImageString(
     GC ,
     int ,
     int ,
-    _Xconst char* ,
+
+# 3810 "Xlib.h" 3 4
+   const
+# 3810 "Xlib.h"
+           char* ,
     int
 );
 
@@ -3591,7 +4640,11 @@ extern void XwcDrawImageString(
     GC ,
     int ,
     int ,
-    _Xconst wchar_t* ,
+
+# 3821 "Xlib.h" 3 4
+   const
+# 3821 "Xlib.h"
+           wchar_t* ,
     int
 );
 
@@ -3602,7 +4655,11 @@ extern void Xutf8DrawImageString(
     GC ,
     int ,
     int ,
-    _Xconst char* ,
+
+# 3832 "Xlib.h" 3 4
+   const
+# 3832 "Xlib.h"
+           char* ,
     int
 );
 
@@ -3619,11 +4676,27 @@ extern int XCloseIM(
 
 extern char *XGetIMValues(
     XIM , ...
-) _X_SENTINEL(0);
+)
+# 3849 "Xlib.h" 3 4
+ __attribute__ ((__sentinel__(
+# 3849 "Xlib.h"
+ 0
+# 3849 "Xlib.h" 3 4
+ )))
+# 3849 "Xlib.h"
+               ;
 
 extern char *XSetIMValues(
     XIM , ...
-) _X_SENTINEL(0);
+)
+# 3853 "Xlib.h" 3 4
+ __attribute__ ((__sentinel__(
+# 3853 "Xlib.h"
+ 0
+# 3853 "Xlib.h" 3 4
+ )))
+# 3853 "Xlib.h"
+               ;
 
 extern Display *XDisplayOfIM(
     XIM
@@ -3635,7 +4708,15 @@ extern char *XLocaleOfIM(
 
 extern XIC XCreateIC(
     XIM , ...
-) _X_SENTINEL(0);
+)
+# 3865 "Xlib.h" 3 4
+ __attribute__ ((__sentinel__(
+# 3865 "Xlib.h"
+ 0
+# 3865 "Xlib.h" 3 4
+ )))
+# 3865 "Xlib.h"
+               ;
 
 extern void XDestroyIC(
     XIC
@@ -3663,11 +4744,27 @@ extern char *Xutf8ResetIC(
 
 extern char *XSetICValues(
     XIC , ...
-) _X_SENTINEL(0);
+)
+# 3893 "Xlib.h" 3 4
+ __attribute__ ((__sentinel__(
+# 3893 "Xlib.h"
+ 0
+# 3893 "Xlib.h" 3 4
+ )))
+# 3893 "Xlib.h"
+               ;
 
 extern char *XGetICValues(
     XIC , ...
-) _X_SENTINEL(0);
+)
+# 3897 "Xlib.h" 3 4
+ __attribute__ ((__sentinel__(
+# 3897 "Xlib.h"
+ 0
+# 3897 "Xlib.h" 3 4
+ )))
+# 3897 "Xlib.h"
+               ;
 
 extern XIM XIMOfIC(
     XIC
@@ -3707,7 +4804,15 @@ extern int Xutf8LookupString(
 
 extern XVaNestedList XVaCreateNestedList(
     int , ...
-) _X_SENTINEL(0);
+)
+# 3937 "Xlib.h" 3 4
+ __attribute__ ((__sentinel__(
+# 3937 "Xlib.h"
+ 0
+# 3937 "Xlib.h" 3 4
+ )))
+# 3937 "Xlib.h"
+               ;
 
 
 
@@ -3788,10 +4893,4 @@ extern void XFreeEventData(
     Display* ,
     XGenericEventCookie*
 );
-
-
-
-
-
-_XFUNCPROTOEND
 

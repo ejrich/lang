@@ -2927,6 +2927,8 @@ namespace ol
 
         private static T CreateAst<T>(IAst source) where T : IAst, new()
         {
+            if (source == null) return new();
+
             return new()
             {
                 FileIndex = source.FileIndex,

@@ -6,9 +6,19 @@ struct Token {
 enum TokenType {
     Identifier;
     Struct;
+    Union;
     Enum;
     Typedef;
     Extern;
+    Signed;
+    Unsigned;
+    Long;
+    Int;
+    Short;
+    Char;
+    Float;
+    Double;
+    Const;
     Star = '*';
     OpenParen = '(';
     CloseParen = ')';
@@ -81,9 +91,19 @@ check_reserved_tokens(Token* token) {
     if token.type != TokenType.Identifier return;
 
     if token.value == "struct" token.type = TokenType.Struct;
+    else if token.value == "union" token.type = TokenType.Union;
     else if token.value == "enum" token.type = TokenType.Enum;
     else if token.value == "typedef" token.type = TokenType.Typedef;
     else if token.value == "extern" token.type = TokenType.Extern;
+    else if token.value == "signed" token.type = TokenType.Signed;
+    else if token.value == "unsigned" token.type = TokenType.Unsigned;
+    else if token.value == "long" token.type = TokenType.Long;
+    else if token.value == "int" token.type = TokenType.Int;
+    else if token.value == "short" token.type = TokenType.Short;
+    else if token.value == "char" token.type = TokenType.Char;
+    else if token.value == "float" token.type = TokenType.Float;
+    else if token.value == "double" token.type = TokenType.Double;
+    else if token.value == "const" token.type = TokenType.Const;
 }
 
 Token get_token(u8 char, int i, string file) {
