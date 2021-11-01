@@ -34,6 +34,10 @@ struct TypeDefinition {
 }
 
 TypeDefinition, Node<Token>* parse_type(Node<Token>* node) {
+    if node.data.type == TokenType.Const {
+        node = node.next;
+    }
+
     type := node.data.type;
 
     if type == TokenType.Signed {
@@ -132,6 +136,7 @@ TypeDefinition, Node<Token>* check_for_pointers(string type, Node<Token>* node) 
 
 struct Argument {
     type: TypeDefinition;
+    array_length: string;
     name: string;
 }
 
@@ -170,13 +175,19 @@ Node<Token>* parse_extern(Node<Token>* node, FILE* file, string library) {
                     node = node.next;
                 }
             }
+            else if type == TokenType.OpenBracket {
+                argument.array_length, node = get_array_length(node.next);
+            }
             else if type == TokenType.Comma {
                 array_insert(&function.arguments, argument);
 
                 // Reset argument fields
                 new_arg = true;
                 argument.name.length = 0;
+                // TODO Free
                 argument.name.data = null;
+                argument.array_length.length = 0;
+                argument.array_length.data = null;
 
                 node = node.next;
             }
@@ -207,7 +218,14 @@ Node<Token>* parse_extern(Node<Token>* node, FILE* file, string library) {
         fputc('(', file);
 
         each arg, i in function.arguments {
-            print_type(arg.type, file);
+            if !string_is_empty(arg.array_length) {
+                print_string("CArray<", file);
+                print_type(arg.type, file);
+                print_string(">[", file);
+                print_string(arg.array_length, file);
+                print_string("]", file);
+            }
+            else print_type(arg.type, file);
             fputc(' ', file);
 
             if string_is_empty(arg.name) {
@@ -242,6 +260,9 @@ Node<Token>* parse_typedef(Node<Token>* node, FILE* file, string library) {
         }
         else if type == TokenType.Enum {
             return parse_enum(node, file, library);
+        }
+        else {
+            // TODO Handle type aliasing
         }
     }
 
