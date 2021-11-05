@@ -11,29 +11,25 @@ parse(string file_contents, string library) {
         while node {
             type := node.data.type;
             if type == TokenType.Typedef {
-                node = parse_typedef(node, lib_file, library);
+                node = parse_typedef(node, lib_file);
+            }
+            else if type == TokenType.Struct {
+                node = parse_struct(node, lib_file, alias = false);
             }
             else if type == TokenType.Extern {
                 node = parse_function(node.next, lib_file, library);
             }
             else if type == TokenType.Static {
-                node = node.next;
-                while node.data.type != TokenType.CloseBrace {
-                    node = node.next;
-                }
+                node = move_until(node.next, TokenType.CloseBrace);
                 node = node.next;
             }
             else if type == TokenType.Extension node = node.next;
             else if type == TokenType.Attribute {
-                node = node.next;
-                while node.data.type != TokenType.SemiColon {
-                    node = node.next;
-                }
+                node = move_until(node.next, TokenType.SemiColon);
                 node = node.next;
             }
             else {
-                // node = parse_function(node, lib_file, library);
-                node = node.next;
+                node = parse_function(node, lib_file, library);
             }
         }
 
@@ -42,6 +38,14 @@ parse(string file_contents, string library) {
     else {
         printf("Unable to create file '%s'\n", library);
     }
+}
+
+Node<Token>* move_until(Node<Token>* node, TokenType type) {
+    while node.data.type != type {
+        node = node.next;
+    }
+
+    return node;
 }
 
 struct TypeDefinition {
@@ -115,6 +119,9 @@ TypeDefinition, Node<Token>* parse_type(Node<Token>* node) {
         return check_for_pointers("u32", node.next);
     }
     else if type == TokenType.Long {
+        if node.next.data.type == TokenType.Double {
+            return check_for_pointers("float64", node.next.next);
+        }
         if node.next.data.type == TokenType.Long {
             node = node.next;
         }
@@ -216,7 +223,7 @@ Node<Token>* parse_function(Node<Token>* node, FILE* file, string library) {
             if !new_arg
                 array_insert(&function.arguments, argument);
             // Move over ')' and ';'
-            node = node.next;
+            node = move_until(node.next, TokenType.SemiColon);
             node = node.next;
             break;
         }
@@ -266,27 +273,31 @@ Node<Token>* parse_function(Node<Token>* node, FILE* file, string library) {
     return node;
 }
 
-Node<Token>* parse_typedef(Node<Token>* node, FILE* file, string library) {
+Node<Token>* parse_typedef(Node<Token>* node, FILE* file) {
     node = node.next;
 
     if node {
         type := node.data.type;
 
         if type == TokenType.Struct {
-            return parse_struct(node, file, library);
+            return parse_struct(node, file);
         }
         else if type == TokenType.Union {
-            return parse_struct(node, file, library, "union");
+            return parse_struct(node, file, "union");
         }
         else if type == TokenType.Enum {
-            return parse_enum(node, file, library);
+            return parse_enum(node, file);
         }
         else {
             type_def, next_node := parse_type(node);
             node = next_node;
 
             name := node.data.value;
+
+            // Move over ';'
+            node = move_until(node.next, TokenType.SemiColon);
             node = node.next;
+
             // TODO Handle type aliasing
         }
     }
@@ -307,14 +318,15 @@ struct StructField {
     names: Array<string>;
 }
 
-Node<Token>* parse_struct(Node<Token>* node, FILE* file, string library, string type_name = "struct") {
+Node<Token>* parse_struct(Node<Token>* node, FILE* file, string type_name = "struct", bool alias = true) {
     node = node.next;
 
     if node {
         struct_def: Struct;
 
         if node.data.type == TokenType.Identifier {
-            struct_def.alias = node.data.value;
+            if alias struct_def.alias = node.data.value;
+            else struct_def.name = node.data.value;
             node = node.next;
         }
 
@@ -340,6 +352,9 @@ Node<Token>* parse_struct(Node<Token>* node, FILE* file, string library, string 
             }
             else if type == TokenType.OpenBracket {
                 struct_field.array_length, node = get_array_length(node.next);
+            }
+            else if type == TokenType.Attribute {
+                node = move_until(node.next, TokenType.SemiColon);
             }
             else if type == TokenType.SemiColon {
                 array_insert(&struct_def.fields, struct_field);
@@ -372,10 +387,10 @@ Node<Token>* parse_struct(Node<Token>* node, FILE* file, string library, string 
             node = node.next;
         }
 
-        struct_def.name = node.data.value;
+        if alias struct_def.name = node.data.value;
 
         // Move over ';'
-        node = node.next;
+        node = move_until(node, TokenType.SemiColon);
         node = node.next;
 
         // Print struct definition to file
@@ -418,10 +433,7 @@ Node<Token>* parse_struct(Node<Token>* node, FILE* file, string library, string 
 string, Node<Token>* get_array_length(Node<Token>* node) {
     array_length := node.data.value;
 
-    node = node.next;
-    while node.data.type != TokenType.CloseBracket {
-        node = node.next;
-    }
+    node = move_until(node.next, TokenType.CloseBracket);
 
     return array_length, node.next;
 }
@@ -437,7 +449,7 @@ struct Enum_Value {
     value: string;
 }
 
-Node<Token>* parse_enum(Node<Token>* node, FILE* file, string library) {
+Node<Token>* parse_enum(Node<Token>* node, FILE* file) {
     node = node.next;
 
     if node {
