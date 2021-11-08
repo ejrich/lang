@@ -25,9 +25,8 @@ variables() #print_ir {
 
     assert(b != null);
 
-    // TODO Implement me
-    // a(1, 2);
-    // b(1, 3.14);
+    a(1, 2);
+    b(1, 3.14);
 }
 
 foo_impl(int x, int y) {

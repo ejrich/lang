@@ -457,6 +457,7 @@ namespace ol
                                 break;
                             case TypeKind.Pointer:
                             case TypeKind.Interface:
+                            case TypeKind.Function:
                                 Marshal.StructureToPtr(value.Pointer, pointer.Pointer, false);
                                 break;
                             case TypeKind.String:

@@ -1421,15 +1421,15 @@ namespace ol
                     }
                     else
                     {
+                        var functionDef = TypeTable.Functions[identifierAst.Name][0];
                         if (getFunctionPointer)
                         {
                             return new InstructionValue
                             {
-                                ValueType = InstructionValueType.Function, Type = null, // TODO Fix
-                                ConstantString = identifierAst.Name
+                                ValueType = InstructionValueType.Function, Type = functionDef, ConstantString = identifierAst.Name
                             };
                         }
-                        return GetConstantInteger(TypeTable.Functions[identifierAst.Name][0].TypeIndex);
+                        return GetConstantInteger(functionDef.TypeIndex);
                     }
                 case StructFieldRefAst structField:
                     if (structField.IsEnum)
@@ -1477,6 +1477,7 @@ namespace ol
                     }
                     return structFieldPointer;
                 case CallAst call:
+                    // TODO Implement CallFunctionPointer
                     return EmitCall(function, call, scope);
                 case ChangeByOneAst changeByOne:
                     var (pointer, pointerType) = EmitGetReference(function, changeByOne.Value, scope, out loaded);

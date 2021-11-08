@@ -20,15 +20,18 @@ namespace ol
         uint Size { get; set; }
     }
 
-    public interface IFunction : IAst
+    public interface IInterface : IAst
     {
         string Name { get; set; }
-        FunctionFlags Flags { get; set; }
         IType ReturnType { get; set; }
         TypeDefinition ReturnTypeDefinition { get; set; }
-        List<string> Generics { get; }
         List<DeclarationAst> Arguments { get; }
-        ScopeAst Body { get; set; }
+    }
+
+    public interface IFunction : IInterface
+    {
+        FunctionFlags Flags { get; set; }
+        List<string> Generics { get; }
     }
 
     [Flags]
@@ -470,7 +473,7 @@ namespace ol
         public ScopeAst Body { get; set; }
     }
 
-    public class InterfaceAst : IAst, IType
+    public class InterfaceAst : IInterface, IType
     {
         public int FileIndex { get; set; }
         public uint Line { get; init; }

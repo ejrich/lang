@@ -3207,148 +3207,114 @@ namespace ol
                 return null;
             }
 
-            if (!function.Flags.HasFlag(FunctionFlags.Verified) && function != currentFunction)
+            if (function is FunctionAst functionAst)
             {
-                VerifyFunction(function);
-            }
-
-            if (currentFunction != null && !currentFunction.Flags.HasFlag(FunctionFlags.CallsCompiler) && (function.Flags.HasFlag(FunctionFlags.Compiler) || function.Flags.HasFlag(FunctionFlags.CallsCompiler)))
-            {
-                currentFunction.Flags |= FunctionFlags.CallsCompiler;
-            }
-
-            call.Function = function;
-            var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params) ? function.Arguments.Count - 1 : function.Arguments.Count;
-
-            // Verify call arguments match the types of the function arguments
-            for (var i = 0; i < argumentCount; i++)
-            {
-                var functionArg = function.Arguments[i];
-                if (call.SpecifiedArguments != null && call.SpecifiedArguments.TryGetValue(functionArg.Name, out var specifiedArgument))
+                if (!functionAst.Flags.HasFlag(FunctionFlags.Verified) && function != currentFunction)
                 {
-                    VerifyConstantIfNecessary(specifiedArgument, functionArg.Type);
-
-                    call.Arguments.Insert(i, specifiedArgument);
-                    continue;
+                    VerifyFunction(functionAst);
                 }
 
-                var argumentAst = call.Arguments.ElementAtOrDefault(i);
-                if (argumentAst == null)
+                if (currentFunction != null && !currentFunction.Flags.HasFlag(FunctionFlags.CallsCompiler) && (functionAst.Flags.HasFlag(FunctionFlags.Compiler) || functionAst.Flags.HasFlag(FunctionFlags.CallsCompiler)))
                 {
-                    call.Arguments.Insert(i, functionArg.Value);
+                    currentFunction.Flags |= FunctionFlags.CallsCompiler;
                 }
-                else if (argumentAst is NullAst nullAst)
+
+                call.Function = functionAst;
+                var argumentCount = functionAst.Flags.HasFlag(FunctionFlags.Varargs) || functionAst.Flags.HasFlag(FunctionFlags.Params) ? function.Arguments.Count - 1 : function.Arguments.Count;
+
+                OrderCallArguments(call, function, argumentCount, argumentTypes);
+
+                // Verify varargs call arguments
+                if (functionAst.Flags.HasFlag(FunctionFlags.Params))
                 {
-                    nullAst.TargetType = functionArg.Type;
-                }
-                else
-                {
-                    var argument = argumentTypes[i];
-                    if (argument != null)
+                    var paramsType = functionAst.ParamsElementType;
+
+                    if (paramsType != null)
                     {
-                        if (functionArg.Type.TypeKind == TypeKind.Type)
+                        for (var i = argumentCount; i < argumentTypes.Length; i++)
                         {
-                            if (argument.TypeKind != TypeKind.Type)
+                            var argumentAst = call.Arguments[i];
+                            if (argumentAst is NullAst nullAst)
                             {
-                                var typeIndex = new ConstantAst {Type = TypeTable.S32Type, Value = new Constant {Integer = argument.TypeIndex}};
-                                call.Arguments[i] = typeIndex;
-                                argumentTypes[i] = typeIndex.Type;
+                                nullAst.TargetType = functionAst.ParamsElementType;
                             }
-                        }
-                        else
-                        {
-                            VerifyConstantIfNecessary(call.Arguments[i], functionArg.Type);
-                        }
-                    }
-                }
-            }
-
-            // Verify varargs call arguments
-            if (function.Flags.HasFlag(FunctionFlags.Params))
-            {
-                var paramsType = function.ParamsElementType;
-
-                if (paramsType != null)
-                {
-                    for (var i = argumentCount; i < argumentTypes.Length; i++)
-                    {
-                        var argumentAst = call.Arguments[i];
-                        if (argumentAst is NullAst nullAst)
-                        {
-                            nullAst.TargetType = function.ParamsElementType;
-                        }
-                        else
-                        {
-                            var argument = argumentTypes[i];
-                            if (argument != null)
+                            else
                             {
-                                if (paramsType.TypeKind == TypeKind.Type)
+                                var argument = argumentTypes[i];
+                                if (argument != null)
                                 {
-                                    if (argument.TypeKind != TypeKind.Type)
+                                    if (paramsType.TypeKind == TypeKind.Type)
                                     {
-                                        var typeIndex = new ConstantAst {Type = TypeTable.S32Type, Value = new Constant {Integer = argument.TypeIndex}};
-                                        call.Arguments[i] = typeIndex;
-                                        argumentTypes[i] = typeIndex.Type;
+                                        if (argument.TypeKind != TypeKind.Type)
+                                        {
+                                            var typeIndex = new ConstantAst {Type = TypeTable.S32Type, Value = new Constant {Integer = argument.TypeIndex}};
+                                            call.Arguments[i] = typeIndex;
+                                            argumentTypes[i] = typeIndex.Type;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        VerifyConstantIfNecessary(argumentAst, paramsType);
                                     }
                                 }
-                                else
-                                {
-                                    VerifyConstantIfNecessary(argumentAst, paramsType);
-                                }
                             }
                         }
                     }
                 }
-            }
-            else if (function.Flags.HasFlag(FunctionFlags.Varargs))
-            {
-                for (var i = 0; i < argumentTypes.Length; i++)
+                else if (functionAst.Flags.HasFlag(FunctionFlags.Varargs))
                 {
-                    var argumentType = argumentTypes[i];
-                    // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
-                    // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
-                    if (argumentType.TypeKind == TypeKind.Float && argumentType.Size == 4)
+                    for (var i = 0; i < argumentTypes.Length; i++)
                     {
-                        argumentTypes[i] = TypeTable.Float64Type;
-                    }
-                }
-                var found = false;
-                for (var index = 0; index < function.VarargsCallTypes.Count; index++)
-                {
-                    var callTypes = function.VarargsCallTypes[index];
-                    if (callTypes.Length == argumentTypes.Length)
-                    {
-                        var callMatches = true;
-                        for (var i = 0; i < callTypes.Length; i++)
+                        var argumentType = argumentTypes[i];
+                        // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
+                        // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
+                        if (argumentType.TypeKind == TypeKind.Float && argumentType.Size == 4)
                         {
-                            if (callTypes[i] != argumentTypes[i])
+                            argumentTypes[i] = TypeTable.Float64Type;
+                        }
+                    }
+                    var found = false;
+                    for (var index = 0; index < functionAst.VarargsCallTypes.Count; index++)
+                    {
+                        var callTypes = functionAst.VarargsCallTypes[index];
+                        if (callTypes.Length == argumentTypes.Length)
+                        {
+                            var callMatches = true;
+                            for (var i = 0; i < callTypes.Length; i++)
                             {
-                                callMatches = false;
+                                if (callTypes[i] != argumentTypes[i])
+                                {
+                                    callMatches = false;
+                                    break;
+                                }
+                            }
+
+                            if (callMatches)
+                            {
+                                found = true;
+                                call.ExternIndex = index;
                                 break;
                             }
                         }
+                    }
 
-                        if (callMatches)
-                        {
-                            found = true;
-                            call.ExternIndex = index;
-                            break;
-                        }
+                    if (!found)
+                    {
+                        call.ExternIndex = functionAst.VarargsCallTypes.Count;
+                        _runner.InitVarargsFunction(functionAst, argumentTypes);
+                        functionAst.VarargsCallTypes.Add(argumentTypes);
                     }
                 }
-
-                if (!found)
-                {
-                    call.ExternIndex = function.VarargsCallTypes.Count;
-                    _runner.InitVarargsFunction(function, argumentTypes);
-                    function.VarargsCallTypes.Add(argumentTypes);
-                }
+            }
+            else
+            {
+                OrderCallArguments(call, function, function.Arguments.Count, argumentTypes);
             }
 
             return function.ReturnType;
         }
 
-        private FunctionAst DetermineCallingFunction(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments, ScopeAst scope)
+        private IInterface DetermineCallingFunction(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments, ScopeAst scope)
         {
             if (TypeTable.Functions.TryGetValue(call.FunctionName, out var functions))
             {
@@ -3617,6 +3583,15 @@ namespace ol
                 }
             }
 
+            if (GetScopeIdentifier(scope, call.FunctionName, out var ast))
+            {
+                var interfaceAst = VerifyInterfaceCall(call, ast, arguments, specifiedArguments);
+                if (interfaceAst != null)
+                {
+                    return interfaceAst;
+                }
+            }
+
             if (functions == null && polymorphicFunctions == null)
             {
                 ErrorReporter.Report($"Call to undefined function '{call.FunctionName}'", call);
@@ -3626,6 +3601,145 @@ namespace ol
                 ErrorReporter.Report($"No overload of function '{call.FunctionName}' found with given arguments", call);
             }
             return null;
+        }
+
+        private InterfaceAst VerifyInterfaceCall(CallAst call, IAst ast, IType[] arguments, Dictionary<string, IType> specifiedArguments)
+        {
+            InterfaceAst interfaceAst = null;
+            if (ast is DeclarationAst declaration)
+            {
+                if (declaration.Type is InterfaceAst interfaceType)
+                {
+                    interfaceAst = interfaceType;
+                }
+                else
+                {
+                    return null;
+                }
+            }
+            else if (ast is VariableAst variable)
+            {
+                if (variable.Type is InterfaceAst interfaceType)
+                {
+                    interfaceAst = interfaceType;
+                }
+                else
+                {
+                    return null;
+                }
+            }
+            // TODO Handle struct fields
+
+            if (interfaceAst == null)
+            {
+                return null;
+            }
+
+            var argCount = interfaceAst.Arguments.Count;
+
+            if (call.SpecifiedArguments != null)
+            {
+                foreach (var (name, argument) in call.SpecifiedArguments)
+                {
+                    var found = false;
+                    for (var argIndex = 0; argIndex < argCount; argIndex++)
+                    {
+                        var functionArg = interfaceAst.Arguments[argIndex];
+                        if (functionArg.Name == name)
+                        {
+                            found = VerifyArgument(argument, specifiedArguments[name], functionArg.Type);
+                            break;
+                        }
+                    }
+                    if (!found)
+                    {
+                        return null;
+                    }
+                }
+            }
+
+            var match = true;
+            var callArgIndex = 0;
+            for (var arg = 0; arg < argCount; arg++)
+            {
+                var functionArg = interfaceAst.Arguments[arg];
+                if (specifiedArguments.ContainsKey(functionArg.Name))
+                {
+                    continue;
+                }
+
+                var argumentAst = call.Arguments.ElementAtOrDefault(callArgIndex);
+                if (argumentAst == null)
+                {
+                    if (functionArg.Value == null)
+                    {
+                        match = false;
+                        break;
+                    }
+                }
+                else
+                {
+                    if (!VerifyArgument(argumentAst, arguments[callArgIndex], functionArg.Type))
+                    {
+                        match = false;
+                        break;
+                    }
+                    callArgIndex++;
+                }
+            }
+
+            if (match && callArgIndex == call.Arguments.Count)
+            {
+                return interfaceAst;
+            }
+
+            return null;
+        }
+
+        private void OrderCallArguments(CallAst call, IInterface function, int argumentCount, IType[] argumentTypes)
+        {
+            // Verify call arguments match the types of the function arguments
+            for (var i = 0; i < argumentCount; i++)
+            {
+                var functionArg = function.Arguments[i];
+                if (call.SpecifiedArguments != null && call.SpecifiedArguments.TryGetValue(functionArg.Name, out var specifiedArgument))
+                {
+                    VerifyConstantIfNecessary(specifiedArgument, functionArg.Type);
+
+                    call.Arguments.Insert(i, specifiedArgument);
+                    continue;
+                }
+
+                var argumentAst = call.Arguments.ElementAtOrDefault(i);
+                if (argumentAst == null)
+                {
+                    call.Arguments.Insert(i, functionArg.Value);
+                }
+                else if (argumentAst is NullAst nullAst)
+                {
+                    nullAst.TargetType = functionArg.Type;
+                }
+                else
+                {
+                    var argument = argumentTypes[i];
+                    if (argument != null)
+                    {
+                        if (functionArg.Type.TypeKind == TypeKind.Type)
+                        {
+                            if (argument.TypeKind != TypeKind.Type)
+                            {
+                                var typeIndex = new ConstantAst {Type = TypeTable.S32Type, Value = new Constant {Integer = argument.TypeIndex}};
+                                call.Arguments[i] = typeIndex;
+                                argumentTypes[i] = typeIndex.Type;
+                            }
+                        }
+                        else
+                        {
+                            VerifyConstantIfNecessary(call.Arguments[i], functionArg.Type);
+                        }
+                    }
+                }
+            }
         }
 
         private bool VerifyArgument(IAst argumentAst, IType callType, IType argumentType, bool externCall = false)
