@@ -1477,7 +1477,6 @@ namespace ol
                     }
                     return structFieldPointer;
                 case CallAst call:
-                    // TODO Implement CallFunctionPointer
                     return EmitCall(function, call, scope);
                 case ChangeByOneAst changeByOne:
                     var (pointer, pointerType) = EmitGetReference(function, changeByOne.Value, scope, out loaded);
@@ -1764,6 +1763,11 @@ namespace ol
 
         private InstructionValue EmitCall(FunctionIR function, CallAst call, ScopeAst scope)
         {
+            if (call.Interface != null)
+            {
+                return EmitCallFunctionPointer(function, call, scope);
+            }
+
             var argumentCount = call.Function.Flags.HasFlag(FunctionFlags.Varargs) ? call.Arguments.Count : call.Function.Arguments.Count;
             var arguments = new InstructionValue[argumentCount];
 
@@ -1894,6 +1898,12 @@ namespace ol
             }
 
             return EmitLoad(function, TypeTable.AnyType, allocation);
+        }
+
+        private InstructionValue EmitCallFunctionPointer(FunctionIR function, CallAst call, ScopeAst scope)
+        {
+            // TODO Implement me
+            return null;
         }
 
         private InstructionValue EmitGetIndexPointer(FunctionIR function, IndexAst index, ScopeAst scope, IType type = null, InstructionValue variable = null)

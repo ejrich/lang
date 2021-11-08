@@ -320,6 +320,7 @@ namespace ol
         public uint Column { get; init; }
         public string FunctionName { get; set; }
         public FunctionAst Function { get; set; }
+        public IInterface Interface { get; set; }
         public int ExternIndex { get; set; }
         public List<TypeDefinition> Generics { get; set; }
         public Dictionary<string, IAst> SpecifiedArguments { get; set; }
