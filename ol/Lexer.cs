@@ -34,6 +34,7 @@ namespace ol
             {"struct", TokenType.Struct},
             {"enum", TokenType.Enum},
             {"union", TokenType.Union},
+            {"interface", TokenType.Interface},
             {"null", TokenType.Null},
             {"cast", TokenType.Cast},
             {"operator", TokenType.Operator},
@@ -493,8 +494,9 @@ namespace ol
         Comma = ',',        // 44
         Period = '.',       // 46
         Pound = '#',        // 35
+        Interface = 256,
         // Ignored by parser
-        Comment = 256,
+        Comment,
         NumberRange
     }
 

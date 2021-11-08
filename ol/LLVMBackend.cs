@@ -145,6 +145,24 @@ namespace ol
                                 }
                             }
                             break;
+                        case InterfaceAst interfaceAst:
+                            DeclareInterfaceType(interfaceAst, typeInfoType);
+
+                            var debugArgumentTypes = new LLVMMetadataRef[interfaceAst.Arguments.Count + 1];
+                            debugArgumentTypes[0] = _debugTypes[interfaceAst.ReturnType.TypeIndex];
+
+                            for (var i = 0; i < interfaceAst.Arguments.Count; i++)
+                            {
+                                var argument = interfaceAst.Arguments[i];
+                                debugArgumentTypes[i + 1] = _debugTypes[argument.Type.TypeIndex];
+                            }
+
+                            var functionType = _debugBuilder.CreateSubroutineType(_debugFiles[interfaceAst.FileIndex], debugArgumentTypes, LLVMDIFlags.LLVMDIFlagZero);
+                            using (var interfaceName = new MarshaledString(interfaceAst.Name))
+                            {
+                                _debugTypes[interfaceAst.TypeIndex] = LLVM.DIBuilderCreatePointerType(_debugBuilder, functionType, 64, 0, 0, interfaceName.Value, (UIntPtr)interfaceName.Length);
+                            }
+                            break;
                     }
                 }
             }
@@ -174,6 +192,9 @@ namespace ol
                             break;
                         case CompoundType compoundType:
                             DeclareCompoundType(compoundType, typeInfoType, typeInfoArrayType, compoundTypeInfoType);
+                            break;
+                        case InterfaceAst interfaceAst:
+                            DeclareInterfaceType(interfaceAst, typeInfoType);
                             break;
                     }
                 }
@@ -607,6 +628,20 @@ namespace ol
 
             var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, array};
             CreateAndSetTypeInfo(compoundTypeInfo, fields, compoundType.TypeIndex);
+        }
+
+        private void DeclareInterfaceType(InterfaceAst interfaceAst, LLVMTypeRef typeInfoType)
+        {
+            var argumentTypes = interfaceAst.Arguments.Select(arg => _types[arg.Type.TypeIndex]).ToArray();
+            var functionType = LLVMTypeRef.CreateFunction(_types[interfaceAst.ReturnType.TypeIndex], argumentTypes, false);
+            _types[interfaceAst.TypeIndex] = LLVM.PointerType(functionType, 0);
+
+            var typeName = GetString(interfaceAst.Name);
+            var typeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Interface, 0);
+            // TODO Interface type info
+
+            var fields = new LLVMValueRef[]{typeName, typeKind, _zeroInt};
+            CreateAndSetTypeInfo(typeInfoType, fields, interfaceAst.TypeIndex);
         }
 
         private void SetStructTypeFields(StructAst structAst, LLVMTypeRef typeFieldType, LLVMTypeRef typeFieldArrayType, LLVMValueRef defaultFields, LLVMTypeRef stringArrayType, LLVMValueRef defaultAttributes, LLVMTypeRef structTypeInfoType)
@@ -1438,6 +1473,8 @@ namespace ol
                 case InstructionValueType.TypeInfo:
                     var typeInfo = _typeInfos[value.ValueIndex];
                     return _builder.BuildBitCast(typeInfo, _typeInfoPointerType);
+                case InstructionValueType.Function:
+                    return GetOrCreateFunctionDefinition(value.ConstantString);
             }
             return null;
         }
