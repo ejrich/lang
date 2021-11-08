@@ -3308,6 +3308,7 @@ namespace ol
             }
             else
             {
+                call.Interface = function;
                 OrderCallArguments(call, function, function.Arguments.Count, argumentTypes);
             }
 
