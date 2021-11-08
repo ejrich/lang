@@ -173,6 +173,10 @@ namespace ol
                             VerifyOperatorOverloadDefinition(overload);
                             RemoveNode(previous, node);
                             break;
+                        case InterfaceAst interfaceAst:
+                            VerifyInterface(interfaceAst);
+                            RemoveNode(previous, node);
+                            break;
                         default:
                             previous = node;
                             break;
@@ -1085,6 +1089,64 @@ namespace ol
             }
         }
 
+        private void VerifyInterface(InterfaceAst interfaceAst)
+        {
+            // 1. Verify the return type of the function is valid
+            if (interfaceAst.ReturnTypeDefinition == null)
+            {
+                interfaceAst.ReturnType = TypeTable.VoidType;
+            }
+            else
+            {
+                interfaceAst.ReturnType = VerifyType(interfaceAst.ReturnTypeDefinition, _globalScope, out _, out var isVarargs, out var isParams);
+                if (isVarargs || isParams)
+                {
+                    ErrorReporter.Report($"Return type of interface '{interfaceAst.Name}' cannot be varargs or Params", interfaceAst.ReturnTypeDefinition);
+                }
+                else if (interfaceAst.ReturnType == null)
+                {
+                    ErrorReporter.Report($"Return type '{PrintTypeDefinition(interfaceAst.ReturnTypeDefinition)}' of interface '{interfaceAst.Name}' is not defined", interfaceAst.ReturnTypeDefinition);
+                }
+                else if (interfaceAst.ReturnType.TypeKind == TypeKind.Array && interfaceAst.ReturnTypeDefinition.Count != null)
+                {
+                    ErrorReporter.Report($"Size of Array does not need to be specified for return type of interface '{interfaceAst.Name}'", interfaceAst.ReturnTypeDefinition.Count);
+                }
+            }
+
+            // 2. Verify the argument types
+            var argumentNames = new HashSet<string>();
+            foreach (var argument in interfaceAst.Arguments)
+            {
+                // 3a. Check if the argument has been previously defined
+                if (!argumentNames.Add(argument.Name))
+                {
+                    ErrorReporter.Report($"Interface '{interfaceAst.Name}' already contains argument '{argument.Name}'", argument);
+                }
+
+                // 3b. Check for errored or undefined field types
+                argument.Type = VerifyType(argument.TypeDefinition, _globalScope, out _, out var isVarargs, out var isParams);
+
+                if (isVarargs || isParams)
+                {
+                    ErrorReporter.Report($"Interface '{interfaceAst.Name}' cannot have varargs arguments", argument.TypeDefinition);
+                }
+                else if (isParams)
+                {
+                    ErrorReporter.Report($"Interface '{interfaceAst.Name}' cannot have params", argument.TypeDefinition);
+                }
+                else if (argument.Type == null)
+                {
+                    ErrorReporter.Report($"Type '{PrintTypeDefinition(argument.TypeDefinition)}' of argument '{argument.Name}' in interfaceAst '{interfaceAst.Name}' is not defined", argument.TypeDefinition);
+                }
+            }
+
+            // 3. Load the interface into the type table
+            if (!TypeTable.AddInterface(interfaceAst))
+            {
+                ErrorReporter.Report($"Multiple definitions of interface '{interfaceAst.Name}'", interfaceAst);
+            }
+        }
+
         private bool GetScopeIdentifier(ScopeAst scope, string name, out IAst ast)
         {
             return GetScopeIdentifier(scope, name, out ast, out _);
@@ -1645,9 +1707,9 @@ namespace ol
                 }
                 else
                 {
-                    if (declaration.Type != null && declaration.Type.TypeKind != TypeKind.Pointer)
+                    if (declaration.Type != null && declaration.Type.TypeKind != TypeKind.Pointer && declaration.Type.TypeKind != TypeKind.Interface)
                     {
-                        ErrorReporter.Report("Cannot assign null to non-pointer type", declaration.Value);
+                        ErrorReporter.Report($"Cannot assign null to non-pointer type '{declaration.Type.Name}'", declaration.Value);
                     }
 
                     nullAst.TargetType = declaration.Type;
@@ -1664,6 +1726,10 @@ namespace ol
                     if (valueType?.TypeKind == TypeKind.Void)
                     {
                         ErrorReporter.Report($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.Value);
+                    }
+                    else if (valueType?.TypeKind == TypeKind.Function)
+                    {
+                        ErrorReporter.Report($"Variable '{declaration.Name}' cannot be assigned function '{valueType.Name}' without specifying interface", declaration.Value);
                     }
                     declaration.Type = valueType;
                 }
@@ -2102,9 +2168,9 @@ namespace ol
                 {
                     ErrorReporter.Report("Cannot assign null value with operator assignment", assignment.Value);
                 }
-                if (variableType.TypeKind != TypeKind.Pointer)
+                if (variableType.TypeKind != TypeKind.Pointer && variableType.TypeKind != TypeKind.Interface)
                 {
-                    ErrorReporter.Report("Cannot assign null to non-pointer type", assignment.Value);
+                    ErrorReporter.Report($"Cannot assign null to non-pointer type '{variableType.Name}'", assignment.Value);
                 }
                 nullAst.TargetType = variableType;
             }
@@ -2709,7 +2775,12 @@ namespace ol
                                 ErrorReporter.Report($"Cannot determine type for function '{identifierAst.Name}' that has multiple overloads", identifierAst);
                                 return null;
                             }
-                            return functions[0];
+                            var function = functions[0];
+                            if (!function.Flags.HasFlag(FunctionFlags.Verified) && function != currentFunction)
+                            {
+                                VerifyFunction(function);
+                            }
+                            return function;
                         }
                         ErrorReporter.Report($"Identifier '{identifierAst.Name}' not defined", identifierAst);
                     }
@@ -3675,7 +3746,7 @@ namespace ol
                 var next = expression.Children[i];
                 if (next is NullAst nullAst)
                 {
-                    if (expression.Type.TypeKind != TypeKind.Pointer || (op != Operator.Equality && op != Operator.NotEqual))
+                    if ((expression.Type.TypeKind != TypeKind.Pointer && expression.Type.TypeKind != TypeKind.Interface) || (op != Operator.Equality && op != Operator.NotEqual))
                     {
                         ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{expression.Type.Name}' and null", next);
                     }
@@ -3971,6 +4042,21 @@ namespace ol
         private bool TypeEquals(IType target, IType source, bool checkPrimitives = false)
         {
             if (target == null || source == null) return false;
+            if (target is InterfaceAst interfaceAst)
+            {
+                // Cannot assign interfaces to interface types
+                if (source is InterfaceAst) return false;
+                if (source is not FunctionAst function) return false;
+                if (interfaceAst.ReturnType != function.ReturnType || interfaceAst.Arguments.Count != function.Arguments.Count) return false;
+
+                for (var i = 0; i < interfaceAst.Arguments.Count; i++)
+                {
+                    var interfaceArg = interfaceAst.Arguments[i];
+                    var functionArg = function.Arguments[i];
+                    if (interfaceArg.Type != functionArg.Type) return false;
+                }
+                return true;
+            }
             if (target == source) return true;
 
             switch (target.TypeKind)

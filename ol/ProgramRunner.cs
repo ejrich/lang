@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace ol
@@ -390,6 +391,7 @@ namespace ol
                                 }
                                 break;
                             case TypeKind.Pointer:
+                            case TypeKind.Interface:
                                 register.Pointer = Marshal.ReadIntPtr(pointer.Pointer);
                                 break;
                             case TypeKind.String:
@@ -454,6 +456,7 @@ namespace ol
                                 }
                                 break;
                             case TypeKind.Pointer:
+                            case TypeKind.Interface:
                                 Marshal.StructureToPtr(value.Pointer, pointer.Pointer, false);
                                 break;
                             case TypeKind.String:
@@ -486,92 +489,14 @@ namespace ol
                     case InstructionType.Call:
                     {
                         var callingFunction = Program.Functions[instruction.String];
-
-                        if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Extern))
-                        {
-                            var args = new object[instruction.Value1.Values.Length];
-                            for (var i = 0; i < args.Length; i++)
-                            {
-                                var argument = instruction.Value1.Values[i];
-                                var value = GetValue(argument, registers, stackPointer, function, arguments);
-
-                                switch (argument.Type.TypeKind)
-                                {
-                                    case TypeKind.Boolean:
-                                        args[i] = value.Bool;
-                                        break;
-                                    case TypeKind.Integer:
-                                    case TypeKind.Enum:
-                                        switch (argument.Type.Size)
-                                        {
-                                            case 1:
-                                                args[i] = value.Byte;
-                                                break;
-                                            case 2:
-                                                args[i] = value.UShort;
-                                                break;
-                                            case 8:
-                                                args[i] = value.ULong;
-                                                break;
-                                            default:
-                                                args[i] = value.UInteger;
-                                                break;
-                                        }
-                                        break;
-                                    case TypeKind.Float:
-                                        if (argument.Type.Size == 4)
-                                        {
-                                            args[i] = value.Float;
-                                        }
-                                        else
-                                        {
-                                            args[i] = value.Double;
-                                        }
-                                        break;
-                                    default:
-                                        args[i] = value.Pointer;
-                                        break;
-                                }
-                            }
-
-                            var functionDecl = _externFunctions[instruction.String][instruction.Index];
-                            var returnValue = functionDecl.Invoke(null, args);
-                            registers[instruction.ValueIndex] = (Register)returnValue;
-                        }
-                        else if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Compiler))
-                        {
-                            var returnValue = new Register();
-                            switch (instruction.String)
-                            {
-                                case "set_linker":
-                                {
-                                    var value = GetValue(instruction.Value1.Values[0], registers, stackPointer, function, arguments);
-                                    SetLinker(value.Byte);
-                                    break;
-                                }
-                                case "set_executable_name":
-                                {
-                                    var value = GetValue(instruction.Value1.Values[0], registers, stackPointer, function, arguments);
-                                    var name = Marshal.PtrToStructure<String>(value.Pointer);
-                                    SetExecutableName(name);
-                                    break;
-                                }
-                                default:
-                                    ErrorReporter.Report($"Undefined compiler function '{callingFunction.Source.Name}'", callingFunction.Source);
-                                    break;
-                            }
-                            registers[instruction.ValueIndex] = returnValue;
-                        }
-                        else
-                        {
-                            var args = new Register[instruction.Value1.Values.Length];
-                            for (var i = 0; i < instruction.Value1.Values.Length; i++)
-                            {
-                                args[i] = GetValue(instruction.Value1.Values[i], registers, stackPointer, function, arguments);
-                            }
-
-                            registers[instruction.ValueIndex] = ExecuteFunction(callingFunction, args);
-                        }
+                        registers[instruction.ValueIndex] = MakeCall(callingFunction, instruction.Value1.Values, registers, stackPointer, function, arguments, instruction.Index);
+                        break;
+                    }
+                    case InstructionType.CallFunctionPointer:
+                    {
+                        var functionPointer = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
+                        var callingFunction = Unsafe.AsRef<FunctionIR>(functionPointer.Pointer.ToPointer());
+                        registers[instruction.ValueIndex] = MakeCall(callingFunction, instruction.Value2.Values, registers, stackPointer, function, arguments, instruction.Index);
                         break;
                     }
                     case InstructionType.IntegerExtend:
@@ -1354,6 +1279,9 @@ namespace ol
                 case InstructionValueType.TypeInfo:
                     var typeInfoPointer = TypeTable.TypeInfos[value.ValueIndex];
                     return new Register {Pointer = typeInfoPointer};
+                case InstructionValueType.Function:
+                    var functionDef = Program.Functions[value.ConstantString];
+                    return new Register {Pointer = (IntPtr)Unsafe.AsPointer(ref functionDef)};
             }
 
             return new Register();
@@ -1389,6 +1317,95 @@ namespace ol
                     break;
             }
             return register;
+        }
+
+        private Register MakeCall(FunctionIR callingFunction, InstructionValue[] arguments, Register[] registers, IntPtr stackPointer, FunctionIR function, Register[] functionArgs, int externIndex = 0)
+        {
+            if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Extern))
+            {
+                var args = new object[arguments.Length];
+                for (var i = 0; i < args.Length; i++)
+                {
+                    var argument = arguments[i];
+                    var value = GetValue(argument, registers, stackPointer, function, functionArgs);
+
+                    switch (argument.Type.TypeKind)
+                    {
+                        case TypeKind.Boolean:
+                            args[i] = value.Bool;
+                            break;
+                        case TypeKind.Integer:
+                        case TypeKind.Enum:
+                            switch (argument.Type.Size)
+                            {
+                                case 1:
+                                    args[i] = value.Byte;
+                                    break;
+                                case 2:
+                                    args[i] = value.UShort;
+                                    break;
+                                case 8:
+                                    args[i] = value.ULong;
+                                    break;
+                                default:
+                                    args[i] = value.UInteger;
+                                    break;
+                            }
+                            break;
+                        case TypeKind.Float:
+                            if (argument.Type.Size == 4)
+                            {
+                                args[i] = value.Float;
+                            }
+                            else
+                            {
+                                args[i] = value.Double;
+                            }
+                            break;
+                        default:
+                            args[i] = value.Pointer;
+                            break;
+                    }
+                }
+
+                var functionDecl = _externFunctions[callingFunction.Source.Name][externIndex];
+                var returnValue = functionDecl.Invoke(null, args);
+                return (Register)returnValue;
+            }
+            else if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Compiler))
+            {
+                var returnValue = new Register();
+                switch (callingFunction.Source.Name)
+                {
+                    case "set_linker":
+                    {
+                        var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                        SetLinker(value.Byte);
+                        break;
+                    }
+                    case "set_executable_name":
+                    {
+                        var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                        var name = Marshal.PtrToStructure<String>(value.Pointer);
+                        SetExecutableName(name);
+                        break;
+                    }
+                    default:
+                        ErrorReporter.Report($"Undefined compiler function '{callingFunction.Source.Name}'", callingFunction.Source);
+                        break;
+                }
+                return returnValue;
+            }
+            else
+            {
+                var args = new Register[arguments.Length];
+                for (var i = 0; i < arguments.Length; i++)
+                {
+                    args[i] = GetValue(arguments[i], registers, stackPointer, function, functionArgs);
+                }
+
+                return ExecuteFunction(callingFunction, args);
+            }
         }
 
         private static Register GetIntegerValue(Constant value, PrimitiveAst integerType)

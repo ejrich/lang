@@ -192,6 +192,12 @@ namespace ol
                         ErrorReporter.Report($"Operator overloads cannot have attributes", token);
                     }
                     return ParseOperatorOverload(enumerator);
+                case TokenType.Interface:
+                    if (attributes != null)
+                    {
+                        ErrorReporter.Report($"Interfaces cannot have attributes", token);
+                    }
+                    return ParseInterface(enumerator);
                 default:
                     ErrorReporter.Report($"Unexpected token '{token.Value}'", token);
                     return null;
@@ -293,7 +299,7 @@ namespace ol
                 case TokenType.OpenParen:
                     if (function.ReturnTypeDefinition.Name == "*" || function.ReturnTypeDefinition.Count != null)
                     {
-                        ErrorReporter.Report("Expected the function name to be declared", function.ReturnTypeDefinition.FileIndex, function.ReturnTypeDefinition.Line, function.ReturnTypeDefinition.Column);
+                        ErrorReporter.Report("Expected the function name to be declared", function.ReturnTypeDefinition);
                     }
                     else
                     {
@@ -302,7 +308,7 @@ namespace ol
                         {
                             if (generic.Generics.Any())
                             {
-                                ErrorReporter.Report($"Invalid generic in function '{function.Name}'", generic.FileIndex, generic.Line, generic.Column);
+                                ErrorReporter.Report($"Invalid generic in function '{function.Name}'", generic);
                             }
                             else if (function.Generics.Contains(generic.Name))
                             {
@@ -556,6 +562,11 @@ namespace ol
                 ErrorReporter.Report($"Unexpected token '{token.Value}' in function definition", token);
                 while (enumerator.Current != null && enumerator.Current.Type != TokenType.OpenBrace)
                     enumerator.MoveNext();
+
+                if (enumerator.Current == null)
+                {
+                    return function;
+                }
             }
 
             // 8. Parse function body
@@ -2537,6 +2548,165 @@ namespace ol
             overload.Body = ParseScope(enumerator, overload);
 
             return overload;
+        }
+
+        private static InterfaceAst ParseInterface(TokenEnumerator enumerator)
+        {
+            var interfaceAst = CreateAst<InterfaceAst>(enumerator.Current);
+            enumerator.MoveNext();
+
+            // 1a. Check if the return type is void
+            if (enumerator.Peek()?.Type != TokenType.OpenParen)
+            {
+                interfaceAst.ReturnTypeDefinition = ParseType(enumerator);
+                enumerator.MoveNext();
+            }
+
+            // 1b. Handle multiple return values
+            if (enumerator.Current?.Type == TokenType.Comma)
+            {
+                var returnType = CreateAst<TypeDefinition>(interfaceAst.ReturnTypeDefinition);
+                returnType.Compound = true;
+                returnType.Generics.Add(interfaceAst.ReturnTypeDefinition);
+                interfaceAst.ReturnTypeDefinition = returnType;
+
+                while (enumerator.Current?.Type == TokenType.Comma)
+                {
+                    if (!enumerator.MoveNext())
+                    {
+                        break;
+                    }
+                    returnType.Generics.Add(ParseType(enumerator));
+                    enumerator.MoveNext();
+                }
+            }
+
+            // 1b. Set the name of the function or get the name from the type
+            switch (enumerator.Current?.Type)
+            {
+                case TokenType.Identifier:
+                    interfaceAst.Name = enumerator.Current.Value;
+                    enumerator.MoveNext();
+                    break;
+                case TokenType.OpenParen:
+                    if (interfaceAst.ReturnTypeDefinition.Name == "*" || interfaceAst.ReturnTypeDefinition.Count != null)
+                    {
+                        ErrorReporter.Report("Expected the interface name to be declared", interfaceAst.ReturnTypeDefinition);
+                    }
+                    else
+                    {
+                        interfaceAst.Name = interfaceAst.ReturnTypeDefinition.Name;
+                        if (interfaceAst.ReturnTypeDefinition.Generics.Any())
+                        {
+                            ErrorReporter.Report($"Interface '{interfaceAst.Name}' cannot have generics", interfaceAst.ReturnTypeDefinition);
+                        }
+                        interfaceAst.ReturnTypeDefinition = null;
+                    }
+                    break;
+                case null:
+                    ErrorReporter.Report("Expected the interface name to be declared", enumerator.Last);
+                    return null;
+                default:
+                    ErrorReporter.Report("Expected the interface name to be declared", enumerator.Current);
+                    enumerator.MoveNext();
+                    break;
+            }
+
+            // 2. Parse arguments until a close paren
+            var commaRequiredBeforeNextArgument = false;
+            DeclarationAst currentArgument = null;
+            while (enumerator.MoveNext())
+            {
+                var token = enumerator.Current;
+
+                if (token.Type == TokenType.CloseParen)
+                {
+                    if (commaRequiredBeforeNextArgument)
+                    {
+                        interfaceAst.Arguments.Add(currentArgument);
+                        currentArgument = null;
+                    }
+                    break;
+                }
+
+                switch (token.Type)
+                {
+                    case TokenType.Identifier:
+                        if (commaRequiredBeforeNextArgument)
+                        {
+                            ErrorReporter.Report("Comma required after declaring an argument", token);
+                        }
+                        else if (currentArgument == null)
+                        {
+                            currentArgument = CreateAst<DeclarationAst>(token);
+                            currentArgument.TypeDefinition = ParseType(enumerator);
+                        }
+                        else
+                        {
+                            currentArgument.Name = token.Value;
+                            commaRequiredBeforeNextArgument = true;
+                        }
+                        break;
+                    case TokenType.Comma:
+                        if (commaRequiredBeforeNextArgument)
+                        {
+                            interfaceAst.Arguments.Add(currentArgument);
+                        }
+                        else
+                        {
+                            ErrorReporter.Report("Unexpected comma in arguments", token);
+                        }
+                        currentArgument = null;
+                        commaRequiredBeforeNextArgument = false;
+                        break;
+                    case TokenType.Equals:
+                        if (commaRequiredBeforeNextArgument)
+                        {
+                            ErrorReporter.Report($"Interface '{interfaceAst.Name}' cannot have default argument values", token);
+                            while (enumerator.MoveNext())
+                            {
+                                if (enumerator.Current.Type == TokenType.Comma)
+                                {
+                                    commaRequiredBeforeNextArgument = false;
+                                    interfaceAst.Arguments.Add(currentArgument);
+                                    currentArgument = null;
+                                    break;
+                                }
+                                else if (enumerator.Current.Type == TokenType.Comma)
+                                {
+                                    interfaceAst.Arguments.Add(currentArgument);
+                                    currentArgument = null;
+                                    break;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            ErrorReporter.Report("Unexpected token '=' in arguments", token);
+                        }
+                        break;
+                    default:
+                        ErrorReporter.Report($"Unexpected token '{token.Value}' in arguments", token);
+                        break;
+                }
+
+                if (enumerator.Current?.Type == TokenType.CloseParen)
+                {
+                    break;
+                }
+            }
+
+            if (currentArgument != null)
+            {
+                ErrorReporter.Report($"Incomplete argument in interface '{interfaceAst.Name}'", enumerator.Current ?? enumerator.Last);
+            }
+
+            if (!commaRequiredBeforeNextArgument && interfaceAst.Arguments.Any())
+            {
+                ErrorReporter.Report("Unexpected comma in arguments", enumerator.Current ?? enumerator.Last);
+            }
+
+            return interfaceAst;
         }
 
         private static TypeDefinition ParseType(TokenEnumerator enumerator, IFunction currentFunction = null, bool argument = false, int depth = 0)

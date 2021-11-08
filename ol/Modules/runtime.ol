@@ -139,6 +139,7 @@ enum TypeKind {
     Enum;
     Struct;
     Union;
+    Interface;
     Type;
     Any;
     Compound;

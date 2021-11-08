@@ -303,6 +303,8 @@ namespace ol
                     return "null";
                 case InstructionValueType.Type:
                     return value.Type.Name;
+                case InstructionValueType.Function:
+                    return $"@{value.ConstantString}";
                 case InstructionValueType.CallArguments:
                     return string.Join(", ", value.Values.Select(PrintInstructionValue));
             }
@@ -375,6 +377,7 @@ namespace ol
                             break;
                         // Initialize pointers to null
                         case TypeKind.Pointer:
+                        case TypeKind.Interface:
                             globalVariable.InitialValue = new InstructionValue {ValueType = InstructionValueType.Null, Type = globalVariable.Type};
                             break;
                         // Don't initialize unions
@@ -452,14 +455,15 @@ namespace ol
                         constArray.Values = field.ArrayValues.Select(val => EmitConstantIR(val, scope)).ToArray();
                     }
                     return constArray;
-                    // Initialize struct field default values
+                // Initialize struct field default values
                 case TypeKind.Struct:
                 case TypeKind.String:
                     return GetConstantStruct((StructAst)field.Type, scope, field.Assignments);
-                    // Initialize pointers to null
+                // Initialize pointers to null
                 case TypeKind.Pointer:
+                case TypeKind.Interface:
                     return new InstructionValue {ValueType = InstructionValueType.Null, Type = field.Type};
-                    // Or initialize to default
+                // Or initialize to default
                 default:
                     return field.Value == null ? GetDefaultConstant(field.Type) : EmitConstantIR(field.Value, scope);
             }
@@ -644,6 +648,7 @@ namespace ol
                         break;
                     // Initialize pointers to null
                     case TypeKind.Pointer:
+                    case TypeKind.Interface:
                         EmitStore(function, allocation, new InstructionValue {ValueType = InstructionValueType.Null, Type = declaration.Type});
                         break;
                     // Don't initialize unions
@@ -812,7 +817,7 @@ namespace ol
                             }
                         }
                         break;
-                        // Initialize struct field default values
+                    // Initialize struct field default values
                     case TypeKind.Struct:
                     case TypeKind.String:
                         foreach (var variable in declaration.Variables)
@@ -820,15 +825,16 @@ namespace ol
                             InitializeStruct(function, (StructAst)declaration.Type, variable.Pointer, scope, declaration.Assignments);
                         }
                         break;
-                        // Initialize pointers to null
+                    // Initialize pointers to null
                     case TypeKind.Pointer:
+                    case TypeKind.Interface:
                         var nullValue = new InstructionValue {ValueType = InstructionValueType.Null, Type = declaration.Type};
                         foreach (var variable in declaration.Variables)
                         {
                             EmitStore(function, variable.Pointer, nullValue);
                         }
                         break;
-                        // Or initialize to default
+                    // Or initialize to default
                     default:
                         var zero = GetDefaultConstant(declaration.Type);
                         foreach (var variable in declaration.Variables)
@@ -992,6 +998,7 @@ namespace ol
                     break;
                 // Initialize pointers to null
                 case TypeKind.Pointer:
+                case TypeKind.Interface:
                     EmitStore(function, pointer, new InstructionValue {ValueType = InstructionValueType.Null, Type = field.Type});
                     break;
                 // Don't initialize unions
@@ -1099,7 +1106,7 @@ namespace ol
                     type = pointerType.PointerType;
                 }
 
-                var value = EmitIR(function, assignment.Value, scope);
+                var value = EmitIR(function, assignment.Value, scope, getFunctionPointer: type.TypeKind == TypeKind.Interface);
                 if (assignment.Operator != Operator.None)
                 {
                     var previousValue = EmitLoad(function, type, pointer);
@@ -1358,11 +1365,11 @@ namespace ol
 
         private InstructionValue EmitAndCast(FunctionIR function, IAst ast, ScopeAst scope, IType type, bool useRawString = false, bool returnValue = false)
         {
-            var value = EmitIR(function, ast, scope, useRawString, returnValue);
+            var value = EmitIR(function, ast, scope, useRawString, returnValue, type.TypeKind == TypeKind.Interface);
             return EmitCastValue(function, value, type);
         }
 
-        private InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, bool useRawString = false, bool returnValue = false)
+        private InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, bool useRawString = false, bool returnValue = false, bool getFunctionPointer = false)
         {
             switch (ast)
             {
@@ -1414,6 +1421,14 @@ namespace ol
                     }
                     else
                     {
+                        if (getFunctionPointer)
+                        {
+                            return new InstructionValue
+                            {
+                                ValueType = InstructionValueType.Function, Type = null, // TODO Fix
+                                ConstantString = identifierAst.Name
+                            };
+                        }
                         return GetConstantInteger(TypeTable.Functions[identifierAst.Name][0].TypeIndex);
                     }
                 case StructFieldRefAst structField:
@@ -2084,6 +2099,24 @@ namespace ol
                 case TypeKind.Enum:
                     var enumAst = (EnumAst)lhs.Type;
                     return EmitInstruction(GetIntCompareInstructionType(op, enumAst.BaseType.Signed), function, type, lhs, rhs);
+                case TypeKind.Interface:
+                    if (op == Operator.Equality)
+                    {
+                        if (rhs.ValueType == InstructionValueType.Null)
+                        {
+                            return EmitInstruction(InstructionType.IsNull, function, type, lhs);
+                        }
+                        return EmitInstruction(InstructionType.PointerEquals, function, type, lhs, rhs);
+                    }
+                    if (op == Operator.NotEqual)
+                    {
+                        if (rhs.ValueType == InstructionValueType.Null)
+                        {
+                            return EmitInstruction(InstructionType.IsNotNull, function, type, lhs);
+                        }
+                        return EmitInstruction(InstructionType.PointerNotEquals, function, type, lhs, rhs);
+                    }
+                    break;
             }
 
             Console.WriteLine("Unexpected type in compare");
@@ -2123,7 +2156,7 @@ namespace ol
 
         private InstructionValue EmitCastValue(FunctionIR function, InstructionValue value, IType targetType)
         {
-            if (value.Type == targetType || value.UseRawString || targetType.TypeKind == TypeKind.Type)
+            if (value.Type == targetType || value.UseRawString || targetType.TypeKind == TypeKind.Type || targetType.TypeKind == TypeKind.Interface)
             {
                 return value;
             }
