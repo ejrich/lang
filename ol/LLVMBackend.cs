@@ -980,6 +980,17 @@ namespace ol
                             values[instruction.ValueIndex] = _builder.BuildCall(callFunction, arguments);
                             break;
                         }
+                        case InstructionType.CallFunctionPointer:
+                        {
+                            var callFunction = GetValue(instruction.Value1, values, allocations, functionPointer);
+                            var arguments = new LLVMValueRef[instruction.Value2.Values.Length];
+                            for (var i = 0; i < instruction.Value2.Values.Length; i++)
+                            {
+                                arguments[i] = GetValue(instruction.Value2.Values[i], values, allocations, functionPointer);
+                            }
+                            values[instruction.ValueIndex] = _builder.BuildCall(callFunction, arguments);
+                            break;
+                        }
                         case InstructionType.IntegerExtend:
                         case InstructionType.UnsignedIntegerToIntegerExtend:
                         {
