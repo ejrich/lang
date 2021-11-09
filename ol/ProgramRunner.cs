@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace ol
@@ -496,7 +495,8 @@ namespace ol
                     case InstructionType.CallFunctionPointer:
                     {
                         var functionPointer = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
-                        var callingFunction = Unsafe.AsRef<FunctionIR>(functionPointer.Pointer.ToPointer());
+                        var functionHandle = GCHandle.FromIntPtr(functionPointer.Pointer);
+                        var callingFunction = functionHandle.Target as FunctionIR;
                         registers[instruction.ValueIndex] = MakeCall(callingFunction, instruction.Value2.Values, registers, stackPointer, function, arguments, instruction.Index);
                         break;
                     }
@@ -1282,7 +1282,8 @@ namespace ol
                     return new Register {Pointer = typeInfoPointer};
                 case InstructionValueType.Function:
                     var functionDef = Program.Functions[value.ConstantString];
-                    return new Register {Pointer = (IntPtr)Unsafe.AsPointer(ref functionDef)};
+                    var functionHandle = GCHandle.Alloc(functionDef);
+                    return new Register {Pointer = GCHandle.ToIntPtr(functionHandle)};
             }
 
             return new Register();
