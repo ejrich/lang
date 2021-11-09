@@ -10,7 +10,7 @@ interface foo(int x, int y)
 interface int bar(int x, float y)
 interface void* baz(s64 x, float y)
 
-variables() #print_ir {
+variables() {
     a: foo = null;
 
     assert(a == null);
@@ -34,6 +34,7 @@ foo_impl(int x, int y) {
 }
 
 int bar_impl(int x, float y) {
+    printf("%d %.2f\n", x, y);
     return 9;
 }
 

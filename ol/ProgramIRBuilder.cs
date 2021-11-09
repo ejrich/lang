@@ -1763,7 +1763,7 @@ namespace ol
 
         private InstructionValue EmitCall(FunctionIR function, CallAst call, ScopeAst scope)
         {
-            if (call.Interface != null)
+            if (call.Function == null)
             {
                 return EmitCallFunctionPointer(function, call, scope);
             }
@@ -1900,10 +1900,42 @@ namespace ol
             return EmitLoad(function, TypeTable.AnyType, allocation);
         }
 
-        private InstructionValue EmitCallFunctionPointer(FunctionIR function, CallAst call, ScopeAst scope)
+        private InstructionValue EmitCallFunctionPointer(FunctionIR function, CallAst call, ScopeAst scope, InstructionValue functionPointer = null)
         {
-            // TODO Implement me
-            return null;
+            if (functionPointer == null)
+            {
+                var identifier = GetScopeIdentifier(scope, call.FunctionName, out var _);
+                if (identifier is DeclarationAst declaration)
+                {
+                    functionPointer = EmitLoad(function, declaration.Type, declaration.Allocation);
+                }
+                else if (identifier is VariableAst variable)
+                {
+                    functionPointer = EmitLoad(function, variable.Type, variable.Pointer);
+                }
+            }
+
+            var arguments = new InstructionValue[call.Interface.Arguments.Count];
+            for (var i = 0; i < arguments.Length; i++)
+            {
+                var functionArg = call.Interface.Arguments[i];
+                var argument = EmitIR(function, call.Arguments[i], scope);
+                if (functionArg.Type.TypeKind == TypeKind.Any)
+                {
+                    arguments[i] = GetAnyValue(function, argument);
+                }
+                else
+                {
+                    arguments[i] = EmitCastValue(function, argument, functionArg.Type);
+                }
+            }
+
+            var callInstruction = new Instruction
+            {
+                Type = InstructionType.CallFunctionPointer, Value1 = functionPointer,
+                Value2 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Values = arguments}
+            };
+            return AddInstruction(function, callInstruction, call.Interface.ReturnType);
         }
 
         private InstructionValue EmitGetIndexPointer(FunctionIR function, IndexAst index, ScopeAst scope, IType type = null, InstructionValue variable = null)
