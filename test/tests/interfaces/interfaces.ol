@@ -60,7 +60,11 @@ struct FunctionPointers {
 
 structs() {
     pointers: FunctionPointers;
-    // TODO Implement me
+    pointers.b = foo_impl;
+    pointers.c = bar_impl;
+
+    pointers.b(10, 20);
+    pointers.c(10, 31.4);
 }
 
 #run main();
