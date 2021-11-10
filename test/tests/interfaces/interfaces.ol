@@ -39,7 +39,16 @@ int bar_impl(int x, float y) {
 }
 
 calls() {
+    use_interface(foo_impl);
+    use_interface(foo_impl2);
+}
 
+use_interface(foo pointer) {
+    pointer(20, 23);
+}
+
+foo_impl2(int x, int y) {
+    printf("This is foo_impl2 %d %d\n", x, y);
 }
 
 struct FunctionPointers {
@@ -51,6 +60,7 @@ struct FunctionPointers {
 
 structs() {
     pointers: FunctionPointers;
+    // TODO Implement me
 }
 
 #run main();

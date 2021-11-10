@@ -1106,7 +1106,7 @@ namespace ol
                     type = pointerType.PointerType;
                 }
 
-                var value = EmitIR(function, assignment.Value, scope, getFunctionPointer: type.TypeKind == TypeKind.Interface);
+                var value = EmitIR(function, assignment.Value, scope);
                 if (assignment.Operator != Operator.None)
                 {
                     var previousValue = EmitLoad(function, type, pointer);
@@ -1365,11 +1365,11 @@ namespace ol
 
         private InstructionValue EmitAndCast(FunctionIR function, IAst ast, ScopeAst scope, IType type, bool useRawString = false, bool returnValue = false)
         {
-            var value = EmitIR(function, ast, scope, useRawString, returnValue, type.TypeKind == TypeKind.Interface);
+            var value = EmitIR(function, ast, scope, useRawString, returnValue);
             return EmitCastValue(function, value, type);
         }
 
-        private InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, bool useRawString = false, bool returnValue = false, bool getFunctionPointer = false)
+        private InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, bool useRawString = false, bool returnValue = false)
         {
             switch (ast)
             {
@@ -1422,14 +1422,10 @@ namespace ol
                     else
                     {
                         var functionDef = TypeTable.Functions[identifierAst.Name][0];
-                        if (getFunctionPointer)
+                        return new InstructionValue
                         {
-                            return new InstructionValue
-                            {
-                                ValueType = InstructionValueType.Function, Type = functionDef, ConstantString = identifierAst.Name
-                            };
-                        }
-                        return GetConstantInteger(functionDef.TypeIndex);
+                            ValueType = InstructionValueType.Function, Type = functionDef, ConstantString = identifierAst.Name
+                        };
                     }
                 case StructFieldRefAst structField:
                     if (structField.IsEnum)
