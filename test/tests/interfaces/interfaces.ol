@@ -65,15 +65,29 @@ struct FunctionPointers {
     e: baz;
 }
 
+Foo foobar_impl(s64 x, float y) {
+    a: Foo = { bar = x; baz = y; }
+    printf("foobar_impl %d, %.2f\n", x, y);
+    return a;
+}
+
+Foo* baz_impl(s64 x, float y) {
+    a: Foo = { bar = x; baz = y; }
+    printf("baz_impl %d, %.2f\n", x, y);
+    return &a;
+}
+
 structs() #print_ir {
-    pointers: FunctionPointers = { b = foo_impl; c = bar_impl; }
+    pointers: FunctionPointers = { b = foo_impl; c = bar_impl; d = foobar_impl; e = baz_impl; }
 
     pointers.b(10, 20);
     pointers.c(10, 31.4);
 
-    a := pointers.d();
-    b := pointers.d().bar;
-    c := pointers.e().baz;
+    a := pointers.d(23, 4.20);
+    b := pointers.d(230, 42.0).bar;
+    c := pointers.e(2300, 420.0).baz;
+
+    printf("Values %d %d %.2f\n", a.bar, b, c);
 }
 
 #run main();

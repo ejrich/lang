@@ -1707,7 +1707,6 @@ namespace ol
                 }
                 skipPointer = false;
 
-                // TODO Handle calls
                 if (type.TypeKind == TypeKind.CArray)
                 {
                     if (structField.Children[i] is IndexAst index)
@@ -1750,6 +1749,23 @@ namespace ol
                             {
                                 loaded = true;
                             }
+                        }
+                    }
+                    else if (structField.Children[i] is CallAst call)
+                    {
+                        var functionPointer = EmitLoad(function, value.Type, value);
+                        value = EmitCallFunctionPointer(function, call, scope, functionPointer);
+
+                        skipPointer = true;
+                        if (i < structField.Pointers.Length && !structField.Pointers[i])
+                        {
+                            var allocation = AddAllocation(function, value.Type);
+                            EmitStore(function, allocation, value);
+                            value = allocation;
+                        }
+                        else if (i == structField.Pointers.Length)
+                        {
+                            loaded = true;
                         }
                     }
                 }
