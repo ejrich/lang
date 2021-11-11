@@ -2287,7 +2287,6 @@ namespace ol
                     structFieldRef.Types = new IType[structFieldRef.Children.Count - 1];
                     structFieldRef.ValueIndices = new int[structFieldRef.Children.Count - 1];
 
-                    // TypeDefinition refType;
                     IType refType;
                     switch (structFieldRef.Children[0])
                     {
@@ -2486,6 +2485,12 @@ namespace ol
                         if (fieldType == null) return null;
                         refType = VerifyIndex(index, fieldType, currentFunction, scope, out _);
                         break;
+                    case CallAst call:
+                        var callType = VerifyStructField(call.Name, refType, structField, i-1, call, true);
+                        if (callType == null) return null;
+                        var interfaceAst = (InterfaceAst)callType;
+                        refType = VerifyCall(call, currentFunction, scope, interfaceAst);
+                        break;
                     default:
                         ErrorReporter.Report("Expected to have a reference to a variable, field, or pointer", structField.Children[i]);
                         return null;
@@ -2527,7 +2532,7 @@ namespace ol
             return null;
         }
 
-        private IType VerifyStructField(string fieldName, IType structType, StructFieldRefAst structField, int fieldIndex, IAst ast)
+        private IType VerifyStructField(string fieldName, IType structType, StructFieldRefAst structField, int fieldIndex, IAst ast, bool call = false)
         {
             if (structType.TypeKind == TypeKind.Pointer)
             {
@@ -2560,6 +2565,14 @@ namespace ol
                 {
                     ErrorReporter.Report($"Struct '{structType.Name}' does not contain field '{fieldName}'", ast);
                     return null;
+                }
+                if (call)
+                {
+                    if (field.Type is not InterfaceAst)
+                    {
+                        ErrorReporter.Report($"Expected field to be an interface, but get '{field.Type.Name}'", ast);
+                        return null;
+                    }
                 }
 
                 return field.Type;
@@ -3132,7 +3145,7 @@ namespace ol
             return enumAst;
         }
 
-        private IType VerifyCall(CallAst call, IFunction currentFunction, ScopeAst scope)
+        private IType VerifyCall(CallAst call, IFunction currentFunction, ScopeAst scope, IInterface function = null)
         {
             var argumentTypes = new IType[call.Arguments.Count];
             var argumentsError = false;
@@ -3177,34 +3190,41 @@ namespace ol
 
             if (argumentsError)
             {
-                TypeTable.Functions.TryGetValue(call.FunctionName, out var functions);
-                _polymorphicFunctions.TryGetValue(call.FunctionName, out var polymorphicFunctions);
-                if (functions == null)
+                if (function == null)
                 {
-                    if (polymorphicFunctions == null)
+                    TypeTable.Functions.TryGetValue(call.Name, out var functions);
+                    if (functions == null)
                     {
-                        ErrorReporter.Report($"Call to undefined function '{call.FunctionName}'", call);
-                        return null;
-                    }
+                        _polymorphicFunctions.TryGetValue(call.Name, out var polymorphicFunctions);
+                        if (polymorphicFunctions == null)
+                        {
+                            ErrorReporter.Report($"Call to undefined function '{call.Name}'", call);
+                            return null;
+                        }
 
-                    if (polymorphicFunctions.Count == 1)
-                    {
-                        var calledFunction = polymorphicFunctions[0];
-                        return calledFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? null : calledFunction.ReturnType;
+                        if (polymorphicFunctions.Count == 1)
+                        {
+                            var calledFunction = polymorphicFunctions[0];
+                            return calledFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? null : calledFunction.ReturnType;
+                        }
                     }
+                    else if (functions.Count == 1)
+                    {
+                        return functions[0].ReturnType;
+                    }
+                    return null;
                 }
-                else if (polymorphicFunctions == null && functions.Count == 1)
-                {
-                    return functions[0].ReturnType;
-                }
-                return null;
+                return function.ReturnType;
             }
-
-            var function = DetermineCallingFunction(call, argumentTypes, specifiedArguments, scope);
 
             if (function == null)
             {
-                return null;
+                function = DetermineCallingFunction(call, argumentTypes, specifiedArguments, scope);
+
+                if (function == null)
+                {
+                    return null;
+                }
             }
 
             if (function is FunctionAst functionAst)
@@ -3317,7 +3337,7 @@ namespace ol
 
         private IInterface DetermineCallingFunction(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments, ScopeAst scope)
         {
-            if (TypeTable.Functions.TryGetValue(call.FunctionName, out var functions))
+            if (TypeTable.Functions.TryGetValue(call.Name, out var functions))
             {
                 for (var i = 0; i < functions.Count; i++)
                 {
@@ -3405,7 +3425,7 @@ namespace ol
                 }
             }
 
-            if (_polymorphicFunctions.TryGetValue(call.FunctionName, out var polymorphicFunctions))
+            if (_polymorphicFunctions.TryGetValue(call.Name, out var polymorphicFunctions))
             {
                 for (var i = 0; i < polymorphicFunctions.Count; i++)
                 {
@@ -3584,7 +3604,7 @@ namespace ol
                 }
             }
 
-            if (GetScopeIdentifier(scope, call.FunctionName, out var ast))
+            if (GetScopeIdentifier(scope, call.Name, out var ast))
             {
                 var interfaceAst = VerifyInterfaceCall(call, ast, arguments, specifiedArguments);
                 if (interfaceAst != null)
@@ -3595,11 +3615,11 @@ namespace ol
 
             if (functions == null && polymorphicFunctions == null)
             {
-                ErrorReporter.Report($"Call to undefined function '{call.FunctionName}'", call);
+                ErrorReporter.Report($"Call to undefined function '{call.Name}'", call);
             }
             else
             {
-                ErrorReporter.Report($"No overload of function '{call.FunctionName}' found with given arguments", call);
+                ErrorReporter.Report($"No overload of function '{call.Name}' found with given arguments", call);
             }
             return null;
         }

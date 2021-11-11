@@ -318,7 +318,7 @@ namespace ol
         public int FileIndex { get; set; }
         public uint Line { get; init; }
         public uint Column { get; init; }
-        public string FunctionName { get; set; }
+        public string Name { get; set; }
         public FunctionAst Function { get; set; }
         public IInterface Interface { get; set; }
         public int ExternIndex { get; set; }

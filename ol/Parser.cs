@@ -1863,7 +1863,7 @@ namespace ol
                                 if (enumerator.Current?.Type == TokenType.OpenParen)
                                 {
                                     var callAst = CreateAst<CallAst>(typeDefinition);
-                                    callAst.FunctionName = typeDefinition.Name;
+                                    callAst.Name = typeDefinition.Name;
                                     callAst.Generics = typeDefinition.Generics;
 
                                     foreach (var generic in callAst.Generics)
@@ -2059,7 +2059,7 @@ namespace ol
         private static CallAst ParseCall(TokenEnumerator enumerator, IFunction currentFunction, bool requiresSemicolon = false)
         {
             var callAst = CreateAst<CallAst>(enumerator.Current);
-            callAst.FunctionName = enumerator.Current.Value;
+            callAst.Name = enumerator.Current.Value;
 
             // This enumeration is the open paren
             enumerator.MoveNext();

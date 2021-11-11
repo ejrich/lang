@@ -1707,6 +1707,7 @@ namespace ol
                 }
                 skipPointer = false;
 
+                // TODO Handle calls
                 if (type.TypeKind == TypeKind.CArray)
                 {
                     if (structField.Children[i] is IndexAst index)
@@ -1900,7 +1901,7 @@ namespace ol
         {
             if (functionPointer == null)
             {
-                var identifier = GetScopeIdentifier(scope, call.FunctionName, out var _);
+                var identifier = GetScopeIdentifier(scope, call.Name, out var _);
                 if (identifier is DeclarationAst declaration)
                 {
                     functionPointer = EmitLoad(function, declaration.Type, declaration.Allocation);
