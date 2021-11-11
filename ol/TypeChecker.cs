@@ -2488,8 +2488,7 @@ namespace ol
                     case CallAst call:
                         var callType = VerifyStructField(call.Name, refType, structField, i-1, call, true);
                         if (callType == null) return null;
-                        var interfaceAst = (InterfaceAst)callType;
-                        refType = VerifyCall(call, currentFunction, scope, interfaceAst);
+                        refType = VerifyCall(call, currentFunction, scope, (InterfaceAst)callType);
                         break;
                     default:
                         ErrorReporter.Report("Expected to have a reference to a variable, field, or pointer", structField.Children[i]);
@@ -3226,6 +3225,20 @@ namespace ol
                     return null;
                 }
             }
+            else
+            {
+                if (call.Arguments.Count != function.Arguments.Count)
+                {
+                    ErrorReporter.Report($"Expected call to function '{function.Name}' to have {function.Arguments.Count} arguments", call);
+                    return null;
+                }
+
+                if (!VerifyArguments(call, argumentTypes, specifiedArguments, function))
+                {
+                    ErrorReporter.Report($"No overload of function '{function.Name}' found with given arguments", call);
+                    return null;
+                }
+            }
 
             if (function is FunctionAst functionAst)
             {
@@ -3342,83 +3355,7 @@ namespace ol
                 for (var i = 0; i < functions.Count; i++)
                 {
                     var function = functions[i];
-                    var match = true;
-                    var callArgIndex = 0;
-                    var functionArgCount = function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params) ? function.Arguments.Count - 1 : function.Arguments.Count;
-
-                    if (call.SpecifiedArguments != null)
-                    {
-                        var specifiedArgsMatch = true;
-                        foreach (var (name, argument) in call.SpecifiedArguments)
-                        {
-                            var found = false;
-                            for (var argIndex = 0; argIndex < function.Arguments.Count; argIndex++)
-                            {
-                                var functionArg = function.Arguments[argIndex];
-                                if (functionArg.Name == name)
-                                {
-                                    found = VerifyArgument(argument, specifiedArguments[name], functionArg.Type, function.Flags.HasFlag(FunctionFlags.Extern));
-                                    break;
-                                }
-                            }
-                            if (!found)
-                            {
-                                specifiedArgsMatch = false;
-                                break;
-                            }
-                        }
-                        if (!specifiedArgsMatch)
-                        {
-                            continue;
-                        }
-                    }
-
-                    for (var arg = 0; arg < functionArgCount; arg++)
-                    {
-                        var functionArg = function.Arguments[arg];
-                        if (specifiedArguments.ContainsKey(functionArg.Name))
-                        {
-                            continue;
-                        }
-
-                        var argumentAst = call.Arguments.ElementAtOrDefault(callArgIndex);
-                        if (argumentAst == null)
-                        {
-                            if (functionArg.Value == null)
-                            {
-                                match = false;
-                                break;
-                            }
-                        }
-                        else
-                        {
-                            if (!VerifyArgument(argumentAst, arguments[callArgIndex], functionArg.Type, function.Flags.HasFlag(FunctionFlags.Extern)))
-                            {
-                                match = false;
-                                break;
-                            }
-                            callArgIndex++;
-                        }
-                    }
-
-                    if (match && function.Flags.HasFlag(FunctionFlags.Params))
-                    {
-                        var paramsType = function.ParamsElementType;
-
-                        if (paramsType != null)
-                        {
-                            for (; callArgIndex < arguments.Length; callArgIndex++)
-                            {
-                                if (!VerifyArgument(call.Arguments[callArgIndex], arguments[callArgIndex], paramsType))
-                                {
-                                    match = false;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    if (match && (function.Flags.HasFlag(FunctionFlags.Varargs) || callArgIndex == call.Arguments.Count))
+                    if (VerifyArguments(call, arguments, specifiedArguments, function, function.Flags.HasFlag(FunctionFlags.Varargs), function.Flags.HasFlag(FunctionFlags.Params), function.ParamsElementType, function.Flags.HasFlag(FunctionFlags.Extern)))
                     {
                         return function;
                     }
@@ -3624,6 +3561,77 @@ namespace ol
             return null;
         }
 
+        private bool VerifyArguments(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments, IInterface function, bool varargs = false, bool Params = false, IType paramsElementType = null, bool Extern = false)
+        {
+            var match = true;
+            var callArgIndex = 0;
+            var functionArgCount = varargs || Params ? function.Arguments.Count - 1 : function.Arguments.Count;
+
+            if (call.SpecifiedArguments != null)
+            {
+                foreach (var (name, argument) in call.SpecifiedArguments)
+                {
+                    for (var argIndex = 0; argIndex < function.Arguments.Count; argIndex++)
+                    {
+                        var functionArg = function.Arguments[argIndex];
+                        if (functionArg.Name == name)
+                        {
+                            if (!VerifyArgument(argument, specifiedArguments[name], functionArg.Type, Extern))
+                            {
+                                return false;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            for (var arg = 0; arg < functionArgCount; arg++)
+            {
+                var functionArg = function.Arguments[arg];
+                if (specifiedArguments.ContainsKey(functionArg.Name))
+                {
+                    continue;
+                }
+
+                var argumentAst = call.Arguments.ElementAtOrDefault(callArgIndex);
+                if (argumentAst == null)
+                {
+                    if (functionArg.Value == null)
+                    {
+                        match = false;
+                        break;
+                    }
+                }
+                else
+                {
+                    if (!VerifyArgument(argumentAst, arguments[callArgIndex], functionArg.Type, Extern))
+                    {
+                        match = false;
+                        break;
+                    }
+                    callArgIndex++;
+                }
+            }
+
+            if (match && Params)
+            {
+                if (paramsElementType != null)
+                {
+                    for (; callArgIndex < arguments.Length; callArgIndex++)
+                    {
+                        if (!VerifyArgument(call.Arguments[callArgIndex], arguments[callArgIndex], paramsElementType))
+                        {
+                            match = false;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            return match && (varargs || callArgIndex == call.Arguments.Count);
+        }
+
         private InterfaceAst VerifyInterfaceCall(CallAst call, IAst ast, IType[] arguments, Dictionary<string, IType> specifiedArguments)
         {
             InterfaceAst interfaceAst = null;
@@ -3649,7 +3657,6 @@ namespace ol
                     return null;
                 }
             }
-            // TODO Handle struct fields
 
             if (interfaceAst == null)
             {
