@@ -338,7 +338,7 @@ namespace ol
                     return unaryCopy;
                 case CallAst call:
                     var callCopy = CopyAst(call);
-                    callCopy.FunctionName = call.FunctionName;
+                    callCopy.Name = call.Name;
                     if (call.Generics != null)
                     {
                         callCopy.Generics = new List<TypeDefinition>(call.Generics.Count);

@@ -8,7 +8,13 @@ main() {
 
 interface foo(int x, int y)
 interface int bar(int x, float y)
-interface void* baz(s64 x, float y)
+interface Foo foobar(s64 x, float y)
+interface Foo* baz(s64 x, float y)
+
+struct Foo {
+    bar: int;
+    baz: float;
+}
 
 variables() {
     a: foo = null;
@@ -55,16 +61,19 @@ struct FunctionPointers {
     a: int;
     b: foo;
     c: bar;
-    d: baz;
+    d: foobar;
+    e: baz;
 }
 
-structs() {
-    pointers: FunctionPointers;
-    pointers.b = foo_impl;
-    pointers.c = bar_impl;
+structs() #print_ir {
+    pointers: FunctionPointers = { b = foo_impl; c = bar_impl; }
 
     pointers.b(10, 20);
     pointers.c(10, 31.4);
+
+    a := pointers.d();
+    b := pointers.d().bar;
+    c := pointers.e().baz;
 }
 
 #run main();
