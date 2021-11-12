@@ -193,54 +193,7 @@ Node<Token>* parse_function(Node<Token>* node, FILE* file, string library) {
     node = node.next;
     node = node.next;
 
-    new_arg := true;
-    argument: Argument;
-
-    while node {
-        type := node.data.type;
-
-        if type == TokenType.Struct node = node.next;
-        else if type == TokenType.Identifier {
-            if new_arg {
-                argument.type, node = parse_type(node);
-                new_arg = false;
-            }
-            else {
-                argument.name = node.data.value;
-                node = node.next;
-            }
-        }
-        else if type == TokenType.OpenBracket {
-            argument.array_length, node = get_array_length(node.next);
-        }
-        else if type == TokenType.Comma {
-            array_insert(&function.arguments, argument);
-
-            // Reset argument fields
-            new_arg = true;
-            argument.name.length = 0;
-            // TODO Free
-            argument.name.data = null;
-            argument.array_length.length = 0;
-            argument.array_length.data = null;
-
-            node = node.next;
-        }
-        else if type == TokenType.CloseParen {
-            if !new_arg
-                array_insert(&function.arguments, argument);
-            // Move over ')' and ';'
-            node = move_over(node.next, TokenType.SemiColon);
-            break;
-        }
-        else if new_arg {
-            argument.type, node = parse_type(node);
-            new_arg = false;
-        }
-        else {
-            node = node.next;
-        }
-    }
+    node = parse_arguments(node, &function);
 
     // Print function definition to file
     if function.return_type.name != "void" || function.return_type.pointer_count > 0 {
@@ -275,6 +228,58 @@ Node<Token>* parse_function(Node<Token>* node, FILE* file, string library) {
     }
 
     fprintf(file, ") #extern \"%s\"\n\n", library);
+
+    return node;
+}
+
+Node<Token>* parse_arguments(Node<Token>* node, Function* function) {
+    new_arg := true;
+    argument: Argument;
+
+    while node {
+        type := node.data.type;
+
+        if type == TokenType.Struct node = node.next;
+        else if type == TokenType.Identifier {
+            if new_arg {
+                argument.type, node = parse_type(node);
+                new_arg = false;
+            }
+            else {
+                argument.name = node.data.value;
+                node = node.next;
+            }
+        }
+        else if type == TokenType.OpenBracket {
+            argument.array_length, node = get_array_length(node.next);
+        }
+        else if type == TokenType.Comma {
+            array_insert(&function.arguments, argument);
+
+            // Reset argument fields
+            new_arg = true;
+            argument.name.length = 0;
+            // TODO Free
+            argument.name.data = null;
+            argument.array_length.length = 0;
+            argument.array_length.data = null;
+
+            node = node.next;
+        }
+        else if type == TokenType.CloseParen {
+            if !new_arg array_insert(&function.arguments, argument);
+            // Move over ')' and ';'
+            node = move_over(node.next, TokenType.SemiColon);
+            break;
+        }
+        else if new_arg {
+            argument.type, node = parse_type(node);
+            new_arg = false;
+        }
+        else {
+            node = node.next;
+        }
+    }
 
     return node;
 }
@@ -566,7 +571,47 @@ Node<Token>* parse_enum(Node<Token>* node, FILE* file) {
 }
 
 Node<Token>* parse_interface(Node<Token>* node, FILE* file, TypeDefinition return_type) {
-    // TODO Implement me
+    node = node.next.next;
+
+    function: Function = { return_type = return_type; name = node.data.value; }
+
+    node = parse_arguments(node.next.next.next, &function);
+
+    // Print interface definition to file
+    print_string("interface ", file);
+    if function.return_type.name != "void" || function.return_type.pointer_count > 0 {
+        print_type(function.return_type, file);
+        fputc(' ', file);
+    }
+
+    print_string(function.name, file);
+    fputc('(', file);
+
+    each arg, i in function.arguments {
+        if !string_is_empty(arg.array_length) {
+            print_string("CArray<", file);
+            print_type(arg.type, file);
+            print_string(">[", file);
+            print_string(arg.array_length, file);
+            print_string("]", file);
+        }
+        else print_type(arg.type, file);
+        fputc(' ', file);
+
+        if string_is_empty(arg.name) {
+            fputc('a' + i, file);
+        }
+        else {
+            print_string(arg.name, file);
+        }
+
+        if i < function.arguments.length - 1 {
+            print_string(", ", file);
+        }
+    }
+
+    print_string(")\n\n", file);
+
     return node;
 }
 
