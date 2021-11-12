@@ -16,17 +16,18 @@ parse(string file_contents, string library) {
             else if type == TokenType.Struct {
                 node = parse_struct(node, lib_file, alias = false);
             }
+            else if type == TokenType.Union {
+                node = parse_struct(node, lib_file, "union", false);
+            }
             else if type == TokenType.Extern {
                 node = parse_function(node.next, lib_file, library);
             }
             else if type == TokenType.Static {
-                node = move_until(node.next, TokenType.CloseBrace);
-                node = node.next;
+                node = move_over(node.next, TokenType.CloseBrace);
             }
             else if type == TokenType.Extension node = node.next;
             else if type == TokenType.Attribute {
-                node = move_until(node.next, TokenType.SemiColon);
-                node = node.next;
+                node = move_over(node.next, TokenType.SemiColon);
             }
             else {
                 node = parse_function(node, lib_file, library);
@@ -46,6 +47,12 @@ Node<Token>* move_until(Node<Token>* node, TokenType type) {
     }
 
     return node;
+}
+
+Node<Token>* move_over(Node<Token>* node, TokenType type) {
+    node = move_until(node, type);
+
+    return node.next;
 }
 
 struct TypeDefinition {
@@ -223,8 +230,7 @@ Node<Token>* parse_function(Node<Token>* node, FILE* file, string library) {
             if !new_arg
                 array_insert(&function.arguments, argument);
             // Move over ')' and ';'
-            node = move_until(node.next, TokenType.SemiColon);
-            node = node.next;
+            node = move_over(node.next, TokenType.SemiColon);
             break;
         }
         else if new_arg {
@@ -280,10 +286,16 @@ Node<Token>* parse_typedef(Node<Token>* node, FILE* file) {
         type := node.data.type;
 
         if type == TokenType.Struct {
-            return parse_struct(node, file);
+            return parse_struct(node, file, typedef = true);
         }
         else if type == TokenType.Union {
-            return parse_struct(node, file, "union");
+            if node.next.data.type == TokenType.OpenBrace {
+                return parse_struct(node, file, "union");
+            }
+            else if node.next.next.data.type == TokenType.OpenBrace {
+                return parse_struct(node, file, "union");
+            }
+            return move_over(node, TokenType.SemiColon);
         }
         else if type == TokenType.Enum {
             return parse_enum(node, file);
@@ -292,11 +304,13 @@ Node<Token>* parse_typedef(Node<Token>* node, FILE* file) {
             type_def, next_node := parse_type(node);
             node = next_node;
 
+            if node.data.type == TokenType.OpenParen {
+                return parse_interface(node, file, type_def);
+            }
             name := node.data.value;
 
             // Move over ';'
-            node = move_until(node.next, TokenType.SemiColon);
-            node = node.next;
+            node = move_over(node.next, TokenType.SemiColon);
 
             // TODO Handle type aliasing
         }
@@ -318,20 +332,33 @@ struct StructField {
     names: Array<string>;
 }
 
-Node<Token>* parse_struct(Node<Token>* node, FILE* file, string type_name = "struct", bool alias = true) {
+Node<Token>* parse_struct(Node<Token>* node, FILE* file, string type_name = "struct", bool alias = true, string struct_name = "", bool typedef = false, bool internal = false) {
     node = node.next;
 
     if node {
         struct_def: Struct;
 
-        if node.data.type == TokenType.Identifier {
-            if alias struct_def.alias = node.data.value;
-            else struct_def.name = node.data.value;
-            node = node.next;
-        }
+        if string_is_empty(struct_name) {
+            if node.data.type == TokenType.Identifier {
+                if alias struct_def.alias = node.data.value;
+                else struct_def.name = node.data.value;
+                node = node.next;
+            }
 
-        // Move over '{'
-        node = node.next;
+            // Move over '{'
+            if node.data.type == TokenType.OpenBrace {
+                node = node.next;
+            }
+            else if node.data.type == TokenType.SemiColon {
+                return node.next;
+            }
+            else if typedef {
+                return finish_struct_and_print(node, file, type_name, alias, struct_def, internal);
+            }
+        }
+        else {
+            struct_def.name = struct_name;
+        }
 
         new_field := true;
         struct_field: StructField;
@@ -339,8 +366,7 @@ Node<Token>* parse_struct(Node<Token>* node, FILE* file, string type_name = "str
         while node {
             type := node.data.type;
 
-            if type == TokenType.Struct node = node.next;
-            else if type == TokenType.Identifier {
+            if type == TokenType.Identifier {
                 if new_field {
                     struct_field.type, node = parse_type(node);
                     new_field = false;
@@ -349,6 +375,14 @@ Node<Token>* parse_struct(Node<Token>* node, FILE* file, string type_name = "str
                     array_insert(&struct_field.names, node.data.value);
                     node = node.next;
                 }
+            }
+            else if type == TokenType.OpenBrace {
+                // Parse internal structs
+                node = parse_struct(node, file, alias = string_is_empty(struct_field.type.name), name = struct_field.type.name, internal = true);
+            }
+            else if type == TokenType.Union {
+                // Parse internal union
+                node = parse_struct(node, file, "union", node.next.data.type == TokenType.OpenBrace, struct_field.type.name, internal = true);
             }
             else if type == TokenType.OpenBracket {
                 struct_field.array_length, node = get_array_length(node.next);
@@ -361,6 +395,9 @@ Node<Token>* parse_struct(Node<Token>* node, FILE* file, string type_name = "str
 
                 // Reset StructField struct_fields
                 new_field = true;
+                struct_field.type.name.length = 0;
+                struct_field.type.name.data = null;
+                struct_field.type.pointer_count = 0;
                 struct_field.names.length = 0;
                 // TODO Free
                 struct_field.names.data = null;
@@ -373,6 +410,9 @@ Node<Token>* parse_struct(Node<Token>* node, FILE* file, string type_name = "str
                 node = node.next;
                 break;
             }
+            else if type == TokenType.Struct || type == TokenType.Extension {
+                node = node.next;
+            }
             else if new_field {
                 struct_field.type, node = parse_type(node);
                 new_field = false;
@@ -382,49 +422,54 @@ Node<Token>* parse_struct(Node<Token>* node, FILE* file, string type_name = "str
             }
         }
 
-        if node.data.type == TokenType.Star {
-            struct_def.pointer = true;
-            node = node.next;
-        }
+        node = finish_struct_and_print(node, file, type_name, alias, struct_def, internal);
+    }
 
-        if alias struct_def.name = node.data.value;
+    return node;
+}
 
-        // Move over ';'
-        node = move_until(node, TokenType.SemiColon);
+Node<Token>* finish_struct_and_print(Node<Token>* node, FILE* file, string type_name, bool alias, Struct struct_def, bool internal) {
+    if node.data.type == TokenType.Star {
+        struct_def.pointer = true;
         node = node.next;
+    }
 
-        // Print struct definition to file
-        print_string(type_name, file);
-        fputc(' ', file);
-        print_string(struct_def.name, file);
-        print_string(" {", file);
+    if alias struct_def.name = node.data.value;
 
-        if struct_def.fields.length {
-            fputc('\n', file);
-        }
+    // Move over ';'
+    if !internal node = move_over(node, TokenType.SemiColon);
 
-        each field in struct_def.fields {
-            each name in field.names {
-                print_string("    ", file);
-                print_string(name, file);
-                print_string(": ", file);
-                if !string_is_empty(field.array_length) {
-                    print_string("CArray<", file);
-                    print_type(field.type, file);
-                    print_string(">[", file);
-                    print_string(field.array_length, file);
-                    print_string("]", file);
-                }
-                else print_type(field.type, file);
+    // Print struct definition to file
+    print_string(type_name, file);
+    fputc(' ', file);
+    print_string(struct_def.name, file);
+    print_string(" {", file);
 
-                print_string(";\n", file);
+    if struct_def.fields.length {
+        fputc('\n', file);
+    }
+
+    each field in struct_def.fields {
+        each name in field.names {
+            print_string("    ", file);
+            print_string(name, file);
+            print_string(": ", file);
+            if !string_is_empty(field.array_length) {
+                print_string("CArray<", file);
+                print_type(field.type, file);
+                print_string(">[", file);
+                print_string(field.array_length, file);
+                print_string("]", file);
             }
-        }
-        print_string("}\n", file);
+            else print_type(field.type, file);
 
-        if struct_def.fields.length {
-            fputc('\n', file);
+            print_string(";\n", file);
         }
+    }
+    print_string("}\n", file);
+
+    if struct_def.fields.length {
+        fputc('\n', file);
     }
 
     return node;
@@ -517,6 +562,11 @@ Node<Token>* parse_enum(Node<Token>* node, FILE* file) {
         print_string("}\n\n", file);
     }
 
+    return node;
+}
+
+Node<Token>* parse_interface(Node<Token>* node, FILE* file, TypeDefinition return_type) {
+    // TODO Implement me
     return node;
 }
 
