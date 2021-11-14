@@ -158,6 +158,7 @@ TypeDefinition, Node<Token>* parse_type(Node<Token>* node) {
         return check_for_pointers("float64", node.next);
     }
 
+    // TODO Handle type aliasing
     return check_for_pointers(node.data.value, node.next);
 }
 
@@ -259,7 +260,6 @@ Node<Token>* parse_arguments(Node<Token>* node, Function* function, bool interna
             // Reset argument fields
             new_arg = true;
             argument.name.length = 0;
-            // TODO Free
             argument.name.data = null;
             argument.array_length.length = 0;
             argument.array_length.data = null;
@@ -415,7 +415,6 @@ Node<Token>* parse_struct(Node<Token>* node, FILE* file, string type_name = "str
                 struct_field.type.name.data = null;
                 struct_field.type.pointer_count = 0;
                 struct_field.names.length = 0;
-                // TODO Free
                 struct_field.names.data = null;
                 struct_field.array_length.length = 0;
                 struct_field.array_length.data = null;
