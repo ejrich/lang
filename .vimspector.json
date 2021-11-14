@@ -6,8 +6,8 @@
         "request": "launch",
         "program": "${workspaceRoot}/ol/bin/Debug/net5.0/ol.dll",
         //"args": ["-S", "${workspaceRoot}/example/main.ol", "-noThreads"],
-        "args": ["-S", "${workspaceRoot}/test/tests/interfaces/interfaces.ol", "-noThreads"],
-        //"args": ["-S", "${workspaceRoot}/hp/hp.ol", "-noThreads"],
+        //"args": ["-S", "${workspaceRoot}/test/tests/interfaces/interfaces.ol", "-noThreads"],
+        "args": ["-S", "${workspaceRoot}/hp/hp.ol", "-noThreads"],
         "stopAtEntry": false,
         "cwd": "${workspaceRoot}"
       }

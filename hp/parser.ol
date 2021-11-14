@@ -232,7 +232,7 @@ Node<Token>* parse_function(Node<Token>* node, FILE* file, string library) {
     return node;
 }
 
-Node<Token>* parse_arguments(Node<Token>* node, Function* function) {
+Node<Token>* parse_arguments(Node<Token>* node, Function* function, bool internal = false) {
     new_arg := true;
     argument: Argument;
 
@@ -269,7 +269,9 @@ Node<Token>* parse_arguments(Node<Token>* node, Function* function) {
         else if type == TokenType.CloseParen {
             if !new_arg array_insert(&function.arguments, argument);
             // Move over ')' and ';'
-            node = move_over(node.next, TokenType.SemiColon);
+            node = move_until(node.next, TokenType.SemiColon);
+
+            if !internal node = node.next;
             break;
         }
         else if new_arg {
@@ -383,11 +385,20 @@ Node<Token>* parse_struct(Node<Token>* node, FILE* file, string type_name = "str
             }
             else if type == TokenType.OpenBrace {
                 // Parse internal structs
-                node = parse_struct(node, file, alias = string_is_empty(struct_field.type.name), name = struct_field.type.name, internal = true);
+                node = parse_struct(node, file, alias = string_is_empty(struct_field.type.name), struct_name = struct_field.type.name, internal = true);
             }
             else if type == TokenType.Union {
                 // Parse internal union
                 node = parse_struct(node, file, "union", node.next.data.type == TokenType.OpenBrace, struct_field.type.name, internal = true);
+            }
+            else if type == TokenType.OpenParen {
+                // Parse internal interfaces
+                interface_name := node.next.next.data.value;
+                node = parse_interface(node, file, struct_field.type, true);
+
+                struct_field.type.name = interface_name;
+                struct_field.type.pointer_count = 0;
+                array_insert(&struct_field.names, interface_name);
             }
             else if type == TokenType.OpenBracket {
                 struct_field.array_length, node = get_array_length(node.next);
@@ -570,12 +581,12 @@ Node<Token>* parse_enum(Node<Token>* node, FILE* file) {
     return node;
 }
 
-Node<Token>* parse_interface(Node<Token>* node, FILE* file, TypeDefinition return_type) {
+Node<Token>* parse_interface(Node<Token>* node, FILE* file, TypeDefinition return_type, bool internal = false) {
     node = node.next.next;
 
     function: Function = { return_type = return_type; name = node.data.value; }
 
-    node = parse_arguments(node.next.next.next, &function);
+    node = parse_arguments(node.next.next.next, &function, internal);
 
     // Print interface definition to file
     print_string("interface ", file);

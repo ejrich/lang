@@ -3571,17 +3571,26 @@ namespace ol
             {
                 foreach (var (name, argument) in call.SpecifiedArguments)
                 {
+                    var found = false;
                     for (var argIndex = 0; argIndex < function.Arguments.Count; argIndex++)
                     {
                         var functionArg = function.Arguments[argIndex];
                         if (functionArg.Name == name)
                         {
-                            if (!VerifyArgument(argument, specifiedArguments[name], functionArg.Type, Extern))
+                            if (VerifyArgument(argument, specifiedArguments[name], functionArg.Type, Extern))
+                            {
+                                found = true;
+                            }
+                            else
                             {
                                 return false;
                             }
                             break;
                         }
+                    }
+                    if (!found)
+                    {
+                        return false;
                     }
                 }
             }
