@@ -164,6 +164,7 @@ namespace ol
 
             var copyType = CopyAst(type);
             copyType.Name = type.Name;
+            copyType.Compound = type.Compound;
             copyType.Count = type.Count;
 
             foreach (var generic in type.Generics)
@@ -380,6 +381,13 @@ namespace ol
                     castCopy.TargetTypeDefinition = cast.HasGenerics ? CopyType(cast.TargetTypeDefinition, genericTypes) : cast.TargetTypeDefinition;
                     castCopy.Value = CopyExpression(cast.Value, genericTypes, generics);
                     return castCopy;
+                case CompoundExpressionAst compound:
+                    var compoundCopy = CopyAst(compound);
+                    foreach (var child in compound.Children)
+                    {
+                        compoundCopy.Children.Add(CopyExpression(child, genericTypes, generics));
+                    }
+                    return compoundCopy;
                 default:
                     return null;
             }

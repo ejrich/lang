@@ -60,6 +60,8 @@ struct TypeDefinition {
     pointer_count: int;
 }
 
+types: HashTable<TypeDefinition>;
+
 TypeDefinition, Node<Token>* parse_type(Node<Token>* node) {
     if node.data.type == TokenType.Const {
         node = node.next;
@@ -159,8 +161,12 @@ TypeDefinition, Node<Token>* parse_type(Node<Token>* node) {
     }
 
     // TODO Handle type aliasing
+    // a, b := search(&types, node.data.value);
+
     return check_for_pointers(node.data.value, node.next);
 }
+
+foosel: Array<int>[1000];
 
 TypeDefinition, Node<Token>* check_for_pointers(string type, Node<Token>* node) {
     type_def: TypeDefinition = { name = type; }
