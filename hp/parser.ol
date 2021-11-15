@@ -160,8 +160,16 @@ TypeDefinition, Node<Token>* parse_type(Node<Token>* node) {
         return check_for_pointers("float64", node.next);
     }
 
-    // TODO Handle type aliasing
-    // a, b := search(&types, node.data.value);
+    found, type_def := search(&types, node.data.value);
+
+    if found {
+        while node.data.type == TokenType.Star {
+            node = node.next;
+            type_def.pointer_count++;
+        }
+
+        return type_def, node;
+    }
 
     return check_for_pointers(node.data.value, node.next);
 }
