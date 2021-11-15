@@ -56,6 +56,67 @@ add<T>(LinkedList<T>* list, T data) {
     }
 }
 
+hash_table_entries := 1000; #const
+
+struct HashTableRecord<T> {
+    key: string;
+    value: T;
+}
+
+struct HashTable<T> {
+    entries: Array<HashTableRecord<T>*>[hash_table_entries];
+    overflow: Array<LinkedList<HashTableRecord<T>*>>[hash_table_entries];
+    count: int;
+}
+
+int hash_key(string key) {
+    sum: int;
+    each i in 0..key.length-1 {
+        sum += key[i];
+    }
+    return sum % hash_table_entries;
+}
+
+insert<T>(HashTable<T>* table, string key, T value) {
+    record := new<HashTableRecord<T>>();
+    record.key = key;
+    record.value = value;
+
+    hash := hash_key(key);
+
+    entry := table.entries[hash]
+
+    if entry {
+        if entry.key == key {
+            table.entries[hash] = record;
+        }
+        else {
+            // TODO Handle collisions
+        }
+    }
+    else {
+        table.entries[hash] = record;
+        table.count++;
+    }
+}
+
+bool, T search<T>(HashTable<T>* table, string key) {
+    hash := hash_key(key);
+    entry := table.entries[hash]
+
+    if entry {
+        if entry.key == key {
+            return true, entry.value;
+        }
+        else {
+            // TODO Handle collisions
+        }
+    }
+
+    default: T;
+    return false, default;
+)
+
 T* new<T>() {
     size := size_of(T);
     pointer := allocate(size);
