@@ -1464,6 +1464,16 @@ namespace ol
                 {
                     ErrorReporter.Report($"Variable '{declaration.Name}' cannot be assigned type 'void'", declaration.TypeDefinition);
                 }
+                else if (declaration.Type.TypeKind == TypeKind.Array)
+                {
+                    var arrayStruct = (StructAst)declaration.Type;
+                    declaration.ArrayElementType = arrayStruct.GenericTypes[0];
+                }
+                else if (declaration.Type.TypeKind == TypeKind.CArray)
+                {
+                    var arrayType = (ArrayType)declaration.Type;
+                    declaration.ArrayElementType = arrayType.ElementType;
+                }
             }
 
             // 2. Verify the null values

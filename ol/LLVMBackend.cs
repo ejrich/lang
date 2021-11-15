@@ -358,6 +358,18 @@ namespace ol
                 {
                     var elementType = _types[globalVariable.Type.TypeIndex];
                     global = _module.AddGlobal(LLVM.ArrayType(elementType, globalVariable.ArrayLength), globalVariable.Name);
+
+                    if (globalVariable.InitialValue == null)
+                    {
+                        var defaultValue = GetDefaultValue(globalVariable.Type);
+                        var values = new LLVMValueRef[globalVariable.ArrayLength];
+                        for (var j = 0; j < values.Length; j++)
+                        {
+                            values[j] = defaultValue;
+                        }
+                        var constArray = LLVMValueRef.CreateConstArray(elementType, values);
+                        LLVM.SetInitializer(global, constArray);
+                    }
                 }
                 else
                 {
@@ -1518,7 +1530,7 @@ namespace ol
             return null;
         }
 
-        private LLVMValueRef GetConstant(InstructionValue value, bool constant = false)
+        private LLVMValueRef GetConstant(InstructionValue value)
         {
             switch (value.Type.TypeKind)
             {
@@ -1531,6 +1543,58 @@ namespace ol
                     return LLVMValueRef.CreateConstReal(_types[value.Type.TypeIndex], value.ConstantValue.Double);
                 case TypeKind.String:
                     return GetString(value.ConstantString, value.UseRawString, false);
+            }
+            return null;
+        }
+
+        private LLVMValueRef GetDefaultValue(IType type)
+        {
+            switch (type.TypeKind)
+            {
+                case TypeKind.Boolean:
+                    return LLVMValueRef.CreateConstInt(LLVM.Int1Type(), 0, false);
+                case TypeKind.Integer:
+                case TypeKind.Enum:
+                case TypeKind.Type:
+                    return LLVMValueRef.CreateConstInt(_types[type.TypeIndex], 0, false);
+                case TypeKind.Float:
+                    return LLVMValueRef.CreateConstReal(_types[type.TypeIndex], 0);
+                case TypeKind.String:
+                case TypeKind.Array:
+                case TypeKind.Struct:
+                case TypeKind.Any:
+                    var structAst = (StructAst)type;
+                    var fields = new LLVMValueRef[structAst.Fields.Count];
+                    for (var i = 0; i < fields.Length; i++)
+                    {
+                        fields[i] = GetDefaultValue(structAst.Fields[i].Type);
+                    }
+                    return LLVMValueRef.CreateConstNamedStruct(_types[structAst.TypeIndex], fields);
+                case TypeKind.Pointer:
+                case TypeKind.Interface:
+                    return LLVMValueRef.CreateConstNull(_types[type.TypeIndex]);
+                case TypeKind.CArray:
+                {
+                    var arrayType = (ArrayType)type;
+                    var defaultValue = GetDefaultValue(arrayType.ElementType);
+                    var values = new LLVMValueRef[arrayType.Length];
+                    for (var i = 0; i < values.Length; i++)
+                    {
+                        values[i] = defaultValue;
+                    }
+                    return LLVMValueRef.CreateConstArray(_types[arrayType.ElementType.TypeIndex], values);
+                }
+                case TypeKind.Union:
+                {
+                    var defaultValue = LLVMValueRef.CreateConstInt(LLVM.Int8Type(), 0, false);
+                    var values = new LLVMValueRef[type.Size];
+                    for (var i = 0; i < values.Length; i++)
+                    {
+                        values[i] = defaultValue;
+                    }
+                    var constArray = LLVMValueRef.CreateConstArray(LLVM.Int8Type(), values);
+                    return LLVMValueRef.CreateConstNamedStruct(_types[type.TypeIndex], new [] {constArray});
+                }
             }
             return null;
         }
