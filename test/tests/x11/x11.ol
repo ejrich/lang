@@ -43,3 +43,5 @@ close_window(Window window) {
     XDestroyWindow(window.handle, window.window);
     XCloseDisplay(window.handle);
 }
+
+#run main();
