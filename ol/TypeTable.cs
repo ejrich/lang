@@ -37,18 +37,6 @@ namespace ol
             return false;
         }
 
-        public static bool AddInterface(InterfaceAst interfaceAst)
-        {
-            if (Types.TryAdd(interfaceAst.Name, interfaceAst))
-            {
-                interfaceAst.TypeIndex = Count++;
-                // TODO Set the values in the type table
-                TypeInfos.Add(IntPtr.Zero);
-                return true;
-            }
-            return false;
-        }
-
         public static List<FunctionAst> AddFunction(string name, FunctionAst function)
         {
             if (!Functions.TryGetValue(name, out var functions))

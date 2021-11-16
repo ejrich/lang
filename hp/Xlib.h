@@ -1,11 +1,13 @@
-# 1 "Xlib.h"
+# 1 "Xutil.h"
 # 1 "<built-in>" 1
 # 1 "<built-in>" 3
-# 346 "<built-in>" 3
+# 348 "<built-in>" 3
 # 1 "<command line>" 1
 # 1 "<built-in>" 2
-# 1 "Xlib.h" 2
-# 38 "Xlib.h"
+# 1 "Xutil.h" 2
+# 53 "Xutil.h"
+# 1 "/usr/include/X11/Xlib.h" 1 3 4
+# 38 "/usr/include/X11/Xlib.h" 3 4
 # 1 "/usr/include/sys/types.h" 1 3 4
 # 25 "/usr/include/sys/types.h" 3 4
 # 1 "/usr/include/features.h" 1 3 4
@@ -275,8 +277,8 @@ typedef __time_t time_t;
 typedef __timer_t timer_t;
 # 131 "/usr/include/sys/types.h" 2 3 4
 # 144 "/usr/include/sys/types.h" 3 4
-# 1 "/usr/lib/clang/12.0.1/include/stddef.h" 1 3 4
-# 46 "/usr/lib/clang/12.0.1/include/stddef.h" 3 4
+# 1 "/usr/lib/clang/13.0.0/include/stddef.h" 1 3 4
+# 46 "/usr/lib/clang/13.0.0/include/stddef.h" 3 4
 typedef long unsigned int size_t;
 # 145 "/usr/include/sys/types.h" 2 3 4
 
@@ -317,13 +319,13 @@ typedef int register_t __attribute__ ((__mode__ (__word__)));
 # 35 "/usr/include/endian.h" 3 4
 # 1 "/usr/include/bits/byteswap.h" 1 3 4
 # 33 "/usr/include/bits/byteswap.h" 3 4
-    static __inline __uint16_t
+static __inline __uint16_t
 __bswap_16 (__uint16_t __bsx)
 {
 
 
 
-    return ((__uint16_t) ((((__bsx) >> 8) & 0xff) | (((__bsx) & 0xff) << 8)));
+  return ((__uint16_t) ((((__bsx) >> 8) & 0xff) | (((__bsx) & 0xff) << 8)));
 
 }
 
@@ -332,13 +334,13 @@ __bswap_16 (__uint16_t __bsx)
 
 
 
-    static __inline __uint32_t
+static __inline __uint32_t
 __bswap_32 (__uint32_t __bsx)
 {
 
 
 
-    return ((((__bsx) & 0xff000000u) >> 24) | (((__bsx) & 0x00ff0000u) >> 8) | (((__bsx) & 0x0000ff00u) << 8) | (((__bsx) & 0x000000ffu) << 24));
+  return ((((__bsx) & 0xff000000u) >> 24) | (((__bsx) & 0x00ff0000u) >> 8) | (((__bsx) & 0x0000ff00u) << 8) | (((__bsx) & 0x000000ffu) << 24));
 
 }
 # 69 "/usr/include/bits/byteswap.h" 3 4
@@ -701,7 +703,7 @@ typedef union
   int __align;
 } pthread_barrierattr_t;
 # 228 "/usr/include/sys/types.h" 2 3 4
-# 39 "Xlib.h" 2
+# 39 "/usr/include/X11/Xlib.h" 2 3 4
 
 
 
@@ -735,44 +737,44 @@ typedef XID GContext;
 typedef XID KeySym;
 
 typedef unsigned char KeyCode;
-# 45 "Xlib.h" 2
+# 45 "/usr/include/X11/Xlib.h" 2 3 4
 
 
 # 1 "/usr/include/X11/Xfuncproto.h" 1 3 4
-# 48 "Xlib.h" 2
+# 48 "/usr/include/X11/Xlib.h" 2 3 4
 # 1 "/usr/include/X11/Xosdefs.h" 1 3 4
-# 49 "Xlib.h" 2
+# 49 "/usr/include/X11/Xlib.h" 2 3 4
 
 
-# 1 "/usr/lib/clang/12.0.1/include/stddef.h" 1 3
-# 35 "/usr/lib/clang/12.0.1/include/stddef.h" 3
+# 1 "/usr/lib/clang/13.0.0/include/stddef.h" 1 3 4
+# 35 "/usr/lib/clang/13.0.0/include/stddef.h" 3 4
 typedef long int ptrdiff_t;
-# 74 "/usr/lib/clang/12.0.1/include/stddef.h" 3
+# 74 "/usr/lib/clang/13.0.0/include/stddef.h" 3 4
 typedef int wchar_t;
-# 102 "/usr/lib/clang/12.0.1/include/stddef.h" 3
-# 1 "/usr/lib/clang/12.0.1/include/__stddef_max_align_t.h" 1 3
-# 19 "/usr/lib/clang/12.0.1/include/__stddef_max_align_t.h" 3
+# 102 "/usr/lib/clang/13.0.0/include/stddef.h" 3 4
+# 1 "/usr/lib/clang/13.0.0/include/__stddef_max_align_t.h" 1 3 4
+# 19 "/usr/lib/clang/13.0.0/include/__stddef_max_align_t.h" 3 4
 typedef struct {
   long long __clang_max_align_nonce1
       __attribute__((__aligned__(__alignof__(long long))));
   long double __clang_max_align_nonce2
       __attribute__((__aligned__(__alignof__(long double))));
 } max_align_t;
-# 103 "/usr/lib/clang/12.0.1/include/stddef.h" 2 3
-# 52 "Xlib.h" 2
-# 62 "Xlib.h"
+# 103 "/usr/lib/clang/13.0.0/include/stddef.h" 2 3 4
+# 52 "/usr/include/X11/Xlib.h" 2 3 4
+# 62 "/usr/include/X11/Xlib.h" 3 4
 extern int
 _Xmblen(
     char *str,
     int len
     );
-# 76 "Xlib.h"
+# 76 "/usr/include/X11/Xlib.h" 3 4
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wpadded"
 
 
 typedef char *XPointer;
-# 148 "Xlib.h"
+# 148 "/usr/include/X11/Xlib.h" 3 4
 typedef struct _XExtData {
  int number;
  struct _XExtData *next;
@@ -1104,7 +1106,7 @@ typedef struct {
   int max_keypermod;
   KeyCode *modifiermap;
 } XModifierKeymap;
-# 487 "Xlib.h"
+# 487 "/usr/include/X11/Xlib.h" 3 4
 typedef struct _XDisplay Display;
 
 
@@ -1727,7 +1729,7 @@ typedef struct {
     int delta;
     XFontSet font_set;
 } XwcTextItem;
-# 1121 "Xlib.h"
+# 1121 "/usr/include/X11/Xlib.h" 3 4
 typedef struct {
     int charset_count;
     char **charset_list;
@@ -1779,7 +1781,7 @@ typedef struct {
     unsigned short count_styles;
     XIMStyle *supported_styles;
 } XIMStyles;
-# 1233 "Xlib.h"
+# 1233 "/usr/include/X11/Xlib.h" 3 4
 typedef void *XVaNestedList;
 
 typedef struct {
@@ -1793,7 +1795,7 @@ typedef struct {
 } XICCallback;
 
 typedef unsigned long XIMFeedback;
-# 1257 "Xlib.h"
+# 1257 "/usr/include/X11/Xlib.h" 3 4
 typedef struct _XIMText {
     unsigned short length;
     XIMFeedback *feedback;
@@ -1820,7 +1822,7 @@ typedef unsigned long XIMResetState;
 
 
 typedef unsigned long XIMStringConversionFeedback;
-# 1291 "Xlib.h"
+# 1291 "/usr/include/X11/Xlib.h" 3 4
 typedef struct _XIMStringConversionText {
     unsigned short length;
     XIMStringConversionFeedback *feedback;
@@ -4547,6 +4549,586 @@ extern int XGetEventData(
 extern void XFreeEventData(
     Display* ,
     XGenericEventCookie*
+);
+
+
+#pragma clang diagnostic pop
+# 54 "Xutil.h" 2
+# 1 "/usr/include/X11/keysym.h" 1 3 4
+# 73 "/usr/include/X11/keysym.h" 3 4
+# 1 "/usr/include/X11/keysymdef.h" 1 3 4
+# 74 "/usr/include/X11/keysym.h" 2 3 4
+# 55 "Xutil.h" 2
+
+
+
+
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wpadded"
+# 81 "Xutil.h"
+typedef struct {
+     long flags;
+ int x, y;
+ int width, height;
+ int min_width, min_height;
+ int max_width, max_height;
+     int width_inc, height_inc;
+ struct {
+  int x;
+  int y;
+ } min_aspect, max_aspect;
+ int base_width, base_height;
+ int win_gravity;
+} XSizeHints;
+# 119 "Xutil.h"
+typedef struct {
+ long flags;
+ int input;
+
+ int initial_state;
+ Pixmap icon_pixmap;
+ Window icon_window;
+ int icon_x, icon_y;
+ Pixmap icon_mask;
+ XID window_group;
+
+} XWMHints;
+# 163 "Xutil.h"
+typedef struct {
+    unsigned char *value;
+    Atom encoding;
+    int format;
+    unsigned long nitems;
+} XTextProperty;
+
+
+
+
+
+typedef enum {
+    XStringStyle,
+    XCompoundTextStyle,
+    XTextStyle,
+    XStdICCTextStyle,
+
+    XUTF8StringStyle
+} XICCEncodingStyle;
+
+typedef struct {
+ int min_width, min_height;
+ int max_width, max_height;
+ int width_inc, height_inc;
+} XIconSize;
+
+typedef struct {
+ char *res_name;
+ char *res_class;
+} XClassHint;
+# 231 "Xutil.h"
+typedef struct _XComposeStatus {
+    XPointer compose_ptr;
+    int chars_matched;
+} XComposeStatus;
+# 273 "Xutil.h"
+typedef struct _XRegion *Region;
+# 287 "Xutil.h"
+typedef struct {
+  Visual *visual;
+  VisualID visualid;
+  int screen;
+  int depth;
+
+
+
+  int class;
+
+  unsigned long red_mask;
+  unsigned long green_mask;
+  unsigned long blue_mask;
+  int colormap_size;
+  int bits_per_rgb;
+} XVisualInfo;
+# 320 "Xutil.h"
+typedef struct {
+ Colormap colormap;
+ unsigned long red_max;
+ unsigned long red_mult;
+ unsigned long green_max;
+ unsigned long green_mult;
+ unsigned long blue_max;
+ unsigned long blue_mult;
+ unsigned long base_pixel;
+ VisualID visualid;
+ XID killid;
+} XStandardColormap;
+# 357 "Xutil.h"
+typedef int XContext;
+# 366 "Xutil.h"
+extern XClassHint *XAllocClassHint (
+    void
+);
+
+extern XIconSize *XAllocIconSize (
+    void
+);
+
+extern XSizeHints *XAllocSizeHints (
+    void
+);
+
+extern XStandardColormap *XAllocStandardColormap (
+    void
+);
+
+extern XWMHints *XAllocWMHints (
+    void
+);
+
+extern int XClipBox(
+    Region ,
+    XRectangle*
+);
+
+extern Region XCreateRegion(
+    void
+);
+
+extern const char *XDefaultString (void);
+
+extern int XDeleteContext(
+    Display* ,
+    XID ,
+    XContext
+);
+
+extern int XDestroyRegion(
+    Region
+);
+
+extern int XEmptyRegion(
+    Region
+);
+
+extern int XEqualRegion(
+    Region ,
+    Region
+);
+
+extern int XFindContext(
+    Display* ,
+    XID ,
+    XContext ,
+    XPointer*
+);
+
+extern int XGetClassHint(
+    Display* ,
+    Window ,
+    XClassHint*
+);
+
+extern int XGetIconSizes(
+    Display* ,
+    Window ,
+    XIconSize** ,
+    int*
+);
+
+extern int XGetNormalHints(
+    Display* ,
+    Window ,
+    XSizeHints*
+);
+
+extern int XGetRGBColormaps(
+    Display* ,
+    Window ,
+    XStandardColormap** ,
+    int* ,
+    Atom
+);
+
+extern int XGetSizeHints(
+    Display* ,
+    Window ,
+    XSizeHints* ,
+    Atom
+);
+
+extern int XGetStandardColormap(
+    Display* ,
+    Window ,
+    XStandardColormap* ,
+    Atom
+);
+
+extern int XGetTextProperty(
+    Display* ,
+    Window ,
+    XTextProperty* ,
+    Atom
+);
+
+extern XVisualInfo *XGetVisualInfo(
+    Display* ,
+    long ,
+    XVisualInfo* ,
+    int*
+);
+
+extern int XGetWMClientMachine(
+    Display* ,
+    Window ,
+    XTextProperty*
+);
+
+extern XWMHints *XGetWMHints(
+    Display* ,
+    Window
+);
+
+extern int XGetWMIconName(
+    Display* ,
+    Window ,
+    XTextProperty*
+);
+
+extern int XGetWMName(
+    Display* ,
+    Window ,
+    XTextProperty*
+);
+
+extern int XGetWMNormalHints(
+    Display* ,
+    Window ,
+    XSizeHints* ,
+    long*
+);
+
+extern int XGetWMSizeHints(
+    Display* ,
+    Window ,
+    XSizeHints* ,
+    long* ,
+    Atom
+);
+
+extern int XGetZoomHints(
+    Display* ,
+    Window ,
+    XSizeHints*
+);
+
+extern int XIntersectRegion(
+    Region ,
+    Region ,
+    Region
+);
+
+extern void XConvertCase(
+    KeySym ,
+    KeySym* ,
+    KeySym*
+);
+
+extern int XLookupString(
+    XKeyEvent* ,
+    char* ,
+    int ,
+    KeySym* ,
+    XComposeStatus*
+);
+
+extern int XMatchVisualInfo(
+    Display* ,
+    int ,
+    int ,
+    int ,
+    XVisualInfo*
+);
+
+extern int XOffsetRegion(
+    Region ,
+    int ,
+    int
+);
+
+extern int XPointInRegion(
+    Region ,
+    int ,
+    int
+);
+
+extern Region XPolygonRegion(
+    XPoint* ,
+    int ,
+    int
+);
+
+extern int XRectInRegion(
+    Region ,
+    int ,
+    int ,
+    unsigned int ,
+    unsigned int
+);
+
+extern int XSaveContext(
+    Display* ,
+    XID ,
+    XContext ,
+    const char*
+);
+
+extern int XSetClassHint(
+    Display* ,
+    Window ,
+    XClassHint*
+);
+
+extern int XSetIconSizes(
+    Display* ,
+    Window ,
+    XIconSize* ,
+    int
+);
+
+extern int XSetNormalHints(
+    Display* ,
+    Window ,
+    XSizeHints*
+);
+
+extern void XSetRGBColormaps(
+    Display* ,
+    Window ,
+    XStandardColormap* ,
+    int ,
+    Atom
+);
+
+extern int XSetSizeHints(
+    Display* ,
+    Window ,
+    XSizeHints* ,
+    Atom
+);
+
+extern int XSetStandardProperties(
+    Display* ,
+    Window ,
+    const char* ,
+    const char* ,
+    Pixmap ,
+    char** ,
+    int ,
+    XSizeHints*
+);
+
+extern void XSetTextProperty(
+    Display* ,
+    Window ,
+    XTextProperty* ,
+    Atom
+);
+
+extern void XSetWMClientMachine(
+    Display* ,
+    Window ,
+    XTextProperty*
+);
+
+extern int XSetWMHints(
+    Display* ,
+    Window ,
+    XWMHints*
+);
+
+extern void XSetWMIconName(
+    Display* ,
+    Window ,
+    XTextProperty*
+);
+
+extern void XSetWMName(
+    Display* ,
+    Window ,
+    XTextProperty*
+);
+
+extern void XSetWMNormalHints(
+    Display* ,
+    Window ,
+    XSizeHints*
+);
+
+extern void XSetWMProperties(
+    Display* ,
+    Window ,
+    XTextProperty* ,
+    XTextProperty* ,
+    char** ,
+    int ,
+    XSizeHints* ,
+    XWMHints* ,
+    XClassHint*
+);
+
+extern void XmbSetWMProperties(
+    Display* ,
+    Window ,
+    const char* ,
+    const char* ,
+    char** ,
+    int ,
+    XSizeHints* ,
+    XWMHints* ,
+    XClassHint*
+);
+
+extern void Xutf8SetWMProperties(
+    Display* ,
+    Window ,
+    const char* ,
+    const char* ,
+    char** ,
+    int ,
+    XSizeHints* ,
+    XWMHints* ,
+    XClassHint*
+);
+
+extern void XSetWMSizeHints(
+    Display* ,
+    Window ,
+    XSizeHints* ,
+    Atom
+);
+
+extern int XSetRegion(
+    Display* ,
+    GC ,
+    Region
+);
+
+extern void XSetStandardColormap(
+    Display* ,
+    Window ,
+    XStandardColormap* ,
+    Atom
+);
+
+extern int XSetZoomHints(
+    Display* ,
+    Window ,
+    XSizeHints*
+);
+
+extern int XShrinkRegion(
+    Region ,
+    int ,
+    int
+);
+
+extern int XStringListToTextProperty(
+    char** ,
+    int ,
+    XTextProperty*
+);
+
+extern int XSubtractRegion(
+    Region ,
+    Region ,
+    Region
+);
+
+extern int XmbTextListToTextProperty(
+    Display* display,
+    char** list,
+    int count,
+    XICCEncodingStyle style,
+    XTextProperty* text_prop_return
+);
+
+extern int XwcTextListToTextProperty(
+    Display* display,
+    wchar_t** list,
+    int count,
+    XICCEncodingStyle style,
+    XTextProperty* text_prop_return
+);
+
+extern int Xutf8TextListToTextProperty(
+    Display* display,
+    char** list,
+    int count,
+    XICCEncodingStyle style,
+    XTextProperty* text_prop_return
+);
+
+extern void XwcFreeStringList(
+    wchar_t** list
+);
+
+extern int XTextPropertyToStringList(
+    XTextProperty* ,
+    char*** ,
+    int*
+);
+
+extern int XmbTextPropertyToTextList(
+    Display* display,
+    const XTextProperty* text_prop,
+    char*** list_return,
+    int* count_return
+);
+
+extern int XwcTextPropertyToTextList(
+    Display* display,
+    const XTextProperty* text_prop,
+    wchar_t*** list_return,
+    int* count_return
+);
+
+extern int Xutf8TextPropertyToTextList(
+    Display* display,
+    const XTextProperty* text_prop,
+    char*** list_return,
+    int* count_return
+);
+
+extern int XUnionRectWithRegion(
+    XRectangle* ,
+    Region ,
+    Region
+);
+
+extern int XUnionRegion(
+    Region ,
+    Region ,
+    Region
+);
+
+extern int XWMGeometry(
+    Display* ,
+    int ,
+    const char* ,
+    const char* ,
+    unsigned int ,
+    XSizeHints* ,
+    int* ,
+    int* ,
+    int* ,
+    int* ,
+    int*
+);
+
+extern int XXorRegion(
+    Region ,
+    Region ,
+    Region
 );
 
 

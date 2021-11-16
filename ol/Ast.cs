@@ -484,6 +484,8 @@ namespace ol
         public int TypeIndex { get; set; }
         public TypeKind TypeKind { get; set; } = TypeKind.Interface;
         public uint Size { get; set; } = 8;
+        public bool Verified { get; set; }
+        public bool Verifying { get; set; }
         public IType ReturnType { get; set; }
         public TypeDefinition ReturnTypeDefinition { get; set; }
         public List<DeclarationAst> Arguments { get; } = new();

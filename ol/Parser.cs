@@ -856,14 +856,50 @@ namespace ol
                     case TokenType.Number:
                         if (currentValue != null && parsingValueDefault)
                         {
-                            if (int.TryParse(token.Value, out var value))
+                            if (token.Flags == TokenFlags.None)
                             {
-                                currentValue.Value = value;
-                                currentValue.Defined = true;
+                                if (int.TryParse(token.Value, out var value))
+                                {
+                                    currentValue.Value = value;
+                                    currentValue.Defined = true;
+                                }
+                                else
+                                {
+                                    ErrorReporter.Report($"Expected enum value to be an integer, but got '{token.Value}'", token);
+                                }
                             }
-                            else
+                            else if (token.Flags.HasFlag(TokenFlags.Float))
                             {
                                 ErrorReporter.Report($"Expected enum value to be an integer, but got '{token.Value}'", token);
+                            }
+                            else if (token.Flags.HasFlag(TokenFlags.HexNumber))
+                            {
+                                if (token.Value.Length == 2)
+                                {
+                                    ErrorReporter.Report($"Invalid number '{token.Value}'", token);
+                                }
+
+                                var value = token.Value.Substring(2);
+                                if (value.Length <= 8)
+                                {
+                                    if (uint.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u32))
+                                    {
+                                        currentValue.Value = (int)u32;
+                                        currentValue.Defined = true;
+                                    }
+                                }
+                                else if (value.Length <= 16)
+                                {
+                                    if (ulong.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u64))
+                                    {
+                                        currentValue.Value = (int)u64;
+                                        currentValue.Defined = true;
+                                    }
+                                }
+                                else
+                                {
+                                    ErrorReporter.Report($"Expected enum value to be an integer, but got '{token.Value}'", token);
+                                }
                             }
                             parsingValueDefault = false;
                         }
