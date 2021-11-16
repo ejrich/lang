@@ -826,6 +826,7 @@ namespace ol
                         }
                         else
                         {
+                            parsingValueDefault = false;
                             ErrorReporter.Report($"Unexpected token '{token.Value}' in enum", token);
                         }
                         break;
