@@ -824,9 +824,31 @@ namespace ol
                             currentValue = CreateAst<EnumValueAst>(token);
                             currentValue.Name = token.Value;
                         }
-                        else
+                        else if (parsingValueDefault)
                         {
                             parsingValueDefault = false;
+                            var found = false;
+                            foreach (var value in enumAst.Values)
+                            {
+                                if (token.Value == value.Name)
+                                {
+                                    if (!value.Defined)
+                                    {
+                                        ErrorReporter.Report($"Expected previously defined value '{token.Value}' to have a defined value", token);
+                                    }
+                                    currentValue.Value = value.Value;
+                                    currentValue.Defined = true;
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (!found)
+                            {
+                                ErrorReporter.Report($"Expected value '{token.Value}' to be previously defined in enum '{enumAst.Name}'", token);
+                            }
+                        }
+                        else
+                        {
                             ErrorReporter.Report($"Unexpected token '{token.Value}' in enum", token);
                         }
                         break;
