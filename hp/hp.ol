@@ -92,7 +92,15 @@ insert<T>(HashTable<T>* table, string key, T value) {
             table.entries[hash] = record;
         }
         else {
-            // TODO Handle collisions
+            node := table.overflow[hash].head;
+            while node {
+                if node.data.key == key {
+                    node.data = record;
+                    return;
+                }
+                node = node.next;
+            }
+            add(&table.overflow[hash], record);
         }
     }
     else {
@@ -110,7 +118,13 @@ bool, T search<T>(HashTable<T>* table, string key) {
             return true, entry.value;
         }
         else {
-            // TODO Handle collisions
+            node := table.overflow[hash].head;
+            while node {
+                if node.data.key == key {
+                    return true, node.data.value;
+                }
+                node = node.next;
+            }
         }
     }
 
