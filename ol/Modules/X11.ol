@@ -1,3 +1,13 @@
+struct GC {}
+struct Display {}
+struct _XrmHashBucketRec {}
+struct XOM {}
+struct XOC {}
+struct XFontSet {}
+struct XIM {}
+struct XIC {}
+struct Region {}
+
 s32 _Xmblen(u8* str, s32 len) #extern "X11"
 
 interface s32 free_private(XExtData* extension)
@@ -47,8 +57,6 @@ struct XGCValues {
     dash_offset: s32;
     dashes: u8;
 }
-
-struct GC {}
 
 struct Visual {
     ext_data: XExtData*;
@@ -155,18 +163,13 @@ struct XServerInterpretedAddress {
 }
 
 interface XImage* create_image(Display* a, Visual* b, u32 c, s32 d, s32 e, u8* f, u32 g, u32 h, s32 i, s32 j)
-
 interface s32 destroy_image(XImage* a)
-
 interface u64 get_pixel(XImage* a, s32 b, s32 c)
-
 interface s32 put_pixel(XImage* a, s32 b, s32 c, u64 d)
-
 interface XImage* sub_image(XImage* a, s32 b, s32 c, u32 d, u32 e)
-
 interface s32 add_pixel(XImage* a, s64 b)
 
-struct funcs {
+struct XImageFunctions {
     create_image: create_image;
     destroy_image: destroy_image;
     get_pixel: get_pixel;
@@ -192,7 +195,7 @@ struct XImage {
     green_mask: u64;
     blue_mask: u64;
     obdata: u8*;
-    f: funcs;
+    f: XImageFunctions;
 }
 
 struct XWindowChanges {
@@ -274,60 +277,6 @@ struct XModifierKeymap {
     modifiermap: u8*;
 }
 
-struct Display {}
-struct _XPrivate {}
-struct _XrmHashBucketRec {}
-
-interface u64 resource_alloc(Display* a)
-
-interface s32 private15(Display* a)
-
-struct _XPrivDisplay {
-    ext_data: XExtData*;
-    private1: _XPrivate*;
-    fd: s32;
-    private2: s32;
-    proto_major_version: s32;
-    proto_minor_version: s32;
-    vendor: u8*;
-    private3: u64;
-    private4: u64;
-    private5: u64;
-    private6: s32;
-    resource_alloc: resource_alloc;
-    byte_order: s32;
-    bitmap_unit: s32;
-    bitmap_pad: s32;
-    bitmap_bit_order: s32;
-    nformats: s32;
-    pixmap_format: ScreenFormat*;
-    private8: s32;
-    release: s32;
-    private9: _XPrivate*;
-    private10: _XPrivate*;
-    qlen: s32;
-    last_request_read: u64;
-    request: u64;
-    private11: u8*;
-    private12: u8*;
-    private13: u8*;
-    private14: u8*;
-    max_request_size: u32;
-    db: _XrmHashBucketRec*;
-    private15: private15;
-    display_name: u8*;
-    default_screen: s32;
-    nscreens: s32;
-    screens: Screen*;
-    motion_buffer: u64;
-    private16: u64;
-    min_keycode: s32;
-    max_keycode: s32;
-    private17: u8*;
-    private18: u8*;
-    private19: s32;
-    xdefaults: u8*;
-}
 
 struct XKeyEvent {
     type: XEventType;
@@ -867,10 +816,6 @@ struct XFontSetExtents {
     max_logical_extent: XRectangle;
 }
 
-struct XOM {}
-struct XOC {}
-struct XFontSet {}
-
 struct XmbTextItem {
     chars: u8*;
     nchars: s32;
@@ -908,8 +853,6 @@ struct XOMFontInfo {
     font_name_list: u8**;
 }
 
-struct XIM {}
-struct XIC {}
 interface XIMProc(XIM* a, u8* b, u8* c)
 
 interface s32 XICProc(XIC* a, u8* b, u8* c)
@@ -1008,6 +951,130 @@ struct XIMHotKeyTriggers {
 struct XIMValuesList {
     count_values: u16;
     supported_values: u8**;
+}
+
+struct XSizeHintsAspect {
+    x: s32;
+    y: s32;
+}
+
+struct XSizeHints {
+    flags: s64;
+    x: s32;
+    y: s32;
+    width: s32;
+    height: s32;
+    min_width: s32;
+    min_height: s32;
+    max_width: s32;
+    max_height: s32;
+    width_inc: s32;
+    height_inc: s32;
+    min_aspect: XSizeHintsAspect;
+    max_aspect: XSizeHintsAspect;
+    base_width: s32;
+    base_height: s32;
+    win_gravity: s32;
+}
+
+struct XWMHints {
+    flags: s64;
+    input: s32;
+    initial_state: s32;
+    icon_pixmap: u64;
+    icon_window: u64;
+    icon_x: s32;
+    icon_y: s32;
+    icon_mask: u64;
+    window_group: u64;
+}
+
+struct XTextProperty {
+    value: u8*;
+    encoding: u64;
+    format: s32;
+    nitems: u64;
+}
+
+enum XICCEncodingStyle {
+    XStringStyle;
+    XCompoundTextStyle;
+    XTextStyle;
+    XStdICCTextStyle;
+}
+
+struct XIconSize {
+    min_width: s32;
+    min_height: s32;
+    max_width: s32;
+    max_height: s32;
+    width_inc: s32;
+    height_inc: s32;
+}
+
+struct XClassHint {
+    res_name: u8*;
+    res_class: u8*;
+}
+
+struct XComposeStatus {
+    compose_ptr: u8*;
+    chars_matched: s32;
+}
+
+struct XVisualInfo {
+    visual: Visual*;
+    visualid: u64;
+    screen: s32;
+    depth: s32;
+    class: s32;
+    red_mask: u64;
+    green_mask: u64;
+    blue_mask: u64;
+    colormap_size: s32;
+    bits_per_rgb: s32;
+}
+
+struct XStandardColormap {
+    colormap: u64;
+    red_max: u64;
+    red_mult: u64;
+    green_max: u64;
+    green_mult: u64;
+    blue_max: u64;
+    blue_mult: u64;
+    base_pixel: u64;
+    visualid: u64;
+    killid: u64;
+}
+
+enum InputMasks : s64 {
+    NoEventMask              = 0x0;
+    KeyPressMask             = 0x1;
+    KeyReleaseMask           = 0x2;
+    ButtonPressMask          = 0x4;
+    ButtonReleaseMask        = 0x8;
+    EnterWindowMask          = 0x10;
+    LeaveWindowMask          = 0x20;
+    PointerMotionMask        = 0x40;
+    PointerMotionHintMask    = 0x80;
+    Button1MotionMask        = 0x100;
+    Button2MotionMask        = 0x200;
+    Button3MotionMask        = 0x400;
+    Button4MotionMask        = 0x800;
+    Button5MotionMask        = 0x1000;
+    ButtonMotionMask         = 0x2000;
+    KeymapStateMask          = 0x4000;
+    ExposureMask             = 0x8000;
+    VisibilityChangeMask     = 0x10000;
+    StructureNotifyMask      = 0x20000;
+    ResizeRedirectMask       = 0x40000;
+    SubstructureNotifyMask   = 0x80000;
+    SubstructureRedirectMask = 0x100000;
+    FocusChangeMask          = 0x200000;
+    PropertyChangeMask       = 0x400000;
+    ColormapChangeMask       = 0x800000;
+    OwnerGrabButtonMask      = 0x1000000;
 }
 
 XFontStruct* XQueryFont(Display* a, u64 b) #extern "X11"
@@ -1837,131 +1904,6 @@ s32 _Xwctomb(u8* a, s32 b) #extern "X11"
 s32 XGetEventData(Display* a, XGenericEventCookie* b) #extern "X11"
 
 XFreeEventData(Display* a, XGenericEventCookie* b) #extern "X11"
-
-struct aspect {
-    x: s32;
-    y: s32;
-}
-
-struct XSizeHints {
-    flags: s64;
-    x: s32;
-    y: s32;
-    width: s32;
-    height: s32;
-    min_width: s32;
-    min_height: s32;
-    max_width: s32;
-    max_height: s32;
-    width_inc: s32;
-    height_inc: s32;
-    min_aspect: aspect;
-    max_aspect: aspect;
-    base_width: s32;
-    base_height: s32;
-    win_gravity: s32;
-}
-
-struct XWMHints {
-    flags: s64;
-    input: s32;
-    initial_state: s32;
-    icon_pixmap: u64;
-    icon_window: u64;
-    icon_x: s32;
-    icon_y: s32;
-    icon_mask: u64;
-    window_group: u64;
-}
-
-struct XTextProperty {
-    value: u8*;
-    encoding: u64;
-    format: s32;
-    nitems: u64;
-}
-
-enum XICCEncodingStyle {
-    XStringStyle;
-    XCompoundTextStyle;
-    XTextStyle;
-    XStdICCTextStyle;
-}
-
-struct XIconSize {
-    min_width: s32;
-    min_height: s32;
-    max_width: s32;
-    max_height: s32;
-    width_inc: s32;
-    height_inc: s32;
-}
-
-struct XClassHint {
-    res_name: u8*;
-    res_class: u8*;
-}
-
-struct XComposeStatus {
-    compose_ptr: u8*;
-    chars_matched: s32;
-}
-
-struct Region {}
-struct XVisualInfo {
-    visual: Visual*;
-    visualid: u64;
-    screen: s32;
-    depth: s32;
-    class: s32;
-    red_mask: u64;
-    green_mask: u64;
-    blue_mask: u64;
-    colormap_size: s32;
-    bits_per_rgb: s32;
-}
-
-struct XStandardColormap {
-    colormap: u64;
-    red_max: u64;
-    red_mult: u64;
-    green_max: u64;
-    green_mult: u64;
-    blue_max: u64;
-    blue_mult: u64;
-    base_pixel: u64;
-    visualid: u64;
-    killid: u64;
-}
-
-enum InputMasks : s64 {
-    NoEventMask              = 0x0;
-    KeyPressMask             = 0x1;
-    KeyReleaseMask           = 0x2;
-    ButtonPressMask          = 0x4;
-    ButtonReleaseMask        = 0x8;
-    EnterWindowMask          = 0x10;
-    LeaveWindowMask          = 0x20;
-    PointerMotionMask        = 0x40;
-    PointerMotionHintMask    = 0x80;
-    Button1MotionMask        = 0x100;
-    Button2MotionMask        = 0x200;
-    Button3MotionMask        = 0x400;
-    Button4MotionMask        = 0x800;
-    Button5MotionMask        = 0x1000;
-    ButtonMotionMask         = 0x2000;
-    KeymapStateMask          = 0x4000;
-    ExposureMask             = 0x8000;
-    VisibilityChangeMask     = 0x10000;
-    StructureNotifyMask      = 0x20000;
-    ResizeRedirectMask       = 0x40000;
-    SubstructureNotifyMask   = 0x80000;
-    SubstructureRedirectMask = 0x100000;
-    FocusChangeMask          = 0x200000;
-    PropertyChangeMask       = 0x400000;
-    ColormapChangeMask       = 0x800000;
-    OwnerGrabButtonMask      = 0x1000000;
-}
 
 XClassHint* XAllocClassHint() #extern "X11"
 
