@@ -1048,7 +1048,7 @@ struct XStandardColormap {
     killid: u64;
 }
 
-enum InputMasks : s64 {
+enum XInputMasks : s64 {
     NoEventMask              = 0x0;
     KeyPressMask             = 0x1;
     KeyReleaseMask           = 0x2;
@@ -1629,7 +1629,7 @@ s32 XRotateWindowProperties(Display* a, u64 b, u64* c, s32 d, s32 e) #extern "X1
 
 s32 XScreenCount(Display* a) #extern "X11"
 
-s32 XSelectInput(Display* a, u64 b, InputMasks c) #extern "X11"
+s32 XSelectInput(Display* a, u64 b, XInputMasks c) #extern "X11"
 
 s32 XSendEvent(Display* a, u64 b, s32 c, s64 d, XEvent* e) #extern "X11"
 

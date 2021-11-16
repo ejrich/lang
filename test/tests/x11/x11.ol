@@ -22,7 +22,7 @@ Window create_window() {
     x_win := XCreateSimpleWindow(display, default_window, 0, 0, 400, 300, 0, white, black);
     XSetStandardProperties(display, x_win, "My Window", "HI!", 0, null, 0, null);
 
-    XSelectInput(display, x_win, InputMasks.ExposureMask|InputMasks.ButtonPressMask|InputMasks.KeyPressMask);
+    XSelectInput(display, x_win, XInputMasks.ExposureMask|XInputMasks.ButtonPressMask|XInputMasks.KeyPressMask);
 
     gc := XCreateGC(display, x_win, 0, null);
 

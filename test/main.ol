@@ -10,8 +10,8 @@ main() {
         file := readdir(dir);
         test_dir: string;
         while file {
-            if file.d_type == FileType.DT_DIR && file.d_reclen == 32 {
-                dir_name := get_file_name(file);
+            dir_name := get_file_name(file);
+            if file.d_type == FileType.DT_DIR && dir_name != "." && dir_name != ".." {
                 test_dir = format_string("%/%", tests_dir, dir_name);
 
                 if !run_test(test_dir, dir_name) failed_test_count++;
