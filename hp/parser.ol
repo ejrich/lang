@@ -163,6 +163,7 @@ TypeDefinition, Node<Token>* parse_type(Node<Token>* node) {
     found, type_def := search(&types, node.data.value);
 
     if found {
+        node = node.next;
         while node.data.type == TokenType.Star {
             node = node.next;
             type_def.pointer_count++;
@@ -173,8 +174,6 @@ TypeDefinition, Node<Token>* parse_type(Node<Token>* node) {
 
     return check_for_pointers(node.data.value, node.next);
 }
-
-foosel: Array<int>[1000];
 
 TypeDefinition, Node<Token>* check_for_pointers(string type, Node<Token>* node) {
     type_def: TypeDefinition = { name = type; }
@@ -333,7 +332,7 @@ Node<Token>* parse_typedef(Node<Token>* node, FILE* file) {
             // Move over ';'
             node = move_over(node.next, TokenType.SemiColon);
 
-            // TODO Handle type aliasing
+            insert(&types, name, type_def);
         }
     }
 
@@ -439,7 +438,7 @@ Node<Token>* parse_struct(Node<Token>* node, FILE* file, string type_name = "str
                 node = node.next;
                 break;
             }
-            else if type == TokenType.Struct || type == TokenType.Extension {
+            else if type == TokenType.Struct || type == TokenType.Const || type == TokenType.Extension {
                 node = node.next;
             }
             else if new_field {
@@ -458,12 +457,18 @@ Node<Token>* parse_struct(Node<Token>* node, FILE* file, string type_name = "str
 }
 
 Node<Token>* finish_struct_and_print(Node<Token>* node, FILE* file, string type_name, bool alias, Struct struct_def, bool internal) {
+    struct_type_def: TypeDefinition;
+
     if node.data.type == TokenType.Star {
         struct_def.pointer = true;
         node = node.next;
+        struct_type_def.pointer_count = 1;
     }
 
     if alias struct_def.name = node.data.value;
+
+    struct_type_def.name = struct_def.name;
+    insert(&types, struct_def.name, struct_type_def);
 
     // Move over ';'
     if !internal node = move_over(node, TokenType.SemiColon);
