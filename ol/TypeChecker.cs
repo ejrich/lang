@@ -118,6 +118,13 @@ namespace ol
                             }
                             previous = node;
                             break;
+                        case InterfaceAst interfaceAst:
+                            if (!TypeTable.Add(interfaceAst.Name, interfaceAst))
+                            {
+                                ErrorReporter.Report($"Multiple definitions of type '{interfaceAst.Name}'", interfaceAst);
+                            }
+                            previous = node;
+                            break;
                         default:
                             previous = node;
                             break;
@@ -137,7 +144,17 @@ namespace ol
                             RemoveNode(previous, node);
                             break;
                         case UnionAst union:
-                            VerifyUnion(union);
+                            if (!union.Verified)
+                            {
+                                VerifyUnion(union);
+                            }
+                            RemoveNode(previous, node);
+                            break;
+                        case InterfaceAst interfaceAst:
+                            if (!interfaceAst.Verified)
+                            {
+                                VerifyInterface(interfaceAst);
+                            }
                             RemoveNode(previous, node);
                             break;
                         default:
@@ -171,10 +188,6 @@ namespace ol
                             break;
                         case OperatorOverloadAst overload:
                             VerifyOperatorOverloadDefinition(overload);
-                            RemoveNode(previous, node);
-                            break;
-                        case InterfaceAst interfaceAst:
-                            VerifyInterface(interfaceAst);
                             RemoveNode(previous, node);
                             break;
                         default:
@@ -429,7 +442,10 @@ namespace ol
                 }
             }
 
-            TypeTable.CreateTypeInfo(enumAst);
+            if (!ErrorReporter.Errors.Any())
+            {
+                TypeTable.CreateTypeInfo(enumAst);
+            }
         }
 
         private void VerifyStruct(StructAst structAst)
@@ -689,7 +705,10 @@ namespace ol
                 }
             }
 
-            TypeTable.CreateTypeInfo(structAst);
+            if (!ErrorReporter.Errors.Any())
+            {
+                TypeTable.CreateTypeInfo(structAst);
+            }
             structAst.Verified = true;
         }
 
@@ -773,7 +792,10 @@ namespace ol
                 }
             }
 
-            TypeTable.CreateTypeInfo(union);
+            if (!ErrorReporter.Errors.Any())
+            {
+                TypeTable.CreateTypeInfo(union);
+            }
             union.Verified = true;
         }
 
@@ -839,6 +861,10 @@ namespace ol
                 else if (argument.Type == null && !isGeneric)
                 {
                     ErrorReporter.Report($"Type '{PrintTypeDefinition(argument.TypeDefinition)}' of argument '{argument.Name}' in function '{function.Name}' is not defined", argument.TypeDefinition);
+                }
+                else if (argument.Type?.TypeKind == TypeKind.Void)
+                {
+                    ErrorReporter.Report($"Argument '{argument.Name}' in function '{function.Name}' is cannot be void", argument.TypeDefinition);
                 }
                 else
                 {
@@ -1091,6 +1117,7 @@ namespace ol
 
         private void VerifyInterface(InterfaceAst interfaceAst)
         {
+            interfaceAst.Verifying = true;
             // 1. Verify the return type of the function is valid
             if (interfaceAst.ReturnTypeDefinition == null)
             {
@@ -1141,10 +1168,12 @@ namespace ol
             }
 
             // 3. Load the interface into the type table
-            if (!TypeTable.AddInterface(interfaceAst))
+            if (!ErrorReporter.Errors.Any())
             {
-                ErrorReporter.Report($"Multiple definitions of interface '{interfaceAst.Name}'", interfaceAst);
+                // TODO Implement me
+                // TypeTable.CreateTypeInfo(interfaceAst);
             }
+            interfaceAst.Verified = true;
         }
 
         private bool GetScopeIdentifier(ScopeAst scope, string name, out IAst ast)
@@ -2226,8 +2255,14 @@ namespace ol
                         case Operator.BitwiseAnd:
                         case Operator.BitwiseOr:
                         case Operator.Xor:
-                            if (!(lhs == TypeKind.Boolean && rhs == TypeKind.Boolean) &&
-                                !(lhs == TypeKind.Integer && rhs == TypeKind.Integer))
+                            if (lhs == TypeKind.Enum && rhs == TypeKind.Enum)
+                            {
+                                if (lhs != rhs)
+                                {
+                                    ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
+                                }
+                            }
+                            else if (!(lhs == TypeKind.Boolean && rhs == TypeKind.Boolean) && !(lhs == TypeKind.Integer && rhs == TypeKind.Integer))
                             {
                                 ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
                             }
@@ -4034,6 +4069,13 @@ namespace ol
                                     expression.Type = GetNextIntegerType(expression.Type, nextExpressionType);
                                 }
                             }
+                            else if (type == TypeKind.Enum && nextType == TypeKind.Enum)
+                            {
+                                if (expression.Type != nextExpressionType)
+                                {
+                                    ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{expression.Type.Name}' and '{nextExpressionType.Name}'", expression.Children[i]);
+                                }
+                            }
                             else if (!(type == TypeKind.Boolean && nextType == TypeKind.Boolean))
                             {
                                 ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{expression.Type.Name}' and '{nextExpressionType.Name}'", expression.Children[i]);
@@ -4552,6 +4594,10 @@ namespace ol
                         else if (typeValue is UnionAst union && !union.Verifying)
                         {
                             VerifyUnion(union);
+                        }
+                        else if (typeValue is InterfaceAst interfaceAst && !interfaceAst.Verifying)
+                        {
+                            VerifyInterface(interfaceAst);
                         }
                         return typeValue;
                     }

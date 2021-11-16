@@ -72,6 +72,7 @@ namespace ol
             _stringType = stringType;
             var defaultAttributes = LLVMValueRef.CreateConstNamedStruct(stringArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(stringType, 0))});
 
+            var interfaceQueue = new List<InterfaceAst>();
             var structQueue = new List<StructAst>();
             var unionQueue = new List<UnionAst>();
 
@@ -146,7 +147,7 @@ namespace ol
                             }
                             break;
                         case InterfaceAst interfaceAst:
-                            DeclareInterfaceType(interfaceAst, typeInfoType);
+                            DeclareInterfaceType(interfaceAst, typeInfoType, interfaceQueue);
 
                             var debugArgumentTypes = new LLVMMetadataRef[interfaceAst.Arguments.Count + 1];
                             debugArgumentTypes[0] = _debugTypes[interfaceAst.ReturnType.TypeIndex];
@@ -194,10 +195,17 @@ namespace ol
                             DeclareCompoundType(compoundType, typeInfoType, typeInfoArrayType, compoundTypeInfoType);
                             break;
                         case InterfaceAst interfaceAst:
-                            DeclareInterfaceType(interfaceAst, typeInfoType);
+                            DeclareInterfaceType(interfaceAst, typeInfoType, interfaceQueue);
                             break;
                     }
                 }
+            }
+
+            foreach (var interfaceAst in interfaceQueue)
+            {
+                var argumentTypes = interfaceAst.Arguments.Select(arg => _types[arg.Type.TypeIndex]).ToArray();
+                var functionType = LLVMTypeRef.CreateFunction(_types[interfaceAst.ReturnType.TypeIndex], argumentTypes, false);
+                _types[interfaceAst.TypeIndex] = LLVM.PointerType(functionType, 0);
             }
 
             var typeField = _module.GetTypeByName("TypeField");
@@ -642,11 +650,9 @@ namespace ol
             CreateAndSetTypeInfo(compoundTypeInfo, fields, compoundType.TypeIndex);
         }
 
-        private void DeclareInterfaceType(InterfaceAst interfaceAst, LLVMTypeRef typeInfoType)
+        private void DeclareInterfaceType(InterfaceAst interfaceAst, LLVMTypeRef typeInfoType, List<InterfaceAst> interfaceQueue)
         {
-            var argumentTypes = interfaceAst.Arguments.Select(arg => _types[arg.Type.TypeIndex]).ToArray();
-            var functionType = LLVMTypeRef.CreateFunction(_types[interfaceAst.ReturnType.TypeIndex], argumentTypes, false);
-            _types[interfaceAst.TypeIndex] = LLVM.PointerType(functionType, 0);
+            interfaceQueue.Add(interfaceAst);
 
             var typeName = GetString(interfaceAst.Name);
             var typeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Interface, 0);
