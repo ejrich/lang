@@ -1,9 +1,9 @@
 #import "lexer.ol"
 
-parse(string file_contents, string library) {
+parse(string file_contents, string library, string output_file) {
     tokens := get_file_tokens(file_contents);
 
-    lib_file := fopen(library, "w+");
+    lib_file := fopen(output_file, "w+");
 
     if lib_file {
         node := tokens.head;
@@ -23,7 +23,8 @@ parse(string file_contents, string library) {
                 node = parse_function(node.next, lib_file, library);
             }
             else if type == TokenType.Static {
-                node = move_over(node.next, TokenType.CloseBrace);
+                if node.next.data.type == TokenType.Const node = parse_constant(node.next.next, lib_file);
+                else node = move_over(node.next, TokenType.CloseBrace);
             }
             else if type == TokenType.Extension node = node.next;
             else if type == TokenType.Attribute {
@@ -184,6 +185,26 @@ TypeDefinition, Node<Token>* check_for_pointers(string type, Node<Token>* node) 
     }
 
     return type_def, node;
+}
+
+Node<Token>* parse_constant(Node<Token>* node, FILE* file) {
+    type_def: TypeDefinition;
+    type_def, node = parse_type(node);
+
+    name := node.data.value;
+
+    node = node.next.next;
+
+    value := node.data.value;
+
+    print_string(name, file);
+    print_string(": ", file);
+    print_type(type_def, file);
+    print_string(" = ", file);
+    print_string(value, file);
+    print_string("; #const\n", file);
+
+    return move_over(node.next, TokenType.SemiColon);
 }
 
 struct Argument {
@@ -561,7 +582,7 @@ Node<Token>* parse_enum(Node<Token>* node, FILE* file) {
                 enum_value.value.data = null;
             }
             if type == TokenType.CloseBrace {
-                if string_is_empty(enum_value.name) {
+                if !string_is_empty(enum_value.name) {
                     array_insert(&enum_def.values, enum_value);
                 }
                 node = node.next;

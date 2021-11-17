@@ -1,8 +1,8 @@
 #import "parser.ol"
 
 main() {
-    if command_line_arguments.length != 2 {
-        printf("Please provide an input file and the library name\n");
+    if command_line_arguments.length != 3 {
+        printf("Please provide an input file, library name, and output file\n");
         exit_code = 1;
         return;
     }
@@ -20,7 +20,7 @@ main() {
         fread(file_contents.data, 1, size, file);
         fclose(file);
 
-        parse(file_contents, command_line_arguments[1]);
+        parse(file_contents, command_line_arguments[1], command_line_arguments[2]);
 
         each arena in arenas
             free(arena.pointer);

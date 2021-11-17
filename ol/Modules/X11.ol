@@ -840,6 +840,7 @@ enum XOrientation {
     XOMOrientation_RTL_TTB;
     XOMOrientation_TTB_LTR;
     XOMOrientation_TTB_RTL;
+    XOMOrientation_Context;
 }
 
 struct XOMOrientation {
@@ -901,6 +902,7 @@ enum XIMCaretDirection {
     XIMLineStart;
     XIMLineEnd;
     XIMAbsolutePosition;
+    XIMDontChange;
 }
 
 struct XIMStringConversionCallbackStruct {
@@ -921,6 +923,7 @@ struct XIMPreeditDrawCallbackStruct {
 enum XIMCaretStyle {
     XIMIsInvisible;
     XIMIsPrimary;
+    XIMIsSecondary;
 }
 
 struct XIMPreeditCaretCallbackStruct {
@@ -931,6 +934,7 @@ struct XIMPreeditCaretCallbackStruct {
 
 enum XIMStatusDataType {
     XIMTextType;
+    XIMBitmapType;
 }
 
 struct XIMStatusDrawCallbackStruct {
@@ -1001,6 +1005,7 @@ enum XICCEncodingStyle {
     XCompoundTextStyle;
     XTextStyle;
     XStdICCTextStyle;
+    XUTF8StringStyle;
 }
 
 struct XIconSize {
