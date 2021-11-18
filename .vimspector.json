@@ -4,7 +4,7 @@
       "adapter": "netcoredbg",
       "configuration": {
         "request": "launch",
-        "program": "${workspaceRoot}/ol/bin/Debug/net5.0/ol.dll",
+        "program": "${workspaceRoot}/ol/bin/Debug/net6.0/ol.dll",
         "args": ["-S", "${workspaceRoot}/example/main.ol", "-noThreads"],
         //"args": ["-S", "${workspaceRoot}/test/tests/x11/x11.ol", "-noThreads"],
         //"args": ["-S", "${workspaceRoot}/hp/hp.ol", "-noThreads"],
