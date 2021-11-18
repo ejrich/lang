@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 
 namespace ol
 {
@@ -252,7 +251,16 @@ namespace ol
             }
             else
             {
-                CheckForReservedTokensAndErrors(currentToken, character);
+                // Check tokens for reserved keywords
+                if (currentToken.Type == TokenType.Identifier && _reservedTokens.TryGetValue(currentToken.Value, out var type))
+                {
+                    currentToken.Type = type;
+                }
+
+                if (currentToken.Error)
+                {
+                    ErrorReporter.Report($"Unexpected token '{currentToken.Value + character}'", currentToken);
+                }
             }
 
             tokens.Add(currentToken);
@@ -268,23 +276,6 @@ namespace ol
                 '\t' => true,
                 _ => false
             };
-        }
-
-        private static void CheckForReservedTokensAndErrors(Token token, char character)
-        {
-            // Check tokens for reserved keywords
-            if (token.Type == TokenType.Identifier)
-            {
-                if (_reservedTokens.TryGetValue(token.Value, out var type))
-                {
-                    token.Type = type;
-                }
-            }
-
-            if (token.Error)
-            {
-                ErrorReporter.Report($"Unexpected token '{token.Value + character}'", token);
-            }
         }
 
         private static TokenType GetTokenType(char character)
