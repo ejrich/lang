@@ -956,10 +956,6 @@ namespace ol
                     {
                         ErrorReporter.Report($"Multiple definitions of extern function '{function.Name}'", function);
                     }
-                    else if (!function.Flags.HasFlag(FunctionFlags.Varargs))
-                    {
-                        _runner.InitExternFunction(function);
-                    }
                     BuildSettings.Dependencies.Add(function.ExternLib);
                     function.Flags |= FunctionFlags.Verified;
                     _irBuilder.AddFunctionDefinition(function);
@@ -2776,7 +2772,9 @@ namespace ol
                                 ErrorReporter.Report($"Cannot determine type for function '{identifierAst.Name}' that has multiple overloads", identifierAst);
                                 return null;
                             }
-                            return functions[0];
+                            var function = functions[0];
+                            VerifyFunctionIfNecessary(function, currentFunction);
+                            return function;
                         }
                         ErrorReporter.Report($"Identifier '{identifierAst.Name}' not defined", identifierAst);
                     }
@@ -2806,6 +2804,22 @@ namespace ol
             }
         }
 
+        private void VerifyFunctionIfNecessary(FunctionAst function, IFunction currentFunction)
+        {
+            if (function.Flags.HasFlag(FunctionFlags.Extern))
+            {
+                if (!function.Flags.HasFlag(FunctionFlags.Varargs) && !function.Flags.HasFlag(FunctionFlags.ExternInitted))
+                {
+                    function.Flags |= FunctionFlags.ExternInitted;
+                    _runner.InitExternFunction(function);
+                }
+            }
+            else if (!function.Flags.HasFlag(FunctionFlags.Verified) && function != currentFunction)
+            {
+                VerifyFunction(function);
+            }
+        }
+
         private IType VerifyExpression(IAst ast, IFunction currentFunction, ScopeAst scope)
         {
             // 1. Verify the expression value
@@ -2828,10 +2842,7 @@ namespace ol
                                 return null;
                             }
                             var function = functions[0];
-                            if (!function.Flags.HasFlag(FunctionFlags.Verified) && function != currentFunction)
-                            {
-                                VerifyFunction(function);
-                            }
+                            VerifyFunctionIfNecessary(function, currentFunction);
                             return function;
                         }
                         ErrorReporter.Report($"Identifier '{identifierAst.Name}' not defined", identifierAst);
@@ -3282,10 +3293,7 @@ namespace ol
 
             if (function is FunctionAst functionAst)
             {
-                if (!functionAst.Flags.HasFlag(FunctionFlags.Verified) && function != currentFunction)
-                {
-                    VerifyFunction(functionAst);
-                }
+                VerifyFunctionIfNecessary(functionAst, currentFunction);
 
                 if (currentFunction != null && !currentFunction.Flags.HasFlag(FunctionFlags.CallsCompiler) && (functionAst.Flags.HasFlag(FunctionFlags.Compiler) || functionAst.Flags.HasFlag(FunctionFlags.CallsCompiler)))
                 {
