@@ -281,7 +281,6 @@ namespace ol
         private static TokenType GetTokenType(char character)
         {
             if (char.IsDigit(character)) return TokenType.Number;
-            if (char.IsLetter(character)) return TokenType.Identifier;
 
             return character switch
             {
