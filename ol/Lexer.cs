@@ -57,6 +57,7 @@ namespace ol
             for (var i = 0; i < fileText.Length; i++)
             {
                 var character = fileText[i];
+                column++;
 
                 // Skip through comments
                 if (lexerStatus.ReadingComment)
@@ -79,182 +80,182 @@ namespace ol
                         lexerStatus.ReadingComment = false;
                         currentToken = null;
                     }
-
-                    continue;
                 }
-
-                column++;
-                if (character == '\n')
+                else if (currentToken == null)
                 {
-                    line++;
-                    column = 0;
-                }
-
-                // Interpret string literals
-                if (currentToken?.Type == TokenType.Quote)
-                {
-                    currentToken.Type = TokenType.Literal;
-                    currentToken.Value = string.Empty;
-                }
-
-                // Add characters to the string literal
-                if (currentToken?.Type == TokenType.Literal)
-                {
-                    if (character == '\\' && !literalEscapeToken)
+                    if (character == '\n')
                     {
-                        literalEscapeToken = true;
+                        line++;
+                        column = 0;
                     }
-                    else if (literalEscapeToken)
+                    else if (!IsWhiteSpace(character))
                     {
-                        if (_escapableCharacters.TryGetValue(character, out var escapedCharacter))
-                        {
-                            currentToken.Value += escapedCharacter;
-                        }
-                        else
-                        {
-                            currentToken.Error = true;
-                            currentToken.Value += character;
-                        }
-                        literalEscapeToken = false;
-                    }
-                    else
-                    {
-                        if (character == '"')
-                        {
-                            if (currentToken.Error)
-                            {
-                                ErrorReporter.Report($"Unexpected token '{currentToken.Value}'", currentToken);
-                            }
+                        // Get token from character, determine to emit value
+                        var tokenType = GetTokenType(character);
 
-                            tokens.Add(currentToken);
-                            currentToken = null;
-                        }
-                        else
+                        currentToken = new Token
                         {
-                            currentToken.Value += character;
-                        }
+                            Type = tokenType,
+                            Value = character.ToString(),
+                            FileIndex = fileIndex,
+                            Line = line,
+                            Column = column
+                        };
                     }
-                    continue;
-                }
-
-                // Interpret character literals
-                if (currentToken?.Type == TokenType.Apostrophe)
-                {
-                    currentToken.Type = TokenType.Character;
-                    if (character == '\\')
-                    {
-                        character = fileText[++i];
-                        if (_escapableCharacters.TryGetValue(character, out var escapedCharacter))
-                        {
-                            currentToken.Value = $"{escapedCharacter}";
-                        }
-                        else
-                        {
-                            ErrorReporter.Report($"Unknown escaped character '\\{character}'", currentToken);
-                        }
-                    }
-                    else
-                    {
-                        currentToken.Value = $"{character}";
-                    }
-                    continue;
-                }
-
-                if (currentToken?.Type == TokenType.Character)
-                {
-                    tokens.Add(currentToken);
-                    if (character != '\'')
-                    {
-                        ErrorReporter.Report($"Expected a single digit character", currentToken);
-                    }
-                    else
-                    {
-                        currentToken = null;
-                    }
-                    continue;
-                }
-
-                // Skip over whitespace and emit the current token if not null
-                if (IsWhiteSpace(character))
-                {
-                    if (currentToken != null)
-                    {
-                        // Number ranges should have the number yielded first
-                        if (currentToken.Type == TokenType.NumberRange)
-                        {
-                            var number = currentToken.Value[..^2];
-                            tokens.Add(new Token
-                            {
-                                Type = TokenType.Number,
-                                Value = number,
-                                FileIndex = fileIndex,
-                                Line = currentToken.Line,
-                                Column = currentToken.Column
-                            });
-                            currentToken.Type = TokenType.Range;
-                            currentToken.Value = "..";
-                            currentToken.Column += (uint)number.Length;
-                        }
-                        else
-                        {
-                            CheckForReservedTokensAndErrors(currentToken, character);
-                        }
-
-                        tokens.Add(currentToken);
-                    }
-                    currentToken = null;
-                    continue;
-                }
-
-                // Get token from character, determine to emit value
-                var tokenType = GetTokenType(character);
-
-                if (ContinueToken(currentToken, tokenType, character, lexerStatus))
-                {
-                    currentToken!.Value += character;
                 }
                 else
                 {
-                    if (currentToken != null)
+                    var type = currentToken.Type;
+
+                    // Interpret string literals
+                    if (type == TokenType.Quote)
                     {
-                        // Number ranges should have the number yielded first
-                        if (currentToken.Type == TokenType.NumberRange)
+                        currentToken.Type = type = TokenType.Literal;
+                        currentToken.Value = string.Empty;
+                    }
+
+                    if (character == '\n')
+                    {
+                        line++;
+                        column = 0;
+                    }
+
+                    // Add characters to the string literal
+                    if (type == TokenType.Literal)
+                    {
+                        if (character == '\\' && !literalEscapeToken)
                         {
-                            var number = currentToken.Value[..^2];
-                            tokens.Add(new Token
+                            literalEscapeToken = true;
+                        }
+                        else if (literalEscapeToken)
+                        {
+                            if (_escapableCharacters.TryGetValue(character, out var escapedCharacter))
                             {
-                                Type = TokenType.Number,
-                                FileIndex = fileIndex,
-                                Value = number,
-                                Line = currentToken.Line,
-                                Column = currentToken.Column
-                            });
-                            currentToken.Type = TokenType.Range;
-                            currentToken.Value = "..";
-                            currentToken.Column += (uint)number.Length;
+                                currentToken.Value += escapedCharacter;
+                            }
+                            else
+                            {
+                                currentToken.Error = true;
+                                currentToken.Value += character;
+                            }
+                            literalEscapeToken = false;
                         }
                         else
                         {
-                            CheckForReservedTokensAndErrors(currentToken, character);
+                            if (character == '"')
+                            {
+                                if (currentToken.Error)
+                                {
+                                    ErrorReporter.Report($"Unexpected token '{currentToken.Value}'", currentToken);
+                                }
+
+                                tokens.Add(currentToken);
+                                currentToken = null;
+                            }
+                            else
+                            {
+                                currentToken.Value += character;
+                            }
                         }
-
-                        tokens.Add(currentToken);
                     }
-
-                    currentToken = new Token
+                    // Interpret character literals
+                    else if (type == TokenType.Apostrophe)
                     {
-                        Type = tokenType,
-                        Value = character.ToString(),
-                        FileIndex = fileIndex,
-                        Line = line,
-                        Column = column
-                    };
+                        currentToken.Type = TokenType.Character;
+                        if (character == '\\')
+                        {
+                            character = fileText[++i];
+                            if (_escapableCharacters.TryGetValue(character, out var escapedCharacter))
+                            {
+                                currentToken.Value = $"{escapedCharacter}";
+                            }
+                            else
+                            {
+                                ErrorReporter.Report($"Unknown escaped character '\\{character}'", currentToken);
+                            }
+                        }
+                        else
+                        {
+                            currentToken.Value = $"{character}";
+                        }
+                    }
+                    // Finish character literals
+                    else if (type == TokenType.Character)
+                    {
+                        tokens.Add(currentToken);
+                        if (character != '\'')
+                        {
+                            ErrorReporter.Report($"Expected a single digit character", currentToken);
+                        }
+                        else
+                        {
+                            currentToken = null;
+                        }
+                    }
+                    // Skip over whitespace and emit the current token if not null
+                    else if (IsWhiteSpace(character))
+                    {
+                        AddToken(currentToken, tokens, fileIndex, character);
+                        currentToken = null;
+                    }
+                    else
+                    {
+                        // Get token from character, determine to emit value
+                        var tokenType = GetTokenType(character);
+
+                        if (ContinueToken(currentToken, tokenType, character, lexerStatus))
+                        {
+                            currentToken!.Value += character;
+                        }
+                        else
+                        {
+                            if (currentToken != null)
+                            {
+                                AddToken(currentToken, tokens, fileIndex, character);
+                            }
+
+                            currentToken = new Token
+                            {
+                                Type = tokenType,
+                                Value = character.ToString(),
+                                FileIndex = fileIndex,
+                                Line = line,
+                                Column = column
+                            };
+                        }
+                    }
                 }
             }
 
             if (!lexerStatus.ReadingComment && currentToken != null) tokens.Add(currentToken);
 
             return tokens;
+        }
+
+        private static void AddToken(Token currentToken, List<Token> tokens, int fileIndex, char character)
+        {
+            // Number ranges should have the number yielded first
+            if (currentToken.Type == TokenType.NumberRange)
+            {
+                var number = currentToken.Value[..^2];
+                tokens.Add(new Token
+                {
+                    Type = TokenType.Number,
+                    Value = number,
+                    FileIndex = fileIndex,
+                    Line = currentToken.Line,
+                    Column = currentToken.Column
+                });
+                currentToken.Type = TokenType.Range;
+                currentToken.Value = "..";
+                currentToken.Column += (uint)number.Length;
+            }
+            else
+            {
+                CheckForReservedTokensAndErrors(currentToken, character);
+            }
+
+            tokens.Add(currentToken);
         }
 
         private static bool IsWhiteSpace(char character)
@@ -269,7 +270,7 @@ namespace ol
             };
         }
 
-        private static void CheckForReservedTokensAndErrors(Token token, char character = default)
+        private static void CheckForReservedTokensAndErrors(Token token, char character)
         {
             // Check tokens for reserved keywords
             if (token.Type == TokenType.Identifier)
