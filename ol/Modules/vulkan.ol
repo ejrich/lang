@@ -2066,15 +2066,15 @@ struct VkPipelineCacheHeaderVersionOne {
     pipelineCacheUUID: CArray<u8>[16];
 }
 
-interface void* PFN_vkAllocationFunction(void* pUserData, size_t size, size_t alignment, VkSystemAllocationScope allocationScope)
+interface void* PFN_vkAllocationFunction(void* pUserData, u64 size, u64 alignment, VkSystemAllocationScope allocationScope)
 
 interface PFN_vkFreeFunction(void* pUserData, void* pMemory)
 
-interface PFN_vkInternalAllocationNotification(void* pUserData, size_t size, VkInternalAllocationType allocationType, VkSystemAllocationScope allocationScope)
+interface PFN_vkInternalAllocationNotification(void* pUserData, u64 size, VkInternalAllocationType allocationType, VkSystemAllocationScope allocationScope)
 
-interface PFN_vkInternalFreeNotification(void* pUserData, size_t size, VkInternalAllocationType allocationType, VkSystemAllocationScope allocationScope)
+interface PFN_vkInternalFreeNotification(void* pUserData, u64 size, VkInternalAllocationType allocationType, VkSystemAllocationScope allocationScope)
 
-interface void* PFN_vkReallocationFunction(void* pUserData, void* pOriginal, size_t size, size_t alignment, VkSystemAllocationScope allocationScope)
+interface void* PFN_vkReallocationFunction(void* pUserData, void* pOriginal, u64 size, u64 alignment, VkSystemAllocationScope allocationScope)
 
 interface PFN_vkVoidFunction(void a)
 
@@ -2257,7 +2257,7 @@ struct VkPhysicalDeviceLimits {
     maxViewportDimensions: CArray<u32>[2];
     viewportBoundsRange: CArray<float>[2];
     viewportSubPixelBits: u32;
-    minMemoryMapAlignment: size_t;
+    minMemoryMapAlignment: u64;
     minTexelBufferOffsetAlignment: u64;
     minUniformBufferOffsetAlignment: u64;
     minStorageBufferOffsetAlignment: u64;
@@ -2566,7 +2566,7 @@ struct VkShaderModuleCreateInfo {
     sType: VkStructureType;
     pNext: void*;
     flags: u32;
-    codeSize: size_t;
+    codeSize: u64;
     pCode: u32*;
 }
 
@@ -2574,20 +2574,20 @@ struct VkPipelineCacheCreateInfo {
     sType: VkStructureType;
     pNext: void*;
     flags: u32;
-    initialDataSize: size_t;
+    initialDataSize: u64;
     pInitialData: void*;
 }
 
 struct VkSpecializationMapEntry {
     constantID: u32;
     offset: u32;
-    size: size_t;
+    size: u64;
 }
 
 struct VkSpecializationInfo {
     mapEntryCount: u32;
     pMapEntries: VkSpecializationMapEntry*;
-    dataSize: size_t;
+    dataSize: u64;
     pData: void*;
 }
 
@@ -3163,7 +3163,7 @@ interface VkResult PFN_vkCreateQueryPool(VkDevice* device, VkQueryPoolCreateInfo
 
 interface PFN_vkDestroyQueryPool(VkDevice* device, VkQueryPool* queryPool, VkAllocationCallbacks* pAllocator)
 
-interface VkResult PFN_vkGetQueryPoolResults(VkDevice* device, VkQueryPool* queryPool, u32 firstQuery, u32 queryCount, size_t dataSize, void* pData, u64 stride, u32 flags)
+interface VkResult PFN_vkGetQueryPoolResults(VkDevice* device, VkQueryPool* queryPool, u32 firstQuery, u32 queryCount, u64 dataSize, void* pData, u64 stride, u32 flags)
 
 interface VkResult PFN_vkCreateBuffer(VkDevice* device, VkBufferCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkBuffer** pBuffer)
 
@@ -3191,7 +3191,7 @@ interface VkResult PFN_vkCreatePipelineCache(VkDevice* device, VkPipelineCacheCr
 
 interface PFN_vkDestroyPipelineCache(VkDevice* device, VkPipelineCache* pipelineCache, VkAllocationCallbacks* pAllocator)
 
-interface VkResult PFN_vkGetPipelineCacheData(VkDevice* device, VkPipelineCache* pipelineCache, size_t* pDataSize, void* pData)
+interface VkResult PFN_vkGetPipelineCacheData(VkDevice* device, VkPipelineCache* pipelineCache, u64* pDataSize, void* pData)
 
 interface VkResult PFN_vkMergePipelineCaches(VkDevice* device, VkPipelineCache* dstCache, u32 srcCacheCount, VkPipelineCache** pSrcCaches)
 
@@ -3437,7 +3437,7 @@ VkResult vkCreateQueryPool(VkDevice* device, VkQueryPoolCreateInfo* pCreateInfo,
 
 vkDestroyQueryPool(VkDevice* device, VkQueryPool* queryPool, VkAllocationCallbacks* pAllocator) #extern "vulkan"
 
-VkResult vkGetQueryPoolResults(VkDevice* device, VkQueryPool* queryPool, u32 firstQuery, u32 queryCount, size_t dataSize, void* pData, u64 stride, u32 flags) #extern "vulkan"
+VkResult vkGetQueryPoolResults(VkDevice* device, VkQueryPool* queryPool, u32 firstQuery, u32 queryCount, u64 dataSize, void* pData, u64 stride, u32 flags) #extern "vulkan"
 
 VkResult vkCreateBuffer(VkDevice* device, VkBufferCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkBuffer** pBuffer) #extern "vulkan"
 
@@ -3465,7 +3465,7 @@ VkResult vkCreatePipelineCache(VkDevice* device, VkPipelineCacheCreateInfo* pCre
 
 vkDestroyPipelineCache(VkDevice* device, VkPipelineCache* pipelineCache, VkAllocationCallbacks* pAllocator) #extern "vulkan"
 
-VkResult vkGetPipelineCacheData(VkDevice* device, VkPipelineCache* pipelineCache, size_t* pDataSize, void* pData) #extern "vulkan"
+VkResult vkGetPipelineCacheData(VkDevice* device, VkPipelineCache* pipelineCache, u64* pDataSize, void* pData) #extern "vulkan"
 
 VkResult vkMergePipelineCaches(VkDevice* device, VkPipelineCache* dstCache, u32 srcCacheCount, VkPipelineCache** pSrcCaches) #extern "vulkan"
 
@@ -4141,8 +4141,8 @@ struct VkDescriptorUpdateTemplateEntry {
     dstArrayElement: u32;
     descriptorCount: u32;
     descriptorType: VkDescriptorType;
-    offset: size_t;
-    stride: size_t;
+    offset: u64;
+    stride: u64;
 }
 
 struct VkDescriptorUpdateTemplateCreateInfo {
@@ -6064,7 +6064,7 @@ struct VkPipelineExecutableInternalRepresentationKHR {
     name: CArray<u8>[256];
     description: CArray<u8>[256];
     isText: u32;
-    dataSize: size_t;
+    dataSize: u64;
     pData: void*;
 }
 
@@ -6565,7 +6565,7 @@ enum VkDebugReportFlagBitsEXT {
     VK_DEBUG_REPORT_FLAG_BITS_MAX_ENUM_EXT = 0x7FFFFFFF;
 }
 
-interface u32 PFN_vkDebugReportCallbackEXT(u32 flags, VkDebugReportObjectTypeEXT objectType, u64 object, size_t location, s32 messageCode, u8* pLayerPrefix, u8* pMessage, void* pUserData)
+interface u32 PFN_vkDebugReportCallbackEXT(u32 flags, VkDebugReportObjectTypeEXT objectType, u64 object, u64 location, s32 messageCode, u8* pLayerPrefix, u8* pMessage, void* pUserData)
 
 struct VkDebugReportCallbackCreateInfoEXT {
     sType: VkStructureType;
@@ -6579,13 +6579,13 @@ interface VkResult PFN_vkCreateDebugReportCallbackEXT(VkInstance* instance, VkDe
 
 interface PFN_vkDestroyDebugReportCallbackEXT(VkInstance* instance, VkDebugReportCallbackEXT* callback, VkAllocationCallbacks* pAllocator)
 
-interface PFN_vkDebugReportMessageEXT(VkInstance* instance, u32 flags, VkDebugReportObjectTypeEXT objectType, u64 object, size_t location, s32 messageCode, u8* pLayerPrefix, u8* pMessage)
+interface PFN_vkDebugReportMessageEXT(VkInstance* instance, u32 flags, VkDebugReportObjectTypeEXT objectType, u64 object, u64 location, s32 messageCode, u8* pLayerPrefix, u8* pMessage)
 
 VkResult vkCreateDebugReportCallbackEXT(VkInstance* instance, VkDebugReportCallbackCreateInfoEXT* pCreateInfo, VkAllocationCallbacks* pAllocator, VkDebugReportCallbackEXT** pCallback) #extern "vulkan"
 
 vkDestroyDebugReportCallbackEXT(VkInstance* instance, VkDebugReportCallbackEXT* callback, VkAllocationCallbacks* pAllocator) #extern "vulkan"
 
-vkDebugReportMessageEXT(VkInstance* instance, u32 flags, VkDebugReportObjectTypeEXT objectType, u64 object, size_t location, s32 messageCode, u8* pLayerPrefix, u8* pMessage) #extern "vulkan"
+vkDebugReportMessageEXT(VkInstance* instance, u32 flags, VkDebugReportObjectTypeEXT objectType, u64 object, u64 location, s32 messageCode, u8* pLayerPrefix, u8* pMessage) #extern "vulkan"
 
 enum VkRasterizationOrderAMD {
     VK_RASTERIZATION_ORDER_STRICT_AMD = 0;
@@ -6613,7 +6613,7 @@ struct VkDebugMarkerObjectTagInfoEXT {
     objectType: VkDebugReportObjectTypeEXT;
     object: u64;
     tagName: u64;
-    tagSize: size_t;
+    tagSize: u64;
     pTag: void*;
 }
 
@@ -6721,7 +6721,7 @@ struct VkCuFunctionNVX {}
 struct VkCuModuleCreateInfoNVX {
     sType: VkStructureType;
     pNext: void*;
-    dataSize: size_t;
+    dataSize: u64;
     pData: void*;
 }
 
@@ -6743,9 +6743,9 @@ struct VkCuLaunchInfoNVX {
     blockDimY: u32;
     blockDimZ: u32;
     sharedMemBytes: u32;
-    paramCount: size_t;
+    paramCount: u64;
     pParams: void*;
-    extraCount: size_t;
+    extraCount: u64;
     pExtras: void*;
 }
 
@@ -6817,8 +6817,8 @@ struct VkShaderResourceUsageAMD {
     numUsedVgprs: u32;
     numUsedSgprs: u32;
     ldsSizePerLocalWorkGroup: u32;
-    ldsUsageSizeInBytes: size_t;
-    scratchMemUsageInBytes: size_t;
+    ldsUsageSizeInBytes: u64;
+    scratchMemUsageInBytes: u64;
 }
 
 struct VkShaderStatisticsInfoAMD {
@@ -6831,9 +6831,9 @@ struct VkShaderStatisticsInfoAMD {
     computeWorkGroupSize: CArray<u32>[3];
 }
 
-interface VkResult PFN_vkGetShaderInfoAMD(VkDevice* device, VkPipeline* pipeline, VkShaderStageFlagBits shaderStage, VkShaderInfoTypeAMD infoType, size_t* pInfoSize, void* pInfo)
+interface VkResult PFN_vkGetShaderInfoAMD(VkDevice* device, VkPipeline* pipeline, VkShaderStageFlagBits shaderStage, VkShaderInfoTypeAMD infoType, u64* pInfoSize, void* pInfo)
 
-VkResult vkGetShaderInfoAMD(VkDevice* device, VkPipeline* pipeline, VkShaderStageFlagBits shaderStage, VkShaderInfoTypeAMD infoType, size_t* pInfoSize, void* pInfo) #extern "vulkan"
+VkResult vkGetShaderInfoAMD(VkDevice* device, VkPipeline* pipeline, VkShaderStageFlagBits shaderStage, VkShaderInfoTypeAMD infoType, u64* pInfoSize, void* pInfo) #extern "vulkan"
 
 struct VkPhysicalDeviceCornerSampledImageFeaturesNV {
     sType: VkStructureType;
@@ -7266,7 +7266,7 @@ struct VkDebugUtilsObjectTagInfoEXT {
     objectType: VkObjectType;
     objectHandle: u64;
     tagName: u64;
-    tagSize: size_t;
+    tagSize: u64;
     pTag: void*;
 }
 
@@ -7536,7 +7536,7 @@ struct VkValidationCacheCreateInfoEXT {
     sType: VkStructureType;
     pNext: void*;
     flags: u32;
-    initialDataSize: size_t;
+    initialDataSize: u64;
     pInitialData: void*;
 }
 
@@ -7552,7 +7552,7 @@ interface PFN_vkDestroyValidationCacheEXT(VkDevice* device, VkValidationCacheEXT
 
 interface VkResult PFN_vkMergeValidationCachesEXT(VkDevice* device, VkValidationCacheEXT* dstCache, u32 srcCacheCount, VkValidationCacheEXT** pSrcCaches)
 
-interface VkResult PFN_vkGetValidationCacheDataEXT(VkDevice* device, VkValidationCacheEXT* validationCache, size_t* pDataSize, void* pData)
+interface VkResult PFN_vkGetValidationCacheDataEXT(VkDevice* device, VkValidationCacheEXT* validationCache, u64* pDataSize, void* pData)
 
 VkResult vkCreateValidationCacheEXT(VkDevice* device, VkValidationCacheCreateInfoEXT* pCreateInfo, VkAllocationCallbacks* pAllocator, VkValidationCacheEXT** pValidationCache) #extern "vulkan"
 
@@ -7560,7 +7560,7 @@ vkDestroyValidationCacheEXT(VkDevice* device, VkValidationCacheEXT* validationCa
 
 VkResult vkMergeValidationCachesEXT(VkDevice* device, VkValidationCacheEXT* dstCache, u32 srcCacheCount, VkValidationCacheEXT** pSrcCaches) #extern "vulkan"
 
-VkResult vkGetValidationCacheDataEXT(VkDevice* device, VkValidationCacheEXT* validationCache, size_t* pDataSize, void* pData) #extern "vulkan"
+VkResult vkGetValidationCacheDataEXT(VkDevice* device, VkValidationCacheEXT* validationCache, u64* pDataSize, void* pData) #extern "vulkan"
 
 enum VkShadingRatePaletteEntryNV {
     VK_SHADING_RATE_PALETTE_ENTRY_NO_INVOCATIONS_NV = 0;
@@ -7846,7 +7846,7 @@ struct VkPhysicalDeviceRayTracingPropertiesNV {
 }
 
 struct VkTransformMatrixKHR {
-    matrix: CArray<float>[4];
+    matrix: CArray<CArray<float>[4]>[3];
 }
 
 struct VkAabbPositionsKHR {
@@ -7860,10 +7860,11 @@ struct VkAabbPositionsKHR {
 
 struct VkAccelerationStructureInstanceKHR {
     transform: VkTransformMatrixKHR;
-    instanceCustomIndex:24: u32;
-    mask:8: u32;
-    instanceShaderBindingTableRecordOffset:24: u32;
-    flags:8: u32;
+    instanceCustomIndex: u32;
+    // @Future Support bitfields
+    // mask:8: u32;
+    instanceShaderBindingTableRecordOffset: u32;
+    // flags:8: u32;
     accelerationStructureReference: u64;
 }
 
@@ -7883,11 +7884,11 @@ interface PFN_vkCmdTraceRaysNV(VkCommandBuffer* commandBuffer, VkBuffer* raygenS
 
 interface VkResult PFN_vkCreateRayTracingPipelinesNV(VkDevice* device, VkPipelineCache* pipelineCache, u32 createInfoCount, VkRayTracingPipelineCreateInfoNV* pCreateInfos, VkAllocationCallbacks* pAllocator, VkPipeline** pPipelines)
 
-interface VkResult PFN_vkGetRayTracingShaderGroupHandlesKHR(VkDevice* device, VkPipeline* pipeline, u32 firstGroup, u32 groupCount, size_t dataSize, void* pData)
+interface VkResult PFN_vkGetRayTracingShaderGroupHandlesKHR(VkDevice* device, VkPipeline* pipeline, u32 firstGroup, u32 groupCount, u64 dataSize, void* pData)
 
-interface VkResult PFN_vkGetRayTracingShaderGroupHandlesNV(VkDevice* device, VkPipeline* pipeline, u32 firstGroup, u32 groupCount, size_t dataSize, void* pData)
+interface VkResult PFN_vkGetRayTracingShaderGroupHandlesNV(VkDevice* device, VkPipeline* pipeline, u32 firstGroup, u32 groupCount, u64 dataSize, void* pData)
 
-interface VkResult PFN_vkGetAccelerationStructureHandleNV(VkDevice* device, VkAccelerationStructureNV* accelerationStructure, size_t dataSize, void* pData)
+interface VkResult PFN_vkGetAccelerationStructureHandleNV(VkDevice* device, VkAccelerationStructureNV* accelerationStructure, u64 dataSize, void* pData)
 
 interface PFN_vkCmdWriteAccelerationStructuresPropertiesNV(VkCommandBuffer* commandBuffer, u32 accelerationStructureCount, VkAccelerationStructureNV** pAccelerationStructures, VkQueryType queryType, VkQueryPool* queryPool, u32 firstQuery)
 
@@ -7909,11 +7910,11 @@ vkCmdTraceRaysNV(VkCommandBuffer* commandBuffer, VkBuffer* raygenShaderBindingTa
 
 VkResult vkCreateRayTracingPipelinesNV(VkDevice* device, VkPipelineCache* pipelineCache, u32 createInfoCount, VkRayTracingPipelineCreateInfoNV* pCreateInfos, VkAllocationCallbacks* pAllocator, VkPipeline** pPipelines) #extern "vulkan"
 
-VkResult vkGetRayTracingShaderGroupHandlesKHR(VkDevice* device, VkPipeline* pipeline, u32 firstGroup, u32 groupCount, size_t dataSize, void* pData) #extern "vulkan"
+VkResult vkGetRayTracingShaderGroupHandlesKHR(VkDevice* device, VkPipeline* pipeline, u32 firstGroup, u32 groupCount, u64 dataSize, void* pData) #extern "vulkan"
 
-VkResult vkGetRayTracingShaderGroupHandlesNV(VkDevice* device, VkPipeline* pipeline, u32 firstGroup, u32 groupCount, size_t dataSize, void* pData) #extern "vulkan"
+VkResult vkGetRayTracingShaderGroupHandlesNV(VkDevice* device, VkPipeline* pipeline, u32 firstGroup, u32 groupCount, u64 dataSize, void* pData) #extern "vulkan"
 
-VkResult vkGetAccelerationStructureHandleNV(VkDevice* device, VkAccelerationStructureNV* accelerationStructure, size_t dataSize, void* pData) #extern "vulkan"
+VkResult vkGetAccelerationStructureHandleNV(VkDevice* device, VkAccelerationStructureNV* accelerationStructure, u64 dataSize, void* pData) #extern "vulkan"
 
 vkCmdWriteAccelerationStructuresPropertiesNV(VkCommandBuffer* commandBuffer, u32 accelerationStructureCount, VkAccelerationStructureNV** pAccelerationStructures, VkQueryType queryType, VkQueryPool* queryPool, u32 firstQuery) #extern "vulkan"
 
@@ -9216,10 +9217,11 @@ struct VkAccelerationStructureMotionInfoNV {
 struct VkAccelerationStructureMatrixMotionInstanceNV {
     transformT0: VkTransformMatrixKHR;
     transformT1: VkTransformMatrixKHR;
-    instanceCustomIndex:24: u32;
-    mask:8: u32;
-    instanceShaderBindingTableRecordOffset:24: u32;
-    flags:8: u32;
+    instanceCustomIndex: u32;
+    // @Future Support bitfields
+    // mask:8: u32;
+    instanceShaderBindingTableRecordOffset: u32;
+    // flags:8: u32;
     accelerationStructureReference: u64;
 }
 
@@ -9245,10 +9247,11 @@ struct VkSRTDataNV {
 struct VkAccelerationStructureSRTMotionInstanceNV {
     transformT0: VkSRTDataNV;
     transformT1: VkSRTDataNV;
-    instanceCustomIndex:24: u32;
-    mask:8: u32;
-    instanceShaderBindingTableRecordOffset:24: u32;
-    flags:8: u32;
+    instanceCustomIndex: u32;
+    // @Future Support bitfields
+    // mask:8: u32;
+    instanceShaderBindingTableRecordOffset: u32;
+    // flags:8: u32;
     accelerationStructureReference: u64;
 }
 
@@ -9730,7 +9733,7 @@ interface VkResult PFN_vkCopyAccelerationStructureToMemoryKHR(VkDevice* device, 
 
 interface VkResult PFN_vkCopyMemoryToAccelerationStructureKHR(VkDevice* device, VkDeferredOperationKHR* deferredOperation, VkCopyMemoryToAccelerationStructureInfoKHR* pInfo)
 
-interface VkResult PFN_vkWriteAccelerationStructuresPropertiesKHR(VkDevice* device, u32 accelerationStructureCount, VkAccelerationStructureKHR** pAccelerationStructures, VkQueryType queryType, size_t dataSize, void* pData, size_t stride)
+interface VkResult PFN_vkWriteAccelerationStructuresPropertiesKHR(VkDevice* device, u32 accelerationStructureCount, VkAccelerationStructureKHR** pAccelerationStructures, VkQueryType queryType, u64 dataSize, void* pData, u64 stride)
 
 interface PFN_vkCmdCopyAccelerationStructureKHR(VkCommandBuffer* commandBuffer, VkCopyAccelerationStructureInfoKHR* pInfo)
 
@@ -9762,7 +9765,7 @@ VkResult vkCopyAccelerationStructureToMemoryKHR(VkDevice* device, VkDeferredOper
 
 VkResult vkCopyMemoryToAccelerationStructureKHR(VkDevice* device, VkDeferredOperationKHR* deferredOperation, VkCopyMemoryToAccelerationStructureInfoKHR* pInfo) #extern "vulkan"
 
-VkResult vkWriteAccelerationStructuresPropertiesKHR(VkDevice* device, u32 accelerationStructureCount, VkAccelerationStructureKHR** pAccelerationStructures, VkQueryType queryType, size_t dataSize, void* pData, size_t stride) #extern "vulkan"
+VkResult vkWriteAccelerationStructuresPropertiesKHR(VkDevice* device, u32 accelerationStructureCount, VkAccelerationStructureKHR** pAccelerationStructures, VkQueryType queryType, u64 dataSize, void* pData, u64 stride) #extern "vulkan"
 
 vkCmdCopyAccelerationStructureKHR(VkCommandBuffer* commandBuffer, VkCopyAccelerationStructureInfoKHR* pInfo) #extern "vulkan"
 
@@ -9860,7 +9863,7 @@ interface PFN_vkCmdTraceRaysKHR(VkCommandBuffer* commandBuffer, VkStridedDeviceA
 
 interface VkResult PFN_vkCreateRayTracingPipelinesKHR(VkDevice* device, VkDeferredOperationKHR* deferredOperation, VkPipelineCache* pipelineCache, u32 createInfoCount, VkRayTracingPipelineCreateInfoKHR* pCreateInfos, VkAllocationCallbacks* pAllocator, VkPipeline** pPipelines)
 
-interface VkResult PFN_vkGetRayTracingCaptureReplayShaderGroupHandlesKHR(VkDevice* device, VkPipeline* pipeline, u32 firstGroup, u32 groupCount, size_t dataSize, void* pData)
+interface VkResult PFN_vkGetRayTracingCaptureReplayShaderGroupHandlesKHR(VkDevice* device, VkPipeline* pipeline, u32 firstGroup, u32 groupCount, u64 dataSize, void* pData)
 
 interface PFN_vkCmdTraceRaysIndirectKHR(VkCommandBuffer* commandBuffer, VkStridedDeviceAddressRegionKHR* pRaygenShaderBindingTable, VkStridedDeviceAddressRegionKHR* pMissShaderBindingTable, VkStridedDeviceAddressRegionKHR* pHitShaderBindingTable, VkStridedDeviceAddressRegionKHR* pCallableShaderBindingTable, u64 indirectDeviceAddress)
 
@@ -9872,7 +9875,7 @@ vkCmdTraceRaysKHR(VkCommandBuffer* commandBuffer, VkStridedDeviceAddressRegionKH
 
 VkResult vkCreateRayTracingPipelinesKHR(VkDevice* device, VkDeferredOperationKHR* deferredOperation, VkPipelineCache* pipelineCache, u32 createInfoCount, VkRayTracingPipelineCreateInfoKHR* pCreateInfos, VkAllocationCallbacks* pAllocator, VkPipeline** pPipelines) #extern "vulkan"
 
-VkResult vkGetRayTracingCaptureReplayShaderGroupHandlesKHR(VkDevice* device, VkPipeline* pipeline, u32 firstGroup, u32 groupCount, size_t dataSize, void* pData) #extern "vulkan"
+VkResult vkGetRayTracingCaptureReplayShaderGroupHandlesKHR(VkDevice* device, VkPipeline* pipeline, u32 firstGroup, u32 groupCount, u64 dataSize, void* pData) #extern "vulkan"
 
 vkCmdTraceRaysIndirectKHR(VkCommandBuffer* commandBuffer, VkStridedDeviceAddressRegionKHR* pRaygenShaderBindingTable, VkStridedDeviceAddressRegionKHR* pMissShaderBindingTable, VkStridedDeviceAddressRegionKHR* pHitShaderBindingTable, VkStridedDeviceAddressRegionKHR* pCallableShaderBindingTable, u64 indirectDeviceAddress) #extern "vulkan"
 

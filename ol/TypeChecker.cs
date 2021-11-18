@@ -342,7 +342,7 @@ namespace ol
             ThreadPool.CompleteWork();
         }
 
-        private void RemoveNode(Node<IAst> previous, Node<IAst> current)
+        private static void RemoveNode(Node<IAst> previous, Node<IAst> current)
         {
             if (previous == null)
             {
@@ -403,7 +403,6 @@ namespace ol
 
             // 2. Verify enums don't have repeated values
             var valueNames = new HashSet<string>();
-            var values = new HashSet<int>();
 
             var lowestAllowedValue = enumAst.BaseType.Signed ? -Math.Pow(2, 8 * enumAst.Size - 1) : 0;
             var largestAllowedValue = enumAst.BaseType.Signed ? Math.Pow(2, 8 * enumAst.Size - 1) - 1 : Math.Pow(2, 8 * enumAst.Size) - 1;
@@ -420,11 +419,7 @@ namespace ol
                 // 2b. Check if the value has been previously used
                 if (value.Defined)
                 {
-                    if (!values.Add(value.Value))
-                    {
-                        ErrorReporter.Report($"Value '{value.Value}' previously defined in enum '{enumAst.Name}'", value);
-                    }
-                    else if (value.Value > largestValue)
+                    if (value.Value > largestValue)
                     {
                         largestValue = value.Value;
                     }
@@ -1153,7 +1148,7 @@ namespace ol
                 // 3b. Check for errored or undefined field types
                 argument.Type = VerifyType(argument.TypeDefinition, _globalScope, out _, out var isVarargs, out var isParams);
 
-                if (isVarargs || isParams)
+                if (isVarargs)
                 {
                     ErrorReporter.Report($"Interface '{interfaceAst.Name}' cannot have varargs arguments", argument.TypeDefinition);
                 }
@@ -2257,7 +2252,7 @@ namespace ol
                         case Operator.Xor:
                             if (lhs == TypeKind.Enum && rhs == TypeKind.Enum)
                             {
-                                if (lhs != rhs)
+                                if (variableType != valueType)
                                 {
                                     ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
                                 }
@@ -2576,7 +2571,7 @@ namespace ol
             return null;
         }
 
-        private IType VerifyStructField(string fieldName, IType structType, StructFieldRefAst structField, int fieldIndex, IAst ast, bool call = false)
+        private static IType VerifyStructField(string fieldName, IType structType, StructFieldRefAst structField, int fieldIndex, IAst ast, bool call = false)
         {
             if (structType.TypeKind == TypeKind.Pointer)
             {
@@ -2621,7 +2616,7 @@ namespace ol
 
                 return field.Type;
             }
-            else if (structType is UnionAst union)
+            if (structType is UnionAst union)
             {
                 UnionFieldAst field = null;
                 for (var i = 0; i < union.Fields.Count; i++)
@@ -3059,7 +3054,7 @@ namespace ol
             }
         }
 
-        private void VerifyConstantIfNecessary(IAst ast, IType targetType)
+        private static void VerifyConstantIfNecessary(IAst ast, IType targetType)
         {
             if (ast is ConstantAst constant && constant.Type != targetType && (constant.Type.TypeKind == TypeKind.Integer || constant.Type.TypeKind == TypeKind.Float) && targetType.TypeKind != TypeKind.Any)
             {
@@ -3152,7 +3147,7 @@ namespace ol
             }
         }
 
-        private IType VerifyEnumValue(EnumAst enumAst, StructFieldRefAst structField)
+        private static IType VerifyEnumValue(EnumAst enumAst, StructFieldRefAst structField)
         {
             structField.IsEnum = true;
             structField.Types = new [] {enumAst};
@@ -3397,9 +3392,8 @@ namespace ol
         {
             if (TypeTable.Functions.TryGetValue(call.Name, out var functions))
             {
-                for (var i = 0; i < functions.Count; i++)
+                foreach (var function in functions)
                 {
-                    var function = functions[i];
                     if (VerifyArguments(call, arguments, specifiedArguments, function, function.Flags.HasFlag(FunctionFlags.Varargs), function.Flags.HasFlag(FunctionFlags.Params), function.ParamsElementType, function.Flags.HasFlag(FunctionFlags.Extern)))
                     {
                         return function;
@@ -3778,7 +3772,7 @@ namespace ol
             return null;
         }
 
-        private void OrderCallArguments(CallAst call, IInterface function, int argumentCount, IType[] argumentTypes)
+        private static void OrderCallArguments(CallAst call, IInterface function, int argumentCount, IType[] argumentTypes)
         {
             // Verify call arguments match the types of the function arguments
             for (var i = 0; i < argumentCount; i++)
@@ -4242,7 +4236,7 @@ namespace ol
             }
         }
 
-        private bool TypeEquals(IType target, IType source, bool checkPrimitives = false)
+        private static bool TypeEquals(IType target, IType source, bool checkPrimitives = false)
         {
             if (target == null || source == null) return false;
             if (target is InterfaceAst interfaceAst)
@@ -4637,7 +4631,7 @@ namespace ol
             return arrayStruct;
         }
 
-        private IType CreateCompoundType(IType[] types, string backendName, uint size)
+        private static IType CreateCompoundType(IType[] types, string backendName, uint size)
         {
             var compoundType = new CompoundType {Name = string.Join(", ", types.Select(t => t.Name)), BackendName = backendName, Size = size, Types = types};
             TypeTable.Add(backendName, compoundType);
