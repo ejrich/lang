@@ -44,31 +44,19 @@ namespace ol
 
         public static List<Token> LoadFileTokens(string filePath, int fileIndex)
         {
-            using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
-            using var reader = new StreamReader(fileStream);
-
-            return GetTokens(reader, fileIndex).ToList();
-        }
-
-        private static IEnumerable<Token> GetTokens(StreamReader reader, int fileIndex)
-        {
-            var lexerStatus = new LexerStatus();
+            var fileText = File.ReadAllText(filePath);
 
             Token currentToken = null;
             var closingMultiLineComment = false;
             var literalEscapeToken = false;
             uint line = 1, column = 1;
 
-            while (reader.Peek() > 0)
-            {
-                var character = (char)reader.Read();
+            var lexerStatus = new LexerStatus();
+            var tokens = new List<Token>();
 
-                column++;
-                if (character == '\n')
-                {
-                    line++;
-                    column = 0;
-                }
+            for (var i = 0; i < fileText.Length; i++)
+            {
+                var character = fileText[i];
 
                 // Skip through comments
                 if (lexerStatus.ReadingComment)
@@ -86,11 +74,20 @@ namespace ol
                     }
                     else if (character == '\n')
                     {
+                        line++;
+                        column = 0;
                         lexerStatus.ReadingComment = false;
                         currentToken = null;
                     }
 
                     continue;
+                }
+
+                column++;
+                if (character == '\n')
+                {
+                    line++;
+                    column = 0;
                 }
 
                 // Interpret string literals
@@ -129,7 +126,7 @@ namespace ol
                                 ErrorReporter.Report($"Unexpected token '{currentToken.Value}'", currentToken);
                             }
 
-                            yield return currentToken;
+                            tokens.Add(currentToken);
                             currentToken = null;
                         }
                         else
@@ -146,7 +143,7 @@ namespace ol
                     currentToken.Type = TokenType.Character;
                     if (character == '\\')
                     {
-                        character = (char)reader.Read();
+                        character = fileText[++i];
                         if (_escapableCharacters.TryGetValue(character, out var escapedCharacter))
                         {
                             currentToken.Value = $"{escapedCharacter}";
@@ -165,7 +162,7 @@ namespace ol
 
                 if (currentToken?.Type == TokenType.Character)
                 {
-                    yield return currentToken;
+                    tokens.Add(currentToken);
                     if (character != '\'')
                     {
                         ErrorReporter.Report($"Expected a single digit character", currentToken);
@@ -178,7 +175,7 @@ namespace ol
                 }
 
                 // Skip over whitespace and emit the current token if not null
-                if (char.IsWhiteSpace(character))
+                if (IsWhiteSpace(character))
                 {
                     if (currentToken != null)
                     {
@@ -186,14 +183,14 @@ namespace ol
                         if (currentToken.Type == TokenType.NumberRange)
                         {
                             var number = currentToken.Value[..^2];
-                            yield return new Token
+                            tokens.Add(new Token
                             {
                                 Type = TokenType.Number,
                                 Value = number,
                                 FileIndex = fileIndex,
                                 Line = currentToken.Line,
                                 Column = currentToken.Column
-                            };
+                            });
                             currentToken.Type = TokenType.Range;
                             currentToken.Value = "..";
                             currentToken.Column += (uint)number.Length;
@@ -203,7 +200,7 @@ namespace ol
                             CheckForReservedTokensAndErrors(currentToken, character);
                         }
 
-                        yield return currentToken;
+                        tokens.Add(currentToken);
                     }
                     currentToken = null;
                     continue;
@@ -224,14 +221,14 @@ namespace ol
                         if (currentToken.Type == TokenType.NumberRange)
                         {
                             var number = currentToken.Value[..^2];
-                            yield return new Token
+                            tokens.Add(new Token
                             {
                                 Type = TokenType.Number,
                                 FileIndex = fileIndex,
                                 Value = number,
                                 Line = currentToken.Line,
                                 Column = currentToken.Column
-                            };
+                            });
                             currentToken.Type = TokenType.Range;
                             currentToken.Value = "..";
                             currentToken.Column += (uint)number.Length;
@@ -241,7 +238,7 @@ namespace ol
                             CheckForReservedTokensAndErrors(currentToken, character);
                         }
 
-                        yield return currentToken;
+                        tokens.Add(currentToken);
                     }
 
                     currentToken = new Token
@@ -255,7 +252,21 @@ namespace ol
                 }
             }
 
-            if (!lexerStatus.ReadingComment && currentToken != null) yield return currentToken;
+            if (!lexerStatus.ReadingComment && currentToken != null) tokens.Add(currentToken);
+
+            return tokens;
+        }
+
+        private static bool IsWhiteSpace(char character)
+        {
+            return character switch
+            {
+                ' ' => true,
+                '\n' => true,
+                '\r' => true,
+                '\t' => true,
+                _ => false
+            };
         }
 
         private static void CheckForReservedTokensAndErrors(Token token, char character = default)
@@ -277,11 +288,37 @@ namespace ol
 
         private static TokenType GetTokenType(char character)
         {
-            var token = (TokenType)character;
-
             if (char.IsDigit(character)) return TokenType.Number;
 
-            return Enum.IsDefined(typeof(TokenType), token) ? token : TokenType.Identifier;
+            return character switch
+            {
+                '(' => TokenType.OpenParen,
+                ')' => TokenType.CloseParen,
+                '[' => TokenType.OpenBracket,
+                ']' => TokenType.CloseBracket,
+                '{' => TokenType.OpenBrace,
+                '}' => TokenType.CloseBrace,
+                '!' => TokenType.Not,
+                '&' => TokenType.Ampersand,
+                '|' => TokenType.Pipe,
+                '^' => TokenType.Caret,
+                '+' => TokenType.Plus,
+                '-' => TokenType.Minus,
+                '*' => TokenType.Asterisk,
+                '/' => TokenType.ForwardSlash,
+                '%' => TokenType.Percent,
+                '=' => TokenType.Equals,
+                ':' => TokenType.Colon,
+                ';' => TokenType.SemiColon,
+                '"' => TokenType.Quote,
+                '\'' => TokenType.Apostrophe,
+                '<' => TokenType.LessThan,
+                '>' => TokenType.GreaterThan,
+                ',' => TokenType.Comma,
+                '.' => TokenType.Period,
+                '#' => TokenType.Pound,
+                _ => TokenType.Identifier
+            };
         }
 
         private static bool ContinueToken(Token currentToken, TokenType type, char character, LexerStatus lexerStatus)

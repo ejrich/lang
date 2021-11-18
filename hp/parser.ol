@@ -132,6 +132,9 @@ TypeDefinition, Node<Token>* parse_type(Node<Token>* node) {
         if node.next.data.type == TokenType.Double {
             return check_for_pointers("float64", node.next.next);
         }
+        if node.next.data.type == TokenType.Unsigned {
+            node = node.next;
+        }
         if node.next.data.type == TokenType.Long {
             node = node.next;
         }
