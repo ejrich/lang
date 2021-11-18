@@ -1,83 +1,82 @@
 using System;
 using System.Collections.Generic;
 
-namespace ol
+namespace ol;
+
+public static class ErrorCodes
 {
-    public static class ErrorCodes
+    public const int ArgumentsError = 1;
+    public const int ParsingError = 2;
+    public const int CompilationError = 3;
+    public const int BuildError = 4;
+    public const int LinkError = 5;
+}
+
+public class Error
+{
+    public string Message { get; init; }
+    public int? FileIndex { get; set; }
+    public uint Line { get; set; }
+    public uint Column { get; set; }
+}
+
+public static class ErrorReporter
+{
+    public static List<Error> Errors { get; } = new();
+
+    public static void Report(string message, Token token)
     {
-        public const int ArgumentsError = 1;
-        public const int ParsingError = 2;
-        public const int CompilationError = 3;
-        public const int BuildError = 4;
-        public const int LinkError = 5;
+        if (token != null)
+        {
+            Report(message, token.FileIndex, token.Line, token.Column);
+        }
+        else
+        {
+            Report(message);
+        }
     }
 
-    public class Error
+    public static void Report(string message, IAst ast)
     {
-        public string Message { get; init; }
-        public int? FileIndex { get; set; }
-        public uint Line { get; set; }
-        public uint Column { get; set; }
+        if (ast != null)
+        {
+            Report(message, ast.FileIndex, ast.Line, ast.Column);
+        }
+        else
+        {
+            Report(message);
+        }
     }
 
-    public static class ErrorReporter
+    public static void Report(string message)
     {
-        public static List<Error> Errors { get; } = new();
+        Errors.Add(new Error {Message = message});
+    }
 
-        public static void Report(string message, Token token)
+    public static void Report(string message, int fileIndex, uint line, uint column)
+    {
+        Errors.Add(new Error {Message = message, FileIndex = fileIndex, Line = line, Column = column});
+    }
+
+    public static void ListErrorsAndExit(int errorCode)
+    {
+        if (Errors.Count > 0)
         {
-            if (token != null)
-            {
-                Report(message, token.FileIndex, token.Line, token.Column);
-            }
-            else
-            {
-                Report(message);
-            }
-        }
+            Console.WriteLine($"{Errors.Count} compilation error(s):\n");
 
-        public static void Report(string message, IAst ast)
-        {
-            if (ast != null)
+            foreach (var error in Errors)
             {
-                Report(message, ast.FileIndex, ast.Line, ast.Column);
-            }
-            else
-            {
-                Report(message);
-            }
-        }
-
-        public static void Report(string message)
-        {
-            Errors.Add(new Error {Message = message});
-        }
-
-        public static void Report(string message, int fileIndex, uint line, uint column)
-        {
-            Errors.Add(new Error {Message = message, FileIndex = fileIndex, Line = line, Column = column});
-        }
-
-        public static void ListErrorsAndExit(int errorCode)
-        {
-            if (Errors.Count > 0)
-            {
-                Console.WriteLine($"{Errors.Count} compilation error(s):\n");
-
-                foreach (var error in Errors)
+                if (error.FileIndex.HasValue)
                 {
-                    if (error.FileIndex.HasValue)
-                    {
-                        Console.WriteLine($"{BuildSettings.Files[error.FileIndex.Value].Replace(BuildSettings.Path, string.Empty)}: {error.Message} at line {error.Line}:{error.Column}");
-                    }
-                    else
-                    {
-                        Console.WriteLine(error.Message);
-                    }
+                    Console.WriteLine($"{BuildSettings.Files[error.FileIndex.Value].Replace(BuildSettings.Path, string.Empty)}: {error.Message} at line {error.Line}:{error.Column}");
                 }
-
-                Environment.Exit(errorCode);
+                else
+                {
+                    Console.WriteLine(error.Message);
+                }
             }
+
+            Environment.Exit(errorCode);
         }
     }
 }
