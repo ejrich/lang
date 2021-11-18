@@ -93,8 +93,7 @@ public static class ol
 
         // 4. Build program
         stopwatch.Restart();
-        var backend = new LLVMBackend();
-        var objectFile = backend.Build();
+        var objectFile = LLVMBackend.Build();
         stopwatch.Stop();
         var buildTime = stopwatch.Elapsed;
 
