@@ -305,6 +305,11 @@ public static unsafe class ProgramRunner
         BuildSettings.Name = Marshal.PtrToStringAnsi(name.Data);
     }
 
+    private static void SetOutputTypeTable(byte config)
+    {
+        BuildSettings.OutputTypeTable = (OutputTypeTableConfiguration)config;
+    }
+
     private static Register ExecuteFunction(FunctionIR function, Register[] arguments)
     {
         var instructionPointer = 0;
@@ -1381,6 +1386,12 @@ public static unsafe class ProgramRunner
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
                     var name = Marshal.PtrToStructure<String>(value.Pointer);
                     SetExecutableName(name);
+                    break;
+                }
+                case "set_output_type_table":
+                {
+                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    SetOutputTypeTable(value.Byte);
                     break;
                 }
                 default:

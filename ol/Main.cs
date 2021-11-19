@@ -9,6 +9,7 @@ public static class BuildSettings
 {
     public static string Name { get; set; }
     public static LinkerType Linker { get; set; } = LinkerType.Dynamic; // TODO How to remove libc
+    public static OutputTypeTableConfiguration OutputTypeTable { get; set; }
     public static bool Release { get; set; }
     public static bool OutputAssembly { get; set; }
     public static string Path { get; set; }
@@ -20,6 +21,14 @@ public enum LinkerType : byte
 {
     Static,
     Dynamic
+}
+
+// TODO Implement in backend
+public enum OutputTypeTableConfiguration : byte
+{
+    Full,
+    Used,
+    None
 }
 
 public static class ol
