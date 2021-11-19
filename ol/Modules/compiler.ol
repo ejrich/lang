@@ -25,3 +25,11 @@ enum LinkerType : u8 {
 set_linker(LinkerType linker) #compiler
 
 set_executable_name(string name) #compiler
+
+enum OutputTypeTableConfiguration : u8 {
+    Full;
+    Used;
+    None;
+}
+
+set_output_type_table(OutputTypeTableConfiguration config) #compiler
