@@ -427,10 +427,7 @@ public static class TypeChecker
             }
         }
 
-        if (!ErrorReporter.Errors.Any())
-        {
-            TypeTable.CreateTypeInfo(enumAst);
-        }
+        TypeTable.CreateTypeInfo(enumAst);
     }
 
     private static void VerifyStruct(StructAst structAst)
@@ -690,10 +687,7 @@ public static class TypeChecker
             }
         }
 
-        if (!ErrorReporter.Errors.Any())
-        {
-            TypeTable.CreateTypeInfo(structAst);
-        }
+        TypeTable.CreateTypeInfo(structAst);
         structAst.Verified = true;
     }
 
@@ -777,10 +771,7 @@ public static class TypeChecker
             }
         }
 
-        if (!ErrorReporter.Errors.Any())
-        {
-            TypeTable.CreateTypeInfo(union);
-        }
+        TypeTable.CreateTypeInfo(union);
         union.Verified = true;
     }
 
@@ -1149,11 +1140,7 @@ public static class TypeChecker
         }
 
         // 3. Load the interface into the type table
-        if (!ErrorReporter.Errors.Any())
-        {
-            // TODO Implement me
-            // TypeTable.CreateTypeInfo(interfaceAst);
-        }
+        TypeTable.CreateTypeInfo(interfaceAst);
         interfaceAst.Verified = true;
     }
 

@@ -121,9 +121,12 @@ struct CompoundTypeInfo : TypeInfo {
     types: Array<TypeInfo>;
 }
 
-struct FunctionTypeInfo : TypeInfo {
+struct InterfaceTypeInfo : TypeInfo {
     return_type: TypeInfo*;
     arguments: Array<ArgumentType>;
+}
+
+struct FunctionTypeInfo : InterfaceTypeInfo {
     attributes: Array<string>;
 }
 
