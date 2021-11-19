@@ -146,7 +146,7 @@ public unsafe static class TypeTable
     {
         [FieldOffset(0)] public String Name;
         [FieldOffset(12)] public TypeKind Type;
-        [FieldOffset(16)] public uint Size;
+        [FieldOffset(16)] public uint Size = 8;
         [FieldOffset(20)] public IntPtr PointerType;
     }
 
@@ -204,6 +204,17 @@ public unsafe static class TypeTable
         [FieldOffset(20)] public Array Types;
     }
 
+    private const int InterfaceTypeInfoSize = 40;
+    [StructLayout(LayoutKind.Explicit, Size=InterfaceTypeInfoSize)]
+    public struct InterfaceTypeInfo
+    {
+        [FieldOffset(0)] public String Name;
+        [FieldOffset(12)] public TypeKind Type;
+        [FieldOffset(16)] public uint Size = 8;
+        [FieldOffset(20)] public IntPtr ReturnType;
+        [FieldOffset(28)] public Array Arguments;
+    }
+
     private const int FunctionTypeInfoSize = 52;
     [StructLayout(LayoutKind.Explicit, Size=FunctionTypeInfoSize)]
     public struct FunctionTypeInfo
@@ -259,6 +270,8 @@ public unsafe static class TypeTable
 
     public static void CreateTypeInfo(IType type)
     {
+        if (ErrorReporter.Errors.Count == 0) return;
+
         var typeInfoPointer = IntPtr.Zero;
         var name = Allocator.MakeString(type.Name);
 
@@ -281,7 +294,7 @@ public unsafe static class TypeTable
             case TypeKind.Pointer:
                 typeInfoPointer = Allocator.Allocate(PointerTypeInfoSize);
                 var pointerType = (PrimitiveAst)type;
-                var pointerTypeInfo = new PointerTypeInfo {Name = name, Type = TypeKind.Pointer, Size = type.Size, PointerType = TypeInfos[pointerType.PointerType.TypeIndex]};
+                var pointerTypeInfo = new PointerTypeInfo {Name = name, Type = TypeKind.Pointer, PointerType = TypeInfos[pointerType.PointerType.TypeIndex]};
                 Marshal.StructureToPtr(pointerTypeInfo, typeInfoPointer, false);
                 break;
             case TypeKind.CArray:
@@ -448,9 +461,37 @@ public unsafe static class TypeTable
                 {
                     Buffer.MemoryCopy(pointer, unionFieldsPointer.ToPointer(), unionFieldsArraySize, unionFieldsArraySize);
                 }
-                structTypeInfo.Fields.Data = unionFieldsPointer;
+                unionTypeInfo.Fields.Data = unionFieldsPointer;
 
                 Marshal.StructureToPtr(unionTypeInfo, typeInfoPointer, false);
+                break;
+            case TypeKind.Interface:
+                typeInfoPointer = Allocator.Allocate(InterfaceTypeInfoSize);
+                var interfaceAst = (InterfaceAst)type;
+                var interfaceTypeInfo = new InterfaceTypeInfo {Name = name, Type = TypeKind.Interface, ReturnType = TypeInfos[interfaceAst.ReturnType.TypeIndex]};
+
+                if (interfaceAst.Arguments.Count > 0)
+                {
+                    interfaceTypeInfo.Arguments.Length = interfaceAst.Arguments.Count;
+                    var arguments = new ArgumentType[interfaceAst.Arguments.Count];
+
+                    for (var i = 0; i < arguments.Length; i++)
+                    {
+                        var argument = interfaceAst.Arguments[i];
+                        var argumentType = new ArgumentType {Name = Allocator.MakeString(argument.Name), TypeInfo = TypeInfos[argument.Type.TypeIndex]};
+                        arguments[i] = argumentType;
+                    }
+
+                    var argumentTypesArraySize = arguments.Length * ArgumentTypeSize;
+                    var argumentTypesPointer = Allocator.Allocate(argumentTypesArraySize);
+                    fixed (ArgumentType* pointer = &arguments[0])
+                    {
+                        Buffer.MemoryCopy(pointer, argumentTypesPointer.ToPointer(), argumentTypesArraySize, argumentTypesArraySize);
+                    }
+                    interfaceTypeInfo.Arguments.Data = argumentTypesPointer;
+                }
+
+                Marshal.StructureToPtr(interfaceTypeInfo, typeInfoPointer, false);
                 break;
         }
 
