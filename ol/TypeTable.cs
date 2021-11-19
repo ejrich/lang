@@ -270,7 +270,7 @@ public unsafe static class TypeTable
 
     public static void CreateTypeInfo(IType type)
     {
-        if (ErrorReporter.Errors.Count == 0) return;
+        if (ErrorReporter.Errors.Count > 0) return;
 
         var typeInfoPointer = IntPtr.Zero;
         var name = Allocator.MakeString(type.Name);
