@@ -41,6 +41,256 @@ public static class Lexer
         {"continue", TokenType.Continue}
     };
 
+    public static List<Token> _LoadFileTokens(string filePath, int fileIndex)
+    {
+        var fileText = File.ReadAllText(filePath);
+
+        var tokens = new List<Token>();
+        uint line = 1, column = 0;
+
+        for (var i = 0; i < fileText.Length; i++)
+        {
+            var character = fileText[i];
+            column++;
+
+            if (character == '\n')
+            {
+                line++;
+                column = 0;
+            }
+            else if (!IsWhiteSpace(character))
+            {
+                // Handle possible comments
+                if (character == '/')
+                {
+                    character = fileText[i+1];
+                    if (character == '/')
+                    {
+                        i++;
+                        line++;
+                        column = 0;
+                        while (fileText[++i] != '\n');
+                    }
+                    else if (character == '*')
+                    {
+                        i += 2;
+                        column += 2;
+                        while (true)
+                        {
+                            character = fileText[i++];
+                            if (character == '*')
+                            {
+                                character = fileText[i];
+                                if (character == '/')
+                                {
+                                    column++;
+                                    break;
+                                }
+                                else if (character == '\n')
+                                {
+                                    line++;
+                                    column = 1;
+                                }
+                                else
+                                {
+                                    column++;
+                                }
+                                i++;
+                            }
+                            else if (character == '\n')
+                            {
+                                line++;
+                                column = 1;
+                            }
+                            else
+                            {
+                                column++;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        var token = new Token
+                        {
+                            Type = TokenType.ForwardSlash,
+                            Value = "/", // TODO Can this be null?
+                            FileIndex = fileIndex,
+                            Line = line,
+                            Column = column
+                        };
+                        tokens.Add(token);
+                    }
+                }
+                // Handle literals
+                else if (character == '"')
+                {
+                    var literalEscapeToken = false;
+                    var token = new Token
+                    {
+                        Type = TokenType.Literal,
+                        Value = "",
+                        FileIndex = fileIndex,
+                        Line = line,
+                        Column = column
+                    };
+
+                    // TODO Maybe use substring to reduce allocations?
+                    while (true)
+                    {
+                        character = fileText[++i];
+                        column++;
+
+                        if (character == '\\' && !literalEscapeToken)
+                        {
+                            literalEscapeToken = true;
+                        }
+                        else if (character == '\n')
+                        {
+                            line++;
+                            column = 0;
+                            if (literalEscapeToken)
+                            {
+                                token.Error = true;
+                                literalEscapeToken = false;
+                            }
+                        }
+                        else if (literalEscapeToken)
+                        {
+                            if (_escapableCharacters.TryGetValue(character, out var escapedCharacter))
+                            {
+                                token.Value += escapedCharacter;
+                            }
+                            else
+                            {
+                                token.Error = true;
+                                token.Value += character;
+                            }
+                            literalEscapeToken = false;
+                        }
+                        else
+                        {
+                            if (character == '"')
+                            {
+                                if (token.Error)
+                                {
+                                    ErrorReporter.Report($"Unexpected token '{token.Value}'", token);
+                                }
+
+                                tokens.Add(token);
+                                break;
+                            }
+                            else
+                            {
+                                token.Value += character;
+                            }
+                        }
+                    }
+                }
+                // Handle characters
+                else if (character == '\'')
+                {
+                    character = fileText[++i];
+                    if (character == '\\')
+                    {
+                        character = fileText[++i];
+                        if (_escapableCharacters.TryGetValue(character, out var escapedCharacter))
+                        {
+                            var token = new Token
+                            {
+                                Type = TokenType.Character,
+                                Character = escapedCharacter,
+                                FileIndex = fileIndex,
+                                Line = line,
+                                Column = column
+                            };
+                            tokens.Add(token);
+                        }
+                        else
+                        {
+                            ErrorReporter.Report($"Unknown escaped character '\\{character}'", fileIndex, line, column);
+                        }
+                        column += 2;
+                    }
+                    else
+                    {
+                        column++;
+                        var token = new Token
+                        {
+                            Type = TokenType.Character,
+                            Character = character,
+                            FileIndex = fileIndex,
+                            Line = line,
+                            Column = column
+                        };
+                        tokens.Add(token);
+                    }
+
+                    character = fileText[i+1];
+                    if (character == '\'')
+                    {
+                        i++;
+                        column++;
+                    }
+                    else
+                    {
+                        ErrorReporter.Report("Expected a single digit character", fileIndex, line, column);
+                    }
+                }
+                // Handle numbers
+                else if (char.IsDigit(character))
+                {
+                    var startIndex = i;
+                    var token = new Token
+                    {
+                        Type = TokenType.Number,
+                        FileIndex = fileIndex,
+                        Line = line,
+                        Column = column
+                    };
+
+                    while (true)
+                    {
+                        character = fileText[i+1];
+
+                        if (!char.IsDigit(character))
+                        {
+                            if (character == '.')
+                            {
+                                // TODO Implement me
+                            }
+                            else if (character == 'x')
+                            {
+                                // TODO Implement me
+                            }
+                            else if (character == '\n')
+                            {
+                                line++;
+                                column = 0;
+                                break;
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+
+                        i++;
+                        column++;
+                    }
+
+                    token.Value = fileText.Substring(startIndex, i - startIndex + 1);
+                    tokens.Add(token);
+                }
+                // Handle other characters
+                else
+                {
+                }
+            }
+        }
+
+        return tokens;
+    }
+
     public static List<Token> LoadFileTokens(string filePath, int fileIndex)
     {
         var fileText = File.ReadAllText(filePath);
@@ -184,7 +434,7 @@ public static class Lexer
                     tokens.Add(currentToken);
                     if (character != '\'')
                     {
-                        ErrorReporter.Report($"Expected a single digit character", currentToken);
+                        ErrorReporter.Report("Expected a single digit character", currentToken);
                     }
                     else
                     {
@@ -455,6 +705,7 @@ public class Token
 {
     public TokenType Type { get; set; }
     public string Value { get; set; }
+    public char Character { get; set; }
     public TokenFlags Flags { get; set; }
     public int FileIndex { get; init; }
     public uint Line { get; init; }
