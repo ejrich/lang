@@ -141,7 +141,7 @@ public static class Parser
         var parseData = (ParseData)data;
 
         // 1. Load file tokens
-        var tokens = Lexer.LoadFileTokens(parseData.File, parseData.FileIndex);
+        var tokens = Lexer._LoadFileTokens(parseData.File, parseData.FileIndex);
         var directory = Path.GetDirectoryName(parseData.File);
 
         // 2. Iterate through tokens, tracking different ASTs
