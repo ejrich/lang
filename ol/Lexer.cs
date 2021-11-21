@@ -130,6 +130,7 @@ public static class Lexer
                 case '"':
                 {
                     var literalEscapeToken = false;
+                    var error = false;
                     token = new Token
                     {
                         Type = TokenType.Literal,
@@ -155,7 +156,7 @@ public static class Lexer
                             column = 0;
                             if (literalEscapeToken)
                             {
-                                token.Error = true;
+                                error = true;
                                 literalEscapeToken = false;
                             }
                         }
@@ -167,7 +168,7 @@ public static class Lexer
                             }
                             else
                             {
-                                token.Error = true;
+                                error = true;
                                 token.Value += character;
                             }
                             literalEscapeToken = false;
@@ -176,7 +177,7 @@ public static class Lexer
                         {
                             if (character == '"')
                             {
-                                if (token.Error)
+                                if (error)
                                 {
                                     ErrorReporter.Report($"Unexpected token '{token.Value}'", token);
                                 }
@@ -712,7 +713,6 @@ public class Token
     public int FileIndex { get; init; }
     public uint Line { get; init; }
     public uint Column { get; set; }
-    public bool Error { get; set; }
 }
 
 public enum TokenType
