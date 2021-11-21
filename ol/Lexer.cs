@@ -45,6 +45,7 @@ public static class Lexer
     {
         var fileText = File.ReadAllText(filePath);
 
+        Token token;
         var tokens = new List<Token>();
         uint line = 1, column = 0;
 
@@ -53,15 +54,18 @@ public static class Lexer
             var character = fileText[i];
             column++;
 
-            if (character == '\n')
+            switch (character)
             {
-                line++;
-                column = 0;
-            }
-            else if (!IsWhiteSpace(character))
-            {
+                case '\n':
+                    line++;
+                    column = 0;
+                    break;
+                case ' ':
+                case '\r':
+                case '\t':
+                    break;
                 // Handle possible comments
-                if (character == '/')
+                case '/':
                 {
                     character = fileText[i+1];
                     if (character == '/')
@@ -110,22 +114,23 @@ public static class Lexer
                     }
                     else
                     {
-                        var token = new Token
+                        token = new Token
                         {
                             Type = TokenType.ForwardSlash,
-                            Value = "/", // TODO Can this be null?
+                            Value = "/",
                             FileIndex = fileIndex,
                             Line = line,
                             Column = column
                         };
                         tokens.Add(token);
                     }
+                    break;
                 }
                 // Handle literals
-                else if (character == '"')
+                case '"':
                 {
                     var literalEscapeToken = false;
-                    var token = new Token
+                    token = new Token
                     {
                         Type = TokenType.Literal,
                         Value = "",
@@ -185,9 +190,10 @@ public static class Lexer
                             }
                         }
                     }
+                    break;
                 }
                 // Handle characters
-                else if (character == '\'')
+                case '\'':
                 {
                     character = fileText[++i];
                     if (character == '\\')
@@ -195,10 +201,10 @@ public static class Lexer
                         character = fileText[++i];
                         if (_escapableCharacters.TryGetValue(character, out var escapedCharacter))
                         {
-                            var token = new Token
+                            token = new Token
                             {
                                 Type = TokenType.Character,
-                                Character = escapedCharacter,
+                                Value = escapedCharacter.ToString(),
                                 FileIndex = fileIndex,
                                 Line = line,
                                 Column = column
@@ -214,10 +220,10 @@ public static class Lexer
                     else
                     {
                         column++;
-                        var token = new Token
+                        token = new Token
                         {
                             Type = TokenType.Character,
-                            Character = character,
+                            Value = character.ToString(),
                             FileIndex = fileIndex,
                             Line = line,
                             Column = column
@@ -235,12 +241,307 @@ public static class Lexer
                     {
                         ErrorReporter.Report("Expected a single digit character", fileIndex, line, column);
                     }
+                    break;
+                }
+                // Handle ranges and varargs
+                case '.':
+                {
+                    token = new Token {FileIndex = fileIndex, Line = line, Column = column};
+
+                    if (fileText[i+1] == '.')
+                    {
+                        if (fileText[i+2] == '.')
+                        {
+                            token.Type = TokenType.VarArgs;
+                            token.Value = "...";
+                            i += 2;
+                            column += 2;
+                        }
+                        else
+                        {
+                            token.Type = TokenType.Range;
+                            token.Value = "..";
+                            i++;
+                            column++;
+                        }
+                    }
+                    else
+                    {
+                        token.Type = TokenType.Period;
+                        token.Value = ".";
+                    }
+
+                    tokens.Add(token);
+                    break;
+                }
+                case '!':
+                {
+                    token = new Token {FileIndex = fileIndex, Line = line, Column = column};
+
+                    if (fileText[i+1] == '=')
+                    {
+                        token.Type = TokenType.NotEqual;
+                        token.Value = "!=";
+                        i++;
+                        column++;
+                    }
+                    else
+                    {
+                        token.Type = TokenType.Not;
+                        token.Value = "!";
+                    }
+
+                    tokens.Add(token);
+                    break;
+                }
+                case '&':
+                {
+                    token = new Token {FileIndex = fileIndex, Line = line, Column = column};
+
+                    if (fileText[i+1] == '&')
+                    {
+                        token.Type = TokenType.And;
+                        token.Value = "&&";
+                        i++;
+                        column++;
+                    }
+                    else
+                    {
+                        token.Type = TokenType.Ampersand;
+                        token.Value = "&";
+                    }
+
+                    tokens.Add(token);
+                    break;
+                }
+                case '|':
+                {
+                    token = new Token {FileIndex = fileIndex, Line = line, Column = column};
+
+                    if (fileText[i+1] == '|')
+                    {
+                        token.Type = TokenType.Or;
+                        token.Value = "||";
+                        i++;
+                        column++;
+                    }
+                    else
+                    {
+                        token.Type = TokenType.Pipe;
+                        token.Value = "|";
+                    }
+
+                    tokens.Add(token);
+                    break;
+                }
+                case '+':
+                {
+                    token = new Token {FileIndex = fileIndex, Line = line, Column = column};
+
+                    if (fileText[i+1] == '+')
+                    {
+                        token.Type = TokenType.Increment;
+                        token.Value = "++";
+                        i++;
+                        column++;
+                    }
+                    else
+                    {
+                        token.Type = TokenType.Plus;
+                        token.Value = "+";
+                    }
+
+                    tokens.Add(token);
+                    break;
+                }
+                case '-':
+                {
+                    token = new Token {FileIndex = fileIndex, Line = line, Column = column};
+
+                    character = fileText[i+1];
+                    if (character == '-')
+                    {
+                        token.Type = TokenType.Decrement;
+                        token.Value = "--";
+                        i++;
+                        column++;
+                    }
+                    else if (char.IsDigit(character))
+                    {
+                        token.Type = TokenType.Number;
+                        var startIndex = i++;
+
+                        while (true)
+                        {
+                            var nextCharacter = fileText[i+1];
+
+                            if (!char.IsDigit(nextCharacter))
+                            {
+                                if (nextCharacter == '.')
+                                {
+                                    if (token.Flags.HasFlag(TokenFlags.Float) || fileText[i+2] == '.')
+                                    {
+                                        break;
+                                    }
+                                    else
+                                    {
+                                        token.Flags |= TokenFlags.Float;
+                                    }
+                                }
+                                else if (nextCharacter == '\n')
+                                {
+                                    line++;
+                                    column = 0;
+                                    break;
+                                }
+                                else
+                                {
+                                    break;
+                                }
+                            }
+
+                            i++;
+                            column++;
+                        }
+
+                        token.Value = fileText.Substring(startIndex, i - startIndex + 1);
+                    }
+                    // TODO Handle negative numbers
+                    else
+                    {
+                        token.Type = TokenType.Minus;
+                        token.Value = "-";
+                    }
+
+                    tokens.Add(token);
+                    break;
+                }
+                case '=':
+                {
+                    token = new Token {FileIndex = fileIndex, Line = line, Column = column};
+
+                    if (fileText[i+1] == '=')
+                    {
+                        token.Type = TokenType.Equality;
+                        token.Value = "==";
+                        i++;
+                        column++;
+                    }
+                    else
+                    {
+                        token.Type = TokenType.Equals;
+                        token.Value = "=";
+                    }
+
+                    tokens.Add(token);
+                    break;
+                }
+                case '<':
+                {
+                    token = new Token {FileIndex = fileIndex, Line = line, Column = column};
+
+                    character = fileText[i+1];
+                    if (character == '=')
+                    {
+                        token.Type = TokenType.LessThanEqual;
+                        token.Value = "<=";
+                        i++;
+                        column++;
+                    }
+                    else if (character == '<')
+                    {
+                        if (fileText[i+2] == '<')
+                        {
+                            token.Type = TokenType.RotateLeft;
+                            token.Value = "<<<";
+                            i += 2;
+                            column += 2;
+                        }
+                        else
+                        {
+                            token.Type = TokenType.ShiftLeft;
+                            token.Value = "<<";
+                            i++;
+                            column++;
+                        }
+                    }
+                    else
+                    {
+                        token.Type = TokenType.LessThan;
+                        token.Value = "<";
+                    }
+
+                    tokens.Add(token);
+                    break;
+                }
+                case '>':
+                {
+                    token = new Token {FileIndex = fileIndex, Line = line, Column = column};
+
+                    character = fileText[i+1];
+                    if (character == '=')
+                    {
+                        token.Type = TokenType.GreaterThanEqual;
+                        token.Value = ">=";
+                        i++;
+                        column++;
+                    }
+                    else if (character == '>')
+                    {
+                        if (fileText[i+2] == '>')
+                        {
+                            token.Type = TokenType.RotateRight;
+                            token.Value = ">>>";
+                            i += 2;
+                            column += 2;
+                        }
+                        else
+                        {
+                            token.Type = TokenType.ShiftRight;
+                            token.Value = ">>";
+                            i++;
+                            column++;
+                        }
+                    }
+                    else
+                    {
+                        token.Type = TokenType.GreaterThan;
+                        token.Value = ">";
+                    }
+
+                    tokens.Add(token);
+                    break;
+                }
+                case '(':
+                case ')':
+                case '[':
+                case ']':
+                case '{':
+                case '}':
+                case '^':
+                case '*':
+                case '%':
+                case ':':
+                case ';':
+                case ',':
+                case '#':
+                {
+                    token = new Token
+                    {
+                        Type = (TokenType)character,
+                        Value = character.ToString(),
+                        FileIndex = fileIndex,
+                        Line = line,
+                        Column = column
+                    };
+                    tokens.Add(token);
+                    break;
                 }
                 // Handle numbers
-                else if (char.IsDigit(character))
+                case >= '0' and <= '9':
                 {
                     var startIndex = i;
-                    var token = new Token
+                    token = new Token
                     {
                         Type = TokenType.Number,
                         FileIndex = fileIndex,
@@ -250,25 +551,40 @@ public static class Lexer
 
                     while (true)
                     {
-                        character = fileText[i+1];
+                        var nextCharacter = fileText[i+1];
 
-                        if (!char.IsDigit(character))
+                        if (!char.IsDigit(nextCharacter))
                         {
-                            if (character == '.')
+                            if (nextCharacter == '.')
                             {
-                                // TODO Implement me
+                                if (token.Flags.HasFlag(TokenFlags.Float) || fileText[i+2] == '.')
+                                {
+                                    break;
+                                }
+                                else
+                                {
+                                    token.Flags |= TokenFlags.Float;
+                                }
                             }
-                            else if (character == 'x')
+                            else if (nextCharacter == 'x')
                             {
-                                // TODO Implement me
+                                if (i == startIndex && character == '0')
+                                {
+                                    token.Flags |= TokenFlags.HexNumber;
+                                }
+                                else
+                                {
+                                    break;
+                                }
                             }
-                            else if (character == '\n')
+                            else if (nextCharacter == '\n')
                             {
+                                i++;
                                 line++;
                                 column = 0;
                                 break;
                             }
-                            else
+                            else if (!token.Flags.HasFlag(TokenFlags.HexNumber) || !IsHexLetter(nextCharacter))
                             {
                                 break;
                             }
@@ -280,15 +596,73 @@ public static class Lexer
 
                     token.Value = fileText.Substring(startIndex, i - startIndex + 1);
                     tokens.Add(token);
+                    break;
                 }
                 // Handle other characters
-                else
+                default:
                 {
+                    var startIndex = i;
+                    token = new Token {FileIndex = fileIndex, Line = line, Column = column};
+
+                    character = fileText[i+1];
+                    while (!IsWhiteSpace(character) && IsIdentifierCharacter(character))
+                    {
+                        column++;
+                        character = fileText[++i + 1];
+                    }
+
+                    token.Value = fileText.Substring(startIndex, i - startIndex + 1);
+
+                    if (_reservedTokens.TryGetValue(token.Value, out var type))
+                    {
+                        token.Type = type;
+                    }
+
+                    tokens.Add(token);
+                    break;
                 }
             }
         }
 
         return tokens;
+    }
+
+    private static bool IsHexLetter(char character)
+    {
+        return (character >= 'A' && character <= 'F') || (character >= 'a' && character <= 'f');
+    }
+
+    private static bool IsIdentifierCharacter(char character)
+    {
+        return character switch
+        {
+            '(' => false,
+            ')' => false,
+            '[' => false,
+            ']' => false,
+            '{' => false,
+            '}' => false,
+            '!' => false,
+            '&' => false,
+            '|' => false,
+            '^' => false,
+            '+' => false,
+            '-' => false,
+            '*' => false,
+            '/' => false,
+            '%' => false,
+            '=' => false,
+            ':' => false,
+            ';' => false,
+            '"' => false,
+            '\'' => false,
+            '<' => false,
+            '>' => false,
+            ',' => false,
+            '.' => false,
+            '#' => false,
+            _ => true
+        };
     }
 
     public static List<Token> LoadFileTokens(string filePath, int fileIndex)
@@ -702,10 +1076,10 @@ public static class Lexer
 }
 
 public class Token
+// public struct Token
 {
     public TokenType Type { get; set; }
     public string Value { get; set; }
-    public char Character { get; set; }
     public TokenFlags Flags { get; set; }
     public int FileIndex { get; init; }
     public uint Line { get; init; }
