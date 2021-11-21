@@ -41,7 +41,7 @@ public static class Lexer
         {"continue", TokenType.Continue}
     };
 
-    public static List<Token> _LoadFileTokens(string filePath, int fileIndex)
+    public static List<Token> LoadFileTokens(string filePath, int fileIndex)
     {
         var fileText = File.ReadAllText(filePath);
 
@@ -370,14 +370,15 @@ public static class Lexer
                     {
                         token.Type = TokenType.Number;
                         var startIndex = i++;
+                        var offset = 1;
 
                         while (true)
                         {
-                            var nextCharacter = fileText[i+1];
+                            character = fileText[i+1];
 
-                            if (!char.IsDigit(nextCharacter))
+                            if (!char.IsDigit(character))
                             {
-                                if (nextCharacter == '.')
+                                if (character == '.')
                                 {
                                     if (token.Flags.HasFlag(TokenFlags.Float) || fileText[i+2] == '.')
                                     {
@@ -388,14 +389,21 @@ public static class Lexer
                                         token.Flags |= TokenFlags.Float;
                                     }
                                 }
-                                else if (nextCharacter == '\n')
-                                {
-                                    line++;
-                                    column = 0;
-                                    break;
-                                }
                                 else
                                 {
+                                    if (character == '\n')
+                                    {
+                                        i++;
+                                        line++;
+                                        column = 0;
+                                        offset = 0;
+                                    }
+                                    else if (character == ' ' || character == '\r' || character == '\t')
+                                    {
+                                        i++;
+                                        column++;
+                                        offset = 0;
+                                    }
                                     break;
                                 }
                             }
@@ -404,9 +412,8 @@ public static class Lexer
                             column++;
                         }
 
-                        token.Value = fileText.Substring(startIndex, i - startIndex + 1);
+                        token.Value = fileText.Substring(startIndex, i - startIndex + offset);
                     }
-                    // TODO Handle negative numbers
                     else
                     {
                         token.Type = TokenType.Minus;
@@ -541,6 +548,7 @@ public static class Lexer
                 case >= '0' and <= '9':
                 {
                     var startIndex = i;
+                    var offset = 1;
                     token = new Token
                     {
                         Type = TokenType.Number,
@@ -582,6 +590,14 @@ public static class Lexer
                                 i++;
                                 line++;
                                 column = 0;
+                                offset = 0;
+                                break;
+                            }
+                            else if (nextCharacter == ' ' || nextCharacter == '\r' || nextCharacter == '\t')
+                            {
+                                i++;
+                                column++;
+                                offset = 0;
                                 break;
                             }
                             else if (!token.Flags.HasFlag(TokenFlags.HexNumber) || !IsHexLetter(nextCharacter))
@@ -594,7 +610,7 @@ public static class Lexer
                         column++;
                     }
 
-                    token.Value = fileText.Substring(startIndex, i - startIndex + 1);
+                    token.Value = fileText.Substring(startIndex, i - startIndex + offset);
                     tokens.Add(token);
                     break;
                 }
@@ -602,16 +618,37 @@ public static class Lexer
                 default:
                 {
                     var startIndex = i;
+                    var offset = 1;
                     token = new Token {FileIndex = fileIndex, Line = line, Column = column};
 
-                    character = fileText[i+1];
-                    while (!IsWhiteSpace(character) && IsIdentifierCharacter(character))
+                    while (true)
                     {
+                        character = fileText[i+1];
+                        if (character == '\n')
+                        {
+                            i++;
+                            line++;
+                            column = 0;
+                            offset = 0;
+                            break;
+                        }
+                        else if (character == ' ' || character == '\r' || character == '\t')
+                        {
+                            i++;
+                            column++;
+                            offset = 0;
+                            break;
+                        }
+                        else if (IsNotIdentifierCharacter(character))
+                        {
+                            break;
+                        }
+
+                        i++;
                         column++;
-                        character = fileText[++i + 1];
                     }
 
-                    token.Value = fileText.Substring(startIndex, i - startIndex + 1);
+                    token.Value = fileText.Substring(startIndex, i - startIndex + offset);
 
                     if (_reservedTokens.TryGetValue(token.Value, out var type))
                     {
@@ -632,446 +669,37 @@ public static class Lexer
         return (character >= 'A' && character <= 'F') || (character >= 'a' && character <= 'f');
     }
 
-    private static bool IsIdentifierCharacter(char character)
+    private static bool IsNotIdentifierCharacter(char character)
     {
         return character switch
         {
-            '(' => false,
-            ')' => false,
-            '[' => false,
-            ']' => false,
-            '{' => false,
-            '}' => false,
-            '!' => false,
-            '&' => false,
-            '|' => false,
-            '^' => false,
-            '+' => false,
-            '-' => false,
-            '*' => false,
-            '/' => false,
-            '%' => false,
-            '=' => false,
-            ':' => false,
-            ';' => false,
-            '"' => false,
-            '\'' => false,
-            '<' => false,
-            '>' => false,
-            ',' => false,
-            '.' => false,
-            '#' => false,
-            _ => true
-        };
-    }
-
-    public static List<Token> LoadFileTokens(string filePath, int fileIndex)
-    {
-        var fileText = File.ReadAllText(filePath);
-
-        Token currentToken = null;
-        var closingMultiLineComment = false;
-        var literalEscapeToken = false;
-        uint line = 1, column = 1;
-
-        var lexerStatus = new LexerStatus();
-        var tokens = new List<Token>();
-
-        for (var i = 0; i < fileText.Length; i++)
-        {
-            var character = fileText[i];
-            column++;
-
-            // Skip through comments
-            if (lexerStatus.ReadingComment)
-            {
-                if (lexerStatus.MultiLineComment)
-                {
-                    if (closingMultiLineComment && character == '/')
-                    {
-                        lexerStatus.MultiLineComment = false;
-                        lexerStatus.ReadingComment = false;
-                        currentToken = null;
-                    }
-
-                    closingMultiLineComment = character == '*';
-                }
-                else if (character == '\n')
-                {
-                    line++;
-                    column = 0;
-                    lexerStatus.ReadingComment = false;
-                    currentToken = null;
-                }
-            }
-            else if (currentToken == null)
-            {
-                if (character == '\n')
-                {
-                    line++;
-                    column = 0;
-                }
-                else if (!IsWhiteSpace(character))
-                {
-                    // Get token from character, determine to emit value
-                    var tokenType = GetTokenType(character);
-
-                    currentToken = new Token
-                    {
-                        Type = tokenType,
-                        Value = character.ToString(),
-                        FileIndex = fileIndex,
-                        Line = line,
-                        Column = column
-                    };
-                }
-            }
-            else
-            {
-                var type = currentToken.Type;
-
-                // Interpret string literals
-                if (type == TokenType.Quote)
-                {
-                    currentToken.Type = type = TokenType.Literal;
-                    currentToken.Value = string.Empty;
-                }
-
-                if (character == '\n')
-                {
-                    line++;
-                    column = 0;
-                }
-
-                // Add characters to the string literal
-                if (type == TokenType.Literal)
-                {
-                    if (character == '\\' && !literalEscapeToken)
-                    {
-                        literalEscapeToken = true;
-                    }
-                    else if (literalEscapeToken)
-                    {
-                        if (_escapableCharacters.TryGetValue(character, out var escapedCharacter))
-                        {
-                            currentToken.Value += escapedCharacter;
-                        }
-                        else
-                        {
-                            currentToken.Error = true;
-                            currentToken.Value += character;
-                        }
-                        literalEscapeToken = false;
-                    }
-                    else
-                    {
-                        if (character == '"')
-                        {
-                            if (currentToken.Error)
-                            {
-                                ErrorReporter.Report($"Unexpected token '{currentToken.Value}'", currentToken);
-                            }
-
-                            tokens.Add(currentToken);
-                            currentToken = null;
-                        }
-                        else
-                        {
-                            currentToken.Value += character;
-                        }
-                    }
-                }
-                // Interpret character literals
-                else if (type == TokenType.Apostrophe)
-                {
-                    currentToken.Type = TokenType.Character;
-                    if (character == '\\')
-                    {
-                        character = fileText[++i];
-                        if (_escapableCharacters.TryGetValue(character, out var escapedCharacter))
-                        {
-                            currentToken.Value = $"{escapedCharacter}";
-                        }
-                        else
-                        {
-                            ErrorReporter.Report($"Unknown escaped character '\\{character}'", currentToken);
-                        }
-                    }
-                    else
-                    {
-                        currentToken.Value = $"{character}";
-                    }
-                }
-                // Finish character literals
-                else if (type == TokenType.Character)
-                {
-                    tokens.Add(currentToken);
-                    if (character != '\'')
-                    {
-                        ErrorReporter.Report("Expected a single digit character", currentToken);
-                    }
-                    else
-                    {
-                        currentToken = null;
-                    }
-                }
-                // Skip over whitespace and emit the current token if not null
-                else if (IsWhiteSpace(character))
-                {
-                    AddToken(currentToken, tokens, fileIndex, character);
-                    currentToken = null;
-                }
-                else
-                {
-                    // Get token from character, determine to emit value
-                    var tokenType = GetTokenType(character);
-
-                    if (ContinueToken(currentToken, tokenType, character, lexerStatus))
-                    {
-                        currentToken!.Value += character;
-                    }
-                    else
-                    {
-                        if (currentToken != null)
-                        {
-                            AddToken(currentToken, tokens, fileIndex, character);
-                        }
-
-                        currentToken = new Token
-                        {
-                            Type = tokenType,
-                            Value = character.ToString(),
-                            FileIndex = fileIndex,
-                            Line = line,
-                            Column = column
-                        };
-                    }
-                }
-            }
-        }
-
-        if (!lexerStatus.ReadingComment && currentToken != null) tokens.Add(currentToken);
-
-        return tokens;
-    }
-
-    private static void AddToken(Token currentToken, List<Token> tokens, int fileIndex, char character)
-    {
-        // Number ranges should have the number yielded first
-        if (currentToken.Type == TokenType.NumberRange)
-        {
-            var number = currentToken.Value[..^2];
-            tokens.Add(new Token
-            {
-                Type = TokenType.Number,
-                Value = number,
-                FileIndex = fileIndex,
-                Line = currentToken.Line,
-                Column = currentToken.Column
-            });
-            currentToken.Type = TokenType.Range;
-            currentToken.Value = "..";
-            currentToken.Column += (uint)number.Length;
-        }
-        else
-        {
-            // Check tokens for reserved keywords
-            if (currentToken.Type == TokenType.Identifier && _reservedTokens.TryGetValue(currentToken.Value, out var type))
-            {
-                currentToken.Type = type;
-            }
-
-            if (currentToken.Error)
-            {
-                ErrorReporter.Report($"Unexpected token '{currentToken.Value + character}'", currentToken);
-            }
-        }
-
-        tokens.Add(currentToken);
-    }
-
-    private static bool IsWhiteSpace(char character)
-    {
-        return character switch
-        {
-            ' ' => true,
-            '\n' => true,
-            '\r' => true,
-            '\t' => true,
+            '(' => true,
+            ')' => true,
+            '[' => true,
+            ']' => true,
+            '{' => true,
+            '}' => true,
+            '!' => true,
+            '&' => true,
+            '|' => true,
+            '^' => true,
+            '+' => true,
+            '-' => true,
+            '*' => true,
+            '/' => true,
+            '%' => true,
+            '=' => true,
+            ':' => true,
+            ';' => true,
+            '"' => true,
+            '\'' => true,
+            '<' => true,
+            '>' => true,
+            ',' => true,
+            '.' => true,
+            '#' => true,
             _ => false
         };
-    }
-
-    private static TokenType GetTokenType(char character)
-    {
-        if (char.IsDigit(character)) return TokenType.Number;
-
-        return character switch
-        {
-            '(' => TokenType.OpenParen,
-            ')' => TokenType.CloseParen,
-            '[' => TokenType.OpenBracket,
-            ']' => TokenType.CloseBracket,
-            '{' => TokenType.OpenBrace,
-            '}' => TokenType.CloseBrace,
-            '!' => TokenType.Not,
-            '&' => TokenType.Ampersand,
-            '|' => TokenType.Pipe,
-            '^' => TokenType.Caret,
-            '+' => TokenType.Plus,
-            '-' => TokenType.Minus,
-            '*' => TokenType.Asterisk,
-            '/' => TokenType.ForwardSlash,
-            '%' => TokenType.Percent,
-            '=' => TokenType.Equals,
-            ':' => TokenType.Colon,
-            ';' => TokenType.SemiColon,
-            '"' => TokenType.Quote,
-            '\'' => TokenType.Apostrophe,
-            '<' => TokenType.LessThan,
-            '>' => TokenType.GreaterThan,
-            ',' => TokenType.Comma,
-            '.' => TokenType.Period,
-            '#' => TokenType.Pound,
-            _ => TokenType.Identifier
-        };
-    }
-
-    private static bool ContinueToken(Token currentToken, TokenType type, char character, LexerStatus lexerStatus)
-    {
-        if (currentToken == null) return false;
-
-        switch (currentToken.Type)
-        {
-            case TokenType.Identifier:
-                return type == TokenType.Identifier || type == TokenType.Number;
-            case TokenType.Number:
-                switch (type)
-                {
-                    case TokenType.Number:
-                        return true;
-                    case TokenType.Period:
-                        if (currentToken.Flags.HasFlag(TokenFlags.Float))
-                        {
-                            // Handle number ranges
-                            if (currentToken.Value[^1] == '.')
-                            {
-                                currentToken.Flags &= ~TokenFlags.Float;
-                                currentToken.Type = TokenType.NumberRange;
-                                return true;
-                            }
-                            currentToken.Error = true;
-                            return false;
-                        }
-                        currentToken.Flags |= TokenFlags.Float;
-                        return true;
-                    case TokenType.Identifier:
-                        if (currentToken.Value == "0" && character == 'x')
-                        {
-                            currentToken.Flags |= TokenFlags.HexNumber;
-                            return true;
-                        }
-                        if (currentToken.Flags.HasFlag(TokenFlags.HexNumber))
-                        {
-                            return true;
-                        }
-                        currentToken.Error = true;
-                        return false;
-                    default:
-                        return false;
-                }
-            case TokenType.ForwardSlash:
-                switch (type)
-                {
-                    case TokenType.ForwardSlash:
-                        currentToken.Type = TokenType.Comment;
-                        lexerStatus.ReadingComment = true;
-                        return true;
-                    case TokenType.Asterisk:
-                        currentToken.Type = TokenType.Comment;
-                        lexerStatus.ReadingComment = true;
-                        lexerStatus.MultiLineComment = true;
-                        return true;
-                    default:
-                        return false;
-                }
-            case TokenType.Not:
-                if (type == TokenType.Equals)
-                {
-                    currentToken.Type = TokenType.NotEqual;
-                    return true;
-                }
-                return false;
-            case TokenType.GreaterThan:
-                if (type == TokenType.Equals)
-                {
-                    currentToken.Type = TokenType.GreaterThanEqual;
-                    return true;
-                }
-                return ChangeTypeIfSame(currentToken, type, TokenType.ShiftRight);
-            case TokenType.LessThan:
-                if (type == TokenType.Equals)
-                {
-                    currentToken.Type = TokenType.LessThanEqual;
-                    return true;
-                }
-                return ChangeTypeIfSame(currentToken, type, TokenType.ShiftLeft);
-            case TokenType.Ampersand:
-                return ChangeTypeIfSame(currentToken, type, TokenType.And);
-            case TokenType.Pipe:
-                return ChangeTypeIfSame(currentToken, type, TokenType.Or);
-            case TokenType.Equals:
-                return ChangeTypeIfSame(currentToken, type, TokenType.Equality);
-            case TokenType.Plus:
-                return ChangeTypeIfSame(currentToken, type, TokenType.Increment);
-            case TokenType.Range:
-                if (type == TokenType.Period)
-                {
-                    currentToken.Type = TokenType.VarArgs;
-                    return true;
-                }
-                return false;
-            case TokenType.Minus:
-                if (type == TokenType.Number)
-                {
-                    currentToken.Type = type;
-                    return true;
-                }
-                return ChangeTypeIfSame(currentToken, type, TokenType.Decrement);
-            case TokenType.Period:
-                return ChangeTypeIfSame(currentToken, type, TokenType.Range);
-            case TokenType.ShiftLeft:
-                if (type == TokenType.LessThan)
-                {
-                    currentToken.Type = TokenType.RotateLeft;
-                    return true;
-                }
-                return false;
-            case TokenType.ShiftRight:
-                if (type == TokenType.GreaterThan)
-                {
-                    currentToken.Type = TokenType.RotateRight;
-                    return true;
-                }
-                return false;
-            default:
-                return false;
-        }
-    }
-
-    private static bool ChangeTypeIfSame(Token token, TokenType type, TokenType newType)
-    {
-        if (token.Type != type)
-            return false;
-
-        token.Type = newType;
-        return true;
-    }
-
-    private class LexerStatus
-    {
-        public bool ReadingComment { get; set; }
-        public bool MultiLineComment { get; set; }
     }
 }
 
@@ -1121,37 +749,32 @@ public enum TokenType
     RotateRight,
     Operator,
     Break,
-    Continue,
-    VarArgs,
+    Continue,           // 32
+    Not = '!',          // 33
+    Pound = '#',        // 35
+    Percent = '%',      // 37
+    Ampersand = '&',    // 38
     OpenParen = '(',    // 40
     CloseParen = ')',   // 41
-    OpenBracket = '[',  // 91
-    CloseBracket = ']', // 93
-    OpenBrace = '{',    // 123
-    CloseBrace = '}',   // 125
-    Not = '!',          // 33
-    Ampersand = '&',    // 38
-    Pipe = '|',         // 124
-    Caret = '^',        // 94
-    Plus = '+',         // 43
-    Minus = '-',        // 45
     Asterisk = '*',     // 42
+    Plus = '+',         // 43
+    Comma = ',',        // 44
+    Minus = '-',        // 45
+    Period = '.',       // 46
     ForwardSlash = '/', // 47
-    Percent = '%',      // 37
-    Equals = '=',       // 61
     Colon = ':',        // 58
     SemiColon = ';',    // 59
-    Quote = '"',        // 34
-    Apostrophe = '\'',  // 39
     LessThan = '<',     // 60
+    Equals = '=',       // 61
     GreaterThan = '>',  // 62
-    Comma = ',',        // 44
-    Period = '.',       // 46
-    Pound = '#',        // 35
-    Interface = 256,
-    // Ignored by parser
-    Comment,
-    NumberRange
+    OpenBracket = '[',  // 91
+    CloseBracket = ']', // 93
+    Caret = '^',        // 94
+    OpenBrace = '{',    // 123
+    Pipe = '|',         // 124
+    CloseBrace = '}',   // 125
+    VarArgs = 256,
+    Interface,
 }
 
 [Flags]

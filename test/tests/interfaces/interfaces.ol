@@ -77,7 +77,7 @@ Foo* baz_impl(s64 x, float y) {
     return &a;
 }
 
-structs() #print_ir {
+structs() {
     pointers: FunctionPointers = { b = foo_impl; c = bar_impl; d = foobar_impl; e = baz_impl; }
 
     pointers.b(10, 20);
