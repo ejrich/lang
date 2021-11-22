@@ -22,25 +22,39 @@ public static class Parser
             _tokens = tokens;
         }
 
-        public Token Current { get; private set; }
+        public Token Current;
+        public bool Remaining = true;
 
         public bool MoveNext()
         {
-            Current = _tokens.Count > _index ? _tokens[_index] : null;
-            _index++;
-            return Current != null;
+            if (_tokens.Count > _index)
+            {
+                Current = _tokens[_index++];
+                return true;
+            }
+            return Remaining = false;
         }
 
         public bool Move(int steps)
         {
             _index += steps;
-            Current = _tokens.Count > _index ? _tokens[_index] : null;
-            return Current != null;
+            if (_tokens.Count > _index)
+            {
+                Current = _tokens[_index];
+                return true;
+            }
+            return false;
         }
 
-        public Token Peek(int steps = 0)
+        public bool Peek(out Token token, int steps = 0)
         {
-            return _tokens.Count > _index + steps ? _tokens[_index + steps] : null;
+            if (_tokens.Count > _index + steps)
+            {
+                token = _tokens[_index + steps];
+                return true;
+            }
+            token = Last;
+            return false;
         }
 
         public void Insert(Token token)
@@ -60,7 +74,16 @@ public static class Parser
         ThreadPool.CompleteWork();
     }
 
-    private static void AddModule(string module, Token token = null)
+    private static void AddModule(string module)
+    {
+        var file = Path.Combine(_libraryDirectory, $"{module}.ol");
+        if (File.Exists(file))
+        {
+            QueueFileIfNotExists(file);
+        }
+    }
+
+    private static void AddModule(string module, Token token)
     {
         var file = Path.Combine(_libraryDirectory, $"{module}.ol");
         if (File.Exists(file))
@@ -91,7 +114,7 @@ public static class Parser
         AddFile(filePath, token);
     }
 
-    private static void AddFile(string file, Token token = null)
+    private static void AddFile(string file, Token token = default)
     {
         if (File.Exists(file))
         {
@@ -161,15 +184,20 @@ public static class Parser
         switch (token.Type)
         {
             case TokenType.Identifier:
-                if (enumerator.Peek()?.Type == TokenType.Colon)
+                if (enumerator.Peek(out token))
                 {
-                    if (attributes != null)
+                    if (token.Type == TokenType.Colon)
                     {
-                        ErrorReporter.Report($"Global variables cannot have attributes", token);
+                        if (attributes != null)
+                        {
+                            ErrorReporter.Report($"Global variables cannot have attributes", token);
+                        }
+                        return ParseDeclaration(enumerator);
                     }
-                    return ParseDeclaration(enumerator);
+                    return ParseFunction(enumerator, attributes);
                 }
-                return ParseFunction(enumerator, attributes);
+                ErrorReporter.Report($"Unexpected token '{token.Value}'", token);
+                return null;
             case TokenType.Struct:
                 return ParseStruct(enumerator, attributes);
             case TokenType.Enum:
@@ -246,11 +274,11 @@ public static class Parser
 
         if (attributes.Count == 0)
         {
-            ErrorReporter.Report("Expected attribute(s) to be in attribute list", enumerator.Current ?? enumerator.Last);
+            ErrorReporter.Report("Expected attribute(s) to be in attribute list", enumerator.Current);
         }
         else if (!commaRequired)
         {
-            ErrorReporter.Report("Expected attribute after comma in attribute list", enumerator.Current ?? enumerator.Last);
+            ErrorReporter.Report("Expected attribute after comma in attribute list", enumerator.Current);
         }
         enumerator.MoveNext();
 
@@ -264,21 +292,27 @@ public static class Parser
         function.Attributes = attributes;
 
         // 1a. Check if the return type is void
-        if (enumerator.Peek()?.Type != TokenType.OpenParen)
+        if (!enumerator.Peek(out var token))
+        {
+            ErrorReporter.Report($"Expected function definition", token);
+            return null;
+        }
+
+        if (token.Type != TokenType.OpenParen)
         {
             function.ReturnTypeDefinition = ParseType(enumerator);
             enumerator.MoveNext();
         }
 
         // 1b. Handle multiple return values
-        if (enumerator.Current?.Type == TokenType.Comma)
+        if (enumerator.Current.Type == TokenType.Comma)
         {
             var returnType = CreateAst<TypeDefinition>(function.ReturnTypeDefinition);
             returnType.Compound = true;
             returnType.Generics.Add(function.ReturnTypeDefinition);
             function.ReturnTypeDefinition = returnType;
 
-            while (enumerator.Current?.Type == TokenType.Comma)
+            while (enumerator.Current.Type == TokenType.Comma)
             {
                 if (!enumerator.MoveNext())
                 {
@@ -290,7 +324,13 @@ public static class Parser
         }
 
         // 1b. Set the name of the function or get the name from the type
-        switch (enumerator.Current?.Type)
+        if (!enumerator.Remaining)
+        {
+            ErrorReporter.Report("Expected the function name to be declared", enumerator.Last);
+            return null;
+        }
+
+        switch (enumerator.Current.Type)
         {
             case TokenType.Identifier:
                 function.Name = enumerator.Current.Value;
@@ -322,9 +362,6 @@ public static class Parser
                     function.ReturnTypeDefinition = null;
                 }
                 break;
-            case null:
-                ErrorReporter.Report("Expected the function name to be declared", enumerator.Last);
-                return null;
             default:
                 ErrorReporter.Report("Expected the function name to be declared", enumerator.Current);
                 enumerator.MoveNext();
@@ -332,13 +369,13 @@ public static class Parser
         }
 
         // 2. Parse generics
-        if (enumerator.Current?.Type == TokenType.LessThan)
+        if (enumerator.Current.Type == TokenType.LessThan)
         {
             var commaRequiredBeforeNextType = false;
             var generics = new HashSet<string>();
             while (enumerator.MoveNext())
             {
-                var token = enumerator.Current;
+                token = enumerator.Current;
 
                 if (token.Type == TokenType.GreaterThan)
                 {
@@ -384,7 +421,7 @@ public static class Parser
 
             if (!generics.Any())
             {
-                ErrorReporter.Report("Expected function to contain generics", enumerator.Current ?? enumerator.Last);
+                ErrorReporter.Report("Expected function to contain generics", enumerator.Current);
             }
             enumerator.MoveNext();
             function.Generics.AddRange(generics);
@@ -404,12 +441,12 @@ public static class Parser
         }
 
         // 4. Find open paren to start parsing arguments
-        if (enumerator.Current?.Type != TokenType.OpenParen)
+        if (enumerator.Current.Type != TokenType.OpenParen)
         {
             // Add an error to the function AST and continue until open paren
-            var token = enumerator.Current ?? enumerator.Last;
+            token = enumerator.Current;
             ErrorReporter.Report($"Unexpected token '{token.Value}' in function definition", token);
-            while (enumerator.Current != null && enumerator.Current.Type != TokenType.OpenParen)
+            while (enumerator.Remaining && enumerator.Current.Type != TokenType.OpenParen)
                 enumerator.MoveNext();
         }
 
@@ -418,7 +455,7 @@ public static class Parser
         DeclarationAst currentArgument = null;
         while (enumerator.MoveNext())
         {
-            var token = enumerator.Current;
+            token = enumerator.Current;
 
             if (token.Type == TokenType.CloseParen)
             {
@@ -474,7 +511,13 @@ public static class Parser
                     {
                         enumerator.MoveNext();
                         currentArgument.Value = ParseExpression(enumerator, function, null, TokenType.Comma, TokenType.CloseParen);
-                        switch (enumerator.Current?.Type)
+                        if (!enumerator.Remaining)
+                        {
+                            ErrorReporter.Report($"Incomplete definition for function '{function.Name}'", enumerator.Last);
+                            return null;
+                        }
+
+                        switch (enumerator.Current.Type)
                         {
                             case TokenType.Comma:
                                 commaRequiredBeforeNextArgument = false;
@@ -485,9 +528,6 @@ public static class Parser
                                 function.Arguments.Add(currentArgument);
                                 currentArgument = null;
                                 break;
-                            case null:
-                                ErrorReporter.Report($"Incomplete definition for function '{function.Name}'", enumerator.Last);
-                                return null;
                             default:
                                 ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in arguments of function '{function.Name}'", enumerator.Current);
                                 break;
@@ -503,7 +543,7 @@ public static class Parser
                     break;
             }
 
-            if (enumerator.Current?.Type == TokenType.CloseParen)
+            if (enumerator.Current.Type == TokenType.CloseParen)
             {
                 break;
             }
@@ -511,26 +551,35 @@ public static class Parser
 
         if (currentArgument != null)
         {
-            ErrorReporter.Report($"Incomplete function argument in function '{function.Name}'", enumerator.Current ?? enumerator.Last);
+            ErrorReporter.Report($"Incomplete function argument in function '{function.Name}'", enumerator.Current);
         }
 
         if (!commaRequiredBeforeNextArgument && function.Arguments.Any())
         {
-            ErrorReporter.Report("Unexpected comma in arguments", enumerator.Current ?? enumerator.Last);
+            ErrorReporter.Report("Unexpected comma in arguments", enumerator.Current);
         }
 
-        enumerator.MoveNext();
-        // 6. Handle compiler directives
-        if (enumerator.Current?.Type == TokenType.Pound)
+        if (!enumerator.MoveNext())
         {
-            enumerator.MoveNext();
-            switch (enumerator.Current?.Value)
+            ErrorReporter.Report("Unexpected function body or compiler directive", enumerator.Last);
+            return null;
+        }
+        // 6. Handle compiler directives
+        if (enumerator.Current.Type == TokenType.Pound)
+        {
+            if (!enumerator.MoveNext())
+            {
+                ErrorReporter.Report("Expected compiler directive value", enumerator.Last);
+                return null;
+            }
+
+            switch (enumerator.Current.Value)
             {
                 case "extern":
                     function.Flags |= FunctionFlags.Extern;
-                    if (enumerator.Peek()?.Type != TokenType.Literal)
+                    if (!enumerator.Peek(out token) || token.Type != TokenType.Literal)
                     {
-                        ErrorReporter.Report("Extern function definition should be followed by the library in use", enumerator.Current);
+                        ErrorReporter.Report("Extern function definition should be followed by the library in use", token);
                     }
                     else
                     {
@@ -544,9 +593,6 @@ public static class Parser
                 case "print_ir":
                     function.Flags |= FunctionFlags.PrintIR;
                     break;
-                case null:
-                    ErrorReporter.Report("Expected compiler directive value", enumerator.Last);
-                    return function;
                 default:
                     ErrorReporter.Report($"Unexpected compiler directive '{enumerator.Current.Value}'", enumerator.Current);
                     break;
@@ -555,15 +601,14 @@ public static class Parser
         }
 
         // 7. Find open brace to start parsing body
-        if (enumerator.Current?.Type != TokenType.OpenBrace)
+        if (enumerator.Current.Type != TokenType.OpenBrace)
         {
             // Add an error and continue until open paren
-            var token = enumerator.Current ?? enumerator.Last;
+            token = enumerator.Current;
             ErrorReporter.Report($"Unexpected token '{token.Value}' in function definition", token);
-            while (enumerator.Current != null && enumerator.Current.Type != TokenType.OpenBrace)
-                enumerator.MoveNext();
+            while (enumerator.MoveNext() && enumerator.Current.Type != TokenType.OpenBrace);
 
-            if (enumerator.Current == null)
+            if (!enumerator.Remaining)
             {
                 return function;
             }
@@ -581,14 +626,15 @@ public static class Parser
         structAst.Attributes = attributes;
 
         // 1. Determine name of struct
-        enumerator.MoveNext();
-        switch (enumerator.Current?.Type)
+        if (!enumerator.MoveNext())
+        {
+            ErrorReporter.Report("Expected struct to have name", enumerator.Last);
+            return null;
+        }
+        switch (enumerator.Current.Type)
         {
             case TokenType.Identifier:
                 structAst.Name = enumerator.Current.Value;
-                break;
-            case null:
-                ErrorReporter.Report("Expected struct to have name", enumerator.Last);
                 break;
             default:
                 ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in struct definition", enumerator.Current);
@@ -596,7 +642,13 @@ public static class Parser
         }
 
         // 2. Parse struct generics
-        if (enumerator.Peek()?.Type == TokenType.LessThan)
+        if (!enumerator.Peek(out var token))
+        {
+            ErrorReporter.Report($"Unexpected struct body", token);
+            return null;
+        }
+
+        if (token.Type == TokenType.LessThan)
         {
             // Clear the '<' before entering loop
             enumerator.MoveNext();
@@ -604,7 +656,7 @@ public static class Parser
             var generics = new HashSet<string>();
             while (enumerator.MoveNext())
             {
-                var token = enumerator.Current;
+                token = enumerator.Current;
 
                 if (token.Type == TokenType.GreaterThan)
                 {
@@ -649,14 +701,14 @@ public static class Parser
 
             if (!generics.Any())
             {
-                ErrorReporter.Report($"Expected struct '{structAst.Name}' to contain generics", enumerator.Current ?? enumerator.Last);
+                ErrorReporter.Report($"Expected struct '{structAst.Name}' to contain generics", enumerator.Current);
             }
             structAst.Generics = generics.ToList();
         }
 
         // 3. Get any inherited structs
         enumerator.MoveNext();
-        if (enumerator.Current?.Type == TokenType.Colon)
+        if (enumerator.Current.Type == TokenType.Colon)
         {
             enumerator.MoveNext();
             structAst.BaseTypeDefinition = ParseType(enumerator);
@@ -664,11 +716,10 @@ public static class Parser
         }
 
         // 4. Parse over the open brace
-        if (enumerator.Current?.Type != TokenType.OpenBrace)
+        if (enumerator.Current.Type != TokenType.OpenBrace)
         {
-            ErrorReporter.Report("Expected '{' token in struct definition", enumerator.Current ?? enumerator.Last);
-            while (enumerator.Current != null && enumerator.Current.Type != TokenType.OpenBrace)
-                enumerator.MoveNext();
+            ErrorReporter.Report("Expected '{' token in struct definition", enumerator.Current);
+            while (enumerator.MoveNext() && enumerator.Current.Type != TokenType.OpenBrace);
         }
 
         // 5. Iterate through fields
@@ -715,9 +766,9 @@ public static class Parser
 
         // 1. Expect to get colon
         enumerator.MoveNext();
-        if (enumerator.Current?.Type != TokenType.Colon)
+        if (enumerator.Current.Type != TokenType.Colon)
         {
-            var errorToken = enumerator.Current ?? enumerator.Last;
+            var errorToken = enumerator.Current;
             ErrorReporter.Report($"Unexpected token in struct field '{errorToken.Value}'", errorToken);
             // Parse to a ; or }
             while (enumerator.MoveNext())
@@ -732,16 +783,27 @@ public static class Parser
         }
 
         // 2. Check if type is given
-        if (enumerator.Peek()?.Type == TokenType.Identifier)
+        if (!enumerator.Peek(out var token))
+        {
+            ErrorReporter.Report("Expected type of struct field", token);
+            return null;
+        }
+
+        if (token.Type == TokenType.Identifier)
         {
             enumerator.MoveNext();
             structField.TypeDefinition = ParseType(enumerator, null);
         }
 
         // 3. Get the value or return
-        enumerator.MoveNext();
-        var token = enumerator.Current;
-        switch (token?.Type)
+        if (!enumerator.MoveNext())
+        {
+            ErrorReporter.Report("Expected declaration to have value", enumerator.Last);
+            return null;
+        }
+
+        token = enumerator.Current;
+        switch (token.Type)
         {
             case TokenType.Equals:
                 ParseDeclarationValue(structField, enumerator, null);
@@ -752,14 +814,10 @@ public static class Parser
                     ErrorReporter.Report("Expected declaration to have value", token);
                 }
                 break;
-            case null:
-                ErrorReporter.Report("Expected declaration to have value", enumerator.Last);
-                return structField;
             default:
                 ErrorReporter.Report($"Unexpected token '{token.Value}' in declaration", token);
                 // Parse until there is an equals sign
-                while (enumerator.Current != null && enumerator.Current.Type != TokenType.Equals)
-                    enumerator.MoveNext();
+                while (enumerator.MoveNext() && enumerator.Current.Type != TokenType.Equals);
 
                 ParseDeclarationValue(structField, enumerator, null);
                 break;
@@ -774,34 +832,34 @@ public static class Parser
         enumAst.Attributes = attributes;
 
         // 1. Determine name of enum
-        enumerator.MoveNext();
-        switch (enumerator.Current?.Type)
+        if (!enumerator.MoveNext())
         {
-            case TokenType.Identifier:
-                enumAst.Name = enumAst.BackendName = enumerator.Current.Value;
-                break;
-            case null:
-                ErrorReporter.Report("Expected enum to have name", enumerator.Last);
-                break;
-            default:
-                ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in enum definition", enumerator.Current);
-                break;
+            ErrorReporter.Report("Expected enum to have name", enumerator.Last);
+            return null;
+        }
+
+        if (enumerator.Current.Type == TokenType.Identifier)
+        {
+            enumAst.Name = enumAst.BackendName = enumerator.Current.Value;
+        }
+        else
+        {
+            ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in enum definition", enumerator.Current);
         }
 
         // 2. Parse over the open brace
         enumerator.MoveNext();
-        if (enumerator.Current?.Type == TokenType.Colon)
+        if (enumerator.Current.Type == TokenType.Colon)
         {
             enumerator.MoveNext();
             enumAst.BaseTypeDefinition = ParseType(enumerator);
             enumerator.MoveNext();
         }
 
-        if (enumerator.Current?.Type != TokenType.OpenBrace)
+        if (enumerator.Current.Type != TokenType.OpenBrace)
         {
-            ErrorReporter.Report("Expected '{' token in enum definition", enumerator.Current ?? enumerator.Last);
-            while (enumerator.Current != null && enumerator.Current.Type != TokenType.OpenBrace)
-                enumerator.MoveNext();
+            ErrorReporter.Report("Expected '{' token in enum definition", enumerator.Current);
+            while (enumerator.MoveNext() && enumerator.Current.Type != TokenType.OpenBrace);
         }
 
         // 3. Iterate through fields
@@ -951,7 +1009,7 @@ public static class Parser
 
         if (currentValue != null)
         {
-            var token = enumerator.Current ?? enumerator.Last;
+            var token = enumerator.Current;
             ErrorReporter.Report($"Unexpected token '{token.Value}' in enum", token);
         }
 
@@ -963,27 +1021,27 @@ public static class Parser
         var union = CreateAst<UnionAst>(enumerator.Current);
 
         // 1. Determine name of enum
-        enumerator.MoveNext();
-        switch (enumerator.Current?.Type)
+        if (!enumerator.MoveNext())
         {
-            case TokenType.Identifier:
-                union.Name = union.BackendName = enumerator.Current.Value;
-                break;
-            case null:
-                ErrorReporter.Report("Expected union to have name", enumerator.Last);
-                break;
-            default:
-                ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in union definition", enumerator.Current);
-                break;
+            ErrorReporter.Report("Expected union to have name", enumerator.Last);
+            return null;
+        }
+
+        if (enumerator.Current.Type == TokenType.Identifier)
+        {
+            union.Name = union.BackendName = enumerator.Current.Value;
+        }
+        else
+        {
+            ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in union definition", enumerator.Current);
         }
 
         // 2. Parse over the open brace
         enumerator.MoveNext();
-        if (enumerator.Current?.Type != TokenType.OpenBrace)
+        if (enumerator.Current.Type != TokenType.OpenBrace)
         {
-            ErrorReporter.Report("Expected '{' token in union definition", enumerator.Current ?? enumerator.Last);
-            while (enumerator.Current != null && enumerator.Current.Type != TokenType.OpenBrace)
-                enumerator.MoveNext();
+            ErrorReporter.Report("Expected '{' token in union definition", enumerator.Current);
+            while (enumerator.MoveNext() && enumerator.Current.Type != TokenType.OpenBrace);
         }
 
         // 3. Iterate through fields
@@ -1014,10 +1072,10 @@ public static class Parser
 
         // 1. Expect to get colon
         enumerator.MoveNext();
-        if (enumerator.Current?.Type != TokenType.Colon)
+        if (enumerator.Current.Type != TokenType.Colon)
         {
-            var errorToken = enumerator.Current ?? enumerator.Last;
-            ErrorReporter.Report($"Unexpected token in struct field '{errorToken.Value}'", errorToken);
+            var errorToken = enumerator.Current;
+            ErrorReporter.Report($"Unexpected token in union field '{errorToken.Value}'", errorToken);
             // Parse to a ; or }
             while (enumerator.MoveNext())
             {
@@ -1031,19 +1089,29 @@ public static class Parser
         }
 
         // 2. Check if type is given
-        if (enumerator.Peek()?.Type == TokenType.Identifier)
+        if (!enumerator.Peek(out var token))
+        {
+            ErrorReporter.Report("Unexpected type of union field", token);
+            return null;
+        }
+
+        if (token.Type == TokenType.Identifier)
         {
             enumerator.MoveNext();
             field.TypeDefinition = ParseType(enumerator, null);
         }
 
         // 3. Get the value or return
-        enumerator.MoveNext();
-        var token = enumerator.Current;
-        switch (token?.Type)
+        if (!enumerator.MoveNext())
+        {
+            ErrorReporter.Report("Expected union to be closed by a '}'", token);
+            return null;
+        }
+
+        token = enumerator.Current;
+        switch (token.Type)
         {
             case TokenType.SemiColon:
-            case null:
                 if (field.TypeDefinition == null)
                 {
                     ErrorReporter.Report("Expected union field to have a type", token);
@@ -1052,10 +1120,13 @@ public static class Parser
             default:
                 ErrorReporter.Report($"Unexpected token '{token.Value}' in declaration", token);
                 // Parse until there is a semicolon or closing brace
-                while (token != null && (token.Type != TokenType.Equals || token.Type != TokenType.CloseBrace))
+                while (enumerator.MoveNext())
                 {
-                    enumerator.MoveNext();
                     token = enumerator.Current;
+                    if (token.Type == TokenType.SemiColon || token.Type == TokenType.CloseBrace)
+                    {
+                        break;
+                    }
                 }
                 break;
         }
@@ -1085,9 +1156,14 @@ public static class Parser
 
     private static IAst ParseLine(TokenEnumerator enumerator, IFunction currentFunction)
     {
-        var token = enumerator.Current;
+        if (!enumerator.Remaining)
+        {
+            ErrorReporter.Report("End of file reached without closing scope", enumerator.Last);
+            return null;
+        }
 
-        switch (token?.Type)
+        var token = enumerator.Current;
+        switch (token.Type)
         {
             case TokenType.Return:
                 return ParseReturn(enumerator, currentFunction);
@@ -1098,8 +1174,12 @@ public static class Parser
             case TokenType.Each:
                 return ParseEach(enumerator, currentFunction);
             case TokenType.Identifier:
-                var nextToken = enumerator.Peek();
-                switch (nextToken?.Type)
+                if (!enumerator.Peek(out token))
+                {
+                    ErrorReporter.Report("End of file reached without closing scope", enumerator.Last);
+                    return null;
+                }
+                switch (token.Type)
                 {
                     case TokenType.OpenParen:
                         return ParseCall(enumerator, currentFunction, true);
@@ -1146,9 +1226,6 @@ public static class Parser
                     ErrorReporter.Report("End of file reached without closing scope", enumerator.Last);
                 }
                 return continueAst;
-            case null:
-                ErrorReporter.Report("End of file reached without closing scope", enumerator.Last);
-                return null;
             default:
                 ErrorReporter.Report($"Unexpected token '{token.Value}'", token);
                 return null;
@@ -1173,7 +1250,7 @@ public static class Parser
 
         if (!closed)
         {
-            ErrorReporter.Report("Scope not closed by '}'", enumerator.Current ?? enumerator.Last);
+            ErrorReporter.Report("Scope not closed by '}'", enumerator.Current);
         }
 
         return scopeAst;
@@ -1187,8 +1264,13 @@ public static class Parser
         enumerator.MoveNext();
         conditionalAst.Condition = ParseConditionExpression(enumerator, currentFunction);
 
+        if (!enumerator.Remaining)
+        {
+            ErrorReporter.Report("Expected if to contain conditional expression and body", enumerator.Last);
+            return null;
+        }
         // 2. Determine how many lines to parse
-        switch (enumerator.Current?.Type)
+        switch (enumerator.Current.Type)
         {
             case TokenType.Then:
                 // Parse single AST
@@ -1200,9 +1282,6 @@ public static class Parser
                 // Parse until close brace
                 conditionalAst.IfBlock = ParseScope(enumerator, currentFunction, topLevel, directory);
                 break;
-            case null:
-                ErrorReporter.Report("Expected if to contain conditional expression and body", enumerator.Last);
-                break;
             default:
                 // Parse single AST
                 conditionalAst.IfBlock = CreateAst<ScopeAst>(enumerator.Current);
@@ -1211,12 +1290,25 @@ public static class Parser
         }
 
         // 3. Parse else block if necessary
-        if (enumerator.Peek()?.Type == TokenType.Else)
+        if (!enumerator.Peek(out var token))
+        {
+            if (topLevel)
+            {
+                return conditionalAst;
+            }
+            // TODO Error here?
+        }
+
+        if (token.Type == TokenType.Else)
         {
             // First clear the else and then determine how to parse else block
             enumerator.MoveNext();
-            enumerator.MoveNext();
-            switch (enumerator.Current?.Type)
+            if (!enumerator.MoveNext())
+            {
+                ErrorReporter.Report("Expected body of else branch", enumerator.Last);
+                return null;
+            }
+            switch (enumerator.Current.Type)
             {
                 case TokenType.Then:
                     // Parse single AST
@@ -1227,9 +1319,6 @@ public static class Parser
                 case TokenType.OpenBrace:
                     // Parse until close brace
                     conditionalAst.ElseBlock = ParseScope(enumerator, currentFunction, topLevel, directory);
-                    break;
-                case null:
-                    ErrorReporter.Report("Expected body of else branch", enumerator.Last);
                     break;
                 default:
                     // Parse single AST
@@ -1251,7 +1340,12 @@ public static class Parser
         whileAst.Condition = ParseConditionExpression(enumerator, currentFunction);
 
         // 2. Determine how many lines to parse
-        switch (enumerator.Current?.Type)
+        if (!enumerator.Remaining)
+        {
+            ErrorReporter.Report("Expected while loop to contain body", enumerator.Last);
+            return null;
+        }
+        switch (enumerator.Current.Type)
         {
             case TokenType.Then:
                 // Parse single AST
@@ -1262,9 +1356,6 @@ public static class Parser
             case TokenType.OpenBrace:
                 // Parse until close brace
                 whileAst.Body = ParseScope(enumerator, currentFunction);
-                break;
-            case null:
-                ErrorReporter.Report("Expected while loop to contain body", enumerator.Last);
                 break;
             default:
                 // Parse single AST
@@ -1282,21 +1373,21 @@ public static class Parser
 
         // 1. Parse the iteration variable by first iterating over the initial 'each'
         enumerator.MoveNext();
-        if (enumerator.Current?.Type == TokenType.Identifier)
+        if (enumerator.Current.Type == TokenType.Identifier)
         {
             eachAst.IterationVariable = CreateAst<VariableAst>(enumerator.Current);
             eachAst.IterationVariable.Name = enumerator.Current.Value;
         }
         else
         {
-            ErrorReporter.Report("Expected variable in each block definition", enumerator.Current ?? enumerator.Last);
+            ErrorReporter.Report("Expected variable in each block definition", enumerator.Current);
         }
 
         enumerator.MoveNext();
-        if (enumerator.Current?.Type == TokenType.Comma)
+        if (enumerator.Current.Type == TokenType.Comma)
         {
             enumerator.MoveNext();
-            if (enumerator.Current?.Type == TokenType.Identifier)
+            if (enumerator.Current.Type == TokenType.Identifier)
             {
                 eachAst.IndexVariable = CreateAst<VariableAst>(enumerator.Current);
                 eachAst.IndexVariable.Name = enumerator.Current.Value;
@@ -1304,16 +1395,15 @@ public static class Parser
             }
             else
             {
-                ErrorReporter.Report("Expected index variable after comma in each declaration", enumerator.Current ?? enumerator.Last);
+                ErrorReporter.Report("Expected index variable after comma in each declaration", enumerator.Current);
             }
         }
 
         // 2. Parse over the in keyword
-        if (enumerator.Current?.Type != TokenType.In)
+        if (enumerator.Current.Type != TokenType.In)
         {
-            ErrorReporter.Report("Expected 'in' token in each block", enumerator.Current ?? enumerator.Last);
-            while (enumerator.Current != null && enumerator.Current.Type != TokenType.In)
-                enumerator.MoveNext();
+            ErrorReporter.Report("Expected 'in' token in each block", enumerator.Current);
+            while (enumerator.MoveNext() && enumerator.Current.Type != TokenType.In);
         }
 
         // 3. Determine the iterator
@@ -1321,7 +1411,12 @@ public static class Parser
         var expression = ParseConditionExpression(enumerator, currentFunction);
 
         // 3a. Check if the next token is a range
-        switch (enumerator.Current?.Type)
+        if (!enumerator.Remaining)
+        {
+            ErrorReporter.Report("Expected each block to have iteration and body", enumerator.Last);
+            return null;
+        }
+        switch (enumerator.Current.Type)
         {
             case TokenType.Range:
                 if (eachAst.IndexVariable != null)
@@ -1330,30 +1425,26 @@ public static class Parser
                 }
 
                 eachAst.RangeBegin = expression;
-                enumerator.MoveNext();
-                if (enumerator.Current == null)
+                if (!enumerator.MoveNext())
                 {
                     ErrorReporter.Report("Expected range to have an end", enumerator.Last);
                     return eachAst;
                 }
 
                 eachAst.RangeEnd = ParseConditionExpression(enumerator, currentFunction);
-                if (enumerator.Current == null)
+                if (!enumerator.Remaining)
                 {
                     ErrorReporter.Report("Expected each block to have iteration and body", enumerator.Last);
                     return eachAst;
                 }
                 break;
-            case null:
-                ErrorReporter.Report("Expected each block to have iteration and body", enumerator.Last);
-                return eachAst;
             default:
                 eachAst.Iteration = expression;
                 break;
         }
 
         // 4. Determine how many lines to parse
-        switch (enumerator.Current?.Type)
+        switch (enumerator.Current.Type)
         {
             case TokenType.Then:
                 // Parse single AST
@@ -1448,15 +1539,19 @@ public static class Parser
 
         // 1. Expect to get colon
         enumerator.MoveNext();
-        if (enumerator.Current?.Type != TokenType.Colon)
+        if (enumerator.Current.Type != TokenType.Colon)
         {
-            var errorToken = enumerator.Current ?? enumerator.Last;
+            var errorToken = enumerator.Current;
             ErrorReporter.Report($"Unexpected token in declaration '{errorToken.Value}'", errorToken);
             return declaration;
         }
 
         // 2. Check if type is given
-        if (enumerator.Peek()?.Type == TokenType.Identifier)
+        if (!enumerator.Peek(out var token))
+        {
+            ErrorReporter.Report("Expected type or value of declaration", token);
+        }
+        if (token.Type == TokenType.Identifier)
         {
             enumerator.MoveNext();
             declaration.TypeDefinition = ParseType(enumerator, currentFunction);
@@ -1474,9 +1569,14 @@ public static class Parser
         }
 
         // 3. Get the value or return
-        enumerator.MoveNext();
-        var token = enumerator.Current;
-        switch (token?.Type)
+        if (!enumerator.MoveNext())
+        {
+            ErrorReporter.Report("Expected declaration to have value", enumerator.Last);
+            return declaration;
+        }
+
+        token = enumerator.Current;
+        switch (token.Type)
         {
             case TokenType.Equals:
                 ParseDeclarationValue(declaration, enumerator, currentFunction);
@@ -1487,29 +1587,23 @@ public static class Parser
                     ErrorReporter.Report("Expected token declaration to have value", token);
                 }
                 break;
-            case null:
-                ErrorReporter.Report("Expected declaration to have value", enumerator.Last);
-                return declaration;
             default:
                 ErrorReporter.Report($"Unexpected token '{token.Value}' in declaration", token);
                 // Parse until there is an equals sign
-                while (enumerator.Current != null && enumerator.Current.Type != TokenType.Equals)
-                    enumerator.MoveNext();
+                while (enumerator.MoveNext() && enumerator.Current.Type != TokenType.Equals);
 
                 ParseDeclarationValue(declaration, enumerator, currentFunction);
                 break;
         }
 
         // 4. Parse compiler directives
-        if (enumerator.Peek()?.Type == TokenType.Pound)
+        if (enumerator.Peek(out token) && token.Type == TokenType.Pound)
         {
-            switch (enumerator.Peek(1)?.Value)
+            if (enumerator.Peek(out token, 1) && token.Value == "const")
             {
-                case "const":
-                    declaration.Constant = true;
-                    enumerator.MoveNext();
-                    enumerator.MoveNext();
-                    break;
+                declaration.Constant = true;
+                enumerator.MoveNext();
+                enumerator.MoveNext();
             }
         }
 
@@ -1530,7 +1624,7 @@ public static class Parser
         {
             case TokenType.OpenBrace:
                 declaration.Assignments = new Dictionary<string, AssignmentAst>();
-                while (enumerator.Current?.Type != TokenType.CloseBrace && enumerator.MoveNext())
+                while (enumerator.MoveNext())
                 {
                     var token = enumerator.Current;
                     if (token.Type == TokenType.CloseBrace)
@@ -1543,11 +1637,15 @@ public static class Parser
                     {
                         ErrorReporter.Report($"Multiple assignments for field '{token.Value}'", token);
                     }
+                    if (enumerator.Current.Type == TokenType.CloseBrace)
+                    {
+                        break;
+                    }
                 }
                 break;
             case TokenType.OpenBracket:
                 declaration.ArrayValues = new List<IAst>();
-                while (enumerator.Current?.Type != TokenType.CloseBracket && enumerator.MoveNext())
+                while (enumerator.MoveNext())
                 {
                     if (enumerator.Current.Type == TokenType.CloseBracket)
                     {
@@ -1556,6 +1654,10 @@ public static class Parser
 
                     var value = ParseExpression(enumerator, currentFunction, null, TokenType.Comma, TokenType.CloseBracket);
                     declaration.ArrayValues.Add(value);
+                    if (enumerator.Current.Type == TokenType.CloseBracket)
+                    {
+                        break;
+                    }
                 }
                 break;
             default:
@@ -1596,7 +1698,12 @@ public static class Parser
                 if (op != Operator.None)
                 {
                     assignment.Operator = op;
-                    if (enumerator.Peek()?.Type == TokenType.Equals)
+                    if (!enumerator.Peek(out token))
+                    {
+                        ErrorReporter.Report("Expected '=' in assignment'", token);
+                        return null;
+                    }
+                    if (token.Type == TokenType.Equals)
                     {
                         enumerator.MoveNext();
                     }
@@ -1721,11 +1828,11 @@ public static class Parser
     {
         if (!expression.Children.Any())
         {
-            ErrorReporter.Report("Expression should contain elements", enumerator.Current ?? enumerator.Last);
+            ErrorReporter.Report("Expression should contain elements", enumerator.Current);
         }
         else if (!operatorRequired && expression.Children.Any())
         {
-            ErrorReporter.Report("Value required after operator", enumerator.Current ?? enumerator.Last);
+            ErrorReporter.Report("Value required after operator", enumerator.Current);
             return expression;
         }
 
@@ -1753,7 +1860,7 @@ public static class Parser
             return compoundExpression;
         }
 
-        while (enumerator.Current != null)
+        while (enumerator.Remaining)
         {
             var token = enumerator.Current;
             if (token.Type == TokenType.SemiColon)
@@ -1801,7 +1908,11 @@ public static class Parser
                         enumerator.MoveNext();
                     }
 
-                    switch (enumerator.Current?.Type)
+                    if (!enumerator.Remaining)
+                    {
+                        return compoundDeclaration;
+                    }
+                    switch (enumerator.Current.Type)
                     {
                         case TokenType.Equals:
                             ParseDeclarationValue(compoundDeclaration, enumerator, currentFunction);
@@ -1812,13 +1923,10 @@ public static class Parser
                                 ErrorReporter.Report("Expected token declaration to have type and/or value", token);
                             }
                             break;
-                        case null:
-                            break;
                         default:
                             ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in declaration", enumerator.Current);
                             // Parse until there is an equals sign
-                            while (enumerator.Current != null && enumerator.Current.Type != TokenType.Equals)
-                                enumerator.MoveNext();
+                            while (enumerator.MoveNext() && enumerator.Current.Type != TokenType.Equals);
 
                             ParseDeclarationValue(compoundDeclaration, enumerator, currentFunction);
                             break;
@@ -1827,7 +1935,7 @@ public static class Parser
                     return compoundDeclaration;
                 default:
                     compoundExpression.Children.Add(ParseExpression(enumerator, currentFunction, null, TokenType.Comma, TokenType.Colon, TokenType.Equals));
-                    if (enumerator.Current?.Type == TokenType.Comma)
+                    if (enumerator.Current.Type == TokenType.Comma)
                     {
                         enumerator.MoveNext();
                     }
@@ -1876,7 +1984,6 @@ public static class Parser
     private static IAst ParseNextExpressionUnit(TokenEnumerator enumerator, IFunction currentFunction, out bool operatorRequired)
     {
         var token = enumerator.Current;
-        var nextToken = enumerator.Peek();
         operatorRequired = true;
         switch (token.Type)
         {
@@ -1890,36 +1997,41 @@ public static class Parser
                 return CreateAst<NullAst>(token);
             case TokenType.Identifier:
                 // Parse variable, call, or expression
-                switch (nextToken?.Type)
+                if (!enumerator.Peek(out var nextToken))
+                {
+                    ErrorReporter.Report($"Expected token to follow '{token.Value}'", token);
+                    return null;
+                }
+                switch (nextToken.Type)
                 {
                     case TokenType.OpenParen:
                         return ParseCall(enumerator, currentFunction);
                     case TokenType.OpenBracket:
                         return ParseIndex(enumerator, currentFunction);
-                    case null:
-                        ErrorReporter.Report($"Expected token to follow '{token.Value}'", token);
-                        return null;
                     case TokenType.Asterisk:
-                        switch (enumerator.Peek(1)?.Type)
+                        if (enumerator.Peek(out nextToken, 1))
                         {
-                            case TokenType.Comma:
-                            case TokenType.CloseParen:
-                                if (TryParseType(enumerator, out var typeDefinition))
-                                {
-                                    for (var i = 0; i < currentFunction.Generics.Count; i++)
+                            switch (nextToken.Type)
+                            {
+                                case TokenType.Comma:
+                                case TokenType.CloseParen:
+                                    if (TryParseType(enumerator, out var typeDefinition))
                                     {
-                                        SearchForGeneric(currentFunction.Generics[i], i, typeDefinition);
+                                        for (var i = 0; i < currentFunction.Generics.Count; i++)
+                                        {
+                                            SearchForGeneric(currentFunction.Generics[i], i, typeDefinition);
+                                        }
+                                        return typeDefinition;
                                     }
-                                    return typeDefinition;
-                                }
-                                break;
+                                    break;
+                            }
                         }
                         break;
                     case TokenType.LessThan:
                     {
                         if (TryParseType(enumerator, out var typeDefinition))
                         {
-                            if (enumerator.Current?.Type == TokenType.OpenParen)
+                            if (enumerator.Current.Type == TokenType.OpenParen)
                             {
                                 var callAst = CreateAst<CallAst>(typeDefinition);
                                 callAst.Name = typeDefinition.Name;
@@ -1961,7 +2073,7 @@ public static class Parser
                     changeByOneAst.Prefix = true;
                     changeByOneAst.Positive = positive;
                     changeByOneAst.Value = ParseNextExpressionUnit(enumerator, currentFunction, out operatorRequired);
-                    if (enumerator.Peek()?.Type == TokenType.Period)
+                    if (enumerator.Peek(out token) && token.Type == TokenType.Period)
                     {
                         enumerator.MoveNext();
                         changeByOneAst.Value = ParseStructFieldRef(enumerator, changeByOneAst.Value, currentFunction);
@@ -1993,7 +2105,7 @@ public static class Parser
                     var unaryAst = CreateAst<UnaryAst>(token);
                     unaryAst.Operator = (UnaryOperator)token.Value[0];
                     unaryAst.Value = ParseNextExpressionUnit(enumerator, currentFunction, out operatorRequired);
-                    if (enumerator.Peek()?.Type == TokenType.Period)
+                    if (enumerator.Peek(out token) && token.Type == TokenType.Period)
                     {
                         enumerator.MoveNext();
                         unaryAst.Value = ParseStructFieldRef(enumerator, unaryAst.Value, currentFunction);
@@ -2125,19 +2237,18 @@ public static class Parser
         // Enumerate over the first argument
         ParseArguments(callAst, enumerator, currentFunction);
 
-        var current = enumerator.Current;
-        if (current == null)
+        if (!enumerator.Remaining)
         {
             ErrorReporter.Report("Expected to close call", enumerator.Last);
         }
         else if (requiresSemicolon)
         {
-            if (current.Type == TokenType.SemiColon)
+            if (enumerator.Current.Type == TokenType.SemiColon)
                 return callAst;
 
-            if (enumerator.Peek()?.Type != TokenType.SemiColon)
+            if (!enumerator.Peek(out var token) || token.Type != TokenType.SemiColon)
             {
-                ErrorReporter.Report("Expected ';'", enumerator.Current ?? enumerator.Last);
+                ErrorReporter.Report("Expected ';'", token);
             }
             else
             {
@@ -2170,7 +2281,7 @@ public static class Parser
             }
             else
             {
-                if (token.Type == TokenType.Identifier && enumerator.Peek()?.Type == TokenType.Equals)
+                if (token.Type == TokenType.Identifier && enumerator.Peek(out var nextToken) && nextToken.Type == TokenType.Equals)
                 {
                     var argumentName = token.Value;
 
@@ -2189,7 +2300,7 @@ public static class Parser
                     callAst.Arguments.Add(ParseExpression(enumerator, currentFunction, null, TokenType.Comma, TokenType.CloseParen));
                 }
 
-                var currentType = enumerator.Current?.Type;
+                var currentType = enumerator.Current.Type;
                 if (currentType == TokenType.CloseParen) break;
                 if (currentType == TokenType.Comma)
                 {
@@ -2230,14 +2341,7 @@ public static class Parser
         index.Name = enumerator.Current.Value;
         enumerator.MoveNext();
 
-        // 2. Expect to get open bracket
-        if (enumerator.Current?.Type != TokenType.OpenBracket)
-        {
-            var errorToken = enumerator.Current ?? enumerator.Last;
-            ErrorReporter.Report($"Unexpected token in array index '{errorToken.Value}'", errorToken);
-            return index;
-        }
-
+        // 2. Parse index expression
         enumerator.MoveNext();
         index.Index = ParseExpression(enumerator, currentFunction, null, TokenType.CloseBracket);
 
@@ -2274,9 +2378,13 @@ public static class Parser
                 directive.Value = ParseExpression(enumerator, null);
                 break;
             case "import":
-                enumerator.MoveNext();
+                if (!enumerator.MoveNext())
+                {
+                    ErrorReporter.Report($"Expected module name or source file", enumerator.Last);
+                    return null;
+                }
                 token = enumerator.Current;
-                switch (token?.Type)
+                switch (token.Type)
                 {
                     case TokenType.Identifier:
                         directive.Type = DirectiveType.ImportModule;
@@ -2357,7 +2465,7 @@ public static class Parser
         }
 
         // 1. Determine the operator
-        if (enumerator.Current.Type == TokenType.OpenBracket && enumerator.Peek()?.Type == TokenType.CloseBracket)
+        if (enumerator.Current.Type == TokenType.OpenBracket && enumerator.Peek(out var token) && token.Type == TokenType.CloseBracket)
         {
             overload.Operator = Operator.Subscript;
             enumerator.MoveNext();
@@ -2377,13 +2485,13 @@ public static class Parser
         }
 
         // 2. Determine generics if necessary
-        if (enumerator.Current?.Type == TokenType.LessThan)
+        if (enumerator.Current.Type == TokenType.LessThan)
         {
             var commaRequiredBeforeNextType = false;
             var generics = new HashSet<string>();
             while (enumerator.MoveNext())
             {
-                var token = enumerator.Current;
+                token = enumerator.Current;
 
                 if (token.Type == TokenType.GreaterThan)
                 {
@@ -2429,20 +2537,19 @@ public static class Parser
 
             if (!generics.Any())
             {
-                ErrorReporter.Report("Expected operator overload to contain generics", enumerator.Current ?? enumerator.Last);
+                ErrorReporter.Report("Expected operator overload to contain generics", enumerator.Current);
             }
             enumerator.MoveNext();
             overload.Generics.AddRange(generics);
         }
 
         // 3. Find open paren to start parsing arguments
-        if (enumerator.Current?.Type != TokenType.OpenParen)
+        if (enumerator.Current.Type != TokenType.OpenParen)
         {
             // Add an error to the function AST and continue until open paren
-            var token = enumerator.Current ?? enumerator.Last;
+            token = enumerator.Current;
             ErrorReporter.Report($"Unexpected token '{token.Value}' in operator overload definition", token);
-            while (enumerator.Current != null && enumerator.Current.Type != TokenType.OpenParen)
-                enumerator.MoveNext();
+            while (enumerator.MoveNext() && enumerator.Current.Type != TokenType.OpenParen);
         }
 
         // 4. Get the arguments for the operator overload
@@ -2450,7 +2557,7 @@ public static class Parser
         DeclarationAst currentArgument = null;
         while (enumerator.MoveNext())
         {
-            var token = enumerator.Current;
+            token = enumerator.Current;
 
             if (token.Type == TokenType.CloseParen)
             {
@@ -2509,7 +2616,7 @@ public static class Parser
                     break;
             }
 
-            if (enumerator.Current?.Type == TokenType.CloseParen)
+            if (enumerator.Current.Type == TokenType.CloseParen)
             {
                 break;
             }
@@ -2522,7 +2629,7 @@ public static class Parser
 
         if (!commaRequiredBeforeNextArgument && overload.Arguments.Any())
         {
-            ErrorReporter.Report("Unexpected comma in arguments", enumerator.Current ?? enumerator.Last);
+            ErrorReporter.Report("Unexpected comma in arguments", enumerator.Current);
         }
 
         // 5. Set the return type based on the operator
@@ -2541,7 +2648,7 @@ public static class Parser
                 overload.ReturnTypeDefinition = new TypeDefinition {Name = "bool"};
                 break;
             case Operator.Subscript:
-                if (enumerator.Current?.Type != TokenType.Colon)
+                if (enumerator.Current.Type != TokenType.Colon)
                 {
                     ErrorReporter.Report($"Unexpected to define return type for subscript", enumerator.Current);
                 }
@@ -2575,17 +2682,18 @@ public static class Parser
         }
 
         // 6. Handle compiler directives
-        if (enumerator.Current?.Type == TokenType.Pound)
+        if (enumerator.Current.Type == TokenType.Pound)
         {
-            enumerator.MoveNext();
-            switch (enumerator.Current?.Value)
+            if (!enumerator.MoveNext())
+            {
+                ErrorReporter.Report("Expected compiler directive value", enumerator.Last);
+                return null;
+            }
+            switch (enumerator.Current.Value)
             {
                 case "print_ir":
                     overload.Flags |= FunctionFlags.PrintIR;
                     break;
-                case null:
-                    ErrorReporter.Report("Expected compiler directive value", enumerator.Last);
-                    return overload;
                 default:
                     ErrorReporter.Report($"Unexpected compiler directive '{enumerator.Current.Value}'", enumerator.Current);
                     break;
@@ -2594,13 +2702,12 @@ public static class Parser
         }
 
         // 7. Find open brace to start parsing body
-        if (enumerator.Current?.Type != TokenType.OpenBrace)
+        if (enumerator.Current.Type != TokenType.OpenBrace)
         {
             // Add an error and continue until open paren
-            var token = enumerator.Current ?? enumerator.Last;
+            token = enumerator.Current;
             ErrorReporter.Report($"Unexpected token '{token.Value}' in operator overload definition", token);
-            while (enumerator.Current != null && enumerator.Current.Type != TokenType.OpenBrace)
-                enumerator.MoveNext();
+            while (enumerator.MoveNext() && enumerator.Current.Type != TokenType.OpenBrace);
         }
 
         // 8. Parse body
@@ -2615,21 +2722,25 @@ public static class Parser
         enumerator.MoveNext();
 
         // 1a. Check if the return type is void
-        if (enumerator.Peek()?.Type != TokenType.OpenParen)
+        if (!enumerator.Peek(out var token))
+        {
+            ErrorReporter.Report("Expected interface definition", token);
+        }
+        if (token.Type != TokenType.OpenParen)
         {
             interfaceAst.ReturnTypeDefinition = ParseType(enumerator);
             enumerator.MoveNext();
         }
 
         // 1b. Handle multiple return values
-        if (enumerator.Current?.Type == TokenType.Comma)
+        if (enumerator.Current.Type == TokenType.Comma)
         {
             var returnType = CreateAst<TypeDefinition>(interfaceAst.ReturnTypeDefinition);
             returnType.Compound = true;
             returnType.Generics.Add(interfaceAst.ReturnTypeDefinition);
             interfaceAst.ReturnTypeDefinition = returnType;
 
-            while (enumerator.Current?.Type == TokenType.Comma)
+            while (enumerator.Current.Type == TokenType.Comma)
             {
                 if (!enumerator.MoveNext())
                 {
@@ -2640,8 +2751,13 @@ public static class Parser
             }
         }
 
-        // 1b. Set the name of the function or get the name from the type
-        switch (enumerator.Current?.Type)
+        // 1b. Set the name of the interface or get the name from the type
+        if (!enumerator.Remaining)
+        {
+            ErrorReporter.Report("Expected the interface name to be declared", enumerator.Last);
+            return null;
+        }
+        switch (enumerator.Current.Type)
         {
             case TokenType.Identifier:
                 interfaceAst.Name = enumerator.Current.Value;
@@ -2662,9 +2778,6 @@ public static class Parser
                     interfaceAst.ReturnTypeDefinition = null;
                 }
                 break;
-            case null:
-                ErrorReporter.Report("Expected the interface name to be declared", enumerator.Last);
-                return null;
             default:
                 ErrorReporter.Report("Expected the interface name to be declared", enumerator.Current);
                 enumerator.MoveNext();
@@ -2676,7 +2789,7 @@ public static class Parser
         DeclarationAst currentArgument = null;
         while (enumerator.MoveNext())
         {
-            var token = enumerator.Current;
+            token = enumerator.Current;
 
             if (token.Type == TokenType.CloseParen)
             {
@@ -2749,7 +2862,7 @@ public static class Parser
                     break;
             }
 
-            if (enumerator.Current?.Type == TokenType.CloseParen)
+            if (enumerator.Current.Type == TokenType.CloseParen)
             {
                 break;
             }
@@ -2757,12 +2870,12 @@ public static class Parser
 
         if (currentArgument != null)
         {
-            ErrorReporter.Report($"Incomplete argument in interface '{interfaceAst.Name}'", enumerator.Current ?? enumerator.Last);
+            ErrorReporter.Report($"Incomplete argument in interface '{interfaceAst.Name}'", enumerator.Current);
         }
 
         if (!commaRequiredBeforeNextArgument && interfaceAst.Arguments.Any())
         {
-            ErrorReporter.Report("Unexpected comma in arguments", enumerator.Current ?? enumerator.Last);
+            ErrorReporter.Report("Unexpected comma in arguments", enumerator.Current);
         }
 
         return interfaceAst;
@@ -2789,14 +2902,14 @@ public static class Parser
         }
 
         // Determine whether to parse a generic type, otherwise return
-        if (enumerator.Peek()?.Type == TokenType.LessThan)
+        if (enumerator.Peek(out var token) && token.Type == TokenType.LessThan)
         {
             // Clear the '<' before entering loop
             enumerator.MoveNext();
             var commaRequiredBeforeNextType = false;
             while (enumerator.MoveNext())
             {
-                var token = enumerator.Current;
+                token = enumerator.Current;
 
                 if (token.Type == TokenType.GreaterThan)
                 {
@@ -2862,11 +2975,11 @@ public static class Parser
 
             if (!typeDefinition.Generics.Any())
             {
-                ErrorReporter.Report("Expected type to contain generics", enumerator.Current ?? enumerator.Last);
+                ErrorReporter.Report("Expected type to contain generics", enumerator.Current);
             }
         }
 
-        while (enumerator.Peek()?.Type == TokenType.Asterisk)
+        while (enumerator.Peek(out token) && token.Type == TokenType.Asterisk)
         {
             enumerator.MoveNext();
             var pointerType = CreateAst<TypeDefinition>(enumerator.Current);
@@ -2875,7 +2988,7 @@ public static class Parser
             typeDefinition = pointerType;
         }
 
-        if (enumerator.Peek()?.Type == TokenType.OpenBracket)
+        if (enumerator.Peek(out token) && token.Type == TokenType.OpenBracket)
         {
             // Skip over the open bracket and parse the expression
             enumerator.MoveNext();
@@ -2911,15 +3024,14 @@ public static class Parser
         }
 
         // Determine whether to parse a generic type, otherwise return
-        if (enumerator.Peek(steps)?.Type == TokenType.LessThan)
+        if (enumerator.Peek(out var token, steps) && token.Type == TokenType.LessThan)
         {
             // Clear the '<' before entering loop
             steps++;
             var commaRequiredBeforeNextType = false;
-            while (enumerator.Peek(steps) != null)
+            while (enumerator.Peek(out token, steps))
             {
-                var token = enumerator.Peek(steps++);
-
+                steps++;
                 if (token.Type == TokenType.GreaterThan)
                 {
                     if (!commaRequiredBeforeNextType && typeDefinition.Generics.Any())
@@ -2986,9 +3098,9 @@ public static class Parser
             }
         }
 
-        while (enumerator.Peek(steps)?.Type == TokenType.Asterisk)
+        while (enumerator.Peek(out token, steps) && token.Type == TokenType.Asterisk)
         {
-            var pointerType = CreateAst<TypeDefinition>(enumerator.Peek(steps));
+            var pointerType = CreateAst<TypeDefinition>(token);
             pointerType.Name = "*";
             pointerType.Generics.Add(typeDefinition);
             typeDefinition = pointerType;
@@ -3108,10 +3220,9 @@ public static class Parser
         var castAst = CreateAst<CastAst>(enumerator.Current);
 
         // 1. Try to get the open paren to begin the cast
-        enumerator.MoveNext();
-        if (enumerator.Current?.Type != TokenType.OpenParen)
+        if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.OpenParen)
         {
-            ErrorReporter.Report("Expected '(' after cast", enumerator.Current ?? enumerator.Last);
+            ErrorReporter.Report("Expected '(' after 'cast'", enumerator.Current);
             return null;
         }
 
@@ -3135,13 +3246,11 @@ public static class Parser
         }
 
         // 3. Expect to get a comma
-        enumerator.MoveNext();
-        if (enumerator.Current?.Type != TokenType.Comma)
+        if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Comma)
         {
-            ErrorReporter.Report("Expected ',' after type in cast", enumerator.Current ?? enumerator.Last);
+            ErrorReporter.Report("Expected ',' after type in cast", enumerator.Current);
             return null;
         }
-
 
         // 4. Get the value expression
         if (!enumerator.MoveNext())

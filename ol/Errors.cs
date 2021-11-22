@@ -26,14 +26,7 @@ public static class ErrorReporter
 
     public static void Report(string message, Token token)
     {
-        if (token != null)
-        {
-            Report(message, token.FileIndex, token.Line, token.Column);
-        }
-        else
-        {
-            Report(message);
-        }
+        Report(message, token.FileIndex, token.Line, token.Column);
     }
 
     public static void Report(string message, IAst ast)
