@@ -1292,11 +1292,7 @@ public static class Parser
         // 3. Parse else block if necessary
         if (!enumerator.Peek(out var token))
         {
-            if (topLevel)
-            {
-                return conditionalAst;
-            }
-            // TODO Error here?
+            return conditionalAst;
         }
 
         if (token.Type == TokenType.Else)

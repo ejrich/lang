@@ -28,6 +28,8 @@ public static unsafe class ProgramRunner
     private static ModuleBuilder _moduleBuilder;
     private static TypeBuilder _functionTypeBuilder;
     private static int _version;
+    private static ConstructorInfo _dllImportConstructor;
+    private static readonly Dictionary<string, CustomAttributeBuilder> _libraries = new();
     private static readonly Dictionary<string, List<MethodInfo>> _externFunctions = new();
 
     private static int _typeCount;
@@ -107,14 +109,19 @@ public static unsafe class ProgramRunner
         _functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
 
         var method = _functionTypeBuilder.DefineMethod(name, MethodAttributes.Public | MethodAttributes.Static, typeof(Register), argumentTypes);
-        var caBuilder = new CustomAttributeBuilder(typeof(DllImportAttribute).GetConstructor(new []{typeof(string)}), new []{library});
+
+        if (!_libraries.TryGetValue(library, out var libraryDllImport))
+        {
+            _dllImportConstructor ??= typeof(DllImportAttribute).GetConstructor(new []{typeof(string)});
+            libraryDllImport = _libraries[library] = new CustomAttributeBuilder(_dllImportConstructor, new []{library});
+        }
 
         /* @Future Uncomment this for when shipping on Windows
         var dllImport = typeof(DllImportAttribute);
         var callingConvention = dllImport.GetField("CallingConvention");
         var caBuilder = new CustomAttributeBuilder(dllImport.GetConstructor(new []{typeof(string)}), new []{library}, new []{callingConvention}, new object[]{CallingConvention.Cdecl});
         */
-        method.SetCustomAttribute(caBuilder);
+        method.SetCustomAttribute(libraryDllImport);
     }
 
     public static void Init()
