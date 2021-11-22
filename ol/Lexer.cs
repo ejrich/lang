@@ -45,8 +45,8 @@ public static class Lexer
     {
         var fileText = File.ReadAllText(filePath);
 
-        Token token;
         var tokens = new List<Token>();
+        Token token;
         uint line = 1, column = 0;
 
         for (var i = 0; i < fileText.Length; i++)
@@ -706,12 +706,12 @@ public static class Lexer
 
 public struct Token
 {
-    public TokenType Type { get; set; }
-    public string Value { get; set; }
-    public TokenFlags Flags { get; set; }
-    public int FileIndex { get; init; }
-    public uint Line { get; init; }
-    public uint Column { get; set; }
+    public TokenType Type;
+    public string Value;
+    public TokenFlags Flags;
+    public int FileIndex;
+    public uint Line;
+    public uint Column;
 }
 
 public enum TokenType
