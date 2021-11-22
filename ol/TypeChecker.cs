@@ -643,7 +643,7 @@ public static class TypeChecker
                         {
                             ErrorReporter.Report("Default values in structs must be constant", structField.Value);
                         }
-                        if (valueType.TypeKind == TypeKind.Void)
+                        if (valueType?.TypeKind == TypeKind.Void)
                         {
                             ErrorReporter.Report($"Struct field '{structAst.Name}.{structField.Name}' cannot be assigned type 'void'", structField.Value);
                         }
