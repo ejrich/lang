@@ -704,8 +704,7 @@ public static class Lexer
     }
 }
 
-public class Token
-// public struct Token
+public struct Token
 {
     public TokenType Type { get; set; }
     public string Value { get; set; }

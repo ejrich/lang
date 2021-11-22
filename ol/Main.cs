@@ -56,7 +56,7 @@ public static class ol
                     noThreads = true;
                     break;
                 default:
-                    if (arg.StartsWith("-"))
+                    if (arg[0] == '-')
                     {
                         ErrorReporter.Report($"Unrecognized compiler flag '{arg}'");
                     }
@@ -65,7 +65,6 @@ public static class ol
                         ErrorReporter.Report($"Multiple program entrypoints defined '{arg}'");
                     }
                     else
-
                     {
                         if (!File.Exists(arg) || !arg.EndsWith(".ol"))
                         {
