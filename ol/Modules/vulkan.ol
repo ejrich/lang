@@ -1,3 +1,6 @@
+VK_TRUE := 1; #const
+VK_FALSE := 0; #const
+
 struct VkBuffer {}
 struct VkImage {}
 struct VkInstance {}
@@ -2097,6 +2100,27 @@ struct VkApplicationInfo {
     apiVersion: u32;
 }
 
+u32 vk_make_api_version(u32 variant, u32 major, u32 minor, u32 patch) {
+    return (variant << 29) | (major << 22) | (minor << 12) | patch;
+}
+
+u32 vk_api_version_1_0() {
+    return vk_make_api_version(0, 1, 0, 0);
+}
+
+u32 vk_api_version_variant(u32 version) {
+    return version >> 29;
+}
+u32 vk_api_version_major(u32 version) {
+    return (version >> 22) & 0x7F;
+}
+u32 vk_api_version_minor(u32 version) {
+    return (version >> 29) & 0x3FF;
+}
+u32 vk_api_version_patch(u32 version) {
+    return version & 0xFFF;
+}
+
 struct VkFormatProperties {
     linearTilingFeatures: u32;
     optimalTilingFeatures: u32;
@@ -2117,9 +2141,9 @@ struct VkInstanceCreateInfo {
     flags: u32;
     pApplicationInfo: VkApplicationInfo*;
     enabledLayerCount: u32;
-    ppEnabledLayerNames: u8*;
+    ppEnabledLayerNames: u8**;
     enabledExtensionCount: u32;
-    ppEnabledExtensionNames: u8*;
+    ppEnabledExtensionNames: u8**;
 }
 
 struct VkMemoryHeap {
@@ -2349,9 +2373,9 @@ struct VkDeviceCreateInfo {
     queueCreateInfoCount: u32;
     pQueueCreateInfos: VkDeviceQueueCreateInfo*;
     enabledLayerCount: u32;
-    ppEnabledLayerNames: u8*;
+    ppEnabledLayerNames: u8**;
     enabledExtensionCount: u32;
-    ppEnabledExtensionNames: u8*;
+    ppEnabledExtensionNames: u8**;
     pEnabledFeatures: VkPhysicalDeviceFeatures*;
 }
 

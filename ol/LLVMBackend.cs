@@ -651,7 +651,7 @@ public static unsafe class LLVMBackend
     {
         var type = _types[union.TypeIndex] = _context.CreateNamedStruct(union.Name);
 
-        type.StructSetBody(new []{LLVMTypeRef.CreateArray(LLVM.Int8Type(), union.Size)}, true);
+        type.StructSetBody(new []{LLVMTypeRef.CreateArray(LLVM.Int8Type(), union.Size)}, false);
 
         CreateTypeInfo(unionTypeInfo, union.TypeIndex);
     }
@@ -745,7 +745,7 @@ public static unsafe class LLVMBackend
 
                 typeFields[i] = typeField;
             }
-            _types[structAst.TypeIndex].StructSetBody(structFields, true);
+            _types[structAst.TypeIndex].StructSetBody(structFields, false);
 
             var typeFieldArray = LLVMValueRef.CreateConstArray(typeFieldType, typeFields);
             var typeFieldArrayGlobal = _module.AddGlobal(LLVM.TypeOf(typeFieldArray), "____type_fields");
@@ -1709,7 +1709,6 @@ public static unsafe class LLVMBackend
         _module.Target = defaultTriple;
 
         var targetMachine = target.CreateTargetMachine(defaultTriple, "generic", string.Empty, _codeGenLevel, LLVMRelocMode.LLVMRelocDefault, LLVMCodeModel.LLVMCodeModelDefault);
-        _module.DataLayout = Marshal.PtrToStringAnsi(targetMachine.CreateTargetDataLayout().Handle);
 
         if (outputIntermediate)
         {
