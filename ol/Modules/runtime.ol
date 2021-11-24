@@ -16,14 +16,12 @@ array_insert<T>(Array<T>* array, T value) {
         new_blocks := length / ARRAY_BLOCK_SIZE + 1;
         element_size := size_of(T);
 
-        new_data := malloc(element_size * new_blocks * ARRAY_BLOCK_SIZE);
-
-        if length > 0 {
-            memcpy(new_data, array.data, length * element_size);
-            free(array.data);
+        if length {
+            array.data = realloc(array.data, element_size * new_blocks * ARRAY_BLOCK_SIZE);
         }
-
-        array.data = cast(T*, new_data);
+        else {
+            array.data = malloc(element_size * new_blocks * ARRAY_BLOCK_SIZE);
+        }
     }
 
     array.data[length] = value;
@@ -192,6 +190,7 @@ struct Any {
 printf(string format, ... args) #extern "c"
 exit(int exit_code) #extern "c"
 void* malloc(int size) #extern "c"
+void* realloc(void* pointer, int size) #extern "c"
 free(void* data) #extern "c"
 void* memcpy(void* dest, void* src, int length) #extern "c"
 
