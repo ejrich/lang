@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using LLVMSharp.Interop;
 
 namespace ol;
@@ -316,7 +315,7 @@ public static unsafe class LLVMBackend
 
             var arguments = LLVMValueRef.CreateConstNamedStruct(argumentArrayType, new LLVMValueRef[]
             {
-                LLVM.ConstInt(LLVM.Int32Type(), (ulong)interfaceAst.Arguments.Count, 0),
+                LLVM.ConstInt(LLVM.Int64Type(), (ulong)interfaceAst.Arguments.Count, 0),
                 argumentArrayGlobal
             });
 
@@ -355,7 +354,7 @@ public static unsafe class LLVMBackend
 
                 var arguments = LLVMValueRef.CreateConstNamedStruct(argumentArrayType, new LLVMValueRef[]
                 {
-                    LLVM.ConstInt(LLVM.Int32Type(), (ulong)function.Arguments.Count, 0),
+                    LLVM.ConstInt(LLVM.Int64Type(), (ulong)function.Arguments.Count, 0),
                     argumentArrayGlobal
                 });
 
@@ -376,7 +375,7 @@ public static unsafe class LLVMBackend
 
                     attributes = LLVMValueRef.CreateConstNamedStruct(stringArrayType, new LLVMValueRef[]
                     {
-                        LLVM.ConstInt(LLVM.Int32Type(), (ulong)attributeRefs.Length, 0), attributesArrayGlobal
+                        LLVM.ConstInt(LLVM.Int64Type(), (ulong)attributeRefs.Length, 0), attributesArrayGlobal
                     });
                 }
                 else
@@ -453,7 +452,7 @@ public static unsafe class LLVMBackend
         SetPrivateConstant(typeArrayGlobal);
         LLVM.SetInitializer(typeArrayGlobal, typeArray);
 
-        var typeCount = LLVM.ConstInt(LLVM.Int32Type(), (ulong)_typeInfos.Length, 0);
+        var typeCount = LLVM.ConstInt(LLVM.Int64Type(), (ulong)_typeInfos.Length, 0);
         LLVM.SetInitializer(typeTable, LLVMValueRef.CreateConstNamedStruct(typeInfoArrayType, new LLVMValueRef[] {typeCount, typeArrayGlobal}));
 
         // 6. Write the program beginning at the entrypoint
@@ -561,7 +560,7 @@ public static unsafe class LLVMBackend
 
         var valuesArray = LLVMValueRef.CreateConstNamedStruct(enumValueArrayType, new LLVMValueRef[]
         {
-            LLVM.ConstInt(LLVM.Int32Type(), (ulong)enumValueRefs.Length, 0), enumValuesArrayGlobal
+            LLVM.ConstInt(LLVM.Int64Type(), (ulong)enumValueRefs.Length, 0), enumValuesArrayGlobal
         });
 
         LLVMValueRef attributes;
@@ -581,7 +580,7 @@ public static unsafe class LLVMBackend
 
             attributes = LLVMValueRef.CreateConstNamedStruct(stringArrayType, new LLVMValueRef[]
             {
-                LLVM.ConstInt(LLVM.Int32Type(), (ulong)attributeRefs.Length, 0), attributesArrayGlobal
+                LLVM.ConstInt(LLVM.Int64Type(), (ulong)attributeRefs.Length, 0), attributesArrayGlobal
             });
         }
         else
@@ -677,7 +676,7 @@ public static unsafe class LLVMBackend
 
         var array = LLVMValueRef.CreateConstNamedStruct(typeInfoArray, new LLVMValueRef[]
         {
-            LLVM.ConstInt(LLVM.Int32Type(), (ulong)typeInfos.Length, 0), typesArrayGlobal
+            LLVM.ConstInt(LLVM.Int64Type(), (ulong)typeInfos.Length, 0), typesArrayGlobal
         });
 
         var typeName = GetString(compoundType.Name);
@@ -733,7 +732,7 @@ public static unsafe class LLVMBackend
 
                     fieldAttributes = LLVMValueRef.CreateConstNamedStruct(stringArrayType, new LLVMValueRef[]
                     {
-                        LLVM.ConstInt(LLVM.Int32Type(), (ulong)attributeRefs.Length, 0), attributesArrayGlobal
+                        LLVM.ConstInt(LLVM.Int64Type(), (ulong)attributeRefs.Length, 0), attributesArrayGlobal
                     });
                 }
                 else
@@ -754,7 +753,7 @@ public static unsafe class LLVMBackend
 
             structTypeInfoFields = LLVMValueRef.CreateConstNamedStruct(typeFieldArrayType, new LLVMValueRef[]
             {
-                LLVM.ConstInt(LLVM.Int32Type(), (ulong)structAst.Fields.Count, 0),
+                LLVM.ConstInt(LLVM.Int64Type(), (ulong)structAst.Fields.Count, 0),
                 typeFieldArrayGlobal
             });
 
@@ -785,7 +784,7 @@ public static unsafe class LLVMBackend
 
             attributes = LLVMValueRef.CreateConstNamedStruct(stringArrayType, new LLVMValueRef[]
             {
-                LLVM.ConstInt(LLVM.Int32Type(), (ulong)attributeRefs.Length, 0), attributesArrayGlobal
+                LLVM.ConstInt(LLVM.Int64Type(), (ulong)attributeRefs.Length, 0), attributesArrayGlobal
             });
         }
         else
@@ -1654,7 +1653,7 @@ public static unsafe class LLVMBackend
             return stringPointer;
         }
 
-        var length = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), (uint)value.Length, false);
+        var length = LLVMValueRef.CreateConstInt(LLVM.Int64Type(), (ulong)value.Length, false);
         return LLVMValueRef.CreateConstNamedStruct(_stringType, new [] {length, stringPointer});
     }
 

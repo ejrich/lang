@@ -609,7 +609,7 @@ public static class ProgramIRBuilder
                     else if (declaration.TypeDefinition.Count != null)
                     {
                         function.SaveStack = true;
-                        var count = EmitIR(function, declaration.TypeDefinition.Count, scope);
+                        var count = EmitAndCast(function, declaration.TypeDefinition.Count, scope, TypeTable.S64Type);
                         var countPointer = EmitGetStructPointer(function, allocation, arrayStruct, 0);
                         EmitStore(function, countPointer, count);
 
@@ -1262,7 +1262,7 @@ public static class ProgramIRBuilder
                 arrayData = iteration;
                 cArrayIteration = true;
                 var arrayType = (ArrayType)iteration.Type;
-                compareTarget = GetConstantInteger(arrayType.Length);
+                compareTarget = GetConstantS64(arrayType.Length);
             }
             else
             {
