@@ -2,7 +2,7 @@
 
 // Runtime structs
 struct Array<T> {
-    length: int;
+    length: s64;
     data: T*;
 }
 
@@ -45,7 +45,7 @@ bool array_remove<T>(Array<T>* array, int index) {
 }
 
 struct string {
-    length: int;
+    length: s64;
     data: u8*;
 }
 

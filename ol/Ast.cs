@@ -18,6 +18,7 @@ public interface IType
     int TypeIndex { get; set; }
     TypeKind TypeKind { get; set; }
     uint Size { get; set; }
+    uint Alignment { get; set; }
     bool Used { get; set; }
 }
 
@@ -85,6 +86,7 @@ public class FunctionAst : IFunction, IType
     public TypeKind TypeKind { get; set; } = TypeKind.Function;
     public FunctionFlags Flags { get; set; }
     public uint Size { get; set; } // Will always be 0
+    public uint Alignment { get; set; } // Will always be 0
     public bool Used { get; set; }
     public string ExternLib { get; set; }
     public IType ParamsElementType { get; set; }
@@ -107,6 +109,7 @@ public class StructAst : IAst, IType
     public int TypeIndex { get; set; }
     public TypeKind TypeKind { get; set; }
     public uint Size { get; set; }
+    public uint Alignment { get; set; }
     public bool Used { get; set; }
     public List<string> Attributes { get; set; }
     public string BaseStructName { get; set; }
@@ -164,6 +167,7 @@ public class EnumAst : IAst, IType
     public string BackendName { get; set; }
     public int TypeIndex { get; set; }
     public uint Size { get; set; } = 4;
+    public uint Alignment { get; set; }
     public bool Used { get; set; }
     public TypeKind TypeKind { get; set; } = TypeKind.Enum;
     public List<string> Attributes { get; set; }
@@ -192,6 +196,7 @@ public class PrimitiveAst : IAst, IType
     public int TypeIndex { get; set; }
     public TypeKind TypeKind { get; set; }
     public uint Size { get; set; }
+    public uint Alignment { get; set; }
     public bool Used { get; set; }
     public bool Signed { get; set; }
     public IType PointerType { get; set; }
@@ -204,6 +209,7 @@ public class ArrayType : IType
     public int TypeIndex { get; set; }
     public TypeKind TypeKind { get; set; } = TypeKind.CArray;
     public uint Size { get; set; }
+    public uint Alignment { get; set; }
     public bool Used { get; set; }
     public uint Length { get; set; }
     public IType ElementType { get; set; }
@@ -219,6 +225,7 @@ public class UnionAst : IAst, IType
     public int TypeIndex { get; set; }
     public TypeKind TypeKind { get; set; } = TypeKind.Union;
     public uint Size { get; set; }
+    public uint Alignment { get; set; }
     public bool Used { get; set; }
     public bool Verified { get; set; }
     public bool Verifying { get; set; }
@@ -242,6 +249,7 @@ public class CompoundType : IType
     public int TypeIndex { get; set; }
     public TypeKind TypeKind { get; set; } = TypeKind.Compound;
     public uint Size { get; set; }
+    public uint Alignment { get; set; } // Since compound types will always be packed
     public bool Used { get; set; }
     public IType[] Types { get; set; }
 }
@@ -493,6 +501,7 @@ public class InterfaceAst : IInterface, IType
     public int TypeIndex { get; set; }
     public TypeKind TypeKind { get; set; } = TypeKind.Interface;
     public uint Size { get; set; } = 8;
+    public uint Alignment { get; set; } = 8;
     public bool Used { get; set; }
     public bool Verified { get; set; }
     public bool Verifying { get; set; }

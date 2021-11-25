@@ -69,7 +69,7 @@ public static class Allocator
         }
     }
 
-    public const int StringLength = 12;
+    public const int StringLength = 16;
 
     public static IntPtr MakeString(string value, bool useRawString)
     {
@@ -86,8 +86,6 @@ public static class Allocator
 
         return stringPointer;
     }
-
-    public const int StringSize = 12;
 
     public static String MakeString(string value)
     {
@@ -113,9 +111,9 @@ public static class Allocator
     }
 }
 
-[StructLayout(LayoutKind.Explicit, Size=Allocator.StringSize)]
+[StructLayout(LayoutKind.Explicit, Size=Allocator.StringLength)]
 public struct String
 {
-    [FieldOffset(0)] public int Length;
-    [FieldOffset(4)] public IntPtr Data;
+    [FieldOffset(0)] public long Length;
+    [FieldOffset(8)] public IntPtr Data;
 }

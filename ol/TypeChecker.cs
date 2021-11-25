@@ -2674,7 +2674,7 @@ public static class TypeChecker
 
             if (each.IndexVariable != null)
             {
-                each.IndexVariable.Type = TypeTable.S32Type;
+                each.IndexVariable.Type = TypeTable.S64Type;
                 each.Body.Identifiers.TryAdd(each.IndexVariable.Name, each.IndexVariable);
             }
 
