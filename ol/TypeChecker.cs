@@ -355,7 +355,7 @@ public static class TypeChecker
 
     private static PrimitiveAst AddPrimitive(string name, TypeKind typeKind, uint size = 0, bool signed = false)
     {
-        var primitiveAst = new PrimitiveAst {Name = name, BackendName = name, TypeKind = typeKind, Size = size, Signed = signed};
+        var primitiveAst = new PrimitiveAst {Name = name, BackendName = name, TypeKind = typeKind, Size = size, Alignment = size, Signed = signed};
         _globalScope.Identifiers.Add(name, primitiveAst);
         TypeTable.Add(name, primitiveAst);
         TypeTable.CreateTypeInfo(primitiveAst);
@@ -382,12 +382,11 @@ public static class TypeChecker
             {
                 ErrorReporter.Report($"Base type of enum must be an integer, but got '{PrintTypeDefinition(enumAst.BaseTypeDefinition)}'", enumAst.BaseTypeDefinition);
                 enumAst.BaseType = TypeTable.S32Type;
-                enumAst.Size = 4;
             }
             else
             {
                 enumAst.BaseType = (PrimitiveAst)baseType;
-                enumAst.Size = enumAst.BaseType.Size;
+                enumAst.Alignment = enumAst.Size = enumAst.BaseType.Size;
             }
         }
 
@@ -681,9 +680,30 @@ public static class TypeChecker
                         VerifyUnion(fieldUnion);
                     }
                 }
+
+                if (structField.Type.Alignment > structAst.Alignment)
+                {
+                    structAst.Alignment = structField.Type.Alignment;
+                }
+
+                var alignmentOffset = structAst.Size % structField.Type.Alignment;
+                if (alignmentOffset > 0)
+                {
+                    structAst.Size += structField.Type.Alignment - alignmentOffset;
+                }
+
                 structField.Offset = structAst.Size;
                 structField.Size = structField.Type.Size;
                 structAst.Size += structField.Type.Size;
+            }
+        }
+
+        if (structAst.Size > 0)
+        {
+            var alignmentOffset = structAst.Size % structAst.Alignment;
+            if (alignmentOffset > 0)
+            {
+                structAst.Size += structAst.Alignment - alignmentOffset;
             }
         }
 
@@ -763,11 +783,24 @@ public static class TypeChecker
                             VerifyUnion(fieldUnion);
                         }
                     }
+                    if (field.Type.Alignment > union.Alignment)
+                    {
+                        union.Alignment = field.Type.Alignment;
+                    }
                     if (field.Type.Size > union.Size)
                     {
                         union.Size = field.Type.Size;
                     }
                 }
+            }
+        }
+
+        if (union.Size > 0)
+        {
+            var alignmentOffset = union.Size % union.Alignment;
+            if (alignmentOffset > 0)
+            {
+                union.Size += union.Alignment - alignmentOffset;
             }
         }
 
@@ -2884,7 +2917,7 @@ public static class TypeChecker
                         if (!TypeTable.Types.TryGetValue(backendName, out var pointerType))
                         {
                             var name = $"{arrayType.ElementType.Name}*";
-                            pointerType = new PrimitiveAst {Name = name, BackendName = backendName, TypeKind = TypeKind.Pointer, Size = 8, PointerType = arrayType.ElementType};
+                            pointerType = new PrimitiveAst {Name = name, BackendName = backendName, TypeKind = TypeKind.Pointer, Size = 8, Alignment = 8, PointerType = arrayType.ElementType};
                             TypeTable.Add(backendName, pointerType);
                             TypeTable.CreateTypeInfo(pointerType);
                         }
@@ -2896,7 +2929,7 @@ public static class TypeChecker
                         if (!TypeTable.Types.TryGetValue(backendName, out var pointerType))
                         {
                             var name = $"{referenceType.Name}*";
-                            pointerType = new PrimitiveAst {Name = name, BackendName = backendName, TypeKind = TypeKind.Pointer, Size = 8, PointerType = referenceType};
+                            pointerType = new PrimitiveAst {Name = name, BackendName = backendName, TypeKind = TypeKind.Pointer, Size = 8, Alignment = 8, PointerType = referenceType};
                             TypeTable.Add(backendName, pointerType);
                             TypeTable.CreateTypeInfo(pointerType);
                         }
@@ -4424,7 +4457,7 @@ public static class TypeChecker
                         var backendName = $"{type.GenericName}.{arrayLength}";
                         if (!TypeTable.Types.TryGetValue(backendName, out var arrayType))
                         {
-                            arrayType = new ArrayType {Name = name, BackendName = backendName, Size = elementType.Size * arrayLength, Length = arrayLength, ElementType = elementType};
+                            arrayType = new ArrayType {Name = name, BackendName = backendName, Size = elementType.Size * arrayLength, Alignment = elementType.Alignment, Length = arrayLength, ElementType = elementType};
                             TypeTable.Add(backendName, arrayType);
                             TypeTable.CreateTypeInfo(arrayType);
                         }
@@ -4461,7 +4494,7 @@ public static class TypeChecker
                         // To account for this, the type table needs to be checked for again for the type
                         if (!TypeTable.Types.TryGetValue(type.GenericName, out pointerType))
                         {
-                            pointerType = new PrimitiveAst {Name = PrintTypeDefinition(type), BackendName = type.GenericName, TypeKind = TypeKind.Pointer, Size = 8, PointerType = pointedToType};
+                            pointerType = new PrimitiveAst {Name = PrintTypeDefinition(type), BackendName = type.GenericName, TypeKind = TypeKind.Pointer, Size = 8, Alignment = 8, PointerType = pointedToType};
                             TypeTable.Add(type.GenericName, pointerType);
                             TypeTable.CreateTypeInfo(pointerType);
                         }

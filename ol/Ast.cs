@@ -166,10 +166,10 @@ public class EnumAst : IAst, IType
     public string Name { get; set; }
     public string BackendName { get; set; }
     public int TypeIndex { get; set; }
-    public uint Size { get; set; } = 4;
-    public uint Alignment { get; set; }
-    public bool Used { get; set; }
     public TypeKind TypeKind { get; set; } = TypeKind.Enum;
+    public uint Size { get; set; } = 4;
+    public uint Alignment { get; set; } = 4;
+    public bool Used { get; set; }
     public List<string> Attributes { get; set; }
     public TypeDefinition BaseTypeDefinition { get; set; }
     public PrimitiveAst BaseType { get; set; }
@@ -249,7 +249,8 @@ public class CompoundType : IType
     public int TypeIndex { get; set; }
     public TypeKind TypeKind { get; set; } = TypeKind.Compound;
     public uint Size { get; set; }
-    public uint Alignment { get; set; } // Since compound types will always be packed
+    // @Note Since compound types cannot be set as struct types, the alignment doesn't matter
+    public uint Alignment { get; set; }
     public bool Used { get; set; }
     public IType[] Types { get; set; }
 }
