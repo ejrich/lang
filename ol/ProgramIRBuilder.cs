@@ -345,7 +345,7 @@ public static class ProgramIRBuilder
                             var constArray = new InstructionValue
                             {
                                 ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
-                                Values = new [] {GetConstantInteger(0), new InstructionValue {ValueType = InstructionValueType.Null, Type = arrayStruct.Fields[1].Type}}
+                                Values = new [] {GetConstantS64(0), new InstructionValue {ValueType = InstructionValueType.Null, Type = arrayStruct.Fields[1].Type}}
                             };
                             globalVariable.InitialValue = constArray;
                         }
@@ -434,7 +434,7 @@ public static class ProgramIRBuilder
                     return new InstructionValue
                     {
                         ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
-                        Values = new [] {GetConstantInteger(0), new InstructionValue {ValueType = InstructionValueType.Null, Type = arrayStruct.Fields[1].Type}}
+                        Values = new [] {GetConstantS64(0), new InstructionValue {ValueType = InstructionValueType.Null, Type = arrayStruct.Fields[1].Type}}
                     };
                 }
             case TypeKind.CArray:
@@ -485,7 +485,7 @@ public static class ProgramIRBuilder
         return new InstructionValue
         {
             ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
-            Values = new [] {GetConstantInteger(length), new InstructionValue {ValueIndex = arrayIndex}}
+            Values = new [] {GetConstantS64(length), new InstructionValue {ValueIndex = arrayIndex}}
         };
     }
 
@@ -621,7 +621,7 @@ public static class ProgramIRBuilder
                     else
                     {
                         var lengthPointer = EmitGetStructPointer(function, allocation, arrayStruct, 0);
-                        var lengthValue = GetConstantInteger(0);
+                        var lengthValue = GetConstantS64(0);
                         EmitStore(function, lengthPointer, lengthValue);
                     }
                     break;
@@ -790,7 +790,7 @@ public static class ProgramIRBuilder
                     }
                     else
                     {
-                        var lengthValue = GetConstantInteger(0);
+                        var lengthValue = GetConstantS64(0);
                         foreach (var variable in declaration.Variables)
                         {
                             var lengthPointer = EmitGetStructPointer(function, variable.Pointer, arrayStruct, 0);
@@ -893,7 +893,7 @@ public static class ProgramIRBuilder
     private static InstructionValue InitializeConstArray(FunctionIR function, InstructionValue arrayPointer, StructAst arrayStruct, uint length, IType elementType)
     {
         var lengthPointer = EmitGetStructPointer(function, arrayPointer, arrayStruct, 0);
-        var lengthValue = GetConstantInteger(length);
+        var lengthValue = GetConstantS64(length);
         EmitStore(function, lengthPointer, lengthValue);
 
         var dataPointerType = arrayStruct.Fields[1].Type;
@@ -971,7 +971,7 @@ public static class ProgramIRBuilder
                 else
                 {
                     var lengthPointer = EmitGetStructPointer(function, pointer, arrayStruct, 0);
-                    var lengthValue = GetConstantInteger(0);
+                    var lengthValue = GetConstantS64(0);
                     EmitStore(function, lengthPointer, lengthValue);
                 }
                 break;
@@ -1235,15 +1235,13 @@ public static class ProgramIRBuilder
             function.Instructions.Add(new Instruction {Type = InstructionType.DebugSetLocation, Source = each});
         }
 
-        var indexVariable = AddAllocation(function, TypeTable.S32Type);
-        InstructionType compareType;
+        InstructionValue indexVariable;
         InstructionValue compareTarget;
-        InstructionValue arrayData = null;
-        var cArrayIteration = false;
+        BasicBlock afterBlock;
 
         if (each.Iteration != null)
         {
-            compareType = InstructionType.IntegerGreaterThanOrEqual;
+            indexVariable = AddAllocation(function, TypeTable.S64Type);
             if (each.IndexVariable != null)
             {
                 each.IndexVariable.Pointer = indexVariable;
@@ -1252,11 +1250,13 @@ public static class ProgramIRBuilder
                     DeclareVariable(function, each.IndexVariable);
                 }
             }
-            EmitStore(function, indexVariable, GetConstantInteger(0));
+            EmitStore(function, indexVariable, GetConstantS64(0));
 
             var iteration = EmitIR(function, each.Iteration, scope);
 
             // Load the array data and set the compareTarget to the array count
+            InstructionValue arrayData = null;
+            var cArrayIteration = false;
             if (iteration.Type.TypeKind == TypeKind.CArray)
             {
                 arrayData = iteration;
@@ -1277,12 +1277,26 @@ public static class ProgramIRBuilder
                 var dataPointer = EmitGetStructPointer(function, iterationVariable, arrayDef, 1, dataField);
                 arrayData = EmitLoad(function, dataField.Type, dataPointer);
             }
+
+            var conditionBlock = AddBasicBlock(function);
+            var indexValue = EmitLoad(function, TypeTable.S64Type, indexVariable);
+            var condition = EmitInstruction(InstructionType.IntegerGreaterThanOrEqual, function, TypeTable.BoolType, indexValue, compareTarget);
+
+            var iterationPointer = EmitGetPointer(function, arrayData, indexValue, each.IterationVariable.Type, cArrayIteration);
+            each.IterationVariable.Pointer = iterationPointer;
+
+            if (!BuildSettings.Release)
+            {
+                DeclareVariable(function, each.IterationVariable);
+            }
+
+            afterBlock = EmitEachBody(function, each.Body, TypeTable.S64Type, returnType, indexValue, indexVariable, condition, conditionBlock);
         }
         else
         {
-            compareType = InstructionType.IntegerGreaterThan;
+            indexVariable = AddAllocation(function, TypeTable.S32Type);
             // Begin the loop at the beginning of the range
-            var value = EmitIR(function, each.RangeBegin, scope);
+            var value = EmitAndCast(function, each.RangeBegin, scope, TypeTable.S32Type);
 
             EmitStore(function, indexVariable, value);
             each.IterationVariable.Pointer = indexVariable;
@@ -1292,43 +1306,42 @@ public static class ProgramIRBuilder
             }
 
             // Get the end of the range
-            compareTarget = EmitIR(function, each.RangeEnd, scope);
+            compareTarget = EmitAndCast(function, each.RangeEnd, scope, TypeTable.S32Type);
+
+            var conditionBlock = AddBasicBlock(function);
+            var indexValue = EmitLoad(function, TypeTable.S32Type, indexVariable);
+            var condition = EmitInstruction(InstructionType.IntegerGreaterThan, function, TypeTable.BoolType, indexValue, compareTarget);
+
+            afterBlock = EmitEachBody(function, each.Body, TypeTable.S32Type, returnType, indexValue, indexVariable, condition, conditionBlock);
         }
 
-        var conditionBlock = AddBasicBlock(function);
-        var indexValue = EmitLoad(function, TypeTable.S32Type, indexVariable);
-        var condition = EmitInstruction(compareType, function, TypeTable.BoolType, indexValue, compareTarget);
-        if (each.Iteration != null)
+        if (!BuildSettings.Release)
         {
-            var iterationVariable = EmitGetPointer(function, arrayData, indexValue, each.IterationVariable.Type, cArrayIteration);
-            each.IterationVariable.Pointer = iterationVariable;
-
-            if (!BuildSettings.Release)
-            {
-                DeclareVariable(function, each.IterationVariable);
-            }
+            function.Instructions.Add(new Instruction {Type = InstructionType.DebugPopLexicalBlock});
         }
+
+        return afterBlock;
+    }
+
+    private static BasicBlock EmitEachBody(FunctionIR function, ScopeAst eachBody, IType indexType, IType returnType, InstructionValue indexValue, InstructionValue indexVariable, InstructionValue condition, BasicBlock conditionBlock)
+    {
         var conditionJump = new Instruction {Type = InstructionType.ConditionalJump, Value1 = condition};
         function.Instructions.Add(conditionJump);
 
         var eachBodyBlock = AddBasicBlock(function);
         var eachIncrementBlock = new BasicBlock();
         var afterBlock = new BasicBlock();
-        eachBodyBlock = EmitScopeChildren(function, eachBodyBlock, each.Body, returnType, afterBlock, eachIncrementBlock);
+        eachBodyBlock = EmitScopeChildren(function, eachBodyBlock, eachBody, returnType, afterBlock, eachIncrementBlock);
 
         AddBasicBlock(function, eachIncrementBlock);
-        var nextValue = EmitInstruction(InstructionType.IntegerAdd, function, TypeTable.S32Type, indexValue, GetConstantInteger(1));
+        var incrementValue = new InstructionValue {ValueType = InstructionValueType.Constant, Type = indexType, ConstantValue = new Constant {Integer = 1}};
+        var nextValue = EmitInstruction(InstructionType.IntegerAdd, function, TypeTable.S32Type, indexValue, incrementValue);
         EmitStore(function, indexVariable, nextValue);
         var jumpToCondition = new Instruction {Type = InstructionType.Jump, Value1 = BasicBlockValue(conditionBlock)};
         function.Instructions.Add(jumpToCondition);
 
         AddBasicBlock(function, afterBlock);
         conditionJump.Value2 = BasicBlockValue(afterBlock);
-
-        if (!BuildSettings.Release)
-        {
-            function.Instructions.Add(new Instruction {Type = InstructionType.DebugPopLexicalBlock});
-        }
 
         return afterBlock;
     }
@@ -2268,6 +2281,11 @@ public static class ProgramIRBuilder
             }
             return sourceType.Signed ? InstructionType.IntegerToUnsignedIntegerTruncate : InstructionType.UnsignedIntegerTruncate;
         }
+    }
+
+    private static InstructionValue GetConstantS64(long value)
+    {
+        return new InstructionValue {ValueType = InstructionValueType.Constant, Type = TypeTable.S64Type, ConstantValue = new Constant {Integer = value}};
     }
 
     private static InstructionValue GetConstantInteger(int value)

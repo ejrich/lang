@@ -85,7 +85,7 @@ public unsafe static class TypeTable
                     attributes[i] = Allocator.MakeString(function.Attributes[i]);
                 }
 
-                var attributesArraySize = attributes.Length * Allocator.StringSize;
+                var attributesArraySize = attributes.Length * Allocator.StringLength;
                 var attributesPointer = Allocator.Allocate(attributesArraySize);
                 fixed (String* pointer = &attributes[0])
                 {
@@ -121,151 +121,151 @@ public unsafe static class TypeTable
 
     public static List<IntPtr> TypeInfos { get; } = new();
 
-    private const int TypeInfoSize = 20;
+    private const int TypeInfoSize = 24;
     [StructLayout(LayoutKind.Explicit, Size=TypeInfoSize)]
     public struct TypeInfo
     {
         [FieldOffset(0)] public String Name;
-        [FieldOffset(12)] public TypeKind Type;
-        [FieldOffset(16)] public uint Size;
+        [FieldOffset(16)] public TypeKind Type;
+        [FieldOffset(20)] public uint Size;
     }
 
-    private const int IntegerTypeInfoSize = 21;
+    private const int IntegerTypeInfoSize = 28;
     [StructLayout(LayoutKind.Explicit, Size=IntegerTypeInfoSize)]
     public struct IntegerTypeInfo
     {
         [FieldOffset(0)] public String Name;
-        [FieldOffset(12)] public TypeKind Type;
-        [FieldOffset(16)] public uint Size;
-        [FieldOffset(20)] public bool Signed;
+        [FieldOffset(16)] public TypeKind Type;
+        [FieldOffset(20)] public uint Size;
+        [FieldOffset(24)] public bool Signed;
     }
 
-    private const int PointerTypeInfoSize = 28;
+    private const int PointerTypeInfoSize = 32;
     [StructLayout(LayoutKind.Explicit, Size=TypeInfoSize)]
     public struct PointerTypeInfo
     {
         [FieldOffset(0)] public String Name;
-        [FieldOffset(12)] public TypeKind Type;
-        [FieldOffset(16)] public uint Size = 8;
-        [FieldOffset(20)] public IntPtr PointerType;
+        [FieldOffset(16)] public TypeKind Type;
+        [FieldOffset(20)] public uint Size = 8;
+        [FieldOffset(24)] public IntPtr PointerType;
     }
 
-    private const int CArrayTypeInfoSize = 32;
+    private const int CArrayTypeInfoSize = 40;
     [StructLayout(LayoutKind.Explicit, Size=CArrayTypeInfoSize)]
     public struct CArrayTypeInfo
     {
         [FieldOffset(0)] public String Name;
-        [FieldOffset(12)] public TypeKind Type;
-        [FieldOffset(16)] public uint Size;
-        [FieldOffset(20)] public uint Length;
-        [FieldOffset(24)] public IntPtr ElementType;
+        [FieldOffset(16)] public TypeKind Type;
+        [FieldOffset(20)] public uint Size;
+        [FieldOffset(24)] public uint Length;
+        [FieldOffset(32)] public IntPtr ElementType;
     }
 
-    private const int EnumTypeInfoSize = 52;
+    private const int EnumTypeInfoSize = 64;
     [StructLayout(LayoutKind.Explicit, Size=EnumTypeInfoSize)]
     public struct EnumTypeInfo
     {
         [FieldOffset(0)] public String Name;
-        [FieldOffset(12)] public TypeKind Type;
-        [FieldOffset(16)] public uint Size;
-        [FieldOffset(20)] public IntPtr BaseType;
-        [FieldOffset(28)] public Array Values;
-        [FieldOffset(40)] public Array Attributes;
+        [FieldOffset(16)] public TypeKind Type;
+        [FieldOffset(20)] public uint Size;
+        [FieldOffset(24)] public IntPtr BaseType;
+        [FieldOffset(32)] public Array Values;
+        [FieldOffset(48)] public Array Attributes;
     }
 
-    private const int StructTypeInfoSize = 44;
+    private const int StructTypeInfoSize = 56;
     [StructLayout(LayoutKind.Explicit, Size=StructTypeInfoSize)]
     public struct StructTypeInfo
     {
         [FieldOffset(0)] public String Name;
-        [FieldOffset(12)] public TypeKind Type;
-        [FieldOffset(16)] public uint Size;
-        [FieldOffset(20)] public Array Fields;
-        [FieldOffset(32)] public Array Attributes;
+        [FieldOffset(16)] public TypeKind Type;
+        [FieldOffset(20)] public uint Size;
+        [FieldOffset(24)] public Array Fields;
+        [FieldOffset(40)] public Array Attributes;
     }
 
-    private const int UnionTypeInfoSize = 32;
+    private const int UnionTypeInfoSize = 40;
     [StructLayout(LayoutKind.Explicit, Size=UnionTypeInfoSize)]
     public struct UnionTypeInfo
     {
         [FieldOffset(0)] public String Name;
-        [FieldOffset(12)] public TypeKind Type;
-        [FieldOffset(16)] public uint Size;
-        [FieldOffset(20)] public Array Fields;
+        [FieldOffset(16)] public TypeKind Type;
+        [FieldOffset(20)] public uint Size;
+        [FieldOffset(24)] public Array Fields;
     }
 
-    private const int CompoundTypeInfoSize = 32;
+    private const int CompoundTypeInfoSize = 40;
     [StructLayout(LayoutKind.Explicit, Size=CompoundTypeInfoSize)]
     public struct CompoundTypeInfo
     {
         [FieldOffset(0)] public String Name;
-        [FieldOffset(12)] public TypeKind Type;
-        [FieldOffset(16)] public uint Size;
-        [FieldOffset(20)] public Array Types;
+        [FieldOffset(16)] public TypeKind Type;
+        [FieldOffset(20)] public uint Size;
+        [FieldOffset(24)] public Array Types;
     }
 
-    private const int InterfaceTypeInfoSize = 40;
+    private const int InterfaceTypeInfoSize = 48;
     [StructLayout(LayoutKind.Explicit, Size=InterfaceTypeInfoSize)]
     public struct InterfaceTypeInfo
     {
         [FieldOffset(0)] public String Name;
-        [FieldOffset(12)] public TypeKind Type;
-        [FieldOffset(16)] public uint Size = 8;
-        [FieldOffset(20)] public IntPtr ReturnType;
-        [FieldOffset(28)] public Array Arguments;
+        [FieldOffset(16)] public TypeKind Type;
+        [FieldOffset(20)] public uint Size = 8;
+        [FieldOffset(24)] public IntPtr ReturnType;
+        [FieldOffset(32)] public Array Arguments;
     }
 
-    private const int FunctionTypeInfoSize = 52;
+    private const int FunctionTypeInfoSize = 64;
     [StructLayout(LayoutKind.Explicit, Size=FunctionTypeInfoSize)]
     public struct FunctionTypeInfo
     {
         [FieldOffset(0)] public String Name;
-        [FieldOffset(12)] public TypeKind Type;
-        [FieldOffset(16)] public uint Size;
-        [FieldOffset(20)] public IntPtr ReturnType;
-        [FieldOffset(28)] public Array Arguments;
-        [FieldOffset(40)] public Array Attributes;
+        [FieldOffset(16)] public TypeKind Type;
+        [FieldOffset(20)] public uint Size;
+        [FieldOffset(24)] public IntPtr ReturnType;
+        [FieldOffset(32)] public Array Arguments;
+        [FieldOffset(48)] public Array Attributes;
     }
 
-    [StructLayout(LayoutKind.Explicit, Size=12)]
+    [StructLayout(LayoutKind.Explicit, Size=16)]
     public struct Array
     {
-        [FieldOffset(0)] public int Length;
-        [FieldOffset(4)] public IntPtr Data;
+        [FieldOffset(0)] public long Length;
+        [FieldOffset(8)] public IntPtr Data;
     }
 
-    private const int TypeFieldSize = 36;
+    private const int TypeFieldSize = 48;
     [StructLayout(LayoutKind.Explicit, Size=TypeFieldSize)]
     public struct TypeField
     {
         [FieldOffset(0)] public String Name;
-        [FieldOffset(12)] public uint Offset;
-        [FieldOffset(16)] public IntPtr TypeInfo;
-        [FieldOffset(24)] public Array Attributes;
+        [FieldOffset(16)] public uint Offset;
+        [FieldOffset(24)] public IntPtr TypeInfo;
+        [FieldOffset(32)] public Array Attributes;
     }
 
-    private const int UnionFieldSize = 20;
+    private const int UnionFieldSize = 24;
     [StructLayout(LayoutKind.Explicit, Size=UnionFieldSize)]
     public struct UnionField
     {
         [FieldOffset(0)] public String Name;
-        [FieldOffset(12)] public IntPtr TypeInfo;
+        [FieldOffset(16)] public IntPtr TypeInfo;
     }
 
-    private const int EnumValueSize = 16;
+    private const int EnumValueSize = 24;
     [StructLayout(LayoutKind.Explicit, Size=EnumValueSize)]
     public struct EnumValue
     {
         [FieldOffset(0)] public String Name;
-        [FieldOffset(12)] public int Value;
+        [FieldOffset(16)] public int Value;
     }
 
-    private const int ArgumentTypeSize = 20;
+    private const int ArgumentTypeSize = 24;
     [StructLayout(LayoutKind.Explicit, Size=ArgumentTypeSize)]
     public struct ArgumentType
     {
         [FieldOffset(0)] public String Name;
-        [FieldOffset(12)] public IntPtr TypeInfo;
+        [FieldOffset(16)] public IntPtr TypeInfo;
     }
 
     public static void CreateTypeInfo(IType type)
@@ -311,14 +311,14 @@ public unsafe static class TypeTable
                 enumTypeInfo.Values.Length = enumType.Values.Count;
                 var enumValues = new EnumValue[enumTypeInfo.Values.Length];
 
-                for (var i = 0; i < enumTypeInfo.Values.Length; i++)
+                for (var i = 0; i < enumValues.Length; i++)
                 {
                     var value = enumType.Values[i];
                     var enumValue = new EnumValue {Name = Allocator.MakeString(value.Name), Value = value.Value};
                     enumValues[i] = enumValue;
                 }
 
-                var enumValuesArraySize = enumTypeInfo.Values.Length * EnumValueSize;
+                var enumValuesArraySize = enumValues.Length * EnumValueSize;
                 var enumValuesPointer = Allocator.Allocate(enumValuesArraySize);
                 fixed (EnumValue* pointer = &enumValues[0])
                 {
@@ -336,7 +336,7 @@ public unsafe static class TypeTable
                         attributes[i] = Allocator.MakeString(enumType.Attributes[i]);
                     }
 
-                    var attributesArraySize = attributes.Length * Allocator.StringSize;
+                    var attributesArraySize = attributes.Length * Allocator.StringLength;
                     var attributesPointer = Allocator.Allocate(attributesArraySize);
                     fixed (String* pointer = &attributes[0])
                     {
@@ -360,7 +360,7 @@ public unsafe static class TypeTable
                     structTypeInfo.Fields.Length = structType.Fields.Count;
                     var typeFields = new TypeField[structTypeInfo.Fields.Length];
 
-                    for (var i = 0; i < structTypeInfo.Fields.Length; i++)
+                    for (var i = 0; i < structType.Fields.Count; i++)
                     {
                         var field = structType.Fields[i];
                         var typeField = new TypeField {Name = Allocator.MakeString(field.Name), Offset = field.Offset, TypeInfo = TypeInfos[field.Type.TypeIndex]};
@@ -375,7 +375,7 @@ public unsafe static class TypeTable
                                 attributes[attributeIndex] = Allocator.MakeString(field.Attributes[attributeIndex]);
                             }
 
-                            var attributesArraySize = attributes.Length * Allocator.StringSize;
+                            var attributesArraySize = attributes.Length * Allocator.StringLength;
                             var attributesPointer = Allocator.Allocate(attributesArraySize);
                             fixed (String* pointer = &attributes[0])
                             {
@@ -387,7 +387,7 @@ public unsafe static class TypeTable
                         typeFields[i] = typeField;
                     }
 
-                    var typeFieldsArraySize = structTypeInfo.Fields.Length * TypeFieldSize;
+                    var typeFieldsArraySize = typeFields.Length * TypeFieldSize;
                     var typeFieldsPointer = Allocator.Allocate(typeFieldsArraySize);
                     fixed (TypeField* pointer = &typeFields[0])
                     {
@@ -406,7 +406,7 @@ public unsafe static class TypeTable
                         attributes[i] = Allocator.MakeString(structType.Attributes[i]);
                     }
 
-                    var attributesArraySize = attributes.Length * Allocator.StringSize;
+                    var attributesArraySize = attributes.Length * Allocator.StringLength;
                     var attributesPointer = Allocator.Allocate(attributesArraySize);
                     fixed (String* pointer = &attributes[0])
                     {
@@ -425,7 +425,7 @@ public unsafe static class TypeTable
                 compoundTypeInfo.Types.Length = compoundType.Types.Length;
                 var types = new IntPtr[compoundTypeInfo.Types.Length];
 
-                for (var i = 0; i < compoundTypeInfo.Types.Length; i++)
+                for (var i = 0; i < types.Length; i++)
                 {
                     var subType = compoundType.Types[i];
                     types[i] = TypeInfos[subType.TypeIndex];
@@ -449,13 +449,13 @@ public unsafe static class TypeTable
                 unionTypeInfo.Fields.Length = union.Fields.Count;
                 var unionFields = new UnionField[unionTypeInfo.Fields.Length];
 
-                for (var i = 0; i < unionTypeInfo.Fields.Length; i++)
+                for (var i = 0; i < unionFields.Length; i++)
                 {
                     var field = union.Fields[i];
                     unionFields[i] = new UnionField {Name = Allocator.MakeString(field.Name), TypeInfo = TypeInfos[field.Type.TypeIndex]};
                 }
 
-                var unionFieldsArraySize = unionTypeInfo.Fields.Length * UnionFieldSize;
+                var unionFieldsArraySize = unionFields.Length * UnionFieldSize;
                 var unionFieldsPointer = Allocator.Allocate(unionFieldsArraySize);
                 fixed (UnionField* pointer = &unionFields[0])
                 {

@@ -668,7 +668,7 @@ public static unsafe class LLVMBackend
             typeInfos[i] = _typeInfos[type.TypeIndex];
         }
 
-        _types[compoundType.TypeIndex] = LLVMTypeRef.CreateStruct(types, false);
+        _types[compoundType.TypeIndex] = LLVMTypeRef.CreateStruct(types, true);
 
         var typesArray = LLVMValueRef.CreateConstArray(typeInfo, typeInfos);
         var typesArrayGlobal = _module.AddGlobal(LLVM.TypeOf(typesArray), "____enum_values");
