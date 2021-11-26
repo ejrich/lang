@@ -122,7 +122,7 @@ public static class TypeChecker
                 node = node.Next;
             }
 
-            // 2. Verify global variables and function return types/arguments
+            // 2. Verify global variables, unions, and interfaces
             node = Parser.Asts.Head;
             previous = null;
             while (node != null)
@@ -237,7 +237,7 @@ public static class TypeChecker
                                         {
                                             foreach (var ast in conditional.IfBlock.Children)
                                             {
-                                                Parser.Asts.Add(ast);
+                                                AddAdditionalAst(ast, ref parsingAdditional);
                                             }
                                         }
                                     }
@@ -245,7 +245,7 @@ public static class TypeChecker
                                     {
                                         foreach (var ast in conditional.ElseBlock.Children)
                                         {
-                                            Parser.Asts.Add(ast);
+                                            AddAdditionalAst(ast, ref parsingAdditional);
                                         }
                                     }
                                 }
@@ -351,6 +351,26 @@ public static class TypeChecker
         {
             previous.Next = current.Next;
         }
+    }
+
+    private static void AddAdditionalAst(IAst ast, ref bool parsingAdditional)
+    {
+        if (ast is CompilerDirectiveAst directive)
+        {
+            if (directive.Type == DirectiveType.ImportModule)
+            {
+                Parser.AddModule(directive);
+                parsingAdditional = true;
+                return;
+            }
+            else if (directive.Type == DirectiveType.ImportFile)
+            {
+                Parser.AddFile(directive);
+                parsingAdditional = true;
+                return;
+            }
+        }
+        Parser.Asts.Add(ast);
     }
 
     private static PrimitiveAst AddPrimitive(string name, TypeKind typeKind, uint size = 0, bool signed = false)
