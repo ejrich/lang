@@ -1,5 +1,4 @@
-- Add padding to structs and change string and Array to have u64 as the length field type
-- Vulkan tests and default sType values
+- Vulkan tests
 - Handle constant values for conditions in compiler directives
 - Full, Used, and None in the type table for LLVM
 - Only write the IR for functions starting from entrypoint or run directives

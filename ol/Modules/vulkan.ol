@@ -1991,12 +1991,12 @@ struct VkRect2D {
 }
 
 struct VkBaseInStructure {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType: VkStructureType;
     pNext: VkBaseInStructure*;
 }
 
 struct VkBaseOutStructure {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType: VkStructureType;
     pNext: VkBaseOutStructure*;
 }
 
@@ -4275,7 +4275,7 @@ struct VkPhysicalDeviceExternalSemaphoreInfo {
 }
 
 struct VkExternalSemaphoreProperties {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO; // TODO Update default value
+    sType := VkStructureType.VK_STRUCTURE_TYPE_EXTERNAL_SEMAPHORE_PROPERTIES;
     pNext: void*;
     exportFromImportedHandleTypes: u32;
     compatibleHandleTypes: u32;
@@ -4283,20 +4283,20 @@ struct VkExternalSemaphoreProperties {
 }
 
 struct VkPhysicalDeviceMaintenance3Properties {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_3_PROPERTIES;
     pNext: void*;
     maxPerSetDescriptors: u32;
     maxMemoryAllocationSize: u64;
 }
 
 struct VkDescriptorSetLayoutSupport {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_SUPPORT;
     pNext: void*;
     supported: u32;
 }
 
 struct VkPhysicalDeviceShaderDrawParametersFeatures {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES;
     pNext: void*;
     shaderDrawParameters: u32;
 }
@@ -4510,7 +4510,7 @@ enum VkSemaphoreWaitFlagBits {
 }
 
 struct VkPhysicalDeviceVulkan11Features {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
     pNext: void*;
     storageBuffer16BitAccess: u32;
     uniformAndStorageBuffer16BitAccess: u32;
@@ -4527,7 +4527,7 @@ struct VkPhysicalDeviceVulkan11Features {
 }
 
 struct VkPhysicalDeviceVulkan11Properties {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES;
     pNext: void*;
     deviceUUID: CArray<u8>[16];
     driverUUID: CArray<u8>[16];
@@ -4547,7 +4547,7 @@ struct VkPhysicalDeviceVulkan11Properties {
 }
 
 struct VkPhysicalDeviceVulkan12Features {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
     pNext: void*;
     samplerMirrorClampToEdge: u32;
     drawIndirectCount: u32;
@@ -4606,7 +4606,7 @@ struct VkConformanceVersion {
 }
 
 struct VkPhysicalDeviceVulkan12Properties {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES;
     pNext: void*;
     driverID: VkDriverId;
     driverName: CArray<u8>[256];
@@ -4663,14 +4663,14 @@ struct VkPhysicalDeviceVulkan12Properties {
 }
 
 struct VkImageFormatListCreateInfo {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO;
     pNext: void*;
     viewFormatCount: u32;
     pViewFormats: VkFormat*;
 }
 
 struct VkAttachmentDescription2 {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2;
     pNext: void*;
     flags: u32;
     format: VkFormat;
@@ -4684,7 +4684,7 @@ struct VkAttachmentDescription2 {
 }
 
 struct VkAttachmentReference2 {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2;
     pNext: void*;
     attachment: u32;
     layout: VkImageLayout;
@@ -4692,7 +4692,7 @@ struct VkAttachmentReference2 {
 }
 
 struct VkSubpassDescription2 {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_2;
     pNext: void*;
     flags: u32;
     pipelineBindPoint: VkPipelineBindPoint;
@@ -4708,7 +4708,7 @@ struct VkSubpassDescription2 {
 }
 
 struct VkSubpassDependency2 {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SUBPASS_DEPENDENCY_2;
     pNext: void*;
     srcSubpass: u32;
     dstSubpass: u32;
@@ -4721,7 +4721,7 @@ struct VkSubpassDependency2 {
 }
 
 struct VkRenderPassCreateInfo2 {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO_2;
     pNext: void*;
     flags: u32;
     attachmentCount: u32;
@@ -4735,18 +4735,18 @@ struct VkRenderPassCreateInfo2 {
 }
 
 struct VkSubpassBeginInfo {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SUBPASS_BEGIN_INFO;
     pNext: void*;
     contents: VkSubpassContents;
 }
 
 struct VkSubpassEndInfo {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SUBPASS_END_INFO;
     pNext: void*;
 }
 
 struct VkPhysicalDevice8BitStorageFeatures {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES;
     pNext: void*;
     storageBuffer8BitAccess: u32;
     uniformAndStorageBuffer8BitAccess: u32;
@@ -4754,7 +4754,7 @@ struct VkPhysicalDevice8BitStorageFeatures {
 }
 
 struct VkPhysicalDeviceDriverProperties {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
     pNext: void*;
     driverID: VkDriverId;
     driverName: CArray<u8>[256];
@@ -4763,21 +4763,21 @@ struct VkPhysicalDeviceDriverProperties {
 }
 
 struct VkPhysicalDeviceShaderAtomicInt64Features {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES;
     pNext: void*;
     shaderBufferInt64Atomics: u32;
     shaderSharedInt64Atomics: u32;
 }
 
 struct VkPhysicalDeviceShaderFloat16Int8Features {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES;
     pNext: void*;
     shaderFloat16: u32;
     shaderInt8: u32;
 }
 
 struct VkPhysicalDeviceFloatControlsProperties {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT_CONTROLS_PROPERTIES;
     pNext: void*;
     denormBehaviorIndependence: VkShaderFloatControlsIndependence;
     roundingModeIndependence: VkShaderFloatControlsIndependence;
@@ -4799,14 +4799,14 @@ struct VkPhysicalDeviceFloatControlsProperties {
 }
 
 struct VkDescriptorSetLayoutBindingFlagsCreateInfo {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
     pNext: void*;
     bindingCount: u32;
     pBindingFlags: u32*;
 }
 
 struct VkPhysicalDeviceDescriptorIndexingFeatures {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
     pNext: void*;
     shaderInputAttachmentArrayDynamicIndexing: u32;
     shaderUniformTexelBufferArrayDynamicIndexing: u32;
@@ -4831,7 +4831,7 @@ struct VkPhysicalDeviceDescriptorIndexingFeatures {
 }
 
 struct VkPhysicalDeviceDescriptorIndexingProperties {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES;
     pNext: void*;
     maxUpdateAfterBindDescriptorsInAllPools: u32;
     shaderUniformBufferArrayNonUniformIndexingNative: u32;
@@ -4859,20 +4859,20 @@ struct VkPhysicalDeviceDescriptorIndexingProperties {
 }
 
 struct VkDescriptorSetVariableDescriptorCountAllocateInfo {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO;
     pNext: void*;
     descriptorSetCount: u32;
     pDescriptorCounts: u32*;
 }
 
 struct VkDescriptorSetVariableDescriptorCountLayoutSupport {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_LAYOUT_SUPPORT;
     pNext: void*;
     maxVariableDescriptorCount: u32;
 }
 
 struct VkSubpassDescriptionDepthStencilResolve {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_DEPTH_STENCIL_RESOLVE;
     pNext: void*;
     depthResolveMode: VkResolveModeFlagBits;
     stencilResolveMode: VkResolveModeFlagBits;
@@ -4880,7 +4880,7 @@ struct VkSubpassDescriptionDepthStencilResolve {
 }
 
 struct VkPhysicalDeviceDepthStencilResolveProperties {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_STENCIL_RESOLVE_PROPERTIES;
     pNext: void*;
     supportedDepthResolveModes: u32;
     supportedStencilResolveModes: u32;
@@ -4889,32 +4889,32 @@ struct VkPhysicalDeviceDepthStencilResolveProperties {
 }
 
 struct VkPhysicalDeviceScalarBlockLayoutFeatures {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES;
     pNext: void*;
     scalarBlockLayout: u32;
 }
 
 struct VkImageStencilUsageCreateInfo {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_IMAGE_STENCIL_USAGE_CREATE_INFO;
     pNext: void*;
     stencilUsage: u32;
 }
 
 struct VkSamplerReductionModeCreateInfo {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SAMPLER_REDUCTION_MODE_CREATE_INFO;
     pNext: void*;
     reductionMode: VkSamplerReductionMode;
 }
 
 struct VkPhysicalDeviceSamplerFilterMinmaxProperties {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_FILTER_MINMAX_PROPERTIES;
     pNext: void*;
     filterMinmaxSingleComponentFormats: u32;
     filterMinmaxImageComponentMapping: u32;
 }
 
 struct VkPhysicalDeviceVulkanMemoryModelFeatures {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES;
     pNext: void*;
     vulkanMemoryModel: u32;
     vulkanMemoryModelDeviceScope: u32;
@@ -4922,13 +4922,13 @@ struct VkPhysicalDeviceVulkanMemoryModelFeatures {
 }
 
 struct VkPhysicalDeviceImagelessFramebufferFeatures {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGELESS_FRAMEBUFFER_FEATURES;
     pNext: void*;
     imagelessFramebuffer: u32;
 }
 
 struct VkFramebufferAttachmentImageInfo {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENT_IMAGE_INFO;
     pNext: void*;
     flags: u32;
     usage: u32;
@@ -4940,77 +4940,77 @@ struct VkFramebufferAttachmentImageInfo {
 }
 
 struct VkFramebufferAttachmentsCreateInfo {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENTS_CREATE_INFO;
     pNext: void*;
     attachmentImageInfoCount: u32;
     pAttachmentImageInfos: VkFramebufferAttachmentImageInfo*;
 }
 
 struct VkRenderPassAttachmentBeginInfo {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_RENDER_PASS_ATTACHMENT_BEGIN_INFO;
     pNext: void*;
     attachmentCount: u32;
     pAttachments: VkImageView**;
 }
 
 struct VkPhysicalDeviceUniformBufferStandardLayoutFeatures {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_UNIFORM_BUFFER_STANDARD_LAYOUT_FEATURES;
     pNext: void*;
     uniformBufferStandardLayout: u32;
 }
 
 struct VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_EXTENDED_TYPES_FEATURES;
     pNext: void*;
     shaderSubgroupExtendedTypes: u32;
 }
 
 struct VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SEPARATE_DEPTH_STENCIL_LAYOUTS_FEATURES;
     pNext: void*;
     separateDepthStencilLayouts: u32;
 }
 
 struct VkAttachmentReferenceStencilLayout {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_STENCIL_LAYOUT;
     pNext: void*;
     stencilLayout: VkImageLayout;
 }
 
 struct VkAttachmentDescriptionStencilLayout {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_STENCIL_LAYOUT;
     pNext: void*;
     stencilInitialLayout: VkImageLayout;
     stencilFinalLayout: VkImageLayout;
 }
 
 struct VkPhysicalDeviceHostQueryResetFeatures {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES;
     pNext: void*;
     hostQueryReset: u32;
 }
 
 struct VkPhysicalDeviceTimelineSemaphoreFeatures {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
     pNext: void*;
     timelineSemaphore: u32;
 }
 
 struct VkPhysicalDeviceTimelineSemaphoreProperties {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_PROPERTIES;
     pNext: void*;
     maxTimelineSemaphoreValueDifference: u64;
 }
 
 struct VkSemaphoreTypeCreateInfo {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
     pNext: void*;
     semaphoreType: VkSemaphoreType;
     initialValue: u64;
 }
 
 struct VkTimelineSemaphoreSubmitInfo {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
     pNext: void*;
     waitSemaphoreValueCount: u32;
     pWaitSemaphoreValues: u64*;
@@ -5019,7 +5019,7 @@ struct VkTimelineSemaphoreSubmitInfo {
 }
 
 struct VkSemaphoreWaitInfo {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
     pNext: void*;
     flags: u32;
     semaphoreCount: u32;
@@ -5028,14 +5028,14 @@ struct VkSemaphoreWaitInfo {
 }
 
 struct VkSemaphoreSignalInfo {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO;
     pNext: void*;
     semaphore: VkSemaphore*;
     value: u64;
 }
 
 struct VkPhysicalDeviceBufferDeviceAddressFeatures {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
     pNext: void*;
     bufferDeviceAddress: u32;
     bufferDeviceAddressCaptureReplay: u32;
@@ -5043,25 +5043,25 @@ struct VkPhysicalDeviceBufferDeviceAddressFeatures {
 }
 
 struct VkBufferDeviceAddressInfo {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
     pNext: void*;
     buffer: VkBuffer*;
 }
 
 struct VkBufferOpaqueCaptureAddressCreateInfo {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_BUFFER_OPAQUE_CAPTURE_ADDRESS_CREATE_INFO;
     pNext: void*;
     opaqueCaptureAddress: u64;
 }
 
 struct VkMemoryOpaqueCaptureAddressAllocateInfo {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_MEMORY_OPAQUE_CAPTURE_ADDRESS_ALLOCATE_INFO;
     pNext: void*;
     opaqueCaptureAddress: u64;
 }
 
 struct VkDeviceMemoryOpaqueCaptureAddressInfo {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEVICE_MEMORY_OPAQUE_CAPTURE_ADDRESS_INFO;
     pNext: void*;
     memory: VkDeviceMemory*;
 }
@@ -5227,7 +5227,7 @@ enum VkDeviceGroupPresentModeFlagBitsKHR {
 }
 
 struct VkSwapchainCreateInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     pNext: void*;
     flags: u32;
     surface: VkSurfaceKHR*;
@@ -5248,7 +5248,7 @@ struct VkSwapchainCreateInfoKHR {
 }
 
 struct VkPresentInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     pNext: void*;
     waitSemaphoreCount: u32;
     pWaitSemaphores: VkSemaphore**;
@@ -5259,20 +5259,20 @@ struct VkPresentInfoKHR {
 }
 
 struct VkImageSwapchainCreateInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_IMAGE_SWAPCHAIN_CREATE_INFO_KHR;
     pNext: void*;
     swapchain: VkSwapchainKHR*;
 }
 
 struct VkBindImageMemorySwapchainInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_SWAPCHAIN_INFO_KHR;
     pNext: void*;
     swapchain: VkSwapchainKHR*;
     imageIndex: u32;
 }
 
 struct VkAcquireNextImageInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_ACQUIRE_NEXT_IMAGE_INFO_KHR;
     pNext: void*;
     swapchain: VkSwapchainKHR*;
     timeout: u64;
@@ -5282,14 +5282,14 @@ struct VkAcquireNextImageInfoKHR {
 }
 
 struct VkDeviceGroupPresentCapabilitiesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEVICE_GROUP_PRESENT_CAPABILITIES_KHR;
     pNext: void*;
     presentMask: CArray<u32>[32];
     modes: u32;
 }
 
 struct VkDeviceGroupPresentInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEVICE_GROUP_PRESENT_INFO_KHR;
     pNext: void*;
     swapchainCount: u32;
     pDeviceMasks: u32*;
@@ -5297,7 +5297,7 @@ struct VkDeviceGroupPresentInfoKHR {
 }
 
 struct VkDeviceGroupSwapchainCreateInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEVICE_GROUP_SWAPCHAIN_CREATE_INFO_KHR;
     pNext: void*;
     modes: u32;
 }
@@ -5354,7 +5354,7 @@ struct VkDisplayModeParametersKHR {
 }
 
 struct VkDisplayModeCreateInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DISPLAY_MODE_CREATE_INFO_KHR;
     pNext: void*;
     flags: u32;
     parameters: VkDisplayModeParametersKHR;
@@ -5393,7 +5393,7 @@ struct VkDisplayPropertiesKHR {
 }
 
 struct VkDisplaySurfaceCreateInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DISPLAY_SURFACE_CREATE_INFO_KHR;
     pNext: void*;
     flags: u32;
     displayMode: VkDisplayModeKHR*;
@@ -5434,7 +5434,7 @@ VkResult vkGetDisplayPlaneCapabilitiesKHR(VkPhysicalDevice* physicalDevice, VkDi
 VkResult vkCreateDisplayPlaneSurfaceKHR(VkInstance* instance, VkDisplaySurfaceCreateInfoKHR* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSurfaceKHR** pSurface) #extern "vulkan"
 
 struct VkDisplayPresentInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DISPLAY_PRESENT_INFO_KHR;
     pNext: void*;
     srcRect: VkRect2D;
     dstRect: VkRect2D;
@@ -5498,20 +5498,20 @@ interface PFN_vkGetPhysicalDeviceExternalBufferPropertiesKHR(VkPhysicalDevice* p
 vkGetPhysicalDeviceExternalBufferPropertiesKHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceExternalBufferInfo* pExternalBufferInfo, VkExternalBufferProperties* pExternalBufferProperties) #extern "vulkan"
 
 struct VkImportMemoryFdInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR;
     pNext: void*;
     handleType: VkExternalMemoryHandleTypeFlagBits;
     fd: s32;
 }
 
 struct VkMemoryFdPropertiesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_MEMORY_FD_PROPERTIES_KHR;
     pNext: void*;
     memoryTypeBits: u32;
 }
 
 struct VkMemoryGetFdInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR;
     pNext: void*;
     memory: VkDeviceMemory*;
     handleType: VkExternalMemoryHandleTypeFlagBits;
@@ -5530,7 +5530,7 @@ interface PFN_vkGetPhysicalDeviceExternalSemaphorePropertiesKHR(VkPhysicalDevice
 vkGetPhysicalDeviceExternalSemaphorePropertiesKHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceExternalSemaphoreInfo* pExternalSemaphoreInfo, VkExternalSemaphoreProperties* pExternalSemaphoreProperties) #extern "vulkan"
 
 struct VkImportSemaphoreFdInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_FD_INFO_KHR;
     pNext: void*;
     semaphore: VkSemaphore*;
     flags: u32;
@@ -5539,7 +5539,7 @@ struct VkImportSemaphoreFdInfoKHR {
 }
 
 struct VkSemaphoreGetFdInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR;
     pNext: void*;
     semaphore: VkSemaphore*;
     handleType: VkExternalSemaphoreHandleTypeFlagBits;
@@ -5554,7 +5554,7 @@ VkResult vkImportSemaphoreFdKHR(VkDevice* device, VkImportSemaphoreFdInfoKHR* pI
 VkResult vkGetSemaphoreFdKHR(VkDevice* device, VkSemaphoreGetFdInfoKHR* pGetFdInfo, s32* pFd) #extern "vulkan"
 
 struct VkPhysicalDevicePushDescriptorPropertiesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PUSH_DESCRIPTOR_PROPERTIES_KHR;
     pNext: void*;
     maxPushDescriptors: u32;
 }
@@ -5579,7 +5579,7 @@ struct VkPresentRegionKHR {
 }
 
 struct VkPresentRegionsKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PRESENT_REGIONS_KHR;
     pNext: void*;
     swapchainCount: u32;
     pRegions: VkPresentRegionKHR*;
@@ -5614,7 +5614,7 @@ vkCmdNextSubpass2KHR(VkCommandBuffer* commandBuffer, VkSubpassBeginInfo* pSubpas
 vkCmdEndRenderPass2KHR(VkCommandBuffer* commandBuffer, VkSubpassEndInfo* pSubpassEndInfo) #extern "vulkan"
 
 struct VkSharedPresentSurfaceCapabilitiesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SHARED_PRESENT_SURFACE_CAPABILITIES_KHR;
     pNext: void*;
     sharedPresentSupportedUsageFlags: u32;
 }
@@ -5628,7 +5628,7 @@ interface PFN_vkGetPhysicalDeviceExternalFencePropertiesKHR(VkPhysicalDevice* ph
 vkGetPhysicalDeviceExternalFencePropertiesKHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceExternalFenceInfo* pExternalFenceInfo, VkExternalFenceProperties* pExternalFenceProperties) #extern "vulkan"
 
 struct VkImportFenceFdInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_IMPORT_FENCE_FD_INFO_KHR;
     pNext: void*;
     fence: VkFence*;
     flags: u32;
@@ -5637,7 +5637,7 @@ struct VkImportFenceFdInfoKHR {
 }
 
 struct VkFenceGetFdInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_FENCE_GET_FD_INFO_KHR;
     pNext: void*;
     fence: VkFence*;
     handleType: VkExternalFenceHandleTypeFlagBits;
@@ -5699,20 +5699,20 @@ enum VkAcquireProfilingLockFlagBitsKHR {
 }
 
 struct VkPhysicalDevicePerformanceQueryFeaturesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PERFORMANCE_QUERY_FEATURES_KHR;
     pNext: void*;
     performanceCounterQueryPools: u32;
     performanceCounterMultipleQueryPools: u32;
 }
 
 struct VkPhysicalDevicePerformanceQueryPropertiesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PERFORMANCE_QUERY_PROPERTIES_KHR;
     pNext: void*;
     allowCommandBufferQueryCopies: u32;
 }
 
 struct VkPerformanceCounterKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PERFORMANCE_COUNTER_KHR;
     pNext: void*;
     unit: VkPerformanceCounterUnitKHR;
     scope: VkPerformanceCounterScopeKHR;
@@ -5721,7 +5721,7 @@ struct VkPerformanceCounterKHR {
 }
 
 struct VkPerformanceCounterDescriptionKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PERFORMANCE_COUNTER_DESCRIPTION_KHR;
     pNext: void*;
     flags: u32;
     name: CArray<u8>[256];
@@ -5730,7 +5730,7 @@ struct VkPerformanceCounterDescriptionKHR {
 }
 
 struct VkQueryPoolPerformanceCreateInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PERFORMANCE_QUERY_SUBMIT_INFO_KHR;
     pNext: void*;
     queueFamilyIndex: u32;
     counterIndexCount: u32;
@@ -5747,14 +5747,14 @@ union VkPerformanceCounterResultKHR {
 }
 
 struct VkAcquireProfilingLockInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_ACQUIRE_PROFILING_LOCK_INFO_KHR;
     pNext: void*;
     flags: u32;
     timeout: u64;
 }
 
 struct VkPerformanceQuerySubmitInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PERFORMANCE_QUERY_SUBMIT_INFO_KHR;
     pNext: void*;
     counterPassIndex: u32;
 }
@@ -5776,19 +5776,19 @@ VkResult vkAcquireProfilingLockKHR(VkDevice* device, VkAcquireProfilingLockInfoK
 vkReleaseProfilingLockKHR(VkDevice* device) #extern "vulkan"
 
 struct VkPhysicalDeviceSurfaceInfo2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR;
     pNext: void*;
     surface: VkSurfaceKHR*;
 }
 
 struct VkSurfaceCapabilities2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_KHR;
     pNext: void*;
     surfaceCapabilities: VkSurfaceCapabilitiesKHR;
 }
 
 struct VkSurfaceFormat2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SURFACE_FORMAT_2_KHR;
     pNext: void*;
     surfaceFormat: VkSurfaceFormatKHR;
 }
@@ -5802,32 +5802,32 @@ VkResult vkGetPhysicalDeviceSurfaceCapabilities2KHR(VkPhysicalDevice* physicalDe
 VkResult vkGetPhysicalDeviceSurfaceFormats2KHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceSurfaceInfo2KHR* pSurfaceInfo, u32* pSurfaceFormatCount, VkSurfaceFormat2KHR* pSurfaceFormats) #extern "vulkan"
 
 struct VkDisplayProperties2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DISPLAY_PROPERTIES_2_KHR;
     pNext: void*;
     displayProperties: VkDisplayPropertiesKHR;
 }
 
 struct VkDisplayPlaneProperties2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DISPLAY_PLANE_PROPERTIES_2_KHR;
     pNext: void*;
     displayPlaneProperties: VkDisplayPlanePropertiesKHR;
 }
 
 struct VkDisplayModeProperties2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DISPLAY_MODE_PROPERTIES_2_KHR;
     pNext: void*;
     displayModeProperties: VkDisplayModePropertiesKHR;
 }
 
 struct VkDisplayPlaneInfo2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DISPLAY_PLANE_INFO_2_KHR;
     pNext: void*;
     mode: VkDisplayModeKHR*;
     planeIndex: u32;
 }
 
 struct VkDisplayPlaneCapabilities2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DISPLAY_PLANE_CAPABILITIES_2_KHR;
     pNext: void*;
     capabilities: VkDisplayPlaneCapabilitiesKHR;
 }
@@ -5889,7 +5889,7 @@ vkCmdDrawIndirectCountKHR(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 
 vkCmdDrawIndexedIndirectCountKHR(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride) #extern "vulkan"
 
 struct VkPhysicalDeviceShaderClockFeaturesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR;
     pNext: void*;
     shaderSubgroupClock: u32;
     shaderDeviceClock: u32;
@@ -5908,7 +5908,7 @@ VkResult vkWaitSemaphoresKHR(VkDevice* device, VkSemaphoreWaitInfo* pWaitInfo, u
 VkResult vkSignalSemaphoreKHR(VkDevice* device, VkSemaphoreSignalInfo* pSignalInfo) #extern "vulkan"
 
 struct VkPhysicalDeviceShaderTerminateInvocationFeaturesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_TERMINATE_INVOCATION_FEATURES_KHR;
     pNext: void*;
     shaderTerminateInvocation: u32;
 }
@@ -5923,21 +5923,21 @@ enum VkFragmentShadingRateCombinerOpKHR {
 }
 
 struct VkFragmentShadingRateAttachmentInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_FRAGMENT_SHADING_RATE_ATTACHMENT_INFO_KHR;
     pNext: void*;
     pFragmentShadingRateAttachment: VkAttachmentReference2*;
     shadingRateAttachmentTexelSize: VkExtent2D;
 }
 
 struct VkPipelineFragmentShadingRateStateCreateInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_FRAGMENT_SHADING_RATE_STATE_CREATE_INFO_KHR;
     pNext: void*;
     fragmentSize: VkExtent2D;
     combinerOps: CArray<VkFragmentShadingRateCombinerOpKHR>[2];
 }
 
 struct VkPhysicalDeviceFragmentShadingRateFeaturesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR;
     pNext: void*;
     pipelineFragmentShadingRate: u32;
     primitiveFragmentShadingRate: u32;
@@ -5945,7 +5945,7 @@ struct VkPhysicalDeviceFragmentShadingRateFeaturesKHR {
 }
 
 struct VkPhysicalDeviceFragmentShadingRatePropertiesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_PROPERTIES_KHR;
     pNext: void*;
     minFragmentShadingRateAttachmentTexelSize: VkExtent2D;
     maxFragmentShadingRateAttachmentTexelSize: VkExtent2D;
@@ -5967,7 +5967,7 @@ struct VkPhysicalDeviceFragmentShadingRatePropertiesKHR {
 }
 
 struct VkPhysicalDeviceFragmentShadingRateKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_KHR;
     pNext: void*;
     sampleCounts: u32;
     fragmentSize: VkExtent2D;
@@ -5982,13 +5982,13 @@ VkResult vkGetPhysicalDeviceFragmentShadingRatesKHR(VkPhysicalDevice* physicalDe
 vkCmdSetFragmentShadingRateKHR(VkCommandBuffer* commandBuffer, VkExtent2D* pFragmentSize, CArray<VkFragmentShadingRateCombinerOpKHR>[2] combinerOps) #extern "vulkan"
 
 struct VkSurfaceProtectedCapabilitiesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SURFACE_PROTECTED_CAPABILITIES_KHR;
     pNext: void*;
     supportsProtected: u32;
 }
 
 struct VkPhysicalDevicePresentWaitFeaturesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_WAIT_FEATURES_KHR;
     pNext: void*;
     presentWait: u32;
 }
@@ -6039,19 +6039,19 @@ enum VkPipelineExecutableStatisticFormatKHR {
 }
 
 struct VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_EXECUTABLE_PROPERTIES_FEATURES_KHR;
     pNext: void*;
     pipelineExecutableInfo: u32;
 }
 
 struct VkPipelineInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_INFO_KHR;
     pNext: void*;
     pipeline: VkPipeline*;
 }
 
 struct VkPipelineExecutablePropertiesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_PROPERTIES_KHR;
     pNext: void*;
     stages: u32;
     name: CArray<u8>[256];
@@ -6060,7 +6060,7 @@ struct VkPipelineExecutablePropertiesKHR {
 }
 
 struct VkPipelineExecutableInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_INFO_KHR;
     pNext: void*;
     pipeline: VkPipeline*;
     executableIndex: u32;
@@ -6074,7 +6074,7 @@ union VkPipelineExecutableStatisticValueKHR {
 }
 
 struct VkPipelineExecutableStatisticKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_STATISTIC_KHR;
     pNext: void*;
     name: CArray<u8>[256];
     description: CArray<u8>[256];
@@ -6083,7 +6083,7 @@ struct VkPipelineExecutableStatisticKHR {
 }
 
 struct VkPipelineExecutableInternalRepresentationKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_INTERNAL_REPRESENTATION_KHR;
     pNext: void*;
     name: CArray<u8>[256];
     description: CArray<u8>[256];
@@ -6105,13 +6105,13 @@ VkResult vkGetPipelineExecutableStatisticsKHR(VkDevice* device, VkPipelineExecut
 VkResult vkGetPipelineExecutableInternalRepresentationsKHR(VkDevice* device, VkPipelineExecutableInfoKHR* pExecutableInfo, u32* pInternalRepresentationCount, VkPipelineExecutableInternalRepresentationKHR* pInternalRepresentations) #extern "vulkan"
 
 struct VkPhysicalDeviceShaderIntegerDotProductFeaturesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_FEATURES_KHR;
     pNext: void*;
     shaderIntegerDotProduct: u32;
 }
 
 struct VkPhysicalDeviceShaderIntegerDotProductPropertiesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_PROPERTIES_KHR;
     pNext: void*;
     integerDotProduct8BitUnsignedAccelerated: u32;
     integerDotProduct8BitSignedAccelerated: u32;
@@ -6146,21 +6146,21 @@ struct VkPhysicalDeviceShaderIntegerDotProductPropertiesKHR {
 }
 
 struct VkPipelineLibraryCreateInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_LIBRARY_CREATE_INFO_KHR;
     pNext: void*;
     libraryCount: u32;
     pLibraries: VkPipeline**;
 }
 
 struct VkPresentIdKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PRESENT_ID_KHR;
     pNext: void*;
     swapchainCount: u32;
     pPresentIds: u64*;
 }
 
 struct VkPhysicalDevicePresentIdFeaturesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_ID_FEATURES_KHR;
     pNext: void*;
     presentId: u32;
 }
@@ -6248,7 +6248,7 @@ enum VkSubmitFlagBitsKHR {
 }
 
 struct VkMemoryBarrier2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_MEMORY_BARRIER_2_KHR;
     pNext: void*;
     srcStageMask: u64;
     srcAccessMask: u64;
@@ -6257,7 +6257,7 @@ struct VkMemoryBarrier2KHR {
 }
 
 struct VkBufferMemoryBarrier2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2_KHR;
     pNext: void*;
     srcStageMask: u64;
     srcAccessMask: u64;
@@ -6271,7 +6271,7 @@ struct VkBufferMemoryBarrier2KHR {
 }
 
 struct VkImageMemoryBarrier2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2_KHR;
     pNext: void*;
     srcStageMask: u64;
     srcAccessMask: u64;
@@ -6286,7 +6286,7 @@ struct VkImageMemoryBarrier2KHR {
 }
 
 struct VkDependencyInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEPENDENCY_INFO_KHR;
     pNext: void*;
     dependencyFlags: u32;
     memoryBarrierCount: u32;
@@ -6298,7 +6298,7 @@ struct VkDependencyInfoKHR {
 }
 
 struct VkSemaphoreSubmitInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO_KHR;
     pNext: void*;
     semaphore: VkSemaphore*;
     value: u64;
@@ -6307,14 +6307,14 @@ struct VkSemaphoreSubmitInfoKHR {
 }
 
 struct VkCommandBufferSubmitInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO_KHR;
     pNext: void*;
     commandBuffer: VkCommandBuffer*;
     deviceMask: u32;
 }
 
 struct VkSubmitInfo2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SUBMIT_INFO_2_KHR;
     pNext: void*;
     flags: u32;
     waitSemaphoreInfoCount: u32;
@@ -6326,19 +6326,19 @@ struct VkSubmitInfo2KHR {
 }
 
 struct VkPhysicalDeviceSynchronization2FeaturesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR;
     pNext: void*;
     synchronization2: u32;
 }
 
 struct VkQueueFamilyCheckpointProperties2NV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_QUEUE_FAMILY_CHECKPOINT_PROPERTIES_2_NV;
     pNext: void*;
     checkpointExecutionStageMask: u64;
 }
 
 struct VkCheckpointData2NV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_CHECKPOINT_DATA_2_NV;
     pNext: void*;
     stage: u64;
     pCheckpointMarker: void*;
@@ -6377,19 +6377,19 @@ vkCmdWriteBufferMarker2AMD(VkCommandBuffer* commandBuffer, u64 stage, VkBuffer* 
 vkGetQueueCheckpointData2NV(VkQueue* queue, u32* pCheckpointDataCount, VkCheckpointData2NV* pCheckpointData) #extern "vulkan"
 
 struct VkPhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_FEATURES_KHR;
     pNext: void*;
     shaderSubgroupUniformControlFlow: u32;
 }
 
 struct VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeaturesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ZERO_INITIALIZE_WORKGROUP_MEMORY_FEATURES_KHR;
     pNext: void*;
     shaderZeroInitializeWorkgroupMemory: u32;
 }
 
 struct VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_FEATURES_KHR;
     pNext: void*;
     workgroupMemoryExplicitLayout: u32;
     workgroupMemoryExplicitLayoutScalarBlockLayout: u32;
@@ -6398,7 +6398,7 @@ struct VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR {
 }
 
 struct VkBufferCopy2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_BUFFER_COPY_2_KHR;
     pNext: void*;
     srcOffset: u64;
     dstOffset: u64;
@@ -6406,7 +6406,7 @@ struct VkBufferCopy2KHR {
 }
 
 struct VkCopyBufferInfo2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2_KHR;
     pNext: void*;
     srcBuffer: VkBuffer*;
     dstBuffer: VkBuffer*;
@@ -6415,7 +6415,7 @@ struct VkCopyBufferInfo2KHR {
 }
 
 struct VkImageCopy2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_IMAGE_COPY_2_KHR;
     pNext: void*;
     srcSubresource: VkImageSubresourceLayers;
     srcOffset: VkOffset3D;
@@ -6425,7 +6425,7 @@ struct VkImageCopy2KHR {
 }
 
 struct VkCopyImageInfo2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_COPY_IMAGE_INFO_2_KHR;
     pNext: void*;
     srcImage: VkImage*;
     srcImageLayout: VkImageLayout;
@@ -6436,7 +6436,7 @@ struct VkCopyImageInfo2KHR {
 }
 
 struct VkBufferImageCopy2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2_KHR;
     pNext: void*;
     bufferOffset: u64;
     bufferRowLength: u32;
@@ -6447,7 +6447,7 @@ struct VkBufferImageCopy2KHR {
 }
 
 struct VkCopyBufferToImageInfo2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2_KHR;
     pNext: void*;
     srcBuffer: VkBuffer*;
     dstImage: VkImage*;
@@ -6457,7 +6457,7 @@ struct VkCopyBufferToImageInfo2KHR {
 }
 
 struct VkCopyImageToBufferInfo2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2_KHR;
     pNext: void*;
     srcImage: VkImage*;
     srcImageLayout: VkImageLayout;
@@ -6467,7 +6467,7 @@ struct VkCopyImageToBufferInfo2KHR {
 }
 
 struct VkImageBlit2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_IMAGE_BLIT_2_KHR;
     pNext: void*;
     srcSubresource: VkImageSubresourceLayers;
     srcOffsets: CArray<VkOffset3D>[2];
@@ -6476,7 +6476,7 @@ struct VkImageBlit2KHR {
 }
 
 struct VkBlitImageInfo2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2_KHR;
     pNext: void*;
     srcImage: VkImage*;
     srcImageLayout: VkImageLayout;
@@ -6488,7 +6488,7 @@ struct VkBlitImageInfo2KHR {
 }
 
 struct VkImageResolve2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_IMAGE_RESOLVE_2_KHR;
     pNext: void*;
     srcSubresource: VkImageSubresourceLayers;
     srcOffset: VkOffset3D;
@@ -6498,7 +6498,7 @@ struct VkImageResolve2KHR {
 }
 
 struct VkResolveImageInfo2KHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_RESOLVE_IMAGE_INFO_2_KHR;
     pNext: void*;
     srcImage: VkImage*;
     srcImageLayout: VkImageLayout;
@@ -6592,7 +6592,7 @@ enum VkDebugReportFlagBitsEXT {
 interface u32 PFN_vkDebugReportCallbackEXT(u32 flags, VkDebugReportObjectTypeEXT objectType, u64 object, u64 location, s32 messageCode, u8* pLayerPrefix, u8* pMessage, void* pUserData)
 
 struct VkDebugReportCallbackCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
     pNext: void*;
     flags: u32;
     pfnCallback: PFN_vkDebugReportCallbackEXT;
@@ -6618,13 +6618,13 @@ enum VkRasterizationOrderAMD {
 }
 
 struct VkPipelineRasterizationStateRasterizationOrderAMD {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_RASTERIZATION_ORDER_AMD;
     pNext: void*;
     rasterizationOrder: VkRasterizationOrderAMD;
 }
 
 struct VkDebugMarkerObjectNameInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT;
     pNext: void*;
     objectType: VkDebugReportObjectTypeEXT;
     object: u64;
@@ -6632,7 +6632,7 @@ struct VkDebugMarkerObjectNameInfoEXT {
 }
 
 struct VkDebugMarkerObjectTagInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_TAG_INFO_EXT;
     pNext: void*;
     objectType: VkDebugReportObjectTypeEXT;
     object: u64;
@@ -6642,7 +6642,7 @@ struct VkDebugMarkerObjectTagInfoEXT {
 }
 
 struct VkDebugMarkerMarkerInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
     pNext: void*;
     pMarkerName: u8*;
     color: CArray<float>[4];
@@ -6669,33 +6669,33 @@ vkCmdDebugMarkerEndEXT(VkCommandBuffer* commandBuffer) #extern "vulkan"
 vkCmdDebugMarkerInsertEXT(VkCommandBuffer* commandBuffer, VkDebugMarkerMarkerInfoEXT* pMarkerInfo) #extern "vulkan"
 
 struct VkDedicatedAllocationImageCreateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEDICATED_ALLOCATION_IMAGE_CREATE_INFO_NV;
     pNext: void*;
     dedicatedAllocation: u32;
 }
 
 struct VkDedicatedAllocationBufferCreateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEDICATED_ALLOCATION_BUFFER_CREATE_INFO_NV;
     pNext: void*;
     dedicatedAllocation: u32;
 }
 
 struct VkDedicatedAllocationMemoryAllocateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEDICATED_ALLOCATION_MEMORY_ALLOCATE_INFO_NV;
     pNext: void*;
     image: VkImage*;
     buffer: VkBuffer*;
 }
 
 struct VkPhysicalDeviceTransformFeedbackFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TRANSFORM_FEEDBACK_FEATURES_EXT;
     pNext: void*;
     transformFeedback: u32;
     geometryStreams: u32;
 }
 
 struct VkPhysicalDeviceTransformFeedbackPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TRANSFORM_FEEDBACK_PROPERTIES_EXT;
     pNext: void*;
     maxTransformFeedbackStreams: u32;
     maxTransformFeedbackBuffers: u32;
@@ -6710,7 +6710,7 @@ struct VkPhysicalDeviceTransformFeedbackPropertiesEXT {
 }
 
 struct VkPipelineRasterizationStateStreamCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_STREAM_CREATE_INFO_EXT;
     pNext: void*;
     flags: u32;
     rasterizationStream: u32;
@@ -6742,22 +6742,23 @@ vkCmdDrawIndirectByteCountEXT(VkCommandBuffer* commandBuffer, u32 instanceCount,
 
 struct VkCuModuleNVX {}
 struct VkCuFunctionNVX {}
+
 struct VkCuModuleCreateInfoNVX {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_CU_MODULE_CREATE_INFO_NVX;
     pNext: void*;
     dataSize: u64;
     pData: void*;
 }
 
 struct VkCuFunctionCreateInfoNVX {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_CU_FUNCTION_CREATE_INFO_NVX;
     pNext: void*;
     module: VkCuModuleNVX*;
     pName: u8*;
 }
 
 struct VkCuLaunchInfoNVX {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_CU_LAUNCH_INFO_NVX;
     pNext: void*;
     function: VkCuFunctionNVX*;
     gridDimX: u32;
@@ -6794,7 +6795,7 @@ vkDestroyCuFunctionNVX(VkDevice* device, VkCuFunctionNVX* function, VkAllocation
 vkCmdCuLaunchKernelNVX(VkCommandBuffer* commandBuffer, VkCuLaunchInfoNVX* pLaunchInfo) #extern "vulkan"
 
 struct VkImageViewHandleInfoNVX {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_IMAGE_VIEW_HANDLE_INFO_NVX;
     pNext: void*;
     imageView: VkImageView*;
     descriptorType: VkDescriptorType;
@@ -6802,7 +6803,7 @@ struct VkImageViewHandleInfoNVX {
 }
 
 struct VkImageViewAddressPropertiesNVX {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_IMAGE_VIEW_ADDRESS_PROPERTIES_NVX;
     pNext: void*;
     deviceAddress: u64;
     size: u64;
@@ -6825,7 +6826,7 @@ vkCmdDrawIndirectCountAMD(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 
 vkCmdDrawIndexedIndirectCountAMD(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride) #extern "vulkan"
 
 struct VkTextureLODGatherFormatPropertiesAMD {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_TEXTURE_LOD_GATHER_FORMAT_PROPERTIES_AMD;
     pNext: void*;
     supportsTextureGatherLODBiasAMD: u32;
 }
@@ -6860,7 +6861,7 @@ interface VkResult PFN_vkGetShaderInfoAMD(VkDevice* device, VkPipeline* pipeline
 VkResult vkGetShaderInfoAMD(VkDevice* device, VkPipeline* pipeline, VkShaderStageFlagBits shaderStage, VkShaderInfoTypeAMD infoType, u64* pInfoSize, void* pInfo) #extern "vulkan"
 
 struct VkPhysicalDeviceCornerSampledImageFeaturesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CORNER_SAMPLED_IMAGE_FEATURES_NV;
     pNext: void*;
     cornerSampledImage: u32;
 }
@@ -6892,13 +6893,13 @@ interface VkResult PFN_vkGetPhysicalDeviceExternalImageFormatPropertiesNV(VkPhys
 VkResult vkGetPhysicalDeviceExternalImageFormatPropertiesNV(VkPhysicalDevice* physicalDevice, VkFormat format, VkImageType type, VkImageTiling tiling, u32 usage, u32 flags, u32 externalHandleType, VkExternalImageFormatPropertiesNV* pExternalImageFormatProperties) #extern "vulkan"
 
 struct VkExternalMemoryImageCreateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO_NV;
     pNext: void*;
     handleTypes: u32;
 }
 
 struct VkExportMemoryAllocateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_NV;
     pNext: void*;
     handleTypes: u32;
 }
@@ -6910,26 +6911,26 @@ enum VkValidationCheckEXT {
 }
 
 struct VkValidationFlagsEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_VALIDATION_FLAGS_EXT;
     pNext: void*;
     disabledValidationCheckCount: u32;
     pDisabledValidationChecks: VkValidationCheckEXT*;
 }
 
 struct VkPhysicalDeviceTextureCompressionASTCHDRFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXTURE_COMPRESSION_ASTC_HDR_FEATURES_EXT;
     pNext: void*;
     textureCompressionASTC_HDR: u32;
 }
 
 struct VkImageViewASTCDecodeModeEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_IMAGE_VIEW_ASTC_DECODE_MODE_EXT;
     pNext: void*;
     decodeMode: VkFormat;
 }
 
 struct VkPhysicalDeviceASTCDecodeFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ASTC_DECODE_FEATURES_EXT;
     pNext: void*;
     decodeModeSharedExponent: u32;
 }
@@ -6940,7 +6941,7 @@ enum VkConditionalRenderingFlagBitsEXT {
 }
 
 struct VkConditionalRenderingBeginInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_CONDITIONAL_RENDERING_BEGIN_INFO_EXT;
     pNext: void*;
     buffer: VkBuffer*;
     offset: u64;
@@ -6948,14 +6949,14 @@ struct VkConditionalRenderingBeginInfoEXT {
 }
 
 struct VkPhysicalDeviceConditionalRenderingFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CONDITIONAL_RENDERING_FEATURES_EXT;
     pNext: void*;
     conditionalRendering: u32;
     inheritedConditionalRendering: u32;
 }
 
 struct VkCommandBufferInheritanceConditionalRenderingInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_CONDITIONAL_RENDERING_INFO_EXT;
     pNext: void*;
     conditionalRenderingEnable: u32;
 }
@@ -6974,7 +6975,7 @@ struct VkViewportWScalingNV {
 }
 
 struct VkPipelineViewportWScalingStateCreateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_W_SCALING_STATE_CREATE_INFO_NV;
     pNext: void*;
     viewportWScalingEnable: u32;
     viewportCount: u32;
@@ -6996,7 +6997,7 @@ enum VkSurfaceCounterFlagBitsEXT {
 }
 
 struct VkSurfaceCapabilities2EXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT;
     pNext: void*;
     minImageCount: u32;
     maxImageCount: u32;
@@ -7033,25 +7034,25 @@ enum VkDisplayEventTypeEXT {
 }
 
 struct VkDisplayPowerInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DISPLAY_POWER_INFO_EXT;
     pNext: void*;
     powerState: VkDisplayPowerStateEXT;
 }
 
 struct VkDeviceEventInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEVICE_EVENT_INFO_EXT;
     pNext: void*;
     deviceEvent: VkDeviceEventTypeEXT;
 }
 
 struct VkDisplayEventInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DISPLAY_EVENT_INFO_EXT;
     pNext: void*;
     displayEvent: VkDisplayEventTypeEXT;
 }
 
 struct VkSwapchainCounterCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SWAPCHAIN_COUNTER_CREATE_INFO_EXT;
     pNext: void*;
     surfaceCounters: u32;
 }
@@ -7090,7 +7091,7 @@ struct VkPresentTimeGOOGLE {
 }
 
 struct VkPresentTimesInfoGOOGLE {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PRESENT_TIMES_INFO_GOOGLE;
     pNext: void*;
     swapchainCount: u32;
     pTimes: VkPresentTimeGOOGLE*;
@@ -7105,7 +7106,7 @@ VkResult vkGetRefreshCycleDurationGOOGLE(VkDevice* device, VkSwapchainKHR* swapc
 VkResult vkGetPastPresentationTimingGOOGLE(VkDevice* device, VkSwapchainKHR* swapchain, u32* pPresentationTimingCount, VkPastPresentationTimingGOOGLE* pPresentationTimings) #extern "vulkan"
 
 struct VkPhysicalDeviceMultiviewPerViewAttributesPropertiesNVX {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_PER_VIEW_ATTRIBUTES_PROPERTIES_NVX;
     pNext: void*;
     perViewPositionAllComponents: u32;
 }
@@ -7130,7 +7131,7 @@ struct VkViewportSwizzleNV {
 }
 
 struct VkPipelineViewportSwizzleStateCreateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_SWIZZLE_STATE_CREATE_INFO_NV;
     pNext: void*;
     flags: u32;
     viewportCount: u32;
@@ -7144,13 +7145,13 @@ enum VkDiscardRectangleModeEXT {
 }
 
 struct VkPhysicalDeviceDiscardRectanglePropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DISCARD_RECTANGLE_PROPERTIES_EXT;
     pNext: void*;
     maxDiscardRectangles: u32;
 }
 
 struct VkPipelineDiscardRectangleStateCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_DISCARD_RECTANGLE_STATE_CREATE_INFO_EXT;
     pNext: void*;
     flags: u32;
     discardRectangleMode: VkDiscardRectangleModeEXT;
@@ -7170,7 +7171,7 @@ enum VkConservativeRasterizationModeEXT {
 }
 
 struct VkPhysicalDeviceConservativeRasterizationPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CONSERVATIVE_RASTERIZATION_PROPERTIES_EXT;
     pNext: void*;
     primitiveOverestimationSize: float;
     maxExtraPrimitiveOverestimationSize: float;
@@ -7184,7 +7185,7 @@ struct VkPhysicalDeviceConservativeRasterizationPropertiesEXT {
 }
 
 struct VkPipelineRasterizationConservativeStateCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_CONSERVATIVE_STATE_CREATE_INFO_EXT;
     pNext: void*;
     flags: u32;
     conservativeRasterizationMode: VkConservativeRasterizationModeEXT;
@@ -7192,13 +7193,13 @@ struct VkPipelineRasterizationConservativeStateCreateInfoEXT {
 }
 
 struct VkPhysicalDeviceDepthClipEnableFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_CLIP_ENABLE_FEATURES_EXT;
     pNext: void*;
     depthClipEnable: u32;
 }
 
 struct VkPipelineRasterizationDepthClipStateCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_DEPTH_CLIP_STATE_CREATE_INFO_EXT;
     pNext: void*;
     flags: u32;
     depthClipEnable: u32;
@@ -7210,7 +7211,7 @@ struct VkXYColorEXT {
 }
 
 struct VkHdrMetadataEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_HDR_METADATA_EXT;
     pNext: void*;
     displayPrimaryRed: VkXYColorEXT;
     displayPrimaryGreen: VkXYColorEXT;
@@ -7243,14 +7244,14 @@ enum VkDebugUtilsMessageTypeFlagBitsEXT {
 }
 
 struct VkDebugUtilsLabelEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
     pNext: void*;
     pLabelName: u8*;
     color: CArray<float>[4];
 }
 
 struct VkDebugUtilsObjectNameInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
     pNext: void*;
     objectType: VkObjectType;
     objectHandle: u64;
@@ -7258,7 +7259,7 @@ struct VkDebugUtilsObjectNameInfoEXT {
 }
 
 struct VkDebugUtilsMessengerCallbackDataEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CALLBACK_DATA_EXT;
     pNext: void*;
     flags: u32;
     pMessageIdName: u8*;
@@ -7275,7 +7276,7 @@ struct VkDebugUtilsMessengerCallbackDataEXT {
 interface u32 PFN_vkDebugUtilsMessengerCallbackEXT(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, u32 messageTypes, VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
 
 struct VkDebugUtilsMessengerCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
     pNext: void*;
     flags: u32;
     messageSeverity: u32;
@@ -7285,7 +7286,7 @@ struct VkDebugUtilsMessengerCreateInfoEXT {
 }
 
 struct VkDebugUtilsObjectTagInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_TAG_INFO_EXT;
     pNext: void*;
     objectType: VkObjectType;
     objectHandle: u64;
@@ -7339,14 +7340,14 @@ vkDestroyDebugUtilsMessengerEXT(VkInstance* instance, VkDebugUtilsMessengerEXT* 
 vkSubmitDebugUtilsMessageEXT(VkInstance* instance, VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, u32 messageTypes, VkDebugUtilsMessengerCallbackDataEXT* pCallbackData) #extern "vulkan"
 
 struct VkPhysicalDeviceInlineUniformBlockFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_FEATURES_EXT;
     pNext: void*;
     inlineUniformBlock: u32;
     descriptorBindingInlineUniformBlockUpdateAfterBind: u32;
 }
 
 struct VkPhysicalDeviceInlineUniformBlockPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_PROPERTIES_EXT;
     pNext: void*;
     maxInlineUniformBlockSize: u32;
     maxPerStageDescriptorInlineUniformBlocks: u32;
@@ -7356,14 +7357,14 @@ struct VkPhysicalDeviceInlineUniformBlockPropertiesEXT {
 }
 
 struct VkWriteDescriptorSetInlineUniformBlockEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_INLINE_UNIFORM_BLOCK_EXT;
     pNext: void*;
     dataSize: u32;
     pData: void*;
 }
 
 struct VkDescriptorPoolInlineUniformBlockCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_INLINE_UNIFORM_BLOCK_CREATE_INFO_EXT;
     pNext: void*;
     maxInlineUniformBlockBindings: u32;
 }
@@ -7374,7 +7375,7 @@ struct VkSampleLocationEXT {
 }
 
 struct VkSampleLocationsInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SAMPLE_LOCATIONS_INFO_EXT;
     pNext: void*;
     sampleLocationsPerPixel: VkSampleCountFlagBits;
     sampleLocationGridSize: VkExtent2D;
@@ -7393,7 +7394,7 @@ struct VkSubpassSampleLocationsEXT {
 }
 
 struct VkRenderPassSampleLocationsBeginInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_RENDER_PASS_SAMPLE_LOCATIONS_BEGIN_INFO_EXT;
     pNext: void*;
     attachmentInitialSampleLocationsCount: u32;
     pAttachmentInitialSampleLocations: VkAttachmentSampleLocationsEXT*;
@@ -7402,14 +7403,14 @@ struct VkRenderPassSampleLocationsBeginInfoEXT {
 }
 
 struct VkPipelineSampleLocationsStateCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_SAMPLE_LOCATIONS_STATE_CREATE_INFO_EXT;
     pNext: void*;
     sampleLocationsEnable: u32;
     sampleLocationsInfo: VkSampleLocationsInfoEXT;
 }
 
 struct VkPhysicalDeviceSampleLocationsPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLE_LOCATIONS_PROPERTIES_EXT;
     pNext: void*;
     sampleLocationSampleCounts: u32;
     maxSampleLocationGridSize: VkExtent2D;
@@ -7419,7 +7420,7 @@ struct VkPhysicalDeviceSampleLocationsPropertiesEXT {
 }
 
 struct VkMultisamplePropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_MULTISAMPLE_PROPERTIES_EXT;
     pNext: void*;
     maxSampleLocationGridSize: VkExtent2D;
 }
@@ -7440,13 +7441,13 @@ enum VkBlendOverlapEXT {
 }
 
 struct VkPhysicalDeviceBlendOperationAdvancedFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BLEND_OPERATION_ADVANCED_FEATURES_EXT;
     pNext: void*;
     advancedBlendCoherentOperations: u32;
 }
 
 struct VkPhysicalDeviceBlendOperationAdvancedPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BLEND_OPERATION_ADVANCED_PROPERTIES_EXT;
     pNext: void*;
     advancedBlendMaxColorAttachments: u32;
     advancedBlendIndependentBlend: u32;
@@ -7457,7 +7458,7 @@ struct VkPhysicalDeviceBlendOperationAdvancedPropertiesEXT {
 }
 
 struct VkPipelineColorBlendAdvancedStateCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_ADVANCED_STATE_CREATE_INFO_EXT;
     pNext: void*;
     srcPremultiplied: u32;
     dstPremultiplied: u32;
@@ -7465,7 +7466,7 @@ struct VkPipelineColorBlendAdvancedStateCreateInfoEXT {
 }
 
 struct VkPipelineCoverageToColorStateCreateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_COVERAGE_TO_COLOR_STATE_CREATE_INFO_NV;
     pNext: void*;
     flags: u32;
     coverageToColorEnable: u32;
@@ -7481,7 +7482,7 @@ enum VkCoverageModulationModeNV {
 }
 
 struct VkPipelineCoverageModulationStateCreateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_COVERAGE_MODULATION_STATE_CREATE_INFO_NV;
     pNext: void*;
     flags: u32;
     coverageModulationMode: VkCoverageModulationModeNV;
@@ -7491,14 +7492,14 @@ struct VkPipelineCoverageModulationStateCreateInfoNV {
 }
 
 struct VkPhysicalDeviceShaderSMBuiltinsPropertiesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SM_BUILTINS_PROPERTIES_NV;
     pNext: void*;
     shaderSMCount: u32;
     shaderWarpsPerSM: u32;
 }
 
 struct VkPhysicalDeviceShaderSMBuiltinsFeaturesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SM_BUILTINS_FEATURES_NV;
     pNext: void*;
     shaderSMBuiltins: u32;
 }
@@ -7510,14 +7511,14 @@ struct VkDrmFormatModifierPropertiesEXT {
 }
 
 struct VkDrmFormatModifierPropertiesListEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_EXT;
     pNext: void*;
     drmFormatModifierCount: u32;
     pDrmFormatModifierProperties: VkDrmFormatModifierPropertiesEXT*;
 }
 
 struct VkPhysicalDeviceImageDrmFormatModifierInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_DRM_FORMAT_MODIFIER_INFO_EXT;
     pNext: void*;
     drmFormatModifier: u64;
     sharingMode: VkSharingMode;
@@ -7526,14 +7527,14 @@ struct VkPhysicalDeviceImageDrmFormatModifierInfoEXT {
 }
 
 struct VkImageDrmFormatModifierListCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_IMAGE_DRM_FORMAT_MODIFIER_LIST_CREATE_INFO_EXT;
     pNext: void*;
     drmFormatModifierCount: u32;
     pDrmFormatModifiers: u64*;
 }
 
 struct VkImageDrmFormatModifierExplicitCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_IMAGE_DRM_FORMAT_MODIFIER_EXPLICIT_CREATE_INFO_EXT;
     pNext: void*;
     drmFormatModifier: u64;
     drmFormatModifierPlaneCount: u32;
@@ -7541,7 +7542,7 @@ struct VkImageDrmFormatModifierExplicitCreateInfoEXT {
 }
 
 struct VkImageDrmFormatModifierPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_IMAGE_DRM_FORMAT_MODIFIER_PROPERTIES_EXT;
     pNext: void*;
     drmFormatModifier: u64;
 }
@@ -7557,7 +7558,7 @@ enum VkValidationCacheHeaderVersionEXT {
 }
 
 struct VkValidationCacheCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_VALIDATION_CACHE_CREATE_INFO_EXT;
     pNext: void*;
     flags: u32;
     initialDataSize: u64;
@@ -7565,7 +7566,7 @@ struct VkValidationCacheCreateInfoEXT {
 }
 
 struct VkShaderModuleValidationCacheCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SHADER_MODULE_VALIDATION_CACHE_CREATE_INFO_EXT;
     pNext: void*;
     validationCache: VkValidationCacheEXT*;
 }
@@ -7616,7 +7617,7 @@ struct VkShadingRatePaletteNV {
 }
 
 struct VkPipelineViewportShadingRateImageStateCreateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_SHADING_RATE_IMAGE_STATE_CREATE_INFO_NV;
     pNext: void*;
     shadingRateImageEnable: u32;
     viewportCount: u32;
@@ -7624,14 +7625,14 @@ struct VkPipelineViewportShadingRateImageStateCreateInfoNV {
 }
 
 struct VkPhysicalDeviceShadingRateImageFeaturesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADING_RATE_IMAGE_FEATURES_NV;
     pNext: void*;
     shadingRateImage: u32;
     shadingRateCoarseSampleOrder: u32;
 }
 
 struct VkPhysicalDeviceShadingRateImagePropertiesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADING_RATE_IMAGE_PROPERTIES_NV;
     pNext: void*;
     shadingRateTexelSize: VkExtent2D;
     shadingRatePaletteSize: u32;
@@ -7652,7 +7653,7 @@ struct VkCoarseSampleOrderCustomNV {
 }
 
 struct VkPipelineViewportCoarseSampleOrderStateCreateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_COARSE_SAMPLE_ORDER_STATE_CREATE_INFO_NV;
     pNext: void*;
     sampleOrderType: VkCoarseSampleOrderTypeNV;
     customSampleOrderCount: u32;
@@ -7754,7 +7755,7 @@ enum VkBuildAccelerationStructureFlagBitsKHR {
 }
 
 struct VkRayTracingShaderGroupCreateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
     pNext: void*;
     type: VkRayTracingShaderGroupTypeKHR;
     generalShader: u32;
@@ -7764,7 +7765,7 @@ struct VkRayTracingShaderGroupCreateInfoNV {
 }
 
 struct VkRayTracingPipelineCreateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
     pNext: void*;
     flags: u32;
     stageCount: u32;
@@ -7778,7 +7779,7 @@ struct VkRayTracingPipelineCreateInfoNV {
 }
 
 struct VkGeometryTrianglesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NV;
     pNext: void*;
     vertexData: VkBuffer*;
     vertexOffset: u64;
@@ -7794,7 +7795,7 @@ struct VkGeometryTrianglesNV {
 }
 
 struct VkGeometryAABBNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_GEOMETRY_AABB_NV;
     pNext: void*;
     aabbData: VkBuffer*;
     numAABBs: u32;
@@ -7808,7 +7809,7 @@ struct VkGeometryDataNV {
 }
 
 struct VkGeometryNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_GEOMETRY_NV;
     pNext: void*;
     geometryType: VkGeometryTypeKHR;
     geometry: VkGeometryDataNV;
@@ -7816,7 +7817,7 @@ struct VkGeometryNV {
 }
 
 struct VkAccelerationStructureInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV;
     pNext: void*;
     type: VkAccelerationStructureTypeKHR;
     flags: u32;
@@ -7826,14 +7827,14 @@ struct VkAccelerationStructureInfoNV {
 }
 
 struct VkAccelerationStructureCreateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_NV;
     pNext: void*;
     compactedSize: u64;
     info: VkAccelerationStructureInfoNV;
 }
 
 struct VkBindAccelerationStructureMemoryInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_BIND_ACCELERATION_STRUCTURE_MEMORY_INFO_NV;
     pNext: void*;
     accelerationStructure: VkAccelerationStructureNV*;
     memory: VkDeviceMemory*;
@@ -7843,21 +7844,21 @@ struct VkBindAccelerationStructureMemoryInfoNV {
 }
 
 struct VkWriteDescriptorSetAccelerationStructureNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_NV;
     pNext: void*;
     accelerationStructureCount: u32;
     pAccelerationStructures: VkAccelerationStructureNV**;
 }
 
 struct VkAccelerationStructureMemoryRequirementsInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NV;
     pNext: void*;
     type: VkAccelerationStructureMemoryRequirementsTypeNV;
     accelerationStructure: VkAccelerationStructureNV*;
 }
 
 struct VkPhysicalDeviceRayTracingPropertiesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PROPERTIES_NV;
     pNext: void*;
     shaderGroupHandleSize: u32;
     maxRecursionDepth: u32;
@@ -7945,25 +7946,25 @@ vkCmdWriteAccelerationStructuresPropertiesNV(VkCommandBuffer* commandBuffer, u32
 VkResult vkCompileDeferredNV(VkDevice* device, VkPipeline* pipeline, u32 shader) #extern "vulkan"
 
 struct VkPhysicalDeviceRepresentativeFragmentTestFeaturesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_REPRESENTATIVE_FRAGMENT_TEST_FEATURES_NV;
     pNext: void*;
     representativeFragmentTest: u32;
 }
 
 struct VkPipelineRepresentativeFragmentTestStateCreateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_REPRESENTATIVE_FRAGMENT_TEST_STATE_CREATE_INFO_NV;
     pNext: void*;
     representativeFragmentTestEnable: u32;
 }
 
 struct VkPhysicalDeviceImageViewImageFormatInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_VIEW_IMAGE_FORMAT_INFO_EXT;
     pNext: void*;
     imageViewType: VkImageViewType;
 }
 
 struct VkFilterCubicImageViewImageFormatPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_FILTER_CUBIC_IMAGE_VIEW_IMAGE_FORMAT_PROPERTIES_EXT;
     pNext: void*;
     filterCubic: u32;
     filterCubicMinmax: u32;
@@ -7978,26 +7979,26 @@ enum VkQueueGlobalPriorityEXT {
 }
 
 struct VkDeviceQueueGlobalPriorityCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEVICE_QUEUE_GLOBAL_PRIORITY_CREATE_INFO_EXT;
     pNext: void*;
     globalPriority: VkQueueGlobalPriorityEXT;
 }
 
 struct VkImportMemoryHostPointerInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT;
     pNext: void*;
     handleType: VkExternalMemoryHandleTypeFlagBits;
     pHostPointer: void*;
 }
 
 struct VkMemoryHostPointerPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_MEMORY_HOST_POINTER_PROPERTIES_EXT;
     pNext: void*;
     memoryTypeBits: u32;
 }
 
 struct VkPhysicalDeviceExternalMemoryHostPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_HOST_PROPERTIES_EXT;
     pNext: void*;
     minImportedHostPointerAlignment: u64;
 }
@@ -8015,7 +8016,7 @@ enum VkPipelineCompilerControlFlagBitsAMD {
 }
 
 struct VkPipelineCompilerControlCreateInfoAMD {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_COMPILER_CONTROL_CREATE_INFO_AMD;
     pNext: void*;
     compilerControlFlags: u32;
 }
@@ -8029,7 +8030,7 @@ enum VkTimeDomainEXT {
 }
 
 struct VkCalibratedTimestampInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_EXT;
     pNext: void*;
     timeDomain: VkTimeDomainEXT;
 }
@@ -8043,7 +8044,7 @@ VkResult vkGetPhysicalDeviceCalibrateableTimeDomainsEXT(VkPhysicalDevice* physic
 VkResult vkGetCalibratedTimestampsEXT(VkDevice* device, u32 timestampCount, VkCalibratedTimestampInfoEXT* pTimestampInfos, u64* pTimestamps, u64* pMaxDeviation) #extern "vulkan"
 
 struct VkPhysicalDeviceShaderCorePropertiesAMD {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CORE_PROPERTIES_AMD;
     pNext: void*;
     shaderEngineCount: u32;
     shaderArraysPerEngineCount: u32;
@@ -8069,13 +8070,13 @@ enum VkMemoryOverallocationBehaviorAMD {
 }
 
 struct VkDeviceMemoryOverallocationCreateInfoAMD {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEVICE_MEMORY_OVERALLOCATION_CREATE_INFO_AMD;
     pNext: void*;
     overallocationBehavior: VkMemoryOverallocationBehaviorAMD;
 }
 
 struct VkPhysicalDeviceVertexAttributeDivisorPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_PROPERTIES_EXT;
     pNext: void*;
     maxVertexAttribDivisor: u32;
 }
@@ -8086,14 +8087,14 @@ struct VkVertexInputBindingDivisorDescriptionEXT {
 }
 
 struct VkPipelineVertexInputDivisorStateCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT;
     pNext: void*;
     vertexBindingDivisorCount: u32;
     pVertexBindingDivisors: VkVertexInputBindingDivisorDescriptionEXT*;
 }
 
 struct VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_FEATURES_EXT;
     pNext: void*;
     vertexAttributeInstanceRateDivisor: u32;
     vertexAttributeInstanceRateZeroDivisor: u32;
@@ -8112,7 +8113,7 @@ struct VkPipelineCreationFeedbackEXT {
 }
 
 struct VkPipelineCreationFeedbackCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_CREATION_FEEDBACK_CREATE_INFO_EXT;
     pNext: void*;
     pPipelineCreationFeedback: VkPipelineCreationFeedbackEXT*;
     pipelineStageCreationFeedbackCount: u32;
@@ -8120,21 +8121,21 @@ struct VkPipelineCreationFeedbackCreateInfoEXT {
 }
 
 struct VkPhysicalDeviceComputeShaderDerivativesFeaturesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COMPUTE_SHADER_DERIVATIVES_FEATURES_NV;
     pNext: void*;
     computeDerivativeGroupQuads: u32;
     computeDerivativeGroupLinear: u32;
 }
 
 struct VkPhysicalDeviceMeshShaderFeaturesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_NV;
     pNext: void*;
     taskShader: u32;
     meshShader: u32;
 }
 
 struct VkPhysicalDeviceMeshShaderPropertiesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_PROPERTIES_NV;
     pNext: void*;
     maxDrawMeshTasksCount: u32;
     maxTaskWorkGroupInvocations: u32;
@@ -8169,26 +8170,26 @@ vkCmdDrawMeshTasksIndirectNV(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u
 vkCmdDrawMeshTasksIndirectCountNV(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride) #extern "vulkan"
 
 struct VkPhysicalDeviceFragmentShaderBarycentricFeaturesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_BARYCENTRIC_FEATURES_NV;
     pNext: void*;
     fragmentShaderBarycentric: u32;
 }
 
 struct VkPhysicalDeviceShaderImageFootprintFeaturesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_IMAGE_FOOTPRINT_FEATURES_NV;
     pNext: void*;
     imageFootprint: u32;
 }
 
 struct VkPipelineViewportExclusiveScissorStateCreateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_EXCLUSIVE_SCISSOR_STATE_CREATE_INFO_NV;
     pNext: void*;
     exclusiveScissorCount: u32;
     pExclusiveScissors: VkRect2D*;
 }
 
 struct VkPhysicalDeviceExclusiveScissorFeaturesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXCLUSIVE_SCISSOR_FEATURES_NV;
     pNext: void*;
     exclusiveScissor: u32;
 }
@@ -8198,13 +8199,13 @@ interface PFN_vkCmdSetExclusiveScissorNV(VkCommandBuffer* commandBuffer, u32 fir
 vkCmdSetExclusiveScissorNV(VkCommandBuffer* commandBuffer, u32 firstExclusiveScissor, u32 exclusiveScissorCount, VkRect2D* pExclusiveScissors) #extern "vulkan"
 
 struct VkQueueFamilyCheckpointPropertiesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_QUEUE_FAMILY_CHECKPOINT_PROPERTIES_NV;
     pNext: void*;
     checkpointExecutionStageMask: u32;
 }
 
 struct VkCheckpointDataNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_CHECKPOINT_DATA_NV;
     pNext: void*;
     stage: VkPipelineStageFlagBits;
     pCheckpointMarker: void*;
@@ -8219,7 +8220,7 @@ vkCmdSetCheckpointNV(VkCommandBuffer* commandBuffer, void* pCheckpointMarker) #e
 vkGetQueueCheckpointDataNV(VkQueue* queue, u32* pCheckpointDataCount, VkCheckpointDataNV* pCheckpointData) #extern "vulkan"
 
 struct VkPhysicalDeviceShaderIntegerFunctions2FeaturesINTEL {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_FUNCTIONS_2_FEATURES_INTEL;
     pNext: void*;
     shaderIntegerFunctions2: u32;
 }
@@ -8270,31 +8271,31 @@ struct VkPerformanceValueINTEL {
 }
 
 struct VkInitializePerformanceApiInfoINTEL {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_INITIALIZE_PERFORMANCE_API_INFO_INTEL;
     pNext: void*;
     pUserData: void*;
 }
 
 struct VkQueryPoolPerformanceQueryCreateInfoINTEL {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_QUERY_POOL_PERFORMANCE_QUERY_CREATE_INFO_INTEL;
     pNext: void*;
     performanceCountersSampling: VkQueryPoolSamplingModeINTEL;
 }
 
 struct VkPerformanceMarkerInfoINTEL {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PERFORMANCE_MARKER_INFO_INTEL;
     pNext: void*;
     marker: u64;
 }
 
 struct VkPerformanceStreamMarkerInfoINTEL {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PERFORMANCE_STREAM_MARKER_INFO_INTEL;
     pNext: void*;
     marker: u32;
 }
 
 struct VkPerformanceOverrideInfoINTEL {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PERFORMANCE_OVERRIDE_INFO_INTEL;
     pNext: void*;
     type: VkPerformanceOverrideTypeINTEL;
     enable: u32;
@@ -8302,7 +8303,7 @@ struct VkPerformanceOverrideInfoINTEL {
 }
 
 struct VkPerformanceConfigurationAcquireInfoINTEL {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PERFORMANCE_CONFIGURATION_ACQUIRE_INFO_INTEL;
     pNext: void*;
     type: VkPerformanceConfigurationTypeINTEL;
 }
@@ -8344,7 +8345,7 @@ VkResult vkQueueSetPerformanceConfigurationINTEL(VkQueue* queue, VkPerformanceCo
 VkResult vkGetPerformanceParameterINTEL(VkDevice* device, VkPerformanceParameterTypeINTEL parameter, VkPerformanceValueINTEL* pValue) #extern "vulkan"
 
 struct VkPhysicalDevicePCIBusInfoPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PCI_BUS_INFO_PROPERTIES_EXT;
     pNext: void*;
     pciDomain: u32;
     pciBus: u32;
@@ -8353,13 +8354,13 @@ struct VkPhysicalDevicePCIBusInfoPropertiesEXT {
 }
 
 struct VkDisplayNativeHdrSurfaceCapabilitiesAMD {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DISPLAY_NATIVE_HDR_SURFACE_CAPABILITIES_AMD;
     pNext: void*;
     localDimmingSupport: u32;
 }
 
 struct VkSwapchainDisplayNativeHdrCreateInfoAMD {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SWAPCHAIN_DISPLAY_NATIVE_HDR_CREATE_INFO_AMD;
     pNext: void*;
     localDimmingEnable: u32;
 }
@@ -8369,7 +8370,7 @@ interface PFN_vkSetLocalDimmingAMD(VkDevice* device, VkSwapchainKHR* swapChain, 
 vkSetLocalDimmingAMD(VkDevice* device, VkSwapchainKHR* swapChain, u32 localDimmingEnable) #extern "vulkan"
 
 struct VkPhysicalDeviceFragmentDensityMapFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_DENSITY_MAP_FEATURES_EXT;
     pNext: void*;
     fragmentDensityMap: u32;
     fragmentDensityMapDynamic: u32;
@@ -8377,7 +8378,7 @@ struct VkPhysicalDeviceFragmentDensityMapFeaturesEXT {
 }
 
 struct VkPhysicalDeviceFragmentDensityMapPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_DENSITY_MAP_PROPERTIES_EXT;
     pNext: void*;
     minFragmentDensityTexelSize: VkExtent2D;
     maxFragmentDensityTexelSize: VkExtent2D;
@@ -8385,20 +8386,20 @@ struct VkPhysicalDeviceFragmentDensityMapPropertiesEXT {
 }
 
 struct VkRenderPassFragmentDensityMapCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_RENDER_PASS_FRAGMENT_DENSITY_MAP_CREATE_INFO_EXT;
     pNext: void*;
     fragmentDensityMapAttachment: VkAttachmentReference;
 }
 
 struct VkPhysicalDeviceSubgroupSizeControlFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_FEATURES_EXT;
     pNext: void*;
     subgroupSizeControl: u32;
     computeFullSubgroups: u32;
 }
 
 struct VkPhysicalDeviceSubgroupSizeControlPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_PROPERTIES_EXT;
     pNext: void*;
     minSubgroupSize: u32;
     maxSubgroupSize: u32;
@@ -8407,7 +8408,7 @@ struct VkPhysicalDeviceSubgroupSizeControlPropertiesEXT {
 }
 
 struct VkPipelineShaderStageRequiredSubgroupSizeCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO_EXT;
     pNext: void*;
     requiredSubgroupSize: u32;
 }
@@ -8417,52 +8418,52 @@ enum VkShaderCorePropertiesFlagBitsAMD {
 }
 
 struct VkPhysicalDeviceShaderCoreProperties2AMD {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CORE_PROPERTIES_2_AMD;
     pNext: void*;
     shaderCoreFeatures: u32;
     activeComputeUnitCount: u32;
 }
 
 struct VkPhysicalDeviceCoherentMemoryFeaturesAMD {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COHERENT_MEMORY_FEATURES_AMD;
     pNext: void*;
     deviceCoherentMemory: u32;
 }
 
 struct VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_IMAGE_ATOMIC_INT64_FEATURES_EXT;
     pNext: void*;
     shaderImageInt64Atomics: u32;
     sparseImageInt64Atomics: u32;
 }
 
 struct VkPhysicalDeviceMemoryBudgetPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT;
     pNext: void*;
     heapBudget: CArray<u64>[16];
     heapUsage: CArray<u64>[16];
 }
 
 struct VkPhysicalDeviceMemoryPriorityFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PRIORITY_FEATURES_EXT;
     pNext: void*;
     memoryPriority: u32;
 }
 
 struct VkMemoryPriorityAllocateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_MEMORY_PRIORITY_ALLOCATE_INFO_EXT;
     pNext: void*;
     priority: float;
 }
 
 struct VkPhysicalDeviceDedicatedAllocationImageAliasingFeaturesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEDICATED_ALLOCATION_IMAGE_ALIASING_FEATURES_NV;
     pNext: void*;
     dedicatedAllocationImageAliasing: u32;
 }
 
 struct VkPhysicalDeviceBufferDeviceAddressFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_EXT;
     pNext: void*;
     bufferDeviceAddress: u32;
     bufferDeviceAddressCaptureReplay: u32;
@@ -8470,7 +8471,7 @@ struct VkPhysicalDeviceBufferDeviceAddressFeaturesEXT {
 }
 
 struct VkBufferDeviceAddressCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_CREATE_INFO_EXT;
     pNext: void*;
     deviceAddress: u64;
 }
@@ -8491,7 +8492,7 @@ enum VkToolPurposeFlagBitsEXT {
 }
 
 struct VkPhysicalDeviceToolPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TOOL_PROPERTIES_EXT;
     pNext: void*;
     name: CArray<u8>[256];
     version: CArray<u8>[256];
@@ -8526,7 +8527,7 @@ enum VkValidationFeatureDisableEXT {
 }
 
 struct VkValidationFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
     pNext: void*;
     enabledValidationFeatureCount: u32;
     pEnabledValidationFeatures: VkValidationFeatureEnableEXT*;
@@ -8558,7 +8559,7 @@ enum VkScopeNV {
 }
 
 struct VkCooperativeMatrixPropertiesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_PROPERTIES_NV;
     pNext: void*;
     MSize: u32;
     NSize: u32;
@@ -8571,14 +8572,14 @@ struct VkCooperativeMatrixPropertiesNV {
 }
 
 struct VkPhysicalDeviceCooperativeMatrixFeaturesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_FEATURES_NV;
     pNext: void*;
     cooperativeMatrix: u32;
     cooperativeMatrixRobustBufferAccess: u32;
 }
 
 struct VkPhysicalDeviceCooperativeMatrixPropertiesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_PROPERTIES_NV;
     pNext: void*;
     cooperativeMatrixSupportedStages: u32;
 }
@@ -8594,20 +8595,20 @@ enum VkCoverageReductionModeNV {
 }
 
 struct VkPhysicalDeviceCoverageReductionModeFeaturesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COVERAGE_REDUCTION_MODE_FEATURES_NV;
     pNext: void*;
     coverageReductionMode: u32;
 }
 
 struct VkPipelineCoverageReductionStateCreateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_COVERAGE_REDUCTION_STATE_CREATE_INFO_NV;
     pNext: void*;
     flags: u32;
     coverageReductionMode: VkCoverageReductionModeNV;
 }
 
 struct VkFramebufferMixedSamplesCombinationNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_FRAMEBUFFER_MIXED_SAMPLES_COMBINATION_NV;
     pNext: void*;
     coverageReductionMode: VkCoverageReductionModeNV;
     rasterizationSamples: VkSampleCountFlagBits;
@@ -8620,7 +8621,7 @@ interface VkResult PFN_vkGetPhysicalDeviceSupportedFramebufferMixedSamplesCombin
 VkResult vkGetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV(VkPhysicalDevice* physicalDevice, u32* pCombinationCount, VkFramebufferMixedSamplesCombinationNV* pCombinations) #extern "vulkan"
 
 struct VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT;
     pNext: void*;
     fragmentShaderSampleInterlock: u32;
     fragmentShaderPixelInterlock: u32;
@@ -8628,7 +8629,7 @@ struct VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT {
 }
 
 struct VkPhysicalDeviceYcbcrImageArraysFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_YCBCR_IMAGE_ARRAYS_FEATURES_EXT;
     pNext: void*;
     ycbcrImageArrays: u32;
 }
@@ -8640,27 +8641,27 @@ enum VkProvokingVertexModeEXT {
 }
 
 struct VkPhysicalDeviceProvokingVertexFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROVOKING_VERTEX_FEATURES_EXT;
     pNext: void*;
     provokingVertexLast: u32;
     transformFeedbackPreservesProvokingVertex: u32;
 }
 
 struct VkPhysicalDeviceProvokingVertexPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROVOKING_VERTEX_PROPERTIES_EXT;
     pNext: void*;
     provokingVertexModePerPipeline: u32;
     transformFeedbackPreservesTriangleFanProvokingVertex: u32;
 }
 
 struct VkPipelineRasterizationProvokingVertexStateCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_PROVOKING_VERTEX_STATE_CREATE_INFO_EXT;
     pNext: void*;
     provokingVertexMode: VkProvokingVertexModeEXT;
 }
 
 struct VkHeadlessSurfaceCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_HEADLESS_SURFACE_CREATE_INFO_EXT;
     pNext: void*;
     flags: u32;
 }
@@ -8678,7 +8679,7 @@ enum VkLineRasterizationModeEXT {
 }
 
 struct VkPhysicalDeviceLineRasterizationFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_FEATURES_EXT;
     pNext: void*;
     rectangularLines: u32;
     bresenhamLines: u32;
@@ -8689,13 +8690,13 @@ struct VkPhysicalDeviceLineRasterizationFeaturesEXT {
 }
 
 struct VkPhysicalDeviceLineRasterizationPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_PROPERTIES_EXT;
     pNext: void*;
     lineSubPixelPrecisionBits: u32;
 }
 
 struct VkPipelineRasterizationLineStateCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_LINE_STATE_CREATE_INFO_EXT;
     pNext: void*;
     lineRasterizationMode: VkLineRasterizationModeEXT;
     stippledLineEnable: u32;
@@ -8708,7 +8709,7 @@ interface PFN_vkCmdSetLineStippleEXT(VkCommandBuffer* commandBuffer, u32 lineSti
 vkCmdSetLineStippleEXT(VkCommandBuffer* commandBuffer, u32 lineStippleFactor, u16 lineStipplePattern) #extern "vulkan"
 
 struct VkPhysicalDeviceShaderAtomicFloatFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_FEATURES_EXT;
     pNext: void*;
     shaderBufferFloat32Atomics: u32;
     shaderBufferFloat32AtomicAdd: u32;
@@ -8729,13 +8730,13 @@ interface PFN_vkResetQueryPoolEXT(VkDevice* device, VkQueryPool* queryPool, u32 
 vkResetQueryPoolEXT(VkDevice* device, VkQueryPool* queryPool, u32 firstQuery, u32 queryCount) #extern "vulkan"
 
 struct VkPhysicalDeviceIndexTypeUint8FeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INDEX_TYPE_UINT8_FEATURES_EXT;
     pNext: void*;
     indexTypeUint8: u32;
 }
 
 struct VkPhysicalDeviceExtendedDynamicStateFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
     pNext: void*;
     extendedDynamicState: u32;
 }
@@ -8789,7 +8790,7 @@ vkCmdSetStencilTestEnableEXT(VkCommandBuffer* commandBuffer, u32 stencilTestEnab
 vkCmdSetStencilOpEXT(VkCommandBuffer* commandBuffer, u32 faceMask, VkStencilOp failOp, VkStencilOp passOp, VkStencilOp depthFailOp, VkCompareOp compareOp) #extern "vulkan"
 
 struct VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_2_FEATURES_EXT;
     pNext: void*;
     shaderBufferFloat16Atomics: u32;
     shaderBufferFloat16AtomicAdd: u32;
@@ -8806,7 +8807,7 @@ struct VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT {
 }
 
 struct VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES_EXT;
     pNext: void*;
     shaderDemoteToHelperInvocation: u32;
 }
@@ -8837,7 +8838,7 @@ enum VkIndirectCommandsLayoutUsageFlagBitsNV {
 }
 
 struct VkPhysicalDeviceDeviceGeneratedCommandsPropertiesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEVICE_GENERATED_COMMANDS_PROPERTIES_NV;
     pNext: void*;
     maxGraphicsShaderGroupCount: u32;
     maxIndirectSequenceCount: u32;
@@ -8851,13 +8852,13 @@ struct VkPhysicalDeviceDeviceGeneratedCommandsPropertiesNV {
 }
 
 struct VkPhysicalDeviceDeviceGeneratedCommandsFeaturesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEVICE_GENERATED_COMMANDS_FEATURES_NV;
     pNext: void*;
     deviceGeneratedCommands: u32;
 }
 
 struct VkGraphicsShaderGroupCreateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_GRAPHICS_SHADER_GROUP_CREATE_INFO_NV;
     pNext: void*;
     stageCount: u32;
     pStages: VkPipelineShaderStageCreateInfo*;
@@ -8866,7 +8867,7 @@ struct VkGraphicsShaderGroupCreateInfoNV {
 }
 
 struct VkGraphicsPipelineShaderGroupsCreateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_SHADER_GROUPS_CREATE_INFO_NV;
     pNext: void*;
     groupCount: u32;
     pGroups: VkGraphicsShaderGroupCreateInfoNV*;
@@ -8900,7 +8901,7 @@ struct VkIndirectCommandsStreamNV {
 }
 
 struct VkIndirectCommandsLayoutTokenNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_INDIRECT_COMMANDS_LAYOUT_TOKEN_NV;
     pNext: void*;
     tokenType: VkIndirectCommandsTokenTypeNV;
     stream: u32;
@@ -8918,7 +8919,7 @@ struct VkIndirectCommandsLayoutTokenNV {
 }
 
 struct VkIndirectCommandsLayoutCreateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_INDIRECT_COMMANDS_LAYOUT_CREATE_INFO_NV;
     pNext: void*;
     flags: u32;
     pipelineBindPoint: VkPipelineBindPoint;
@@ -8929,7 +8930,7 @@ struct VkIndirectCommandsLayoutCreateInfoNV {
 }
 
 struct VkGeneratedCommandsInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_GENERATED_COMMANDS_INFO_NV;
     pNext: void*;
     pipelineBindPoint: VkPipelineBindPoint;
     pipeline: VkPipeline*;
@@ -8947,7 +8948,7 @@ struct VkGeneratedCommandsInfoNV {
 }
 
 struct VkGeneratedCommandsMemoryRequirementsInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_GENERATED_COMMANDS_MEMORY_REQUIREMENTS_INFO_NV;
     pNext: void*;
     pipelineBindPoint: VkPipelineBindPoint;
     pipeline: VkPipeline*;
@@ -8980,13 +8981,13 @@ VkResult vkCreateIndirectCommandsLayoutNV(VkDevice* device, VkIndirectCommandsLa
 vkDestroyIndirectCommandsLayoutNV(VkDevice* device, VkIndirectCommandsLayoutNV* indirectCommandsLayout, VkAllocationCallbacks* pAllocator) #extern "vulkan"
 
 struct VkPhysicalDeviceInheritedViewportScissorFeaturesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INHERITED_VIEWPORT_SCISSOR_FEATURES_NV;
     pNext: void*;
     inheritedViewportScissor2D: u32;
 }
 
 struct VkCommandBufferInheritanceViewportScissorInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_VIEWPORT_SCISSOR_INFO_NV;
     pNext: void*;
     viewportScissor2D: u32;
     viewportDepthCount: u32;
@@ -8994,13 +8995,13 @@ struct VkCommandBufferInheritanceViewportScissorInfoNV {
 }
 
 struct VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_FEATURES_EXT;
     pNext: void*;
     texelBufferAlignment: u32;
 }
 
 struct VkPhysicalDeviceTexelBufferAlignmentPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_PROPERTIES_EXT;
     pNext: void*;
     storageTexelBufferOffsetAlignmentBytes: u64;
     storageTexelBufferOffsetSingleTexelAlignment: u32;
@@ -9009,13 +9010,13 @@ struct VkPhysicalDeviceTexelBufferAlignmentPropertiesEXT {
 }
 
 struct VkRenderPassTransformBeginInfoQCOM {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_RENDER_PASS_TRANSFORM_BEGIN_INFO_QCOM;
     pNext: void*;
     transform: VkSurfaceTransformFlagBitsKHR;
 }
 
 struct VkCommandBufferInheritanceRenderPassTransformInfoQCOM {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDER_PASS_TRANSFORM_INFO_QCOM;
     pNext: void*;
     transform: VkSurfaceTransformFlagBitsKHR;
     renderArea: VkRect2D;
@@ -9031,13 +9032,13 @@ enum VkDeviceMemoryReportEventTypeEXT {
 }
 
 struct VkPhysicalDeviceDeviceMemoryReportFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEVICE_MEMORY_REPORT_FEATURES_EXT;
     pNext: void*;
     deviceMemoryReport: u32;
 }
 
 struct VkDeviceMemoryReportCallbackDataEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEVICE_MEMORY_REPORT_CALLBACK_DATA_EXT;
     pNext: void*;
     flags: u32;
     type: VkDeviceMemoryReportEventTypeEXT;
@@ -9051,7 +9052,7 @@ struct VkDeviceMemoryReportCallbackDataEXT {
 interface PFN_vkDeviceMemoryReportCallbackEXT(VkDeviceMemoryReportCallbackDataEXT* pCallbackData, void* pUserData)
 
 struct VkDeviceDeviceMemoryReportCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEVICE_DEVICE_MEMORY_REPORT_CREATE_INFO_EXT;
     pNext: void*;
     flags: u32;
     pfnUserCallback: PFN_vkDeviceMemoryReportCallbackEXT;
@@ -9067,7 +9068,7 @@ VkResult vkAcquireDrmDisplayEXT(VkPhysicalDevice* physicalDevice, s32 drmFd, VkD
 VkResult vkGetDrmDisplayEXT(VkPhysicalDevice* physicalDevice, s32 drmFd, u32 connectorId, VkDisplayKHR** display) #extern "vulkan"
 
 struct VkPhysicalDeviceRobustness2FeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
     pNext: void*;
     robustBufferAccess2: u32;
     robustImageAccess2: u32;
@@ -9075,51 +9076,52 @@ struct VkPhysicalDeviceRobustness2FeaturesEXT {
 }
 
 struct VkPhysicalDeviceRobustness2PropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_PROPERTIES_EXT;
     pNext: void*;
     robustStorageBufferAccessSizeAlignment: u64;
     robustUniformBufferAccessSizeAlignment: u64;
 }
 
 struct VkSamplerCustomBorderColorCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SAMPLER_CUSTOM_BORDER_COLOR_CREATE_INFO_EXT;
     pNext: void*;
     customBorderColor: VkClearColorValue;
     format: VkFormat;
 }
 
 struct VkPhysicalDeviceCustomBorderColorPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_PROPERTIES_EXT;
     pNext: void*;
     maxCustomBorderColorSamplers: u32;
 }
 
 struct VkPhysicalDeviceCustomBorderColorFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_FEATURES_EXT;
     pNext: void*;
     customBorderColors: u32;
     customBorderColorWithoutFormat: u32;
 }
 
 struct VkPrivateDataSlotEXT {}
+
 enum VkPrivateDataSlotCreateFlagBitsEXT {
     VK_PRIVATE_DATA_SLOT_CREATE_FLAG_BITS_MAX_ENUM_EXT = 0x7FFFFFFF;
 }
 
 struct VkPhysicalDevicePrivateDataFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIVATE_DATA_FEATURES_EXT;
     pNext: void*;
     privateData: u32;
 }
 
 struct VkDevicePrivateDataCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEVICE_PRIVATE_DATA_CREATE_INFO_EXT;
     pNext: void*;
     privateDataSlotRequestCount: u32;
 }
 
 struct VkPrivateDataSlotCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PRIVATE_DATA_SLOT_CREATE_INFO_EXT;
     pNext: void*;
     flags: u32;
 }
@@ -9141,7 +9143,7 @@ VkResult vkSetPrivateDataEXT(VkDevice* device, VkObjectType objectType, u64 obje
 vkGetPrivateDataEXT(VkDevice* device, VkObjectType objectType, u64 objectHandle, VkPrivateDataSlotEXT* privateDataSlot, u64* pData) #extern "vulkan"
 
 struct VkPhysicalDevicePipelineCreationCacheControlFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_CREATION_CACHE_CONTROL_FEATURES_EXT;
     pNext: void*;
     pipelineCreationCacheControl: u32;
 }
@@ -9154,13 +9156,13 @@ enum VkDeviceDiagnosticsConfigFlagBitsNV {
 }
 
 struct VkPhysicalDeviceDiagnosticsConfigFeaturesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DIAGNOSTICS_CONFIG_FEATURES_NV;
     pNext: void*;
     diagnosticsConfig: u32;
 }
 
 struct VkDeviceDiagnosticsConfigCreateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_DEVICE_DIAGNOSTICS_CONFIG_CREATE_INFO_NV;
     pNext: void*;
     flags: u32;
 }
@@ -9188,7 +9190,7 @@ enum VkFragmentShadingRateNV {
 }
 
 struct VkPhysicalDeviceFragmentShadingRateEnumsFeaturesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_ENUMS_FEATURES_NV;
     pNext: void*;
     fragmentShadingRateEnums: u32;
     supersampleFragmentShadingRates: u32;
@@ -9196,13 +9198,13 @@ struct VkPhysicalDeviceFragmentShadingRateEnumsFeaturesNV {
 }
 
 struct VkPhysicalDeviceFragmentShadingRateEnumsPropertiesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_ENUMS_PROPERTIES_NV;
     pNext: void*;
     maxFragmentShadingRateInvocationCount: VkSampleCountFlagBits;
 }
 
 struct VkPipelineFragmentShadingRateEnumStateCreateInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_FRAGMENT_SHADING_RATE_ENUM_STATE_CREATE_INFO_NV;
     pNext: void*;
     shadingRateType: VkFragmentShadingRateTypeNV;
     shadingRate: VkFragmentShadingRateNV;
@@ -9226,13 +9228,13 @@ union VkDeviceOrHostAddressConstKHR {
 }
 
 struct VkAccelerationStructureGeometryMotionTrianglesDataNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_MOTION_TRIANGLES_DATA_NV;
     pNext: void*;
     vertexData: VkDeviceOrHostAddressConstKHR;
 }
 
 struct VkAccelerationStructureMotionInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MOTION_INFO_NV;
     pNext: void*;
     maxInstances: u32;
     flags: u32;
@@ -9292,26 +9294,26 @@ struct VkAccelerationStructureMotionInstanceNV {
 }
 
 struct VkPhysicalDeviceRayTracingMotionBlurFeaturesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_MOTION_BLUR_FEATURES_NV;
     pNext: void*;
     rayTracingMotionBlur: u32;
     rayTracingMotionBlurPipelineTraceRaysIndirect: u32;
 }
 
 struct VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_YCBCR_2_PLANE_444_FORMATS_FEATURES_EXT;
     pNext: void*;
     ycbcr2plane444Formats: u32;
 }
 
 struct VkPhysicalDeviceFragmentDensityMap2FeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_DENSITY_MAP_2_FEATURES_EXT;
     pNext: void*;
     fragmentDensityMapDeferred: u32;
 }
 
 struct VkPhysicalDeviceFragmentDensityMap2PropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_DENSITY_MAP_2_PROPERTIES_EXT;
     pNext: void*;
     subsampledLoads: u32;
     subsampledCoarseReconstructionEarlyAccess: u32;
@@ -9320,19 +9322,19 @@ struct VkPhysicalDeviceFragmentDensityMap2PropertiesEXT {
 }
 
 struct VkCopyCommandTransformInfoQCOM {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_COPY_COMMAND_TRANSFORM_INFO_QCOM;
     pNext: void*;
     transform: VkSurfaceTransformFlagBitsKHR;
 }
 
 struct VkPhysicalDeviceImageRobustnessFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_ROBUSTNESS_FEATURES_EXT;
     pNext: void*;
     robustImageAccess: u32;
 }
 
 struct VkPhysicalDevice4444FormatsFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_4444_FORMATS_FEATURES_EXT;
     pNext: void*;
     formatA4R4G4B4: u32;
     formatA4B4G4R4: u32;
@@ -9347,7 +9349,7 @@ VkResult vkAcquireWinrtDisplayNV(VkPhysicalDevice* physicalDevice, VkDisplayKHR*
 VkResult vkGetWinrtDisplayNV(VkPhysicalDevice* physicalDevice, u32 deviceRelativeId, VkDisplayKHR** pDisplay) #extern "vulkan"
 
 struct VkPhysicalDeviceMutableDescriptorTypeFeaturesVALVE {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MUTABLE_DESCRIPTOR_TYPE_FEATURES_VALVE;
     pNext: void*;
     mutableDescriptorType: u32;
 }
@@ -9358,20 +9360,20 @@ struct VkMutableDescriptorTypeListVALVE {
 }
 
 struct VkMutableDescriptorTypeCreateInfoVALVE {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_MUTABLE_DESCRIPTOR_TYPE_CREATE_INFO_VALVE;
     pNext: void*;
     mutableDescriptorTypeListCount: u32;
     pMutableDescriptorTypeLists: VkMutableDescriptorTypeListVALVE*;
 }
 
 struct VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT;
     pNext: void*;
     vertexInputDynamicState: u32;
 }
 
 struct VkVertexInputBindingDescription2EXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT;
     pNext: void*;
     binding: u32;
     stride: u32;
@@ -9380,7 +9382,7 @@ struct VkVertexInputBindingDescription2EXT {
 }
 
 struct VkVertexInputAttributeDescription2EXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_VERTEX_INPUT_ATTRIBUTE_DESCRIPTION_2_EXT;
     pNext: void*;
     location: u32;
     binding: u32;
@@ -9393,7 +9395,7 @@ interface PFN_vkCmdSetVertexInputEXT(VkCommandBuffer* commandBuffer, u32 vertexB
 vkCmdSetVertexInputEXT(VkCommandBuffer* commandBuffer, u32 vertexBindingDescriptionCount, VkVertexInputBindingDescription2EXT* pVertexBindingDescriptions, u32 vertexAttributeDescriptionCount, VkVertexInputAttributeDescription2EXT* pVertexAttributeDescriptions) #extern "vulkan"
 
 struct VkPhysicalDeviceDrmPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRM_PROPERTIES_EXT;
     pNext: void*;
     hasPrimary: u32;
     hasRender: u32;
@@ -9404,27 +9406,27 @@ struct VkPhysicalDeviceDrmPropertiesEXT {
 }
 
 struct VkPhysicalDevicePrimitiveTopologyListRestartFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIMITIVE_TOPOLOGY_LIST_RESTART_FEATURES_EXT;
     pNext: void*;
     primitiveTopologyListRestart: u32;
     primitiveTopologyPatchListRestart: u32;
 }
 
 struct VkSubpassShadingPipelineCreateInfoHUAWEI {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_SUBPASS_SHADING_PIPELINE_CREATE_INFO_HUAWEI;
     pNext: void*;
     renderPass: VkRenderPass*;
     subpass: u32;
 }
 
 struct VkPhysicalDeviceSubpassShadingFeaturesHUAWEI {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBPASS_SHADING_FEATURES_HUAWEI;
     pNext: void*;
     subpassShading: u32;
 }
 
 struct VkPhysicalDeviceSubpassShadingPropertiesHUAWEI {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBPASS_SHADING_PROPERTIES_HUAWEI;
     pNext: void*;
     maxSubpassShadingWorkgroupSizeAspectRatio: u32;
 }
@@ -9438,7 +9440,7 @@ VkResult vkGetDeviceSubpassShadingMaxWorkgroupSizeHUAWEI(VkDevice* device, VkRen
 vkCmdSubpassShadingHUAWEI(VkCommandBuffer* commandBuffer) #extern "vulkan"
 
 struct VkPhysicalDeviceInvocationMaskFeaturesHUAWEI {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INVOCATION_MASK_FEATURES_HUAWEI;
     pNext: void*;
     invocationMask: u32;
 }
@@ -9448,14 +9450,14 @@ interface PFN_vkCmdBindInvocationMaskHUAWEI(VkCommandBuffer* commandBuffer, VkIm
 vkCmdBindInvocationMaskHUAWEI(VkCommandBuffer* commandBuffer, VkImageView* imageView, VkImageLayout imageLayout) #extern "vulkan"
 
 struct VkMemoryGetRemoteAddressInfoNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_MEMORY_GET_REMOTE_ADDRESS_INFO_NV;
     pNext: void*;
     memory: VkDeviceMemory*;
     handleType: VkExternalMemoryHandleTypeFlagBits;
 }
 
 struct VkPhysicalDeviceExternalMemoryRDMAFeaturesNV {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_RDMA_FEATURES_NV;
     pNext: void*;
     externalMemoryRDMA: u32;
 }
@@ -9465,7 +9467,7 @@ interface VkResult PFN_vkGetMemoryRemoteAddressNV(VkDevice* device, VkMemoryGetR
 VkResult vkGetMemoryRemoteAddressNV(VkDevice* device, VkMemoryGetRemoteAddressInfoNV* pMemoryGetRemoteAddressInfo, void** pAddress) #extern "vulkan"
 
 struct VkPhysicalDeviceExtendedDynamicState2FeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT;
     pNext: void*;
     extendedDynamicState2: u32;
     extendedDynamicState2LogicOp: u32;
@@ -9493,13 +9495,13 @@ vkCmdSetLogicOpEXT(VkCommandBuffer* commandBuffer, VkLogicOp logicOp) #extern "v
 vkCmdSetPrimitiveRestartEnableEXT(VkCommandBuffer* commandBuffer, u32 primitiveRestartEnable) #extern "vulkan"
 
 struct VkPhysicalDeviceColorWriteEnableFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COLOR_WRITE_ENABLE_FEATURES_EXT;
     pNext: void*;
     colorWriteEnable: u32;
 }
 
 struct VkPipelineColorWriteCreateInfoEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PIPELINE_COLOR_WRITE_CREATE_INFO_EXT;
     pNext: void*;
     attachmentCount: u32;
     pColorWriteEnables: u32*;
@@ -9510,26 +9512,26 @@ interface PFN_vkCmdSetColorWriteEnableEXT(VkCommandBuffer* commandBuffer, u32 at
 vkCmdSetColorWriteEnableEXT(VkCommandBuffer* commandBuffer, u32 attachmentCount, u32* pColorWriteEnables) #extern "vulkan"
 
 struct VkPhysicalDeviceGlobalPriorityQueryFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GLOBAL_PRIORITY_QUERY_FEATURES_EXT;
     pNext: void*;
     globalPriorityQuery: u32;
 }
 
 struct VkQueueFamilyGlobalPriorityPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_QUEUE_FAMILY_GLOBAL_PRIORITY_PROPERTIES_EXT;
     pNext: void*;
     priorityCount: u32;
     priorities: CArray<VkQueueGlobalPriorityEXT>[16];
 }
 
 struct VkPhysicalDeviceMultiDrawFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTI_DRAW_FEATURES_EXT;
     pNext: void*;
     multiDraw: u32;
 }
 
 struct VkPhysicalDeviceMultiDrawPropertiesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTI_DRAW_PROPERTIES_EXT;
     pNext: void*;
     maxMultiDrawCount: u32;
 }
@@ -9554,7 +9556,7 @@ vkCmdDrawMultiEXT(VkCommandBuffer* commandBuffer, u32 drawCount, VkMultiDrawInfo
 vkCmdDrawMultiIndexedEXT(VkCommandBuffer* commandBuffer, u32 drawCount, VkMultiDrawIndexedInfoEXT* pIndexInfo, u32 instanceCount, u32 firstInstance, u32 stride, s32* pVertexOffset) #extern "vulkan"
 
 struct VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PAGEABLE_DEVICE_LOCAL_MEMORY_FEATURES_EXT;
     pNext: void*;
     pageableDeviceLocalMemory: u32;
 }
@@ -9603,7 +9605,7 @@ struct VkAccelerationStructureBuildRangeInfoKHR {
 }
 
 struct VkAccelerationStructureGeometryTrianglesDataKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
     pNext: void*;
     vertexFormat: VkFormat;
     vertexData: VkDeviceOrHostAddressConstKHR;
@@ -9615,14 +9617,14 @@ struct VkAccelerationStructureGeometryTrianglesDataKHR {
 }
 
 struct VkAccelerationStructureGeometryAabbsDataKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR;
     pNext: void*;
     data: VkDeviceOrHostAddressConstKHR;
     stride: u64;
 }
 
 struct VkAccelerationStructureGeometryInstancesDataKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
     pNext: void*;
     arrayOfPointers: u32;
     data: VkDeviceOrHostAddressConstKHR;
@@ -9635,7 +9637,7 @@ union VkAccelerationStructureGeometryDataKHR {
 }
 
 struct VkAccelerationStructureGeometryKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
     pNext: void*;
     geometryType: VkGeometryTypeKHR;
     geometry: VkAccelerationStructureGeometryDataKHR;
@@ -9643,7 +9645,7 @@ struct VkAccelerationStructureGeometryKHR {
 }
 
 struct VkAccelerationStructureBuildGeometryInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
     pNext: void*;
     type: VkAccelerationStructureTypeKHR;
     flags: u32;
@@ -9657,7 +9659,7 @@ struct VkAccelerationStructureBuildGeometryInfoKHR {
 }
 
 struct VkAccelerationStructureCreateInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
     pNext: void*;
     createFlags: u32;
     buffer: VkBuffer*;
@@ -9668,14 +9670,14 @@ struct VkAccelerationStructureCreateInfoKHR {
 }
 
 struct VkWriteDescriptorSetAccelerationStructureKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
     pNext: void*;
     accelerationStructureCount: u32;
     pAccelerationStructures: VkAccelerationStructureKHR**;
 }
 
 struct VkPhysicalDeviceAccelerationStructureFeaturesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
     pNext: void*;
     accelerationStructure: u32;
     accelerationStructureCaptureReplay: u32;
@@ -9685,7 +9687,7 @@ struct VkPhysicalDeviceAccelerationStructureFeaturesKHR {
 }
 
 struct VkPhysicalDeviceAccelerationStructurePropertiesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR;
     pNext: void*;
     maxGeometryCount: u64;
     maxInstanceCount: u64;
@@ -9698,19 +9700,19 @@ struct VkPhysicalDeviceAccelerationStructurePropertiesKHR {
 }
 
 struct VkAccelerationStructureDeviceAddressInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
     pNext: void*;
     accelerationStructure: VkAccelerationStructureKHR*;
 }
 
 struct VkAccelerationStructureVersionInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_VERSION_INFO_KHR;
     pNext: void*;
     pVersionData: u8*;
 }
 
 struct VkCopyAccelerationStructureToMemoryInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_COPY_ACCELERATION_STRUCTURE_TO_MEMORY_INFO_KHR;
     pNext: void*;
     src: VkAccelerationStructureKHR*;
     dst: VkDeviceOrHostAddressKHR;
@@ -9718,7 +9720,7 @@ struct VkCopyAccelerationStructureToMemoryInfoKHR {
 }
 
 struct VkCopyMemoryToAccelerationStructureInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_COPY_MEMORY_TO_ACCELERATION_STRUCTURE_INFO_KHR;
     pNext: void*;
     src: VkDeviceOrHostAddressConstKHR;
     dst: VkAccelerationStructureKHR*;
@@ -9726,7 +9728,7 @@ struct VkCopyMemoryToAccelerationStructureInfoKHR {
 }
 
 struct VkCopyAccelerationStructureInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_COPY_ACCELERATION_STRUCTURE_INFO_KHR;
     pNext: void*;
     src: VkAccelerationStructureKHR*;
     dst: VkAccelerationStructureKHR*;
@@ -9734,7 +9736,7 @@ struct VkCopyAccelerationStructureInfoKHR {
 }
 
 struct VkAccelerationStructureBuildSizesInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
     pNext: void*;
     accelerationStructureSize: u64;
     updateScratchSize: u64;
@@ -9814,7 +9816,7 @@ enum VkShaderGroupShaderKHR {
 }
 
 struct VkRayTracingShaderGroupCreateInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
     pNext: void*;
     type: VkRayTracingShaderGroupTypeKHR;
     generalShader: u32;
@@ -9825,14 +9827,14 @@ struct VkRayTracingShaderGroupCreateInfoKHR {
 }
 
 struct VkRayTracingPipelineInterfaceCreateInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_INTERFACE_CREATE_INFO_KHR;
     pNext: void*;
     maxPipelineRayPayloadSize: u32;
     maxPipelineRayHitAttributeSize: u32;
 }
 
 struct VkRayTracingPipelineCreateInfoKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
     pNext: void*;
     flags: u32;
     stageCount: u32;
@@ -9849,7 +9851,7 @@ struct VkRayTracingPipelineCreateInfoKHR {
 }
 
 struct VkPhysicalDeviceRayTracingPipelineFeaturesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
     pNext: void*;
     rayTracingPipeline: u32;
     rayTracingPipelineShaderGroupHandleCaptureReplay: u32;
@@ -9859,7 +9861,7 @@ struct VkPhysicalDeviceRayTracingPipelineFeaturesKHR {
 }
 
 struct VkPhysicalDeviceRayTracingPipelinePropertiesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
     pNext: void*;
     shaderGroupHandleSize: u32;
     maxRayRecursionDepth: u32;
@@ -9908,7 +9910,7 @@ u64 vkGetRayTracingShaderGroupStackSizeKHR(VkDevice* device, VkPipeline* pipelin
 vkCmdSetRayTracingPipelineStackSizeKHR(VkCommandBuffer* commandBuffer, u32 pipelineStackSize) #extern "vulkan"
 
 struct VkPhysicalDeviceRayQueryFeaturesKHR {
-    sType := VkStructureType.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
     pNext: void*;
     rayQuery: u32;
 }
