@@ -1167,7 +1167,7 @@ public static class TypeChecker
             }
             else if (argument.Type == null)
             {
-                ErrorReporter.Report($"Type '{PrintTypeDefinition(argument.TypeDefinition)}' of argument '{argument.Name}' in interfaceAst '{interfaceAst.Name}' is not defined", argument.TypeDefinition);
+                ErrorReporter.Report($"Type '{PrintTypeDefinition(argument.TypeDefinition)}' of argument '{argument.Name}' in interface '{interfaceAst.Name}' is not defined", argument.TypeDefinition);
             }
         }
 

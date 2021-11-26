@@ -1,3 +1,25 @@
+#import compiler
+
+#if os == OS.Linux {
+    #import X11
+
+    struct VkXlibSurfaceCreateInfoKHR {
+        sType := VkStructureType.VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
+        pNext: void*;
+        flags: u32;
+        dpy: Display*;
+        window: u64;
+    }
+
+    interface VkResult PFN_vkCreateXlibSurfaceKHR(VkInstance* instance, VkXlibSurfaceCreateInfoKHR* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSurfaceKHR** pSurface)
+
+    interface u32 PFN_vkGetPhysicalDeviceXlibPresentationSupportKHR(VkPhysicalDevice* physicalDevice, u32 queueFamilyIndex, Display* dpy, u64 visualID)
+
+    VkResult vkCreateXlibSurfaceKHR(VkInstance* instance, VkXlibSurfaceCreateInfoKHR* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSurfaceKHR** pSurface) #extern "vulkan"
+
+    u32 vkGetPhysicalDeviceXlibPresentationSupportKHR(VkPhysicalDevice* physicalDevice, u32 queueFamilyIndex, Display* dpy, u64 visualID) #extern "vulkan"
+}
+
 VK_TRUE := 1; #const
 VK_FALSE := 0; #const
 
@@ -5119,6 +5141,7 @@ u64 vkGetBufferOpaqueCaptureAddress(VkDevice* device, VkBufferDeviceAddressInfo*
 u64 vkGetDeviceMemoryOpaqueCaptureAddress(VkDevice* device, VkDeviceMemoryOpaqueCaptureAddressInfo* pInfo) #extern "vulkan"
 
 struct VkSurfaceKHR {}
+
 enum VkPresentModeKHR {
     VK_PRESENT_MODE_IMMEDIATE_KHR = 0;
     VK_PRESENT_MODE_MAILBOX_KHR = 1;
