@@ -693,7 +693,6 @@ public static class TypeChecker
                 }
 
                 structField.Offset = structAst.Size;
-                structField.Size = structField.Type.Size;
                 structAst.Size += structField.Type.Size;
             }
         }

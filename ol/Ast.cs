@@ -129,7 +129,6 @@ public class StructFieldAst : IDeclaration
     public uint Column { get; init; }
     public string Name { get; set; }
     public uint Offset { get; set; }
-    public uint Size { get; set; }
     public TypeDefinition TypeDefinition { get; set; }
     public IType Type { get; set; }
     public IType ArrayElementType { get; set; }

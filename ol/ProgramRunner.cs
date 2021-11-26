@@ -421,7 +421,7 @@ public static unsafe class ProgramRunner
                     var pointer = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
                     var value = GetValue(instruction.Value2, registers, stackPointer, function, arguments);
 
-                    switch (instruction.Value2.Type.TypeKind)
+                    switch (instruction.Value1.Type.TypeKind)
                     {
                         case TypeKind.Boolean:
                             Marshal.StructureToPtr(value.Byte, pointer.Pointer, false);
