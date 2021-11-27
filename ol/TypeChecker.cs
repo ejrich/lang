@@ -4280,6 +4280,12 @@ public static class TypeChecker
         {
             // Cannot assign interfaces to interface types
             if (source is InterfaceAst) return false;
+            if (source.TypeKind == TypeKind.Pointer)
+            {
+                var primitive = (PrimitiveAst)source;
+                return primitive.PointerType == TypeTable.VoidType;
+            }
+
             if (source is not FunctionAst function) return false;
             if (interfaceAst.ReturnType != function.ReturnType || interfaceAst.Arguments.Count != function.Arguments.Count) return false;
 

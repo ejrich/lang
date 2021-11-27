@@ -31,6 +31,7 @@ public static unsafe class ProgramRunner
     private static ConstructorInfo _dllImportConstructor;
     private static readonly Dictionary<string, CustomAttributeBuilder> _libraries = new();
     private static readonly Dictionary<string, List<MethodInfo>> _externFunctions = new();
+    private static readonly Dictionary<string, Type> _functionPointerDelegateTypes = new();
 
     private static int _typeCount;
     private static IntPtr _typeTablePointer;
@@ -174,7 +175,7 @@ public static unsafe class ProgramRunner
                 }
                 else if (variable.InitialValue != null)
                 {
-                     InitializeGlobalVariable(pointer, variable.InitialValue);
+                    InitializeGlobalVariable(pointer, variable.InitialValue);
                 }
 
                 _globals[i] = pointer;
@@ -498,9 +499,22 @@ public static unsafe class ProgramRunner
                 case InstructionType.CallFunctionPointer:
                 {
                     var functionPointer = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
-                    var functionHandle = GCHandle.FromIntPtr(functionPointer.Pointer);
-                    var callingFunction = functionHandle.Target as FunctionIR;
-                    registers[instruction.ValueIndex] = MakeCall(callingFunction, instruction.Value2.Values, registers, stackPointer, function, arguments, instruction.Index);
+                    try
+                    {
+                        var functionHandle = GCHandle.FromIntPtr(functionPointer.Pointer);
+                        var callingFunction = functionHandle.Target as FunctionIR;
+                        registers[instruction.ValueIndex] = MakeCall(callingFunction, instruction.Value2.Values, registers, stackPointer, function, arguments, instruction.Index);
+                    }
+                    catch (NullReferenceException)
+                    {
+                        var interfaceAst = (InterfaceAst)instruction.Value1.Type;
+                        var delegateType = CreateDelegateType(interfaceAst);
+                        var functionDelegate = Marshal.GetDelegateForFunctionPointer(functionPointer.Pointer, delegateType);
+
+                        var args = GetExternArguments(instruction.Value2.Values, registers, stackPointer, function, arguments);
+
+                        registers[instruction.ValueIndex] = (Register)functionDelegate.DynamicInvoke(args);
+                    }
                     break;
                 }
                 case InstructionType.IntegerExtend:
@@ -1328,50 +1342,7 @@ public static unsafe class ProgramRunner
     {
         if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Extern))
         {
-            var args = new object[arguments.Length];
-            for (var i = 0; i < args.Length; i++)
-            {
-                var argument = arguments[i];
-                var value = GetValue(argument, registers, stackPointer, function, functionArgs);
-
-                switch (argument.Type.TypeKind)
-                {
-                    case TypeKind.Boolean:
-                        args[i] = value.Bool;
-                        break;
-                    case TypeKind.Integer:
-                    case TypeKind.Enum:
-                        switch (argument.Type.Size)
-                        {
-                            case 1:
-                                args[i] = value.Byte;
-                                break;
-                            case 2:
-                                args[i] = value.UShort;
-                                break;
-                            case 8:
-                                args[i] = value.ULong;
-                                break;
-                            default:
-                                args[i] = value.UInteger;
-                                break;
-                        }
-                        break;
-                    case TypeKind.Float:
-                        if (argument.Type.Size == 4)
-                        {
-                            args[i] = value.Float;
-                        }
-                        else
-                        {
-                            args[i] = value.Double;
-                        }
-                        break;
-                    default:
-                        args[i] = value.Pointer;
-                        break;
-                }
-            }
+            var args = GetExternArguments(arguments, registers, stackPointer, function, functionArgs);
 
             var functionDecl = _externFunctions[callingFunction.Source.Name][externIndex];
             var returnValue = functionDecl.Invoke(null, args);
@@ -1419,6 +1390,56 @@ public static unsafe class ProgramRunner
         }
     }
 
+    private static object[] GetExternArguments(InstructionValue[] arguments, Register[] registers, IntPtr stackPointer, FunctionIR function, Register[] functionArgs)
+    {
+        var args = new object[arguments.Length];
+        for (var i = 0; i < args.Length; i++)
+        {
+            var argument = arguments[i];
+            var value = GetValue(argument, registers, stackPointer, function, functionArgs);
+
+            switch (argument.Type.TypeKind)
+            {
+                case TypeKind.Boolean:
+                    args[i] = value.Bool;
+                    break;
+                case TypeKind.Integer:
+                case TypeKind.Enum:
+                    switch (argument.Type.Size)
+                    {
+                        case 1:
+                            args[i] = value.Byte;
+                            break;
+                        case 2:
+                            args[i] = value.UShort;
+                            break;
+                        case 8:
+                            args[i] = value.ULong;
+                            break;
+                        default:
+                            args[i] = value.UInteger;
+                            break;
+                    }
+                    break;
+                case TypeKind.Float:
+                    if (argument.Type.Size == 4)
+                    {
+                        args[i] = value.Float;
+                    }
+                    else
+                    {
+                        args[i] = value.Double;
+                    }
+                    break;
+                default:
+                    args[i] = value.Pointer;
+                    break;
+            }
+        }
+
+        return args;
+    }
+
     private static Register GetIntegerValue(Constant value, PrimitiveAst integerType)
     {
         var register = new Register();
@@ -1462,4 +1483,33 @@ public static unsafe class ProgramRunner
 
         return register;
     }
+
+    // Borrowed from https://source.dot.net/#System.Linq.Expressions/System/Linq/Expressions/Compiler/DelegateHelpers.cs,117 so I don't have to load the function with reflection
+    private static Type CreateDelegateType(InterfaceAst interfaceAst)
+    {
+        if (_functionPointerDelegateTypes.TryGetValue(interfaceAst.Name, out var type))
+        {
+            return type;
+        }
+
+        var argumentTypes = new Type[interfaceAst.Arguments.Count];
+        for (var i = 0; i < argumentTypes.Length; i++)
+        {
+            var argument = interfaceAst.Arguments[i];
+            argumentTypes[i] = GetType(argument.Type);
+        }
+
+        var builder = _moduleBuilder.DefineType(interfaceAst.Name, DelegateTypeAttributes, typeof(MulticastDelegate));
+
+        builder.DefineConstructor(CtorAttributes, CallingConventions.Standard, _delegateCtorSignature).SetImplementationFlags(ImplAttributes);
+        builder.DefineMethod("Invoke", InvokeAttributes, typeof(Register), argumentTypes).SetImplementationFlags(ImplAttributes);
+
+        return _functionPointerDelegateTypes[interfaceAst.Name] = builder.CreateTypeInfo();
+    }
+
+    private const TypeAttributes DelegateTypeAttributes = TypeAttributes.Class | TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.AnsiClass | TypeAttributes.AutoClass;
+    private const MethodAttributes CtorAttributes = MethodAttributes.RTSpecialName | MethodAttributes.HideBySig | MethodAttributes.Public;
+    private const MethodImplAttributes ImplAttributes = MethodImplAttributes.Runtime | MethodImplAttributes.Managed;
+    private const MethodAttributes InvokeAttributes = MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.NewSlot | MethodAttributes.Virtual;
+    private static readonly Type[] _delegateCtorSignature = { typeof(object), typeof(IntPtr) };
 }
