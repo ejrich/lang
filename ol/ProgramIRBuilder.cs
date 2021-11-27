@@ -2215,7 +2215,7 @@ public static class ProgramIRBuilder
 
     private static InstructionValue EmitCastValue(FunctionIR function, InstructionValue value, IType targetType)
     {
-        if (value.Type == targetType || value.UseRawString || targetType.TypeKind == TypeKind.Type || targetType.TypeKind == TypeKind.Interface)
+        if (value.Type == targetType || value.UseRawString || targetType.TypeKind == TypeKind.Type || (targetType.TypeKind == TypeKind.Interface && value.Type.TypeKind != TypeKind.Pointer))
         {
             return value;
         }
@@ -2256,6 +2256,7 @@ public static class ProgramIRBuilder
                 }
                 break;
             case TypeKind.Pointer:
+            case TypeKind.Interface:
                 castInstruction.Type = InstructionType.PointerCast;
                 break;
         }

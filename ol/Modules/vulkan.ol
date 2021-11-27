@@ -3,6 +3,8 @@
 #if os == OS.Linux {
     #import X11
 
+    VK_KHR_XLIB_SURFACE_EXTENSION_NAME := "VK_KHR_xlib_surface"; #const
+
     struct VkXlibSurfaceCreateInfoKHR {
         sType := VkStructureType.VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
         pNext: void*;
@@ -2101,8 +2103,6 @@ interface PFN_vkInternalFreeNotification(void* pUserData, u64 size, VkInternalAl
 
 interface void* PFN_vkReallocationFunction(void* pUserData, void* pOriginal, u64 size, u64 alignment, VkSystemAllocationScope allocationScope)
 
-interface PFN_vkVoidFunction(void a)
-
 struct VkAllocationCallbacks {
     pUserData: void*;
     pfnAllocation: PFN_vkAllocationFunction;
@@ -3129,9 +3129,9 @@ interface PFN_vkGetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice* physica
 
 interface PFN_vkGetPhysicalDeviceMemoryProperties(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceMemoryProperties* pMemoryProperties)
 
-interface PFN_vkVoidFunction PFN_vkGetInstanceProcAddr(VkInstance* instance, u8* pName)
+interface void* PFN_vkGetInstanceProcAddr(VkInstance* instance, u8* pName)
 
-interface PFN_vkVoidFunction PFN_vkGetDeviceProcAddr(VkDevice* device, u8* pName)
+interface void* PFN_vkGetDeviceProcAddr(VkDevice* device, u8* pName)
 
 interface VkResult PFN_vkCreateDevice(VkPhysicalDevice* physicalDevice, VkDeviceCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkDevice** pDevice)
 
@@ -3403,9 +3403,9 @@ vkGetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice* physicalDevice, u32* 
 
 vkGetPhysicalDeviceMemoryProperties(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceMemoryProperties* pMemoryProperties) #extern "vulkan"
 
-PFN_vkVoidFunction vkGetInstanceProcAddr(VkInstance* instance, u8* pName) #extern "vulkan"
+void* vkGetInstanceProcAddr(VkInstance* instance, u8* pName) #extern "vulkan"
 
-PFN_vkVoidFunction vkGetDeviceProcAddr(VkDevice* device, u8* pName) #extern "vulkan"
+void* vkGetDeviceProcAddr(VkDevice* device, u8* pName) #extern "vulkan"
 
 VkResult vkCreateDevice(VkPhysicalDevice* physicalDevice, VkDeviceCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkDevice** pDevice) #extern "vulkan"
 
@@ -5141,6 +5141,8 @@ u64 vkGetBufferOpaqueCaptureAddress(VkDevice* device, VkBufferDeviceAddressInfo*
 u64 vkGetDeviceMemoryOpaqueCaptureAddress(VkDevice* device, VkDeviceMemoryOpaqueCaptureAddressInfo* pInfo) #extern "vulkan"
 
 struct VkSurfaceKHR {}
+
+VK_KHR_SURFACE_EXTENSION_NAME := "VK_KHR_surface"; #const
 
 enum VkPresentModeKHR {
     VK_PRESENT_MODE_IMMEDIATE_KHR = 0;
@@ -7251,6 +7253,9 @@ interface PFN_vkSetHdrMetadataEXT(VkDevice* device, u32 swapchainCount, VkSwapch
 vkSetHdrMetadataEXT(VkDevice* device, u32 swapchainCount, VkSwapchainKHR** pSwapchains, VkHdrMetadataEXT* pMetadata) #extern "vulkan"
 
 struct VkDebugUtilsMessengerEXT {}
+
+VK_EXT_DEBUG_UTILS_EXTENSION_NAME := "VK_EXT_debug_utils"; #const
+
 enum VkDebugUtilsMessageSeverityFlagBitsEXT {
     VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT = 0x00000001;
     VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT = 0x00000010;
@@ -7296,14 +7301,14 @@ struct VkDebugUtilsMessengerCallbackDataEXT {
     pObjects: VkDebugUtilsObjectNameInfoEXT*;
 }
 
-interface u32 PFN_vkDebugUtilsMessengerCallbackEXT(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, u32 messageTypes, VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
+interface u32 PFN_vkDebugUtilsMessengerCallbackEXT(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagBitsEXT messageTypes, VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
 
 struct VkDebugUtilsMessengerCreateInfoEXT {
     sType := VkStructureType.VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
     pNext: void*;
     flags: u32;
-    messageSeverity: u32;
-    messageType: u32;
+    messageSeverity: VkDebugUtilsMessageSeverityFlagBitsEXT;
+    messageType: VkDebugUtilsMessageTypeFlagBitsEXT;
     pfnUserCallback: PFN_vkDebugUtilsMessengerCallbackEXT;
     pUserData: void*;
 }
