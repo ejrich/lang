@@ -14,7 +14,6 @@ public static class TypeChecker
     private static ScopeAst _globalScope;
 
     private static StructAst _baseArrayType;
-    private static IType _rawStringType;
 
     public static void CheckTypes()
     {
@@ -83,6 +82,7 @@ public static class TypeChecker
                                 TypeTable.StringType = structAst;
                                 structAst.TypeKind = TypeKind.String;
                                 VerifyStruct(structAst);
+                                TypeTable.RawStringType ??= TypeTable.Types["*.u8"];
                                 RemoveNode(previous, node);
                             }
                             else if (structAst.Name == "Any")
@@ -906,7 +906,7 @@ public static class TypeChecker
                 }
                 else if (function.Flags.HasFlag(FunctionFlags.Extern) && argument.Type?.TypeKind == TypeKind.String)
                 {
-                    argument.Type = _rawStringType ??= TypeTable.Types["*.u8"];
+                    argument.Type = TypeTable.RawStringType ??= TypeTable.Types["*.u8"];
                 }
             }
 
@@ -2587,7 +2587,7 @@ public static class TypeChecker
                     if (identifier.Name == "data")
                     {
                         structField.RawConstantString = true;
-                        return _rawStringType;
+                        return TypeTable.RawStringType;
                     }
                     ErrorReporter.Report($"Type 'string' does not contain field '{identifier.Name}'", identifier);
                     break;
@@ -3873,7 +3873,7 @@ public static class TypeChecker
         {
             if (externCall && callType.TypeKind == TypeKind.String)
             {
-                if (argumentType != _rawStringType)
+                if (argumentType != TypeTable.RawStringType)
                 {
                     return false;
                 }

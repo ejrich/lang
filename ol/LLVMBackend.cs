@@ -1579,10 +1579,9 @@ public static unsafe class LLVMBackend
                 return LLVMValueRef.CreateConstInt(_types[value.Type.TypeIndex], value.ConstantValue.UnsignedInteger, false);
             case TypeKind.Float:
                 return LLVMValueRef.CreateConstReal(_types[value.Type.TypeIndex], value.ConstantValue.Double);
-            case TypeKind.String:
+            default:
                 return GetString(value.ConstantString, value.UseRawString, false);
         }
-        return null;
     }
 
     private static LLVMValueRef GetDefaultValue(IType type)

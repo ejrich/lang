@@ -285,10 +285,9 @@ public static class ProgramIRBuilder
                         return value.ConstantValue.Integer.ToString();
                     case TypeKind.Float:
                         return value.ConstantValue.Double.ToString();
-                    case TypeKind.String:
+                    default:
                         return $"\"{value.ConstantString}\"";
                 }
-                break;
             case InstructionValueType.Null:
                 return "null";
             case InstructionValueType.Type:
@@ -1392,7 +1391,7 @@ public static class ProgramIRBuilder
                         {
                             return new InstructionValue
                             {
-                                ValueType = InstructionValueType.Constant, Type = constantValue.Type,
+                                ValueType = InstructionValueType.Constant, Type = TypeTable.RawStringType,
                                 ConstantString = constantValue.ConstantString, UseRawString = true
                             };
                         }
@@ -1459,7 +1458,7 @@ public static class ProgramIRBuilder
 
                     return new InstructionValue
                     {
-                        ValueType = InstructionValueType.Constant, Type = constantValue.Type,
+                        ValueType = InstructionValueType.Constant, Type = TypeTable.RawStringType,
                         ConstantString = constantValue.ConstantString, UseRawString = true
                     };
                 }
