@@ -423,7 +423,7 @@ public static unsafe class ProgramRunner
                     var pointer = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
                     var value = GetValue(instruction.Value2, registers, stackPointer, function, arguments);
 
-                    switch (instruction.Value1.Type.TypeKind)
+                    switch (instruction.Value2.Type.TypeKind)
                     {
                         case TypeKind.Boolean:
                             Marshal.StructureToPtr(value.Byte, pointer.Pointer, false);
@@ -1322,7 +1322,7 @@ public static unsafe class ProgramRunner
                     register.Double = value.ConstantValue.Double;
                 }
                 break;
-            case TypeKind.String:
+            default:
                 register.Pointer = Allocator.MakeString(value.ConstantString, value.UseRawString);
                 break;
         }

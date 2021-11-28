@@ -23,6 +23,7 @@ public unsafe static class TypeTable
     public static IType Float64Type;
     public static IType TypeType;
     public static StructAst StringType;
+    public static IType RawStringType;
     public static StructAst AnyType;
 
     public static bool Add(string name, IType type)

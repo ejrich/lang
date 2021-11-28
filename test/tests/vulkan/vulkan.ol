@@ -9,9 +9,13 @@ main() {
 
     pick_physical_device();
 
+    create_logical_device();
+
     cleanup();
 }
 
+
+// Part 1: https://vulkan-tutorial.com/Drawing_a_triangle/Setup/Instance
 instance: VkInstance*;
 
 create_instance() {
@@ -86,6 +90,21 @@ Array<u8*> get_required_extensions() {
     return extension_names;
 }
 
+cleanup() {
+    vkDestroyDevice(device, null);
+
+    if enable_validation_layers {
+        func: PFN_vkDestroyDebugUtilsMessengerEXT = vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+        if func != null {
+            func(instance, debug_messenger, null);
+        }
+    }
+
+    vkDestroyInstance(instance, null);
+}
+
+
+// Part 2: https://vulkan-tutorial.com/Drawing_a_triangle/Setup/Validation_layers
 enable_validation_layers := true; #const
 validation_layers: Array<string> = ["VK_LAYER_KHRONOS_validation"]
 
@@ -149,6 +168,8 @@ u32 debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtils
     return VK_FALSE;
 }
 
+
+// Part 3: https://vulkan-tutorial.com/Drawing_a_triangle/Setup/Physical_devices_and_queue_families
 physical_device: VkPhysicalDevice*;
 
 pick_physical_device() {
@@ -164,10 +185,10 @@ pick_physical_device() {
     vkEnumeratePhysicalDevices(instance, &device_count, devices.data);
 
     highest_score: int;
-    each device in devices {
-        score := is_device_suitable(device);
+    each device_candidate in devices {
+        score := is_device_suitable(device_candidate);
         if score > highest_score {
-            physical_device = device;
+            physical_device = device_candidate;
             highest_score = score;
             break;
         }
@@ -194,7 +215,7 @@ int is_device_suitable(VkPhysicalDevice* device) {
 
     if features.geometryShader == VK_FALSE score = 0;
 
-    _: int;
+    _: u32;
     if !find_queue_families(device, &_) score = 0;
 
     printf("Device - %s, Score = %d\n", properties.deviceName, score);
@@ -202,7 +223,7 @@ int is_device_suitable(VkPhysicalDevice* device) {
     return score;
 }
 
-bool find_queue_families(VkPhysicalDevice* device, int* graphics_family) {
+bool find_queue_families(VkPhysicalDevice* device, u32* graphics_family) {
     queue_family_count: u32;
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, null);
 
@@ -211,7 +232,7 @@ bool find_queue_families(VkPhysicalDevice* device, int* graphics_family) {
 
     each family, i in families {
         if family.queueFlags & VkQueueFlagBits.VK_QUEUE_GRAPHICS_BIT {
-            *graphics_family = i;
+            *graphics_family = cast(u32, i);
             return true;
         }
     }
@@ -219,15 +240,40 @@ bool find_queue_families(VkPhysicalDevice* device, int* graphics_family) {
     return false;
 }
 
-cleanup() {
-    if enable_validation_layers {
-        func: PFN_vkDestroyDebugUtilsMessengerEXT = vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
-        if func != null {
-            func(instance, debug_messenger, null);
-        }
+
+// Part 5: https://vulkan-tutorial.com/Drawing_a_triangle/Setup/Logical_device_and_queues
+device: VkDevice*;
+graphics_queue: VkQueue*;
+
+create_logical_device() {
+    queuePriority := 1.0;
+    queue_create_info: VkDeviceQueueCreateInfo = {
+        queueCount = 1;
+        pQueuePriorities = &queuePriority;
+    }
+    find_queue_families(physical_device, &queue_create_info.queueFamilyIndex);
+
+    features: VkPhysicalDeviceFeatures;
+    vkGetPhysicalDeviceFeatures(physical_device, &features);
+
+    device_create_info: VkDeviceCreateInfo = {
+        pQueueCreateInfos = &queue_create_info;
+        queueCreateInfoCount = 1;
+        pEnabledFeatures = &features;
     }
 
-    vkDestroyInstance(instance, null);
+    if enable_validation_layers {
+        device_create_info.enabledLayerCount = validation_layers.length;
+        device_create_info.ppEnabledLayerNames = &validation_layers[0].data; // Not pretty, but works
+    }
+
+    result := vkCreateDevice(physical_device, &device_create_info, null, &device);
+    if result != VkResult.VK_SUCCESS {
+        printf("Unable to create vulkan device %d\n", result);
+        exit(1);
+    }
+
+    vkGetDeviceQueue(device, queue_create_info.queueFamilyIndex, 0, &graphics_queue);
 }
 
 #run main();
