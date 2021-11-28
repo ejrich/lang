@@ -2698,10 +2698,11 @@ public static class TypeChecker
         var conditionalType = VerifyExpression(ast, currentFunction, scope);
         switch (conditionalType?.TypeKind)
         {
+            case TypeKind.Boolean:
             case TypeKind.Integer:
             case TypeKind.Float:
-            case TypeKind.Boolean:
             case TypeKind.Pointer:
+            case TypeKind.Enum:
                 // Valid types
                 return !ErrorReporter.Errors.Any();
             case null:

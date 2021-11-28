@@ -1216,6 +1216,7 @@ public static class ProgramIRBuilder
         switch (value.Type.TypeKind)
         {
             case TypeKind.Integer:
+            case TypeKind.Enum:
                 return EmitInstruction(InstructionType.IntegerEquals, function, TypeTable.BoolType, value, GetDefaultConstant(value.Type));
             case TypeKind.Float:
                 return EmitInstruction(InstructionType.FloatEquals, function, TypeTable.BoolType, value, GetDefaultConstant(value.Type));
