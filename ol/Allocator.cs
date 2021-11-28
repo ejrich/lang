@@ -100,10 +100,13 @@ public static class Allocator
         var pointer = Allocate(value.Length + 1);
         var bytePointer = (byte*)pointer;
 
-        var stringBytes = Encoding.ASCII.GetBytes(value);
-        fixed (byte* p = &stringBytes[0])
+        if (value != "")
         {
-            Buffer.MemoryCopy(p, bytePointer, value.Length, value.Length);
+            var stringBytes = Encoding.ASCII.GetBytes(value);
+            fixed (byte* p = &stringBytes[0])
+            {
+                Buffer.MemoryCopy(p, bytePointer, value.Length, value.Length);
+            }
         }
         bytePointer[value.Length] = 0;
 
