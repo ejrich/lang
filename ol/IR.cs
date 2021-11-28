@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -26,6 +27,7 @@ public class FunctionIR
     public List<Instruction> Instructions { get; set; }
     public List<BasicBlock> BasicBlocks { get; set; }
     public Dictionary<string, InstructionValue> Constants { get; set; }
+    public IntPtr FunctionPointer { get; set; }
 }
 
 public class GlobalVariable
