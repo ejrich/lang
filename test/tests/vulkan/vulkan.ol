@@ -3,15 +3,23 @@
 // This test follows vulkan-tutorial.com
 
 main() {
+    create_window();
+
+    init_vulkan();
+
+    cleanup();
+}
+
+init_vulkan() {
     create_instance();
 
     setup_debug_messenger();
 
+    create_surface();
+
     pick_physical_device();
 
     create_logical_device();
-
-    cleanup();
 }
 
 
@@ -92,6 +100,7 @@ Array<u8*> get_required_extensions() {
 
 cleanup() {
     vkDestroyDevice(device, null);
+    vkDestroySurfaceKHR(instance, surface, null);
 
     if enable_validation_layers {
         func: PFN_vkDestroyDebugUtilsMessengerEXT = vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
@@ -101,6 +110,8 @@ cleanup() {
     }
 
     vkDestroyInstance(instance, null);
+
+    close_window();
 }
 
 
@@ -216,23 +227,37 @@ int is_device_suitable(VkPhysicalDevice* device) {
     if features.geometryShader == VK_FALSE score = 0;
 
     _: u32;
-    if !find_queue_families(device, &_) score = 0;
+    if !find_queue_families(device, &_, &_) score = 0;
 
     printf("Device - %s, Score = %d\n", properties.deviceName, score);
 
     return score;
 }
 
-bool find_queue_families(VkPhysicalDevice* device, u32* graphics_family) {
+bool find_queue_families(VkPhysicalDevice* device, u32* graphics_family, u32* present_family) {
     queue_family_count: u32;
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, null);
 
     families: Array<VkQueueFamilyProperties>[queue_family_count];
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, families.data);
 
+    graphics_family_found: bool;
+    present_support: u32;
     each family, i in families {
         if family.queueFlags & VkQueueFlagBits.VK_QUEUE_GRAPHICS_BIT {
-            *graphics_family = cast(u32, i);
+            *graphics_family = i;
+            graphics_family_found = true;
+        }
+
+        if present_support == VK_FALSE {
+            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &present_support);
+
+            if present_support {
+                *present_family = i;
+            }
+        }
+
+        if graphics_family_found && present_support == VK_TRUE {
             return true;
         }
     }
@@ -246,20 +271,34 @@ device: VkDevice*;
 graphics_queue: VkQueue*;
 
 create_logical_device() {
-    queuePriority := 1.0;
-    queue_create_info: VkDeviceQueueCreateInfo = {
-        queueCount = 1;
-        pQueuePriorities = &queuePriority;
-    }
-    find_queue_families(physical_device, &queue_create_info.queueFamilyIndex);
-
     features: VkPhysicalDeviceFeatures;
     vkGetPhysicalDeviceFeatures(physical_device, &features);
 
-    device_create_info: VkDeviceCreateInfo = {
-        pQueueCreateInfos = &queue_create_info;
-        queueCreateInfoCount = 1;
-        pEnabledFeatures = &features;
+    device_create_info: VkDeviceCreateInfo = { pEnabledFeatures = &features; }
+
+    graphics_family, present_family: u32;
+    find_queue_families(physical_device, &graphics_family, &present_family);
+
+    queuePriority := 1.0;
+    queue_create_info: VkDeviceQueueCreateInfo = {
+        queueFamilyIndex = graphics_family;
+        queueCount = 1;
+        pQueuePriorities = &queuePriority;
+    }
+
+    if graphics_family == present_family {
+        device_create_info.queueCreateInfoCount = 1;
+        device_create_info.pQueueCreateInfos = &queue_create_info;
+    }
+    else {
+        queue_create_infos: Array<VkDeviceQueueCreateInfo>[2];
+        queue_create_infos[0] = queue_create_info;
+
+        queue_create_info.queueFamilyIndex = present_family;
+        queue_create_infos[1] = queue_create_info;
+
+        device_create_info.queueCreateInfoCount = 2;
+        device_create_info.pQueueCreateInfos = queue_create_infos.data;
     }
 
     if enable_validation_layers {
@@ -273,7 +312,72 @@ create_logical_device() {
         exit(1);
     }
 
-    vkGetDeviceQueue(device, queue_create_info.queueFamilyIndex, 0, &graphics_queue);
+    vkGetDeviceQueue(device, graphics_family, 0, &graphics_queue);
+    vkGetDeviceQueue(device, present_family, 0, &present_queue);
+}
+
+
+// Part 6: https://vulkan-tutorial.com/en/Drawing_a_triangle/Presentation/Window_surface
+surface: VkSurfaceKHR*;
+present_queue: VkQueue*;
+
+create_surface() {
+    #if os == OS.Linux {
+        surface_create_info: VkXlibSurfaceCreateInfoKHR = {
+            dpy = window.handle;
+            window = window.window;
+        }
+
+        result := vkCreateXlibSurfaceKHR(instance, &surface_create_info, null, &surface);
+    }
+
+    if result != VkResult.VK_SUCCESS {
+        printf("Unable to create window surface %d\n", result);
+        exit(1);
+    }
+}
+
+struct Window {
+    handle: void*;
+    window: u64;
+    graphics_context: void*;
+}
+
+window: Window;
+
+#if os == OS.Linux {
+    create_window() {
+        display := XOpenDisplay(null);
+        screen := XDefaultScreen(display);
+        black := XBlackPixel(display, screen);
+        white := XWhitePixel(display, screen);
+
+        default_window := XDefaultRootWindow(display);
+        x_win := XCreateSimpleWindow(display, default_window, 0, 0, 1280, 720, 0, white, black);
+        XSetStandardProperties(display, x_win, "Vulkan Window", "", 0, null, 0, null);
+
+        XSelectInput(display, x_win, XInputMasks.ExposureMask|XInputMasks.ButtonPressMask|XInputMasks.KeyPressMask);
+
+        gc := XCreateGC(display, x_win, 0, null);
+
+        XSetBackground(display, gc, white);
+        XSetForeground(display, gc, black);
+
+        XClearWindow(display, x_win);
+        XMapRaised(display, x_win);
+
+        XSync(display, false);
+
+        window.handle = display;
+        window.window = x_win;
+        window.graphics_context = gc;
+    }
+
+    close_window() {
+        XFreeGC(window.handle, window.graphics_context);
+        XDestroyWindow(window.handle, window.window);
+        XCloseDisplay(window.handle);
+    }
 }
 
 #run main();
