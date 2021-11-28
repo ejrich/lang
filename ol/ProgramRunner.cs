@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
@@ -499,22 +500,13 @@ public static unsafe class ProgramRunner
                 case InstructionType.CallFunctionPointer:
                 {
                     var functionPointer = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
-                    try
-                    {
-                        var functionHandle = GCHandle.FromIntPtr(functionPointer.Pointer);
-                        var callingFunction = functionHandle.Target as FunctionIR;
-                        registers[instruction.ValueIndex] = MakeCall(callingFunction, instruction.Value2.Values, registers, stackPointer, function, arguments, instruction.Index);
-                    }
-                    catch (NullReferenceException)
-                    {
-                        var interfaceAst = (InterfaceAst)instruction.Value1.Type;
-                        var delegateType = CreateDelegateType(interfaceAst);
-                        var functionDelegate = Marshal.GetDelegateForFunctionPointer(functionPointer.Pointer, delegateType);
 
-                        var args = GetExternArguments(instruction.Value2.Values, registers, stackPointer, function, arguments);
+                    var interfaceAst = (InterfaceAst)instruction.Value1.Type;
+                    var delegateType = CreateDelegateType(interfaceAst);
+                    var functionDelegate = Marshal.GetDelegateForFunctionPointer(functionPointer.Pointer, delegateType);
 
-                        registers[instruction.ValueIndex] = (Register)functionDelegate.DynamicInvoke(args);
-                    }
+                    var args = GetExternArguments(instruction.Value2.Values, registers, stackPointer, function, arguments);
+                    registers[instruction.ValueIndex] = (Register)functionDelegate.DynamicInvoke(args);
                     break;
                 }
                 case InstructionType.IntegerExtend:
@@ -1299,8 +1291,7 @@ public static unsafe class ProgramRunner
                 return new Register {Pointer = typeInfoPointer};
             case InstructionValueType.Function:
                 var functionDef = Program.Functions[value.ConstantString];
-                var functionHandle = GCHandle.Alloc(functionDef);
-                return new Register {Pointer = GCHandle.ToIntPtr(functionHandle)};
+                return new Register {Pointer = CreateFunctionPointer(functionDef)};
         }
 
         return new Register();
@@ -1484,7 +1475,80 @@ public static unsafe class ProgramRunner
         return register;
     }
 
-    // Borrowed from https://source.dot.net/#System.Linq.Expressions/System/Linq/Expressions/Compiler/DelegateHelpers.cs,117 so I don't have to load the function with reflection
+    private static IntPtr CreateFunctionPointer(FunctionIR function)
+    {
+        if (function.FunctionPointer == IntPtr.Zero)
+        {
+            // Create a delegate for calling the function
+            var parameters = new ParameterExpression[function.Source.Arguments.Count];
+            var arguments = new Expression[parameters.Length];
+            var argumentTypes = new Type[parameters.Length];
+            for (var i = 0; i < parameters.Length; i++)
+            {
+                var type = argumentTypes[i] = GetType(function.Source.Arguments[i].Type);
+                parameters[i] = Expression.Parameter(type);
+                arguments[i] = Expression.Convert(parameters[i], typeof(object));
+            }
+
+            var functionArguments = Expression.NewArrayInit(typeof(object), arguments);
+            var call = Expression.Call(_executeFunction, Expression.Constant(function), functionArguments);
+
+            // Compile the expression to a delegate
+            var delegateType = CreateDelegateType(function.Source.Name, argumentTypes);
+            var functionDelegate = Expression.Lambda(delegateType, call, parameters).Compile();
+
+            // Cache the pointer on the function
+            function.FunctionPointer = Marshal.GetFunctionPointerForDelegate(functionDelegate);
+        }
+
+        return function.FunctionPointer;
+    }
+
+    private static Register ExecuteFunctionFromDelegate(FunctionIR function, object[] arguments)
+    {
+        var args = new Register[arguments.Length];
+
+        for (var i = 0; i < args.Length; i++)
+        {
+            var argument = arguments[i];
+            var register = new Register();
+            switch (argument)
+            {
+                case bool b:
+                    register.Bool = b;
+                    break;
+                case byte b:
+                    register.Byte = b;
+                    break;
+                case ushort s:
+                    register.UShort = s;
+                    break;
+                case uint u:
+                    register.UInteger = u;
+                    break;
+                case ulong l:
+                    register.ULong = l;
+                    break;
+                case float f:
+                    register.Float = f;
+                    break;
+                case double d:
+                    register.Double = d;
+                    break;
+                case IntPtr ptr:
+                    register.Pointer = ptr;
+                    break;
+            }
+
+            args[i] = register;
+        }
+
+        return ExecuteFunction(function, args);
+    }
+
+    private static MethodInfo GetMethodInfo(Delegate d) => d.Method;
+    private static readonly MethodInfo _executeFunction = GetMethodInfo(ExecuteFunctionFromDelegate);
+
     private static Type CreateDelegateType(InterfaceAst interfaceAst)
     {
         if (_functionPointerDelegateTypes.TryGetValue(interfaceAst.Name, out var type))
@@ -1499,17 +1563,23 @@ public static unsafe class ProgramRunner
             argumentTypes[i] = GetType(argument.Type);
         }
 
-        var builder = _moduleBuilder.DefineType(interfaceAst.Name, DelegateTypeAttributes, typeof(MulticastDelegate));
+        return _functionPointerDelegateTypes[interfaceAst.Name] = CreateDelegateType(interfaceAst.Name, argumentTypes);
+    }
 
-        builder.DefineConstructor(CtorAttributes, CallingConventions.Standard, _delegateCtorSignature).SetImplementationFlags(ImplAttributes);
+    // Borrowed from https://source.dot.net/#System.Linq.Expressions/System/Linq/Expressions/Compiler/DelegateHelpers.cs,117 so I don't have to load the function with reflection
+    private static Type CreateDelegateType(string name, Type[] argumentTypes)
+    {
+        var builder = _moduleBuilder.DefineType(name, DelegateTypeAttributes, typeof(MulticastDelegate));
+
+        builder.DefineConstructor(CtorAttributes, CallingConventions.Standard, DelegateCtorSignature).SetImplementationFlags(ImplAttributes);
         builder.DefineMethod("Invoke", InvokeAttributes, typeof(Register), argumentTypes).SetImplementationFlags(ImplAttributes);
 
-        return _functionPointerDelegateTypes[interfaceAst.Name] = builder.CreateTypeInfo();
+        return builder.CreateTypeInfo();
     }
 
     private const TypeAttributes DelegateTypeAttributes = TypeAttributes.Class | TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.AnsiClass | TypeAttributes.AutoClass;
     private const MethodAttributes CtorAttributes = MethodAttributes.RTSpecialName | MethodAttributes.HideBySig | MethodAttributes.Public;
     private const MethodImplAttributes ImplAttributes = MethodImplAttributes.Runtime | MethodImplAttributes.Managed;
     private const MethodAttributes InvokeAttributes = MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.NewSlot | MethodAttributes.Virtual;
-    private static readonly Type[] _delegateCtorSignature = { typeof(object), typeof(IntPtr) };
+    private static readonly Type[] DelegateCtorSignature = { typeof(object), typeof(IntPtr) };
 }
