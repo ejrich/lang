@@ -2373,7 +2373,7 @@ struct VkPhysicalDeviceProperties {
 }
 
 struct VkQueueFamilyProperties {
-    queueFlags: u32;
+    queueFlags: VkQueueFlagBits;
     queueCount: u32;
     timestampValidBits: u32;
     minImageTransferGranularity: VkExtent3D;

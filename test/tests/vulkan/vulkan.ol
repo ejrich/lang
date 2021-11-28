@@ -7,6 +7,8 @@ main() {
 
     setup_debug_messenger();
 
+    pick_physical_device();
+
     cleanup();
 }
 
@@ -137,9 +139,84 @@ setup_debug_messenger() {
 }
 
 u32 debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagBitsEXT type, VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data) {
-    printf("Validation Layer - %s\n", callback_data.pMessage);
+    if severity == VkDebugUtilsMessageSeverityFlagBitsEXT.VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT {
+        printf("Warning - %s\n", callback_data.pMessage);
+    }
+    else if severity == VkDebugUtilsMessageSeverityFlagBitsEXT.VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT {
+        printf("Error - %s\n", callback_data.pMessage);
+    }
 
     return VK_FALSE;
+}
+
+physical_device: VkPhysicalDevice*;
+
+pick_physical_device() {
+    device_count: u32;
+    vkEnumeratePhysicalDevices(instance, &device_count, null);
+
+    if device_count == 0 {
+        printf("Failed to find GPUs with Vulkan support\n");
+        exit(1);
+    }
+
+    devices: Array<VkPhysicalDevice*>[device_count];
+    vkEnumeratePhysicalDevices(instance, &device_count, devices.data);
+
+    highest_score: int;
+    each device in devices {
+        score := is_device_suitable(device);
+        if score > highest_score {
+            physical_device = device;
+            highest_score = score;
+            break;
+        }
+    }
+
+    if physical_device == null {
+        printf("Failed to find a suitable GPU\n");
+        exit(1);
+    }
+}
+
+int is_device_suitable(VkPhysicalDevice* device) {
+    properties: VkPhysicalDeviceProperties;
+    vkGetPhysicalDeviceProperties(device, &properties);
+
+    features: VkPhysicalDeviceFeatures;
+    vkGetPhysicalDeviceFeatures(device, &features);
+
+    score := 0;
+
+    if properties.deviceType == VkPhysicalDeviceType.VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU score += 1000;
+
+    score += properties.limits.maxImageDimension2D;
+
+    if features.geometryShader == VK_FALSE score = 0;
+
+    _: int;
+    if !find_queue_families(device, &_) score = 0;
+
+    printf("Device - %s, Score = %d\n", properties.deviceName, score);
+
+    return score;
+}
+
+bool find_queue_families(VkPhysicalDevice* device, int* graphics_family) {
+    queue_family_count: u32;
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, null);
+
+    families: Array<VkQueueFamilyProperties>[queue_family_count];
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, families.data);
+
+    each family, i in families {
+        if family.queueFlags & VkQueueFlagBits.VK_QUEUE_GRAPHICS_BIT {
+            *graphics_family = i;
+            return true;
+        }
+    }
+
+    return false;
 }
 
 cleanup() {
