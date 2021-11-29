@@ -110,6 +110,7 @@ cleanup() {
         vkDestroyImageView(device, image_view, null);
     }
 
+    vkDestroyPipelineLayout(device, pipeline_layout, null);
     vkDestroySwapchainKHR(device, swap_chain, null);
     vkDestroyDevice(device, null);
     vkDestroySurfaceKHR(instance, surface, null);
@@ -612,6 +613,8 @@ create_graphics_pipeline() {
 
     shader_stages: Array<VkPipelineShaderStageCreateInfo> = [vertex_shader_stage_info, fragment_shader_stage_info]
 
+    create_pipeline_layout();
+
     vkDestroyShaderModule(device, vertex_shader, null);
     vkDestroyShaderModule(device, fragment_shader, null);
 }
@@ -637,5 +640,104 @@ VkShaderModule* create_shader_module(string file) {
 
     return shader_module;
 }
+
+
+// Part 10: https://vulkan-tutorial.com/Drawing_a_triangle/Graphics_pipeline_basics/Fixed_functions
+pipeline_layout: VkPipelineLayout*;
+
+create_pipeline_layout() {
+    vertex_input_info: VkPipelineVertexInputStateCreateInfo = {
+        vertexBindingDescriptionCount = 0;
+        pVertexBindingDescriptions = null;
+        vertexAttributeDescriptionCount = 0;
+        pVertexAttributeDescriptions = null;
+    }
+
+    input_assembly: VkPipelineInputAssemblyStateCreateInfo = {
+        topology = VkPrimitiveTopology.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        primitiveRestartEnable = VK_FALSE;
+    }
+
+    viewport: VkViewport = {
+        x = 0.0;
+        y = 0.0;
+        width = cast(float, swap_chain_extent.width);
+        height = cast(float, swap_chain_extent.height);
+        minDepth = 0.0;
+        maxDepth = 1.0;
+    }
+
+    scissor: VkRect2D = {
+        extent = swap_chain_extent;
+    }
+
+    viewport_state: VkPipelineViewportStateCreateInfo = {
+        viewportCount = 1;
+        pViewports = &viewport;
+        scissorCount = 1;
+        pScissors = &scissor;
+    }
+
+    rasterizer: VkPipelineRasterizationStateCreateInfo = {
+        depthClampEnable = VK_FALSE;
+        rasterizerDiscardEnable = VK_FALSE;
+        polygonMode = VkPolygonMode.VK_POLYGON_MODE_FILL;
+        lineWidth = 1.0;
+        cullMode = VkCullModeFlagBits.VK_CULL_MODE_BACK_BIT;
+        frontFace = VkFrontFace.VK_FRONT_FACE_CLOCKWISE;
+        depthBiasEnable = VK_FALSE;
+        depthBiasConstantFactor = 0.0; // Optional
+        depthBiasClamp = 0.0;          // Optional
+        depthBiasSlopeFactor = 0.0;    // Optional
+    }
+
+    multisampling: VkPipelineMultisampleStateCreateInfo = {
+        sampleShadingEnable = VK_FALSE;
+        rasterizationSamples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
+        minSampleShading = 1.0;           // Optional
+        pSampleMask = null;               // Optional
+        alphaToCoverageEnable = VK_FALSE; // Optional
+        alphaToOneEnable = VK_FALSE;      // Optional
+    }
+
+    color_blend_attachment: VkPipelineColorBlendAttachmentState = {
+        colorWriteMask = VkColorComponentFlagBits.VK_COLOR_COMPONENT_RGBA;
+        blendEnable = VK_FALSE;
+        srcColorBlendFactor = VkBlendFactor.VK_BLEND_FACTOR_ONE;
+        dstColorBlendFactor = VkBlendFactor.VK_BLEND_FACTOR_ZERO;
+        colorBlendOp = VkBlendOp.VK_BLEND_OP_ADD;
+        srcAlphaBlendFactor = VkBlendFactor.VK_BLEND_FACTOR_ONE;
+        dstAlphaBlendFactor = VkBlendFactor.VK_BLEND_FACTOR_ZERO;
+        alphaBlendOp = VkBlendOp.VK_BLEND_OP_ADD;
+    }
+
+    color_blending: VkPipelineColorBlendStateCreateInfo = {
+        logicOpEnable = VK_FALSE;
+        logicOp = VkLogicOp.VK_LOGIC_OP_COPY;
+        attachmentCount = 1;
+        pAttachments = &color_blend_attachment;
+    }
+
+    dynamic_states: Array<VkDynamicState> = [VkDynamicState.VK_DYNAMIC_STATE_VIEWPORT, VkDynamicState.VK_DYNAMIC_STATE_LINE_WIDTH]
+
+    dynamic_state: VkPipelineDynamicStateCreateInfo = {
+        dynamicStateCount = dynamic_states.length;
+        pDynamicStates = dynamic_states.data;
+    }
+
+    pipeline_layout_info: VkPipelineLayoutCreateInfo = {
+        setLayoutCount = 0;         // Optional
+        pSetLayouts = null;         // Optional
+        pushConstantRangeCount = 0; // Optional
+        pPushConstantRanges = null; // Optional
+    }
+
+    result := vkCreatePipelineLayout(device, &pipeline_layout_info, null, &pipeline_layout);
+    if result != VkResult.VK_SUCCESS {
+        printf("Unable to create pipeline layout %d\n", result);
+        exit(1);
+    }
+}
+
 
 #run main();
