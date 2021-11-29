@@ -2058,7 +2058,7 @@ struct VkDrawIndirectCommand {
 }
 
 struct VkImageSubresourceRange {
-    aspectMask: u32;
+    aspectMask: VkImageAspectFlagBits;
     baseMipLevel: u32;
     levelCount: u32;
     baseArrayLayer: u32;
