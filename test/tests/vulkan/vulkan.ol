@@ -29,6 +29,8 @@ init_vulkan() {
     create_render_pass();
 
     create_graphics_pipeline();
+
+    create_framebuffers();
 }
 
 
@@ -108,6 +110,10 @@ Array<u8*> get_required_extensions() {
 }
 
 cleanup() {
+    each framebuffer in swap_chain_framebuffers {
+        vkDestroyFramebuffer(device, framebuffer, null);
+    }
+
     each image_view in swap_chain_image_views {
         vkDestroyImageView(device, image_view, null);
     }
@@ -805,6 +811,32 @@ create_render_pass() {
     if result != VkResult.VK_SUCCESS {
         printf("Unable to create render pass %d\n", result);
         exit(1);
+    }
+}
+
+
+// Part 13: https://vulkan-tutorial.com/en/Drawing_a_triangle/Drawing/Framebuffers
+swap_chain_framebuffers: Array<VkFramebuffer*>;
+
+create_framebuffers() {
+    array_reserve(&swap_chain_framebuffers, swap_chain_image_views.length);
+
+    framebuffer_info: VkFramebufferCreateInfo = {
+        renderPass = render_pass;
+        attachmentCount = 1;
+        width = swap_chain_extent.width;
+        height = swap_chain_extent.height;
+        layers = 1;
+    }
+
+    each image_view, i in swap_chain_image_views {
+        framebuffer_info.pAttachments = &image_view;
+
+        result := vkCreateFramebuffer(device, &framebuffer_info, null, &swap_chain_framebuffers[i]);
+        if result != VkResult.VK_SUCCESS {
+            printf("Unable to create framebuffer %d\n", result);
+            exit(1);
+        }
     }
 }
 
