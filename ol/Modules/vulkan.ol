@@ -2419,7 +2419,7 @@ struct VkSubmitInfo {
     pNext: void*;
     waitSemaphoreCount: u32;
     pWaitSemaphores: VkSemaphore**;
-    pWaitDstStageMask: u32*;
+    pWaitDstStageMask: VkPipelineStageFlagBits*;
     commandBufferCount: u32;
     pCommandBuffers: VkCommandBuffer**;
     signalSemaphoreCount: u32;
