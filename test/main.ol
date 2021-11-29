@@ -1,5 +1,5 @@
 #import compiler
-#import "files.ol"
+#import file
 
 main() {
     tests_dir := "test/tests"; #const
@@ -139,6 +139,10 @@ int run_command(string command) {
     status := pclose(handle);
     return (status & 0xFF00) >> 8;
 }
+
+FILE* popen(string command, string type) #extern "c"
+int pclose(FILE* stream) #extern "c"
+u8* fgets(u8* buffer, int n, FILE* stream) #extern "c"
 
 #run {
     set_executable_name("tests");

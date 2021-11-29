@@ -8,7 +8,7 @@ struct Array<T> {
 
 ARRAY_BLOCK_SIZE := 10; #const
 
-array_insert<T>(Array<T>* array, T value) {
+array_insert<T>(Array<T>* array, T value, allocate allocator = null, reallocate reallocator = null) {
     // Reallocate the array if necessary
     length := array.length;
     if length % ARRAY_BLOCK_SIZE == 0 {
@@ -17,10 +17,14 @@ array_insert<T>(Array<T>* array, T value) {
         element_size := size_of(T);
 
         if length {
-            array.data = realloc(array.data, element_size * new_blocks * ARRAY_BLOCK_SIZE);
+            if reallocator == null reallocator = realloc;
+
+            array.data = reallocator(array.data, element_size * new_blocks * ARRAY_BLOCK_SIZE);
         }
         else {
-            array.data = malloc(element_size * new_blocks * ARRAY_BLOCK_SIZE);
+            if allocator == null allocator = malloc;
+
+            array.data = allocator(element_size * new_blocks * ARRAY_BLOCK_SIZE);
         }
     }
 
@@ -44,16 +48,20 @@ bool array_remove<T>(Array<T>* array, int index) {
     return true;
 }
 
-array_reserve<T>(Array<T>* array, int length) {
+array_reserve<T>(Array<T>* array, int length, allocate allocator = null, reallocate reallocator = null) {
     if array.length >= length || length <= 0 return;
 
     reserve_length := length + ARRAY_BLOCK_SIZE - length % ARRAY_BLOCK_SIZE;
     element_size := size_of(T);
 
     if array.length {
+        if reallocator == null reallocator = realloc;
+
         array.data = realloc(array.data, element_size * reserve_length);
     }
     else {
+        if allocator == null allocator = malloc;
+
         array.data = malloc(element_size * reserve_length);
     }
 
@@ -94,6 +102,10 @@ string convert_c_string(u8* string_pointer) {
     str: string = { length = length; data = string_pointer; }
     return str;
 }
+
+interface void* allocate(int size)
+interface void* reallocate(void* data, int size)
+interface void* free(void* data)
 
 
 // Runtime type information data

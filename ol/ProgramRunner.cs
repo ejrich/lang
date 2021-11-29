@@ -49,27 +49,27 @@ public static unsafe class ProgramRunner
 
     public static void InitExternFunction(FunctionAst function)
     {
-        var functionTypes = new Type[function.Arguments.Count];
+        var argumentTypes = new Type[function.Arguments.Count];
 
-        for (var i = 0; i < function.Arguments.Count; i++)
+        for (var i = 0; i < argumentTypes.Length; i++)
         {
             var argument = function.Arguments[i];
-            functionTypes[i] = GetType(argument.Type);
+            argumentTypes[i] = GetType(argument.Type);
         }
 
-        CreateFunction(function.Name, function.ExternLib, functionTypes);
+        CreateFunction(function.Name, function.ExternLib, argumentTypes);
     }
 
     public static void InitVarargsFunction(FunctionAst function, IType[] types)
     {
-        var functionTypes = new Type[types.Length];
+        var argumentTypes = new Type[types.Length];
 
         for (var i = 0; i < types.Length; i++)
         {
-            functionTypes[i] = GetType(types[i]);
+            argumentTypes[i] = GetType(types[i]);
         }
 
-        CreateFunction(function.Name, function.ExternLib, functionTypes);
+        CreateFunction(function.Name, function.ExternLib, argumentTypes);
     }
 
     private static Type GetType(IType type)
@@ -1479,25 +1479,41 @@ public static unsafe class ProgramRunner
     {
         if (function.FunctionPointer == IntPtr.Zero)
         {
-            // Create a delegate for calling the function
-            var parameters = new ParameterExpression[function.Source.Arguments.Count];
-            var arguments = new Expression[parameters.Length];
-            var argumentTypes = new Type[parameters.Length];
-            for (var i = 0; i < parameters.Length; i++)
+            var argumentTypes = new Type[function.Source.Arguments.Count];
+            Delegate functionDelegate;
+
+            if (function.Source.Flags.HasFlag(FunctionFlags.Extern))
             {
-                var type = argumentTypes[i] = GetType(function.Source.Arguments[i].Type);
-                parameters[i] = Expression.Parameter(type);
-                arguments[i] = Expression.Convert(parameters[i], typeof(object));
+                var methodInfo = _externFunctions[function.Source.Name][0];
+
+                for (var i = 0; i < argumentTypes.Length; i++)
+                {
+                    var argument = function.Source.Arguments[i];
+                    argumentTypes[i] = GetType(argument.Type);
+                }
+
+                var delegateType = CreateDelegateType(function.Source.Name, argumentTypes);
+                functionDelegate = methodInfo.CreateDelegate(delegateType);
+            }
+            else
+            {
+                var parameters = new ParameterExpression[argumentTypes.Length];
+                var arguments = new Expression[argumentTypes.Length];
+                for (var i = 0; i < parameters.Length; i++)
+                {
+                    var type = argumentTypes[i] = GetType(function.Source.Arguments[i].Type);
+                    parameters[i] = Expression.Parameter(type);
+                    arguments[i] = Expression.Convert(parameters[i], typeof(object));
+                }
+
+                var functionArguments = Expression.NewArrayInit(typeof(object), arguments);
+                var call = Expression.Call(_executeFunction, Expression.Constant(function), functionArguments);
+
+                // Compile the expression to a delegate
+                var delegateType = CreateDelegateType(function.Source.Name, argumentTypes);
+                functionDelegate = Expression.Lambda(delegateType, call, parameters).Compile();
             }
 
-            var functionArguments = Expression.NewArrayInit(typeof(object), arguments);
-            var call = Expression.Call(_executeFunction, Expression.Constant(function), functionArguments);
-
-            // Compile the expression to a delegate
-            var delegateType = CreateDelegateType(function.Source.Name, argumentTypes);
-            var functionDelegate = Expression.Lambda(delegateType, call, parameters).Compile();
-
-            // Cache the pointer on the function
             function.FunctionPointer = Marshal.GetFunctionPointerForDelegate(functionDelegate);
         }
 

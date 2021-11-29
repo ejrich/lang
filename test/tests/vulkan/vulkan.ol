@@ -1,4 +1,5 @@
 #import vulkan
+#import file
 
 // This test follows vulkan-tutorial.com
 
@@ -636,34 +637,5 @@ VkShaderModule* create_shader_module(string file) {
 
     return shader_module;
 }
-
-bool, string read_file(string file_path) {
-    file_contents: string;
-    found: bool;
-
-    file := fopen(file_path, "r");
-    if file {
-        found = true;
-        fseek(file, 0, 2);
-        size := ftell(file);
-        fseek(file, 0, 0);
-
-        file_contents.length = size;
-        file_contents.data = malloc(size);
-
-        fread(file_contents.data, 1, size, file);
-        fclose(file);
-    }
-
-    return found, file_contents;
-}
-
-struct FILE {}
-
-FILE* fopen(string file, string type) #extern "c"
-int fseek(FILE* file, s64 offset, int origin) #extern "c"
-s64 ftell(FILE* file) #extern "c"
-int fread(void* buffer, u32 size, u32 length, FILE* file) #extern "c"
-int fclose(FILE* file) #extern "c"
 
 #run main();
