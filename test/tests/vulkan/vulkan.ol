@@ -31,6 +31,10 @@ init_vulkan() {
     create_graphics_pipeline();
 
     create_framebuffers();
+
+    create_command_pool();
+
+    create_command_buffers();
 }
 
 
@@ -118,6 +122,7 @@ cleanup() {
         vkDestroyImageView(device, image_view, null);
     }
 
+    vkDestroyCommandPool(device, command_pool, null);
     vkDestroyPipeline(device, graphics_pipeline, null);
     vkDestroyPipelineLayout(device, pipeline_layout, null);
     vkDestroyRenderPass(device, render_pass, null);
@@ -835,6 +840,82 @@ create_framebuffers() {
         result := vkCreateFramebuffer(device, &framebuffer_info, null, &swap_chain_framebuffers[i]);
         if result != VkResult.VK_SUCCESS {
             printf("Unable to create framebuffer %d\n", result);
+            exit(1);
+        }
+    }
+}
+
+
+// Part 14: https://vulkan-tutorial.com/en/Drawing_a_triangle/Drawing/Command_buffers
+command_pool: VkCommandPool*;
+command_buffers: Array<VkCommandBuffer*>;
+
+create_command_pool() {
+    graphics_family, _: u32;
+    find_queue_families(physical_device, &graphics_family, &_);
+
+    pool_info: VkCommandPoolCreateInfo = {
+        queueFamilyIndex = graphics_family;
+    }
+
+    result := vkCreateCommandPool(device, &pool_info, null, &command_pool);
+    if result != VkResult.VK_SUCCESS {
+        printf("Unable to create command pool %d\n", result);
+        exit(1);
+    }
+}
+
+create_command_buffers() {
+    array_reserve(&command_buffers, swap_chain_framebuffers.length);
+
+    alloc_info: VkCommandBufferAllocateInfo = {
+        commandPool = command_pool;
+        level = VkCommandBufferLevel.VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        commandBufferCount = command_buffers.length;
+    }
+
+    result := vkAllocateCommandBuffers(device, &alloc_info, command_buffers.data);
+    if result != VkResult.VK_SUCCESS {
+        printf("Unable to create command pool %d\n", result);
+        exit(1);
+    }
+
+    begin_info: VkCommandBufferBeginInfo = {
+        pInheritanceInfo = null;
+    }
+
+    clear_color: VkClearValue;
+    clear_color.color.float32[0] = 0.0;
+    clear_color.color.float32[1] = 0.0;
+    clear_color.color.float32[2] = 0.0;
+    clear_color.color.float32[3] = 1.0;
+
+    render_pass_info: VkRenderPassBeginInfo = {
+        renderPass = render_pass;
+        clearValueCount = 1;
+        pClearValues = &clear_color;
+    }
+    render_pass_info.renderArea.extent = swap_chain_extent;
+
+    each command_buffer, i in command_buffers {
+        result = vkBeginCommandBuffer(command_buffer, &begin_info);
+        if result != VkResult.VK_SUCCESS {
+            printf("Unable to begin recording command buffer %d\n", result);
+            exit(1);
+        }
+
+        render_pass_info.framebuffer = swap_chain_framebuffers[i];
+        vkCmdBeginRenderPass(command_buffer, &render_pass_info, VkSubpassContents.VK_SUBPASS_CONTENTS_INLINE);
+
+        vkCmdBindPipeline(command_buffer, VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline);
+
+        vkCmdDraw(command_buffer, 3, 1, 0, 0);
+
+        vkCmdEndRenderPass(command_buffer);
+
+        result = vkEndCommandBuffer(command_buffer);
+        if result != VkResult.VK_SUCCESS {
+            printf("Unable to record command buffer %d\n", result);
             exit(1);
         }
     }

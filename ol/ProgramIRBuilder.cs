@@ -1712,9 +1712,9 @@ public static class ProgramIRBuilder
 
             if (type.TypeKind == TypeKind.CArray)
             {
-                if (structField.Children[i] is IndexAst index)
+                if (structField.Children[i] is IndexAst indexAst)
                 {
-                    var indexValue = EmitIR(function, index.Index, scope);
+                    var indexValue = EmitIR(function, indexAst.Index, scope);
                     var arrayType = (ArrayType) type;
                     var elementType = arrayType.ElementType;
                     value = EmitGetPointer(function, value, indexValue, elementType, true);
@@ -1734,35 +1734,19 @@ public static class ProgramIRBuilder
                 var field = structDefinition.Fields[fieldIndex];
 
                 value = EmitGetStructPointer(function, value, structDefinition, fieldIndex, field);
-                if (structField.Children[i] is IndexAst index)
-                {
-                    value = EmitGetIndexPointer(function, index, scope, field.Type, value);
+            }
 
-                    if (index.CallsOverload)
-                    {
-                        skipPointer = true;
-                        if (i < structField.Pointers.Length && !structField.Pointers[i])
-                        {
-                            var nextType = structField.Types[i];
-                            var allocation = AddAllocation(function, nextType);
-                            EmitStore(function, allocation, value);
-                            value = allocation;
-                        }
-                        else if (i == structField.Pointers.Length)
-                        {
-                            loaded = true;
-                        }
-                    }
-                }
-                else if (structField.Children[i] is CallAst call)
-                {
-                    var functionPointer = EmitLoad(function, value.Type, value);
-                    value = EmitCallFunctionPointer(function, call, scope, functionPointer);
+            if (structField.Children[i] is IndexAst index)
+            {
+                value = EmitGetIndexPointer(function, index, scope, value.Type, value);
 
+                if (index.CallsOverload)
+                {
                     skipPointer = true;
                     if (i < structField.Pointers.Length && !structField.Pointers[i])
                     {
-                        var allocation = AddAllocation(function, value.Type);
+                        var nextType = structField.Types[i];
+                        var allocation = AddAllocation(function, nextType);
                         EmitStore(function, allocation, value);
                         value = allocation;
                     }
@@ -1770,6 +1754,23 @@ public static class ProgramIRBuilder
                     {
                         loaded = true;
                     }
+                }
+            }
+            else if (structField.Children[i] is CallAst call)
+            {
+                var functionPointer = EmitLoad(function, value.Type, value);
+                value = EmitCallFunctionPointer(function, call, scope, functionPointer);
+
+                skipPointer = true;
+                if (i < structField.Pointers.Length && !structField.Pointers[i])
+                {
+                    var allocation = AddAllocation(function, value.Type);
+                    EmitStore(function, allocation, value);
+                    value = allocation;
+                }
+                else if (i == structField.Pointers.Length)
+                {
+                    loaded = true;
                 }
             }
         }
