@@ -935,9 +935,16 @@ public static class TypeChecker
                         VerifyConstantIfNecessary(argument.Value, argument.Type);
                     }
                 }
-                else if (isConstant && argument.Type?.TypeKind != TypeKind.Pointer)
+                else if (argument.Value is NullAst nullAst && argument.Type != null)
                 {
-                    ErrorReporter.Report($"Type of argument '{argument.Name}' in function '{function.Name}' is '{PrintTypeDefinition(argument.TypeDefinition)}', but default value is 'null'", argument.Value);
+                    if (argument.Type.TypeKind != TypeKind.Pointer || argument.Type.TypeKind == TypeKind.Interface)
+                    {
+                        nullAst.TargetType = argument.Type;
+                    }
+                    else
+                    {
+                        ErrorReporter.Report($"Type of argument '{argument.Name}' in function '{function.Name}' is '{PrintTypeDefinition(argument.TypeDefinition)}', but default value is 'null'", argument.Value);
+                    }
                 }
             }
         }

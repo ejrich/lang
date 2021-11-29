@@ -1,3 +1,4 @@
+#import file
 #import "parser.ol"
 
 main() {
@@ -7,18 +8,9 @@ main() {
         return;
     }
 
-    file := fopen(command_line_arguments[0], "r");
-    if file {
-        fseek(file, 0, 2);
-        size := ftell(file);
-        fseek(file, 0, 0);
-
-        printf("Parsing file '%s', size %d\n", command_line_arguments[0], size);
-
-        file_contents: string = {length = size; data = allocate(size);}
-
-        fread(file_contents.data, 1, size, file);
-        fclose(file);
+    found, file_contents := read_file(command_line_arguments[0], allocate);
+    if found {
+        printf("Parsing file '%s', size %d\n", command_line_arguments[0], file_contents.length);
 
         parse(file_contents, command_line_arguments[1], command_line_arguments[2]);
 
@@ -169,11 +161,4 @@ void* allocate_arena(int cursor, int size = arena_size) {
     return arena.pointer;
 }
 
-struct FILE {}
-
-FILE* fopen(string file, string type) #extern "c"
-int fseek(FILE* file, s64 offset, int origin) #extern "c"
-s64 ftell(FILE* file) #extern "c"
-int fread(void* buffer, u32 size, u32 length, FILE* file) #extern "c"
-int fclose(FILE* file) #extern "c"
 memset(void* ptr, int value, int num) #extern "c"
