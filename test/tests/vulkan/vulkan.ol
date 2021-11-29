@@ -112,6 +112,7 @@ cleanup() {
         vkDestroyImageView(device, image_view, null);
     }
 
+    vkDestroyPipeline(device, graphics_pipeline, null);
     vkDestroyPipelineLayout(device, pipeline_layout, null);
     vkDestroyRenderPass(device, render_pass, null);
     vkDestroySwapchainKHR(device, swap_chain, null);
@@ -598,6 +599,9 @@ create_image_views() {
 
 
 // Part 9: https://vulkan-tutorial.com/en/Drawing_a_triangle/Graphics_pipeline_basics/Shader_modules
+pipeline_layout: VkPipelineLayout*;
+graphics_pipeline: VkPipeline*;
+
 create_graphics_pipeline() {
     vertex_shader := create_shader_module("test/tests/vulkan/shaders/vert.spv");
     fragment_shader := create_shader_module("test/tests/vulkan/shaders/frag.spv");
@@ -614,41 +618,8 @@ create_graphics_pipeline() {
         pName = shader_entrypoint.data;
     }
 
-    shader_stages: Array<VkPipelineShaderStageCreateInfo> = [vertex_shader_stage_info, fragment_shader_stage_info]
 
-    create_pipeline_layout();
-
-    vkDestroyShaderModule(device, vertex_shader, null);
-    vkDestroyShaderModule(device, fragment_shader, null);
-}
-
-shader_entrypoint := "main";
-
-VkShaderModule* create_shader_module(string file) {
-    found, code := read_file(file);
-
-    if !found return null;
-
-    shader_create_info: VkShaderModuleCreateInfo = {
-        codeSize = code.length;
-        pCode = cast(u32*, code.data);
-    }
-
-    shader_module: VkShaderModule*;
-    result := vkCreateShaderModule(device, &shader_create_info, null, &shader_module);
-    if result != VkResult.VK_SUCCESS {
-        printf("Unable to create shader module %d\n", result);
-        exit(1);
-    }
-
-    return shader_module;
-}
-
-
-// Part 10: https://vulkan-tutorial.com/Drawing_a_triangle/Graphics_pipeline_basics/Fixed_functions
-pipeline_layout: VkPipelineLayout*;
-
-create_pipeline_layout() {
+    // Part 10: https://vulkan-tutorial.com/Drawing_a_triangle/Graphics_pipeline_basics/Fixed_functions
     vertex_input_info: VkPipelineVertexInputStateCreateInfo = {
         vertexBindingDescriptionCount = 0;
         pVertexBindingDescriptions = null;
@@ -740,6 +711,60 @@ create_pipeline_layout() {
         printf("Unable to create pipeline layout %d\n", result);
         exit(1);
     }
+
+
+    // Part 12: https://vulkan-tutorial.com/en/Drawing_a_triangle/Graphics_pipeline_basics/Conclusion
+    shader_stages: Array<VkPipelineShaderStageCreateInfo> = [vertex_shader_stage_info, fragment_shader_stage_info]
+
+    pipeline_info: VkGraphicsPipelineCreateInfo = {
+        stageCount = shader_stages.length;
+        pStages = shader_stages.data;
+        pVertexInputState = &vertex_input_info;
+        pInputAssemblyState = &input_assembly;
+        pViewportState = &viewport_state;
+        pRasterizationState = &rasterizer;
+        pMultisampleState = &multisampling;
+        pDepthStencilState = null;
+        pColorBlendState = &color_blending;
+        pDynamicState = &dynamic_state;
+        layout = pipeline_layout;
+        renderPass = render_pass;
+        subpass = 0;
+        basePipelineHandle = null;
+        basePipelineIndex = -1;
+    }
+
+    result = vkCreateGraphicsPipelines(device, null, 1, &pipeline_info, null, &graphics_pipeline);
+    if result != VkResult.VK_SUCCESS {
+        printf("Unable to create graphics pipeline %d\n", result);
+        exit(1);
+    }
+
+
+    vkDestroyShaderModule(device, vertex_shader, null);
+    vkDestroyShaderModule(device, fragment_shader, null);
+}
+
+shader_entrypoint := "main";
+
+VkShaderModule* create_shader_module(string file) {
+    found, code := read_file(file);
+
+    if !found return null;
+
+    shader_create_info: VkShaderModuleCreateInfo = {
+        codeSize = code.length;
+        pCode = cast(u32*, code.data);
+    }
+
+    shader_module: VkShaderModule*;
+    result := vkCreateShaderModule(device, &shader_create_info, null, &shader_module);
+    if result != VkResult.VK_SUCCESS {
+        printf("Unable to create shader module %d\n", result);
+        exit(1);
+    }
+
+    return shader_module;
 }
 
 
@@ -782,6 +807,5 @@ create_render_pass() {
         exit(1);
     }
 }
-
 
 #run main();
