@@ -5236,6 +5236,9 @@ VkResult vkGetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice* physicalDevice, 
 VkResult vkGetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice* physicalDevice, VkSurfaceKHR* surface, u32* pPresentModeCount, VkPresentModeKHR* pPresentModes) #extern "vulkan"
 
 struct VkSwapchainKHR {}
+
+VK_KHR_SWAPCHAIN_EXTENSION_NAME := "VK_KHR_swapchain";
+
 enum VkSwapchainCreateFlagBitsKHR {
     VK_SWAPCHAIN_CREATE_SPLIT_INSTANCE_BIND_REGIONS_BIT_KHR = 0x00000001;
     VK_SWAPCHAIN_CREATE_PROTECTED_BIT_KHR = 0x00000002;
@@ -5261,7 +5264,7 @@ struct VkSwapchainCreateInfoKHR {
     imageColorSpace: VkColorSpaceKHR;
     imageExtent: VkExtent2D;
     imageArrayLayers: u32;
-    imageUsage: u32;
+    imageUsage: VkImageUsageFlagBits;
     imageSharingMode: VkSharingMode;
     queueFamilyIndexCount: u32;
     pQueueFamilyIndices: u32*;
