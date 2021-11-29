@@ -24,6 +24,8 @@ init_vulkan() {
     create_swap_chain();
 
     create_image_views();
+
+    create_graphics_pipeline();
 }
 
 
@@ -588,5 +590,80 @@ create_image_views() {
         }
     }
 }
+
+
+// Part 9: https://vulkan-tutorial.com/en/Drawing_a_triangle/Graphics_pipeline_basics/Shader_modules
+create_graphics_pipeline() {
+    vertex_shader := create_shader_module("test/tests/vulkan/shaders/vert.spv");
+    fragment_shader := create_shader_module("test/tests/vulkan/shaders/frag.spv");
+
+    vertex_shader_stage_info: VkPipelineShaderStageCreateInfo = {
+        stage = VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT;
+        module = vertex_shader;
+        pName = shader_entrypoint.data;
+    }
+
+    fragment_shader_stage_info: VkPipelineShaderStageCreateInfo = {
+        stage = VkShaderStageFlagBits.VK_SHADER_STAGE_FRAGMENT_BIT;
+        module = fragment_shader;
+        pName = shader_entrypoint.data;
+    }
+
+    shader_stages: Array<VkPipelineShaderStageCreateInfo> = [vertex_shader_stage_info, fragment_shader_stage_info]
+
+    vkDestroyShaderModule(device, vertex_shader, null);
+    vkDestroyShaderModule(device, fragment_shader, null);
+}
+
+shader_entrypoint := "main";
+
+VkShaderModule* create_shader_module(string file) {
+    found, code := read_file(file);
+
+    if !found return null;
+
+    shader_create_info: VkShaderModuleCreateInfo = {
+        codeSize = code.length;
+        pCode = cast(u32*, code.data);
+    }
+
+    shader_module: VkShaderModule*;
+    result := vkCreateShaderModule(device, &shader_create_info, null, &shader_module);
+    if result != VkResult.VK_SUCCESS {
+        printf("Unable to create shader module %d\n", result);
+        exit(1);
+    }
+
+    return shader_module;
+}
+
+bool, string read_file(string file_path) {
+    file_contents: string;
+    found: bool;
+
+    file := fopen(file_path, "r");
+    if file {
+        found = true;
+        fseek(file, 0, 2);
+        size := ftell(file);
+        fseek(file, 0, 0);
+
+        file_contents.length = size;
+        file_contents.data = malloc(size);
+
+        fread(file_contents.data, 1, size, file);
+        fclose(file);
+    }
+
+    return found, file_contents;
+}
+
+struct FILE {}
+
+FILE* fopen(string file, string type) #extern "c"
+int fseek(FILE* file, s64 offset, int origin) #extern "c"
+s64 ftell(FILE* file) #extern "c"
+int fread(void* buffer, u32 size, u32 length, FILE* file) #extern "c"
+int fclose(FILE* file) #extern "c"
 
 #run main();
