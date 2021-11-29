@@ -26,6 +26,8 @@ init_vulkan() {
 
     create_image_views();
 
+    create_render_pass();
+
     create_graphics_pipeline();
 }
 
@@ -111,6 +113,7 @@ cleanup() {
     }
 
     vkDestroyPipelineLayout(device, pipeline_layout, null);
+    vkDestroyRenderPass(device, render_pass, null);
     vkDestroySwapchainKHR(device, swap_chain, null);
     vkDestroyDevice(device, null);
     vkDestroySurfaceKHR(instance, surface, null);
@@ -735,6 +738,47 @@ create_pipeline_layout() {
     result := vkCreatePipelineLayout(device, &pipeline_layout_info, null, &pipeline_layout);
     if result != VkResult.VK_SUCCESS {
         printf("Unable to create pipeline layout %d\n", result);
+        exit(1);
+    }
+}
+
+
+// Part 11: https://vulkan-tutorial.com/Drawing_a_triangle/Graphics_pipeline_basics/Render_passes
+render_pass: VkRenderPass*;
+
+create_render_pass() {
+    color_attachment: VkAttachmentDescription = {
+        format = swap_chain_format;
+        samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
+        loadOp = VkAttachmentLoadOp.VK_ATTACHMENT_LOAD_OP_CLEAR;
+        storeOp = VkAttachmentStoreOp.VK_ATTACHMENT_STORE_OP_STORE;
+        stencilLoadOp = VkAttachmentLoadOp.VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        stencilStoreOp = VkAttachmentStoreOp.VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        initialLayout = VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
+        finalLayout = VkImageLayout.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    }
+
+    color_attachment_ref: VkAttachmentReference = {
+        attachment = 0;
+        layout = VkImageLayout.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    }
+
+    subpass: VkSubpassDescription = {
+        pipelineBindPoint = VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS;
+        colorAttachmentCount = 1;
+        pColorAttachments = &color_attachment_ref;
+    }
+
+    render_pass_info: VkRenderPassCreateInfo = {
+        attachmentCount = 1;
+        pAttachments = &color_attachment;
+        subpassCount = 1;
+        pSubpasses = &subpass;
+    }
+
+    result := vkCreateRenderPass(device, &render_pass_info, null, &render_pass);
+    if result != VkResult.VK_SUCCESS {
+        printf("Unable to create render pass %d\n", result);
         exit(1);
     }
 }
