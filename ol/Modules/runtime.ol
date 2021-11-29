@@ -44,6 +44,22 @@ bool array_remove<T>(Array<T>* array, int index) {
     return true;
 }
 
+array_reserve<T>(Array<T>* array, int length) {
+    if array.length >= length || length <= 0 return;
+
+    reserve_length := length + ARRAY_BLOCK_SIZE - length % ARRAY_BLOCK_SIZE;
+    element_size := size_of(T);
+
+    if array.length {
+        array.data = realloc(array.data, element_size * reserve_length);
+    }
+    else {
+        array.data = malloc(element_size * reserve_length);
+    }
+
+    array.length = length;
+}
+
 struct string {
     length: s64;
     data: u8*;
