@@ -35,6 +35,8 @@ init_vulkan() {
     create_command_pool();
 
     create_command_buffers();
+
+    create_semaphores();
 }
 
 
@@ -122,6 +124,8 @@ cleanup() {
         vkDestroyImageView(device, image_view, null);
     }
 
+    vkDestroySemaphore(device, image_available_semaphore, null);
+    vkDestroySemaphore(device, render_finished_semaphore, null);
     vkDestroyCommandPool(device, command_pool, null);
     vkDestroyPipeline(device, graphics_pipeline, null);
     vkDestroyPipelineLayout(device, pipeline_layout, null);
@@ -920,5 +924,50 @@ create_command_buffers() {
         }
     }
 }
+
+
+// Part 15: https://vulkan-tutorial.com/en/Drawing_a_triangle/Drawing/Rendering_and_presentation
+image_available_semaphore: VkSemaphore*;
+render_finished_semaphore: VkSemaphore*;
+
+create_semaphores() {
+    semaphore_info: VkSemaphoreCreateInfo;
+
+    result := vkCreateSemaphore(device, &semaphore_info, null, &image_available_semaphore);
+    if result != VkResult.VK_SUCCESS {
+        printf("Unable to create semaphore %d\n", result);
+        exit(1);
+    }
+
+    result = vkCreateSemaphore(device, &semaphore_info, null, &render_finished_semaphore);
+    if result != VkResult.VK_SUCCESS {
+        printf("Unable to create semaphore %d\n", result);
+        exit(1);
+    }
+}
+
+wait_stages: Array<VkPipelineStageFlagBits> = [VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT]
+
+draw_frame() {
+    image_index: u32;
+    vkAcquireNextImageKHR(device, swap_chain, 0xFFFFFFFF, image_available_semaphore, null, &image_index);
+
+    submit_info: VkSubmitInfo = {
+        waitSemaphoreCount = 1;
+        pWaitSemaphores = &image_available_semaphore;
+        pWaitDstStageMask = wait_stages.data;
+        commandBufferCount = 1;
+        pCommandBuffers = &command_buffers[image_index];
+        signalSemaphoreCount = 1;
+        pSignalSemaphores = &render_finished_semaphore;
+    }
+
+    result := vkQueueSubmit(graphics_queue, 1, &submit_info, null);
+    if result != VkResult.VK_SUCCESS {
+        printf("Failed to submit draw command buffer %d\n", result);
+        exit(1);
+    }
+}
+
 
 #run main();
