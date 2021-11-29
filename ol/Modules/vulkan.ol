@@ -1824,6 +1824,7 @@ enum VkColorComponentFlagBits {
     VK_COLOR_COMPONENT_G_BIT = 0x00000002;
     VK_COLOR_COMPONENT_B_BIT = 0x00000004;
     VK_COLOR_COMPONENT_A_BIT = 0x00000008;
+    VK_COLOR_COMPONENT_RGBA  = 0x0000000F;
     VK_COLOR_COMPONENT_FLAG_BITS_MAX_ENUM = 0x7FFFFFFF;
 }
 
@@ -2721,7 +2722,7 @@ struct VkPipelineRasterizationStateCreateInfo {
     depthClampEnable: u32;
     rasterizerDiscardEnable: u32;
     polygonMode: VkPolygonMode;
-    cullMode: u32;
+    cullMode: VkCullModeFlagBits;
     frontFace: VkFrontFace;
     depthBiasEnable: u32;
     depthBiasConstantFactor: float;
@@ -2775,7 +2776,7 @@ struct VkPipelineColorBlendAttachmentState {
     srcAlphaBlendFactor: VkBlendFactor;
     dstAlphaBlendFactor: VkBlendFactor;
     alphaBlendOp: VkBlendOp;
-    colorWriteMask: u32;
+    colorWriteMask: VkColorComponentFlagBits;
 }
 
 struct VkPipelineColorBlendStateCreateInfo {
@@ -2786,7 +2787,7 @@ struct VkPipelineColorBlendStateCreateInfo {
     logicOp: VkLogicOp;
     attachmentCount: u32;
     pAttachments: VkPipelineColorBlendAttachmentState*;
-    blendConstants: CArray<float>[4];
+    blendConstants: CArray<float>[4] = [0.0, 0.0, 0.0, 0.0]
 }
 
 struct VkPipelineDynamicStateCreateInfo {
