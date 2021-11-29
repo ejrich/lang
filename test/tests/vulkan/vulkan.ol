@@ -22,6 +22,8 @@ init_vulkan() {
     create_logical_device();
 
     create_swap_chain();
+
+    create_image_views();
 }
 
 
@@ -101,6 +103,10 @@ Array<u8*> get_required_extensions() {
 }
 
 cleanup() {
+    each image_view in swap_chain_image_views {
+        vkDestroyImageView(device, image_view, null);
+    }
+
     vkDestroySwapchainKHR(device, swap_chain, null);
     vkDestroyDevice(device, null);
     vkDestroySurfaceKHR(instance, surface, null);
@@ -552,6 +558,35 @@ u32 clamp(u32 value, u32 min, u32 max) {
     if value < min return min;
     if value > max return max;
     return value;
+}
+
+
+// Part 8: https://vulkan-tutorial.com/en/Drawing_a_triangle/Presentation/Image_views
+swap_chain_image_views: Array<VkImageView*>;
+
+create_image_views() {
+    array_reserve(&swap_chain_image_views, swap_chain_images.length);
+
+    view_create_info: VkImageViewCreateInfo = {
+        viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
+        format = swap_chain_format;
+    }
+
+    view_create_info.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+    view_create_info.subresourceRange.baseMipLevel = 0;
+    view_create_info.subresourceRange.levelCount = 1;
+    view_create_info.subresourceRange.baseArrayLayer = 0;
+    view_create_info.subresourceRange.layerCount = 1;
+
+    each image, i in swap_chain_images {
+        view_create_info.image = image;
+
+        result := vkCreateImageView(device, &view_create_info, null, &swap_chain_image_views[i]);
+        if result != VkResult.VK_SUCCESS {
+            printf("Unable to create image view %d\n", result);
+            exit(1);
+        }
+    }
 }
 
 #run main();
