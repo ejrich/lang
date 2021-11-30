@@ -668,12 +668,16 @@ create_graphics_pipeline() {
     }
 
 
+    binding_description := get_binding_description();
+    attribute_descriptions := get_attribute_descriptions();
+
+
     // Part 10: https://vulkan-tutorial.com/Drawing_a_triangle/Graphics_pipeline_basics/Fixed_functions
     vertex_input_info: VkPipelineVertexInputStateCreateInfo = {
-        vertexBindingDescriptionCount = 0;
-        pVertexBindingDescriptions = null;
-        vertexAttributeDescriptionCount = 0;
-        pVertexAttributeDescriptions = null;
+        vertexBindingDescriptionCount = 1;
+        pVertexBindingDescriptions = &binding_description;
+        vertexAttributeDescriptionCount = attribute_descriptions.length;
+        pVertexAttributeDescriptions = attribute_descriptions.data;
     }
 
     input_assembly: VkPipelineInputAssemblyStateCreateInfo = {
@@ -1108,6 +1112,45 @@ cleanup_swap_chain() {
     vkDestroyPipelineLayout(device, pipeline_layout, null);
     vkDestroyRenderPass(device, render_pass, null);
     vkDestroySwapchainKHR(device, swap_chain, null);
+}
+
+
+// Part 17: https://vulkan-tutorial.com/en/Vertex_buffers/Vertex_input_description
+struct Vector3 {
+    x: float;
+    y: float;
+    z: float;
+}
+
+struct Vertex {
+    position: Vector3;
+    color: Vector3;
+}
+
+VkVertexInputBindingDescription get_binding_description() {
+    binding_description: VkVertexInputBindingDescription = {
+        binding = 0;
+        stride = size_of(Vertex);
+        inputRate = VkVertexInputRate.VK_VERTEX_INPUT_RATE_VERTEX;
+    }
+
+    return binding_description;
+}
+
+Array<VkVertexInputAttributeDescription> get_attribute_descriptions() {
+    attribute_descriptions: Array<VkVertexInputAttributeDescription>[2];
+
+    attribute_descriptions[0].binding = 0;
+    attribute_descriptions[0].location = 0;
+    attribute_descriptions[0].format = VkFormat.VK_FORMAT_R32G32B32_SFLOAT;
+    attribute_descriptions[0].offset = 0;
+
+    attribute_descriptions[1].binding = 0;
+    attribute_descriptions[1].location = 1;
+    attribute_descriptions[1].format = VkFormat.VK_FORMAT_R32G32B32_SFLOAT;
+    attribute_descriptions[1].offset = size_of(Vector3);
+
+    return attribute_descriptions;
 }
 
 
