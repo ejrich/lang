@@ -8,8 +8,11 @@ main() {
 
     init_vulkan();
 
-    // while true
+    while true {
+        if !handle_inputs() break;
+
         draw_frame();
+    }
 
     vkDeviceWaitIdle(device);
 
@@ -417,6 +420,27 @@ window: Window;
         window.handle = display;
         window.window = x_win;
         window.graphics_context = gc;
+    }
+
+    bool handle_inputs() {
+        while XPending(window.handle) {
+            event: XEvent;
+
+            XNextEvent(window.handle, &event);
+
+            if event.type == XEventType.KeyPress {
+                text: CArray<u8>[255];
+                key: u64;
+
+                if XLookupString(&event.xkey, &text, 255, &key, null) == 1 {
+                    if text[0] == 'q' {
+                        return false;
+                    }
+                }
+            }
+        }
+        // return true;
+        return false;
     }
 
     close_window() {
