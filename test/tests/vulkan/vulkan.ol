@@ -124,13 +124,7 @@ Array<u8*> get_required_extensions() {
 }
 
 cleanup() {
-    each framebuffer in swap_chain_framebuffers {
-        vkDestroyFramebuffer(device, framebuffer, null);
-    }
-
-    each image_view in swap_chain_image_views {
-        vkDestroyImageView(device, image_view, null);
-    }
+    cleanup_swap_chain();
 
     each i in 0..MAX_FRAMES_IN_FLIGHT-1 {
         vkDestroySemaphore(device, image_available_semaphores[i], null);
@@ -139,10 +133,6 @@ cleanup() {
     }
 
     vkDestroyCommandPool(device, command_pool, null);
-    vkDestroyPipeline(device, graphics_pipeline, null);
-    vkDestroyPipelineLayout(device, pipeline_layout, null);
-    vkDestroyRenderPass(device, render_pass, null);
-    vkDestroySwapchainKHR(device, swap_chain, null);
     vkDestroyDevice(device, null);
     vkDestroySurfaceKHR(instance, surface, null);
 
@@ -390,22 +380,28 @@ struct Window {
     handle: void*;
     window: u64;
     graphics_context: void*;
+    width: s32;
+    height: s32;
 }
 
 window: Window;
 
 #if os == OS.Linux {
     create_window() {
+        XInitThreads();
+
         display := XOpenDisplay(null);
         screen := XDefaultScreen(display);
         black := XBlackPixel(display, screen);
         white := XWhitePixel(display, screen);
 
         default_window := XDefaultRootWindow(display);
-        x_win := XCreateSimpleWindow(display, default_window, 0, 0, 960, 720, 0, white, black);
+        window.width = 960;
+        window.height = 720;
+        x_win := XCreateSimpleWindow(display, default_window, 0, 0, window.width, window.height, 0, white, black);
         XSetStandardProperties(display, x_win, "Vulkan Window", "", 0, null, 0, null);
 
-        XSelectInput(display, x_win, XInputMasks.ExposureMask|XInputMasks.ButtonPressMask|XInputMasks.KeyPressMask);
+        XSelectInput(display, x_win, XInputMasks.ButtonPressMask|XInputMasks.KeyPressMask|XInputMasks.ExposureMask|XInputMasks.StructureNotifyMask);
 
         gc := XCreateGC(display, x_win, 0, null);
 
@@ -438,8 +434,16 @@ window: Window;
                     }
                 }
             }
+            else if event.type == XEventType.ConfigureNotify {
+                if window.width != event.xconfigure.width || window.height != event.xconfigure.height {
+                    window.width = event.xconfigure.width;
+                    window.height = event.xconfigure.height;
+                    printf("Handling resize\n");
+                    framebuffer_resized = true;
+                }
+            }
         }
-        // return true;
+        return true;
         return false;
     }
 
@@ -1016,7 +1020,18 @@ draw_frame() {
     vkWaitForFences(device, 1, &in_flight_fences[current_frame], VK_TRUE, 0xFFFFFFFFFFFFFFFF);
 
     image_index: u32;
-    vkAcquireNextImageKHR(device, swap_chain, 0xFFFFFFFFFFFFFFFF, image_available_semaphores[current_frame], null, &image_index);
+    result := vkAcquireNextImageKHR(device, swap_chain, 0xFFFFFFFFFFFFFFFF, image_available_semaphores[current_frame], null, &image_index);
+
+    if result == VkResult.VK_ERROR_OUT_OF_DATE_KHR {
+        framebuffer_resized = false;
+        recreate_swap_chain();
+        printf("Recreating the swap chain\n");
+        return;
+    }
+    else if result != VkResult.VK_SUCCESS && result != VkResult.VK_SUBOPTIMAL_KHR {
+        printf("Failed to acquire swap chain image %d\n", result);
+        exit(1);
+    }
 
     if images_in_flight[image_index] {
         vkWaitForFences(device, 1, &images_in_flight[image_index], VK_TRUE, 0xFFFFFFFFFFFFFFFF);
@@ -1036,7 +1051,7 @@ draw_frame() {
 
     vkResetFences(device, 1, &in_flight_fences[current_frame]);
 
-    result := vkQueueSubmit(graphics_queue, 1, &submit_info, in_flight_fences[current_frame]);
+    result = vkQueueSubmit(graphics_queue, 1, &submit_info, in_flight_fences[current_frame]);
     if result != VkResult.VK_SUCCESS {
         printf("Failed to submit draw command buffer %d\n", result);
         exit(1);
@@ -1050,11 +1065,54 @@ draw_frame() {
         pImageIndices = &image_index;
     }
 
-    vkQueuePresentKHR(present_queue, &present_info);
-
-    vkQueueWaitIdle(present_queue);
+    result = vkQueuePresentKHR(present_queue, &present_info);
+    if result == VkResult.VK_ERROR_OUT_OF_DATE_KHR || result == VkResult.VK_SUBOPTIMAL_KHR || framebuffer_resized {
+        framebuffer_resized = false;
+        recreate_swap_chain();
+        printf("Recreating the swap chain\n");
+    }
+    else if result != VkResult.VK_SUCCESS {
+        printf("Failed to present swap chain image %d\n", result);
+        exit(1);
+    }
 
     current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
+
+    vkQueueWaitIdle(present_queue);
+}
+
+
+// Part 16: https://vulkan-tutorial.com/en/Drawing_a_triangle/Swap_chain_recreation
+framebuffer_resized := false;
+
+recreate_swap_chain() {
+    vkDeviceWaitIdle(device);
+
+    cleanup_swap_chain();
+
+    create_swap_chain();
+    create_image_views();
+    create_render_pass();
+    create_graphics_pipeline();
+    create_framebuffers();
+    create_command_buffers();
+}
+
+cleanup_swap_chain() {
+    each framebuffer in swap_chain_framebuffers {
+        vkDestroyFramebuffer(device, framebuffer, null);
+    }
+
+    each image_view in swap_chain_image_views {
+        vkDestroyImageView(device, image_view, null);
+    }
+
+    vkFreeCommandBuffers(device, command_pool, command_buffers.length, command_buffers.data);
+
+    vkDestroyPipeline(device, graphics_pipeline, null);
+    vkDestroyPipelineLayout(device, pipeline_layout, null);
+    vkDestroyRenderPass(device, render_pass, null);
+    vkDestroySwapchainKHR(device, swap_chain, null);
 }
 
 
