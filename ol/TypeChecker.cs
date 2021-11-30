@@ -871,7 +871,7 @@ public static class TypeChecker
                     ErrorReporter.Report($"Function '{function.Name}' cannot have multiple varargs", argument.TypeDefinition);
                 }
                 function.Flags |= FunctionFlags.Varargs;
-                function.VarargsCallTypes = new List<IType[]>();
+                function.VarargsCallTypes = new List<Type[]>();
             }
             else if (isParams)
             {
@@ -3381,6 +3381,7 @@ public static class TypeChecker
             }
             else if (functionAst.Flags.HasFlag(FunctionFlags.Varargs))
             {
+                var types = new Type[argumentTypes.Length];
                 for (var i = 0; i < argumentTypes.Length; i++)
                 {
                     var argumentType = argumentTypes[i];
@@ -3388,7 +3389,11 @@ public static class TypeChecker
                     // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
                     if (argumentType.TypeKind == TypeKind.Float && argumentType.Size == 4)
                     {
-                        argumentTypes[i] = TypeTable.Float64Type;
+                        types[i] = typeof(double);
+                    }
+                    else
+                    {
+                        types[i] = ProgramRunner.GetType(argumentType);
                     }
                 }
                 var found = false;
@@ -3400,7 +3405,7 @@ public static class TypeChecker
                         var callMatches = true;
                         for (var i = 0; i < callTypes.Length; i++)
                         {
-                            if (callTypes[i] != argumentTypes[i])
+                            if (callTypes[i] != types[i])
                             {
                                 callMatches = false;
                                 break;
@@ -3419,8 +3424,8 @@ public static class TypeChecker
                 if (!found)
                 {
                     call.ExternIndex = functionAst.VarargsCallTypes.Count;
-                    ProgramRunner.InitVarargsFunction(functionAst, argumentTypes);
-                    functionAst.VarargsCallTypes.Add(argumentTypes);
+                    ProgramRunner.InitVarargsFunction(functionAst, types);
+                    functionAst.VarargsCallTypes.Add(types);
                 }
             }
         }

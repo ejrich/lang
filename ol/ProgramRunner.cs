@@ -60,19 +60,12 @@ public static unsafe class ProgramRunner
         CreateFunction(function.Name, function.ExternLib, argumentTypes);
     }
 
-    public static void InitVarargsFunction(FunctionAst function, IType[] types)
+    public static void InitVarargsFunction(FunctionAst function, Type[] types)
     {
-        var argumentTypes = new Type[types.Length];
-
-        for (var i = 0; i < types.Length; i++)
-        {
-            argumentTypes[i] = GetType(types[i]);
-        }
-
-        CreateFunction(function.Name, function.ExternLib, argumentTypes);
+        CreateFunction(function.Name, function.ExternLib, types);
     }
 
-    private static Type GetType(IType type)
+    public static Type GetType(IType type)
     {
         switch (type?.TypeKind)
         {
@@ -135,7 +128,6 @@ public static unsafe class ProgramRunner
 
             foreach (var function in library.GetMethods(BindingFlags.Public | BindingFlags.Static))
             {
-                var argumentCount = function.GetParameters().Length;
                 if (!_externFunctions.TryGetValue(function.Name, out var functions))
                 {
                     _externFunctions[function.Name] = new List<MethodInfo> {function};
@@ -1494,6 +1486,7 @@ public static unsafe class ProgramRunner
 
                 var delegateType = CreateDelegateType(function.Source.Name, argumentTypes);
                 functionDelegate = methodInfo.CreateDelegate(delegateType);
+                GCHandle.Alloc(functionDelegate); // Prevent the pointer from being garbage collected
             }
             else
             {

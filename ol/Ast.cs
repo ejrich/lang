@@ -94,7 +94,7 @@ public class FunctionAst : IFunction, IType
     public TypeDefinition ReturnTypeDefinition { get; set; }
     public List<string> Generics { get; } = new();
     public List<DeclarationAst> Arguments { get; } = new();
-    public List<IType[]> VarargsCallTypes { get; set; }
+    public List<Type[]> VarargsCallTypes { get; set; }
     public ScopeAst Body { get; set; }
     public List<string> Attributes { get; set; }
 }
