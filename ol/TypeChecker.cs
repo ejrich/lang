@@ -3640,7 +3640,20 @@ public static class TypeChecker
         }
         else
         {
-            ErrorReporter.Report($"No overload of function '{call.Name}' found with given arguments", call);
+            if (arguments.Length > 0 || specifiedArguments.Any())
+            {
+                var argumentTypes = string.Join(", ", arguments.Select(type => type == null ? "null" : type.Name));
+                if (arguments.Length > 0 && specifiedArguments.Any())
+                {
+                    argumentTypes += ", ";
+                }
+                argumentTypes += string.Join(", ", specifiedArguments.Select(arg => arg.Value == null ? $"{arg.Key}: null" : $"{arg.Key}: {arg.Value.Name}"));
+                ErrorReporter.Report($"No overload of function '{call.Name}' found with arguments ({argumentTypes})", call);
+            }
+            else
+            {
+                ErrorReporter.Report($"No overload of function '{call.Name}' found without arguments", call);
+            }
         }
         return null;
     }

@@ -11,6 +11,8 @@ main() {
     // while true
         draw_frame();
 
+    vkDeviceWaitIdle(device);
+
     cleanup();
 }
 
@@ -39,7 +41,7 @@ init_vulkan() {
 
     create_command_buffers();
 
-    create_semaphores();
+    create_sync_objects();
 }
 
 
@@ -127,8 +129,12 @@ cleanup() {
         vkDestroyImageView(device, image_view, null);
     }
 
-    vkDestroySemaphore(device, image_available_semaphore, null);
-    vkDestroySemaphore(device, render_finished_semaphore, null);
+    each i in 0..MAX_FRAMES_IN_FLIGHT-1 {
+        vkDestroySemaphore(device, image_available_semaphores[i], null);
+        vkDestroySemaphore(device, render_finished_semaphores[i], null);
+        vkDestroyFence(device, in_flight_fences[i], null);
+    }
+
     vkDestroyCommandPool(device, command_pool, null);
     vkDestroyPipeline(device, graphics_pipeline, null);
     vkDestroyPipelineLayout(device, pipeline_layout, null);
@@ -393,7 +399,7 @@ window: Window;
         white := XWhitePixel(display, screen);
 
         default_window := XDefaultRootWindow(display);
-        x_win := XCreateSimpleWindow(display, default_window, 0, 0, 1280, 720, 0, white, black);
+        x_win := XCreateSimpleWindow(display, default_window, 0, 0, 960, 720, 0, white, black);
         XSetStandardProperties(display, x_win, "Vulkan Window", "", 0, null, 0, null);
 
         XSelectInput(display, x_win, XInputMasks.ExposureMask|XInputMasks.ButtonPressMask|XInputMasks.KeyPressMask);
@@ -744,7 +750,7 @@ create_graphics_pipeline() {
         pMultisampleState = &multisampling;
         pDepthStencilState = null;
         pColorBlendState = &color_blending;
-        pDynamicState = &dynamic_state;
+        pDynamicState = null;
         layout = pipeline_layout;
         renderPass = render_pass;
         subpass = 0;
@@ -813,7 +819,7 @@ create_render_pass() {
     }
 
     dependency: VkSubpassDependency = {
-        srcSubpass = 0xFFFF;
+        srcSubpass = 0xFFFFFFFF;
         dstSubpass = 0;
         srcStageMask = cast(u32, VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
         srcAccessMask = 0;
@@ -941,42 +947,72 @@ create_command_buffers() {
 
 
 // Part 15: https://vulkan-tutorial.com/en/Drawing_a_triangle/Drawing/Rendering_and_presentation
-image_available_semaphore: VkSemaphore*;
-render_finished_semaphore: VkSemaphore*;
+MAX_FRAMES_IN_FLIGHT := 2; #const
+image_available_semaphores: Array<VkSemaphore*>[MAX_FRAMES_IN_FLIGHT];
+render_finished_semaphores: Array<VkSemaphore*>[MAX_FRAMES_IN_FLIGHT];
+in_flight_fences: Array<VkFence*>[MAX_FRAMES_IN_FLIGHT];
+images_in_flight: Array<VkFence*>;
+current_frame := 0;
 
-create_semaphores() {
-    semaphore_info: VkSemaphoreCreateInfo;
-
-    result := vkCreateSemaphore(device, &semaphore_info, null, &image_available_semaphore);
-    if result != VkResult.VK_SUCCESS {
-        printf("Unable to create semaphore %d\n", result);
-        exit(1);
+create_sync_objects() {
+    array_reserve(&images_in_flight, swap_chain_images.length);
+    each image in images_in_flight {
+        image = null;
     }
 
-    result = vkCreateSemaphore(device, &semaphore_info, null, &render_finished_semaphore);
-    if result != VkResult.VK_SUCCESS {
-        printf("Unable to create semaphore %d\n", result);
-        exit(1);
+    semaphore_info: VkSemaphoreCreateInfo;
+    fence_info: VkFenceCreateInfo = {
+        flags = cast(u32, VkFenceCreateFlagBits.VK_FENCE_CREATE_SIGNALED_BIT);
+    }
+
+    each i in 0..MAX_FRAMES_IN_FLIGHT-1 {
+        result := vkCreateSemaphore(device, &semaphore_info, null, &image_available_semaphores[i]);
+        if result != VkResult.VK_SUCCESS {
+            printf("Unable to create semaphore %d\n", result);
+            exit(1);
+        }
+
+        result = vkCreateSemaphore(device, &semaphore_info, null, &render_finished_semaphores[i]);
+        if result != VkResult.VK_SUCCESS {
+            printf("Unable to create semaphore %d\n", result);
+            exit(1);
+        }
+
+        result = vkCreateFence(device, &fence_info, null, &in_flight_fences[i]);
+        if result != VkResult.VK_SUCCESS {
+            printf("Unable to create fence %d\n", result);
+            exit(1);
+        }
     }
 }
 
 wait_stages: Array<VkPipelineStageFlagBits> = [VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT]
 
 draw_frame() {
+    vkWaitForFences(device, 1, &in_flight_fences[current_frame], VK_TRUE, 0xFFFFFFFFFFFFFFFF);
+
     image_index: u32;
-    vkAcquireNextImageKHR(device, swap_chain, 0xFFFFFFFF, image_available_semaphore, null, &image_index);
+    vkAcquireNextImageKHR(device, swap_chain, 0xFFFFFFFFFFFFFFFF, image_available_semaphores[current_frame], null, &image_index);
+
+    if images_in_flight[image_index] {
+        vkWaitForFences(device, 1, &images_in_flight[image_index], VK_TRUE, 0xFFFFFFFFFFFFFFFF);
+    }
+
+    images_in_flight[image_index] = in_flight_fences[current_frame];
 
     submit_info: VkSubmitInfo = {
         waitSemaphoreCount = 1;
-        pWaitSemaphores = &image_available_semaphore;
+        pWaitSemaphores = &image_available_semaphores[current_frame];
         pWaitDstStageMask = wait_stages.data;
         commandBufferCount = 1;
         pCommandBuffers = &command_buffers[image_index];
         signalSemaphoreCount = 1;
-        pSignalSemaphores = &render_finished_semaphore;
+        pSignalSemaphores = &render_finished_semaphores[current_frame];
     }
 
-    result := vkQueueSubmit(graphics_queue, 1, &submit_info, null);
+    vkResetFences(device, 1, &in_flight_fences[current_frame]);
+
+    result := vkQueueSubmit(graphics_queue, 1, &submit_info, in_flight_fences[current_frame]);
     if result != VkResult.VK_SUCCESS {
         printf("Failed to submit draw command buffer %d\n", result);
         exit(1);
@@ -984,7 +1020,7 @@ draw_frame() {
 
     present_info: VkPresentInfoKHR = {
         waitSemaphoreCount = 1;
-        pWaitSemaphores = &render_finished_semaphore;
+        pWaitSemaphores = &render_finished_semaphores[current_frame];
         swapchainCount = 1;
         pSwapchains = &swap_chain;
         pImageIndices = &image_index;
@@ -993,6 +1029,8 @@ draw_frame() {
     vkQueuePresentKHR(present_queue, &present_info);
 
     vkQueueWaitIdle(present_queue);
+
+    current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
 
