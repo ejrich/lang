@@ -67,7 +67,11 @@ public static class Parser
 
     public static void Parse(string entrypoint)
     {
+        #if DEBUG
+        _libraryDirectory = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "../../../", "Modules"));
+        #else
         _libraryDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Modules");
+        #endif
         AddModule("runtime");
         AddFile(entrypoint);
 

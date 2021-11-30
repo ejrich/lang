@@ -10,11 +10,14 @@
     <PackageReference Include="LLVMSharp" Version="12.0.0-beta1" />
   </ItemGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(Configuration)' == 'Release'">
     <None Remove="Modules/**/*.ol" />
     <Content Include="Modules/**/*.ol">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <None Remove="Runtime/*" />
     <Content Include="Runtime/*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
