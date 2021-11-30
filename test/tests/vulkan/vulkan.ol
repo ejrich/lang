@@ -8,6 +8,9 @@ main() {
 
     init_vulkan();
 
+    // while true
+        draw_frame();
+
     cleanup();
 }
 
@@ -809,11 +812,22 @@ create_render_pass() {
         pColorAttachments = &color_attachment_ref;
     }
 
+    dependency: VkSubpassDependency = {
+        srcSubpass = 0xFFFF;
+        dstSubpass = 0;
+        srcStageMask = cast(u32, VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+        srcAccessMask = 0;
+        dstStageMask = cast(u32, VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+        dstAccessMask = cast(u32, VkAccessFlagBits.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+    }
+
     render_pass_info: VkRenderPassCreateInfo = {
         attachmentCount = 1;
         pAttachments = &color_attachment;
         subpassCount = 1;
         pSubpasses = &subpass;
+        dependencyCount = 1;
+        pDependencies = &dependency;
     }
 
     result := vkCreateRenderPass(device, &render_pass_info, null, &render_pass);
@@ -967,6 +981,18 @@ draw_frame() {
         printf("Failed to submit draw command buffer %d\n", result);
         exit(1);
     }
+
+    present_info: VkPresentInfoKHR = {
+        waitSemaphoreCount = 1;
+        pWaitSemaphores = &render_finished_semaphore;
+        swapchainCount = 1;
+        pSwapchains = &swap_chain;
+        pImageIndices = &image_index;
+    }
+
+    vkQueuePresentKHR(present_queue, &present_info);
+
+    vkQueueWaitIdle(present_queue);
 }
 
 
