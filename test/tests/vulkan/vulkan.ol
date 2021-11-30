@@ -411,8 +411,6 @@ window: Window;
         XClearWindow(display, x_win);
         XMapRaised(display, x_win);
 
-        XSync(display, false);
-
         window.handle = display;
         window.window = x_win;
         window.graphics_context = gc;
@@ -438,12 +436,11 @@ window: Window;
                 if window.width != event.xconfigure.width || window.height != event.xconfigure.height {
                     window.width = event.xconfigure.width;
                     window.height = event.xconfigure.height;
-                    printf("Handling resize\n");
                     framebuffer_resized = true;
                 }
             }
         }
-        return true;
+        // return true;
         return false;
     }
 
@@ -1025,7 +1022,6 @@ draw_frame() {
     if result == VkResult.VK_ERROR_OUT_OF_DATE_KHR {
         framebuffer_resized = false;
         recreate_swap_chain();
-        printf("Recreating the swap chain\n");
         return;
     }
     else if result != VkResult.VK_SUCCESS && result != VkResult.VK_SUBOPTIMAL_KHR {
@@ -1069,7 +1065,6 @@ draw_frame() {
     if result == VkResult.VK_ERROR_OUT_OF_DATE_KHR || result == VkResult.VK_SUBOPTIMAL_KHR || framebuffer_resized {
         framebuffer_resized = false;
         recreate_swap_chain();
-        printf("Recreating the swap chain\n");
     }
     else if result != VkResult.VK_SUCCESS {
         printf("Failed to present swap chain image %d\n", result);
