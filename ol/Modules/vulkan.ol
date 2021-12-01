@@ -2907,7 +2907,7 @@ struct VkDescriptorSetLayoutBinding {
     binding: u32;
     descriptorType: VkDescriptorType;
     descriptorCount: u32;
-    stageFlags: u32;
+    stageFlags: VkShaderStageFlagBits;
     pImmutableSamplers: VkSampler**;
 }
 
