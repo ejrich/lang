@@ -42,6 +42,8 @@ init_vulkan() {
 
     create_command_pool();
 
+    setup_vertices();
+
     create_vertex_buffer();
 
     create_command_buffers();
@@ -1161,35 +1163,7 @@ vertex_buffer: VkBuffer*;
 vertex_buffer_memory: VkDeviceMemory*;
 vertices: Array<Vertex>[3];
 
-create_vertex_buffer() {
-    buffer_info: VkBufferCreateInfo = {
-        size = size_of(Vertex) * vertices.length;
-        usage = VkBufferUsageFlagBits.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-        sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
-    }
-
-    result := vkCreateBuffer(device, &buffer_info, null, &vertex_buffer);
-    if result != VkResult.VK_SUCCESS {
-        printf("Unable to create vertex buffer %d\n", result);
-        exit(1);
-    }
-
-    memory_requirements: VkMemoryRequirements;
-    vkGetBufferMemoryRequirements(device, vertex_buffer, &memory_requirements);
-
-    alloc_info: VkMemoryAllocateInfo = {
-        allocationSize = memory_requirements.size;
-        memoryTypeIndex = find_memory_type(memory_requirements.memoryTypeBits, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    }
-
-    result = vkAllocateMemory(device, &alloc_info, null, &vertex_buffer_memory);
-    if result != VkResult.VK_SUCCESS {
-        printf("Unable to allocate vertex buffer memory %d\n", result);
-        exit(1);
-    }
-
-    vkBindBufferMemory(device, vertex_buffer, vertex_buffer_memory, 0);
-
+setup_vertices() {
     position: Vector3 = { x = 0.0; y = -0.5; }
     color: Vector3 = { x = 1.0; y = 0.0; z = 0.0; }
 
@@ -1210,11 +1184,26 @@ create_vertex_buffer() {
 
     vertices[2].position = position;
     vertices[2].color = color;
+}
+
+create_vertex_buffer() {
+    size := size_of(Vertex) * vertices.length;
+
+    staging_buffer: VkBuffer*;
+    staging_buffer_memory: VkDeviceMemory*;
+    create_buffer(size, VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &staging_buffer, &staging_buffer_memory);
 
     data: void*;
-    vkMapMemory(device, vertex_buffer_memory, 0, buffer_info.size, 0, &data);
-    memcpy(data, vertices.data, buffer_info.size);
-    vkUnmapMemory(device, vertex_buffer_memory);
+    vkMapMemory(device, staging_buffer_memory, 0, size, 0, &data);
+    memcpy(data, vertices.data, size);
+    vkUnmapMemory(device, staging_buffer_memory);
+
+    create_buffer(size, VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_DST_BIT | VkBufferUsageFlagBits.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &vertex_buffer, &vertex_buffer_memory);
+
+    copy_buffer(staging_buffer, vertex_buffer, size);
+
+    vkDestroyBuffer(device, staging_buffer, null);
+    vkFreeMemory(device, staging_buffer_memory, null);
 }
 
 u32 find_memory_type(u32 type_filter, VkMemoryPropertyFlagBits properties) {
@@ -1229,6 +1218,75 @@ u32 find_memory_type(u32 type_filter, VkMemoryPropertyFlagBits properties) {
     printf("Failed to find a suitable memory type\n");
     exit(1);
     return 0;
+}
+
+
+// Part 19: https://vulkan-tutorial.com/Vertex_buffers/Staging_buffer
+create_buffer(u64 size, VkBufferUsageFlagBits usage, VkMemoryPropertyFlagBits properties, VkBuffer** buffer, VkDeviceMemory** buffer_memory) {
+    buffer_info: VkBufferCreateInfo = {
+        size = size;
+        usage = usage;
+        sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
+    }
+
+    result := vkCreateBuffer(device, &buffer_info, null, buffer);
+    if result != VkResult.VK_SUCCESS {
+        printf("Unable to create buffer %d\n", result);
+        exit(1);
+    }
+
+    memory_requirements: VkMemoryRequirements;
+    vkGetBufferMemoryRequirements(device, *buffer, &memory_requirements);
+
+    alloc_info: VkMemoryAllocateInfo = {
+        allocationSize = memory_requirements.size;
+        memoryTypeIndex = find_memory_type(memory_requirements.memoryTypeBits, properties);
+    }
+
+    result = vkAllocateMemory(device, &alloc_info, null, buffer_memory);
+    if result != VkResult.VK_SUCCESS {
+        printf("Unable to allocate buffer memory %d\n", result);
+        exit(1);
+    }
+
+    vkBindBufferMemory(device, *buffer, *buffer_memory, 0);
+}
+
+copy_buffer(VkBuffer* source_buffer, VkBuffer* dest_buffer, u64 size) {
+    alloc_info: VkCommandBufferAllocateInfo = {
+        level = VkCommandBufferLevel.VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        commandPool = command_pool;
+        commandBufferCount = 1;
+    }
+
+    command_buffer: VkCommandBuffer*;
+    vkAllocateCommandBuffers(device, &alloc_info, &command_buffer);
+
+    begin_info: VkCommandBufferBeginInfo = {
+        flags = cast(u32, VkCommandBufferUsageFlagBits.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    }
+
+    vkBeginCommandBuffer(command_buffer, &begin_info);
+
+    copy_region: VkBufferCopy = {
+        srcOffset = 0;
+        dstOffset = 0;
+        size = size;
+    }
+
+    vkCmdCopyBuffer(command_buffer, source_buffer, dest_buffer, 1, &copy_region);
+
+    vkEndCommandBuffer(command_buffer);
+
+    submit_info: VkSubmitInfo = {
+        commandBufferCount = 1;
+        pCommandBuffers = &command_buffer;
+    }
+
+    vkQueueSubmit(graphics_queue, 1, &submit_info, null);
+    vkQueueWaitIdle(graphics_queue);
+
+    vkFreeCommandBuffers(device, command_pool, 1, &command_buffer);
 }
 
 
