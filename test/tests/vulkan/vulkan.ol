@@ -36,6 +36,8 @@ init_vulkan() {
 
     create_render_pass();
 
+    create_descriptor_set_layout();
+
     create_graphics_pipeline();
 
     create_framebuffers();
@@ -47,6 +49,8 @@ init_vulkan() {
     create_vertex_buffer();
 
     create_index_buffer();
+
+    create_uniform_buffers();
 
     create_command_buffers();
 
@@ -138,6 +142,7 @@ cleanup() {
         vkDestroyFence(device, in_flight_fences[i], null);
     }
 
+    vkDestroyDescriptorSetLayout(device, descriptor_set_layout, null);
     vkDestroyBuffer(device, index_buffer, null);
     vkFreeMemory(device, index_buffer_memory, null);
     vkDestroyBuffer(device, vertex_buffer, null);
@@ -450,7 +455,7 @@ window: Window;
                 }
             }
         }
-        // return true;
+        return true;
         return false;
     }
 
@@ -774,8 +779,8 @@ create_graphics_pipeline() {
     }
 
     pipeline_layout_info: VkPipelineLayoutCreateInfo = {
-        setLayoutCount = 0;         // Optional
-        pSetLayouts = null;         // Optional
+        setLayoutCount = 1;
+        pSetLayouts = &descriptor_set_layout;
         pushConstantRangeCount = 0; // Optional
         pPushConstantRanges = null; // Optional
     }
@@ -1065,6 +1070,8 @@ draw_frame() {
 
     images_in_flight[image_index] = in_flight_fences[current_frame];
 
+    update_uniform_buffer(image_index);
+
     submit_info: VkSubmitInfo = {
         waitSemaphoreCount = 1;
         pWaitSemaphores = &image_available_semaphores[current_frame];
@@ -1120,6 +1127,7 @@ recreate_swap_chain() {
     create_render_pass();
     create_graphics_pipeline();
     create_framebuffers();
+    create_uniform_buffers();
     create_command_buffers();
 }
 
@@ -1138,6 +1146,11 @@ cleanup_swap_chain() {
     vkDestroyPipelineLayout(device, pipeline_layout, null);
     vkDestroyRenderPass(device, render_pass, null);
     vkDestroySwapchainKHR(device, swap_chain, null);
+
+    each uniform_buffer, i in uniform_buffers {
+        vkDestroyBuffer(device, uniform_buffer, null);
+        vkFreeMemory(device, uniform_buffers_memory[i], null);
+    }
 }
 
 
@@ -1326,6 +1339,115 @@ create_index_buffer() {
     vkDestroyBuffer(device, staging_buffer, null);
     vkFreeMemory(device, staging_buffer_memory, null);
 }
+
+
+// Part 21: https://vulkan-tutorial.com/en/Uniform_buffers/Descriptor_layout_and_buffer
+struct Vector4 {
+    x: float;
+    y: float;
+    z: float;
+    w: float;
+}
+
+struct Matrix4 {
+    a: Vector4;
+    b: Vector4;
+    c: Vector4;
+    d: Vector4;
+}
+
+struct UniformBufferObject {
+    model: Matrix4;
+    view: Matrix4;
+    projection: Matrix4;
+}
+
+descriptor_set_layout: VkDescriptorSetLayout*;
+
+create_descriptor_set_layout() {
+    layout_binding: VkDescriptorSetLayoutBinding = {
+        binding = 0;
+        descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorCount = 1;
+        stageFlags = VkShaderStageFlagBits.VK_SHADER_STAGE_VERTEX_BIT;
+        pImmutableSamplers = null; // Optional
+    }
+
+    layout_info: VkDescriptorSetLayoutCreateInfo = {
+        bindingCount = 1;
+        pBindings = &layout_binding;
+    }
+
+    result := vkCreateDescriptorSetLayout(device, &layout_info, null, &descriptor_set_layout);
+    if result != VkResult.VK_SUCCESS {
+        printf("Failed to create descriptor set layout %d", result);
+        exit(1);
+    }
+}
+
+uniform_buffers: Array<VkBuffer*>;
+uniform_buffers_memory: Array<VkDeviceMemory*>;
+
+create_uniform_buffers() {
+    size := size_of(UniformBufferObject);
+
+    array_reserve(&uniform_buffers, swap_chain_images.length);
+    array_reserve(&uniform_buffers_memory, swap_chain_images.length);
+
+    each uniform_buffer, i in uniform_buffers {
+        create_buffer(size, VkBufferUsageFlagBits.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniform_buffer, &uniform_buffers_memory[i]);
+    }
+}
+
+update_uniform_buffer(u32 current_image) {
+    ubo: UniformBufferObject = {
+        model = mat4_rotate_z(radians(45.0));
+    }
+    size := size_of(ubo);
+
+    data: void*;
+    vkMapMemory(device, uniform_buffers_memory[current_image], 0, size, 0, &data);
+    memcpy(data, &ubo, size);
+    vkUnmapMemory(device, uniform_buffers_memory[current_image]);
+}
+
+pi := 3.14159265359; #const
+
+float radians(float degrees) {
+    return degrees * pi / 180;
+}
+
+Matrix4 mat4_ident() {
+    matrix: Matrix4 = {
+        a = vec4(x = 1.0);
+        b = vec4(y = 1.0);
+        c = vec4(z = 1.0);
+        d = vec4(w = 1.0);
+    }
+    return matrix;
+}
+
+Vector4 vec4(float x = 0.0, float y = 0.0, float z = 0.0, float w = 0.0) {
+    vector: Vector4 = { x = x; y = y; z = z; w = w; }
+    return vector;
+}
+
+// rotate, look_at, and perspective borrowed from https://github.com/g-truc/glm
+Matrix4 mat4_rotate_z(float angle) {
+    sin := sin(angle);
+    cos := cos(angle);
+
+    matrix := mat4_ident();
+    matrix.a.x = cos;
+    matrix.a.y = sin;
+    matrix.b.x = -sin;
+    matrix.b.y = cos;
+
+    return matrix;
+}
+
+float sin(float angle) #extern "m-2.33"
+float cos(float angle) #extern "m-2.33"
 
 
 #run main();
