@@ -2175,7 +2175,7 @@ struct VkMemoryHeap {
 }
 
 struct VkMemoryType {
-    propertyFlags: u32;
+    propertyFlags: VkMemoryPropertyFlagBits;
     heapIndex: u32;
 }
 
@@ -2549,7 +2549,7 @@ struct VkBufferCreateInfo {
     pNext: void*;
     flags: u32;
     size: u64;
-    usage: u32;
+    usage: VkBufferUsageFlagBits;
     sharingMode: VkSharingMode;
     queueFamilyIndexCount: u32;
     pQueueFamilyIndices: u32*;
