@@ -46,6 +46,8 @@ init_vulkan() {
 
     create_vertex_buffer();
 
+    create_index_buffer();
+
     create_command_buffers();
 
     create_sync_objects();
@@ -136,6 +138,8 @@ cleanup() {
         vkDestroyFence(device, in_flight_fences[i], null);
     }
 
+    vkDestroyBuffer(device, index_buffer, null);
+    vkFreeMemory(device, index_buffer_memory, null);
     vkDestroyBuffer(device, vertex_buffer, null);
     vkFreeMemory(device, vertex_buffer_memory, null);
     vkDestroyCommandPool(device, command_pool, null);
@@ -982,7 +986,9 @@ create_command_buffers() {
         offset: u64;
         vkCmdBindVertexBuffers(command_buffer, 0, 1, &vertex_buffer, &offset);
 
-        vkCmdDraw(command_buffer, vertices.length, 1, 0, 0);
+        vkCmdBindIndexBuffer(command_buffer, index_buffer, 0, VkIndexType.VK_INDEX_TYPE_UINT32);
+
+        vkCmdDrawIndexed(command_buffer, indices.length, 1, 0, 0, 0);
 
         vkCmdEndRenderPass(command_buffer);
 
@@ -1161,29 +1167,35 @@ VkVertexInputBindingDescription get_binding_description() {
 // Part 18: https://vulkan-tutorial.com/en/Vertex_buffers/Vertex_buffer_creation
 vertex_buffer: VkBuffer*;
 vertex_buffer_memory: VkDeviceMemory*;
-vertices: Array<Vertex>[3];
+vertices: Array<Vertex>[4];
 
 setup_vertices() {
-    position: Vector3 = { x = 0.0; y = -0.5; }
+    position: Vector3 = { x = -0.5; y = -0.5; }
     color: Vector3 = { x = 1.0; y = 0.0; z = 0.0; }
 
     vertices[0].position = position;
     vertices[0].color = color;
 
     position.x = 0.5;
-    position.y = 0.5;
     color.x = 0.0;
     color.y = 1.0;
 
     vertices[1].position = position;
     vertices[1].color = color;
 
-    position.x = -0.5;
+    position.y = 0.5;
     color.y = 0.0;
     color.z = 1.0;
 
     vertices[2].position = position;
     vertices[2].color = color;
+
+    position.x = -0.5;
+    color.x = 1.0;
+    color.y = 1.0;
+
+    vertices[3].position = position;
+    vertices[3].color = color;
 }
 
 create_vertex_buffer() {
@@ -1287,6 +1299,32 @@ copy_buffer(VkBuffer* source_buffer, VkBuffer* dest_buffer, u64 size) {
     vkQueueWaitIdle(graphics_queue);
 
     vkFreeCommandBuffers(device, command_pool, 1, &command_buffer);
+}
+
+
+// Part 20: https://vulkan-tutorial.com/en/Vertex_buffers/Index_buffer
+index_buffer: VkBuffer*;
+index_buffer_memory: VkDeviceMemory*;
+indices: Array<u32> = [0, 1, 2, 2, 3, 0]
+
+create_index_buffer() {
+    size := size_of(u32) * indices.length;
+
+    staging_buffer: VkBuffer*;
+    staging_buffer_memory: VkDeviceMemory*;
+    create_buffer(size, VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &staging_buffer, &staging_buffer_memory);
+
+    data: void*;
+    vkMapMemory(device, staging_buffer_memory, 0, size, 0, &data);
+    memcpy(data, indices.data, size);
+    vkUnmapMemory(device, staging_buffer_memory);
+
+    create_buffer(size, VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_DST_BIT | VkBufferUsageFlagBits.VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &index_buffer, &index_buffer_memory);
+
+    copy_buffer(staging_buffer, index_buffer, size);
+
+    vkDestroyBuffer(device, staging_buffer, null);
+    vkFreeMemory(device, staging_buffer_memory, null);
 }
 
 
