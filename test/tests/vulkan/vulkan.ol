@@ -42,6 +42,8 @@ init_vulkan() {
 
     create_command_pool();
 
+    create_vertex_buffer();
+
     create_command_buffers();
 
     create_sync_objects();
@@ -132,6 +134,8 @@ cleanup() {
         vkDestroyFence(device, in_flight_fences[i], null);
     }
 
+    vkDestroyBuffer(device, vertex_buffer, null);
+    vkFreeMemory(device, vertex_buffer_memory, null);
     vkDestroyCommandPool(device, command_pool, null);
     vkDestroyDevice(device, null);
     vkDestroySurfaceKHR(instance, surface, null);
@@ -669,7 +673,18 @@ create_graphics_pipeline() {
 
 
     binding_description := get_binding_description();
-    attribute_descriptions := get_attribute_descriptions();
+
+    attribute_descriptions: Array<VkVertexInputAttributeDescription>[2];
+
+    attribute_descriptions[0].binding = 0;
+    attribute_descriptions[0].location = 0;
+    attribute_descriptions[0].format = VkFormat.VK_FORMAT_R32G32B32_SFLOAT;
+    attribute_descriptions[0].offset = 0;
+
+    attribute_descriptions[1].binding = 0;
+    attribute_descriptions[1].location = 1;
+    attribute_descriptions[1].format = VkFormat.VK_FORMAT_R32G32B32_SFLOAT;
+    attribute_descriptions[1].offset = size_of(Vector3);
 
 
     // Part 10: https://vulkan-tutorial.com/Drawing_a_triangle/Graphics_pipeline_basics/Fixed_functions
@@ -962,7 +977,10 @@ create_command_buffers() {
 
         vkCmdBindPipeline(command_buffer, VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline);
 
-        vkCmdDraw(command_buffer, 3, 1, 0, 0);
+        offset: u64;
+        vkCmdBindVertexBuffers(command_buffer, 0, 1, &vertex_buffer, &offset);
+
+        vkCmdDraw(command_buffer, vertices.length, 1, 0, 0);
 
         vkCmdEndRenderPass(command_buffer);
 
@@ -1137,20 +1155,80 @@ VkVertexInputBindingDescription get_binding_description() {
     return binding_description;
 }
 
-Array<VkVertexInputAttributeDescription> get_attribute_descriptions() {
-    attribute_descriptions: Array<VkVertexInputAttributeDescription>[2];
 
-    attribute_descriptions[0].binding = 0;
-    attribute_descriptions[0].location = 0;
-    attribute_descriptions[0].format = VkFormat.VK_FORMAT_R32G32B32_SFLOAT;
-    attribute_descriptions[0].offset = 0;
+// Part 18: https://vulkan-tutorial.com/en/Vertex_buffers/Vertex_buffer_creation
+vertex_buffer: VkBuffer*;
+vertex_buffer_memory: VkDeviceMemory*;
+vertices: Array<Vertex>[3];
 
-    attribute_descriptions[1].binding = 0;
-    attribute_descriptions[1].location = 1;
-    attribute_descriptions[1].format = VkFormat.VK_FORMAT_R32G32B32_SFLOAT;
-    attribute_descriptions[1].offset = size_of(Vector3);
+create_vertex_buffer() {
+    buffer_info: VkBufferCreateInfo = {
+        size = size_of(Vertex) * vertices.length;
+        usage = VkBufferUsageFlagBits.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
+    }
 
-    return attribute_descriptions;
+    result := vkCreateBuffer(device, &buffer_info, null, &vertex_buffer);
+    if result != VkResult.VK_SUCCESS {
+        printf("Unable to create vertex buffer %d\n", result);
+        exit(1);
+    }
+
+    memory_requirements: VkMemoryRequirements;
+    vkGetBufferMemoryRequirements(device, vertex_buffer, &memory_requirements);
+
+    alloc_info: VkMemoryAllocateInfo = {
+        allocationSize = memory_requirements.size;
+        memoryTypeIndex = find_memory_type(memory_requirements.memoryTypeBits, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    }
+
+    result = vkAllocateMemory(device, &alloc_info, null, &vertex_buffer_memory);
+    if result != VkResult.VK_SUCCESS {
+        printf("Unable to allocate vertex buffer memory %d\n", result);
+        exit(1);
+    }
+
+    vkBindBufferMemory(device, vertex_buffer, vertex_buffer_memory, 0);
+
+    position: Vector3 = { x = 0.0; y = -0.5; }
+    color: Vector3 = { x = 1.0; y = 0.0; z = 0.0; }
+
+    vertices[0].position = position;
+    vertices[0].color = color;
+
+    position.x = 0.5;
+    position.y = 0.5;
+    color.x = 0.0;
+    color.y = 1.0;
+
+    vertices[1].position = position;
+    vertices[1].color = color;
+
+    position.x = -0.5;
+    color.y = 0.0;
+    color.z = 1.0;
+
+    vertices[2].position = position;
+    vertices[2].color = color;
+
+    data: void*;
+    vkMapMemory(device, vertex_buffer_memory, 0, buffer_info.size, 0, &data);
+    memcpy(data, vertices.data, buffer_info.size);
+    vkUnmapMemory(device, vertex_buffer_memory);
+}
+
+u32 find_memory_type(u32 type_filter, VkMemoryPropertyFlagBits properties) {
+    memory_properties: VkPhysicalDeviceMemoryProperties;
+    vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
+
+    each i in 0..memory_properties.memoryTypeCount-1 {
+        if (type_filter & (1 << i)) > 0 && (memory_properties.memoryTypes[i].propertyFlags & properties) == properties
+            return i;
+    }
+
+    printf("Failed to find a suitable memory type\n");
+    exit(1);
+    return 0;
 }
 
 
