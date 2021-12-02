@@ -52,6 +52,10 @@ init_vulkan() {
 
     create_uniform_buffers();
 
+    create_descriptor_pool();
+
+    create_descriptor_sets();
+
     create_command_buffers();
 
     create_sync_objects();
@@ -737,6 +741,7 @@ create_graphics_pipeline() {
         polygonMode = VkPolygonMode.VK_POLYGON_MODE_FILL;
         lineWidth = 1.0;
         cullMode = VkCullModeFlagBits.VK_CULL_MODE_BACK_BIT;
+        // frontFace = VkFrontFace.VK_FRONT_FACE_COUNTER_CLOCKWISE;
         frontFace = VkFrontFace.VK_FRONT_FACE_CLOCKWISE;
         depthBiasEnable = VK_FALSE;
         depthBiasConstantFactor = 0.0; // Optional
@@ -993,6 +998,8 @@ create_command_buffers() {
 
         vkCmdBindIndexBuffer(command_buffer, index_buffer, 0, VkIndexType.VK_INDEX_TYPE_UINT32);
 
+        vkCmdBindDescriptorSets(command_buffer, VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_sets[i], 0, null);
+
         vkCmdDrawIndexed(command_buffer, indices.length, 1, 0, 0, 0);
 
         vkCmdEndRenderPass(command_buffer);
@@ -1128,6 +1135,8 @@ recreate_swap_chain() {
     create_graphics_pipeline();
     create_framebuffers();
     create_uniform_buffers();
+    create_descriptor_pool();
+    create_descriptor_sets();
     create_command_buffers();
 }
 
@@ -1151,6 +1160,8 @@ cleanup_swap_chain() {
         vkDestroyBuffer(device, uniform_buffer, null);
         vkFreeMemory(device, uniform_buffers_memory[i], null);
     }
+
+    vkDestroyDescriptorPool(device, descriptor_pool, null);
 }
 
 
@@ -1401,11 +1412,13 @@ create_uniform_buffers() {
 
 update_uniform_buffer(u32 current_image) {
     ubo: UniformBufferObject = {
+        // model = mat4_ident();
         model = mat4_rotate_z(radians(45.0));
-        view = look_at(vec3(2.0, 2.0, 2.0), vec3(), vec3(z = 2.0));
-        projection = perspective(radians(45.0), cast(float, swap_chain_extent.width / swap_chain_extent.height), 0.1, 10.0);
+        view = mat4_ident();
+        // view = look_at(vec3(2.0, 2.0, 2.0), vec3(), vec3(z = 2.0));
+        projection = mat4_ident();
+        // projection = perspective(radians(45.0), cast(float, swap_chain_extent.width / swap_chain_extent.height), 0.1, 10.0);
     }
-    ubo.projection.b.y *= -1;
 
     size := size_of(ubo);
 
@@ -1530,10 +1543,76 @@ Vector3 vec3(float x = 0.0, float y = 0.0, float z = 0.0) {
     return vector;
 }
 
-float sqrt(float value) #extern "m-2.33"
-float sin(float angle) #extern "m-2.33"
-float cos(float angle) #extern "m-2.33"
-float tan(float angle) #extern "m-2.33"
+float64 sqrt(float64 value) #extern "m-2.33"
+float64 sin(float64 angle) #extern "m-2.33"
+float64 cos(float64 angle) #extern "m-2.33"
+float64 tan(float64 angle) #extern "m-2.33"
+
+
+// Part 22: https://vulkan-tutorial.com/en/Uniform_buffers/Descriptor_pool_and_sets
+descriptor_pool: VkDescriptorPool*;
+descriptor_sets: Array<VkDescriptorSet*>;
+
+create_descriptor_pool() {
+    pool_size: VkDescriptorPoolSize = {
+        type = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorCount = swap_chain_images.length;
+    }
+
+    pool_info: VkDescriptorPoolCreateInfo = {
+        poolSizeCount = 1;
+        pPoolSizes = &pool_size;
+        maxSets = swap_chain_images.length;
+    }
+
+    result := vkCreateDescriptorPool(device, &pool_info, null, &descriptor_pool);
+    if result != VkResult.VK_SUCCESS {
+        printf("Unable to create descriptor pool %d\n", result);
+        exit(1);
+    }
+}
+
+create_descriptor_sets() {
+    layouts: Array<VkDescriptorSetLayout*>[swap_chain_images.length];
+    each layout in layouts {
+        layout = descriptor_set_layout;
+    }
+
+    alloc_info: VkDescriptorSetAllocateInfo = {
+        descriptorPool = descriptor_pool;
+        descriptorSetCount = swap_chain_images.length;
+        pSetLayouts = layouts.data;
+    }
+
+    array_reserve(&descriptor_sets, swap_chain_images.length);
+
+    result := vkAllocateDescriptorSets(device, &alloc_info, descriptor_sets.data);
+    if result != VkResult.VK_SUCCESS {
+        printf("Unable to allocate descriptor sets %d\n", result);
+        exit(1);
+    }
+
+    each uniform_buffer, i in uniform_buffers {
+        buffer_info: VkDescriptorBufferInfo = {
+            buffer = uniform_buffer;
+            offset = 0;
+            range = size_of(UniformBufferObject);
+        }
+
+        descriptor_write: VkWriteDescriptorSet = {
+            dstSet = descriptor_sets[i];
+            dstBinding = 0;
+            dstArrayElement = 0;
+            descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorCount = 1;
+            pBufferInfo = &buffer_info;
+            pImageInfo = null;       // Optional
+            pTexelBufferView = null; // Optional
+        }
+
+        vkUpdateDescriptorSets(device, 1, &descriptor_write, 0, null);
+    }
+}
 
 
 #run main();

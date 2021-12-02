@@ -57,18 +57,20 @@ public static unsafe class ProgramRunner
             argumentTypes[i] = GetType(argument.Type);
         }
 
-        CreateFunction(function.Name, function.ExternLib, argumentTypes);
+        CreateFunction(function.Name, function.ExternLib, argumentTypes, GetType(function.ReturnType));
     }
 
     public static void InitVarargsFunction(FunctionAst function, Type[] types)
     {
-        CreateFunction(function.Name, function.ExternLib, types);
+        CreateFunction(function.Name, function.ExternLib, types, GetType(function.ReturnType));
     }
 
     public static Type GetType(IType type)
     {
         switch (type?.TypeKind)
         {
+            case TypeKind.Void:
+                return typeof(void);
             case TypeKind.Boolean:
                 return typeof(bool);
             case TypeKind.Integer:
@@ -99,11 +101,11 @@ public static unsafe class ProgramRunner
         }
     }
 
-    private static void CreateFunction(string name, string library, Type[] argumentTypes)
+    private static void CreateFunction(string name, string library, Type[] argumentTypes, Type returnType)
     {
         _functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
 
-        var method = _functionTypeBuilder.DefineMethod(name, MethodAttributes.Public | MethodAttributes.Static, typeof(Register), argumentTypes);
+        var method = _functionTypeBuilder.DefineMethod(name, MethodAttributes.Public | MethodAttributes.Static, returnType, argumentTypes);
 
         if (!_libraries.TryGetValue(library, out var libraryDllImport))
         {
@@ -498,7 +500,8 @@ public static unsafe class ProgramRunner
                     var functionDelegate = Marshal.GetDelegateForFunctionPointer(functionPointer.Pointer, delegateType);
 
                     var args = GetExternArguments(instruction.Value2.Values, registers, stackPointer, function, arguments);
-                    registers[instruction.ValueIndex] = (Register)functionDelegate.DynamicInvoke(args);
+                    var returnValue = functionDelegate.DynamicInvoke(args);
+                    registers[instruction.ValueIndex] = ConvertToRegister(returnValue);
                     break;
                 }
                 case InstructionType.IntegerExtend:
@@ -1329,7 +1332,7 @@ public static unsafe class ProgramRunner
 
             var functionDecl = _externFunctions[callingFunction.Source.Name][externIndex];
             var returnValue = functionDecl.Invoke(null, args);
-            return (Register)returnValue;
+            return ConvertToRegister(returnValue);
         }
         else if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Compiler))
         {
@@ -1371,6 +1374,41 @@ public static unsafe class ProgramRunner
 
             return ExecuteFunction(callingFunction, args);
         }
+    }
+
+    private static Register ConvertToRegister(object value)
+    {
+        var register = new Register();
+        switch (value)
+        {
+            case Register r:
+                return r;
+            case bool b:
+                register.Bool = b;
+                break;
+            case byte b:
+                register.Byte = b;
+                break;
+            case ushort s:
+                register.UShort = s;
+                break;
+            case uint u:
+                register.UInteger = u;
+                break;
+            case ulong l:
+                register.ULong = l;
+                break;
+            case float f:
+                register.Float = f;
+                break;
+            case double d:
+                register.Double = d;
+                break;
+            case IntPtr ptr:
+                register.Pointer = ptr;
+                break;
+        }
+        return register;
     }
 
     private static object[] GetExternArguments(InstructionValue[] arguments, Register[] registers, IntPtr stackPointer, FunctionIR function, Register[] functionArgs)
@@ -1484,7 +1522,7 @@ public static unsafe class ProgramRunner
                     argumentTypes[i] = GetType(argument.Type);
                 }
 
-                var delegateType = CreateDelegateType(function.Source.Name, argumentTypes);
+                var delegateType = CreateDelegateType(function.Source.Name, argumentTypes, GetType(function.Source.ReturnType));
                 functionDelegate = methodInfo.CreateDelegate(delegateType);
                 GCHandle.Alloc(functionDelegate); // Prevent the pointer from being garbage collected
             }
@@ -1503,7 +1541,7 @@ public static unsafe class ProgramRunner
                 var call = Expression.Call(_executeFunction, Expression.Constant(function), functionArguments);
 
                 // Compile the expression to a delegate
-                var delegateType = CreateDelegateType(function.Source.Name, argumentTypes);
+                var delegateType = CreateDelegateType(function.Source.Name, argumentTypes, typeof(Register));
                 functionDelegate = Expression.Lambda(delegateType, call, parameters).Compile();
             }
 
@@ -1519,37 +1557,7 @@ public static unsafe class ProgramRunner
 
         for (var i = 0; i < args.Length; i++)
         {
-            var argument = arguments[i];
-            var register = new Register();
-            switch (argument)
-            {
-                case bool b:
-                    register.Bool = b;
-                    break;
-                case byte b:
-                    register.Byte = b;
-                    break;
-                case ushort s:
-                    register.UShort = s;
-                    break;
-                case uint u:
-                    register.UInteger = u;
-                    break;
-                case ulong l:
-                    register.ULong = l;
-                    break;
-                case float f:
-                    register.Float = f;
-                    break;
-                case double d:
-                    register.Double = d;
-                    break;
-                case IntPtr ptr:
-                    register.Pointer = ptr;
-                    break;
-            }
-
-            args[i] = register;
+            args[i] = ConvertToRegister(arguments[i]);
         }
 
         return ExecuteFunction(function, args);
@@ -1572,16 +1580,16 @@ public static unsafe class ProgramRunner
             argumentTypes[i] = GetType(argument.Type);
         }
 
-        return _functionPointerDelegateTypes[interfaceAst.Name] = CreateDelegateType(interfaceAst.Name, argumentTypes);
+        return _functionPointerDelegateTypes[interfaceAst.Name] = CreateDelegateType(interfaceAst.Name, argumentTypes, GetType(interfaceAst.ReturnType));
     }
 
     // Borrowed from https://source.dot.net/#System.Linq.Expressions/System/Linq/Expressions/Compiler/DelegateHelpers.cs,117 so I don't have to load the function with reflection
-    private static Type CreateDelegateType(string name, Type[] argumentTypes)
+    private static Type CreateDelegateType(string name, Type[] argumentTypes, Type returnType)
     {
         var builder = _moduleBuilder.DefineType(name, DelegateTypeAttributes, typeof(MulticastDelegate));
 
         builder.DefineConstructor(CtorAttributes, CallingConventions.Standard, DelegateCtorSignature).SetImplementationFlags(ImplAttributes);
-        builder.DefineMethod("Invoke", InvokeAttributes, typeof(Register), argumentTypes).SetImplementationFlags(ImplAttributes);
+        builder.DefineMethod("Invoke", InvokeAttributes, returnType, argumentTypes).SetImplementationFlags(ImplAttributes);
 
         return builder.CreateTypeInfo();
     }
