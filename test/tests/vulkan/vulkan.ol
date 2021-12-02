@@ -741,8 +741,8 @@ create_graphics_pipeline() {
         polygonMode = VkPolygonMode.VK_POLYGON_MODE_FILL;
         lineWidth = 1.0;
         cullMode = VkCullModeFlagBits.VK_CULL_MODE_BACK_BIT;
-        // frontFace = VkFrontFace.VK_FRONT_FACE_COUNTER_CLOCKWISE;
-        frontFace = VkFrontFace.VK_FRONT_FACE_CLOCKWISE;
+        frontFace = VkFrontFace.VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        // frontFace = VkFrontFace.VK_FRONT_FACE_CLOCKWISE;
         depthBiasEnable = VK_FALSE;
         depthBiasConstantFactor = 0.0; // Optional
         depthBiasClamp = 0.0;          // Optional
@@ -1412,12 +1412,10 @@ create_uniform_buffers() {
 
 update_uniform_buffer(u32 current_image) {
     ubo: UniformBufferObject = {
-        // model = mat4_ident();
-        model = mat4_rotate_z(radians(45.0));
-        view = mat4_ident();
-        // view = look_at(vec3(2.0, 2.0, 2.0), vec3(), vec3(z = 2.0));
+        model = mat4_rotate_z(radians(90.0));
+        view = look_at(vec3(2.0, 2.0, 2.0), vec3(), vec3(z = 1.0));
         projection = mat4_ident();
-        // projection = perspective(radians(45.0), cast(float, swap_chain_extent.width / swap_chain_extent.height), 0.1, 10.0);
+        // projection = perspective(radians(45.0), swap_chain_extent.width / cast(float, swap_chain_extent.height), 0.1, 10.0);
     }
 
     size := size_of(ubo);
@@ -1473,20 +1471,20 @@ Matrix4 look_at(Vector3 eye, Vector3 center, Vector3 up) {
     result := mat4_ident();
 
     result.a.x = s.x;
-    result.b.x = s.y;
-    result.c.x = s.z;
+    result.a.y = s.y;
+    result.a.z = s.z;
 
-    result.a.y = u.x;
+    result.b.x = u.x;
     result.b.y = u.y;
-    result.c.y = u.z;
+    result.b.z = u.z;
 
-    result.a.z = f.x;
-    result.b.z = f.y;
-    result.c.z = f.z;
+    result.c.x = -f.x;
+    result.c.y = -f.y;
+    result.c.z = -f.z;
 
-    result.d.x = -dot(s, eye);
-    result.d.y = -dot(u, eye);
-    result.d.z = -dot(f, eye);
+    result.a.w = -dot(s, eye);
+    result.b.w = -dot(u, eye);
+    result.c.w = dot(f, eye);
 
     return result;
 }
@@ -1497,10 +1495,14 @@ Matrix4 perspective(float fovy, float aspect, float z_near, float z_far) {
     result: Matrix4;
 
     result.a.x = 1 / (aspect * tan_half_fovy);
-    result.b.y = 1 / tan_half_fovy;
-    result.c.z = (z_far + z_near) / (z_far - z_near);
-    result.c.w = 1.0;
-    result.d.z = (2.0 * z_far * z_near) / (z_far - z_near);
+    result.b.y = -1 / tan_half_fovy;
+    // result.a.x = tan_half_fovy;
+    // result.b.y = tan_half_fovy;
+    result.c.z = - (z_far + z_near) / (z_far - z_near);
+    // result.c.z = -z_far / (z_far - z_near);
+    result.d.z = -1.0;
+    result.c.w = - (2.0 * z_far * z_near) / (z_far - z_near);
+    // result.c.w = -z_far * z_near / (z_far - z_near);
 
     return result;
 }
