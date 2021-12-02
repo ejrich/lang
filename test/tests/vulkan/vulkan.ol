@@ -455,7 +455,7 @@ window: Window;
                 }
             }
         }
-        return true;
+        // return true;
         return false;
     }
 
@@ -1402,7 +1402,11 @@ create_uniform_buffers() {
 update_uniform_buffer(u32 current_image) {
     ubo: UniformBufferObject = {
         model = mat4_rotate_z(radians(45.0));
+        view = look_at(vec3(2.0, 2.0, 2.0), vec3(), vec3(z = 2.0));
+        projection = perspective(radians(45.0), cast(float, swap_chain_extent.width / swap_chain_extent.height), 0.1, 10.0);
     }
+    ubo.projection.b.y *= -1;
+
     size := size_of(ubo);
 
     data: void*;
@@ -1446,8 +1450,90 @@ Matrix4 mat4_rotate_z(float angle) {
     return matrix;
 }
 
+Matrix4 look_at(Vector3 eye, Vector3 center, Vector3 up) {
+    sub := sub(center, eye);
+    f := normalize(sub);
+    cross := cross(f, up);
+    s := normalize(cross);
+    u := cross(s, f);
+
+    result := mat4_ident();
+
+    result.a.x = s.x;
+    result.b.x = s.y;
+    result.c.x = s.z;
+
+    result.a.y = u.x;
+    result.b.y = u.y;
+    result.c.y = u.z;
+
+    result.a.z = f.x;
+    result.b.z = f.y;
+    result.c.z = f.z;
+
+    result.d.x = -dot(s, eye);
+    result.d.y = -dot(u, eye);
+    result.d.z = -dot(f, eye);
+
+    return result;
+}
+
+Matrix4 perspective(float fovy, float aspect, float z_near, float z_far) {
+    tan_half_fovy := tan(fovy / 2.0);
+
+    result: Matrix4;
+
+    result.a.x = 1 / (aspect * tan_half_fovy);
+    result.b.y = 1 / tan_half_fovy;
+    result.c.z = (z_far + z_near) / (z_far - z_near);
+    result.c.w = 1.0;
+    result.d.z = (2.0 * z_far * z_near) / (z_far - z_near);
+
+    return result;
+}
+
+Vector3 normalize(Vector3 vec) {
+    magnitude := sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
+
+    result: Vector3 = {
+        x = vec.x / magnitude;
+        y = vec.y / magnitude;
+        z = vec.z / magnitude;
+    }
+    return result;
+}
+
+Vector3 cross(Vector3 a, Vector3 b) {
+    result: Vector3 = {
+        x = a.y * b.z - a.z * b.y;
+        y = a.z * b.x - a.x * b.z;
+        z = a.x * b.y - a.y * b.x;
+    }
+    return result;
+}
+
+float dot(Vector3 a, Vector3 b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+Vector3 sub(Vector3 a, Vector3 b) {
+    result: Vector3 = {
+        x = a.x - b.x;
+        y = a.y - b.y;
+        z = a.z - b.z;
+    }
+    return result;
+}
+
+Vector3 vec3(float x = 0.0, float y = 0.0, float z = 0.0) {
+    vector: Vector3 = { x = x; y = y; z = z; }
+    return vector;
+}
+
+float sqrt(float value) #extern "m-2.33"
 float sin(float angle) #extern "m-2.33"
 float cos(float angle) #extern "m-2.33"
+float tan(float angle) #extern "m-2.33"
 
 
 #run main();
