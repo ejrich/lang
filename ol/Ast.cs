@@ -350,6 +350,8 @@ public class DeclarationAst : IDeclaration
     public uint Line { get; init; }
     public uint Column { get; init; }
     public string Name { get; set; }
+    public bool Global { get; set; }
+    public bool Verified { get; set; }
     public TypeDefinition TypeDefinition { get; set; }
     public IType Type { get; set; }
     public IType ArrayElementType { get; set; }

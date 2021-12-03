@@ -5,8 +5,8 @@
       "configuration": {
         "request": "launch",
         "program": "${workspaceRoot}/ol/bin/Debug/net6.0/ol.dll",
-        //"args": ["-S", "${workspaceRoot}/example/main.ol", "-noThreads"],
-        "args": ["-S", "${workspaceRoot}/test/tests/vulkan/vulkan.ol", "-noThreads"],
+        "args": ["-S", "${workspaceRoot}/example/main.ol", "-noThreads"],
+        //"args": ["-S", "${workspaceRoot}/test/tests/vulkan/vulkan.ol", "-noThreads"],
         //"args": ["-S", "${workspaceRoot}/hp/hp.ol", "-noThreads"],
         "stopAtEntry": false,
         "cwd": "${workspaceRoot}"

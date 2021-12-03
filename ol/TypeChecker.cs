@@ -115,6 +115,13 @@ public static class TypeChecker
                         }
                         previous = node;
                         break;
+                    case DeclarationAst globalVariable:
+                        if (!_globalScope.Identifiers.TryAdd(globalVariable.Name, globalVariable))
+                        {
+                            ErrorReporter.Report($"Identifier '{globalVariable.Name}' already defined", globalVariable);
+                            RemoveNode(previous, node);
+                        }
+                        break;
                     default:
                         previous = node;
                         break;
@@ -130,7 +137,10 @@ public static class TypeChecker
                 switch (node.Data)
                 {
                     case DeclarationAst globalVariable:
-                        VerifyGlobalVariable(globalVariable);
+                        if (!globalVariable.Verified)
+                        {
+                            VerifyGlobalVariable(globalVariable);
+                        }
                         RemoveNode(previous, node);
                         break;
                     case UnionAst union:
@@ -996,7 +1006,6 @@ public static class TypeChecker
                 {
                     ErrorReporter.Report($"Multiple definitions of extern function '{function.Name}'", function);
                 }
-                BuildSettings.Dependencies.Add(function.ExternLib);
                 function.Flags |= FunctionFlags.Verified;
                 ProgramIRBuilder.AddFunctionDefinition(function);
             }
@@ -1235,10 +1244,7 @@ public static class TypeChecker
                     ErrorReporter.Report($"Argument '{argument.Name}' already exists as a type", argument);
                 }
             }
-            if (function.Body != null)
-            {
-                function.Body.Identifiers[argument.Name] = argument;
-            }
+            function.Body.Identifiers[argument.Name] = argument;
         }
 
         // 3. Resolve the compiler directives in the function
@@ -1498,16 +1504,11 @@ public static class TypeChecker
 
     private static void VerifyGlobalVariable(DeclarationAst declaration)
     {
-        // 1. Verify the variable is already defined
-        if (GetScopeIdentifier(_globalScope, declaration.Name, out _))
-        {
-            ErrorReporter.Report($"Identifier '{declaration.Name}' already defined", declaration);
-            return;
-        }
+        declaration.Verified = true;
 
         if (declaration.TypeDefinition != null)
         {
-            declaration.Type = VerifyType(declaration.TypeDefinition, _globalScope, out _, out var isVarargs, out var isParams);
+            declaration.Type = VerifyType(declaration.TypeDefinition, _globalScope, out _, out var isVarargs, out var isParams, initialArrayLength: declaration.ArrayValues?.Count);
             if (isVarargs || isParams)
             {
                 ErrorReporter.Report($"Variable '{declaration.Name}' cannot be varargs or Params", declaration.TypeDefinition);
@@ -1567,37 +1568,38 @@ public static class TypeChecker
                 if (declaration.Type == null || (declaration.Type.TypeKind != TypeKind.Struct && declaration.Type.TypeKind != TypeKind.String))
                 {
                     ErrorReporter.Report($"Can only use object initializer with struct type, got '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
-                    return;
                 }
-
-                var structDef = declaration.Type as StructAst;
-                var fields = structDef.Fields.ToDictionary(_ => _.Name);
-                foreach (var (name, assignment) in declaration.Assignments)
+                else
                 {
-                    if (!fields.TryGetValue(name, out var field))
+                    var structDef = declaration.Type as StructAst;
+                    var fields = structDef.Fields.ToDictionary(_ => _.Name);
+                    foreach (var (name, assignment) in declaration.Assignments)
                     {
-                        ErrorReporter.Report($"Field '{name}' not present in struct '{PrintTypeDefinition(declaration.TypeDefinition)}'", assignment.Reference);
-                    }
-
-                    if (assignment.Operator != Operator.None)
-                    {
-                        ErrorReporter.Report("Cannot have operator assignments in object initializers", assignment.Reference);
-                    }
-
-                    var valueType = VerifyConstantExpression(assignment.Value, null, _globalScope, out var isConstant, out _);
-                    if (valueType != null && field != null)
-                    {
-                        if (!TypeEquals(field.Type, valueType))
+                        if (!fields.TryGetValue(name, out var field))
                         {
-                            ErrorReporter.Report($"Expected field value to be type '{PrintTypeDefinition(field.TypeDefinition)}', but got '{valueType.Name}'", assignment.Value);
+                            ErrorReporter.Report($"Field '{name}' not present in struct '{PrintTypeDefinition(declaration.TypeDefinition)}'", assignment.Reference);
                         }
-                        else if (!isConstant)
+
+                        if (assignment.Operator != Operator.None)
                         {
-                            ErrorReporter.Report($"Global variables can only be initialized with constant values", assignment.Value);
+                            ErrorReporter.Report("Cannot have operator assignments in object initializers", assignment.Reference);
                         }
-                        else
+
+                        var valueType = VerifyConstantExpression(assignment.Value, null, _globalScope, out var isConstant, out _);
+                        if (valueType != null && field != null)
                         {
-                            VerifyConstantIfNecessary(assignment.Value, field.Type);
+                            if (!TypeEquals(field.Type, valueType))
+                            {
+                                ErrorReporter.Report($"Expected field value to be type '{PrintTypeDefinition(field.TypeDefinition)}', but got '{valueType.Name}'", assignment.Value);
+                            }
+                            else if (!isConstant)
+                            {
+                                ErrorReporter.Report($"Global variables can only be initialized with constant values", assignment.Value);
+                            }
+                            else
+                            {
+                                VerifyConstantIfNecessary(assignment.Value, field.Type);
+                            }
                         }
                     }
                 }
@@ -1619,7 +1621,7 @@ public static class TypeChecker
                 else
                 {
                     declaration.TypeDefinition.ConstCount = (uint)declaration.ArrayValues.Count;
-                    var elementType = declaration.ArrayElementType = TypeTable.GetType(declaration.TypeDefinition.Generics[0]);
+                    var elementType = declaration.ArrayElementType;
                     foreach (var value in declaration.ArrayValues)
                     {
                         var valueType = VerifyConstantExpression(value, null, _globalScope, out var isConstant, out _);
@@ -1686,8 +1688,6 @@ public static class TypeChecker
         {
             ProgramIRBuilder.EmitGlobalVariable(declaration, _globalScope);
         }
-
-        _globalScope.Identifiers.TryAdd(declaration.Name, declaration);
     }
 
     private static void VerifyGlobalVariableValue(DeclarationAst declaration)
@@ -1727,6 +1727,7 @@ public static class TypeChecker
     private static void VerifyDeclaration(DeclarationAst declaration, IFunction currentFunction, ScopeAst scope)
     {
         // 1. Verify the variable is already defined
+        declaration.Verified = true;
         if (GetScopeIdentifier(scope, declaration.Name, out _))
         {
             ErrorReporter.Report($"Identifier '{declaration.Name}' already defined", declaration);
@@ -1827,33 +1828,34 @@ public static class TypeChecker
                 if (declaration.Type == null || (declaration.Type.TypeKind != TypeKind.Struct && declaration.Type.TypeKind != TypeKind.String))
                 {
                     ErrorReporter.Report($"Can only use object initializer with struct type, got '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
-                    return;
                 }
-
-                var structDef = TypeTable.Types[declaration.TypeDefinition.GenericName] as StructAst;
-                var fields = structDef!.Fields.ToDictionary(_ => _.Name);
-                foreach (var (name, assignment) in declaration.Assignments)
+                else
                 {
-                    if (!fields.TryGetValue(name, out var field))
+                    var structDef = declaration.Type as StructAst;
+                    var fields = structDef.Fields.ToDictionary(_ => _.Name);
+                    foreach (var (name, assignment) in declaration.Assignments)
                     {
-                        ErrorReporter.Report($"Field '{name}' not present in struct '{PrintTypeDefinition(declaration.TypeDefinition)}'", assignment.Reference);
-                    }
-
-                    if (assignment.Operator != Operator.None)
-                    {
-                        ErrorReporter.Report("Cannot have operator assignments in object initializers", assignment.Reference);
-                    }
-
-                    var valueType = VerifyExpression(assignment.Value, currentFunction, scope);
-                    if (valueType != null && field != null)
-                    {
-                        if (!TypeEquals(field.Type, valueType))
+                        if (!fields.TryGetValue(name, out var field))
                         {
-                            ErrorReporter.Report($"Expected field value to be type '{PrintTypeDefinition(field.TypeDefinition)}', but got '{valueType.Name}'", assignment.Value);
+                            ErrorReporter.Report($"Field '{name}' not present in struct '{PrintTypeDefinition(declaration.TypeDefinition)}'", assignment.Reference);
                         }
-                        else
+
+                        if (assignment.Operator != Operator.None)
                         {
-                            VerifyConstantIfNecessary(assignment.Value, field.Type);
+                            ErrorReporter.Report("Cannot have operator assignments in object initializers", assignment.Reference);
+                        }
+
+                        var valueType = VerifyExpression(assignment.Value, currentFunction, scope);
+                        if (valueType != null && field != null)
+                        {
+                            if (!TypeEquals(field.Type, valueType))
+                            {
+                                ErrorReporter.Report($"Expected field value to be type '{PrintTypeDefinition(field.TypeDefinition)}', but got '{valueType.Name}'", assignment.Value);
+                            }
+                            else
+                            {
+                                VerifyConstantIfNecessary(assignment.Value, field.Type);
+                            }
                         }
                     }
                 }
@@ -2491,6 +2493,10 @@ public static class TypeChecker
                 constant = true;
                 return enumAst;
             case DeclarationAst declaration:
+                if (declaration.Global && !declaration.Verified)
+                {
+                    VerifyGlobalVariable(declaration);
+                }
                 constant = declaration.Constant;
                 return declaration.Type;
             case VariableAst variable:
@@ -2517,6 +2523,10 @@ public static class TypeChecker
                     case EnumAst enumAst:
                         return VerifyEnumValue(enumAst, structField);
                     case DeclarationAst declaration:
+                        if (declaration.Global && !declaration.Verified)
+                        {
+                            VerifyGlobalVariable(declaration);
+                        }
                         refType = declaration.Type;
                         if (declaration.Constant && refType?.TypeKind == TypeKind.String)
                         {
@@ -2818,6 +2828,10 @@ public static class TypeChecker
                 switch (identifier)
                 {
                     case DeclarationAst declaration:
+                        if (declaration.Global && !declaration.Verified)
+                        {
+                            VerifyGlobalVariable(declaration);
+                        }
                         isConstant = declaration.Constant;
                         if (isConstant && declaration.Type.TypeKind == TypeKind.Integer)
                         {
@@ -2887,6 +2901,10 @@ public static class TypeChecker
                 switch (identifier)
                 {
                     case DeclarationAst declaration:
+                        if (declaration.Global && !declaration.Verified)
+                        {
+                            VerifyGlobalVariable(declaration);
+                        }
                         return declaration.Type;
                     case VariableAst variable:
                         return variable.Type;
