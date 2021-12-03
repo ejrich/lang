@@ -1543,9 +1543,9 @@ public static class TypeChecker
             }
             else
             {
-                if (declaration.Type != null && declaration.Type.TypeKind != TypeKind.Pointer)
+                if (declaration.Type != null && declaration.Type.TypeKind != TypeKind.Pointer && declaration.Type.TypeKind != TypeKind.Interface)
                 {
-                    ErrorReporter.Report("Cannot assign null to non-pointer type", declaration.Value);
+                    ErrorReporter.Report($"Cannot assign null to non-pointer type '{declaration.Type.Name}'", declaration.Value);
                 }
 
                 nullAst.TargetType = declaration.Type;

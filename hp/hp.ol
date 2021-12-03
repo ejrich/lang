@@ -54,12 +54,11 @@ struct HashTableRecord<T> {
     value: T;
 }
 
-// TODO Get this to work with the HashTable struct array lengths
 hash_table_entries := 1000; #const
 
 struct HashTable<T> {
-    entries: Array<HashTableRecord<T>*>[1000];
-    overflow: Array<LinkedList<HashTableRecord<T>*>>[1000];
+    entries: Array<HashTableRecord<T>*>[hash_table_entries];
+    overflow: Array<LinkedList<HashTableRecord<T>*>>[hash_table_entries];
     count: int;
 }
 
