@@ -44,6 +44,8 @@ init_vulkan() {
 
     create_command_pool();
 
+    create_texture_image();
+
     setup_vertices();
 
     create_vertex_buffer();
@@ -1619,4 +1621,24 @@ create_descriptor_sets() {
 }
 
 
-#run main();
+// Part 23: https://vulkan-tutorial.com/Texture_mapping/Images
+create_texture_image() {
+    a, b, c: int;
+    pixels := stbi_load("test/tests/vulkan/textures/statue.jpg", &a, &b, &c, 4);
+
+    printf("%d %d %d %p\n", a, b, c, pixels);
+
+    if pixels == null {
+        printf("Failed to load texture image\n");
+        exit(1);
+    }
+}
+
+u8* stbi_load(string filename, int* x, int* y, int* comp, int req_comp) #extern "test/tests/vulkan/lib/stb_image.so"
+
+
+#run {
+    main();
+
+    // add_build_file("lib/stb_image.o");
+}
