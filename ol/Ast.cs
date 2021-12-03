@@ -342,6 +342,7 @@ public class CallAst : IAst
     public List<TypeDefinition> Generics { get; set; }
     public Dictionary<string, IAst> SpecifiedArguments { get; set; }
     public List<IAst> Arguments { get; } = new();
+    public IType TypeInfo { get; set; }
 }
 
 public class DeclarationAst : IDeclaration

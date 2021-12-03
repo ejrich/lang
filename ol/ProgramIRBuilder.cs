@@ -292,6 +292,8 @@ public static class ProgramIRBuilder
                 return "null";
             case InstructionValueType.Type:
                 return value.Type.Name;
+            case InstructionValueType.TypeInfo:
+                return $"TypeInfo* {value.ValueIndex}";
             case InstructionValueType.Function:
                 return $"@{value.ConstantString}";
             case InstructionValueType.CallArguments:
@@ -1780,6 +1782,18 @@ public static class ProgramIRBuilder
 
     private static InstructionValue EmitCall(FunctionIR function, CallAst call, ScopeAst scope)
     {
+        if (call.TypeInfo != null)
+        {
+            if (call.Name == "type_of")
+            {
+                return GetTypeInfo(call.TypeInfo);
+            }
+            else
+            {
+                return GetConstantInteger(call.TypeInfo.Size);
+            }
+        }
+
         if (call.Function == null)
         {
             return EmitCallFunctionPointer(function, call, scope);
@@ -1891,8 +1905,8 @@ public static class ProgramIRBuilder
 
         // Set the TypeInfo pointer
         var typeInfoPointer = EmitGetStructPointer(function, allocation, TypeTable.AnyType, 0);
-        _typeInfoPointerType ??= TypeTable.Types["*.TypeInfo"];
-        EmitStore(function, typeInfoPointer, new InstructionValue {ValueType = InstructionValueType.TypeInfo, ValueIndex = argument.Type.TypeIndex, Type = _typeInfoPointerType});
+        var typeInfo = GetTypeInfo(argument.Type);
+        EmitStore(function, typeInfoPointer, typeInfo);
 
         // Set the data pointer
         var dataPointer = EmitGetStructPointer(function, allocation, TypeTable.AnyType, 1);
@@ -1915,6 +1929,12 @@ public static class ProgramIRBuilder
         }
 
         return EmitLoad(function, TypeTable.AnyType, allocation);
+    }
+
+    private static InstructionValue GetTypeInfo(IType type)
+    {
+        _typeInfoPointerType ??= TypeTable.Types["*.TypeInfo"];
+        return new InstructionValue {ValueType = InstructionValueType.TypeInfo, ValueIndex = type.TypeIndex, Type = _typeInfoPointerType};
     }
 
     private static InstructionValue EmitCallFunctionPointer(FunctionIR function, CallAst call, ScopeAst scope, InstructionValue functionPointer = null)

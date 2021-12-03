@@ -199,7 +199,6 @@ struct ArgumentType {
 
 __type_table: Array<TypeInfo*>;
 
-// TODO Make type_of and size_of compile time constants
 TypeInfo* type_of(Type type) {
     return __type_table[type];
 }
