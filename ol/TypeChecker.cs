@@ -3350,6 +3350,25 @@ public static class TypeChecker
         {
             VerifyFunctionIfNecessary(functionAst, currentFunction);
 
+            if (call.Name == "type_of" || call.Name == "size_of")
+            {
+                IType type;
+                if (argumentTypes.Length > 0)
+                {
+                    type = argumentTypes[0];
+                }
+                else
+                {
+                    type = specifiedArguments["type"];
+                }
+
+                if (type.TypeKind != TypeKind.Type)
+                {
+                    call.TypeInfo = type;
+                    return function.ReturnType;
+                }
+            }
+
             if (currentFunction != null && !currentFunction.Flags.HasFlag(FunctionFlags.CallsCompiler) && (functionAst.Flags.HasFlag(FunctionFlags.Compiler) || functionAst.Flags.HasFlag(FunctionFlags.CallsCompiler)))
             {
                 currentFunction.Flags |= FunctionFlags.CallsCompiler;
