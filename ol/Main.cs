@@ -15,6 +15,7 @@ public static class BuildSettings
     public static string Path { get; set; }
     public static List<string> Files { get; } = new();
     public static HashSet<string> Dependencies { get; } = new();
+    public static List<string> BuildFiles { get; } = new();
 }
 
 public enum LinkerType : byte
