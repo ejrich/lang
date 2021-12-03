@@ -875,8 +875,12 @@ public static unsafe class LLVMBackend
             functionPointer = _module.AddFunction(name, LLVMTypeRef.CreateFunction(_types[function.Source.ReturnType.TypeIndex], argumentTypes, varargs));
         }
 
-        if (function.Instructions != null)
+        if (function.Instructions == null)
         {
+            var functionAst = (FunctionAst)function.Source;
+            BuildSettings.Dependencies.Add(functionAst.ExternLib);
+        }
+        else {
             _functionsToWrite.Enqueue((functionPointer, function));
         }
 

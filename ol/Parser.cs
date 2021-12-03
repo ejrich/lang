@@ -196,7 +196,7 @@ public static class Parser
                         {
                             ErrorReporter.Report($"Global variables cannot have attributes", token);
                         }
-                        return ParseDeclaration(enumerator);
+                        return ParseDeclaration(enumerator, global: true);
                     }
                     return ParseFunction(enumerator, attributes);
                 }
@@ -1528,9 +1528,10 @@ public static class Parser
         return CheckExpression(enumerator, expression, operatorRequired);
     }
 
-    private static DeclarationAst ParseDeclaration(TokenEnumerator enumerator, IFunction currentFunction = null)
+    private static DeclarationAst ParseDeclaration(TokenEnumerator enumerator, IFunction currentFunction = null, bool global = false)
     {
         var declaration = CreateAst<DeclarationAst>(enumerator.Current);
+        declaration.Global = global;
         if (enumerator.Current.Type != TokenType.Identifier)
         {
             ErrorReporter.Report($"Expected variable name to be an identifier, but got '{enumerator.Current.Value}'", enumerator.Current);

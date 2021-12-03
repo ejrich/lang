@@ -39,6 +39,7 @@ main() { //#print_ir {
     set_global(8);
     printf("'global_a' = %d\n", global_a);
     printf("'global_b' = %d\n", global_b);
+    printf("'global_c' = %d\n", global_c);
 
     poly_test();
 
@@ -92,8 +93,7 @@ main() { //#print_ir {
     multiple_return_values();
 }
 
-// TODO Make these work
-// global_c := global_b;
+global_c := global_b;
 global_struct: MyStruct;
 global_poly_struct: PolyStruct<int, float64>;
 global_array: Array<int> = [1, 2, 3, 5]
