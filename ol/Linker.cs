@@ -21,12 +21,13 @@ public static class Linker
         var linker = DetermineLinker(BuildSettings.Linker, libDirectory);
         // var gccDirectory = DetermineGCCDirectory(libDirectory);
         var defaultObjects = DefaultObjects(libDirectory);
-        var buildFiles = string.Join(" ", BuildSettings.BuildFiles);
 
         // 3. Run the linker
         var executableFile = Path.Combine(binaryPath, BuildSettings.Name);
-        var dependencyList = string.Join(' ', BuildSettings.Dependencies.Select(d => $"-l{d}"));
-        var linkerArguments = $"{linker} -o {executableFile} {objectFile} {defaultObjects} {buildFiles} --start-group {dependencyList} --end-group";
+        var libraries = string.Join(' ', BuildSettings.Libraries.Select(d => $"-l{d}"));
+        var dependencies = string.Join(' ', BuildSettings.Dependencies);
+
+        var linkerArguments = $"{linker} -o {executableFile} {objectFile} {defaultObjects} --start-group {libraries} {dependencies} --end-group";
         // var linkerArguments = $"{linker} -o {executableFile} {objectFile} {defaultObjects} -L{gccDirectory} --start-group {dependencyList} -lgcc -lgcc_eh --end-group";
 
         var buildProcess = new Process {StartInfo = {FileName = "ld", Arguments = linkerArguments}};

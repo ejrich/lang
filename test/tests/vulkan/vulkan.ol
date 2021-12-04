@@ -1634,11 +1634,9 @@ create_texture_image() {
     }
 }
 
-u8* stbi_load(string filename, int* x, int* y, int* comp, int req_comp) #extern "test/tests/vulkan/lib/stb_image.so"
+#library stb_image "lib/stb_image.so"
+
+u8* stbi_load(string filename, int* x, int* y, int* comp, int req_comp) #extern stb_image
 
 
-#run {
-    main();
-
-    // add_build_file("lib/stb_image.o");
-}
+#run main();

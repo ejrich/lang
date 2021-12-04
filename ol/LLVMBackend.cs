@@ -878,9 +878,17 @@ public static unsafe class LLVMBackend
         if (function.Instructions == null)
         {
             var functionAst = (FunctionAst)function.Source;
-            BuildSettings.Dependencies.Add(functionAst.ExternLib);
+            if (functionAst.Library == null)
+            {
+                BuildSettings.Libraries.Add(functionAst.ExternLib);
+            }
+            else
+            {
+                BuildSettings.Dependencies.Add(functionAst.ExternLib);
+            }
         }
-        else {
+        else
+        {
             _functionsToWrite.Enqueue((functionPointer, function));
         }
 
@@ -1407,7 +1415,7 @@ public static unsafe class LLVMBackend
                     }
                     case InstructionType.FloatModulus:
                     {
-                        BuildSettings.Dependencies.Add("m");
+                        BuildSettings.Libraries.Add("m");
                         var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
                         var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
                         values[instruction.ValueIndex] = _builder.BuildFRem(lhs, rhs);

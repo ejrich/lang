@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
 using System.Text;
 
 namespace ol;
@@ -12,6 +13,7 @@ public static class TypeChecker
     private static Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> _operatorOverloads;
     private static Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads;
     private static ScopeAst _globalScope;
+    private static Dictionary<string, Library> _libraries;
 
     private static StructAst _baseArrayType;
 
@@ -22,6 +24,7 @@ public static class TypeChecker
         _operatorOverloads = new();
         _polymorphicOperatorOverloads = new();
         _globalScope = new();
+        _libraries = new();
 
         var mainDefined = false;
 
@@ -121,6 +124,17 @@ public static class TypeChecker
                             ErrorReporter.Report($"Identifier '{globalVariable.Name}' already defined", globalVariable);
                             RemoveNode(previous, node);
                         }
+                        break;
+                    case CompilerDirectiveAst directive when directive.Type == DirectiveType.Library:
+                        if (!File.Exists(directive.Library.AbsolutePath))
+                        {
+                            ErrorReporter.Report($"File '{directive.Library.Path}' of library '{directive.Library.Name}' was not found", directive);
+                        }
+                        else if (!_libraries.TryAdd(directive.Library.Name, directive.Library))
+                        {
+                            ErrorReporter.Report($"Library '{directive.Library.Name}' already defined", directive);
+                        }
+                        RemoveNode(previous, node);
                         break;
                     default:
                         previous = node;
@@ -274,14 +288,14 @@ public static class TypeChecker
                                 }
                                 break;
                             case DirectiveType.ImportModule:
-                                if (directive.ImportPath != null)
+                                if (directive.Import != null)
                                 {
                                     Parser.AddModule(directive);
                                     parsingAdditional = true;
                                 }
                                 break;
                             case DirectiveType.ImportFile:
-                                if (directive.ImportPath != null)
+                                if (directive.Import != null)
                                 {
                                     Parser.AddFile(directive);
                                     parsingAdditional = true;
@@ -1002,6 +1016,18 @@ public static class TypeChecker
 
             if (function.Flags.HasFlag(FunctionFlags.Extern))
             {
+                if (function.Library != null)
+                {
+                    if (_libraries.TryGetValue(function.Library, out var library))
+                    {
+                        function.ExternLib = library.AbsolutePath;
+                    }
+                    else
+                    {
+                        ErrorReporter.Report($"Function '{function.Name}' references undefined library '{function.Library}'", function);
+                    }
+                }
+
                 if (functions.Count > 1)
                 {
                     ErrorReporter.Report($"Multiple definitions of extern function '{function.Name}'", function);
@@ -2859,7 +2885,7 @@ public static class TypeChecker
     {
         if (function.Flags.HasFlag(FunctionFlags.Extern))
         {
-            if (!function.Flags.HasFlag(FunctionFlags.Varargs) && !function.Flags.HasFlag(FunctionFlags.ExternInitted))
+            if (!function.Flags.HasFlag(FunctionFlags.Varargs) && !function.Flags.HasFlag(FunctionFlags.ExternInitted) && function.ExternLib != null)
             {
                 function.Flags |= FunctionFlags.ExternInitted;
                 ProgramRunner.InitExternFunction(function);
