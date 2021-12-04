@@ -26,8 +26,6 @@ set_linker(LinkerType linker) #compiler
 
 set_executable_name(string name) #compiler
 
-add_build_file(string name) #compiler
-
 enum OutputTypeTableConfiguration : u8 {
     Full;
     Used;

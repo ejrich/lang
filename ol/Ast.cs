@@ -89,6 +89,7 @@ public class FunctionAst : IFunction, IType
     public uint Alignment { get; set; } // Will always be 0
     public bool Used { get; set; }
     public string ExternLib { get; set; }
+    public string Library { get; set; }
     public IType ParamsElementType { get; set; }
     public IType ReturnType { get; set; }
     public TypeDefinition ReturnTypeDefinition { get; set; }
@@ -449,8 +450,21 @@ public class CompilerDirectiveAst : IAst
     public uint Column { get; init; }
     public DirectiveType Type { get; set; }
     public IAst Value { get; set; }
-    public string Import { get; set; }
-    public string ImportPath { get; set; }
+    public Import Import { get; set; }
+    public Library Library { get; set; }
+}
+
+public class Import
+{
+    public string Name { get; set; }
+    public string Path { get; set; }
+}
+
+public class Library
+{
+    public string Name { get; set; }
+    public string Path { get; set; }
+    public string AbsolutePath { get; set; }
 }
 
 public class CastAst : IAst
@@ -589,7 +603,8 @@ public enum DirectiveType
     If,
     Assert,
     ImportModule,
-    ImportFile
+    ImportFile,
+    Library
 }
 
 public enum TypeKind

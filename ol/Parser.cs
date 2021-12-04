@@ -73,7 +73,7 @@ public static class Parser
         _libraryDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Modules");
         #endif
         AddModule("runtime");
-        AddFile(entrypoint);
+        QueueFileIfNotExists(entrypoint);
 
         ThreadPool.CompleteWork();
     }
@@ -102,27 +102,22 @@ public static class Parser
 
     public static void AddModule(CompilerDirectiveAst module)
     {
-        if (File.Exists(module.ImportPath))
+        if (File.Exists(module.Import.Path))
         {
-            QueueFileIfNotExists(module.ImportPath);
+            QueueFileIfNotExists(module.Import.Path);
         }
         else
         {
-            ErrorReporter.Report($"Undefined module '{module.Import}'", module);
+            ErrorReporter.Report($"Undefined module '{module.Import.Name}'", module);
         }
     }
 
     private static void AddFile(string file, string directory, Token token)
     {
         var filePath = Path.Combine(directory, file);
-        AddFile(filePath, token);
-    }
-
-    private static void AddFile(string file, Token token = default)
-    {
-        if (File.Exists(file))
+        if (File.Exists(filePath))
         {
-            QueueFileIfNotExists(file);
+            QueueFileIfNotExists(filePath);
         }
         else
         {
@@ -132,13 +127,13 @@ public static class Parser
 
     public static void AddFile(CompilerDirectiveAst import)
     {
-        if (File.Exists(import.ImportPath))
+        if (File.Exists(import.Import.Path))
         {
-            QueueFileIfNotExists(import.ImportPath);
+            QueueFileIfNotExists(import.Import.Path);
         }
         else
         {
-            ErrorReporter.Report($"File '{import.ImportPath}' does not exist", import);
+            ErrorReporter.Report($"File '{import.Import.Name}' does not exist", import);
         }
     }
 
@@ -581,14 +576,24 @@ public static class Parser
             {
                 case "extern":
                     function.Flags |= FunctionFlags.Extern;
-                    if (!enumerator.Peek(out token) || token.Type != TokenType.Literal)
+                    const string error = "Extern function definition should be followed by the library in use";
+                    if (!enumerator.Peek(out token))
                     {
-                        ErrorReporter.Report("Extern function definition should be followed by the library in use", token);
+                        ErrorReporter.Report(error, token);
+                    }
+                    else if (token.Type == TokenType.Literal)
+                    {
+                        enumerator.MoveNext();
+                        function.ExternLib = token.Value;
+                    }
+                    else if (token.Type == TokenType.Identifier)
+                    {
+                        enumerator.MoveNext();
+                        function.Library = token.Value;
                     }
                     else
                     {
-                        enumerator.MoveNext();
-                        function.ExternLib = enumerator.Current.Value;
+                        ErrorReporter.Report(error, token);
                     }
                     return function;
                 case "compiler":
@@ -2389,31 +2394,55 @@ public static class Parser
                 {
                     case TokenType.Identifier:
                         directive.Type = DirectiveType.ImportModule;
-                        directive.Import = token.Value;
+                        var module = token.Value;
                         if (global)
                         {
-                            AddModule(token.Value, token);
+                            AddModule(module, token);
                         }
                         else
                         {
-                            directive.ImportPath = Path.Combine(_libraryDirectory, $"{token.Value}.ol");
+                            directive.Import = new Import {Name = module, Path = Path.Combine(_libraryDirectory, $"{token.Value}.ol")};
                         }
                         break;
                     case TokenType.Literal:
                         directive.Type = DirectiveType.ImportFile;
-                        directive.Import = token.Value;
+                        var file = token.Value;
                         if (global)
                         {
-                            AddFile(token.Value, directory, token);
+                            AddFile(file, directory, token);
                         }
                         else
                         {
-                            directive.ImportPath = Path.Combine(directory, token.Value);
+                            directive.Import = new Import {Name = file, Path = Path.Combine(directory, token.Value)};
                         }
                         break;
                     default:
                         ErrorReporter.Report($"Expected module name or source file, but got '{token.Value}'", token);
                         break;
+                }
+                break;
+            case "library":
+                directive.Type = DirectiveType.Library;
+                if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Identifier)
+                {
+                    ErrorReporter.Report($"Expected library name, but got '{enumerator.Current.Value}'", enumerator.Current);
+                    return null;
+                }
+                var name = enumerator.Current.Value;
+                if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Literal)
+                {
+                    ErrorReporter.Report($"Expected library path, but got '{enumerator.Current.Value}'", enumerator.Current);
+                    return null;
+                }
+                var path = enumerator.Current.Value;
+                directive.Library = new Library {Name = name, Path = path};
+                if (path[0] == '/')
+                {
+                    directive.Library.AbsolutePath = path;
+                }
+                else
+                {
+                    directive.Library.AbsolutePath = Path.Combine(directory, path);
                 }
                 break;
             default:

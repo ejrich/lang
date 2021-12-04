@@ -309,24 +309,6 @@ public static unsafe class ProgramRunner
         BuildSettings.Name = Marshal.PtrToStringAnsi(name.Data);
     }
 
-    private static void AddBuildFile(String name)
-    {
-        var path = Marshal.PtrToStringAnsi(name.Data);
-        if (!Path.IsPathRooted(path))
-        {
-            path = Path.Combine(BuildSettings.Path, path);
-        }
-
-        if (File.Exists(path))
-        {
-            BuildSettings.BuildFiles.Add(path);
-        }
-        else
-        {
-            ErrorReporter.Report($"Build file not found '{path}'");
-        }
-    }
-
     private static void SetOutputTypeTable(byte config)
     {
         BuildSettings.OutputTypeTable = (OutputTypeTableConfiguration)config;
@@ -1369,13 +1351,6 @@ public static unsafe class ProgramRunner
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
                     var name = Marshal.PtrToStructure<String>(value.Pointer);
                     SetExecutableName(name);
-                    break;
-                }
-                case "add_build_file":
-                {
-                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
-                    var name = Marshal.PtrToStructure<String>(value.Pointer);
-                    AddBuildFile(name);
                     break;
                 }
                 case "set_output_type_table":
