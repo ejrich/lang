@@ -51,6 +51,20 @@ struct VkDescriptorPool {}
 struct VkFramebuffer {}
 struct VkCommandPool {}
 
+VK_UUID_SIZE: u32 = 16; #const
+VK_ATTACHMENT_UNUSED: u32 = 0xFFFFFFFF; #const
+VK_LOD_CLAMP_NONE := 1000.0; #const
+VK_QUEUE_FAMILY_IGNORED: u32 = 0xFFFFFFFF; #const
+VK_REMAINING_ARRAY_LAYERS: u32 = 0xFFFFFFFF; #const
+VK_REMAINING_MIP_LEVELS: u32 = 0xFFFFFFFF; #const
+VK_SUBPASS_EXTERNAL: u32 = 0xFFFFFFFF; #const
+VK_WHOLE_SIZE: u64 = 0xFFFFFFFFFFFFFFFF; #const
+VK_MAX_MEMORY_TYPES: u32 = 32; #const
+VK_MAX_MEMORY_HEAPS: u32 = 16; #const
+VK_MAX_PHYSICAL_DEVICE_NAME_SIZE: u32 = 256; #const
+VK_MAX_EXTENSION_NAME_SIZE: u32 = 256; #const
+VK_MAX_DESCRIPTION_SIZE: u32 = 256; #const
+
 enum VkResult {
     VK_SUCCESS = 0;
     VK_NOT_READY = 1;
@@ -2069,8 +2083,8 @@ struct VkImageSubresourceRange {
 struct VkImageMemoryBarrier {
     sType := VkStructureType.VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     pNext: void*;
-    srcAccessMask: u32;
-    dstAccessMask: u32;
+    srcAccessMask: VkAccessFlagBits;
+    dstAccessMask: VkAccessFlagBits;
     oldLayout: VkImageLayout;
     newLayout: VkImageLayout;
     srcQueueFamilyIndex: u32;
@@ -2576,7 +2590,7 @@ struct VkImageCreateInfo {
     arrayLayers: u32;
     samples: VkSampleCountFlagBits;
     tiling: VkImageTiling;
-    usage: u32;
+    usage: VkImageUsageFlagBits;
     sharingMode: VkSharingMode;
     queueFamilyIndexCount: u32;
     pQueueFamilyIndices: u32*;
@@ -3036,7 +3050,7 @@ struct VkBufferCopy {
 }
 
 struct VkImageSubresourceLayers {
-    aspectMask: u32;
+    aspectMask: VkImageAspectFlagBits;
     mipLevel: u32;
     baseArrayLayer: u32;
     layerCount: u32;
@@ -3364,7 +3378,7 @@ interface PFN_vkCmdResetEvent(VkCommandBuffer* commandBuffer, VkEvent* event, u3
 
 interface PFN_vkCmdWaitEvents(VkCommandBuffer* commandBuffer, u32 eventCount, VkEvent** pEvents, u32 srcStageMask, u32 dstStageMask, u32 memoryBarrierCount, VkMemoryBarrier* pMemoryBarriers, u32 bufferMemoryBarrierCount, VkBufferMemoryBarrier* pBufferMemoryBarriers, u32 imageMemoryBarrierCount, VkImageMemoryBarrier* pImageMemoryBarriers)
 
-interface PFN_vkCmdPipelineBarrier(VkCommandBuffer* commandBuffer, u32 srcStageMask, u32 dstStageMask, u32 dependencyFlags, u32 memoryBarrierCount, VkMemoryBarrier* pMemoryBarriers, u32 bufferMemoryBarrierCount, VkBufferMemoryBarrier* pBufferMemoryBarriers, u32 imageMemoryBarrierCount, VkImageMemoryBarrier* pImageMemoryBarriers)
+interface PFN_vkCmdPipelineBarrier(VkCommandBuffer* commandBuffer, VkPipelineStageFlagBits srcStageMask, VkPipelineStageFlagBits dstStageMask, u32 dependencyFlags, u32 memoryBarrierCount, VkMemoryBarrier* pMemoryBarriers, u32 bufferMemoryBarrierCount, VkBufferMemoryBarrier* pBufferMemoryBarriers, u32 imageMemoryBarrierCount, VkImageMemoryBarrier* pImageMemoryBarriers)
 
 interface PFN_vkCmdBeginQuery(VkCommandBuffer* commandBuffer, VkQueryPool* queryPool, u32 query, u32 flags)
 
@@ -3638,7 +3652,7 @@ vkCmdResetEvent(VkCommandBuffer* commandBuffer, VkEvent* event, u32 stageMask) #
 
 vkCmdWaitEvents(VkCommandBuffer* commandBuffer, u32 eventCount, VkEvent** pEvents, u32 srcStageMask, u32 dstStageMask, u32 memoryBarrierCount, VkMemoryBarrier* pMemoryBarriers, u32 bufferMemoryBarrierCount, VkBufferMemoryBarrier* pBufferMemoryBarriers, u32 imageMemoryBarrierCount, VkImageMemoryBarrier* pImageMemoryBarriers) #extern "vulkan"
 
-vkCmdPipelineBarrier(VkCommandBuffer* commandBuffer, u32 srcStageMask, u32 dstStageMask, u32 dependencyFlags, u32 memoryBarrierCount, VkMemoryBarrier* pMemoryBarriers, u32 bufferMemoryBarrierCount, VkBufferMemoryBarrier* pBufferMemoryBarriers, u32 imageMemoryBarrierCount, VkImageMemoryBarrier* pImageMemoryBarriers) #extern "vulkan"
+vkCmdPipelineBarrier(VkCommandBuffer* commandBuffer, VkPipelineStageFlagBits srcStageMask, VkPipelineStageFlagBits dstStageMask, u32 dependencyFlags, u32 memoryBarrierCount, VkMemoryBarrier* pMemoryBarriers, u32 bufferMemoryBarrierCount, VkBufferMemoryBarrier* pBufferMemoryBarriers, u32 imageMemoryBarrierCount, VkImageMemoryBarrier* pImageMemoryBarriers) #extern "vulkan"
 
 vkCmdBeginQuery(VkCommandBuffer* commandBuffer, VkQueryPool* queryPool, u32 query, u32 flags) #extern "vulkan"
 
