@@ -150,6 +150,8 @@ cleanup() {
         vkDestroyFence(device, in_flight_fences[i], null);
     }
 
+    vkDestroyImage(device, texture_image, null);
+    vkFreeMemory(device, texture_image_memory, null);
     vkDestroyDescriptorSetLayout(device, descriptor_set_layout, null);
     vkDestroyBuffer(device, index_buffer, null);
     vkFreeMemory(device, index_buffer_memory, null);
@@ -1292,20 +1294,7 @@ create_buffer(u64 size, VkBufferUsageFlagBits usage, VkMemoryPropertyFlagBits pr
 }
 
 copy_buffer(VkBuffer* source_buffer, VkBuffer* dest_buffer, u64 size) {
-    alloc_info: VkCommandBufferAllocateInfo = {
-        level = VkCommandBufferLevel.VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        commandPool = command_pool;
-        commandBufferCount = 1;
-    }
-
-    command_buffer: VkCommandBuffer*;
-    vkAllocateCommandBuffers(device, &alloc_info, &command_buffer);
-
-    begin_info: VkCommandBufferBeginInfo = {
-        flags = cast(u32, VkCommandBufferUsageFlagBits.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-    }
-
-    vkBeginCommandBuffer(command_buffer, &begin_info);
+    command_buffer := begin_single_time_commands();
 
     copy_region: VkBufferCopy = {
         srcOffset = 0;
@@ -1315,17 +1304,7 @@ copy_buffer(VkBuffer* source_buffer, VkBuffer* dest_buffer, u64 size) {
 
     vkCmdCopyBuffer(command_buffer, source_buffer, dest_buffer, 1, &copy_region);
 
-    vkEndCommandBuffer(command_buffer);
-
-    submit_info: VkSubmitInfo = {
-        commandBufferCount = 1;
-        pCommandBuffers = &command_buffer;
-    }
-
-    vkQueueSubmit(graphics_queue, 1, &submit_info, null);
-    vkQueueWaitIdle(graphics_queue);
-
-    vkFreeCommandBuffers(device, command_pool, 1, &command_buffer);
+    end_single_time_commands(command_buffer);
 }
 
 
@@ -1622,21 +1601,182 @@ create_descriptor_sets() {
 
 
 // Part 23: https://vulkan-tutorial.com/Texture_mapping/Images
-create_texture_image() {
-    a, b, c: int;
-    pixels := stbi_load("test/tests/vulkan/textures/statue.jpg", &a, &b, &c, 4);
+texture_image: VkImage*;
+texture_image_memory: VkDeviceMemory*;
 
-    printf("%d %d %d %p\n", a, b, c, pixels);
+#library stb_image "lib/stb_image.so"
+
+u8* stbi_load(string filename, int* x, int* y, int* comp, int req_comp) #extern stb_image
+stbi_image_free(void* image) #extern stb_image
+
+create_texture_image() {
+    width, height, channels: int;
+    pixels := stbi_load("test/tests/vulkan/textures/statue.jpg", &width, &height, &channels, 4);
+    image_size := width * height * 4;
 
     if pixels == null {
         printf("Failed to load texture image\n");
         exit(1);
     }
+
+    staging_buffer: VkBuffer*;
+    staging_buffer_memory: VkDeviceMemory*;
+
+    create_buffer(image_size, VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &staging_buffer, &staging_buffer_memory);
+
+    data: void*;
+    vkMapMemory(device, staging_buffer_memory, 0, image_size, 0, &data);
+    memcpy(data, pixels, image_size);
+    vkUnmapMemory(device, staging_buffer_memory);
+
+    stbi_image_free(pixels);
+
+    create_image(width, height, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageTiling.VK_IMAGE_TILING_OPTIMAL, VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits.VK_IMAGE_USAGE_SAMPLED_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &texture_image, &texture_image_memory);
+
+    transition_image_layout(texture_image, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    copy_buffer_to_image(staging_buffer, texture_image, width, height);
+
+    transition_image_layout(texture_image, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    vkDestroyBuffer(device, staging_buffer, null);
+    vkFreeMemory(device, staging_buffer_memory, null);
 }
 
-#library stb_image "lib/stb_image.so"
+create_image(u32 width, u32 height, VkFormat format, VkImageTiling tiling, VkImageUsageFlagBits usage, VkMemoryPropertyFlagBits properties, VkImage** image, VkDeviceMemory** image_memory) {
+    image_info: VkImageCreateInfo = {
+        flags = 0; // Optional
+        imageType = VkImageType.VK_IMAGE_TYPE_2D;
+        format = format;
+        mipLevels = 1;
+        arrayLayers = 1;
+        samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
+        tiling = tiling;
+        usage = usage;
+        sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
+        initialLayout = VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
+    }
+    image_info.extent.width = width;
+    image_info.extent.height = height;
+    image_info.extent.depth = 1;
 
-u8* stbi_load(string filename, int* x, int* y, int* comp, int req_comp) #extern stb_image
+    result := vkCreateImage(device, &image_info, null, &texture_image);
+    if result != VkResult.VK_SUCCESS {
+        printf("Failed to create image %d\n", result);
+        exit(1);
+    }
+
+    memory_requirements: VkMemoryRequirements;
+    vkGetImageMemoryRequirements(device, *image, &memory_requirements);
+
+    alloc_info: VkMemoryAllocateInfo = {
+        allocationSize = memory_requirements.size;
+        memoryTypeIndex = find_memory_type(memory_requirements.memoryTypeBits, properties);
+    }
+
+    result = vkAllocateMemory(device, &alloc_info, null, image_memory);
+    if result != VkResult.VK_SUCCESS {
+        printf("Failed to allocate image memory %d\n", result);
+        exit(1);
+    }
+
+    vkBindImageMemory(device, *image, *image_memory, 0);
+}
+
+VkCommandBuffer* begin_single_time_commands() {
+    alloc_info: VkCommandBufferAllocateInfo = {
+        level = VkCommandBufferLevel.VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        commandPool = command_pool;
+        commandBufferCount = 1;
+    }
+
+    command_buffer: VkCommandBuffer*;
+    vkAllocateCommandBuffers(device, &alloc_info, &command_buffer);
+
+    begin_info: VkCommandBufferBeginInfo = {
+        flags = cast(u32, VkCommandBufferUsageFlagBits.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    }
+
+    vkBeginCommandBuffer(command_buffer, &begin_info);
+
+    return command_buffer;
+}
+
+end_single_time_commands(VkCommandBuffer* command_buffer) {
+    vkEndCommandBuffer(command_buffer);
+
+    submit_info: VkSubmitInfo = {
+        commandBufferCount = 1;
+        pCommandBuffers = &command_buffer;
+    }
+
+    vkQueueSubmit(graphics_queue, 1, &submit_info, null);
+    vkQueueWaitIdle(graphics_queue);
+
+    vkFreeCommandBuffers(device, command_pool, 1, &command_buffer);
+}
+
+transition_image_layout(VkImage* image, VkFormat format, VkImageLayout old_layout, VkImageLayout new_layout) {
+    command_buffer := begin_single_time_commands();
+
+    barrier: VkImageMemoryBarrier = {
+        oldLayout = old_layout;
+        newLayout = new_layout;
+        srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        image = image;
+    }
+    // TODO Nested object initializers
+    barrier.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+
+    source_stage, destination_stage: VkPipelineStageFlagBits;
+
+    if old_layout == VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL {
+        barrier.dstAccessMask = VkAccessFlagBits.VK_ACCESS_TRANSFER_WRITE_BIT;
+        source_stage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destination_stage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TRANSFER_BIT;
+    }
+    else if old_layout == VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && new_layout == VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL {
+        barrier.srcAccessMask = VkAccessFlagBits.VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VkAccessFlagBits.VK_ACCESS_SHADER_READ_BIT;
+        source_stage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TRANSFER_BIT;
+        destination_stage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    }
+    else {
+        printf("Unsupported layout transition\n");
+        exit(1);
+    }
+
+    vkCmdPipelineBarrier(command_buffer, source_stage, destination_stage, 0, 0, null, 0, null, 1, &barrier);
+
+    end_single_time_commands(command_buffer);
+}
+
+copy_buffer_to_image(VkBuffer* buffer, VkImage* image, u32 width, u32 height) {
+    command_buffer := begin_single_time_commands();
+
+    region: VkBufferImageCopy = {
+        bufferOffset = 0;
+        bufferRowLength = 0;
+        bufferImageHeight = 0;
+    }
+    region.imageSubresource.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+
+    region.imageExtent.width = width;
+    region.imageExtent.height = height;
+    region.imageExtent.depth = 1;
+
+    vkCmdCopyBufferToImage(command_buffer, buffer, image, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+    end_single_time_commands(command_buffer);
+}
 
 
 #run main();
