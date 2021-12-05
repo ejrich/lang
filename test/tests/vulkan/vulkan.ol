@@ -703,7 +703,7 @@ create_graphics_pipeline() {
 
     binding_description := get_binding_description();
 
-    attribute_descriptions: Array<VkVertexInputAttributeDescription>[2];
+    attribute_descriptions: Array<VkVertexInputAttributeDescription>[3];
 
     attribute_descriptions[0].binding = 0;
     attribute_descriptions[0].location = 0;
@@ -714,6 +714,11 @@ create_graphics_pipeline() {
     attribute_descriptions[1].location = 1;
     attribute_descriptions[1].format = VkFormat.VK_FORMAT_R32G32B32_SFLOAT;
     attribute_descriptions[1].offset = size_of(Vector3);
+
+    attribute_descriptions[2].binding = 0;
+    attribute_descriptions[2].location = 2;
+    attribute_descriptions[2].format = VkFormat.VK_FORMAT_R32G32_SFLOAT;
+    attribute_descriptions[2].offset = size_of(Vector3) * 2;
 
 
     // Part 10: https://vulkan-tutorial.com/Drawing_a_triangle/Graphics_pipeline_basics/Fixed_functions
@@ -1188,6 +1193,7 @@ struct Vector3 {
 struct Vertex {
     position: Vector3;
     color: Vector3;
+    texture_coord: Vector2;
 }
 
 VkVertexInputBindingDescription get_binding_description() {
@@ -1209,30 +1215,38 @@ vertices: Array<Vertex>[4];
 setup_vertices() {
     position: Vector3 = { x = -0.5; y = -0.5; }
     color: Vector3 = { x = 1.0; y = 0.0; z = 0.0; }
+    texture_coord: Vector2 = { x = 1.0; y = 0.0; }
 
     vertices[0].position = position;
     vertices[0].color = color;
+    vertices[0].texture_coord = texture_coord;
 
     position.x = 0.5;
     color.x = 0.0;
     color.y = 1.0;
+    texture_coord.x = 0.0;
 
     vertices[1].position = position;
     vertices[1].color = color;
+    vertices[1].texture_coord = texture_coord;
 
     position.y = 0.5;
     color.y = 0.0;
     color.z = 1.0;
+    texture_coord.y = 1.0;
 
     vertices[2].position = position;
     vertices[2].color = color;
+    vertices[2].texture_coord = texture_coord;
 
     position.x = -0.5;
     color.x = 1.0;
     color.y = 1.0;
+    texture_coord.x = 1.0;
 
     vertices[3].position = position;
     vertices[3].color = color;
+    vertices[3].texture_coord = texture_coord;
 }
 
 create_vertex_buffer() {
@@ -1366,7 +1380,7 @@ struct UniformBufferObject {
 descriptor_set_layout: VkDescriptorSetLayout*;
 
 create_descriptor_set_layout() {
-    layout_binding: VkDescriptorSetLayoutBinding = {
+    ubo_layout_binding: VkDescriptorSetLayoutBinding = {
         binding = 0;
         descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         descriptorCount = 1;
@@ -1374,9 +1388,18 @@ create_descriptor_set_layout() {
         pImmutableSamplers = null; // Optional
     }
 
+    sampler_layout_binding: VkDescriptorSetLayoutBinding = {
+        binding = 1;
+        descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorCount = 1;
+        stageFlags = VkShaderStageFlagBits.VK_SHADER_STAGE_FRAGMENT_BIT;
+    }
+
+    bindings: Array<VkDescriptorSetLayoutBinding> = [ubo_layout_binding, sampler_layout_binding]
+
     layout_info: VkDescriptorSetLayoutCreateInfo = {
-        bindingCount = 1;
-        pBindings = &layout_binding;
+        bindingCount = bindings.length;
+        pBindings = bindings.data;
     }
 
     result := vkCreateDescriptorSetLayout(device, &layout_info, null, &descriptor_set_layout);
@@ -1547,14 +1570,16 @@ descriptor_pool: VkDescriptorPool*;
 descriptor_sets: Array<VkDescriptorSet*>;
 
 create_descriptor_pool() {
-    pool_size: VkDescriptorPoolSize = {
-        type = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorCount = swap_chain_images.length;
-    }
+    pool_sizes: Array<VkDescriptorPoolSize>[2];
+
+    pool_sizes[0].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    pool_sizes[0].descriptorCount = swap_chain_images.length;
+    pool_sizes[1].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    pool_sizes[1].descriptorCount = swap_chain_images.length;
 
     pool_info: VkDescriptorPoolCreateInfo = {
-        poolSizeCount = 1;
-        pPoolSizes = &pool_size;
+        poolSizeCount = pool_sizes.length;
+        pPoolSizes = pool_sizes.data;
         maxSets = swap_chain_images.length;
     }
 
@@ -1585,25 +1610,36 @@ create_descriptor_sets() {
         exit(1);
     }
 
+    buffer_info: VkDescriptorBufferInfo = {
+        offset = 0;
+        range = size_of(UniformBufferObject);
+    }
+
+    image_info: VkDescriptorImageInfo = {
+        imageLayout = VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageView = texture_image_view;
+        sampler = texture_sampler;
+    }
+
+    descriptor_write: VkWriteDescriptorSet = {
+        dstBinding = 0;
+        dstArrayElement = 0;
+        descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorCount = 1;
+    }
+    descriptor_writes: Array<VkWriteDescriptorSet> = [descriptor_write, descriptor_write]
+
     each uniform_buffer, i in uniform_buffers {
-        buffer_info: VkDescriptorBufferInfo = {
-            buffer = uniform_buffer;
-            offset = 0;
-            range = size_of(UniformBufferObject);
-        }
+        buffer_info.buffer = uniform_buffer;
 
-        descriptor_write: VkWriteDescriptorSet = {
-            dstSet = descriptor_sets[i];
-            dstBinding = 0;
-            dstArrayElement = 0;
-            descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            descriptorCount = 1;
-            pBufferInfo = &buffer_info;
-            pImageInfo = null;       // Optional
-            pTexelBufferView = null; // Optional
-        }
+        descriptor_writes[0].dstSet = descriptor_sets[i];
+        descriptor_writes[0].pBufferInfo = &buffer_info;
+        descriptor_writes[1].dstSet = descriptor_sets[i];
+        descriptor_writes[1].dstBinding = 1;
+        descriptor_writes[1].descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptor_writes[1].pImageInfo = &image_info;
 
-        vkUpdateDescriptorSets(device, 1, &descriptor_write, 0, null);
+        vkUpdateDescriptorSets(device, descriptor_writes.length, descriptor_writes.data, 0, null);
     }
 }
 
@@ -1837,6 +1873,13 @@ create_texture_sampler() {
         printf("Unable to create image sampler %d\n", result);
         exit(1);
     }
+}
+
+
+// Part 25: https://vulkan-tutorial.com/en/Texture_mapping/Combined_image_sampler
+struct Vector2 {
+    x: float;
+    y: float;
 }
 
 
