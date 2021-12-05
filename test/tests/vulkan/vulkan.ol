@@ -46,6 +46,10 @@ init_vulkan() {
 
     create_texture_image();
 
+    create_texture_image_view();
+
+    create_texture_sampler();
+
     setup_vertices();
 
     create_vertex_buffer();
@@ -150,6 +154,8 @@ cleanup() {
         vkDestroyFence(device, in_flight_fences[i], null);
     }
 
+    vkDestroySampler(device, texture_sampler, null);
+    vkDestroyImageView(device, texture_image_view, null);
     vkDestroyImage(device, texture_image, null);
     vkFreeMemory(device, texture_image_memory, null);
     vkDestroyDescriptorSetLayout(device, descriptor_set_layout, null);
@@ -288,6 +294,7 @@ int is_device_suitable(VkPhysicalDevice* device) {
     else if !find_queue_families(device, &_, &_) score = 0;
     else if !check_device_extension_support(device) score = 0;
     else if !swap_chain_adequate(device) score = 0;
+    else if features.samplerAnisotropy == VK_FALSE score = 0;
 
     printf("Device - %s, Score = %d\n", properties.deviceName, score);
 
@@ -331,7 +338,9 @@ device: VkDevice*;
 graphics_queue: VkQueue*;
 
 create_logical_device() {
-    features: VkPhysicalDeviceFeatures;
+    features: VkPhysicalDeviceFeatures = {
+        samplerAnisotropy = VK_TRUE;
+    }
     vkGetPhysicalDeviceFeatures(physical_device, &features);
 
     device_create_info: VkDeviceCreateInfo = {
@@ -465,7 +474,7 @@ window: Window;
                 }
             }
         }
-        // return true;
+        return true;
         return false;
     }
 
@@ -653,7 +662,6 @@ create_image_views() {
         viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
         format = swap_chain_format;
     }
-
     view_create_info.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
     view_create_info.subresourceRange.baseMipLevel = 0;
     view_create_info.subresourceRange.levelCount = 1;
@@ -1776,6 +1784,59 @@ copy_buffer_to_image(VkBuffer* buffer, VkImage* image, u32 width, u32 height) {
     vkCmdCopyBufferToImage(command_buffer, buffer, image, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
     end_single_time_commands(command_buffer);
+}
+
+
+// Part 24: https://vulkan-tutorial.com/en/Texture_mapping/Image_view_and_sampler
+texture_image_view: VkImageView*;
+texture_sampler: VkSampler*;
+
+create_texture_image_view() {
+    view_info: VkImageViewCreateInfo = {
+        image = texture_image;
+        viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
+        format = VkFormat.VK_FORMAT_R8G8B8A8_SRGB;
+    }
+    view_info.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+    view_info.subresourceRange.baseMipLevel = 0;
+    view_info.subresourceRange.levelCount = 1;
+    view_info.subresourceRange.baseArrayLayer = 0;
+    view_info.subresourceRange.layerCount = 1;
+
+    result := vkCreateImageView(device, &view_info, null, &texture_image_view);
+    if result != VkResult.VK_SUCCESS {
+        printf("Unable to create image view %d\n", result);
+        exit(1);
+    }
+}
+
+create_texture_sampler() {
+    properties: VkPhysicalDeviceProperties;
+    vkGetPhysicalDeviceProperties(physical_device, &properties);
+
+    sampler_info: VkSamplerCreateInfo = {
+        magFilter = VkFilter.VK_FILTER_LINEAR;
+        minFilter = VkFilter.VK_FILTER_LINEAR;
+        addressModeU = VkSamplerAddressMode.VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        addressModeV = VkSamplerAddressMode.VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        addressModeW = VkSamplerAddressMode.VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        anisotropyEnable = VK_TRUE;
+        maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+        borderColor = VkBorderColor.VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        unnormalizedCoordinates = VK_FALSE;
+        compareEnable = VK_FALSE;
+        compareOp = VkCompareOp.VK_COMPARE_OP_ALWAYS;
+        mipmapMode = VkSamplerMipmapMode.VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        mipLodBias = 0.0;
+        minLod = 0.0;
+        maxLod = 0.0;
+    }
+
+    result := vkCreateSampler(device, &sampler_info, null, &texture_sampler);
+    if result != VkResult.VK_SUCCESS {
+        printf("Unable to create image sampler %d\n", result);
+        exit(1);
+    }
 }
 
 
