@@ -4273,12 +4273,21 @@ public static class TypeChecker
             ErrorReporter.Report($"Variable '{index.Name}' not defined", index);
             return null;
         }
-        if (identifier is not DeclarationAst declaration)
+        IType type;
+        if (identifier is DeclarationAst declaration)
+        {
+            type = declaration.Type;
+        }
+        else if (identifier is VariableAst variable)
+        {
+            type = variable.Type;
+        }
+        else
         {
             ErrorReporter.Report($"Identifier '{index.Name}' is not a variable", index);
             return null;
         }
-        return VerifyIndex(index, declaration.Type, currentFunction, scope, out _);
+        return VerifyIndex(index, type, currentFunction, scope, out _);
     }
 
     private static IType VerifyIndex(IndexAst index, IType type, IFunction currentFunction, ScopeAst scope, out bool overloaded)
