@@ -1979,9 +1979,17 @@ public static class ProgramIRBuilder
     {
         if (type == null)
         {
-            var declaration = (DeclarationAst) GetScopeIdentifier(scope, index.Name, out var global);
-            type = declaration.Type;
-            variable = declaration.Allocation;
+            var identifier = GetScopeIdentifier(scope, index.Name, out var global);
+            if (identifier is DeclarationAst declaration)
+            {
+                type = declaration.Type;
+                variable = declaration.Allocation;
+            }
+            else if (identifier is VariableAst variableAst)
+            {
+                type = variableAst.Type;
+                variable = variableAst.Pointer;
+            }
         }
 
         var indexValue = EmitIR(function, index.Index, scope);

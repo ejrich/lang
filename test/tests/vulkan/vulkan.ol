@@ -54,6 +54,8 @@ init_vulkan() {
 
     setup_vertices();
 
+    load_model();
+
     create_vertex_buffer();
 
     create_index_buffer();
@@ -2030,6 +2032,95 @@ VkFormat find_depth_format() {
 
 bool has_stencil_component(VkFormat format) {
     return format == VkFormat.VK_FORMAT_D32_SFLOAT_S8_UINT || format == VkFormat.VK_FORMAT_D24_UNORM_S8_UINT;
+}
+
+
+// Part 27: https://vulkan-tutorial.com/Loading_models
+model_vertices: Array<Vertex>;
+model_indices: Array<u32>;
+
+float strtof(u8* str, u8** end) #extern "c"
+
+load_model() {
+    _, model_file := read_file("test/tests/vulkan/models/viking_room.obj");
+
+    // Get the indices and line count of each component
+    vt, vertex_count := find_next(model_file, "vt");
+    vn, texture_count := find_next(model_file, "vn", vt);
+    f, vn_count := find_next(model_file, "f", vn); // Skipping normals for now
+    face_count := find_remaining_lines(model_file, f);
+
+    model_vertices_: Array<Vector3>[vertex_count];
+    model_texture_coordinates: Array<Vector2>[texture_count];
+    color: Vector3 = { x = 1.0; y = 1.0; z = 1.0; }
+
+    // Load vertices
+    i := 0;
+    j := 0;
+    while i < vt {
+        // Move over 'v '
+        i += 2;
+        x := strtof(model_file.data + i, null);
+        while model_file[++i] != ' ' {}
+        i++;
+
+        y := strtof(model_file.data + i, null);
+        while model_file[++i] != ' ' {}
+        i++;
+
+        z := strtof(model_file.data + i, null);
+        while model_file[++i] != '\n' {}
+        i++;
+        printf("%.6f %.6f %.6f\n", x, y, z);
+        j++;
+    }
+    printf("%d %d\n", j, vt);
+
+    // Load texture indices
+    while i < vn {
+        i++;
+    }
+
+    // Load indices
+    array_reserve(&model_indices, face_count * 3);
+
+    free(model_file.data);
+}
+
+s64, int find_next(string value, string match, s64 index = 0) {
+    lines := 0;
+
+    while index < value.length {
+        char := value[index++];
+        if char == '\n' {
+            lines++;
+        }
+        else if char == match[0] {
+            matches := true;
+            each i in 1..match.length-1 {
+                if value[index + i - 1] != match[i] {
+                    matches = false;
+                    break;
+                }
+            }
+            if matches return index, lines;
+        }
+    }
+
+    return index, lines;
+}
+
+int find_remaining_lines(string value, s64 index = 0) {
+    lines := 0;
+
+    while index < value.length {
+        char := value[index++];
+        if char == '\n' {
+            lines++;
+        }
+    }
+
+    return lines;
 }
 
 
