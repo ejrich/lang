@@ -2159,9 +2159,9 @@ u32 vk_api_version_patch(u32 version) {
 }
 
 struct VkFormatProperties {
-    linearTilingFeatures: u32;
-    optimalTilingFeatures: u32;
-    bufferFeatures: u32;
+    linearTilingFeatures: VkFormatFeatureFlagBits;
+    optimalTilingFeatures: VkFormatFeatureFlagBits;
+    bufferFeatures: VkFormatFeatureFlagBits;
 }
 
 struct VkImageFormatProperties {
@@ -2991,10 +2991,10 @@ struct VkSubpassDescription {
 struct VkSubpassDependency {
     srcSubpass: u32;
     dstSubpass: u32;
-    srcStageMask: u32;
-    dstStageMask: u32;
-    srcAccessMask: u32;
-    dstAccessMask: u32;
+    srcStageMask: VkPipelineStageFlagBits;
+    dstStageMask: VkPipelineStageFlagBits;
+    srcAccessMask: VkAccessFlagBits;
+    dstAccessMask: VkAccessFlagBits;
     dependencyFlags: u32;
 }
 
