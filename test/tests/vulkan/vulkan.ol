@@ -40,9 +40,11 @@ init_vulkan() {
 
     create_graphics_pipeline();
 
-    create_framebuffers();
-
     create_command_pool();
+
+    create_depth_resources();
+
+    create_framebuffers();
 
     create_texture_image();
 
@@ -814,6 +816,15 @@ create_graphics_pipeline() {
         exit(1);
     }
 
+    depth_stencil: VkPipelineDepthStencilStateCreateInfo = {
+        depthTestEnable = VK_TRUE;
+        depthWriteEnable = VK_TRUE;
+        depthCompareOp = VkCompareOp.VK_COMPARE_OP_LESS;
+        depthBoundsTestEnable = VK_FALSE;
+        minDepthBounds = 0.0; // Optional
+        maxDepthBounds = 1.0; // Optional
+        stencilTestEnable = VK_FALSE;
+    }
 
     // Part 12: https://vulkan-tutorial.com/en/Drawing_a_triangle/Graphics_pipeline_basics/Conclusion
     shader_stages: Array<VkPipelineShaderStageCreateInfo> = [vertex_shader_stage_info, fragment_shader_stage_info]
@@ -826,7 +837,7 @@ create_graphics_pipeline() {
         pViewportState = &viewport_state;
         pRasterizationState = &rasterizer;
         pMultisampleState = &multisampling;
-        pDepthStencilState = null;
+        pDepthStencilState = &depth_stencil;
         pColorBlendState = &color_blending;
         pDynamicState = null;
         layout = pipeline_layout;
@@ -885,29 +896,48 @@ create_render_pass() {
         finalLayout = VkImageLayout.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     }
 
+    depth_attachment: VkAttachmentDescription = {
+        format = find_depth_format();
+        samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
+        loadOp = VkAttachmentLoadOp.VK_ATTACHMENT_LOAD_OP_CLEAR;
+        storeOp = VkAttachmentStoreOp.VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        stencilLoadOp = VkAttachmentLoadOp.VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        stencilStoreOp = VkAttachmentStoreOp.VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        initialLayout = VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
+        finalLayout = VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    }
+
+    attachments: Array<VkAttachmentDescription> = [color_attachment, depth_attachment]
+
     color_attachment_ref: VkAttachmentReference = {
         attachment = 0;
         layout = VkImageLayout.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    }
+
+    depth_attachment_ref: VkAttachmentReference = {
+        attachment = 1;
+        layout = VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     }
 
     subpass: VkSubpassDescription = {
         pipelineBindPoint = VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS;
         colorAttachmentCount = 1;
         pColorAttachments = &color_attachment_ref;
+        pDepthStencilAttachment = &depth_attachment_ref;
     }
 
     dependency: VkSubpassDependency = {
-        srcSubpass = 0xFFFFFFFF;
+        srcSubpass = VK_SUBPASS_EXTERNAL;
         dstSubpass = 0;
-        srcStageMask = cast(u32, VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-        srcAccessMask = 0;
-        dstStageMask = cast(u32, VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-        dstAccessMask = cast(u32, VkAccessFlagBits.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+        srcStageMask = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VkPipelineStageFlagBits.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        srcAccessMask = VkAccessFlagBits.VK_ACCESS_NONE_KHR;
+        dstStageMask = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VkPipelineStageFlagBits.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        dstAccessMask = VkAccessFlagBits.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VkAccessFlagBits.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
     }
 
     render_pass_info: VkRenderPassCreateInfo = {
-        attachmentCount = 1;
-        pAttachments = &color_attachment;
+        attachmentCount = attachments.length;
+        pAttachments = attachments.data;
         subpassCount = 1;
         pSubpasses = &subpass;
         dependencyCount = 1;
@@ -928,16 +958,20 @@ swap_chain_framebuffers: Array<VkFramebuffer*>;
 create_framebuffers() {
     array_reserve(&swap_chain_framebuffers, swap_chain_image_views.length);
 
+    attachments: Array<VkImageView*>[2];
+    attachments[1] = depth_image_view;
+
     framebuffer_info: VkFramebufferCreateInfo = {
         renderPass = render_pass;
-        attachmentCount = 1;
+        attachmentCount = attachments.length;
+        pAttachments = attachments.data;
         width = swap_chain_extent.width;
         height = swap_chain_extent.height;
         layers = 1;
     }
 
     each image_view, i in swap_chain_image_views {
-        framebuffer_info.pAttachments = &image_view;
+        attachments[0] = image_view;
 
         result := vkCreateFramebuffer(device, &framebuffer_info, null, &swap_chain_framebuffers[i]);
         if result != VkResult.VK_SUCCESS {
@@ -986,16 +1020,18 @@ create_command_buffers() {
         pInheritanceInfo = null;
     }
 
-    clear_color: VkClearValue;
-    clear_color.color.float32[0] = 0.0;
-    clear_color.color.float32[1] = 0.0;
-    clear_color.color.float32[2] = 0.0;
-    clear_color.color.float32[3] = 1.0;
+    clear_values: Array<VkClearValue>[2];
+    clear_values[0].color.float32[0] = 0.0;
+    clear_values[0].color.float32[1] = 0.0;
+    clear_values[0].color.float32[2] = 0.0;
+    clear_values[0].color.float32[3] = 1.0;
+    clear_values[1].depthStencil.depth = 1.0;
+    clear_values[1].depthStencil.stencil = 0;
 
     render_pass_info: VkRenderPassBeginInfo = {
         renderPass = render_pass;
-        clearValueCount = 1;
-        pClearValues = &clear_color;
+        clearValueCount = clear_values.length;
+        pClearValues = clear_values.data;
     }
     render_pass_info.renderArea.extent = swap_chain_extent;
 
@@ -1151,6 +1187,7 @@ recreate_swap_chain() {
     create_image_views();
     create_render_pass();
     create_graphics_pipeline();
+    create_depth_resources();
     create_framebuffers();
     create_uniform_buffers();
     create_descriptor_pool();
@@ -1159,6 +1196,10 @@ recreate_swap_chain() {
 }
 
 cleanup_swap_chain() {
+    vkDestroyImageView(device, depth_image_view, null);
+    vkDestroyImage(device, depth_image, null);
+    vkFreeMemory(device, depth_image_memory, null);
+
     each framebuffer in swap_chain_framebuffers {
         vkDestroyFramebuffer(device, framebuffer, null);
     }
@@ -1210,12 +1251,12 @@ VkVertexInputBindingDescription get_binding_description() {
 // Part 18: https://vulkan-tutorial.com/en/Vertex_buffers/Vertex_buffer_creation
 vertex_buffer: VkBuffer*;
 vertex_buffer_memory: VkDeviceMemory*;
-vertices: Array<Vertex>[4];
+vertices: Array<Vertex>[8];
 
 setup_vertices() {
     position: Vector3 = { x = -0.5; y = -0.5; }
     color: Vector3 = { x = 1.0; y = 0.0; z = 0.0; }
-    texture_coord: Vector2 = { x = 1.0; y = 0.0; }
+    texture_coord: Vector2 = { x = 0.0; y = 0.0; }
 
     vertices[0].position = position;
     vertices[0].color = color;
@@ -1224,7 +1265,7 @@ setup_vertices() {
     position.x = 0.5;
     color.x = 0.0;
     color.y = 1.0;
-    texture_coord.x = 0.0;
+    texture_coord.x = 1.0;
 
     vertices[1].position = position;
     vertices[1].color = color;
@@ -1242,11 +1283,48 @@ setup_vertices() {
     position.x = -0.5;
     color.x = 1.0;
     color.y = 1.0;
-    texture_coord.x = 1.0;
+    texture_coord.x = 0.0;
 
     vertices[3].position = position;
     vertices[3].color = color;
     vertices[3].texture_coord = texture_coord;
+
+    position.y = -0.5;
+    position.z = -0.5;
+    color.y = 0.0;
+    color.z = 0.0;
+    texture_coord.y = 0.0;
+
+    vertices[4].position = position;
+    vertices[4].color = color;
+    vertices[4].texture_coord = texture_coord;
+
+    position.x = 0.5;
+    color.x = 0.0;
+    color.y = 1.0;
+    texture_coord.x = 1.0;
+
+    vertices[5].position = position;
+    vertices[5].color = color;
+    vertices[5].texture_coord = texture_coord;
+
+    position.y = 0.5;
+    color.y = 0.0;
+    color.z = 1.0;
+    texture_coord.y = 1.0;
+
+    vertices[6].position = position;
+    vertices[6].color = color;
+    vertices[6].texture_coord = texture_coord;
+
+    position.x = -0.5;
+    color.x = 1.0;
+    color.y = 1.0;
+    texture_coord.x = 0.0;
+
+    vertices[7].position = position;
+    vertices[7].color = color;
+    vertices[7].texture_coord = texture_coord;
 }
 
 create_vertex_buffer() {
@@ -1333,7 +1411,7 @@ copy_buffer(VkBuffer* source_buffer, VkBuffer* dest_buffer, u64 size) {
 // Part 20: https://vulkan-tutorial.com/en/Vertex_buffers/Index_buffer
 index_buffer: VkBuffer*;
 index_buffer_memory: VkDeviceMemory*;
-indices: Array<u32> = [0, 1, 2, 2, 3, 0]
+indices: Array<u32> = [0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4]
 
 create_index_buffer() {
     size := size_of(u32) * indices.length;
@@ -1514,9 +1592,9 @@ Matrix4 perspective(float fovy, float aspect, float z_near, float z_far) {
 
     result.a.x = 1 / (aspect * tan_half_fovy);
     result.b.y = -1 / tan_half_fovy;
-    result.c.z = - (z_far + z_near) / (z_far - z_near);
+    result.c.z = -z_far / (z_far - z_near);
     result.c.w = -1.0;
-    result.d.z = - (2.0 * z_far * z_near) / (z_far - z_near);
+    result.d.z = - (z_far * z_near) / (z_far - z_near);
 
     return result;
 }
@@ -1704,7 +1782,7 @@ create_image(u32 width, u32 height, VkFormat format, VkImageTiling tiling, VkIma
     image_info.extent.height = height;
     image_info.extent.depth = 1;
 
-    result := vkCreateImage(device, &image_info, null, &texture_image);
+    result := vkCreateImage(device, &image_info, null, image);
     if result != VkResult.VK_SUCCESS {
         printf("Failed to create image %d\n", result);
         exit(1);
@@ -1771,11 +1849,21 @@ transition_image_layout(VkImage* image, VkFormat format, VkImageLayout old_layou
         image = image;
     }
     // TODO Nested object initializers
-    barrier.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount = 1;
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = 1;
+
+    if new_layout == VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL {
+        barrier.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_DEPTH_BIT;
+
+        if has_stencil_component(format) {
+            barrier.subresourceRange.aspectMask |= VkImageAspectFlagBits.VK_IMAGE_ASPECT_STENCIL_BIT;
+        }
+    }
+    else {
+        barrier.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+    }
 
     source_stage, destination_stage: VkPipelineStageFlagBits;
 
@@ -1789,6 +1877,11 @@ transition_image_layout(VkImage* image, VkFormat format, VkImageLayout old_layou
         barrier.dstAccessMask = VkAccessFlagBits.VK_ACCESS_SHADER_READ_BIT;
         source_stage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TRANSFER_BIT;
         destination_stage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    }
+    else if old_layout == VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL {
+        barrier.dstAccessMask = VkAccessFlagBits.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VkAccessFlagBits.VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        source_stage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destination_stage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     }
     else {
         printf("Unsupported layout transition\n");
@@ -1880,6 +1973,63 @@ create_texture_sampler() {
 struct Vector2 {
     x: float;
     y: float;
+}
+
+
+// Part 26: https://vulkan-tutorial.com/en/Depth_buffering
+depth_image: VkImage*;
+depth_image_memory: VkDeviceMemory*;
+depth_image_view: VkImageView*;
+
+create_depth_resources() {
+    depth_format := find_depth_format();
+
+    create_image(swap_chain_extent.width, swap_chain_extent.height, depth_format, VkImageTiling.VK_IMAGE_TILING_OPTIMAL, VkImageUsageFlagBits.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &depth_image, &depth_image_memory);
+
+    view_create_info: VkImageViewCreateInfo = {
+        image = depth_image;
+        viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
+        format = depth_format;
+    }
+    view_create_info.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_DEPTH_BIT;
+    view_create_info.subresourceRange.baseMipLevel = 0;
+    view_create_info.subresourceRange.levelCount = 1;
+    view_create_info.subresourceRange.baseArrayLayer = 0;
+    view_create_info.subresourceRange.layerCount = 1;
+
+    result := vkCreateImageView(device, &view_create_info, null, &depth_image_view);
+    if result != VkResult.VK_SUCCESS {
+        printf("Unable to create image view %d\n", result);
+        exit(1);
+    }
+
+    transition_image_layout(depth_image, depth_format, VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED, VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+}
+
+VkFormat find_supported_format(Array<VkFormat> candidates, VkImageTiling tiling, VkFormatFeatureFlagBits features) {
+    props: VkFormatProperties;
+
+    each format in candidates {
+        vkGetPhysicalDeviceFormatProperties(physical_device, format, &props);
+        if tiling == VkImageTiling.VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features
+            return format;
+        else if tiling == VkImageTiling.VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features
+            return format;
+    }
+
+    printf("Failed to find supported format\n");
+    exit(1);
+    return VkFormat.VK_FORMAT_UNDEFINED;
+}
+
+depth_formats: Array<VkFormat> = [VkFormat.VK_FORMAT_D32_SFLOAT, VkFormat.VK_FORMAT_D32_SFLOAT_S8_UINT, VkFormat.VK_FORMAT_D24_UNORM_S8_UINT]
+
+VkFormat find_depth_format() {
+    return find_supported_format(depth_formats, VkImageTiling.VK_IMAGE_TILING_OPTIMAL, VkFormatFeatureFlagBits.VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+}
+
+bool has_stencil_component(VkFormat format) {
+    return format == VkFormat.VK_FORMAT_D32_SFLOAT_S8_UINT || format == VkFormat.VK_FORMAT_D24_UNORM_S8_UINT;
 }
 
 
