@@ -56,9 +56,9 @@ init_vulkan() {
 
     load_model();
 
-    create_vertex_buffer();
+    create_vertex_buffer(vertices, &vertex_buffer, &vertex_buffer_memory);
 
-    create_index_buffer();
+    create_index_buffer(indices, &index_buffer, &index_buffer_memory);
 
     create_uniform_buffers();
 
@@ -163,10 +163,19 @@ cleanup() {
     vkDestroyImage(device, texture_image, null);
     vkFreeMemory(device, texture_image_memory, null);
     vkDestroyDescriptorSetLayout(device, descriptor_set_layout, null);
+
     vkDestroyBuffer(device, index_buffer, null);
     vkFreeMemory(device, index_buffer_memory, null);
+
     vkDestroyBuffer(device, vertex_buffer, null);
     vkFreeMemory(device, vertex_buffer_memory, null);
+
+    vkDestroyBuffer(device, model_index_buffer, null);
+    vkFreeMemory(device, model_index_buffer_memory, null);
+
+    vkDestroyBuffer(device, model_vertex_buffer, null);
+    vkFreeMemory(device, model_vertex_buffer_memory, null);
+
     vkDestroyCommandPool(device, command_pool, null);
     vkDestroyDevice(device, null);
     vkDestroySurfaceKHR(instance, surface, null);
@@ -1050,13 +1059,16 @@ create_command_buffers() {
         vkCmdBindPipeline(command_buffer, VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline);
 
         offset: u64;
-        vkCmdBindVertexBuffers(command_buffer, 0, 1, &vertex_buffer, &offset);
+        // vkCmdBindVertexBuffers(command_buffer, 0, 1, &vertex_buffer, &offset);
+        vkCmdBindVertexBuffers(command_buffer, 0, 1, &model_vertex_buffer, &offset);
 
-        vkCmdBindIndexBuffer(command_buffer, index_buffer, 0, VkIndexType.VK_INDEX_TYPE_UINT32);
+        // vkCmdBindIndexBuffer(command_buffer, index_buffer, 0, VkIndexType.VK_INDEX_TYPE_UINT32);
+        vkCmdBindIndexBuffer(command_buffer, model_index_buffer, 0, VkIndexType.VK_INDEX_TYPE_UINT32);
 
         vkCmdBindDescriptorSets(command_buffer, VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_sets[i], 0, null);
 
-        vkCmdDrawIndexed(command_buffer, indices.length, 1, 0, 0, 0);
+        // vkCmdDrawIndexed(command_buffer, indices.length, 1, 0, 0, 0);
+        vkCmdDrawIndexed(command_buffer, model_indices.length, 1, 0, 0, 0);
 
         vkCmdEndRenderPass(command_buffer);
 
@@ -1329,7 +1341,7 @@ setup_vertices() {
     vertices[7].texture_coord = texture_coord;
 }
 
-create_vertex_buffer() {
+create_vertex_buffer(Array<Vertex> vertices, VkBuffer** vertex_buffer, VkDeviceMemory** vertex_buffer_memory) {
     size := size_of(Vertex) * vertices.length;
 
     staging_buffer: VkBuffer*;
@@ -1341,9 +1353,9 @@ create_vertex_buffer() {
     memcpy(data, vertices.data, size);
     vkUnmapMemory(device, staging_buffer_memory);
 
-    create_buffer(size, VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_DST_BIT | VkBufferUsageFlagBits.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &vertex_buffer, &vertex_buffer_memory);
+    create_buffer(size, VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_DST_BIT | VkBufferUsageFlagBits.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, vertex_buffer, vertex_buffer_memory);
 
-    copy_buffer(staging_buffer, vertex_buffer, size);
+    copy_buffer(staging_buffer, *vertex_buffer, size);
 
     vkDestroyBuffer(device, staging_buffer, null);
     vkFreeMemory(device, staging_buffer_memory, null);
@@ -1415,7 +1427,7 @@ index_buffer: VkBuffer*;
 index_buffer_memory: VkDeviceMemory*;
 indices: Array<u32> = [0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4]
 
-create_index_buffer() {
+create_index_buffer(Array<u32> indices, VkBuffer** index_buffer, VkDeviceMemory** index_buffer_memory) {
     size := size_of(u32) * indices.length;
 
     staging_buffer: VkBuffer*;
@@ -1427,9 +1439,9 @@ create_index_buffer() {
     memcpy(data, indices.data, size);
     vkUnmapMemory(device, staging_buffer_memory);
 
-    create_buffer(size, VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_DST_BIT | VkBufferUsageFlagBits.VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &index_buffer, &index_buffer_memory);
+    create_buffer(size, VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_DST_BIT | VkBufferUsageFlagBits.VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, index_buffer, index_buffer_memory);
 
-    copy_buffer(staging_buffer, index_buffer, size);
+    copy_buffer(staging_buffer, *index_buffer, size);
 
     vkDestroyBuffer(device, staging_buffer, null);
     vkFreeMemory(device, staging_buffer_memory, null);
@@ -1735,7 +1747,8 @@ stbi_image_free(void* image) #extern stb_image
 
 create_texture_image() {
     width, height, channels: int;
-    pixels := stbi_load("test/tests/vulkan/textures/statue.jpg", &width, &height, &channels, 4);
+    // pixels := stbi_load("test/tests/vulkan/textures/statue.jpg", &width, &height, &channels, 4);
+    pixels := stbi_load("test/tests/vulkan/textures/viking_room.png", &width, &height, &channels, 4);
     image_size := width * height * 4;
 
     if pixels == null {
@@ -2036,10 +2049,16 @@ bool has_stencil_component(VkFormat format) {
 
 
 // Part 27: https://vulkan-tutorial.com/Loading_models
+model_vertex_buffer: VkBuffer*;
+model_vertex_buffer_memory: VkDeviceMemory*;
+model_index_buffer: VkBuffer*;
+model_index_buffer_memory: VkDeviceMemory*;
+
 model_vertices: Array<Vertex>;
 model_indices: Array<u32>;
 
 float strtof(u8* str, u8** end) #extern "c"
+int sscanf(string str, string format, ... args) #extern "c"
 
 load_model() {
     _, model_file := read_file("test/tests/vulkan/models/viking_room.obj");
@@ -2050,13 +2069,12 @@ load_model() {
     f, vn_count := find_next(model_file, "f", vn); // Skipping normals for now
     face_count := find_remaining_lines(model_file, f);
 
-    model_vertices_: Array<Vector3>[vertex_count];
+    model_vertex_array: Array<Vector3>[vertex_count];
     model_texture_coordinates: Array<Vector2>[texture_count];
-    color: Vector3 = { x = 1.0; y = 1.0; z = 1.0; }
 
     // Load vertices
     i := 0;
-    j := 0;
+    vertex_index := 0;
     while i < vt {
         // Move over 'v '
         i += 2;
@@ -2071,40 +2089,98 @@ load_model() {
         z := strtof(model_file.data + i, null);
         while model_file[++i] != '\n' {}
         i++;
-        printf("%.6f %.6f %.6f\n", x, y, z);
-        j++;
+
+        vertex: Vector3 = { x = x; y = y; z = z; }
+        model_vertex_array[vertex_index++] = vertex;
     }
-    printf("%d %d\n", j, vt);
 
     // Load texture indices
+    coord_index := 0;
     while i < vn {
+        // Move over 'vt '
+        i += 3;
+        x := strtof(model_file.data + i, null);
+        while model_file[++i] != ' ' {}
+        i++;
+
+        y := 1.0 - strtof(model_file.data + i, null);
+        while model_file[++i] != '\n' {}
+        i++;
+
+        texture_coordinate: Vector2 = { x = x; y = y; }
+        model_texture_coordinates[coord_index++] = texture_coordinate;
+    }
+    i = f;
+
+    // Load indices
+    array_reserve(&model_vertices, face_count * 3);
+    array_reserve(&model_indices, face_count * 3);
+
+    color: Vector3 = { x = 1.0; y = 1.0; z = 1.0; }
+    vertex: Vertex = { color = color; }
+
+    index := 0;
+    while i < model_file.length {
+        // Move over 'f '
+        i += 2;
+        v, t, n: int;
+
+        sscanf(model_file.data + i, "%d/%d/%d", &v, &t, &n);
+        vertex.position = model_vertex_array[v-1];
+        vertex.texture_coord = model_texture_coordinates[t-1];
+        model_vertices[index] = vertex;
+        model_indices[index] = index;
+        index++;
+
+        while model_file[++i] != ' ' {}
+        i++;
+
+        sscanf(model_file.data + i, "%d/%d/%d", &v, &t, &n);
+        vertex.position = model_vertex_array[v-1];
+        vertex.texture_coord = model_texture_coordinates[t-1];
+        model_vertices[index] = vertex;
+        model_indices[index] = index;
+        index++;
+
+        while model_file[++i] != ' ' {}
+        i++;
+
+        sscanf(model_file.data + i, "%d/%d/%d", &v, &t, &n);
+        vertex.position = model_vertex_array[v-1];
+        vertex.texture_coord = model_texture_coordinates[t-1];
+        model_vertices[index] = vertex;
+        model_indices[index] = index;
+        index++;
+
+        while model_file[++i] != '\n' {}
         i++;
     }
 
-    // Load indices
-    array_reserve(&model_indices, face_count * 3);
-
     free(model_file.data);
+
+    create_vertex_buffer(model_vertices, &model_vertex_buffer, &model_vertex_buffer_memory);
+    create_index_buffer(model_indices, &model_index_buffer, &model_index_buffer_memory);
 }
 
 s64, int find_next(string value, string match, s64 index = 0) {
     lines := 0;
 
     while index < value.length {
-        char := value[index++];
+        char := value[index];
         if char == '\n' {
             lines++;
         }
         else if char == match[0] {
             matches := true;
             each i in 1..match.length-1 {
-                if value[index + i - 1] != match[i] {
+                if value[index + i] != match[i] {
                     matches = false;
                     break;
                 }
             }
             if matches return index, lines;
         }
+        index++;
     }
 
     return index, lines;
