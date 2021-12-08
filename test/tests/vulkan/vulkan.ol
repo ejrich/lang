@@ -46,9 +46,13 @@ init_vulkan() {
 
     create_framebuffers();
 
-    create_texture_image();
+    create_texture_image("test/tests/vulkan/textures/statue.jpg", &texture_image, &texture_image_memory);
 
-    create_texture_image_view();
+    create_texture_image("test/tests/vulkan/textures/viking_room.png", &model_texture_image, &model_texture_image_memory);
+
+    create_texture_image_view(texture_image, &texture_image_view);
+
+    create_texture_image_view(model_texture_image, &model_texture_image_view);
 
     create_texture_sampler();
 
@@ -159,10 +163,15 @@ cleanup() {
     }
 
     vkDestroySampler(device, texture_sampler, null);
-    vkDestroyImageView(device, texture_image_view, null);
+    vkDestroyDescriptorSetLayout(device, descriptor_set_layout, null);
+
     vkDestroyImage(device, texture_image, null);
     vkFreeMemory(device, texture_image_memory, null);
-    vkDestroyDescriptorSetLayout(device, descriptor_set_layout, null);
+    vkDestroyImageView(device, texture_image_view, null);
+
+    vkDestroyImage(device, model_texture_image, null);
+    vkFreeMemory(device, model_texture_image_memory, null);
+    vkDestroyImageView(device, model_texture_image_view, null);
 
     vkDestroyBuffer(device, index_buffer, null);
     vkFreeMemory(device, index_buffer_memory, null);
@@ -1058,16 +1067,15 @@ create_command_buffers() {
 
         vkCmdBindPipeline(command_buffer, VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline);
 
-        offset: u64;
-        // vkCmdBindVertexBuffers(command_buffer, 0, 1, &vertex_buffer, &offset);
-        vkCmdBindVertexBuffers(command_buffer, 0, 1, &model_vertex_buffer, &offset);
-
-        // vkCmdBindIndexBuffer(command_buffer, index_buffer, 0, VkIndexType.VK_INDEX_TYPE_UINT32);
-        vkCmdBindIndexBuffer(command_buffer, model_index_buffer, 0, VkIndexType.VK_INDEX_TYPE_UINT32);
-
         vkCmdBindDescriptorSets(command_buffer, VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_sets[i], 0, null);
 
-        // vkCmdDrawIndexed(command_buffer, indices.length, 1, 0, 0, 0);
+        offset: u64;
+        vkCmdBindVertexBuffers(command_buffer, 0, 1, &vertex_buffer, &offset);
+        vkCmdBindIndexBuffer(command_buffer, index_buffer, 0, VkIndexType.VK_INDEX_TYPE_UINT32);
+        vkCmdDrawIndexed(command_buffer, indices.length, 1, 0, 0, 0);
+
+        vkCmdBindVertexBuffers(command_buffer, 0, 1, &model_vertex_buffer, &offset);
+        vkCmdBindIndexBuffer(command_buffer, model_index_buffer, 0, VkIndexType.VK_INDEX_TYPE_UINT32);
         vkCmdDrawIndexed(command_buffer, model_indices.length, 1, 0, 0, 0);
 
         vkCmdEndRenderPass(command_buffer);
@@ -1745,10 +1753,9 @@ texture_image_memory: VkDeviceMemory*;
 u8* stbi_load(string filename, int* x, int* y, int* comp, int req_comp) #extern stb_image
 stbi_image_free(void* image) #extern stb_image
 
-create_texture_image() {
+create_texture_image(string file, VkImage** texture_image, VkDeviceMemory** texture_image_memory) {
     width, height, channels: int;
-    // pixels := stbi_load("test/tests/vulkan/textures/statue.jpg", &width, &height, &channels, 4);
-    pixels := stbi_load("test/tests/vulkan/textures/viking_room.png", &width, &height, &channels, 4);
+    pixels := stbi_load(file, &width, &height, &channels, 4);
     image_size := width * height * 4;
 
     if pixels == null {
@@ -1768,13 +1775,13 @@ create_texture_image() {
 
     stbi_image_free(pixels);
 
-    create_image(width, height, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageTiling.VK_IMAGE_TILING_OPTIMAL, VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits.VK_IMAGE_USAGE_SAMPLED_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &texture_image, &texture_image_memory);
+    create_image(width, height, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageTiling.VK_IMAGE_TILING_OPTIMAL, VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits.VK_IMAGE_USAGE_SAMPLED_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, texture_image, texture_image_memory);
 
-    transition_image_layout(texture_image, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    transition_image_layout(*texture_image, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-    copy_buffer_to_image(staging_buffer, texture_image, width, height);
+    copy_buffer_to_image(staging_buffer, *texture_image, width, height);
 
-    transition_image_layout(texture_image, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    transition_image_layout(*texture_image, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     vkDestroyBuffer(device, staging_buffer, null);
     vkFreeMemory(device, staging_buffer_memory, null);
@@ -1935,7 +1942,7 @@ copy_buffer_to_image(VkBuffer* buffer, VkImage* image, u32 width, u32 height) {
 texture_image_view: VkImageView*;
 texture_sampler: VkSampler*;
 
-create_texture_image_view() {
+create_texture_image_view(VkImage* texture_image, VkImageView** texture_image_view) {
     view_info: VkImageViewCreateInfo = {
         image = texture_image;
         viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
@@ -1947,7 +1954,7 @@ create_texture_image_view() {
     view_info.subresourceRange.baseArrayLayer = 0;
     view_info.subresourceRange.layerCount = 1;
 
-    result := vkCreateImageView(device, &view_info, null, &texture_image_view);
+    result := vkCreateImageView(device, &view_info, null, texture_image_view);
     if result != VkResult.VK_SUCCESS {
         printf("Unable to create image view %d\n", result);
         exit(1);
@@ -2053,6 +2060,9 @@ model_vertex_buffer: VkBuffer*;
 model_vertex_buffer_memory: VkDeviceMemory*;
 model_index_buffer: VkBuffer*;
 model_index_buffer_memory: VkDeviceMemory*;
+model_texture_image: VkImage*;
+model_texture_image_memory: VkDeviceMemory*;
+model_texture_image_view: VkImageView*;
 
 model_vertices: Array<Vertex>;
 model_indices: Array<u32>;
@@ -2086,7 +2096,7 @@ load_model() {
         while model_file[++i] != ' ' {}
         i++;
 
-        z := strtof(model_file.data + i, null);
+        z := strtof(model_file.data + i, null) + 0.5;
         while model_file[++i] != '\n' {}
         i++;
 
