@@ -1760,9 +1760,15 @@ u8* stbi_load(string filename, int* x, int* y, int* comp, int req_comp) #extern 
 stbi_image_free(void* image) #extern stb_image
 
 create_texture_image(string file, VkImage** texture_image, VkDeviceMemory** texture_image_memory) {
-    width, height, channels: int;
+    width, height, max, channels: int;
     pixels := stbi_load(file, &width, &height, &channels, 4);
     image_size := width * height * 4;
+
+    if width > height max = width;
+    else max = height;
+
+    mip_levels: u32 = cast(u32, floor(log2(cast(float64, max)))) + 1;
+    printf("%d\n", mip_levels);
 
     if pixels == null {
         printf("Failed to load texture image\n");
@@ -1781,7 +1787,7 @@ create_texture_image(string file, VkImage** texture_image, VkDeviceMemory** text
 
     stbi_image_free(pixels);
 
-    create_image(width, height, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageTiling.VK_IMAGE_TILING_OPTIMAL, VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits.VK_IMAGE_USAGE_SAMPLED_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, texture_image, texture_image_memory);
+    create_image(width, height, mip_levels, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageTiling.VK_IMAGE_TILING_OPTIMAL, VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits.VK_IMAGE_USAGE_SAMPLED_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, texture_image, texture_image_memory);
 
     transition_image_layout(*texture_image, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
@@ -1793,12 +1799,12 @@ create_texture_image(string file, VkImage** texture_image, VkDeviceMemory** text
     vkFreeMemory(device, staging_buffer_memory, null);
 }
 
-create_image(u32 width, u32 height, VkFormat format, VkImageTiling tiling, VkImageUsageFlagBits usage, VkMemoryPropertyFlagBits properties, VkImage** image, VkDeviceMemory** image_memory) {
+create_image(u32 width, u32 height, u32 mip_levels, VkFormat format, VkImageTiling tiling, VkImageUsageFlagBits usage, VkMemoryPropertyFlagBits properties, VkImage** image, VkDeviceMemory** image_memory) {
     image_info: VkImageCreateInfo = {
         flags = 0; // Optional
         imageType = VkImageType.VK_IMAGE_TYPE_2D;
         format = format;
-        mipLevels = 1;
+        mipLevels = mip_levels;
         arrayLayers = 1;
         samples = VkSampleCountFlagBits.VK_SAMPLE_COUNT_1_BIT;
         tiling = tiling;
@@ -1866,7 +1872,7 @@ end_single_time_commands(VkCommandBuffer* command_buffer) {
     vkFreeCommandBuffers(device, command_pool, 1, &command_buffer);
 }
 
-transition_image_layout(VkImage* image, VkFormat format, VkImageLayout old_layout, VkImageLayout new_layout) {
+transition_image_layout(VkImage* image, VkFormat format, VkImageLayout old_layout, VkImageLayout new_layout, u32 mip_levels) {
     command_buffer := begin_single_time_commands();
 
     barrier: VkImageMemoryBarrier = {
@@ -1878,7 +1884,7 @@ transition_image_layout(VkImage* image, VkFormat format, VkImageLayout old_layou
     }
     // TODO Nested object initializers
     barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.levelCount = mip_levels;
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = 1;
 
@@ -1948,7 +1954,7 @@ copy_buffer_to_image(VkBuffer* buffer, VkImage* image, u32 width, u32 height) {
 texture_image_view: VkImageView*;
 texture_sampler: VkSampler*;
 
-create_texture_image_view(VkImage* texture_image, VkImageView** texture_image_view) {
+create_texture_image_view(VkImage* texture_image, VkImageView** texture_image_view, u32 mip_levels) {
     view_info: VkImageViewCreateInfo = {
         image = texture_image;
         viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
@@ -1956,7 +1962,7 @@ create_texture_image_view(VkImage* texture_image, VkImageView** texture_image_vi
     }
     view_info.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
     view_info.subresourceRange.baseMipLevel = 0;
-    view_info.subresourceRange.levelCount = 1;
+    view_info.subresourceRange.levelCount = mip_levels;
     view_info.subresourceRange.baseArrayLayer = 0;
     view_info.subresourceRange.layerCount = 1;
 
@@ -2012,7 +2018,7 @@ depth_image_view: VkImageView*;
 create_depth_resources() {
     depth_format := find_depth_format();
 
-    create_image(swap_chain_extent.width, swap_chain_extent.height, depth_format, VkImageTiling.VK_IMAGE_TILING_OPTIMAL, VkImageUsageFlagBits.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &depth_image, &depth_image_memory);
+    create_image(swap_chain_extent.width, swap_chain_extent.height, 1, depth_format, VkImageTiling.VK_IMAGE_TILING_OPTIMAL, VkImageUsageFlagBits.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &depth_image, &depth_image_memory);
 
     view_create_info: VkImageViewCreateInfo = {
         image = depth_image;
@@ -2031,7 +2037,7 @@ create_depth_resources() {
         exit(1);
     }
 
-    transition_image_layout(depth_image, depth_format, VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED, VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    transition_image_layout(depth_image, depth_format, VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED, VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
 }
 
 VkFormat find_supported_format(Array<VkFormat> candidates, VkImageTiling tiling, VkFormatFeatureFlagBits features) {
@@ -2215,6 +2221,11 @@ int find_remaining_lines(string value, s64 index = 0) {
 
     return lines;
 }
+
+
+// Part 28: https://vulkan-tutorial.com/Generating_Mipmaps
+float64 log2(float64 value) #extern "m-2.33"
+float64 floor(float64 value) #extern "m-2.33"
 
 
 #run main();
