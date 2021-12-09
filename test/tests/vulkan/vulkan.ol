@@ -68,7 +68,9 @@ init_vulkan() {
 
     create_descriptor_pool();
 
-    create_descriptor_sets();
+    create_descriptor_sets(&descriptor_sets, texture_image_view);
+
+    create_descriptor_sets(&model_descriptor_sets, model_texture_image_view);
 
     create_command_buffers();
 
@@ -1074,6 +1076,8 @@ create_command_buffers() {
         vkCmdBindIndexBuffer(command_buffer, index_buffer, 0, VkIndexType.VK_INDEX_TYPE_UINT32);
         vkCmdDrawIndexed(command_buffer, indices.length, 1, 0, 0, 0);
 
+        vkCmdBindDescriptorSets(command_buffer, VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &model_descriptor_sets[i], 0, null);
+
         vkCmdBindVertexBuffers(command_buffer, 0, 1, &model_vertex_buffer, &offset);
         vkCmdBindIndexBuffer(command_buffer, model_index_buffer, 0, VkIndexType.VK_INDEX_TYPE_UINT32);
         vkCmdDrawIndexed(command_buffer, model_indices.length, 1, 0, 0, 0);
@@ -1213,7 +1217,8 @@ recreate_swap_chain() {
     create_framebuffers();
     create_uniform_buffers();
     create_descriptor_pool();
-    create_descriptor_sets();
+    create_descriptor_sets(&descriptor_sets, texture_image_view);
+    create_descriptor_sets(&model_descriptor_sets, model_texture_image_view);
     create_command_buffers();
 }
 
@@ -1671,16 +1676,17 @@ descriptor_sets: Array<VkDescriptorSet*>;
 
 create_descriptor_pool() {
     pool_sizes: Array<VkDescriptorPoolSize>[2];
+    descriptor_length := swap_chain_images.length * 2;
 
     pool_sizes[0].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    pool_sizes[0].descriptorCount = swap_chain_images.length;
+    pool_sizes[0].descriptorCount = descriptor_length;
     pool_sizes[1].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    pool_sizes[1].descriptorCount = swap_chain_images.length;
+    pool_sizes[1].descriptorCount = descriptor_length;
 
     pool_info: VkDescriptorPoolCreateInfo = {
         poolSizeCount = pool_sizes.length;
         pPoolSizes = pool_sizes.data;
-        maxSets = swap_chain_images.length;
+        maxSets = descriptor_length;
     }
 
     result := vkCreateDescriptorPool(device, &pool_info, null, &descriptor_pool);
@@ -1690,7 +1696,7 @@ create_descriptor_pool() {
     }
 }
 
-create_descriptor_sets() {
+create_descriptor_sets(Array<VkDescriptorSet*>* descriptor_sets, VkImageView* texture_image_view) {
     layouts: Array<VkDescriptorSetLayout*>[swap_chain_images.length];
     each layout in layouts {
         layout = descriptor_set_layout;
@@ -1702,7 +1708,7 @@ create_descriptor_sets() {
         pSetLayouts = layouts.data;
     }
 
-    array_reserve(&descriptor_sets, swap_chain_images.length);
+    array_reserve(descriptor_sets, swap_chain_images.length);
 
     result := vkAllocateDescriptorSets(device, &alloc_info, descriptor_sets.data);
     if result != VkResult.VK_SUCCESS {
@@ -1732,9 +1738,9 @@ create_descriptor_sets() {
     each uniform_buffer, i in uniform_buffers {
         buffer_info.buffer = uniform_buffer;
 
-        descriptor_writes[0].dstSet = descriptor_sets[i];
+        descriptor_writes[0].dstSet = descriptor_sets.data[i];
         descriptor_writes[0].pBufferInfo = &buffer_info;
-        descriptor_writes[1].dstSet = descriptor_sets[i];
+        descriptor_writes[1].dstSet = descriptor_sets.data[i];
         descriptor_writes[1].dstBinding = 1;
         descriptor_writes[1].descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         descriptor_writes[1].pImageInfo = &image_info;
@@ -2063,6 +2069,7 @@ model_index_buffer_memory: VkDeviceMemory*;
 model_texture_image: VkImage*;
 model_texture_image_memory: VkDeviceMemory*;
 model_texture_image_view: VkImageView*;
+model_descriptor_sets: Array<VkDescriptorSet*>;
 
 model_vertices: Array<Vertex>;
 model_indices: Array<u32>;
