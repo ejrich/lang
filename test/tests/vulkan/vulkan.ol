@@ -46,13 +46,13 @@ init_vulkan() {
 
     create_framebuffers();
 
-    create_texture_image("test/tests/vulkan/textures/statue.jpg", &texture_image, &texture_image_memory);
+    texture_mip_levels := create_texture_image("test/tests/vulkan/textures/statue.jpg", &texture_image, &texture_image_memory);
 
-    create_texture_image("test/tests/vulkan/textures/viking_room.png", &model_texture_image, &model_texture_image_memory);
+    model_mip_levels := create_texture_image("test/tests/vulkan/textures/viking_room.png", &model_texture_image, &model_texture_image_memory);
 
-    create_texture_image_view(texture_image, &texture_image_view);
+    create_texture_image_view(texture_image, &texture_image_view, texture_mip_levels);
 
-    create_texture_image_view(model_texture_image, &model_texture_image_view);
+    create_texture_image_view(model_texture_image, &model_texture_image_view, model_mip_levels);
 
     create_texture_sampler();
 
@@ -1759,7 +1759,7 @@ texture_image_memory: VkDeviceMemory*;
 u8* stbi_load(string filename, int* x, int* y, int* comp, int req_comp) #extern stb_image
 stbi_image_free(void* image) #extern stb_image
 
-create_texture_image(string file, VkImage** texture_image, VkDeviceMemory** texture_image_memory) {
+int create_texture_image(string file, VkImage** texture_image, VkDeviceMemory** texture_image_memory) {
     width, height, max, channels: int;
     pixels := stbi_load(file, &width, &height, &channels, 4);
     image_size := width * height * 4;
@@ -1768,7 +1768,6 @@ create_texture_image(string file, VkImage** texture_image, VkDeviceMemory** text
     else max = height;
 
     mip_levels: u32 = cast(u32, floor(log2(cast(float64, max)))) + 1;
-    printf("%d\n", mip_levels);
 
     if pixels == null {
         printf("Failed to load texture image\n");
@@ -1787,16 +1786,18 @@ create_texture_image(string file, VkImage** texture_image, VkDeviceMemory** text
 
     stbi_image_free(pixels);
 
-    create_image(width, height, mip_levels, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageTiling.VK_IMAGE_TILING_OPTIMAL, VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits.VK_IMAGE_USAGE_SAMPLED_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, texture_image, texture_image_memory);
+    create_image(width, height, mip_levels, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageTiling.VK_IMAGE_TILING_OPTIMAL, VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits.VK_IMAGE_USAGE_SAMPLED_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, texture_image, texture_image_memory);
 
-    transition_image_layout(*texture_image, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    transition_image_layout(*texture_image, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mip_levels);
 
     copy_buffer_to_image(staging_buffer, *texture_image, width, height);
 
-    transition_image_layout(*texture_image, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
     vkDestroyBuffer(device, staging_buffer, null);
     vkFreeMemory(device, staging_buffer_memory, null);
+
+    generate_mipmaps(*texture_image, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, width, height, mip_levels);
+
+    return mip_levels;
 }
 
 create_image(u32 width, u32 height, u32 mip_levels, VkFormat format, VkImageTiling tiling, VkImageUsageFlagBits usage, VkMemoryPropertyFlagBits properties, VkImage** image, VkDeviceMemory** image_memory) {
@@ -1992,7 +1993,7 @@ create_texture_sampler() {
         mipmapMode = VkSamplerMipmapMode.VK_SAMPLER_MIPMAP_MODE_LINEAR;
         mipLodBias = 0.0;
         minLod = 0.0;
-        maxLod = 0.0;
+        maxLod = 10.0;
     }
 
     result := vkCreateSampler(device, &sampler_info, null, &texture_sampler);
@@ -2226,6 +2227,89 @@ int find_remaining_lines(string value, s64 index = 0) {
 // Part 28: https://vulkan-tutorial.com/Generating_Mipmaps
 float64 log2(float64 value) #extern "m-2.33"
 float64 floor(float64 value) #extern "m-2.33"
+
+generate_mipmaps(VkImage* image, VkFormat image_format, int width, int height, int mip_levels) {
+    // Check if image format supports linear blitting
+    format_properties: VkFormatProperties;
+    vkGetPhysicalDeviceFormatProperties(physical_device, image_format, &format_properties);
+
+    if (format_properties.optimalTilingFeatures & VkFormatFeatureFlagBits.VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT) != VkFormatFeatureFlagBits.VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT {
+        printf("Texture image format does not support linear blitting\n");
+        exit(1);
+    }
+
+    command_buffer := begin_single_time_commands();
+
+    barrier: VkImageMemoryBarrier = {
+        srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        image = image;
+    }
+    barrier.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+
+    blit: VkImageBlit;
+    blit.srcSubresource.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+    blit.srcSubresource.baseArrayLayer = 0;
+    blit.srcSubresource.layerCount = 1;
+    blit.srcOffsets[0].x = 0;
+    blit.srcOffsets[0].y = 0;
+    blit.srcOffsets[0].z = 0;
+    blit.srcOffsets[1].z = 1;
+    blit.dstSubresource.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+    blit.dstSubresource.baseArrayLayer = 0;
+    blit.dstSubresource.layerCount = 1;
+    blit.dstOffsets[0].x = 0;
+    blit.dstOffsets[0].y = 0;
+    blit.dstOffsets[0].z = 0;
+    blit.dstOffsets[1].z = 1;
+
+    each i in 1..mip_levels-1 {
+        barrier.srcAccessMask = VkAccessFlagBits.VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VkAccessFlagBits.VK_ACCESS_TRANSFER_READ_BIT;
+        barrier.oldLayout = VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.newLayout = VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        barrier.subresourceRange.baseMipLevel = i - 1;
+        blit.srcSubresource.mipLevel = i - 1;
+        blit.dstSubresource.mipLevel = i;
+        blit.srcOffsets[1].x = width;
+        blit.srcOffsets[1].y = height;
+
+        if width > 1 {
+            blit.dstOffsets[1].x = width / 2;
+            blit.dstOffsets[1].y = height / 2;
+            width /= 2;
+            height /= 2;
+        }
+        else {
+            blit.dstOffsets[1].x = 1;
+            blit.dstOffsets[1].y = 1;
+        }
+
+        vkCmdPipelineBarrier(command_buffer, VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TRANSFER_BIT, VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, null, 0, null, 1, &barrier);
+
+        vkCmdBlitImage(command_buffer, image, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VkFilter.VK_FILTER_LINEAR);
+
+        barrier.srcAccessMask = VkAccessFlagBits.VK_ACCESS_TRANSFER_READ_BIT;
+        barrier.dstAccessMask = VkAccessFlagBits.VK_ACCESS_SHADER_READ_BIT;
+        barrier.oldLayout = VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        barrier.newLayout = VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        vkCmdPipelineBarrier(command_buffer, VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TRANSFER_BIT, VkPipelineStageFlagBits.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, null, 0, null, 1, &barrier);
+    }
+
+    barrier.subresourceRange.baseMipLevel = mip_levels - 1;
+    barrier.srcAccessMask = VkAccessFlagBits.VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VkAccessFlagBits.VK_ACCESS_SHADER_READ_BIT;
+    barrier.oldLayout = VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.newLayout = VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    vkCmdPipelineBarrier(command_buffer, VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TRANSFER_BIT, VkPipelineStageFlagBits.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, null, 0, null, 1, &barrier);
+
+    end_single_time_commands(command_buffer);
+}
 
 
 #run main();
