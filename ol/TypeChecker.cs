@@ -249,11 +249,14 @@ public static class TypeChecker
                                 break;
                             case DirectiveType.If:
                                 var conditional = directive.Value as ConditionalAst;
-                                if (VerifyCondition(conditional.Condition, null, _globalScope))
+                                if (VerifyCondition(conditional.Condition, null, _globalScope, out var constant))
                                 {
                                     var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition, _globalScope);
                                     ProgramRunner.Init();
-                                    ThreadPool.CompleteWork();
+                                    if (!constant)
+                                    {
+                                        ThreadPool.CompleteWork();
+                                    }
 
                                     if (ProgramRunner.ExecuteCondition(condition, conditional.Condition))
                                     {
@@ -275,11 +278,14 @@ public static class TypeChecker
                                 }
                                 break;
                             case DirectiveType.Assert:
-                                if (VerifyCondition(directive.Value, null, _globalScope))
+                                if (VerifyCondition(directive.Value, null, _globalScope, out constant))
                                 {
                                     var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value, _globalScope);
                                     ProgramRunner.Init();
-                                    ThreadPool.CompleteWork();
+                                    if (!constant)
+                                    {
+                                        ThreadPool.CompleteWork();
+                                    }
 
                                     if (!ProgramRunner.ExecuteCondition(condition, directive.Value))
                                     {
@@ -556,7 +562,7 @@ public static class TypeChecker
                     }
                     else
                     {
-                        var valueType = VerifyConstantExpression(structField.Value, null, _globalScope, out var isConstant, out _);
+                        var valueType = VerifyExpression(structField.Value, null, _globalScope, out var isConstant, out _);
 
                         // Verify the type is correct
                         if (valueType != null)
@@ -603,7 +609,7 @@ public static class TypeChecker
                                 ErrorReporter.Report("Cannot have operator assignments in object initializers", assignment.Reference);
                             }
 
-                            var valueType = VerifyConstantExpression(assignment.Value, null, _globalScope, out var isConstant, out _);
+                            var valueType = VerifyExpression(assignment.Value, null, _globalScope, out var isConstant, out _);
                             if (valueType != null && field != null)
                             {
                                 if (!TypeEquals(field.Type, valueType))
@@ -634,7 +640,7 @@ public static class TypeChecker
                         var elementType = structField.ArrayElementType;
                         foreach (var value in structField.ArrayValues)
                         {
-                            var valueType = VerifyConstantExpression(value, null, _globalScope, out var isConstant, out _);
+                            var valueType = VerifyExpression(value, null, _globalScope, out var isConstant, out _);
                             if (valueType != null)
                             {
                                 if (!TypeEquals(elementType, valueType))
@@ -658,7 +664,7 @@ public static class TypeChecker
                 if (structField.Type?.TypeKind == TypeKind.Array && structField.TypeDefinition.Count != null)
                 {
                     // Verify the count is a constant
-                    var countType = VerifyConstantExpression(structField.TypeDefinition.Count, null, _globalScope, out var isConstant, out var arrayLength);
+                    var countType = VerifyExpression(structField.TypeDefinition.Count, null, _globalScope, out var isConstant, out var arrayLength, true);
 
                     if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
                     {
@@ -680,7 +686,7 @@ public static class TypeChecker
                     }
                     else
                     {
-                        var valueType = VerifyConstantExpression(structField.Value, null, _globalScope, out var isConstant, out _);
+                        var valueType = VerifyExpression(structField.Value, null, _globalScope, out var isConstant, out _);
 
                         if (!isConstant)
                         {
@@ -793,7 +799,7 @@ public static class TypeChecker
                 if (field.Type?.TypeKind == TypeKind.Array && field.TypeDefinition.Count != null)
                 {
                     // Verify the count is a constant
-                    var countType = VerifyConstantExpression(field.TypeDefinition.Count, null, _globalScope, out var isConstant, out var arrayLength);
+                    var countType = VerifyExpression(field.TypeDefinition.Count, null, _globalScope, out var isConstant, out var arrayLength, true);
 
                     if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
                     {
@@ -937,7 +943,7 @@ public static class TypeChecker
             // 3c. Check for default arguments
             if (argument.Value != null)
             {
-                var defaultType = VerifyConstantExpression(argument.Value, null, _globalScope, out var isConstant, out _);
+                var defaultType = VerifyExpression(argument.Value, null, _globalScope, out var isConstant, out _);
 
                 if (argument.HasGenerics)
                 {
@@ -1387,11 +1393,14 @@ public static class TypeChecker
                         case DirectiveType.If:
 
                             var conditional = directive.Value as ConditionalAst;
-                            if (VerifyCondition(conditional.Condition, null, _globalScope))
+                            if (VerifyCondition(conditional.Condition, null, _globalScope, out var constant))
                             {
                                 var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition, _globalScope);
                                 ProgramRunner.Init();
-                                ThreadPool.CompleteWork();
+                                if (!constant)
+                                {
+                                    ThreadPool.CompleteWork();
+                                }
 
                                 if (ProgramRunner.ExecuteCondition(condition, conditional.Condition))
                                 {
@@ -1404,11 +1413,14 @@ public static class TypeChecker
                             }
                             break;
                         case DirectiveType.Assert:
-                            if (VerifyCondition(directive.Value, null, _globalScope))
+                            if (VerifyCondition(directive.Value, null, _globalScope, out constant))
                             {
                                 var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value, _globalScope);
                                 ProgramRunner.Init();
-                                ThreadPool.CompleteWork();
+                                if (!constant)
+                                {
+                                    ThreadPool.CompleteWork();
+                                }
 
                                 if (!ProgramRunner.ExecuteCondition(condition, directive.Value))
                                 {
@@ -1486,7 +1498,7 @@ public static class TypeChecker
                 }
                 break;
             default:
-                VerifyExpression(syntaxTree, currentFunction, scope);
+                VerifyExpression(syntaxTree, currentFunction, scope, out _, out _);
                 break;
         }
 
@@ -1495,7 +1507,7 @@ public static class TypeChecker
 
     private static void VerifyReturnStatement(ReturnAst returnAst, IFunction currentFunction, ScopeAst scope)
     {
-        var returnValueType = VerifyExpression(returnAst.Value, currentFunction, scope);
+        var returnValueType = VerifyExpression(returnAst.Value, currentFunction, scope, out _, out _);
 
         // Handle void case since it's the easiest to interpret
         if (currentFunction.ReturnType?.TypeKind == TypeKind.Void)
@@ -1611,7 +1623,7 @@ public static class TypeChecker
                             ErrorReporter.Report("Cannot have operator assignments in object initializers", assignment.Reference);
                         }
 
-                        var valueType = VerifyConstantExpression(assignment.Value, null, _globalScope, out var isConstant, out _);
+                        var valueType = VerifyExpression(assignment.Value, null, _globalScope, out var isConstant, out _);
                         if (valueType != null && field != null)
                         {
                             if (!TypeEquals(field.Type, valueType))
@@ -1650,7 +1662,7 @@ public static class TypeChecker
                     var elementType = declaration.ArrayElementType;
                     foreach (var value in declaration.ArrayValues)
                     {
-                        var valueType = VerifyConstantExpression(value, null, _globalScope, out var isConstant, out _);
+                        var valueType = VerifyExpression(value, null, _globalScope, out var isConstant, out _);
                         if (valueType != null)
                         {
                             if (!TypeEquals(elementType, valueType))
@@ -1689,7 +1701,7 @@ public static class TypeChecker
         // 7. Verify the type definition count if necessary
         if (declaration.Type?.TypeKind == TypeKind.Array && declaration.TypeDefinition.Count != null)
         {
-            var countType = VerifyConstantExpression(declaration.TypeDefinition.Count, null, _globalScope, out var isConstant, out var arrayLength);
+            var countType = VerifyExpression(declaration.TypeDefinition.Count, null, _globalScope, out var isConstant, out var arrayLength, true);
 
             if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
             {
@@ -1718,7 +1730,7 @@ public static class TypeChecker
 
     private static void VerifyGlobalVariableValue(DeclarationAst declaration)
     {
-        var valueType = VerifyConstantExpression(declaration.Value, null, _globalScope, out var isConstant, out _);
+        var valueType = VerifyExpression(declaration.Value, null, _globalScope, out var isConstant, out _);
         if (!isConstant)
         {
             ErrorReporter.Report($"Global variables can only be initialized with constant values", declaration.Value);
@@ -1811,7 +1823,7 @@ public static class TypeChecker
         // 3. Verify declaration values
         else if (declaration.Value != null)
         {
-            var valueType = VerifyExpression(declaration.Value, currentFunction, scope);
+            var valueType = VerifyExpression(declaration.Value, currentFunction, scope, out _, out _);
 
             // Verify the assignment value matches the type definition if it has been defined
             if (declaration.Type == null)
@@ -1871,7 +1883,7 @@ public static class TypeChecker
                             ErrorReporter.Report("Cannot have operator assignments in object initializers", assignment.Reference);
                         }
 
-                        var valueType = VerifyExpression(assignment.Value, currentFunction, scope);
+                        var valueType = VerifyExpression(assignment.Value, currentFunction, scope, out _, out _);
                         if (valueType != null && field != null)
                         {
                             if (!TypeEquals(field.Type, valueType))
@@ -1906,7 +1918,7 @@ public static class TypeChecker
                     var elementType = declaration.ArrayElementType;
                     foreach (var value in declaration.ArrayValues)
                     {
-                        var valueType = VerifyExpression(value, currentFunction, scope);
+                        var valueType = VerifyExpression(value, currentFunction, scope, out _, out _);
                         if (valueType != null)
                         {
                             if (!TypeEquals(elementType, valueType))
@@ -1926,7 +1938,7 @@ public static class TypeChecker
         // 6. Verify the type definition count if necessary
         if (declaration.Type?.TypeKind == TypeKind.Array && declaration.TypeDefinition?.Count != null)
         {
-            var countType = VerifyConstantExpression(declaration.TypeDefinition.Count, currentFunction, scope, out var isConstant, out var arrayLength);
+            var countType = VerifyExpression(declaration.TypeDefinition.Count, currentFunction, scope, out var isConstant, out var arrayLength, true);
 
             if (countType != null)
             {
@@ -2028,7 +2040,7 @@ public static class TypeChecker
         // 3. Verify declaration values
         else if (declaration.Value != null)
         {
-            var valueType = VerifyExpression(declaration.Value, currentFunction, scope);
+            var valueType = VerifyExpression(declaration.Value, currentFunction, scope, out _, out _);
 
             if (valueType != null)
             {
@@ -2112,7 +2124,7 @@ public static class TypeChecker
         // 4. Verify the type definition count if necessary
         if (declaration.Type?.TypeKind == TypeKind.Array && declaration.TypeDefinition?.Count != null)
         {
-            var countType = VerifyConstantExpression(declaration.TypeDefinition.Count, currentFunction, scope, out var isConstant, out var arrayLength);
+            var countType = VerifyExpression(declaration.TypeDefinition.Count, currentFunction, scope, out var isConstant, out var arrayLength, true);
 
             if (countType != null)
             {
@@ -2161,7 +2173,7 @@ public static class TypeChecker
 
     private static void VerifyAssignment(AssignmentAst assignment, IFunction currentFunction, ScopeAst scope)
     {
-        var valueType = VerifyExpression(assignment.Value, currentFunction, scope);
+        var valueType = VerifyExpression(assignment.Value, currentFunction, scope, out _, out _);
 
         if (assignment.Reference is CompoundExpressionAst compoundReference)
         {
@@ -2570,7 +2582,7 @@ public static class TypeChecker
                 }
                 break;
             default:
-                refType = VerifyExpression(structField.Children[0], currentFunction, scope);
+                refType = VerifyExpression(structField.Children[0], currentFunction, scope, out _, out _);
                 break;
         }
         if (refType == null)
@@ -2712,7 +2724,7 @@ public static class TypeChecker
     private static bool VerifyConditional(ConditionalAst conditional, IFunction currentFunction, ScopeAst scope, bool canBreak)
     {
         // 1. Verify the condition expression
-        VerifyCondition(conditional.Condition, currentFunction, scope);
+        VerifyCondition(conditional.Condition, currentFunction, scope, out _);
 
         // 2. Verify the conditional scope
         var ifReturns = VerifyScope(conditional.IfBlock, currentFunction, scope, canBreak);
@@ -2730,15 +2742,15 @@ public static class TypeChecker
     private static void VerifyWhile(WhileAst whileAst, IFunction currentFunction, ScopeAst scope)
     {
         // 1. Verify the condition expression
-        VerifyCondition(whileAst.Condition, currentFunction, scope);
+        VerifyCondition(whileAst.Condition, currentFunction, scope, out _);
 
         // 2. Verify the scope of the while block
         VerifyScope(whileAst.Body, currentFunction, scope, true);
     }
 
-    private static bool VerifyCondition(IAst ast, IFunction currentFunction, ScopeAst scope)
+    private static bool VerifyCondition(IAst ast, IFunction currentFunction, ScopeAst scope, out bool constant)
     {
-        var conditionalType = VerifyExpression(ast, currentFunction, scope);
+        var conditionalType = VerifyExpression(ast, currentFunction, scope, out constant, out _);
         switch (conditionalType?.TypeKind)
         {
             case TypeKind.Boolean:
@@ -2765,7 +2777,7 @@ public static class TypeChecker
         };
         if (each.Iteration != null)
         {
-            var iterationType = VerifyExpression(each.Iteration, currentFunction, scope);
+            var iterationType = VerifyExpression(each.Iteration, currentFunction, scope, out _, out _);
             if (iterationType == null) return;
 
             if (each.IndexVariable != null)
@@ -2794,13 +2806,13 @@ public static class TypeChecker
         }
         else
         {
-            var beginType = VerifyExpression(each.RangeBegin, currentFunction, scope);
+            var beginType = VerifyExpression(each.RangeBegin, currentFunction, scope, out _, out _);
             if (beginType != null && beginType.TypeKind != TypeKind.Integer)
             {
                 ErrorReporter.Report($"Expected range to begin with 'int', but got '{beginType.Name}'", each.RangeBegin);
             }
 
-            var endType = VerifyExpression(each.RangeEnd, currentFunction, scope);
+            var endType = VerifyExpression(each.RangeEnd, currentFunction, scope, out _, out _);
             if (endType != null && endType.TypeKind != TypeKind.Integer)
             {
                 ErrorReporter.Report($"Expected range to end with 'int', but got '{endType.Name}'", each.RangeEnd);
@@ -2814,8 +2826,25 @@ public static class TypeChecker
         VerifyScope(each.Body, currentFunction, scope, true);
     }
 
-    private static IType VerifyConstantExpression(IAst ast, IFunction currentFunction, ScopeAst scope, out bool isConstant, out uint arrayLength)
+    private static void VerifyFunctionIfNecessary(FunctionAst function, IFunction currentFunction)
     {
+        if (function.Flags.HasFlag(FunctionFlags.Extern))
+        {
+            if (!function.Flags.HasFlag(FunctionFlags.Varargs) && !function.Flags.HasFlag(FunctionFlags.ExternInitted) && function.ExternLib != null)
+            {
+                function.Flags |= FunctionFlags.ExternInitted;
+                ProgramRunner.InitExternFunction(function);
+            }
+        }
+        else if (!function.Flags.HasFlag(FunctionFlags.Verified) && function != currentFunction)
+        {
+            VerifyFunction(function);
+        }
+    }
+
+    private static IType VerifyExpression(IAst ast, IFunction currentFunction, ScopeAst scope, out bool isConstant, out uint arrayLength, bool getArrayLength = false)
+    {
+        // 1. Verify the expression value
         isConstant = false;
         arrayLength = 0;
         switch (ast)
@@ -2823,7 +2852,7 @@ public static class TypeChecker
             case ConstantAst constant:
                 isConstant = true;
                 constant.Type = TypeTable.Types[constant.TypeName];
-                if (constant.Type.TypeKind == TypeKind.Integer)
+                if (getArrayLength && constant.Type.TypeKind == TypeKind.Integer)
                 {
                     arrayLength = (uint)constant.Value.UnsignedInteger;
                 }
@@ -2859,77 +2888,12 @@ public static class TypeChecker
                             VerifyGlobalVariable(declaration);
                         }
                         isConstant = declaration.Constant;
-                        if (isConstant && declaration.Type.TypeKind == TypeKind.Integer)
+                        if (getArrayLength && isConstant && declaration.Type.TypeKind == TypeKind.Integer)
                         {
                             if (declaration.Value is ConstantAst constValue)
                             {
                                 arrayLength = (uint)constValue.Value.UnsignedInteger;
                             }
-                        }
-                        return declaration.Type;
-                    case IType type:
-                        if (type is StructAst structAst && structAst.Generics.Any())
-                        {
-                            ErrorReporter.Report($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
-                        }
-                        return type;
-                    default:
-                        return null;
-                }
-            default:
-                return VerifyExpression(ast, currentFunction, scope);
-        }
-    }
-
-    private static void VerifyFunctionIfNecessary(FunctionAst function, IFunction currentFunction)
-    {
-        if (function.Flags.HasFlag(FunctionFlags.Extern))
-        {
-            if (!function.Flags.HasFlag(FunctionFlags.Varargs) && !function.Flags.HasFlag(FunctionFlags.ExternInitted) && function.ExternLib != null)
-            {
-                function.Flags |= FunctionFlags.ExternInitted;
-                ProgramRunner.InitExternFunction(function);
-            }
-        }
-        else if (!function.Flags.HasFlag(FunctionFlags.Verified) && function != currentFunction)
-        {
-            VerifyFunction(function);
-        }
-    }
-
-    private static IType VerifyExpression(IAst ast, IFunction currentFunction, ScopeAst scope)
-    {
-        // 1. Verify the expression value
-        switch (ast)
-        {
-            case ConstantAst constant:
-                return constant.Type = TypeTable.Types[constant.TypeName];
-            case NullAst:
-                return null;
-            case StructFieldRefAst structField:
-                return VerifyStructFieldRef(structField, currentFunction, scope);
-            case IdentifierAst identifierAst:
-                if (!GetScopeIdentifier(scope, identifierAst.Name, out var identifier))
-                {
-                    if (TypeTable.Functions.TryGetValue(identifierAst.Name, out var functions))
-                    {
-                        if (functions.Count > 1)
-                        {
-                            ErrorReporter.Report($"Cannot determine type for function '{identifierAst.Name}' that has multiple overloads", identifierAst);
-                            return null;
-                        }
-                        var function = functions[0];
-                        VerifyFunctionIfNecessary(function, currentFunction);
-                        return function;
-                    }
-                    ErrorReporter.Report($"Identifier '{identifierAst.Name}' not defined", identifierAst);
-                }
-                switch (identifier)
-                {
-                    case DeclarationAst declaration:
-                        if (declaration.Global && !declaration.Verified)
-                        {
-                            VerifyGlobalVariable(declaration);
                         }
                         return declaration.Type;
                     case VariableAst variable:
@@ -3010,7 +2974,7 @@ public static class TypeChecker
                 }
                 else
                 {
-                    var valueType = VerifyExpression(unary.Value, currentFunction, scope);
+                    var valueType = VerifyExpression(unary.Value, currentFunction, scope, out _, out _);
                     if (valueType == null)
                     {
                         return null;
@@ -3057,7 +3021,7 @@ public static class TypeChecker
             case CallAst call:
                 return VerifyCall(call, currentFunction, scope);
             case ExpressionAst expression:
-                return VerifyExpressionType(expression, currentFunction, scope);
+                return VerifyExpressionType(expression, currentFunction, scope, out isConstant);
             case IndexAst index:
                 return VerifyIndexType(index, currentFunction, scope);
             case TypeDefinition typeDef:
@@ -3073,7 +3037,7 @@ public static class TypeChecker
             case CastAst cast:
             {
                 cast.TargetType = VerifyType(cast.TargetTypeDefinition, scope);
-                var valueType = VerifyExpression(cast.Value, currentFunction, scope);
+                var valueType = VerifyExpression(cast.Value, currentFunction, scope, out _, out _);
                 switch (cast.TargetType?.TypeKind)
                 {
                     case TypeKind.Integer:
@@ -3115,7 +3079,7 @@ public static class TypeChecker
                 uint size = 0;
                 for (var i = 0; i < types.Length; i++)
                 {
-                    var type = VerifyExpression(compoundExpression.Children[i], currentFunction, scope);
+                    var type = VerifyExpression(compoundExpression.Children[i], currentFunction, scope, out _, out _);
                     if (type == null)
                     {
                         error = true;
@@ -3284,7 +3248,7 @@ public static class TypeChecker
         for (var i = 0; i < call.Arguments.Count; i++)
         {
             var argument = call.Arguments[i];
-            var argumentType = VerifyExpression(argument, currentFunction, scope);
+            var argumentType = VerifyExpression(argument, currentFunction, scope, out _, out _);
             if (argumentType == null && argument is not NullAst)
             {
                 argumentsError = true;
@@ -3297,7 +3261,7 @@ public static class TypeChecker
         {
             foreach (var (name, argument) in call.SpecifiedArguments)
             {
-                var argumentType = VerifyExpression(argument, currentFunction, scope);
+                var argumentType = VerifyExpression(argument, currentFunction, scope, out _, out _);
                 if (argumentType == null && argument is not NullAst)
                 {
                     argumentsError = true;
@@ -4049,10 +4013,10 @@ public static class TypeChecker
         return true;
     }
 
-    private static IType VerifyExpressionType(ExpressionAst expression, IFunction currentFunction, ScopeAst scope)
+    private static IType VerifyExpressionType(ExpressionAst expression, IFunction currentFunction, ScopeAst scope, out bool isConstant)
     {
         // 1. Get the type of the initial child
-        expression.Type = VerifyExpression(expression.Children[0], currentFunction, scope);
+        expression.Type = VerifyExpression(expression.Children[0], currentFunction, scope, out isConstant, out _);
         if (expression.Type == null) return null;
 
         for (var i = 1; i < expression.Children.Count; i++)
@@ -4073,8 +4037,9 @@ public static class TypeChecker
                 continue;
             }
 
-            var nextExpressionType = VerifyExpression(next, currentFunction, scope);
+            var nextExpressionType = VerifyExpression(next, currentFunction, scope, out var constant, out _);
             if (nextExpressionType == null) return null;
+            isConstant = isConstant && constant;
 
             // 3. Verify the operator and expression types are compatible and convert the expression type if necessary
             var type = expression.Type.TypeKind;
@@ -4326,7 +4291,7 @@ public static class TypeChecker
         }
 
         // 2. Verify the count expression is an integer
-        var indexValue = VerifyExpression(index.Index, currentFunction, scope);
+        var indexValue = VerifyExpression(index.Index, currentFunction, scope, out _, out _);
         if (indexValue != null && indexValue.TypeKind != TypeKind.Integer && indexValue.TypeKind != TypeKind.Type)
         {
             ErrorReporter.Report($"Expected index to be type 'int', but got '{indexValue.Name}'", index);
@@ -4569,7 +4534,7 @@ public static class TypeChecker
                         }
                         else
                         {
-                            var countType = VerifyConstantExpression(type.Count, null, scope, out var isConstant, out arrayLength);
+                            var countType = VerifyExpression(type.Count, null, scope, out var isConstant, out arrayLength, true);
                             if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
                             {
                                 ErrorReporter.Report($"Expected size of C array to be a constant, positive integer", type);
