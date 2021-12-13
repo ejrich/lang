@@ -1,4 +1,4 @@
-# lang
+# ol
 
 ## This is an experiment for writing a compiler from scratch in .Net
 
@@ -12,15 +12,15 @@
 * Simple polymorphism for structs, functions, and operator overloading
 * Concise standard library
 * Modules and packages
-* Build tools and project files, not makefiles
+* API to define the program within the program, not makefiles
 
 ### How to build this project
 
-* First install the [.Net 5 SDK](https://dotnet.microsoft.com/download)
+* First install the [.Net 6 SDK](https://dotnet.microsoft.com/download)
 * Run `dotnet restore`
 * Once the dependencies are installed, run `dotnet build --no-restore`
     * If using vim, this can be run using `<leader><F8>`
-* The executable can be found in `Lang/bin/{Debug|Release}/net5.0/Lang`
+* The executable can be found in `ol/bin/{Debug|Release}/net6.0/ol`
 
 ### Syntax
 
@@ -28,7 +28,7 @@ Examples for syntax can be found in the `Example` and `Tests` folders.
 
 ### Tests
 
-The tests in the `Tests/tests` directory can be run by first compiling the test project and then running the executable in `Tests/bin`.
+The tests in the `test/tests` directory can be run by first compiling the test project and then running the executable in `tests/bin`.
 
 The tests should always be run when making changes to the compiler for regression testing.
 
