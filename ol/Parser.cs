@@ -815,20 +815,26 @@ public static class Parser
         switch (token.Type)
         {
             case TokenType.Equals:
-                ParseDeclarationValue(structField, enumerator, null);
+                ParseValue(structField, enumerator, null);
                 break;
             case TokenType.SemiColon:
                 if (structField.TypeDefinition == null)
                 {
-                    ErrorReporter.Report("Expected declaration to have value", token);
+                    ErrorReporter.Report("Expected struct field to have value", token);
                 }
                 break;
             default:
-                ErrorReporter.Report($"Unexpected token '{token.Value}' in declaration", token);
-                // Parse until there is an equals sign
-                while (enumerator.MoveNext() && enumerator.Current.Type != TokenType.Equals);
-
-                ParseDeclarationValue(structField, enumerator, null);
+                ErrorReporter.Report($"Unexpected token '{token.Value}' in struct field", token);
+                // Parse until there is an equals sign or semicolon
+                while (enumerator.MoveNext())
+                {
+                    if (enumerator.Current.Type == TokenType.SemiColon) break;
+                    if (enumerator.Current.Type == TokenType.Equals)
+                    {
+                        ParseValue(structField, enumerator, null);
+                        break;
+                    }
+                }
                 break;
         }
 
@@ -1195,7 +1201,7 @@ public static class Parser
                     case TokenType.Colon:
                         return ParseDeclaration(enumerator, currentFunction);
                     case TokenType.Equals:
-                        return ParseAssignment(enumerator, currentFunction);
+                        return ParseAssignment(enumerator, currentFunction, out _);
                     default:
                         return ParseExpression(enumerator, currentFunction);
                 }
@@ -1585,20 +1591,26 @@ public static class Parser
         switch (token.Type)
         {
             case TokenType.Equals:
-                ParseDeclarationValue(declaration, enumerator, currentFunction);
+                ParseValue(declaration, enumerator, currentFunction);
                 break;
             case TokenType.SemiColon:
                 if (declaration.TypeDefinition == null)
                 {
-                    ErrorReporter.Report("Expected token declaration to have value", token);
+                    ErrorReporter.Report("Expected declaration to have value", token);
                 }
                 break;
             default:
                 ErrorReporter.Report($"Unexpected token '{token.Value}' in declaration", token);
-                // Parse until there is an equals sign
-                while (enumerator.MoveNext() && enumerator.Current.Type != TokenType.Equals);
-
-                ParseDeclarationValue(declaration, enumerator, currentFunction);
+                // Parse until there is an equals sign or semicolon
+                while (enumerator.MoveNext())
+                {
+                    if (enumerator.Current.Type == TokenType.SemiColon) break;
+                    if (enumerator.Current.Type == TokenType.Equals)
+                    {
+                        ParseValue(declaration, enumerator, currentFunction);
+                        break;
+                    }
+                }
                 break;
         }
 
@@ -1616,20 +1628,20 @@ public static class Parser
         return declaration;
     }
 
-    private static void ParseDeclarationValue(IDeclaration declaration, TokenEnumerator enumerator, IFunction currentFunction)
+    private static bool ParseValue(IValues values, TokenEnumerator enumerator, IFunction currentFunction)
     {
         // 1. Step over '=' sign
         if (!enumerator.MoveNext())
         {
             ErrorReporter.Report("Expected declaration to have a value", enumerator.Last);
-            return;
+            return false;
         }
 
         // 2. Parse expression, constant, or object/array initialization as the value
         switch (enumerator.Current.Type)
         {
             case TokenType.OpenBrace:
-                declaration.Assignments = new Dictionary<string, AssignmentAst>();
+                values.Assignments = new Dictionary<string, AssignmentAst>();
                 while (enumerator.MoveNext())
                 {
                     var token = enumerator.Current;
@@ -1638,8 +1650,13 @@ public static class Parser
                         break;
                     }
 
-                    var assignment = ParseAssignment(enumerator, currentFunction);
-                    if (!declaration.Assignments.TryAdd(token.Value, assignment))
+                    var assignment = ParseAssignment(enumerator, currentFunction, out var moveNext);
+                    if (moveNext)
+                    {
+                        enumerator.MoveNext();
+                    }
+
+                    if (!values.Assignments.TryAdd(token.Value, assignment))
                     {
                         ErrorReporter.Report($"Multiple assignments for field '{token.Value}'", token);
                     }
@@ -1648,9 +1665,9 @@ public static class Parser
                         break;
                     }
                 }
-                break;
+                return true;
             case TokenType.OpenBracket:
-                declaration.ArrayValues = new List<IAst>();
+                values.ArrayValues = new List<IAst>();
                 while (enumerator.MoveNext())
                 {
                     if (enumerator.Current.Type == TokenType.CloseBracket)
@@ -1659,7 +1676,7 @@ public static class Parser
                     }
 
                     var value = ParseExpression(enumerator, currentFunction, null, TokenType.Comma, TokenType.CloseBracket);
-                    declaration.ArrayValues.Add(value);
+                    values.ArrayValues.Add(value);
                     if (enumerator.Current.Type == TokenType.CloseBracket)
                     {
                         break;
@@ -1667,16 +1684,19 @@ public static class Parser
                 }
                 break;
             default:
-                declaration.Value = ParseExpression(enumerator, currentFunction);
+                values.Value = ParseExpression(enumerator, currentFunction);
                 break;
         }
+
+        return false;
     }
 
-    private static AssignmentAst ParseAssignment(TokenEnumerator enumerator, IFunction currentFunction, IAst reference = null)
+    private static AssignmentAst ParseAssignment(TokenEnumerator enumerator, IFunction currentFunction, out bool moveNext, IAst reference = null)
     {
         // 1. Set the variable
         var assignment = reference == null ? CreateAst<AssignmentAst>(enumerator.Current) : CreateAst<AssignmentAst>(reference);
         assignment.Reference = reference;
+        moveNext = false;
 
         // 2. When the original reference is null, set the l-value to an identifier
         if (reference == null)
@@ -1738,15 +1758,29 @@ public static class Parser
             }
         }
 
-        // 4. Step over '=' sign
-        if (!enumerator.MoveNext())
+        // 4. Parse expression, field assignments, or array values
+        switch (enumerator.Current.Type)
         {
-            ErrorReporter.Report("Expected to have a value", enumerator.Last);
-            return null;
+            case TokenType.Equals:
+                moveNext = ParseValue(assignment, enumerator, currentFunction);
+                break;
+            case TokenType.SemiColon:
+                ErrorReporter.Report("Expected assignment to have value", enumerator.Current);
+                break;
+            default:
+                ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in assignment", enumerator.Current);
+                // Parse until there is an equals sign or semicolon
+                while (enumerator.MoveNext())
+                {
+                    if (enumerator.Current.Type == TokenType.SemiColon) break;
+                    if (enumerator.Current.Type == TokenType.Equals)
+                    {
+                        moveNext = ParseValue(assignment, enumerator, currentFunction);
+                        break;
+                    }
+                }
+                break;
         }
-
-        // 5. Parse expression, constant, or another token as the value
-        assignment.Value = ParseExpression(enumerator, currentFunction);
 
         return assignment;
     }
@@ -1769,7 +1803,7 @@ public static class Parser
 
             if (token.Type == TokenType.Equals)
             {
-                return ParseAssignment(enumerator, currentFunction, expression);
+                return ParseAssignment(enumerator, currentFunction, out _, expression);
             }
             else if (token.Type == TokenType.Comma)
             {
@@ -1881,7 +1915,7 @@ public static class Parser
                     {
                         ErrorReporter.Report("Expected compound expression to contain multiple values", firstToken);
                     }
-                    return ParseAssignment(enumerator, currentFunction, compoundExpression);
+                    return ParseAssignment(enumerator, currentFunction, out _, compoundExpression);
                 case TokenType.Colon:
                     var compoundDeclaration = CreateAst<CompoundDeclarationAst>(compoundExpression);
                     compoundDeclaration.Variables = new VariableAst[compoundExpression.Children.Count];
@@ -1921,7 +1955,7 @@ public static class Parser
                     switch (enumerator.Current.Type)
                     {
                         case TokenType.Equals:
-                            ParseDeclarationValue(compoundDeclaration, enumerator, currentFunction);
+                            ParseValue(compoundDeclaration, enumerator, currentFunction);
                             break;
                         case TokenType.SemiColon:
                             if (compoundDeclaration.TypeDefinition == null)
@@ -1931,10 +1965,16 @@ public static class Parser
                             break;
                         default:
                             ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in declaration", enumerator.Current);
-                            // Parse until there is an equals sign
-                            while (enumerator.MoveNext() && enumerator.Current.Type != TokenType.Equals);
-
-                            ParseDeclarationValue(compoundDeclaration, enumerator, currentFunction);
+                            // Parse until there is an equals sign or semicolon
+                            while (enumerator.MoveNext())
+                            {
+                                if (enumerator.Current.Type == TokenType.SemiColon) break;
+                                if (enumerator.Current.Type == TokenType.Equals)
+                                {
+                                    ParseValue(compoundDeclaration, enumerator, currentFunction);
+                                    break;
+                                }
+                            }
                             break;
                     }
 

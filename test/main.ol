@@ -136,8 +136,7 @@ int run_command(string command) {
 
     while fgets(cast(u8*, command_buffer), 1000, handle) != null {}
 
-    status := pclose(handle);
-    return (status & 0xFF00) >> 8;
+    return pclose(handle);
 }
 
 FILE* popen(string command, string type) #extern "c"

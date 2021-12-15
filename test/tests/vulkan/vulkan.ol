@@ -1910,12 +1910,18 @@ transition_image_layout(VkImage* image, VkFormat format, VkImageLayout old_layou
         srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         image = image;
+        subresourceRange = {
+            baseMipLevel = 0;
+            levelCount = mip_levels;
+            baseArrayLayer = 0;
+            layerCount = 1;
+        }
     }
     // TODO Nested object initializers
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = mip_levels;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
+    // barrier.subresourceRange.baseMipLevel = 0;
+    // barrier.subresourceRange.levelCount = mip_levels;
+    // barrier.subresourceRange.baseArrayLayer = 0;
+    // barrier.subresourceRange.layerCount = 1;
 
     if new_layout == VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL {
         barrier.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_DEPTH_BIT;
