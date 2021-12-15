@@ -52,15 +52,17 @@ public enum FunctionFlags
     ExternInitted = 0x400
 }
 
-public interface IDeclaration : IAst
+public interface IValues : IAst
 {
-    TypeDefinition TypeDefinition { get; set; }
-    IType Type { get; set; }
-    IType ArrayElementType { get; set; }
-    bool HasGenerics { get; set; }
     IAst Value { get; set; }
     Dictionary<string, AssignmentAst> Assignments { get; set; }
     List<IAst> ArrayValues { get; set; }
+}
+
+public interface IDeclaration : IValues
+{
+    TypeDefinition TypeDefinition { get; set; }
+    IType ArrayElementType { get; set; }
 }
 
 public class ScopeAst : IAst
@@ -380,7 +382,7 @@ public class CompoundDeclarationAst : IDeclaration
     public List<IAst> ArrayValues { get; set; }
 }
 
-public class AssignmentAst : IAst
+public class AssignmentAst : IValues
 {
     public int FileIndex { get; set; }
     public uint Line { get; init; }
@@ -388,6 +390,8 @@ public class AssignmentAst : IAst
     public IAst Reference { get; set; }
     public Operator Operator { get; set; }
     public IAst Value { get; set; }
+    public Dictionary<string, AssignmentAst> Assignments { get; set; }
+    public List<IAst> ArrayValues { get; set; }
 }
 
 public class ConditionalAst : IAst

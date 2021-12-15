@@ -606,7 +606,7 @@ public static class TypeChecker
 
                             if (assignment.Operator != Operator.None)
                             {
-                                ErrorReporter.Report("Cannot have operator assignments in object initializers", assignment.Reference);
+                                ErrorReporter.Report("Cannot have operator assignments in struct field", assignment.Reference);
                             }
 
                             var valueType = VerifyExpression(assignment.Value, null, _globalScope, out var isConstant, out _);
@@ -1877,23 +1877,9 @@ public static class TypeChecker
                         {
                             ErrorReporter.Report($"Field '{name}' not present in struct '{PrintTypeDefinition(declaration.TypeDefinition)}'", assignment.Reference);
                         }
-
-                        if (assignment.Operator != Operator.None)
+                        else if (field.Type != null)
                         {
-                            ErrorReporter.Report("Cannot have operator assignments in object initializers", assignment.Reference);
-                        }
-
-                        var valueType = VerifyExpression(assignment.Value, currentFunction, scope, out _, out _);
-                        if (valueType != null && field != null)
-                        {
-                            if (!TypeEquals(field.Type, valueType))
-                            {
-                                ErrorReporter.Report($"Expected field value to be type '{PrintTypeDefinition(field.TypeDefinition)}', but got '{valueType.Name}'", assignment.Value);
-                            }
-                            else
-                            {
-                                VerifyConstantIfNecessary(assignment.Value, field.Type);
-                            }
+                            VerifyAssignmentValue(assignment, field.Type, currentFunction, scope, true);
                         }
                     }
                 }
@@ -2173,10 +2159,21 @@ public static class TypeChecker
 
     private static void VerifyAssignment(AssignmentAst assignment, IFunction currentFunction, ScopeAst scope)
     {
-        var valueType = VerifyExpression(assignment.Value, currentFunction, scope, out _, out _);
-
         if (assignment.Reference is CompoundExpressionAst compoundReference)
         {
+            if (assignment.Assignments != null)
+            {
+                ErrorReporter.Report("Unable to assign fields for to a compound reference", assignment);
+                return;
+            }
+            else if (assignment.ArrayValues != null)
+            {
+                ErrorReporter.Report("Unable to assign array values to a compound reference", assignment);
+                return;
+            }
+
+            var valueType = VerifyExpression(assignment.Value, currentFunction, scope, out _, out _);
+
             var referenceTypes = new IType[compoundReference.Children.Count];
             for (var i = 0; i < referenceTypes.Length; i++)
             {
@@ -2267,93 +2264,135 @@ public static class TypeChecker
 
         if (variableType == null) return;
 
-        // 2. Verify the assignment value
-        if (assignment.Value is NullAst nullAst)
+        VerifyAssignmentValue(assignment, variableType, currentFunction, scope);
+    }
+
+    private static void VerifyAssignmentValue(AssignmentAst assignment, IType variableType, IFunction currentFunction, ScopeAst scope, bool disallowOperators = false)
+    {
+        if (assignment.Value != null)
         {
-            if (assignment.Operator != Operator.None)
+            if (assignment.Value is NullAst nullAst)
             {
-                ErrorReporter.Report("Cannot assign null value with operator assignment", assignment.Value);
-            }
-            if (variableType.TypeKind != TypeKind.Pointer && variableType.TypeKind != TypeKind.Interface)
-            {
-                ErrorReporter.Report($"Cannot assign null to non-pointer type '{variableType.Name}'", assignment.Value);
-            }
-            nullAst.TargetType = variableType;
-        }
-        // 3. Verify the assignment value matches the variable type definition
-        else if (valueType != null)
-        {
-            // 3a. Verify the operator is valid
-            if (assignment.Operator != Operator.None)
-            {
-                var lhs = variableType.TypeKind;
-                var rhs = valueType.TypeKind;
-                switch (assignment.Operator)
+                if (assignment.Operator != Operator.None)
                 {
-                    // Both need to be bool and returns bool
-                    case Operator.And:
-                    case Operator.Or:
-                        if (lhs != TypeKind.Boolean || rhs != TypeKind.Boolean)
-                        {
-                            ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
-                        }
-                        break;
-                    // Invalid assignment operators
-                    case Operator.Equality:
-                    case Operator.GreaterThan:
-                    case Operator.LessThan:
-                    case Operator.GreaterThanEqual:
-                    case Operator.LessThanEqual:
-                        ErrorReporter.Report($"Invalid operator '{PrintOperator(assignment.Operator)}' in assignment", assignment);
-                        break;
-                    // Requires same types and returns more precise type
-                    case Operator.Add:
-                    case Operator.Subtract:
-                    case Operator.Multiply:
-                    case Operator.Divide:
-                    case Operator.Modulus:
-                        if (!(lhs == TypeKind.Integer && rhs == TypeKind.Integer) &&
-                            !(lhs == TypeKind.Float && (rhs == TypeKind.Float || rhs == TypeKind.Integer)))
-                        {
-                            ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
-                        }
-                        break;
-                    // Requires both integer or bool types and returns more same type
-                    case Operator.BitwiseAnd:
-                    case Operator.BitwiseOr:
-                    case Operator.Xor:
-                        if (lhs == TypeKind.Enum && rhs == TypeKind.Enum)
-                        {
-                            if (variableType != valueType)
+                    ErrorReporter.Report("Cannot assign null value with operator assignment", assignment.Value);
+                }
+                if (variableType.TypeKind != TypeKind.Pointer && variableType.TypeKind != TypeKind.Interface)
+                {
+                    ErrorReporter.Report($"Cannot assign null to non-pointer type '{variableType.Name}'", assignment.Value);
+                }
+                nullAst.TargetType = variableType;
+                return;
+            }
+
+            var valueType = VerifyExpression(assignment.Value, currentFunction, scope, out _, out _);
+
+            if (valueType != null)
+            {
+                // Verify the operator is valid
+                if (assignment.Operator != Operator.None)
+                {
+                    if (disallowOperators)
+                    {
+                        ErrorReporter.Report("Cannot have operator assignments in object initializers", assignment);
+                        return;
+                    }
+
+                    var lhs = variableType.TypeKind;
+                    var rhs = valueType.TypeKind;
+                    switch (assignment.Operator)
+                    {
+                        // Both need to be bool and returns bool
+                        case Operator.And:
+                        case Operator.Or:
+                            if (lhs != TypeKind.Boolean || rhs != TypeKind.Boolean)
                             {
                                 ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
                             }
-                        }
-                        else if (!(lhs == TypeKind.Boolean && rhs == TypeKind.Boolean) && !(lhs == TypeKind.Integer && rhs == TypeKind.Integer))
-                        {
-                            ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
-                        }
-                        break;
-                    // Requires both to be integers
-                    case Operator.ShiftLeft:
-                    case Operator.ShiftRight:
-                    case Operator.RotateLeft:
-                    case Operator.RotateRight:
-                        if (lhs != TypeKind.Integer || rhs != TypeKind.Integer)
-                        {
-                            ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
-                        }
-                        break;
+                            break;
+                        // Invalid assignment operators
+                        case Operator.Equality:
+                        case Operator.GreaterThan:
+                        case Operator.LessThan:
+                        case Operator.GreaterThanEqual:
+                        case Operator.LessThanEqual:
+                            ErrorReporter.Report($"Invalid operator '{PrintOperator(assignment.Operator)}' in assignment", assignment);
+                            break;
+                        // Requires same types and returns more precise type
+                        case Operator.Add:
+                        case Operator.Subtract:
+                        case Operator.Multiply:
+                        case Operator.Divide:
+                        case Operator.Modulus:
+                            if (!(lhs == TypeKind.Integer && rhs == TypeKind.Integer) &&
+                                !(lhs == TypeKind.Float && (rhs == TypeKind.Float || rhs == TypeKind.Integer)))
+                            {
+                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
+                            }
+                            break;
+                        // Requires both integer or bool types and returns more same type
+                        case Operator.BitwiseAnd:
+                        case Operator.BitwiseOr:
+                        case Operator.Xor:
+                            if (lhs == TypeKind.Enum && rhs == TypeKind.Enum)
+                            {
+                                if (variableType != valueType)
+                                {
+                                    ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
+                                }
+                            }
+                            else if (!(lhs == TypeKind.Boolean && rhs == TypeKind.Boolean) && !(lhs == TypeKind.Integer && rhs == TypeKind.Integer))
+                            {
+                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
+                            }
+                            break;
+                        // Requires both to be integers
+                        case Operator.ShiftLeft:
+                        case Operator.ShiftRight:
+                        case Operator.RotateLeft:
+                        case Operator.RotateRight:
+                            if (lhs != TypeKind.Integer || rhs != TypeKind.Integer)
+                            {
+                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
+                            }
+                            break;
+                    }
+                }
+                else if (!TypeEquals(variableType, valueType))
+                {
+                    ErrorReporter.Report($"Expected assignment value to be type '{variableType.Name}', but got '{valueType.Name}'", assignment.Value);
+                }
+                else
+                {
+                    VerifyConstantIfNecessary(assignment.Value, variableType);
                 }
             }
-            else if (!TypeEquals(variableType, valueType))
+        }
+        else if (assignment.Assignments != null)
+        {
+            if (variableType.TypeKind != TypeKind.Struct && variableType.TypeKind != TypeKind.String)
             {
-                ErrorReporter.Report($"Expected assignment value to be type '{variableType.Name}', but got '{valueType.Name}'", assignment.Value);
+                ErrorReporter.Report("Can only use field assignments with struct type", assignment);
+                return;
             }
-            else
+
+            var structDef = variableType as StructAst;
+            var fields = structDef.Fields.ToDictionary(_ => _.Name);
+            foreach (var (name, assignmentValue) in assignment.Assignments)
             {
-                VerifyConstantIfNecessary(assignment.Value, variableType);
+                if (!fields.TryGetValue(name, out var field))
+                {
+                    ErrorReporter.Report($"Field '{name}' not present in struct '{structDef.Name}'", assignment.Reference);
+                }
+                else if (field.Type != null)
+                {
+                    VerifyAssignmentValue(assignmentValue, field.Type, currentFunction, scope, true);
+                }
             }
+        }
+        else if (assignment.ArrayValues != null)
+        {
+            ErrorReporter.Report("TODO Implement me", assignment);
         }
     }
 

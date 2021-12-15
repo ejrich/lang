@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.IO;
 using System.Threading;
@@ -941,9 +942,24 @@ public static class ProgramIRBuilder
 
                 if (assignments.TryGetValue(field.Name, out var assignment))
                 {
-                    var value = EmitAndCast(function, assignment.Value, scope, field.Type);
+                    if (assignment.Value != null)
+                    {
+                        var value = EmitAndCast(function, assignment.Value, scope, field.Type);
 
-                    EmitStore(function, fieldPointer, value);
+                        EmitStore(function, fieldPointer, value);
+                    }
+                    else if (assignment.Assignments != null)
+                    {
+                        InitializeStruct(function, (StructAst)field.Type, fieldPointer, scope, assignment.Assignments);
+                    }
+                    else if (assignment.ArrayValues != null)
+                    {
+                        // TODO Implement me
+                    }
+                    else
+                    {
+                        Debug.Assert(false, "Expected assignment to have a value");
+                    }
                 }
                 else
                 {
