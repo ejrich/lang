@@ -179,7 +179,7 @@ public static unsafe class ProgramRunner
             }
         }
 
-        if (_typeCount != TypeTable.Count)
+        if (_typeCount != TypeTable.Count && _typeTablePointer != IntPtr.Zero)
         {
             _typeCount = TypeTable.Count;
 

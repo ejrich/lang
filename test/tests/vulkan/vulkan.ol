@@ -691,11 +691,13 @@ create_image_views() {
         viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
         format = swap_chain_format;
     }
-    view_create_info.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
-    view_create_info.subresourceRange.baseMipLevel = 0;
-    view_create_info.subresourceRange.levelCount = 1;
-    view_create_info.subresourceRange.baseArrayLayer = 0;
-    view_create_info.subresourceRange.layerCount = 1;
+    view_create_info.subresourceRange = {
+        aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+        baseMipLevel = 0;
+        levelCount = 1;
+        baseArrayLayer = 0;
+        layerCount = 1;
+    }
 
     each image, i in swap_chain_images {
         view_create_info.image = image;
@@ -1917,11 +1919,6 @@ transition_image_layout(VkImage* image, VkFormat format, VkImageLayout old_layou
             layerCount = 1;
         }
     }
-    // TODO Nested object initializers
-    // barrier.subresourceRange.baseMipLevel = 0;
-    // barrier.subresourceRange.levelCount = mip_levels;
-    // barrier.subresourceRange.baseArrayLayer = 0;
-    // barrier.subresourceRange.layerCount = 1;
 
     if new_layout == VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL {
         barrier.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_DEPTH_BIT;

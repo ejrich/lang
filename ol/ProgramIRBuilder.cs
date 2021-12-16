@@ -1113,6 +1113,14 @@ public static class ProgramIRBuilder
                 type = pointerType.PointerType;
             }
 
+            EmitAssignments(function, assignment, scope, pointer, type);
+        }
+    }
+
+    private static void EmitAssignments(FunctionIR function, AssignmentAst assignment, ScopeAst scope, InstructionValue pointer, IType type)
+    {
+        if (assignment.Value != null)
+        {
             var value = EmitIR(function, assignment.Value, scope);
             if (assignment.Operator != Operator.None)
             {
@@ -1122,6 +1130,29 @@ public static class ProgramIRBuilder
 
             var castValue = EmitCastValue(function, value, type);
             EmitStore(function, pointer, castValue);
+        }
+        else if (assignment.Assignments != null)
+        {
+            var structDef = (StructAst)type;
+
+            for (var i = 0; i < structDef.Fields.Count; i++)
+            {
+                var field = structDef.Fields[i];
+                if (assignment.Assignments.TryGetValue(field.Name, out var assignmentValue))
+                {
+                    var fieldPointer = EmitGetStructPointer(function, pointer, structDef, i, field);
+
+                    EmitAssignments(function, assignmentValue, scope, fieldPointer, field.Type);
+                }
+            }
+        }
+        else if (assignment.ArrayValues != null)
+        {
+            // TODO Implement me
+        }
+        else
+        {
+            Debug.Assert(false, "Expected assignment to have a value");
         }
     }
 
