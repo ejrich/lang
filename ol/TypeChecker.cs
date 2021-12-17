@@ -2392,7 +2392,18 @@ public static class TypeChecker
         }
         else if (assignment.ArrayValues != null)
         {
-            ErrorReporter.Report("TODO Implement me", assignment);
+            if (variableType.TypeKind == TypeKind.Array)
+            {
+                ErrorReporter.Report("TODO Implement me", assignment);
+            }
+            else if (variableType.TypeKind == TypeKind.CArray)
+            {
+                ErrorReporter.Report("TODO Implement me", assignment);
+            }
+            else
+            {
+                ErrorReporter.Report("Can only use field array assignment with Array types", assignment);
+            }
         }
     }
 
