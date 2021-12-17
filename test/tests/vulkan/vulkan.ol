@@ -2275,13 +2275,19 @@ generate_mipmaps(VkImage* image, VkFormat image_format, int width, int height, i
         srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         image = image;
+        subresourceRange = {
+            aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+            levelCount = 1;
+            baseArrayLayer = 0;
+            layerCount = 1;
+        }
     }
-    barrier.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.levelCount = 1;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
 
-    blit: VkImageBlit;
+    blit: VkImageBlit = {
+        srcSubResource = {
+            // TODO Fill me in
+        }
+    }
     blit.srcSubresource.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
     blit.srcSubresource.baseArrayLayer = 0;
     blit.srcSubresource.layerCount = 1;
