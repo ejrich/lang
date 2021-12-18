@@ -1651,16 +1651,22 @@ public static class Parser
                     }
 
                     var assignment = ParseAssignment(enumerator, currentFunction, out var moveNext);
-                    if (moveNext)
-                    {
-                        enumerator.MoveNext();
-                    }
 
                     if (!values.Assignments.TryAdd(token.Value, assignment))
                     {
                         ErrorReporter.Report($"Multiple assignments for field '{token.Value}'", token);
                     }
-                    if (enumerator.Current.Type == TokenType.CloseBrace)
+
+                    if (moveNext)
+                    {
+                        enumerator.Peek(out token);
+                        if (token.Type == TokenType.CloseBrace)
+                        {
+                            enumerator.MoveNext();
+                            break;
+                        }
+                    }
+                    else if (enumerator.Current.Type == TokenType.CloseBrace)
                     {
                         break;
                     }
