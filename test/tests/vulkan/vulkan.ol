@@ -1842,10 +1842,12 @@ create_image(u32 width, u32 height, VkFormat format, VkImageTiling tiling, VkIma
         usage = usage;
         sharingMode = VkSharingMode.VK_SHARING_MODE_EXCLUSIVE;
         initialLayout = VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED;
+        extent = {
+            width = width;
+            height = height;
+            depth = 1;
+        }
     }
-    image_info.extent.width = width;
-    image_info.extent.height = height;
-    image_info.extent.depth = 1;
 
     result := vkCreateImage(device, &image_info, null, image);
     if result != VkResult.VK_SUCCESS {
@@ -1966,15 +1968,18 @@ copy_buffer_to_image(VkBuffer* buffer, VkImage* image, u32 width, u32 height) {
         bufferOffset = 0;
         bufferRowLength = 0;
         bufferImageHeight = 0;
+        imageSubresource = {
+            aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+            mipLevel = 0;
+            baseArrayLayer = 0;
+            layerCount = 1;
+        }
+        imageExtent = {
+            width = width;
+            height = height;
+            depth = 1;
+        }
     }
-    region.imageSubresource.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.mipLevel = 0;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = 1;
-
-    region.imageExtent.width = width;
-    region.imageExtent.height = height;
-    region.imageExtent.depth = 1;
 
     vkCmdCopyBufferToImage(command_buffer, buffer, image, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
@@ -1991,12 +1996,14 @@ create_texture_image_view(VkImage* texture_image, VkImageView** texture_image_vi
         image = texture_image;
         viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
         format = VkFormat.VK_FORMAT_R8G8B8A8_SRGB;
+        subresourceRange = {
+            aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+            baseMipLevel = 0;
+            levelCount = mip_levels;
+            baseArrayLayer = 0;
+            layerCount = 1;
+        }
     }
-    view_info.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
-    view_info.subresourceRange.baseMipLevel = 0;
-    view_info.subresourceRange.levelCount = mip_levels;
-    view_info.subresourceRange.baseArrayLayer = 0;
-    view_info.subresourceRange.layerCount = 1;
 
     result := vkCreateImageView(device, &view_info, null, texture_image_view);
     if result != VkResult.VK_SUCCESS {
@@ -2056,12 +2063,14 @@ create_depth_resources() {
         image = depth_image;
         viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
         format = depth_format;
+        subresourceRange = {
+            aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_DEPTH_BIT;
+            baseMipLevel = 0;
+            levelCount = 1;
+            baseArrayLayer = 0;
+            layerCount = 1;
+        }
     }
-    view_create_info.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_DEPTH_BIT;
-    view_create_info.subresourceRange.baseMipLevel = 0;
-    view_create_info.subresourceRange.levelCount = 1;
-    view_create_info.subresourceRange.baseArrayLayer = 0;
-    view_create_info.subresourceRange.layerCount = 1;
 
     result := vkCreateImageView(device, &view_create_info, null, &depth_image_view);
     if result != VkResult.VK_SUCCESS {
@@ -2284,33 +2293,38 @@ generate_mipmaps(VkImage* image, VkFormat image_format, int width, int height, i
     }
 
     blit: VkImageBlit = {
-        srcSubResource = {
-            // TODO Fill me in
+        srcSubresource = {
+            aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+            baseArrayLayer = 0;
+            layerCount = 1;
+        }
+        dstSubresource = {
+            aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+            baseArrayLayer = 0;
+            layerCount = 1;
         }
     }
-    blit.srcSubresource.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
-    blit.srcSubresource.baseArrayLayer = 0;
-    blit.srcSubresource.layerCount = 1;
     blit.srcOffsets[0].x = 0;
     blit.srcOffsets[0].y = 0;
     blit.srcOffsets[0].z = 0;
     blit.srcOffsets[1].z = 1;
-    blit.dstSubresource.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
-    blit.dstSubresource.baseArrayLayer = 0;
-    blit.dstSubresource.layerCount = 1;
     blit.dstOffsets[0].x = 0;
     blit.dstOffsets[0].y = 0;
     blit.dstOffsets[0].z = 0;
     blit.dstOffsets[1].z = 1;
 
     each i in 1..mip_levels-1 {
-        barrier.srcAccessMask = VkAccessFlagBits.VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VkAccessFlagBits.VK_ACCESS_TRANSFER_READ_BIT;
-        barrier.oldLayout = VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        barrier.newLayout = VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        barrier.subresourceRange.baseMipLevel = i - 1;
-        blit.srcSubresource.mipLevel = i - 1;
-        blit.dstSubresource.mipLevel = i;
+        barrier = {
+            srcAccessMask = VkAccessFlagBits.VK_ACCESS_TRANSFER_WRITE_BIT;
+            dstAccessMask = VkAccessFlagBits.VK_ACCESS_TRANSFER_READ_BIT;
+            oldLayout = VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            newLayout = VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            subresourceRange = { baseMipLevel = i - 1; }
+        }
+        blit = {
+            srcSubresource = { mipLevel = i - 1; }
+            dstSubresource = { mipLevel = i; }
+        }
         blit.srcOffsets[1].x = width;
         blit.srcOffsets[1].y = height;
 
@@ -2329,19 +2343,23 @@ generate_mipmaps(VkImage* image, VkFormat image_format, int width, int height, i
 
         vkCmdBlitImage(command_buffer, image, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VkFilter.VK_FILTER_LINEAR);
 
-        barrier.srcAccessMask = VkAccessFlagBits.VK_ACCESS_TRANSFER_READ_BIT;
-        barrier.dstAccessMask = VkAccessFlagBits.VK_ACCESS_SHADER_READ_BIT;
-        barrier.oldLayout = VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        barrier.newLayout = VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barrier = {
+            srcAccessMask = VkAccessFlagBits.VK_ACCESS_TRANSFER_READ_BIT;
+            dstAccessMask = VkAccessFlagBits.VK_ACCESS_SHADER_READ_BIT;
+            oldLayout = VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            newLayout = VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        }
 
         vkCmdPipelineBarrier(command_buffer, VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TRANSFER_BIT, VkPipelineStageFlagBits.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, null, 0, null, 1, &barrier);
     }
 
-    barrier.subresourceRange.baseMipLevel = mip_levels - 1;
-    barrier.srcAccessMask = VkAccessFlagBits.VK_ACCESS_TRANSFER_WRITE_BIT;
-    barrier.dstAccessMask = VkAccessFlagBits.VK_ACCESS_SHADER_READ_BIT;
-    barrier.oldLayout = VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    barrier.newLayout = VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier = {
+        srcAccessMask = VkAccessFlagBits.VK_ACCESS_TRANSFER_WRITE_BIT;
+        dstAccessMask = VkAccessFlagBits.VK_ACCESS_SHADER_READ_BIT;
+        oldLayout = VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        newLayout = VkImageLayout.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        subresourceRange = { baseMipLevel = mip_levels - 1; }
+    }
 
     vkCmdPipelineBarrier(command_buffer, VkPipelineStageFlagBits.VK_PIPELINE_STAGE_TRANSFER_BIT, VkPipelineStageFlagBits.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, null, 0, null, 1, &barrier);
 
@@ -2381,12 +2399,14 @@ create_color_resources() {
         image = color_image;
         viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
         format = color_format;
+        subresourceRange = {
+            aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
+            baseMipLevel = 0;
+            levelCount = 1;
+            baseArrayLayer = 0;
+            layerCount = 1;
+        }
     }
-    view_create_info.subresourceRange.aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
-    view_create_info.subresourceRange.baseMipLevel = 0;
-    view_create_info.subresourceRange.levelCount = 1;
-    view_create_info.subresourceRange.baseArrayLayer = 0;
-    view_create_info.subresourceRange.layerCount = 1;
 
     result := vkCreateImageView(device, &view_create_info, null, &color_image_view);
     if result != VkResult.VK_SUCCESS {
