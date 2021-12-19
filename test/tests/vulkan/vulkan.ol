@@ -1005,8 +1005,8 @@ create_framebuffers() {
     array_reserve(&swap_chain_framebuffers, swap_chain_image_views.length);
 
     attachments: Array<VkImageView*>[3];
-    attachments[0] = color_image_view;
-    attachments[1] = depth_image_view;
+    // attachments[0] = color_image_view;
+    // attachments[1] = depth_image_view;
 
     framebuffer_info: VkFramebufferCreateInfo = {
         renderPass = render_pass;
@@ -1018,7 +1018,8 @@ create_framebuffers() {
     }
 
     each image_view, i in swap_chain_image_views {
-        attachments[2] = image_view;
+        attachments = [color_image_view, depth_image_view, image_view]
+        // attachments[2] = image_view;
 
         result := vkCreateFramebuffer(device, &framebuffer_info, null, &swap_chain_framebuffers[i]);
         if result != VkResult.VK_SUCCESS {
@@ -1587,10 +1588,10 @@ float radians(float degrees) {
 
 Matrix4 mat4_ident() {
     matrix: Matrix4 = {
-        a = vec4(x = 1.0);
-        b = vec4(y = 1.0);
-        c = vec4(z = 1.0);
-        d = vec4(w = 1.0);
+        a = { x = 1.0; }
+        b = { y = 1.0; }
+        c = { z = 1.0; }
+        d = { w = 1.0; }
     }
     return matrix;
 }
@@ -2298,11 +2299,13 @@ generate_mipmaps(VkImage* image, VkFormat image_format, int width, int height, i
             baseArrayLayer = 0;
             layerCount = 1;
         }
+        // srcOffsets = [1, 2]
         dstSubresource = {
             aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
             baseArrayLayer = 0;
             layerCount = 1;
         }
+        // dstOffsets = []
     }
     blit.srcOffsets[0].x = 0;
     blit.srcOffsets[0].y = 0;

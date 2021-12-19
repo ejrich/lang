@@ -337,29 +337,12 @@ public static class ProgramIRBuilder
                 {
                     // Initialize arrays
                     case TypeKind.Array:
-                        var arrayStruct = (StructAst)declaration.Type;
-                        if (declaration.TypeDefinition.ConstCount != null)
-                        {
-                            globalVariable.InitialValue = InitializeGlobalArray(arrayStruct, declaration, scope);
-                        }
-                        else
-                        {
-                            var constArray = new InstructionValue
-                            {
-                                ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
-                                Values = new [] {GetConstantS64(0), new InstructionValue {ValueType = InstructionValueType.Null, Type = arrayStruct.Fields[1].Type}}
-                            };
-                            globalVariable.InitialValue = constArray;
-                        }
+                        globalVariable.InitialValue = InitializeGlobalArray(declaration, scope, declaration.ArrayValues);
                         break;
                     case TypeKind.CArray:
                         if (declaration.ArrayValues != null)
                         {
-                            globalVariable.InitialValue = new InstructionValue
-                            {
-                                ValueType = InstructionValueType.ConstantArray, Type = declaration.ArrayElementType,
-                                Values = declaration.ArrayValues.Select(val => EmitConstantIR(val, scope)).ToArray(), ArrayLength = globalVariable.ArrayLength
-                            };
+                            globalVariable.InitialValue = InitializeGlobalCArray(declaration, scope, declaration.ArrayValues);
                         }
                         break;
                     // Initialize struct field default values
@@ -408,7 +391,29 @@ public static class ProgramIRBuilder
 
                 if (assignments.TryGetValue(field.Name, out var assignment))
                 {
-                    constantStruct.Values[i] = EmitConstantIR(assignment.Value, scope);
+                    if (assignment.Value != null)
+                    {
+                        constantStruct.Values[i] = EmitConstantIR(assignment.Value, scope);
+                    }
+                    else if (assignment.Assignments != null)
+                    {
+                        constantStruct.Values[i] = GetConstantStruct((StructAst)field.Type, scope, assignment.Assignments);
+                    }
+                    else if (assignment.ArrayValues != null)
+                    {
+                        if (field.Type.TypeKind == TypeKind.Array)
+                        {
+                            constantStruct.Values[i] = InitializeGlobalArray(field, scope, assignment.ArrayValues);
+                        }
+                        else if (field.Type.TypeKind == TypeKind.CArray)
+                        {
+                            constantStruct.Values[i] = InitializeGlobalCArray(field, scope, assignment.ArrayValues);
+                        }
+                    }
+                    else
+                    {
+                        Debug.Assert(false, "Expected assignment to have value");
+                    }
                 }
                 else
                 {
@@ -426,27 +431,9 @@ public static class ProgramIRBuilder
         {
             // Initialize arrays
             case TypeKind.Array:
-                var arrayStruct = (StructAst)field.Type;
-                if (field.TypeDefinition.ConstCount != null)
-                {
-                    return InitializeGlobalArray(arrayStruct, field, scope);
-                }
-                else
-                {
-                    return new InstructionValue
-                    {
-                        ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
-                        Values = new [] {GetConstantS64(0), new InstructionValue {ValueType = InstructionValueType.Null, Type = arrayStruct.Fields[1].Type}}
-                    };
-                }
+                return InitializeGlobalArray(field, scope, field.ArrayValues);
             case TypeKind.CArray:
-                var length = field.TypeDefinition.ConstCount.Value;
-                var constArray = new InstructionValue {ValueType = InstructionValueType.ConstantArray, Type = field.ArrayElementType, ArrayLength = length};
-                if (field.ArrayValues != null)
-                {
-                    constArray.Values = field.ArrayValues.Select(val => EmitConstantIR(val, scope)).ToArray();
-                }
-                return constArray;
+                return InitializeGlobalCArray(field, scope, field.ArrayValues);
             // Initialize struct field default values
             case TypeKind.Struct:
             case TypeKind.String:
@@ -461,8 +448,18 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static InstructionValue InitializeGlobalArray(StructAst arrayStruct, IDeclaration declaration, ScopeAst scope)
+    private static InstructionValue InitializeGlobalArray(IDeclaration declaration, ScopeAst scope, List<IAst> arrayValues)
     {
+        var arrayStruct = (StructAst)declaration.Type;
+        if (declaration.TypeDefinition.ConstCount == null)
+        {
+            return new InstructionValue
+            {
+                ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
+                Values = new [] {GetConstantS64(0), new InstructionValue {ValueType = InstructionValueType.Null, Type = arrayStruct.Fields[1].Type}}
+            };
+        }
+
         var length = declaration.TypeDefinition.ConstCount.Value;
         var elementType = declaration.ArrayElementType;
 
@@ -475,12 +472,12 @@ public static class ProgramIRBuilder
         Program.GlobalVariables.Add(arrayVariable);
         Program.GlobalVariablesSize += arrayVariable.Size;
 
-        if (declaration.ArrayValues != null)
+        if (arrayValues != null)
         {
             arrayVariable.InitialValue = new InstructionValue
             {
                 ValueType = InstructionValueType.ConstantArray, Type = declaration.ArrayElementType,
-                Values = declaration.ArrayValues.Select(val => EmitConstantIR(val, scope)).ToArray(), ArrayLength = length
+                Values = arrayValues.Select(val => EmitConstantIR(val, scope)).ToArray(), ArrayLength = length
             };
         }
 
@@ -489,6 +486,19 @@ public static class ProgramIRBuilder
             ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
             Values = new [] {GetConstantS64(length), new InstructionValue {ValueIndex = arrayIndex}}
         };
+    }
+
+    private static InstructionValue InitializeGlobalCArray(IDeclaration declaration, ScopeAst scope, List<IAst> arrayValues)
+    {
+        var arrayType = (ArrayType)declaration.Type;
+        var constArray = new InstructionValue {ValueType = InstructionValueType.ConstantArray, Type = declaration.ArrayElementType, ArrayLength = arrayType.Length};
+
+        if (arrayValues != null)
+        {
+            constArray.Values = arrayValues.Select(val => EmitConstantIR(val, scope)).ToArray();
+        }
+
+        return constArray;
     }
 
     private static BasicBlock EmitScope(FunctionIR function, BasicBlock block, ScopeAst scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock)
@@ -954,7 +964,7 @@ public static class ProgramIRBuilder
                     }
                     else if (assignment.ArrayValues != null)
                     {
-                        // TODO Implement me
+                        EmitArrayAssignments(function, assignment.ArrayValues, field.Type, fieldPointer, scope);
                     }
                     else
                     {
@@ -1134,7 +1144,6 @@ public static class ProgramIRBuilder
         else if (assignment.Assignments != null)
         {
             var structDef = (StructAst)type;
-
             for (var i = 0; i < structDef.Fields.Count; i++)
             {
                 var field = structDef.Fields[i];
@@ -1148,7 +1157,7 @@ public static class ProgramIRBuilder
         }
         else if (assignment.ArrayValues != null)
         {
-            // TODO Implement me
+            EmitArrayAssignments(function, assignment.ArrayValues, type, pointer, scope);
         }
         else
         {
@@ -1156,7 +1165,30 @@ public static class ProgramIRBuilder
         }
     }
 
-    public static void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, ScopeAst scope)
+    private static void EmitArrayAssignments(FunctionIR function, List<IAst> arrayValues, IType type, InstructionValue pointer, ScopeAst scope)
+    {
+        if (type is StructAst arrayStruct)
+        {
+            var dataPointer = EmitGetStructPointer(function, pointer, arrayStruct, 1);
+            var arrayPointer = EmitLoadPointer(function, dataPointer.Type, dataPointer);
+
+            var elementType = arrayStruct.GenericTypes[0];
+            for (var i = 0; i < arrayValues.Count; i++)
+            {
+                var index = GetConstantInteger(i);
+                var elementPointer = EmitGetPointer(function, arrayPointer, index, elementType);
+
+                var value = EmitAndCast(function, arrayValues[i], scope, elementType);
+                EmitStore(function, elementPointer, value);
+            }
+        }
+        else if (type is ArrayType arrayType)
+        {
+            InitializeArrayValues(function, pointer, arrayType.ElementType, arrayValues, scope);
+        }
+    }
+
+    private static void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, ScopeAst scope)
     {
         if (returnAst.Value == null)
         {
@@ -1649,6 +1681,7 @@ public static class ProgramIRBuilder
                 }
                 break;
         }
+        Debug.Assert(false, "Value is not constant");
         return null;
     }
 
