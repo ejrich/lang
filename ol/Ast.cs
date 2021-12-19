@@ -62,6 +62,7 @@ public interface IValues : IAst
 public interface IDeclaration : IValues
 {
     TypeDefinition TypeDefinition { get; set; }
+    IType Type { get; set; }
     IType ArrayElementType { get; set; }
 }
 

@@ -596,35 +596,9 @@ public static class TypeChecker
                         {
                             VerifyStruct(structDef);
                         }
-                        var fields = structDef.Fields.ToDictionary(_ => _.Name);
                         foreach (var (name, assignment) in structField.Assignments)
                         {
-                            if (!fields.TryGetValue(name, out var field))
-                            {
-                                ErrorReporter.Report($"Field '{name}' not in struct '{PrintTypeDefinition(structField.TypeDefinition)}'", assignment.Reference);
-                            }
-
-                            if (assignment.Operator != Operator.None)
-                            {
-                                ErrorReporter.Report("Cannot have operator assignments in struct field", assignment.Reference);
-                            }
-
-                            var valueType = VerifyExpression(assignment.Value, null, _globalScope, out var isConstant, out _);
-                            if (valueType != null && field != null)
-                            {
-                                if (!TypeEquals(field.Type, valueType))
-                                {
-                                    ErrorReporter.Report($"Expected field value to be type '{PrintTypeDefinition(field.TypeDefinition)}', but got '{valueType.Name}'", assignment.Value);
-                                }
-                                else if (!isConstant)
-                                {
-                                    ErrorReporter.Report("Default values in structs should be constant", assignment.Value);
-                                }
-                                else
-                                {
-                                    VerifyConstantIfNecessary(assignment.Value, field.Type);
-                                }
-                            }
+                            VerifyFieldAssignment(structDef, name, assignment, null, _globalScope, structField: true);
                         }
                     }
                 }
@@ -1391,7 +1365,6 @@ public static class TypeChecker
                     switch (directive.Type)
                     {
                         case DirectiveType.If:
-
                             var conditional = directive.Value as ConditionalAst;
                             if (VerifyCondition(conditional.Condition, null, _globalScope, out var constant))
                             {
@@ -1610,35 +1583,9 @@ public static class TypeChecker
                 else
                 {
                     var structDef = declaration.Type as StructAst;
-                    var fields = structDef.Fields.ToDictionary(_ => _.Name);
                     foreach (var (name, assignment) in declaration.Assignments)
                     {
-                        if (!fields.TryGetValue(name, out var field))
-                        {
-                            ErrorReporter.Report($"Field '{name}' not present in struct '{PrintTypeDefinition(declaration.TypeDefinition)}'", assignment.Reference);
-                        }
-
-                        if (assignment.Operator != Operator.None)
-                        {
-                            ErrorReporter.Report("Cannot have operator assignments in object initializers", assignment.Reference);
-                        }
-
-                        var valueType = VerifyExpression(assignment.Value, null, _globalScope, out var isConstant, out _);
-                        if (valueType != null && field != null)
-                        {
-                            if (!TypeEquals(field.Type, valueType))
-                            {
-                                ErrorReporter.Report($"Expected field value to be type '{PrintTypeDefinition(field.TypeDefinition)}', but got '{valueType.Name}'", assignment.Value);
-                            }
-                            else if (!isConstant)
-                            {
-                                ErrorReporter.Report($"Global variables can only be initialized with constant values", assignment.Value);
-                            }
-                            else
-                            {
-                                VerifyConstantIfNecessary(assignment.Value, field.Type);
-                            }
-                        }
+                        VerifyFieldAssignment(structDef, name, assignment, null, _globalScope, true);
                     }
                 }
             }
@@ -1870,17 +1817,9 @@ public static class TypeChecker
                 else
                 {
                     var structDef = declaration.Type as StructAst;
-                    var fields = structDef.Fields.ToDictionary(_ => _.Name);
                     foreach (var (name, assignment) in declaration.Assignments)
                     {
-                        if (!fields.TryGetValue(name, out var field))
-                        {
-                            ErrorReporter.Report($"Field '{name}' not present in struct '{PrintTypeDefinition(declaration.TypeDefinition)}'", assignment.Reference);
-                        }
-                        else if (field.Type != null)
-                        {
-                            VerifyAssignmentValue(assignment, field.Type, currentFunction, scope, true);
-                        }
+                        VerifyFieldAssignment(structDef, name, assignment, currentFunction, scope);
                     }
                 }
             }
@@ -2267,7 +2206,7 @@ public static class TypeChecker
         VerifyAssignmentValue(assignment, variableType, currentFunction, scope);
     }
 
-    private static void VerifyAssignmentValue(AssignmentAst assignment, IType variableType, IFunction currentFunction, ScopeAst scope, bool disallowOperators = false)
+    private static void VerifyAssignmentValue(AssignmentAst assignment, IType type, IFunction currentFunction, ScopeAst scope, bool disallowOperators = false, bool global = false, bool structField = false)
     {
         if (assignment.Value != null)
         {
@@ -2277,15 +2216,15 @@ public static class TypeChecker
                 {
                     ErrorReporter.Report("Cannot assign null value with operator assignment", assignment.Value);
                 }
-                if (variableType.TypeKind != TypeKind.Pointer && variableType.TypeKind != TypeKind.Interface)
+                if (type.TypeKind != TypeKind.Pointer && type.TypeKind != TypeKind.Interface)
                 {
-                    ErrorReporter.Report($"Cannot assign null to non-pointer type '{variableType.Name}'", assignment.Value);
+                    ErrorReporter.Report($"Cannot assign null to non-pointer type '{type.Name}'", assignment.Value);
                 }
-                nullAst.TargetType = variableType;
+                nullAst.TargetType = type;
                 return;
             }
 
-            var valueType = VerifyExpression(assignment.Value, currentFunction, scope, out _, out _);
+            var valueType = VerifyExpression(assignment.Value, currentFunction, scope, out var isConstant, out _);
 
             if (valueType != null)
             {
@@ -2298,7 +2237,7 @@ public static class TypeChecker
                         return;
                     }
 
-                    var lhs = variableType.TypeKind;
+                    var lhs = type.TypeKind;
                     var rhs = valueType.TypeKind;
                     switch (assignment.Operator)
                     {
@@ -2307,7 +2246,7 @@ public static class TypeChecker
                         case Operator.Or:
                             if (lhs != TypeKind.Boolean || rhs != TypeKind.Boolean)
                             {
-                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
+                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
                             }
                             break;
                         // Invalid assignment operators
@@ -2327,7 +2266,7 @@ public static class TypeChecker
                             if (!(lhs == TypeKind.Integer && rhs == TypeKind.Integer) &&
                                 !(lhs == TypeKind.Float && (rhs == TypeKind.Float || rhs == TypeKind.Integer)))
                             {
-                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
+                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
                             }
                             break;
                         // Requires both integer or bool types and returns more same type
@@ -2336,14 +2275,14 @@ public static class TypeChecker
                         case Operator.Xor:
                             if (lhs == TypeKind.Enum && rhs == TypeKind.Enum)
                             {
-                                if (variableType != valueType)
+                                if (type != valueType)
                                 {
-                                    ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
+                                    ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
                                 }
                             }
                             else if (!(lhs == TypeKind.Boolean && rhs == TypeKind.Boolean) && !(lhs == TypeKind.Integer && rhs == TypeKind.Integer))
                             {
-                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
+                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
                             }
                             break;
                         // Requires both to be integers
@@ -2353,56 +2292,106 @@ public static class TypeChecker
                         case Operator.RotateRight:
                             if (lhs != TypeKind.Integer || rhs != TypeKind.Integer)
                             {
-                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{variableType.Name}' and '{valueType.Name}'", assignment.Value);
+                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
                             }
                             break;
                     }
                 }
-                else if (!TypeEquals(variableType, valueType))
+                else if (!TypeEquals(type, valueType))
                 {
-                    ErrorReporter.Report($"Expected assignment value to be type '{variableType.Name}', but got '{valueType.Name}'", assignment.Value);
+                    ErrorReporter.Report($"Expected assignment value to be type '{type.Name}', but got '{valueType.Name}'", assignment.Value);
                 }
-                else
+                else if (isConstant)
                 {
-                    VerifyConstantIfNecessary(assignment.Value, variableType);
+                    VerifyConstantIfNecessary(assignment.Value, type);
+                }
+                else if (global)
+                {
+                    ErrorReporter.Report($"Global variables can only be initialized with constant values", assignment.Value);
+                }
+                else if (structField)
+                {
+                    ErrorReporter.Report("Default values in structs should be constant", assignment.Value);
                 }
             }
         }
         else if (assignment.Assignments != null)
         {
-            if (variableType.TypeKind != TypeKind.Struct && variableType.TypeKind != TypeKind.String)
+            if (type.TypeKind != TypeKind.Struct && type.TypeKind != TypeKind.String)
             {
                 ErrorReporter.Report("Can only use field assignments with struct type", assignment);
                 return;
             }
 
-            var structDef = variableType as StructAst;
-            var fields = structDef.Fields.ToDictionary(_ => _.Name);
+            var structDef = type as StructAst;
             foreach (var (name, assignmentValue) in assignment.Assignments)
             {
-                if (!fields.TryGetValue(name, out var field))
-                {
-                    ErrorReporter.Report($"Field '{name}' not present in struct '{structDef.Name}'", assignment.Reference);
-                }
-                else if (field.Type != null)
-                {
-                    VerifyAssignmentValue(assignmentValue, field.Type, currentFunction, scope, true);
-                }
+                VerifyFieldAssignment(structDef, name, assignmentValue, currentFunction, scope);
             }
         }
         else if (assignment.ArrayValues != null)
         {
-            if (variableType.TypeKind == TypeKind.Array)
+            if (type.TypeKind == TypeKind.Array)
             {
-                ErrorReporter.Report("TODO Implement me", assignment);
+                var arrayStruct = (StructAst)type;
+                VerifyArrayValues(arrayStruct.GenericTypes[0], assignment, currentFunction, scope, global, structField);
             }
-            else if (variableType.TypeKind == TypeKind.CArray)
+            else if (type.TypeKind == TypeKind.CArray)
             {
-                ErrorReporter.Report("TODO Implement me", assignment);
+                var arrayType = (ArrayType)type;
+                if (assignment.ArrayValues.Count > arrayType.Length)
+                {
+                    ErrorReporter.Report($"Expected {arrayType.Length} or fewer array values, but got {assignment.ArrayValues.Count}", assignment);
+                }
+
+                VerifyArrayValues(arrayType.ElementType, assignment, currentFunction, scope, global, structField);
             }
             else
             {
                 ErrorReporter.Report("Can only use field array assignment with Array types", assignment);
+            }
+        }
+    }
+
+    private static void VerifyFieldAssignment(StructAst structDef, string name, AssignmentAst assignment, IFunction currentFunction, ScopeAst scope, bool global = false, bool structField = false)
+    {
+        foreach (var field in structDef.Fields)
+        {
+            if (name == field.Name)
+            {
+                if (field.Type != null)
+                {
+                    VerifyAssignmentValue(assignment, field.Type, currentFunction, scope, true, global, structField);
+                }
+                return;
+            }
+        }
+        ErrorReporter.Report($"Field '{name}' not present in struct '{structDef.Name}'", assignment.Reference);
+    }
+
+    private static void VerifyArrayValues(IType elementType, AssignmentAst assignment, IFunction currentFunction, ScopeAst scope, bool global, bool structField)
+    {
+        foreach (var value in assignment.ArrayValues)
+        {
+            var valueType = VerifyExpression(value, currentFunction, scope, out var isConstant, out _);
+            if (valueType != null)
+            {
+                if (!TypeEquals(elementType, valueType))
+                {
+                    ErrorReporter.Report($"Expected array value to be type '{elementType.Name}', but got '{valueType.Name}'", value);
+                }
+                else if (isConstant)
+                {
+                    VerifyConstantIfNecessary(value, elementType);
+                }
+                else if (global)
+                {
+                    ErrorReporter.Report($"Global variables can only be initialized with constant values", value);
+                }
+                else if (structField)
+                {
+                    ErrorReporter.Report("Default values in structs array initializers should be constant", value);
+                }
             }
         }
     }
