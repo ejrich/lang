@@ -16,12 +16,37 @@ public static unsafe class LLVMBackend
     private static LLVMPassManagerRef _passManager;
     private static LLVMCodeGenOptLevel _codeGenLevel;
 
-    private static LLVMTypeRef _stringType;
-    private static LLVMTypeRef _typeInfoPointerType;
     private static LLVMTypeRef[] _types;
     private static LLVMValueRef[] _typeInfos;
     private static LLVMValueRef[] _globals;
     private static Queue<(LLVMValueRef, FunctionIR)> _functionsToWrite;
+
+    private static LLVMTypeRef _structTypeInfoType;
+    private static LLVMTypeRef _typeInfoType;
+    private static LLVMTypeRef _typeInfoPointerType;
+    private static LLVMTypeRef _typeInfoArrayType;
+    private static LLVMTypeRef _integerTypeInfoType;
+    private static LLVMTypeRef _pointerTypeInfoType;
+    private static LLVMTypeRef _arrayTypeInfoType;
+    private static LLVMTypeRef _enumTypeInfoType;
+    private static LLVMTypeRef _compoundTypeInfoType;
+    private static LLVMTypeRef _stringType;
+    private static LLVMTypeRef _stringArrayType;
+    private static LLVMTypeRef _enumValueType;
+    private static LLVMTypeRef _enumValueArrayType;
+    private static LLVMTypeRef _unionTypeInfoType;
+    private static LLVMTypeRef _unionFieldType;
+    private static LLVMTypeRef _unionFieldArrayType;
+    private static LLVMTypeRef _interfaceTypeInfoType;
+    private static LLVMTypeRef _typeFieldType;
+    private static LLVMTypeRef _typeFieldArrayType;
+    private static LLVMTypeRef _functionTypeInfoType;
+    private static LLVMTypeRef _argumentType;
+    private static LLVMTypeRef _argumentArrayType;
+
+    private static LLVMValueRef _defaultAttributes;
+    private static LLVMValueRef _defaultFields;
+    private static LLVMValueRef _defaultArguments;
 
     private static bool _emitDebug;
     private static LLVMDIBuilderRef _debugBuilder;
@@ -32,6 +57,8 @@ public static unsafe class LLVMBackend
 
     private static readonly LLVMTypeRef _u8PointerType = LLVM.PointerType(LLVM.Int8Type(), 0);
     private static readonly LLVMValueRef _zeroInt = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), 0, false);
+    private static readonly LLVMValueRef _interfaceTypeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Interface, 0);
+    private static readonly LLVMValueRef _functionTypeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Function, 0);
 
     public static string Build()
     {
@@ -47,29 +74,51 @@ public static unsafe class LLVMBackend
         _types = new LLVMTypeRef[TypeTable.Count];
         _typeInfos = new LLVMValueRef[TypeTable.Count];
 
-        const string structTypeInfoName = "StructTypeInfo";
-        TypeTable.Types.Remove(structTypeInfoName, out var structTypeInfo);
-        var structTypeInfoType = _types[structTypeInfo.TypeIndex] = _context.CreateNamedStruct(structTypeInfoName);
-        CreateTypeInfo(structTypeInfoType, structTypeInfo.TypeIndex);
+        _structTypeInfoType = CreateStruct("StructTypeInfo");
+        _typeInfoType = CreateStruct("TypeInfo");
+        _typeInfoArrayType = CreateStruct("Array.*.TypeInfo");
+        _integerTypeInfoType = CreateStruct("IntegerTypeInfo");
+        _pointerTypeInfoType = CreateStruct("PointerTypeInfo");
+        _arrayTypeInfoType = CreateStruct("CArrayTypeInfo");
+        _enumTypeInfoType = CreateStruct("EnumTypeInfo");
+        _compoundTypeInfoType = CreateStruct("CompoundTypeInfo");
+        _stringType = CreateStruct("string");
+        _stringArrayType = CreateStruct("Array.string");
+        _enumValueType = CreateStruct("EnumValue");
+        _enumValueArrayType = CreateStruct("Array.EnumValue");
+        _unionTypeInfoType = CreateStruct("UnionTypeInfo");
+        _unionFieldType = CreateStruct("UnionField");
+        _unionFieldArrayType = CreateStruct("Array.UnionField");
+        _interfaceTypeInfoType = CreateStruct("InterfaceTypeInfo");
+        _typeFieldType = CreateStruct("TypeField");
+        _typeFieldArrayType = CreateStruct("Array.TypeField");
+        _functionTypeInfoType = CreateStruct("FunctionTypeInfo");
+        _argumentType = CreateStruct("ArgumentType");
+        _argumentArrayType = CreateStruct("Array.ArgumentType");
 
-        var (typeInfoType, typeInfo) = CreateStructAndTypeInfo("TypeInfo", structTypeInfoType);
-        var (typeInfoArrayType, typeInfoArray) = CreateStructAndTypeInfo("Array.*.TypeInfo", structTypeInfoType);
-        var (integerTypeInfoType, integerTypeInfo) = CreateStructAndTypeInfo("IntegerTypeInfo", structTypeInfoType);
-        var (pointerTypeInfoType, pointerTypeInfo) = CreateStructAndTypeInfo("PointerTypeInfo", structTypeInfoType);
-        var (arrayTypeInfoType, arrayTypeInfo) = CreateStructAndTypeInfo("CArrayTypeInfo", structTypeInfoType);
-        var (enumTypeInfoType, enumTypeInfo) = CreateStructAndTypeInfo("EnumTypeInfo", structTypeInfoType);
-        var (compoundTypeInfoType, compoundTypeInfo) = CreateStructAndTypeInfo("CompoundTypeInfo", structTypeInfoType);
-        var (stringType, stringStruct) = CreateStructAndTypeInfo("string", structTypeInfoType);
-        var (stringArrayType, stringArray) = CreateStructAndTypeInfo("Array.string", structTypeInfoType);
-        var (enumValueType, enumValue) = CreateStructAndTypeInfo("EnumValue", structTypeInfoType);
-        var (enumValueArrayType, enumValueArray) = CreateStructAndTypeInfo("Array.EnumValue", structTypeInfoType);
-        var (unionTypeInfoType, unionTypeInfo) = CreateStructAndTypeInfo("UnionTypeInfo", structTypeInfoType);
-        var (unionFieldType, unionField) = CreateStructAndTypeInfo("UnionField", structTypeInfoType);
-        var (unionFieldArrayType, unionFieldArray) = CreateStructAndTypeInfo("Array.UnionField", structTypeInfoType);
-        var (interfaceTypeInfoType, interfaceTypeInfo) = CreateStructAndTypeInfo("InterfaceTypeInfo", structTypeInfoType);
+        _defaultAttributes = LLVMValueRef.CreateConstNamedStruct(_stringArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(_stringType, 0))});
+        _defaultFields = LLVMValueRef.CreateConstNamedStruct(_typeFieldArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(_typeFieldType, 0))});
+        _defaultArguments = LLVMValueRef.CreateConstNamedStruct(_argumentArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(_argumentType, 0))});
 
-        _stringType = stringType;
-        var defaultAttributes = LLVMValueRef.CreateConstNamedStruct(stringArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(stringType, 0))});
+        switch (BuildSettings.OutputTypeTable)
+        {
+            case OutputTypeTableConfiguration.Full:
+            {
+                // Define types and typeinfos as before
+                break;
+            }
+            case OutputTypeTableConfiguration.Used:
+            {
+                // Define base types
+                // Define type infos when the types are requested in the written functions
+                break;
+            }
+            case OutputTypeTableConfiguration.None:
+            {
+                // Define types
+                break;
+            }
+        }
 
         var interfaceQueue = new List<InterfaceAst>();
         var structQueue = new List<StructAst>();
@@ -77,14 +126,16 @@ public static unsafe class LLVMBackend
 
         if (_emitDebug)
         {
-            CreateTemporaryDebugStructType((StructAst)structTypeInfo);
-            foreach (var (name, type) in TypeTable.Types)
+            foreach (var (_, type) in TypeTable.Types)
             {
                 switch (type)
                 {
                     case StructAst structAst:
-                        _types[structAst.TypeIndex] = _context.CreateNamedStruct(name);
-                        CreateTypeInfo(structTypeInfoType, structAst.TypeIndex);
+                        if (_types[structAst.TypeIndex].Handle == IntPtr.Zero)
+                        {
+                            _types[structAst.TypeIndex] = _context.CreateNamedStruct(structAst.Name);
+                        }
+                        CreateTypeInfo(_structTypeInfoType, structAst.TypeIndex);
                         structQueue.Add(structAst);
 
                         if (structAst.Fields.Any())
@@ -97,21 +148,21 @@ public static unsafe class LLVMBackend
                         }
                         break;
                     case EnumAst enumAst:
-                        DeclareEnum(enumAst, enumValueType, enumValueArrayType, enumTypeInfoType, stringArrayType, defaultAttributes);
+                        DeclareEnum(enumAst);
                         CreateDebugEnumType(enumAst);
                         break;
                     case PrimitiveAst primitive:
-                        DeclarePrimitive(primitive, integerTypeInfoType, pointerTypeInfoType, typeInfoType);
-                        CreateDebugBasicType(primitive, name);
+                        DeclarePrimitive(primitive);
+                        CreateDebugBasicType(primitive, primitive.Name);
                         break;
                     case ArrayType arrayType:
-                        DeclareArrayType(arrayType, arrayTypeInfoType);
+                        DeclareArrayType(arrayType);
 
                         var elementType = _debugTypes[arrayType.ElementType.TypeIndex];
                         _debugTypes[arrayType.TypeIndex] = LLVM.DIBuilderCreateArrayType(_debugBuilder, arrayType.Length, 0, elementType, null, 0);
                         break;
                     case UnionAst union:
-                        DeclareUnion(union, unionTypeInfoType);
+                        DeclareUnion(union);
                         unionQueue.Add(union);
 
                         using (var structName = new MarshaledString(union.Name))
@@ -121,7 +172,7 @@ public static unsafe class LLVMBackend
                         }
                         break;
                     case CompoundType compoundType:
-                        DeclareCompoundType(compoundType, typeInfoType, typeInfoArrayType, compoundTypeInfoType);
+                        DeclareCompoundType(compoundType);
 
                         using (var typeName = new MarshaledString(compoundType.Name))
                         {
@@ -146,7 +197,8 @@ public static unsafe class LLVMBackend
                         }
                         break;
                     case InterfaceAst interfaceAst:
-                        DeclareInterfaceType(interfaceAst, interfaceTypeInfoType, interfaceQueue);
+                        DeclareInterfaceType(interfaceAst);
+                        interfaceQueue.Add(interfaceAst);
 
                         var debugArgumentTypes = new LLVMMetadataRef[interfaceAst.Arguments.Count + 1];
                         debugArgumentTypes[0] = _debugTypes[interfaceAst.ReturnType.TypeIndex];
@@ -173,28 +225,32 @@ public static unsafe class LLVMBackend
                 switch (type)
                 {
                     case StructAst structAst:
-                        _types[structAst.TypeIndex] = _context.CreateNamedStruct(name);
-                        CreateTypeInfo(structTypeInfoType, structAst.TypeIndex);
+                        if (_types[structAst.TypeIndex].Handle == IntPtr.Zero)
+                        {
+                            _types[structAst.TypeIndex] = _context.CreateNamedStruct(name);
+                        }
+                        CreateTypeInfo(_structTypeInfoType, structAst.TypeIndex);
                         structQueue.Add(structAst);
                         break;
                     case EnumAst enumAst:
-                        DeclareEnum(enumAst, enumValueType, enumValueArrayType, enumTypeInfoType, stringArrayType, defaultAttributes);
+                        DeclareEnum(enumAst);
                         break;
                     case PrimitiveAst primitive:
-                        DeclarePrimitive(primitive, integerTypeInfoType, pointerTypeInfoType, typeInfoType);
+                        DeclarePrimitive(primitive);
                         break;
                     case ArrayType arrayType:
-                        DeclareArrayType(arrayType, arrayTypeInfoType);
+                        DeclareArrayType(arrayType);
                         break;
                     case UnionAst union:
-                        DeclareUnion(union, unionTypeInfoType);
+                        DeclareUnion(union);
                         unionQueue.Add(union);
                         break;
                     case CompoundType compoundType:
-                        DeclareCompoundType(compoundType, typeInfoType, typeInfoArrayType, compoundTypeInfoType);
+                        DeclareCompoundType(compoundType);
                         break;
                     case InterfaceAst interfaceAst:
-                        DeclareInterfaceType(interfaceAst, interfaceTypeInfoType, interfaceQueue);
+                        DeclareInterfaceType(interfaceAst);
+                        interfaceQueue.Add(interfaceAst);
                         break;
                 }
             }
@@ -202,35 +258,46 @@ public static unsafe class LLVMBackend
 
         foreach (var interfaceAst in interfaceQueue)
         {
-            var argumentTypes = interfaceAst.Arguments.Select(arg => _types[arg.Type.TypeIndex]).ToArray();
+            var argumentCount = interfaceAst.Arguments.Count;
+            var argumentTypes = new LLVMTypeRef[argumentCount];
+            var argumentValues = new LLVMValueRef[argumentCount];
+            for (var arg = 0; arg < argumentCount; arg++)
+            {
+                var argument = interfaceAst.Arguments[arg];
+                argumentTypes[arg] = _types[argument.Type.TypeIndex];
+
+                var argNameString = GetString(argument.Name);
+                var argumentTypeInfo = _typeInfos[argument.Type.TypeIndex];
+                var argumentValue = LLVMValueRef.CreateConstNamedStruct(_argumentType, new LLVMValueRef[] {argNameString, argumentTypeInfo});
+
+                argumentValues[arg] = argumentValue;
+            }
+
             var functionType = LLVMTypeRef.CreateFunction(_types[interfaceAst.ReturnType.TypeIndex], argumentTypes, false);
             _types[interfaceAst.TypeIndex] = LLVM.PointerType(functionType, 0);
+
+            var argumentArray = LLVMValueRef.CreateConstArray(_argumentType, argumentValues);
+            var argumentArrayGlobal = _module.AddGlobal(LLVM.TypeOf(argumentArray), "____type_fields");
+            SetPrivateConstant(argumentArrayGlobal);
+            LLVM.SetInitializer(argumentArrayGlobal, argumentArray);
+
+            var arguments = LLVMValueRef.CreateConstNamedStruct(_argumentArrayType, new LLVMValueRef[]
+            {
+                LLVM.ConstInt(LLVM.Int64Type(), (ulong)interfaceAst.Arguments.Count, 0),
+                argumentArrayGlobal
+            });
+
+            var typeNameString = GetString(interfaceAst.Name);
+            var returnType = _typeInfos[interfaceAst.ReturnType.TypeIndex];
+            var fields = new LLVMValueRef[]{typeNameString, _interfaceTypeKind, _zeroInt, returnType, arguments};
+
+            var typeInfoStruct = LLVMValueRef.CreateConstNamedStruct(_interfaceTypeInfoType, fields);
+            LLVM.SetInitializer(_typeInfos[interfaceAst.TypeIndex], typeInfoStruct);
         }
-
-        var typeField = _module.GetTypeByName("TypeField");
-        var typeFieldArray = _module.GetTypeByName("Array.TypeField");
-        var defaultFields = LLVMValueRef.CreateConstNamedStruct(typeFieldArray, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(typeField, 0))});
-
-        SetStructTypeFields(typeInfo, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
-        SetStructTypeFields(typeInfoArray, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
-        SetStructTypeFields(integerTypeInfo, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
-        SetStructTypeFields(pointerTypeInfo, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
-        SetStructTypeFields(arrayTypeInfo, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
-        SetStructTypeFields(enumTypeInfo, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
-        SetStructTypeFields(unionTypeInfo, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
-        SetStructTypeFields((StructAst)structTypeInfo, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
-        SetStructTypeFields(compoundTypeInfo, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
-        SetStructTypeFields(stringStruct, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
-        SetStructTypeFields(stringArray, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
-        SetStructTypeFields(enumValue, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
-        SetStructTypeFields(enumValueArray, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
-        SetStructTypeFields(unionField, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
-        SetStructTypeFields(unionFieldArray, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
-        SetStructTypeFields(interfaceTypeInfo, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
 
         foreach (var structAst in structQueue)
         {
-            SetStructTypeFields(structAst, typeField, typeFieldArray, defaultFields, stringArrayType, defaultAttributes, structTypeInfoType);
+            SetStructTypeFields(structAst);
         }
 
         foreach (var union in unionQueue)
@@ -247,16 +314,21 @@ public static unsafe class LLVMBackend
 
                 var fieldNameString = GetString(field.Name);
 
-                unionFields[i] = LLVMValueRef.CreateConstNamedStruct(unionFieldType, new LLVMValueRef[] {fieldNameString, _typeInfos[field.Type.TypeIndex]});
+                unionFields[i] = LLVMValueRef.CreateConstNamedStruct(_unionFieldType, new LLVMValueRef[] {fieldNameString, _typeInfos[field.Type.TypeIndex]});
             }
 
-            var fieldArray = LLVMValueRef.CreateConstArray(unionFieldType, unionFields);
+            var fieldArray = LLVMValueRef.CreateConstArray(_unionFieldType, unionFields);
             var unionFieldArrayGlobal = _module.AddGlobal(LLVM.TypeOf(fieldArray), "____union_fields");
             SetPrivateConstant(unionFieldArrayGlobal);
             LLVM.SetInitializer(unionFieldArrayGlobal, fieldArray);
 
-            var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, };
-            var typeInfoStruct = LLVMValueRef.CreateConstNamedStruct(unionTypeInfoType, fields);
+            var unionFieldsArray = LLVMValueRef.CreateConstNamedStruct(_unionFieldArrayType, new LLVMValueRef[]
+            {
+                LLVM.ConstInt(LLVM.Int64Type(), (ulong)union.Fields.Count, 0), unionFieldArrayGlobal
+            });
+
+            var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, unionFieldsArray};
+            var typeInfoStruct = LLVMValueRef.CreateConstNamedStruct(_unionTypeInfoType, fields);
 
             LLVM.SetInitializer(_typeInfos[union.TypeIndex], typeInfoStruct);
 
@@ -285,52 +357,10 @@ public static unsafe class LLVMBackend
             }
         }
 
-        var functionTypeInfoType = _module.GetTypeByName("FunctionTypeInfo");
-        var argumentType = _module.GetTypeByName("ArgumentType");
-        var argumentArrayType = _module.GetTypeByName("Array.ArgumentType");
-        var functionTypeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Function, 0);
-
-        foreach (var interfaceAst in interfaceQueue)
-        {
-            var returnType = _typeInfos[interfaceAst.ReturnType.TypeIndex];
-
-            var argumentCount = interfaceAst.Arguments.Count;
-            var argumentValues = new LLVMValueRef[argumentCount];
-            for (var arg = 0; arg < argumentCount; arg++)
-            {
-                var argument = interfaceAst.Arguments[arg];
-
-                var argNameString = GetString(argument.Name);
-                var argumentTypeInfo = _typeInfos[argument.Type.TypeIndex];
-                var argumentValue = LLVMValueRef.CreateConstNamedStruct(argumentType, new LLVMValueRef[] {argNameString, argumentTypeInfo});
-
-                argumentValues[arg] = argumentValue;
-            }
-
-            var argumentArray = LLVMValueRef.CreateConstArray(argumentType, argumentValues);
-            var argumentArrayGlobal = _module.AddGlobal(LLVM.TypeOf(argumentArray), "____type_fields");
-            SetPrivateConstant(argumentArrayGlobal);
-            LLVM.SetInitializer(argumentArrayGlobal, argumentArray);
-
-            var arguments = LLVMValueRef.CreateConstNamedStruct(argumentArrayType, new LLVMValueRef[]
-            {
-                LLVM.ConstInt(LLVM.Int64Type(), (ulong)interfaceAst.Arguments.Count, 0),
-                argumentArrayGlobal
-            });
-
-            var typeNameString = GetString(interfaceAst.Name);
-            var fields = new LLVMValueRef[]{typeNameString, functionTypeKind, _zeroInt, returnType, arguments};
-
-            var typeInfoStruct = LLVMValueRef.CreateConstNamedStruct(interfaceTypeInfoType, fields);
-            LLVM.SetInitializer(_typeInfos[interfaceAst.TypeIndex], typeInfoStruct);
-        }
-
         foreach (var (_, functions) in TypeTable.Functions)
         {
-            for (var i = 0; i < functions.Count; i++)
+            foreach (var function in functions)
             {
-                var function = functions[i];
-
                 var returnType = _typeInfos[function.ReturnType.TypeIndex];
 
                 var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
@@ -341,17 +371,17 @@ public static unsafe class LLVMBackend
 
                     var argNameString = GetString(argument.Name);
                     var argumentTypeInfo = _typeInfos[argument.Type.TypeIndex];
-                    var argumentValue = LLVMValueRef.CreateConstNamedStruct(argumentType, new LLVMValueRef[] {argNameString, argumentTypeInfo});
+                    var argumentValue = LLVMValueRef.CreateConstNamedStruct(_argumentType, new LLVMValueRef[] {argNameString, argumentTypeInfo});
 
                     argumentValues[arg] = argumentValue;
                 }
 
-                var argumentArray = LLVMValueRef.CreateConstArray(argumentType, argumentValues);
+                var argumentArray = LLVMValueRef.CreateConstArray(_argumentType, argumentValues);
                 var argumentArrayGlobal = _module.AddGlobal(LLVM.TypeOf(argumentArray), "____type_fields");
                 SetPrivateConstant(argumentArrayGlobal);
                 LLVM.SetInitializer(argumentArrayGlobal, argumentArray);
 
-                var arguments = LLVMValueRef.CreateConstNamedStruct(argumentArrayType, new LLVMValueRef[]
+                var arguments = LLVMValueRef.CreateConstNamedStruct(_argumentArrayType, new LLVMValueRef[]
                 {
                     LLVM.ConstInt(LLVM.Int64Type(), (ulong)function.Arguments.Count, 0),
                     argumentArrayGlobal
@@ -372,21 +402,21 @@ public static unsafe class LLVMBackend
                     SetPrivateConstant(attributesArrayGlobal);
                     LLVM.SetInitializer(attributesArrayGlobal, attributesArray);
 
-                    attributes = LLVMValueRef.CreateConstNamedStruct(stringArrayType, new LLVMValueRef[]
+                    attributes = LLVMValueRef.CreateConstNamedStruct(_stringArrayType, new LLVMValueRef[]
                     {
                         LLVM.ConstInt(LLVM.Int64Type(), (ulong)attributeRefs.Length, 0), attributesArrayGlobal
                     });
                 }
                 else
                 {
-                    attributes = defaultAttributes;
+                    attributes = _defaultAttributes;
                 }
 
                 var typeNameString = GetString(function.Name);
 
-                var fields = new LLVMValueRef[]{typeNameString, functionTypeKind, _zeroInt, returnType, arguments, attributes};
+                var fields = new LLVMValueRef[]{typeNameString, _functionTypeKind, _zeroInt, returnType, arguments, attributes};
 
-                CreateAndSetTypeInfo(functionTypeInfoType, fields, function.TypeIndex);
+                CreateAndSetTypeInfo(_functionTypeInfoType, fields, function.TypeIndex);
             }
         }
 
@@ -445,14 +475,14 @@ public static unsafe class LLVMBackend
         }
 
         // 5. Write type table
-        _typeInfoPointerType = LLVM.PointerType(typeInfoType, 0);
+        _typeInfoPointerType = LLVM.PointerType(_typeInfoType, 0);
         var typeArray = LLVMValueRef.CreateConstArray(_typeInfoPointerType, _typeInfos);
         var typeArrayGlobal = _module.AddGlobal(LLVM.TypeOf(typeArray), "____type_array");
         SetPrivateConstant(typeArrayGlobal);
         LLVM.SetInitializer(typeArrayGlobal, typeArray);
 
         var typeCount = LLVM.ConstInt(LLVM.Int64Type(), (ulong)_typeInfos.Length, 0);
-        LLVM.SetInitializer(typeTable, LLVMValueRef.CreateConstNamedStruct(typeInfoArrayType, new LLVMValueRef[] {typeCount, typeArrayGlobal}));
+        LLVM.SetInitializer(typeTable, LLVMValueRef.CreateConstNamedStruct(_typeInfoArrayType, new LLVMValueRef[] {typeCount, typeArrayGlobal}));
 
         // 6. Write the program beginning at the entrypoint
         _functionsToWrite = new();
@@ -511,18 +541,16 @@ public static unsafe class LLVMBackend
         LLVM.AddModuleFlag(_module, LLVMModuleFlagBehavior.LLVMModuleFlagBehaviorWarning, name.Value, (UIntPtr)name.Length, value);
     }
 
-    private static (LLVMTypeRef, StructAst) CreateStructAndTypeInfo(string typeName, LLVMTypeRef typeInfoType)
+    private static LLVMTypeRef CreateStruct(string typeName)
     {
-        TypeTable.Types.Remove(typeName, out var typeInfo);
-        var typeStruct = _types[typeInfo.TypeIndex] = _context.CreateNamedStruct(typeName);
-
-        CreateTypeInfo(typeInfoType, typeInfo.TypeIndex);
+        var typeInfo = TypeTable.Types[typeName];
+        var typeStruct = _types[typeInfo.TypeIndex] = _context.CreateNamedStruct(typeInfo.Name);
 
         if (_emitDebug)
         {
             CreateTemporaryDebugStructType((StructAst)typeInfo);
         }
-        return (typeStruct, (StructAst)typeInfo);
+        return typeStruct;
     }
 
     private static LLVMValueRef CreateTypeInfo(LLVMTypeRef typeInfoType, int typeIndex)
@@ -532,7 +560,7 @@ public static unsafe class LLVMBackend
         return _typeInfos[typeIndex] = typeInfo;
     }
 
-    private static void DeclareEnum(EnumAst enumAst, LLVMTypeRef enumValueType, LLVMTypeRef enumValueArrayType, LLVMTypeRef enumTypeInfoType, LLVMTypeRef stringArrayType, LLVMValueRef defaultAttributes)
+    private static void DeclareEnum(EnumAst enumAst)
     {
         _types[enumAst.TypeIndex] = GetIntegerType(enumAst.BaseType.Size);
 
@@ -549,15 +577,15 @@ public static unsafe class LLVMBackend
             var enumValueNameString = GetString(value.Name);
             var enumValue = LLVM.ConstInt(LLVM.Int32Type(), (uint)value.Value, 0);
 
-            enumValueRefs[i] = LLVMValueRef.CreateConstNamedStruct(enumValueType, new LLVMValueRef[] {enumValueNameString, enumValue});
+            enumValueRefs[i] = LLVMValueRef.CreateConstNamedStruct(_enumValueType, new LLVMValueRef[] {enumValueNameString, enumValue});
         }
 
-        var enumValuesArray = LLVMValueRef.CreateConstArray(enumValueType, enumValueRefs);
+        var enumValuesArray = LLVMValueRef.CreateConstArray(_enumValueType, enumValueRefs);
         var enumValuesArrayGlobal = _module.AddGlobal(LLVM.TypeOf(enumValuesArray), "____enum_values");
         SetPrivateConstant(enumValuesArrayGlobal);
         LLVM.SetInitializer(enumValuesArrayGlobal, enumValuesArray);
 
-        var valuesArray = LLVMValueRef.CreateConstNamedStruct(enumValueArrayType, new LLVMValueRef[]
+        var valuesArray = LLVMValueRef.CreateConstNamedStruct(_enumValueArrayType, new LLVMValueRef[]
         {
             LLVM.ConstInt(LLVM.Int64Type(), (ulong)enumValueRefs.Length, 0), enumValuesArrayGlobal
         });
@@ -577,21 +605,21 @@ public static unsafe class LLVMBackend
             SetPrivateConstant(attributesArrayGlobal);
             LLVM.SetInitializer(attributesArrayGlobal, attributesArray);
 
-            attributes = LLVMValueRef.CreateConstNamedStruct(stringArrayType, new LLVMValueRef[]
+            attributes = LLVMValueRef.CreateConstNamedStruct(_stringArrayType, new LLVMValueRef[]
             {
                 LLVM.ConstInt(LLVM.Int64Type(), (ulong)attributeRefs.Length, 0), attributesArrayGlobal
             });
         }
         else
         {
-            attributes = defaultAttributes;
+            attributes = _defaultAttributes;
         }
 
         var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, _typeInfos[enumAst.BaseType.TypeIndex], valuesArray, attributes};
-        CreateAndSetTypeInfo(enumTypeInfoType, fields, enumAst.TypeIndex);
+        CreateAndSetTypeInfo(_enumTypeInfoType, fields, enumAst.TypeIndex);
     }
 
-    private static void DeclarePrimitive(PrimitiveAst primitive, LLVMTypeRef integerTypeInfoType, LLVMTypeRef pointerTypeInfoType, LLVMTypeRef typeInfoType)
+    private static void DeclarePrimitive(PrimitiveAst primitive)
     {
         _types[primitive.TypeIndex] = primitive.TypeKind switch
         {
@@ -614,25 +642,25 @@ public static unsafe class LLVMBackend
             {
                 var signed = LLVM.ConstInt(LLVM.Int1Type(), (byte)(primitive.Signed ? 1 : 0), 0);
                 var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, signed};
-                CreateAndSetTypeInfo(integerTypeInfoType, fields, primitive.TypeIndex);
+                CreateAndSetTypeInfo(_integerTypeInfoType, fields, primitive.TypeIndex);
                 break;
             }
             case TypeKind.Pointer:
             {
                 var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, _typeInfos[primitive.PointerType.TypeIndex]};
-                CreateAndSetTypeInfo(pointerTypeInfoType, fields, primitive.TypeIndex);
+                CreateAndSetTypeInfo(_pointerTypeInfoType, fields, primitive.TypeIndex);
                 break;
             }
             default:
             {
                 var fields = new LLVMValueRef[]{typeName, typeKind, typeSize};
-                CreateAndSetTypeInfo(typeInfoType, fields, primitive.TypeIndex);
+                CreateAndSetTypeInfo(_typeInfoType, fields, primitive.TypeIndex);
                 break;
             }
         }
     }
 
-    private static void DeclareArrayType(ArrayType arrayType, LLVMTypeRef arrayTypeInfoType)
+    private static void DeclareArrayType(ArrayType arrayType)
     {
         _types[arrayType.TypeIndex] = LLVM.ArrayType(_types[arrayType.ElementType.TypeIndex], arrayType.Length);
 
@@ -642,19 +670,19 @@ public static unsafe class LLVMBackend
         var arrayLength = LLVM.ConstInt(LLVM.Int32Type(), arrayType.Length, 0);
 
         var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, arrayLength, _typeInfos[arrayType.ElementType.TypeIndex]};
-        CreateAndSetTypeInfo(arrayTypeInfoType, fields, arrayType.TypeIndex);
+        CreateAndSetTypeInfo(_arrayTypeInfoType, fields, arrayType.TypeIndex);
     }
 
-    private static void DeclareUnion(UnionAst union, LLVMTypeRef unionTypeInfo)
+    private static void DeclareUnion(UnionAst union)
     {
         var type = _types[union.TypeIndex] = _context.CreateNamedStruct(union.Name);
 
         type.StructSetBody(new []{LLVMTypeRef.CreateArray(LLVM.Int8Type(), union.Size)}, false);
 
-        CreateTypeInfo(unionTypeInfo, union.TypeIndex);
+        CreateTypeInfo(_unionTypeInfoType, union.TypeIndex);
     }
 
-    private static void DeclareCompoundType(CompoundType compoundType, LLVMTypeRef typeInfo, LLVMTypeRef typeInfoArray, LLVMTypeRef compoundTypeInfo)
+    private static void DeclareCompoundType(CompoundType compoundType)
     {
         var types = new LLVMTypeRef[compoundType.Types.Length];
         var typeInfos = new LLVMValueRef[compoundType.Types.Length];
@@ -668,12 +696,12 @@ public static unsafe class LLVMBackend
 
         _types[compoundType.TypeIndex] = LLVMTypeRef.CreateStruct(types, true);
 
-        var typesArray = LLVMValueRef.CreateConstArray(typeInfo, typeInfos);
+        var typesArray = LLVMValueRef.CreateConstArray(_typeInfoType, typeInfos);
         var typesArrayGlobal = _module.AddGlobal(LLVM.TypeOf(typesArray), "____enum_values");
         SetPrivateConstant(typesArrayGlobal);
         LLVM.SetInitializer(typesArrayGlobal, typesArray);
 
-        var array = LLVMValueRef.CreateConstNamedStruct(typeInfoArray, new LLVMValueRef[]
+        var array = LLVMValueRef.CreateConstNamedStruct(_typeInfoArrayType, new LLVMValueRef[]
         {
             LLVM.ConstInt(LLVM.Int64Type(), (ulong)typeInfos.Length, 0), typesArrayGlobal
         });
@@ -683,17 +711,15 @@ public static unsafe class LLVMBackend
         var typeSize = LLVM.ConstInt(LLVM.Int32Type(), compoundType.Size, 0);
 
         var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, array};
-        CreateAndSetTypeInfo(compoundTypeInfo, fields, compoundType.TypeIndex);
+        CreateAndSetTypeInfo(_compoundTypeInfoType, fields, compoundType.TypeIndex);
     }
 
-    private static void DeclareInterfaceType(InterfaceAst interfaceAst, LLVMTypeRef typeInfoType, List<InterfaceAst> interfaceQueue)
+    private static void DeclareInterfaceType(InterfaceAst interfaceAst)
     {
-        interfaceQueue.Add(interfaceAst);
-
-        CreateTypeInfo(typeInfoType, interfaceAst.TypeIndex);
+        CreateTypeInfo(_interfaceTypeInfoType, interfaceAst.TypeIndex);
     }
 
-    private static void SetStructTypeFields(StructAst structAst, LLVMTypeRef typeFieldType, LLVMTypeRef typeFieldArrayType, LLVMValueRef defaultFields, LLVMTypeRef stringArrayType, LLVMValueRef defaultAttributes, LLVMTypeRef structTypeInfoType)
+    private static void SetStructTypeFields(StructAst structAst)
     {
         var typeName = GetString(structAst.Name);
 
@@ -729,28 +755,28 @@ public static unsafe class LLVMBackend
                     SetPrivateConstant(attributesArrayGlobal);
                     LLVM.SetInitializer(attributesArrayGlobal, attributesArray);
 
-                    fieldAttributes = LLVMValueRef.CreateConstNamedStruct(stringArrayType, new LLVMValueRef[]
+                    fieldAttributes = LLVMValueRef.CreateConstNamedStruct(_stringArrayType, new LLVMValueRef[]
                     {
                         LLVM.ConstInt(LLVM.Int64Type(), (ulong)attributeRefs.Length, 0), attributesArrayGlobal
                     });
                 }
                 else
                 {
-                    fieldAttributes = defaultAttributes;
+                    fieldAttributes = _defaultAttributes;
                 }
 
-                var typeField = LLVMValueRef.CreateConstNamedStruct(typeFieldType, new LLVMValueRef[] {fieldNameString, fieldOffset, _typeInfos[field.Type.TypeIndex], fieldAttributes});
+                var typeField = LLVMValueRef.CreateConstNamedStruct(_typeFieldType, new LLVMValueRef[] {fieldNameString, fieldOffset, _typeInfos[field.Type.TypeIndex], fieldAttributes});
 
                 typeFields[i] = typeField;
             }
             _types[structAst.TypeIndex].StructSetBody(structFields, false);
 
-            var typeFieldArray = LLVMValueRef.CreateConstArray(typeFieldType, typeFields);
+            var typeFieldArray = LLVMValueRef.CreateConstArray(_typeFieldType, typeFields);
             var typeFieldArrayGlobal = _module.AddGlobal(LLVM.TypeOf(typeFieldArray), "____type_fields");
             SetPrivateConstant(typeFieldArrayGlobal);
             LLVM.SetInitializer(typeFieldArrayGlobal, typeFieldArray);
 
-            structTypeInfoFields = LLVMValueRef.CreateConstNamedStruct(typeFieldArrayType, new LLVMValueRef[]
+            structTypeInfoFields = LLVMValueRef.CreateConstNamedStruct(_typeFieldArrayType, new LLVMValueRef[]
             {
                 LLVM.ConstInt(LLVM.Int64Type(), (ulong)structAst.Fields.Count, 0),
                 typeFieldArrayGlobal
@@ -763,7 +789,7 @@ public static unsafe class LLVMBackend
         }
         else
         {
-            structTypeInfoFields = defaultFields;
+            structTypeInfoFields = _defaultFields;
         }
 
         LLVMValueRef attributes;
@@ -781,18 +807,18 @@ public static unsafe class LLVMBackend
             SetPrivateConstant(attributesArrayGlobal);
             LLVM.SetInitializer(attributesArrayGlobal, attributesArray);
 
-            attributes = LLVMValueRef.CreateConstNamedStruct(stringArrayType, new LLVMValueRef[]
+            attributes = LLVMValueRef.CreateConstNamedStruct(_stringArrayType, new LLVMValueRef[]
             {
                 LLVM.ConstInt(LLVM.Int64Type(), (ulong)attributeRefs.Length, 0), attributesArrayGlobal
             });
         }
         else
         {
-            attributes = defaultAttributes;
+            attributes = _defaultAttributes;
         }
 
         var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, structTypeInfoFields, attributes};
-        var typeInfoStruct = LLVMValueRef.CreateConstNamedStruct(structTypeInfoType, fields);
+        var typeInfoStruct = LLVMValueRef.CreateConstNamedStruct(_structTypeInfoType, fields);
 
         var typeInfo = _typeInfos[structAst.TypeIndex];
         LLVM.SetInitializer(typeInfo, typeInfoStruct);
