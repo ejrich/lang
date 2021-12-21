@@ -16,7 +16,6 @@ public static unsafe class LLVMBackend
     private static LLVMPassManagerRef _passManager;
     private static LLVMCodeGenOptLevel _codeGenLevel;
 
-    private static LLVMValueRef _stackPointer;
     private static LLVMTypeRef _stringType;
     private static LLVMTypeRef _typeInfoPointerType;
     private static LLVMTypeRef[] _types;
@@ -931,9 +930,20 @@ public static unsafe class LLVMBackend
             }
         }
 
+        LLVMValueRef stackPointer = null;
         if (function.SaveStack)
         {
-            BuildStackSave();
+            const string stackSaveIntrinsic = "llvm.stacksave";
+            stackPointer = _builder.BuildAlloca(_u8PointerType);
+
+            var stackSave = _module.GetNamedFunction(stackSaveIntrinsic);
+            if (stackSave.Handle == IntPtr.Zero)
+            {
+                stackSave = _module.AddFunction(stackSaveIntrinsic, LLVMTypeRef.CreateFunction(_u8PointerType, Array.Empty<LLVMTypeRef>()));
+            }
+
+            var stackPointerValue = _builder.BuildCall(stackSave, Array.Empty<LLVMValueRef>(), "stackPointer");
+            _builder.BuildStore(stackPointerValue, stackPointer);
         }
 
         LLVMMetadataRef debugBlock = null;
@@ -980,7 +990,7 @@ public static unsafe class LLVMBackend
                     {
                         if (function.SaveStack)
                         {
-                            BuildStackRestore();
+                            BuildStackRestore(stackPointer);
                         }
                         var value = GetValue(instruction.Value1, values, allocations, functionPointer);
                         _builder.BuildRet(value);
@@ -991,7 +1001,7 @@ public static unsafe class LLVMBackend
                     {
                         if (function.SaveStack)
                         {
-                            BuildStackRestore();
+                            BuildStackRestore(stackPointer);
                         }
                         _builder.BuildRetVoid();
                         breakToNextBlock = false;
@@ -1670,31 +1680,20 @@ public static unsafe class LLVMBackend
 
     private static void BuildStackSave()
     {
-        const string stackSaveIntrinsic = "llvm.stacksave";
-        _stackPointer = _builder.BuildAlloca(_u8PointerType);
-
-        var function = _module.GetNamedFunction(stackSaveIntrinsic);
-        if (function.Handle == IntPtr.Zero)
-        {
-            function = _module.AddFunction(stackSaveIntrinsic, LLVMTypeRef.CreateFunction(_u8PointerType, Array.Empty<LLVMTypeRef>()));
-        }
-
-        var stackPointer = _builder.BuildCall(function, Array.Empty<LLVMValueRef>(), "stackPointer");
-        _builder.BuildStore(stackPointer, _stackPointer);
     }
 
-    private static void BuildStackRestore()
+    private static void BuildStackRestore(LLVMValueRef stackPointer)
     {
         const string stackRestoreIntrinsic = "llvm.stackrestore";
 
-        var function = _module.GetNamedFunction(stackRestoreIntrinsic);
-        if (function.Handle == IntPtr.Zero)
+        var stackRestore = _module.GetNamedFunction(stackRestoreIntrinsic);
+        if (stackRestore.Handle == IntPtr.Zero)
         {
-            function = _module.AddFunction(stackRestoreIntrinsic, LLVMTypeRef.CreateFunction(LLVM.VoidType(), new [] {_u8PointerType}));
+            stackRestore = _module.AddFunction(stackRestoreIntrinsic, LLVMTypeRef.CreateFunction(LLVM.VoidType(), new [] {_u8PointerType}));
         }
 
-        var stackPointer = _builder.BuildLoad(_stackPointer);
-        _builder.BuildCall(function, new []{stackPointer});
+        var stackPointerValue = _builder.BuildLoad(stackPointer);
+        _builder.BuildCall(stackRestore, new []{stackPointerValue});
     }
 
     private static void Compile(string objectFile, bool outputIntermediate)
