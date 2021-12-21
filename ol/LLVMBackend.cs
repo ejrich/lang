@@ -96,6 +96,7 @@ public static unsafe class LLVMBackend
         _argumentType = CreateStruct("ArgumentType");
         _argumentArrayType = CreateStruct("Array.ArgumentType");
 
+        _typeInfoPointerType = LLVM.PointerType(_typeInfoType, 0);
         _defaultAttributes = LLVMValueRef.CreateConstNamedStruct(_stringArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(_stringType, 0))});
         _defaultFields = LLVMValueRef.CreateConstNamedStruct(_typeFieldArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(_typeFieldType, 0))});
         _defaultArguments = LLVMValueRef.CreateConstNamedStruct(_argumentArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(_argumentType, 0))});
@@ -122,7 +123,7 @@ public static unsafe class LLVMBackend
             }
         }
 
-        // 4. Declare variables
+        // 4. Declare global variables
         LLVMValueRef typeTable = null;
         _globals = new LLVMValueRef[Program.GlobalVariables.Count];
         for (var i = 0; i < Program.GlobalVariables.Count; i++)
@@ -176,17 +177,7 @@ public static unsafe class LLVMBackend
             }
         }
 
-        // 5. Write type table
-        _typeInfoPointerType = LLVM.PointerType(_typeInfoType, 0);
-        var typeArray = LLVMValueRef.CreateConstArray(_typeInfoPointerType, _typeInfos);
-        var typeArrayGlobal = _module.AddGlobal(LLVM.TypeOf(typeArray), "____type_array");
-        SetPrivateConstant(typeArrayGlobal);
-        LLVM.SetInitializer(typeArrayGlobal, typeArray);
-
-        var typeCount = LLVM.ConstInt(LLVM.Int64Type(), (ulong)_typeInfos.Length, 0);
-        LLVM.SetInitializer(typeTable, LLVMValueRef.CreateConstNamedStruct(_typeInfoArrayType, new LLVMValueRef[] {typeCount, typeArrayGlobal}));
-
-        // 6. Write the program beginning at the entrypoint
+        // 5. Write the program beginning at the entrypoint
         _functionsToWrite = new();
         WriteFunctionDefinition("__start", Program.EntryPoint);
         while (_functionsToWrite.Any())
@@ -194,6 +185,15 @@ public static unsafe class LLVMBackend
             var (functionPointer, function) = _functionsToWrite.Dequeue();
             WriteFunction(functionPointer, function);
         }
+
+        // 6. Write type table
+        var typeArray = LLVMValueRef.CreateConstArray(_typeInfoPointerType, _typeInfos);
+        var typeArrayGlobal = _module.AddGlobal(LLVM.TypeOf(typeArray), "____type_array");
+        SetPrivateConstant(typeArrayGlobal);
+        LLVM.SetInitializer(typeArrayGlobal, typeArray);
+
+        var typeCount = LLVM.ConstInt(LLVM.Int64Type(), (ulong)_typeInfos.Length, 0);
+        LLVM.SetInitializer(typeTable, LLVMValueRef.CreateConstNamedStruct(_typeInfoArrayType, new LLVMValueRef[] {typeCount, typeArrayGlobal}));
 
         // 7. Compile to object file
         var objectFile = Path.Combine(objectPath, $"{BuildSettings.Name}.o");
@@ -430,6 +430,12 @@ public static unsafe class LLVMBackend
 
     private static void DeclareAllTypes()
     {
+        var nullTypeInfo = LLVM.ConstNull(_typeInfoPointerType);
+        for (var i = 0; i < _typeInfos.Length; i++)
+        {
+            _typeInfos[i] = nullTypeInfo;
+        }
+
         var interfaceQueue = new List<InterfaceAst>();
         var structQueue = new List<StructAst>();
         var unionQueue = new List<UnionAst>();
