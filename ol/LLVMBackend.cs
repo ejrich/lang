@@ -384,11 +384,9 @@ public static unsafe class LLVMBackend
             {
                 var argument = interfaceAst.Arguments[arg];
                 argumentTypes[arg] = _types[argument.Type.TypeIndex];
-
-                var argNameString = GetString(argument.Name);
                 var argumentTypeInfo = _typeInfos[argument.Type.TypeIndex];
 
-                argumentValues[arg] = LLVMValueRef.CreateConstNamedStruct(_argumentType, new LLVMValueRef[] {argNameString, argumentTypeInfo});
+                argumentValues[arg] = CreateArgumentType(argument, argumentTypeInfo);
             }
 
             var functionType = LLVMTypeRef.CreateFunction(_types[interfaceAst.ReturnType.TypeIndex], argumentTypes, false);
@@ -561,7 +559,19 @@ public static unsafe class LLVMBackend
             {
                 if (function.Used)
                 {
-                    // CreateFunctionTypeInfo(function);
+                    var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
+                    var argumentValues = new LLVMValueRef[argumentCount];
+                    for (var arg = 0; arg < argumentCount; arg++)
+                    {
+                        var argument = function.Arguments[arg];
+                        var argumentTypeInfo = CreateTypeInfoIfNotExists(argument.Type);
+
+                        argumentValues[arg] = CreateArgumentType(argument, argumentTypeInfo);
+                    }
+
+                    var returnType = CreateTypeInfoIfNotExists(function.ReturnType);
+
+                    CreateFunctionTypeInfo(function, argumentValues, returnType);
                 }
             }
         }
@@ -765,11 +775,9 @@ public static unsafe class LLVMBackend
                 for (var arg = 0; arg < argumentValues.Length; arg++)
                 {
                     var argument = interfaceAst.Arguments[arg];
-
-                    var argNameString = GetString(argument.Name);
                     var argumentTypeInfo = CreateTypeInfoIfNotExists(argument.Type);
 
-                    argumentValues[arg] = LLVMValueRef.CreateConstNamedStruct(_argumentType, new LLVMValueRef[] {argNameString, argumentTypeInfo});
+                    argumentValues[arg] = CreateArgumentType(argument, argumentTypeInfo);
                 }
 
                 var returnType = CreateTypeInfoIfNotExists(interfaceAst.ReturnType);
@@ -1200,14 +1208,24 @@ public static unsafe class LLVMBackend
         for (var arg = 0; arg < argumentCount; arg++)
         {
             var argument = function.Arguments[arg];
-
-            var argNameString = GetString(argument.Name);
             var argumentTypeInfo = _typeInfos[argument.Type.TypeIndex];
-            var argumentValue = LLVMValueRef.CreateConstNamedStruct(_argumentType, new LLVMValueRef[] {argNameString, argumentTypeInfo});
 
-            argumentValues[arg] = argumentValue;
+            argumentValues[arg] = CreateArgumentType(argument, argumentTypeInfo);
         }
 
+        var returnType = _typeInfos[function.ReturnType.TypeIndex];
+
+        CreateFunctionTypeInfo(function, argumentValues, returnType);
+    }
+
+    private static LLVMValueRef CreateArgumentType(DeclarationAst argument, LLVMValueRef argumentTypeInfo)
+    {
+        var argNameString = GetString(argument.Name);
+        return LLVMValueRef.CreateConstNamedStruct(_argumentType, new LLVMValueRef[] {argNameString, argumentTypeInfo});
+    }
+
+    private static void CreateFunctionTypeInfo(FunctionAst function, LLVMValueRef[] argumentValues, LLVMValueRef returnType)
+    {
         var argumentArray = LLVMValueRef.CreateConstArray(_argumentType, argumentValues);
         var argumentArrayGlobal = _module.AddGlobal(LLVM.TypeOf(argumentArray), "____type_fields");
         SetPrivateConstant(argumentArrayGlobal);
@@ -1245,7 +1263,6 @@ public static unsafe class LLVMBackend
         }
 
         var typeNameString = GetString(function.Name);
-        var returnType = _typeInfos[function.ReturnType.TypeIndex];
         var fields = new LLVMValueRef[]{typeNameString, _functionTypeKind, _zeroInt, returnType, arguments, attributes};
 
         CreateAndSetTypeInfo(_functionTypeInfoType, fields, function.TypeIndex);
