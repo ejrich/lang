@@ -26,7 +26,6 @@ public enum LinkerType : byte
     Dynamic
 }
 
-// TODO Implement in backend
 public enum OutputTypeTableConfiguration : byte
 {
     Full,

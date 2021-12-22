@@ -1,2 +1,1 @@
-- Full, Used, and None in the type table for LLVM
 - Only write the IR for functions starting from entrypoint or run directives
