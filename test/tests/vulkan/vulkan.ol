@@ -2419,4 +2419,7 @@ create_color_resources() {
 }
 
 
-#run main();
+#run {
+    main();
+    set_output_type_table(OutputTypeTableConfiguration.Used);
+}
