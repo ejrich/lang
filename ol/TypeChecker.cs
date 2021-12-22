@@ -341,16 +341,20 @@ public static class TypeChecker
         }
 
         // 7. Verify operator overload bodies
+        // TODO Turn this into a job
         foreach (var overloads in _operatorOverloads.Values)
         {
             foreach (var overload in overloads.Values)
             {
-                if (overload.Flags.HasFlag(FunctionFlags.Verified)) continue;
-                VerifyOperatorOverload(overload);
+                if (!overload.Flags.HasFlag(FunctionFlags.Verified))
+                {
+                    VerifyOperatorOverload(overload);
+                }
             }
         }
 
         // 8. Verify function bodies
+        // TODO Turn this into a job
         foreach (var function in functionQueue)
         {
             if (!function.Flags.HasFlag(FunctionFlags.Verified))
@@ -3431,6 +3435,7 @@ public static class TypeChecker
                                 {
                                     if (argument.TypeKind != TypeKind.Type)
                                     {
+                                        argument.Used = true;
                                         var typeIndex = new ConstantAst {Type = TypeTable.S32Type, Value = new Constant {Integer = argument.TypeIndex}};
                                         call.Arguments[i] = typeIndex;
                                         argumentTypes[i] = typeIndex.Type;
@@ -3933,6 +3938,7 @@ public static class TypeChecker
                     {
                         if (argument.TypeKind != TypeKind.Type)
                         {
+                            argument.Used = true;
                             var typeIndex = new ConstantAst {Type = TypeTable.S32Type, Value = new Constant {Integer = argument.TypeIndex}};
                             call.Arguments[i] = typeIndex;
                             argumentTypes[i] = typeIndex.Type;

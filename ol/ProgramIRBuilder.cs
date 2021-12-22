@@ -2013,6 +2013,7 @@ public static class ProgramIRBuilder
 
     private static InstructionValue GetTypeInfo(IType type)
     {
+        type.Used = true;
         _typeInfoPointerType ??= TypeTable.Types["*.TypeInfo"];
         return new InstructionValue {ValueType = InstructionValueType.TypeInfo, ValueIndex = type.TypeIndex, Type = _typeInfoPointerType};
     }
