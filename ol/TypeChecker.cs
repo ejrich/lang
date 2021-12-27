@@ -84,6 +84,7 @@ public static class TypeChecker
                             {
                                 TypeTable.StringType = structAst;
                                 structAst.TypeKind = TypeKind.String;
+                                structAst.Used = true;
                                 VerifyStruct(structAst);
                                 TypeTable.RawStringType ??= TypeTable.Types["*.u8"];
                                 RemoveNode(previous, node);
@@ -92,6 +93,7 @@ public static class TypeChecker
                             {
                                 TypeTable.AnyType = structAst;
                                 structAst.TypeKind = TypeKind.Any;
+                                structAst.Used = true;
                                 VerifyStruct(structAst);
                                 RemoveNode(previous, node);
                             }
