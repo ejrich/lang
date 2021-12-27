@@ -189,18 +189,6 @@ public static unsafe class LLVMBackend
         }
 
         // 6. Write type table
-        if (BuildSettings.OutputTypeTable == OutputTypeTableConfiguration.Used)
-        {
-            var nullTypeInfo = LLVM.ConstNull(_typeInfoPointerType);
-            for (var i = 0; i < _typeInfos.Length; i++)
-            {
-                if (_typeInfos[i].Handle == IntPtr.Zero)
-                {
-                    _typeInfos[i] = nullTypeInfo;
-                }
-            }
-        }
-
         var typeArray = CreateConstantArray(_typeInfoPointerType, _typeInfoArrayType, _typeInfos, "____type_array");
         LLVM.SetInitializer(typeTable, typeArray);
 
@@ -274,7 +262,6 @@ public static unsafe class LLVMBackend
         {
             foreach (var (_, type) in TypeTable.Types)
             {
-                type.Written = true;
                 switch (type)
                 {
                     case StructAst structAst:
@@ -331,7 +318,6 @@ public static unsafe class LLVMBackend
         {
             foreach (var (_, type) in TypeTable.Types)
             {
-                type.Written = true;
                 switch (type)
                 {
                     case StructAst structAst:
@@ -570,6 +556,15 @@ public static unsafe class LLVMBackend
                 }
             }
         }
+
+        var nullTypeInfo = LLVM.ConstNull(_typeInfoPointerType);
+        for (var i = 0; i < _typeInfos.Length; i++)
+        {
+            if (_typeInfos[i].Handle == IntPtr.Zero)
+            {
+                _typeInfos[i] = nullTypeInfo;
+            }
+        }
     }
 
     private static void DeclareAllTypes()
@@ -588,7 +583,6 @@ public static unsafe class LLVMBackend
         {
             foreach (var (_, type) in TypeTable.Types)
             {
-                type.Written = true;
                 switch (type)
                 {
                     case StructAst structAst:
@@ -639,7 +633,6 @@ public static unsafe class LLVMBackend
         {
             foreach (var (_, type) in TypeTable.Types)
             {
-                type.Written = true;
                 switch (type)
                 {
                     case StructAst structAst:
