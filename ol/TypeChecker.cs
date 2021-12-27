@@ -3068,7 +3068,8 @@ public static class TypeChecker
             case ExpressionAst expression:
                 return VerifyExpressionType(expression, currentFunction, scope, out isConstant);
             case IndexAst index:
-                return VerifyIndexType(index, currentFunction, scope);
+                var indexType = GetVariable(index.Name, index, scope, out _);
+                return VerifyIndex(index, indexType, currentFunction, scope, out _);
             case TypeDefinition typeDef:
             {
                 var type = VerifyType(typeDef, scope);
@@ -4276,30 +4277,6 @@ public static class TypeChecker
                 _ => TypeTable.U32Type
             };
         }
-    }
-
-    private static IType VerifyIndexType(IndexAst index, IFunction currentFunction, ScopeAst scope)
-    {
-        if (!GetScopeIdentifier(scope, index.Name, out var identifier))
-        {
-            ErrorReporter.Report($"Variable '{index.Name}' not defined", index);
-            return null;
-        }
-        IType type;
-        if (identifier is DeclarationAst declaration)
-        {
-            type = declaration.Type;
-        }
-        else if (identifier is VariableAst variable)
-        {
-            type = variable.Type;
-        }
-        else
-        {
-            ErrorReporter.Report($"Identifier '{index.Name}' is not a variable", index);
-            return null;
-        }
-        return VerifyIndex(index, type, currentFunction, scope, out _);
     }
 
     private static IType VerifyIndex(IndexAst index, IType type, IFunction currentFunction, ScopeAst scope, out bool overloaded)
