@@ -12,21 +12,14 @@ public static class TypeChecker
     private static Dictionary<string, List<FunctionAst>> _polymorphicFunctions;
     private static Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> _operatorOverloads;
     private static Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads;
-    private static GlobalScope _globalScope;
     private static Dictionary<string, Library> _libraries;
 
-    private static StructAst _baseArrayType;
+    public static GlobalScope GlobalScope;
+    public static StructAst BaseArrayType;
 
-    public static void CheckTypes()
+    public static void Init()
     {
-        _polymorphicStructs = new();
-        _polymorphicFunctions = new();
-        _operatorOverloads = new();
-        _polymorphicOperatorOverloads = new();
-        _globalScope = new();
-        _libraries = new();
-
-        var mainDefined = false;
+        GlobalScope = new();
 
         // Add primitive types to global identifiers
         TypeTable.VoidType = AddPrimitive("void", TypeKind.Void, 1);
@@ -42,7 +35,17 @@ public static class TypeChecker
         AddPrimitive("float", TypeKind.Float, 4, true);
         TypeTable.Float64Type = AddPrimitive("float64", TypeKind.Float, 8, true);
         TypeTable.TypeType = AddPrimitive("Type", TypeKind.Type, 4, true);
+    }
 
+    public static void CheckTypes()
+    {
+        _polymorphicStructs = new();
+        _polymorphicFunctions = new();
+        _operatorOverloads = new();
+        _polymorphicOperatorOverloads = new();
+        _libraries = new();
+
+        var mainDefined = false;
         var runQueue = new List<CompilerDirectiveAst>();
         var functionQueue = new List<FunctionAst>();
         do
@@ -63,7 +66,7 @@ public static class TypeChecker
                         {
                             if (structAst.Name == "Array")
                             {
-                                _baseArrayType = structAst;
+                                BaseArrayType = structAst;
                             }
                             if (_polymorphicStructs.ContainsKey(structAst.Name))
                             {
@@ -104,7 +107,7 @@ public static class TypeChecker
                             }
                         }
 
-                        _globalScope.Identifiers[structAst.Name] = structAst;
+                        GlobalScope.Identifiers[structAst.Name] = structAst;
                         break;
                     case UnionAst union:
                         if (!TypeTable.Add(union.Name, union))
@@ -121,7 +124,7 @@ public static class TypeChecker
                         previous = node;
                         break;
                     case DeclarationAst globalVariable:
-                        if (!_globalScope.Identifiers.TryAdd(globalVariable.Name, globalVariable))
+                        if (!GlobalScope.Identifiers.TryAdd(globalVariable.Name, globalVariable))
                         {
                             ErrorReporter.Report($"Identifier '{globalVariable.Name}' already defined", globalVariable);
                             RemoveNode(previous, node);
@@ -251,9 +254,9 @@ public static class TypeChecker
                                 break;
                             case DirectiveType.If:
                                 var conditional = directive.Value as ConditionalAst;
-                                if (VerifyCondition(conditional.Condition, null, _globalScope, out var constant))
+                                if (VerifyCondition(conditional.Condition, null, GlobalScope, out var constant))
                                 {
-                                    var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition, _globalScope);
+                                    var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition);
                                     ProgramRunner.Init();
                                     if (!constant)
                                     {
@@ -280,9 +283,9 @@ public static class TypeChecker
                                 }
                                 break;
                             case DirectiveType.Assert:
-                                if (VerifyCondition(directive.Value, null, _globalScope, out constant))
+                                if (VerifyCondition(directive.Value, null, GlobalScope, out constant))
                                 {
-                                    var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value, _globalScope);
+                                    var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value);
                                     ProgramRunner.Init();
                                     if (!constant)
                                     {
@@ -326,10 +329,10 @@ public static class TypeChecker
         // 6. Execute any other compiler directives
         foreach (var runDirective in runQueue)
         {
-            VerifyAst(runDirective.Value, null, _globalScope, false);
+            VerifyAst(runDirective.Value, null, GlobalScope, false);
             if (!ErrorReporter.Errors.Any())
             {
-                var function = ProgramIRBuilder.CreateRunnableFunction(runDirective.Value, _globalScope);
+                var function = ProgramIRBuilder.CreateRunnableFunction(runDirective.Value);
 
                 ProgramRunner.Init();
                 ThreadPool.CompleteWork();
@@ -412,7 +415,7 @@ public static class TypeChecker
     private static PrimitiveAst AddPrimitive(string name, TypeKind typeKind, uint size = 0, bool signed = false)
     {
         var primitiveAst = new PrimitiveAst {Name = name, BackendName = name, TypeKind = typeKind, Size = size, Alignment = size, Signed = signed};
-        _globalScope.Identifiers.TryAdd(name, primitiveAst);
+        GlobalScope.Identifiers.TryAdd(name, primitiveAst);
         TypeTable.Add(name, primitiveAst);
         TypeTable.CreateTypeInfo(primitiveAst);
         return primitiveAst;
@@ -425,7 +428,7 @@ public static class TypeChecker
         {
             ErrorReporter.Report($"Multiple definitions of enum '{enumAst.Name}'", enumAst);
         }
-        _globalScope.Identifiers.TryAdd(enumAst.Name, enumAst);
+        GlobalScope.Identifiers.TryAdd(enumAst.Name, enumAst);
 
         if (enumAst.BaseTypeDefinition == null)
         {
@@ -433,7 +436,7 @@ public static class TypeChecker
         }
         else
         {
-            var baseType = VerifyType(enumAst.BaseTypeDefinition, _globalScope);
+            var baseType = VerifyType(enumAst.BaseTypeDefinition, GlobalScope);
             if (baseType?.TypeKind != TypeKind.Integer)
             {
                 ErrorReporter.Report($"Base type of enum must be an integer, but got '{PrintTypeDefinition(enumAst.BaseTypeDefinition)}'", enumAst.BaseTypeDefinition);
@@ -494,7 +497,7 @@ public static class TypeChecker
 
         if (structAst.BaseTypeDefinition != null)
         {
-            var baseType = VerifyType(structAst.BaseTypeDefinition, _globalScope, out var isGeneric, out var isVarargs, out var isParams);
+            var baseType = VerifyType(structAst.BaseTypeDefinition, GlobalScope, out var isGeneric, out var isVarargs, out var isParams);
 
             if (isVarargs || isParams || isGeneric)
             {
@@ -532,7 +535,7 @@ public static class TypeChecker
 
             if (structField.TypeDefinition != null)
             {
-                structField.Type = VerifyType(structField.TypeDefinition, _globalScope, out var isGeneric, out var isVarargs, out var isParams);
+                structField.Type = VerifyType(structField.TypeDefinition, GlobalScope, out var isGeneric, out var isVarargs, out var isParams);
 
                 if (isVarargs || isParams)
                 {
@@ -568,7 +571,7 @@ public static class TypeChecker
                     }
                     else
                     {
-                        var valueType = VerifyExpression(structField.Value, null, _globalScope, out var isConstant, out _);
+                        var valueType = VerifyExpression(structField.Value, null, GlobalScope, out var isConstant, out _);
 
                         // Verify the type is correct
                         if (valueType != null)
@@ -604,7 +607,7 @@ public static class TypeChecker
                         }
                         foreach (var (name, assignment) in structField.Assignments)
                         {
-                            VerifyFieldAssignment(structDef, name, assignment, null, _globalScope, structField: true);
+                            VerifyFieldAssignment(structDef, name, assignment, null, GlobalScope, structField: true);
                         }
                     }
                 }
@@ -620,7 +623,7 @@ public static class TypeChecker
                         var elementType = structField.ArrayElementType;
                         foreach (var value in structField.ArrayValues)
                         {
-                            var valueType = VerifyExpression(value, null, _globalScope, out var isConstant, out _);
+                            var valueType = VerifyExpression(value, null, GlobalScope, out var isConstant, out _);
                             if (valueType != null)
                             {
                                 if (!TypeEquals(elementType, valueType))
@@ -644,7 +647,7 @@ public static class TypeChecker
                 if (structField.Type?.TypeKind == TypeKind.Array && structField.TypeDefinition.Count != null)
                 {
                     // Verify the count is a constant
-                    var countType = VerifyExpression(structField.TypeDefinition.Count, null, _globalScope, out var isConstant, out var arrayLength, true);
+                    var countType = VerifyExpression(structField.TypeDefinition.Count, null, GlobalScope, out var isConstant, out var arrayLength, true);
 
                     if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
                     {
@@ -666,7 +669,7 @@ public static class TypeChecker
                     }
                     else
                     {
-                        var valueType = VerifyExpression(structField.Value, null, _globalScope, out var isConstant, out _);
+                        var valueType = VerifyExpression(structField.Value, null, GlobalScope, out var isConstant, out _);
 
                         if (!isConstant)
                         {
@@ -760,7 +763,7 @@ public static class TypeChecker
                     ErrorReporter.Report($"Union '{union.Name}' already contains field '{field.Name}'", field);
                 }
 
-                field.Type = VerifyType(field.TypeDefinition, _globalScope, out var isGeneric, out var isVarargs, out var isParams);
+                field.Type = VerifyType(field.TypeDefinition, GlobalScope, out var isGeneric, out var isVarargs, out var isParams);
 
                 if (isVarargs || isParams)
                 {
@@ -779,7 +782,7 @@ public static class TypeChecker
                 if (field.Type?.TypeKind == TypeKind.Array && field.TypeDefinition.Count != null)
                 {
                     // Verify the count is a constant
-                    var countType = VerifyExpression(field.TypeDefinition.Count, null, _globalScope, out var isConstant, out var arrayLength, true);
+                    var countType = VerifyExpression(field.TypeDefinition.Count, null, GlobalScope, out var isConstant, out var arrayLength, true);
 
                     if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
                     {
@@ -846,7 +849,7 @@ public static class TypeChecker
         }
         else
         {
-            function.ReturnType = VerifyType(function.ReturnTypeDefinition, _globalScope, out var isGeneric, out var isVarargs, out var isParams);
+            function.ReturnType = VerifyType(function.ReturnTypeDefinition, GlobalScope, out var isGeneric, out var isVarargs, out var isParams);
             if (isVarargs || isParams)
             {
                 ErrorReporter.Report($"Return type of function '{function.Name}' cannot be varargs or Params", function.ReturnTypeDefinition);
@@ -872,7 +875,7 @@ public static class TypeChecker
             }
 
             // 3b. Check for errored or undefined field types
-            argument.Type = VerifyType(argument.TypeDefinition, _globalScope, out var isGeneric, out var isVarargs, out var isParams, allowParams: true);
+            argument.Type = VerifyType(argument.TypeDefinition, GlobalScope, out var isGeneric, out var isVarargs, out var isParams, allowParams: true);
 
             if (isVarargs)
             {
@@ -923,7 +926,7 @@ public static class TypeChecker
             // 3c. Check for default arguments
             if (argument.Value != null)
             {
-                var defaultType = VerifyExpression(argument.Value, null, _globalScope, out var isConstant, out _);
+                var defaultType = VerifyExpression(argument.Value, null, GlobalScope, out var isConstant, out _);
 
                 if (argument.HasGenerics)
                 {
@@ -1086,7 +1089,7 @@ public static class TypeChecker
         }
         else
         {
-            var targetType = VerifyType(overload.Type, _globalScope, out var isGeneric, out var isVarargs, out var isParams);
+            var targetType = VerifyType(overload.Type, GlobalScope, out var isGeneric, out var isVarargs, out var isParams);
             if (isVarargs || isParams)
             {
                 ErrorReporter.Report($"Cannot overload operator '{PrintOperator(overload.Operator)}' for type '{PrintTypeDefinition(overload.Type)}'", overload.Type);
@@ -1122,7 +1125,7 @@ public static class TypeChecker
             }
 
             // 2b. Check the argument is the same type as the overload type
-            argument.Type = VerifyType(argument.TypeDefinition, _globalScope);
+            argument.Type = VerifyType(argument.TypeDefinition, GlobalScope);
             if (i > 0)
             {
                 if (overload.Operator == Operator.Subscript)
@@ -1177,7 +1180,7 @@ public static class TypeChecker
         }
         else
         {
-            interfaceAst.ReturnType = VerifyType(interfaceAst.ReturnTypeDefinition, _globalScope, out _, out var isVarargs, out var isParams);
+            interfaceAst.ReturnType = VerifyType(interfaceAst.ReturnTypeDefinition, GlobalScope, out _, out var isVarargs, out var isParams);
             if (isVarargs || isParams)
             {
                 ErrorReporter.Report($"Return type of interface '{interfaceAst.Name}' cannot be varargs or Params", interfaceAst.ReturnTypeDefinition);
@@ -1203,7 +1206,7 @@ public static class TypeChecker
             }
 
             // 3b. Check for errored or undefined field types
-            argument.Type = VerifyType(argument.TypeDefinition, _globalScope, out _, out var isVarargs, out var isParams);
+            argument.Type = VerifyType(argument.TypeDefinition, GlobalScope, out _, out var isVarargs, out var isParams);
 
             if (isVarargs)
             {
@@ -1249,7 +1252,7 @@ public static class TypeChecker
         foreach (var argument in function.Arguments)
         {
             // Arguments with the same name as a global variable will be used instead of the global
-            if (GetScopeIdentifier(_globalScope, argument.Name, out var identifier))
+            if (GetScopeIdentifier(GlobalScope, argument.Name, out var identifier))
             {
                 if (identifier is not DeclarationAst)
                 {
@@ -1266,7 +1269,7 @@ public static class TypeChecker
         }
 
         // 4. Loop through function body and verify all ASTs
-        var returned = VerifyScope(function.Body, function, _globalScope, false);
+        var returned = VerifyScope(function.Body, function, GlobalScope, false);
 
         // 5. Verify the main function doesn't call the compiler
         if (function.Name == "main" && function.Flags.HasFlag(FunctionFlags.CallsCompiler))
@@ -1305,7 +1308,7 @@ public static class TypeChecker
         foreach (var argument in overload.Arguments)
         {
             // Arguments with the same name as a global variable will be used instead of the global
-            if (GetScopeIdentifier(_globalScope, argument.Name, out var identifier))
+            if (GetScopeIdentifier(GlobalScope, argument.Name, out var identifier))
             {
                 if (identifier is not DeclarationAst)
                 {
@@ -1317,7 +1320,7 @@ public static class TypeChecker
                 overload.Body.Identifiers[argument.Name] = argument;
             }
         }
-        overload.ReturnType = VerifyType(overload.ReturnTypeDefinition, _globalScope);
+        overload.ReturnType = VerifyType(overload.ReturnTypeDefinition, GlobalScope);
 
         // 2. Resolve the compiler directives in the body
         if (overload.Flags.HasFlag(FunctionFlags.HasDirectives))
@@ -1326,7 +1329,7 @@ public static class TypeChecker
         }
 
         // 3. Loop through body and verify all ASTs
-        var returned = VerifyScope(overload.Body, overload, _globalScope, false);
+        var returned = VerifyScope(overload.Body, overload, GlobalScope, false);
 
         // 4. Verify the body returns on all paths
         if (!returned)
@@ -1372,9 +1375,9 @@ public static class TypeChecker
                     {
                         case DirectiveType.If:
                             var conditional = directive.Value as ConditionalAst;
-                            if (VerifyCondition(conditional.Condition, null, _globalScope, out var constant))
+                            if (VerifyCondition(conditional.Condition, null, GlobalScope, out var constant))
                             {
-                                var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition, _globalScope);
+                                var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition);
                                 ProgramRunner.Init();
                                 if (!constant)
                                 {
@@ -1392,9 +1395,9 @@ public static class TypeChecker
                             }
                             break;
                         case DirectiveType.Assert:
-                            if (VerifyCondition(directive.Value, null, _globalScope, out constant))
+                            if (VerifyCondition(directive.Value, null, GlobalScope, out constant))
                             {
-                                var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value, _globalScope);
+                                var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value);
                                 ProgramRunner.Init();
                                 if (!constant)
                                 {
@@ -1525,7 +1528,7 @@ public static class TypeChecker
 
         if (declaration.TypeDefinition != null)
         {
-            declaration.Type = VerifyType(declaration.TypeDefinition, _globalScope, out _, out var isVarargs, out var isParams, initialArrayLength: declaration.ArrayValues?.Count);
+            declaration.Type = VerifyType(declaration.TypeDefinition, GlobalScope, out _, out var isVarargs, out var isParams, initialArrayLength: declaration.ArrayValues?.Count);
             if (isVarargs || isParams)
             {
                 ErrorReporter.Report($"Variable '{declaration.Name}' cannot be varargs or Params", declaration.TypeDefinition);
@@ -1591,7 +1594,7 @@ public static class TypeChecker
                     var structDef = declaration.Type as StructAst;
                     foreach (var (name, assignment) in declaration.Assignments)
                     {
-                        VerifyFieldAssignment(structDef, name, assignment, null, _globalScope, true);
+                        VerifyFieldAssignment(structDef, name, assignment, null, GlobalScope, true);
                     }
                 }
             }
@@ -1615,7 +1618,7 @@ public static class TypeChecker
                     var elementType = declaration.ArrayElementType;
                     foreach (var value in declaration.ArrayValues)
                     {
-                        var valueType = VerifyExpression(value, null, _globalScope, out var isConstant, out _);
+                        var valueType = VerifyExpression(value, null, GlobalScope, out var isConstant, out _);
                         if (valueType != null)
                         {
                             if (!TypeEquals(elementType, valueType))
@@ -1654,7 +1657,7 @@ public static class TypeChecker
         // 7. Verify the type definition count if necessary
         if (declaration.Type?.TypeKind == TypeKind.Array && declaration.TypeDefinition.Count != null)
         {
-            var countType = VerifyExpression(declaration.TypeDefinition.Count, null, _globalScope, out var isConstant, out var arrayLength, true);
+            var countType = VerifyExpression(declaration.TypeDefinition.Count, null, GlobalScope, out var isConstant, out var arrayLength, true);
 
             if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
             {
@@ -1677,13 +1680,13 @@ public static class TypeChecker
 
         if (!ErrorReporter.Errors.Any())
         {
-            ProgramIRBuilder.EmitGlobalVariable(declaration, _globalScope);
+            ProgramIRBuilder.EmitGlobalVariable(declaration, GlobalScope);
         }
     }
 
     private static void VerifyGlobalVariableValue(DeclarationAst declaration)
     {
-        var valueType = VerifyExpression(declaration.Value, null, _globalScope, out var isConstant, out _);
+        var valueType = VerifyExpression(declaration.Value, null, GlobalScope, out var isConstant, out _);
         if (!isConstant)
         {
             ErrorReporter.Report($"Global variables can only be initialized with constant values", declaration.Value);
@@ -4750,12 +4753,12 @@ public static class TypeChecker
 
     private static IType CreateArrayStruct(string name, string backendName, IType elementType, TypeDefinition elementTypeDef = null)
     {
-        if (_baseArrayType == null)
+        if (BaseArrayType == null)
         {
             return null;
         }
 
-        var arrayStruct = Polymorpher.CreatePolymorphedStruct(_baseArrayType, name, backendName, TypeKind.Array, new []{elementType}, elementTypeDef);
+        var arrayStruct = Polymorpher.CreatePolymorphedStruct(BaseArrayType, name, backendName, TypeKind.Array, new []{elementType}, elementTypeDef);
         TypeTable.Add(backendName, arrayStruct);
         VerifyStruct(arrayStruct);
         return arrayStruct;

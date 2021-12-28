@@ -91,6 +91,7 @@ public static class ol
 
         // 2. Parse source files to asts
         ThreadPool.Init(noThreads);
+        TypeChecker.Init();
         Parser.Parse(entrypoint);
 
         ErrorReporter.ListErrorsAndExit(ErrorCodes.ParsingError);
