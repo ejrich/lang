@@ -430,61 +430,6 @@ public static class TypeChecker
         }
         GlobalScope.Identifiers.TryAdd(enumAst.Name, enumAst);
 
-        if (enumAst.BaseTypeDefinition == null)
-        {
-            enumAst.BaseType = TypeTable.S32Type;
-        }
-        else
-        {
-            var baseType = VerifyType(enumAst.BaseTypeDefinition, GlobalScope);
-            if (baseType?.TypeKind != TypeKind.Integer)
-            {
-                ErrorReporter.Report($"Base type of enum must be an integer, but got '{PrintTypeDefinition(enumAst.BaseTypeDefinition)}'", enumAst.BaseTypeDefinition);
-                enumAst.BaseType = TypeTable.S32Type;
-            }
-            else
-            {
-                enumAst.BaseType = (PrimitiveAst)baseType;
-                enumAst.Alignment = enumAst.Size = enumAst.BaseType.Size;
-            }
-        }
-
-        // 2. Verify enums don't have repeated values
-        var valueNames = new HashSet<string>();
-
-        var lowestAllowedValue = enumAst.BaseType.Signed ? -Math.Pow(2, 8 * enumAst.Size - 1) : 0;
-        var largestAllowedValue = enumAst.BaseType.Signed ? Math.Pow(2, 8 * enumAst.Size - 1) - 1 : Math.Pow(2, 8 * enumAst.Size) - 1;
-
-        var largestValue = -1;
-        foreach (var value in enumAst.Values)
-        {
-            // 2a. Check if the value has been previously defined
-            if (!valueNames.Add(value.Name))
-            {
-                ErrorReporter.Report($"Enum '{enumAst.Name}' already contains value '{value.Name}'", value);
-            }
-
-            // 2b. Check if the value has been previously used
-            if (value.Defined)
-            {
-                if (value.Value > largestValue)
-                {
-                    largestValue = value.Value;
-                }
-            }
-            // 2c. Assign the value if not specified
-            else
-            {
-                value.Value = ++largestValue;
-            }
-
-            // 2d. Verify the value is in the range of the enum
-            if (value.Value < lowestAllowedValue || value.Value > largestAllowedValue)
-            {
-                ErrorReporter.Report($"Enum value '{enumAst.Name}.{value.Name}' value '{value.Value}' is out of range", value);
-            }
-        }
-
         TypeTable.CreateTypeInfo(enumAst);
     }
 
@@ -2711,7 +2656,7 @@ public static class TypeChecker
         if (structType is ArrayType arrayType && fieldName == "length")
         {
             structField.IsConstant = true;
-            structField.ConstantValue = arrayType.Length;
+            structField.ConstantValue = (int)arrayType.Length;
             return TypeTable.S32Type;
         }
 
@@ -3269,23 +3214,13 @@ public static class TypeChecker
             return null;
         }
 
-        EnumValueAst enumValue = null;
-        for (var i = 0; i < enumAst.Values.Count; i++)
-        {
-            if (enumAst.Values[i].Name == value.Name)
-            {
-                structField.ValueIndices = new [] {i};
-                enumValue = enumAst.Values[i];
-                break;
-            }
-        }
-
-        if (enumValue == null)
+        if (!enumAst.Values.TryGetValue(value.Name, out var enumValue))
         {
             ErrorReporter.Report($"Enum '{enumAst.Name}' does not contain value '{value.Name}'", value);
             return null;
         }
 
+        structField.ConstantValue = enumValue.Value;
         return enumAst;
     }
 
@@ -4453,7 +4388,7 @@ public static class TypeChecker
         return true;
     }
 
-    private static IType VerifyType(TypeDefinition type, IScope scope, int depth = 0)
+    public static IType VerifyType(TypeDefinition type, IScope scope, int depth = 0)
     {
         return VerifyType(type, scope, out _, out _, out _, depth);
     }
@@ -4772,7 +4707,7 @@ public static class TypeChecker
         return compoundType;
     }
 
-    private static string PrintTypeDefinition(TypeDefinition type)
+    public static string PrintTypeDefinition(TypeDefinition type)
     {
         if (type == null) return string.Empty;
 

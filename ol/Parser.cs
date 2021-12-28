@@ -869,6 +869,22 @@ public static class Parser
             enumerator.MoveNext();
             enumAst.BaseTypeDefinition = ParseType(enumerator);
             enumerator.MoveNext();
+
+            var baseType = TypeChecker.VerifyType(enumAst.BaseTypeDefinition, TypeChecker.GlobalScope);
+            if (baseType?.TypeKind != TypeKind.Integer)
+            {
+                ErrorReporter.Report($"Base type of enum must be an integer, but got '{TypeChecker.PrintTypeDefinition(enumAst.BaseTypeDefinition)}'", enumAst.BaseTypeDefinition);
+                enumAst.BaseType = TypeTable.S32Type;
+            }
+            else
+            {
+                enumAst.BaseType = (PrimitiveAst)baseType;
+                enumAst.Alignment = enumAst.Size = enumAst.BaseType.Size;
+            }
+        }
+        else
+        {
+            enumAst.BaseType = TypeTable.S32Type;
         }
 
         if (enumerator.Current.Type != TokenType.OpenBrace)
@@ -878,6 +894,10 @@ public static class Parser
         }
 
         // 3. Iterate through fields
+        var lowestAllowedValue = enumAst.BaseType.Signed ? -Math.Pow(2, 8 * enumAst.Size - 1) : 0;
+        var largestAllowedValue = enumAst.BaseType.Signed ? Math.Pow(2, 8 * enumAst.Size - 1) - 1 : Math.Pow(2, 8 * enumAst.Size) - 1;
+        var largestValue = -1;
+
         EnumValueAst currentValue = null;
         var parsingValueDefault = false;
         while (enumerator.MoveNext())
@@ -900,22 +920,16 @@ public static class Parser
                     else if (parsingValueDefault)
                     {
                         parsingValueDefault = false;
-                        var found = false;
-                        foreach (var value in enumAst.Values)
+                        if (enumAst.Values.TryGetValue(token.Value, out var value))
                         {
-                            if (token.Value == value.Name)
+                            if (!value.Defined)
                             {
-                                if (!value.Defined)
-                                {
-                                    ErrorReporter.Report($"Expected previously defined value '{token.Value}' to have a defined value", token);
-                                }
-                                currentValue.Value = value.Value;
-                                currentValue.Defined = true;
-                                found = true;
-                                break;
+                                ErrorReporter.Report($"Expected previously defined value '{token.Value}' to have a defined value", token);
                             }
+                            currentValue.Value = value.Value;
+                            currentValue.Defined = true;
                         }
-                        if (!found)
+                        else
                         {
                             ErrorReporter.Report($"Expected value '{token.Value}' to be previously defined in enum '{enumAst.Name}'", token);
                         }
@@ -934,7 +948,31 @@ public static class Parser
                             ErrorReporter.Report($"Unexpected token '{token.Value}' in enum", token);
                         }
                         // Add the value to the enum and continue
-                        enumAst.Values.Add(currentValue);
+                        else
+                        {
+                            if (!enumAst.Values.TryAdd(currentValue.Name, currentValue))
+                            {
+                                ErrorReporter.Report($"Enum '{enumAst.Name}' already contains value '{currentValue.Name}'", currentValue);
+                            }
+
+                            if (currentValue.Defined)
+                            {
+                                if (currentValue.Value > largestValue)
+                                {
+                                    largestValue = currentValue.Value;
+                                }
+                            }
+                            else
+                            {
+                                currentValue.Value = ++largestValue;
+                            }
+
+                            if (currentValue.Value < lowestAllowedValue || currentValue.Value > largestAllowedValue)
+                            {
+                                ErrorReporter.Report($"Enum value '{enumAst.Name}.{currentValue.Name}' value '{currentValue.Value}' is out of range", currentValue);
+                            }
+                        }
+
                         currentValue = null;
                         parsingValueDefault = false;
                     }

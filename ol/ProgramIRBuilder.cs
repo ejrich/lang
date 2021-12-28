@@ -1515,12 +1515,11 @@ public static class ProgramIRBuilder
                 if (structField.IsEnum)
                 {
                     var enumDef = (EnumAst)structField.Types[0];
-                    var enumValue = enumDef.Values[structField.ValueIndices[0]].Value;
 
                     return new InstructionValue
                     {
                         ValueType = InstructionValueType.Constant, Type = enumDef,
-                        ConstantValue = new Constant {Integer = enumValue}
+                        ConstantValue = new Constant {Integer = structField.ConstantValue}
                     };
                 }
                 else if (structField.IsConstant)
@@ -1671,12 +1670,11 @@ public static class ProgramIRBuilder
                 if (structField.IsEnum)
                 {
                     var enumDef = (EnumAst)structField.Types[0];
-                    var enumValue = enumDef.Values[structField.ValueIndices[0]].Value;
 
                     return new InstructionValue
                     {
                         ValueType = InstructionValueType.Constant, Type = enumDef,
-                        ConstantValue = new Constant {Integer = enumValue}
+                        ConstantValue = new Constant {Integer = structField.ConstantValue}
                     };
                 }
                 break;
