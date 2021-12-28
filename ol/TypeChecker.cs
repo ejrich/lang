@@ -12,7 +12,7 @@ public static class TypeChecker
     private static Dictionary<string, List<FunctionAst>> _polymorphicFunctions;
     private static Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> _operatorOverloads;
     private static Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads;
-    private static ScopeAst _globalScope;
+    private static GlobalScope _globalScope;
     private static Dictionary<string, Library> _libraries;
 
     private static StructAst _baseArrayType;
@@ -412,7 +412,7 @@ public static class TypeChecker
     private static PrimitiveAst AddPrimitive(string name, TypeKind typeKind, uint size = 0, bool signed = false)
     {
         var primitiveAst = new PrimitiveAst {Name = name, BackendName = name, TypeKind = typeKind, Size = size, Alignment = size, Signed = signed};
-        _globalScope.Identifiers.Add(name, primitiveAst);
+        _globalScope.Identifiers.TryAdd(name, primitiveAst);
         TypeTable.Add(name, primitiveAst);
         TypeTable.CreateTypeInfo(primitiveAst);
         return primitiveAst;
@@ -425,7 +425,7 @@ public static class TypeChecker
         {
             ErrorReporter.Report($"Multiple definitions of enum '{enumAst.Name}'", enumAst);
         }
-        _globalScope.Identifiers.Add(enumAst.Name, enumAst);
+        _globalScope.Identifiers.TryAdd(enumAst.Name, enumAst);
 
         if (enumAst.BaseTypeDefinition == null)
         {
@@ -1224,12 +1224,12 @@ public static class TypeChecker
         interfaceAst.Verified = true;
     }
 
-    private static bool GetScopeIdentifier(ScopeAst scope, string name, out IAst ast)
+    private static bool GetScopeIdentifier(IScope scope, string name, out IAst ast)
     {
         return GetScopeIdentifier(scope, name, out ast, out _);
     }
 
-    private static bool GetScopeIdentifier(ScopeAst scope, string name, out IAst ast, out bool global)
+    private static bool GetScopeIdentifier(IScope scope, string name, out IAst ast, out bool global)
     {
         do {
             if (scope.Identifiers.TryGetValue(name, out ast))
@@ -1421,7 +1421,7 @@ public static class TypeChecker
         }
     }
 
-    private static bool VerifyScope(ScopeAst scope, IFunction currentFunction, ScopeAst parentScope, bool canBreak)
+    private static bool VerifyScope(ScopeAst scope, IFunction currentFunction, IScope parentScope, bool canBreak)
     {
         // 1. Set the parent scope
         scope.Parent = parentScope;
@@ -1438,7 +1438,7 @@ public static class TypeChecker
         return returns;
     }
 
-    private static bool VerifyAst(IAst syntaxTree, IFunction currentFunction, ScopeAst scope, bool canBreak)
+    private static bool VerifyAst(IAst syntaxTree, IFunction currentFunction, IScope scope, bool canBreak)
     {
         switch (syntaxTree)
         {
@@ -1484,7 +1484,7 @@ public static class TypeChecker
         return false;
     }
 
-    private static void VerifyReturnStatement(ReturnAst returnAst, IFunction currentFunction, ScopeAst scope)
+    private static void VerifyReturnStatement(ReturnAst returnAst, IFunction currentFunction, IScope scope)
     {
         var returnValueType = VerifyExpression(returnAst.Value, currentFunction, scope, out _, out _);
 
@@ -1715,7 +1715,7 @@ public static class TypeChecker
         }
     }
 
-    private static void VerifyDeclaration(DeclarationAst declaration, IFunction currentFunction, ScopeAst scope)
+    private static void VerifyDeclaration(DeclarationAst declaration, IFunction currentFunction, IScope scope)
     {
         // 1. Verify the variable is already defined
         declaration.Verified = true;
@@ -1899,7 +1899,7 @@ public static class TypeChecker
         }
     }
 
-    private static void VerifyCompoundDeclaration(CompoundDeclarationAst declaration, IFunction currentFunction, ScopeAst scope)
+    private static void VerifyCompoundDeclaration(CompoundDeclarationAst declaration, IFunction currentFunction, IScope scope)
     {
         // 1. Verify the variables are already defined
         for (var i = 0; i < declaration.Variables.Length; i++)
@@ -2102,7 +2102,7 @@ public static class TypeChecker
         };
     }
 
-    private static void VerifyAssignment(AssignmentAst assignment, IFunction currentFunction, ScopeAst scope)
+    private static void VerifyAssignment(AssignmentAst assignment, IFunction currentFunction, IScope scope)
     {
         if (assignment.Reference is CompoundExpressionAst compoundReference)
         {
@@ -2212,7 +2212,7 @@ public static class TypeChecker
         VerifyAssignmentValue(assignment, variableType, currentFunction, scope);
     }
 
-    private static void VerifyAssignmentValue(AssignmentAst assignment, IType type, IFunction currentFunction, ScopeAst scope, bool disallowOperators = false, bool global = false, bool structField = false)
+    private static void VerifyAssignmentValue(AssignmentAst assignment, IType type, IFunction currentFunction, IScope scope, bool disallowOperators = false, bool global = false, bool structField = false)
     {
         if (assignment.Value != null)
         {
@@ -2359,7 +2359,7 @@ public static class TypeChecker
         }
     }
 
-    private static void VerifyFieldAssignment(StructAst structDef, string name, AssignmentAst assignment, IFunction currentFunction, ScopeAst scope, bool global = false, bool structField = false)
+    private static void VerifyFieldAssignment(StructAst structDef, string name, AssignmentAst assignment, IFunction currentFunction, IScope scope, bool global = false, bool structField = false)
     {
         foreach (var field in structDef.Fields)
         {
@@ -2375,7 +2375,7 @@ public static class TypeChecker
         ErrorReporter.Report($"Field '{name}' not present in struct '{structDef.Name}'", assignment.Reference);
     }
 
-    private static void VerifyArrayValues(IType elementType, AssignmentAst assignment, IFunction currentFunction, ScopeAst scope, bool global, bool structField)
+    private static void VerifyArrayValues(IType elementType, AssignmentAst assignment, IFunction currentFunction, IScope scope, bool global, bool structField)
     {
         foreach (var value in assignment.ArrayValues)
         {
@@ -2402,7 +2402,7 @@ public static class TypeChecker
         }
     }
 
-    private static IType GetReference(IAst ast, IFunction currentFunction, ScopeAst scope, out bool hasPointer, bool fromUnaryReference = false)
+    private static IType GetReference(IAst ast, IFunction currentFunction, IScope scope, out bool hasPointer, bool fromUnaryReference = false)
     {
         hasPointer = true;
         switch (ast)
@@ -2562,7 +2562,7 @@ public static class TypeChecker
         }
     }
 
-    private static IType GetVariable(string name, IAst ast, ScopeAst scope, out bool constant, bool allowEnums = false)
+    private static IType GetVariable(string name, IAst ast, IScope scope, out bool constant, bool allowEnums = false)
     {
         constant = false;
         if (!GetScopeIdentifier(scope, name, out var identifier))
@@ -2590,7 +2590,7 @@ public static class TypeChecker
         }
     }
 
-    private static IType VerifyStructFieldRef(StructFieldRefAst structField, IFunction currentFunction, ScopeAst scope)
+    private static IType VerifyStructFieldRef(StructFieldRefAst structField, IFunction currentFunction, IScope scope)
     {
         IType refType;
         switch (structField.Children[0])
@@ -2766,7 +2766,7 @@ public static class TypeChecker
         return null;
     }
 
-    private static bool VerifyConditional(ConditionalAst conditional, IFunction currentFunction, ScopeAst scope, bool canBreak)
+    private static bool VerifyConditional(ConditionalAst conditional, IFunction currentFunction, IScope scope, bool canBreak)
     {
         // 1. Verify the condition expression
         VerifyCondition(conditional.Condition, currentFunction, scope, out _);
@@ -2784,7 +2784,7 @@ public static class TypeChecker
         return false;
     }
 
-    private static void VerifyWhile(WhileAst whileAst, IFunction currentFunction, ScopeAst scope)
+    private static void VerifyWhile(WhileAst whileAst, IFunction currentFunction, IScope scope)
     {
         // 1. Verify the condition expression
         VerifyCondition(whileAst.Condition, currentFunction, scope, out _);
@@ -2793,7 +2793,7 @@ public static class TypeChecker
         VerifyScope(whileAst.Body, currentFunction, scope, true);
     }
 
-    private static bool VerifyCondition(IAst ast, IFunction currentFunction, ScopeAst scope, out bool constant)
+    private static bool VerifyCondition(IAst ast, IFunction currentFunction, IScope scope, out bool constant)
     {
         var conditionalType = VerifyExpression(ast, currentFunction, scope, out constant, out _);
         switch (conditionalType?.TypeKind)
@@ -2813,7 +2813,7 @@ public static class TypeChecker
         }
     }
 
-    private static void VerifyEach(EachAst each, IFunction currentFunction, ScopeAst scope)
+    private static void VerifyEach(EachAst each, IFunction currentFunction, IScope scope)
     {
         // 1. Verify the iterator or range
         if (GetScopeIdentifier(scope, each.IterationVariable.Name, out _))
@@ -2887,7 +2887,7 @@ public static class TypeChecker
         }
     }
 
-    private static IType VerifyExpression(IAst ast, IFunction currentFunction, ScopeAst scope, out bool isConstant, out uint arrayLength, bool getArrayLength = false)
+    private static IType VerifyExpression(IAst ast, IFunction currentFunction, IScope scope, out bool isConstant, out uint arrayLength, bool getArrayLength = false)
     {
         // 1. Verify the expression value
         isConstant = false;
@@ -3286,7 +3286,7 @@ public static class TypeChecker
         return enumAst;
     }
 
-    private static IType VerifyCall(CallAst call, IFunction currentFunction, ScopeAst scope, IInterface function = null)
+    private static IType VerifyCall(CallAst call, IFunction currentFunction, IScope scope, IInterface function = null)
     {
         var argumentTypes = new IType[call.Arguments.Count];
         var argumentsError = false;
@@ -3512,7 +3512,7 @@ public static class TypeChecker
         return function.ReturnType;
     }
 
-    private static IInterface DetermineCallingFunction(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments, ScopeAst scope)
+    private static IInterface DetermineCallingFunction(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments, IScope scope)
     {
         if (TypeTable.Functions.TryGetValue(call.Name, out var functions))
         {
@@ -4061,7 +4061,7 @@ public static class TypeChecker
         return true;
     }
 
-    private static IType VerifyExpressionType(ExpressionAst expression, IFunction currentFunction, ScopeAst scope, out bool isConstant)
+    private static IType VerifyExpressionType(ExpressionAst expression, IFunction currentFunction, IScope scope, out bool isConstant)
     {
         // 1. Get the type of the initial child
         expression.Type = VerifyExpression(expression.Children[0], currentFunction, scope, out isConstant, out _);
@@ -4279,7 +4279,7 @@ public static class TypeChecker
         }
     }
 
-    private static IType VerifyIndex(IndexAst index, IType type, IFunction currentFunction, ScopeAst scope, out bool overloaded)
+    private static IType VerifyIndex(IndexAst index, IType type, IFunction currentFunction, IScope scope, out bool overloaded)
     {
         // 1. Verify the variable is an array or the operator overload exists
         overloaded = false;
@@ -4324,7 +4324,7 @@ public static class TypeChecker
         return elementType;
     }
 
-    private static OperatorOverloadAst VerifyOperatorOverloadType(StructAst type, Operator op, IFunction currentFunction, IAst ast, ScopeAst scope)
+    private static OperatorOverloadAst VerifyOperatorOverloadType(StructAst type, Operator op, IFunction currentFunction, IAst ast, IScope scope)
     {
         if (_operatorOverloads.TryGetValue(type.BackendName, out var overloads) && overloads.TryGetValue(op, out var overload))
         {
@@ -4450,12 +4450,12 @@ public static class TypeChecker
         return true;
     }
 
-    private static IType VerifyType(TypeDefinition type, ScopeAst scope, int depth = 0)
+    private static IType VerifyType(TypeDefinition type, IScope scope, int depth = 0)
     {
         return VerifyType(type, scope, out _, out _, out _, depth);
     }
 
-    private static IType VerifyType(TypeDefinition type, ScopeAst scope, out bool isGeneric, out bool isVarargs, out bool isParams, int depth = 0, bool allowParams = false, int? initialArrayLength = null)
+    private static IType VerifyType(TypeDefinition type, IScope scope, out bool isGeneric, out bool isVarargs, out bool isParams, int depth = 0, bool allowParams = false, int? initialArrayLength = null)
     {
         isGeneric = false;
         isVarargs = false;
@@ -4729,7 +4729,7 @@ public static class TypeChecker
         }
     }
 
-    private static IType VerifyArray(TypeDefinition typeDef, ScopeAst scope, int depth, out bool isGeneric)
+    private static IType VerifyArray(TypeDefinition typeDef, IScope scope, int depth, out bool isGeneric)
     {
         isGeneric = false;
         var elementTypeDef = typeDef.Generics[0];

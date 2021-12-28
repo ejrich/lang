@@ -118,7 +118,7 @@ public static class ProgramIRBuilder
         return index;
     }
 
-    public static FunctionIR CreateRunnableFunction(IAst ast, ScopeAst globalScope)
+    public static FunctionIR CreateRunnableFunction(IAst ast, IScope globalScope)
     {
         var function = new FunctionIR {Allocations = new(), Instructions = new(), BasicBlocks = new()};
         var entryBlock = AddBasicBlock(function);
@@ -165,7 +165,7 @@ public static class ProgramIRBuilder
         return function;
     }
 
-    public static FunctionIR CreateRunnableCondition(IAst ast, ScopeAst globalScope)
+    public static FunctionIR CreateRunnableCondition(IAst ast, IScope globalScope)
     {
         var function = new FunctionIR {Allocations = new(), Instructions = new(), BasicBlocks = new()};
         var entryBlock = AddBasicBlock(function);
@@ -304,7 +304,7 @@ public static class ProgramIRBuilder
         return string.Empty;
     }
 
-    public static void EmitGlobalVariable(DeclarationAst declaration, ScopeAst scope)
+    public static void EmitGlobalVariable(DeclarationAst declaration, IScope scope)
     {
         if (declaration.Constant)
         {
@@ -371,7 +371,7 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static InstructionValue GetConstantStruct(StructAst structDef, ScopeAst scope, Dictionary<string, AssignmentAst> assignments)
+    private static InstructionValue GetConstantStruct(StructAst structDef, IScope scope, Dictionary<string, AssignmentAst> assignments)
     {
         var constantStruct = new InstructionValue {ValueType = InstructionValueType.ConstantStruct, Type = structDef, Values = new InstructionValue[structDef.Fields.Count]};
 
@@ -425,7 +425,7 @@ public static class ProgramIRBuilder
         return constantStruct;
     }
 
-    private static InstructionValue GetFieldConstant(StructFieldAst field, ScopeAst scope)
+    private static InstructionValue GetFieldConstant(StructFieldAst field, IScope scope)
     {
         switch (field.Type.TypeKind)
         {
@@ -448,7 +448,7 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static InstructionValue InitializeGlobalArray(IDeclaration declaration, ScopeAst scope, List<IAst> arrayValues)
+    private static InstructionValue InitializeGlobalArray(IDeclaration declaration, IScope scope, List<IAst> arrayValues)
     {
         var arrayStruct = (StructAst)declaration.Type;
         if (declaration.TypeDefinition.ConstCount == null)
@@ -488,7 +488,7 @@ public static class ProgramIRBuilder
         };
     }
 
-    private static InstructionValue InitializeGlobalCArray(IDeclaration declaration, ScopeAst scope, List<IAst> arrayValues)
+    private static InstructionValue InitializeGlobalCArray(IDeclaration declaration, IScope scope, List<IAst> arrayValues)
     {
         var arrayType = (ArrayType)declaration.Type;
         var constArray = new InstructionValue {ValueType = InstructionValueType.ConstantArray, Type = declaration.ArrayElementType, ArrayLength = arrayType.Length};
@@ -580,7 +580,7 @@ public static class ProgramIRBuilder
         return block;
     }
 
-    private static void EmitDeclaration(FunctionIR function, DeclarationAst declaration, ScopeAst scope)
+    private static void EmitDeclaration(FunctionIR function, DeclarationAst declaration, IScope scope)
     {
         if (declaration.Constant)
         {
@@ -665,7 +665,7 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static void EmitCompoundDeclaration(FunctionIR function, CompoundDeclarationAst declaration, ScopeAst scope)
+    private static void EmitCompoundDeclaration(FunctionIR function, CompoundDeclarationAst declaration, IScope scope)
     {
         var variableCount = declaration.Variables.Length;
 
@@ -917,7 +917,7 @@ public static class ProgramIRBuilder
         return arrayData;
     }
 
-    private static void InitializeArrayValues(FunctionIR function, InstructionValue arrayPointer, IType elementType, List<IAst> arrayValues, ScopeAst scope)
+    private static void InitializeArrayValues(FunctionIR function, InstructionValue arrayPointer, IType elementType, List<IAst> arrayValues, IScope scope)
     {
         for (var i = 0; i < arrayValues.Count; i++)
         {
@@ -929,7 +929,7 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static void InitializeStruct(FunctionIR function, StructAst structDef, InstructionValue pointer, ScopeAst scope, Dictionary<string, AssignmentAst> assignments)
+    private static void InitializeStruct(FunctionIR function, StructAst structDef, InstructionValue pointer, IScope scope, Dictionary<string, AssignmentAst> assignments)
     {
         if (assignments == null)
         {
@@ -979,7 +979,7 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static void InitializeField(FunctionIR function, StructFieldAst field, InstructionValue pointer, ScopeAst scope)
+    private static void InitializeField(FunctionIR function, StructFieldAst field, InstructionValue pointer, IScope scope)
     {
         switch (field.Type.TypeKind)
         {
@@ -1048,7 +1048,7 @@ public static class ProgramIRBuilder
         return value;
     }
 
-    private static void EmitAssignment(FunctionIR function, AssignmentAst assignment, ScopeAst scope)
+    private static void EmitAssignment(FunctionIR function, AssignmentAst assignment, IScope scope)
     {
         if (assignment.Reference is CompoundExpressionAst compoundReference)
         {
@@ -1127,7 +1127,7 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static void EmitAssignments(FunctionIR function, AssignmentAst assignment, ScopeAst scope, InstructionValue pointer, IType type)
+    private static void EmitAssignments(FunctionIR function, AssignmentAst assignment, IScope scope, InstructionValue pointer, IType type)
     {
         if (assignment.Value != null)
         {
@@ -1165,7 +1165,7 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static void EmitArrayAssignments(FunctionIR function, List<IAst> arrayValues, IType type, InstructionValue pointer, ScopeAst scope)
+    private static void EmitArrayAssignments(FunctionIR function, List<IAst> arrayValues, IType type, InstructionValue pointer, IScope scope)
     {
         if (type is StructAst arrayStruct)
         {
@@ -1188,7 +1188,7 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, ScopeAst scope)
+    private static void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, IScope scope)
     {
         if (returnAst.Value == null)
         {
@@ -1222,7 +1222,7 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static BasicBlock EmitConditional(FunctionIR function, BasicBlock block, ConditionalAst conditional, ScopeAst scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock, out bool returns)
+    private static BasicBlock EmitConditional(FunctionIR function, BasicBlock block, ConditionalAst conditional, IScope scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock, out bool returns)
     {
         // Run the condition expression in the current basic block and then jump to the following
         var condition = EmitConditionExpression(function, conditional.Condition, scope);
@@ -1269,7 +1269,7 @@ public static class ProgramIRBuilder
         return afterBlock;
     }
 
-    private static BasicBlock EmitWhile(FunctionIR function, BasicBlock block, WhileAst whileAst, ScopeAst scope, IType returnType)
+    private static BasicBlock EmitWhile(FunctionIR function, BasicBlock block, WhileAst whileAst, IScope scope, IType returnType)
     {
         // Create a block for the condition expression and then jump to the following
         var conditionBlock = block.Location < function.Instructions.Count ? AddBasicBlock(function) : block;
@@ -1289,7 +1289,7 @@ public static class ProgramIRBuilder
         return afterBlock;
     }
 
-    private static InstructionValue EmitConditionExpression(FunctionIR function, IAst ast, ScopeAst scope)
+    private static InstructionValue EmitConditionExpression(FunctionIR function, IAst ast, IScope scope)
     {
         var value = EmitIR(function, ast, scope);
 
@@ -1308,7 +1308,7 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static BasicBlock EmitEach(FunctionIR function, BasicBlock block, EachAst each, ScopeAst scope, IType returnType)
+    private static BasicBlock EmitEach(FunctionIR function, BasicBlock block, EachAst each, IScope scope, IType returnType)
     {
         if (!BuildSettings.Release)
         {
@@ -1447,13 +1447,13 @@ public static class ProgramIRBuilder
         return block;
     }
 
-    private static InstructionValue EmitAndCast(FunctionIR function, IAst ast, ScopeAst scope, IType type, bool useRawString = false, bool returnValue = false)
+    private static InstructionValue EmitAndCast(FunctionIR function, IAst ast, IScope scope, IType type, bool useRawString = false, bool returnValue = false)
     {
         var value = EmitIR(function, ast, scope, useRawString, returnValue);
         return EmitCastValue(function, value, type);
     }
 
-    private static InstructionValue EmitIR(FunctionIR function, IAst ast, ScopeAst scope, bool useRawString = false, bool returnValue = false)
+    private static InstructionValue EmitIR(FunctionIR function, IAst ast, IScope scope, bool useRawString = false, bool returnValue = false)
     {
         switch (ast)
         {
@@ -1640,7 +1640,7 @@ public static class ProgramIRBuilder
         return null;
     }
 
-    private static InstructionValue EmitConstantIR(IAst ast, ScopeAst scope, FunctionIR function = null)
+    private static InstructionValue EmitConstantIR(IAst ast, IScope scope, FunctionIR function = null)
     {
         switch (ast)
         {
@@ -1700,7 +1700,7 @@ public static class ProgramIRBuilder
         return value;
     }
 
-    private static (InstructionValue, IType) EmitGetReference(FunctionIR function, IAst ast, ScopeAst scope, out bool loaded)
+    private static (InstructionValue, IType) EmitGetReference(FunctionIR function, IAst ast, IScope scope, out bool loaded)
     {
         loaded = false;
         switch (ast)
@@ -1731,7 +1731,7 @@ public static class ProgramIRBuilder
         return (null, null);
     }
 
-    private static InstructionValue EmitGetStructRefPointer(FunctionIR function, StructFieldRefAst structField, ScopeAst scope, out bool loaded)
+    private static InstructionValue EmitGetStructRefPointer(FunctionIR function, StructFieldRefAst structField, IScope scope, out bool loaded)
     {
         loaded = false;
         InstructionValue value = null;
@@ -1860,7 +1860,7 @@ public static class ProgramIRBuilder
         return value;
     }
 
-    private static InstructionValue EmitCall(FunctionIR function, CallAst call, ScopeAst scope)
+    private static InstructionValue EmitCall(FunctionIR function, CallAst call, IScope scope)
     {
         if (call.TypeInfo != null)
         {
@@ -2018,7 +2018,7 @@ public static class ProgramIRBuilder
         return new InstructionValue {ValueType = InstructionValueType.TypeInfo, ValueIndex = type.TypeIndex, Type = _typeInfoPointerType};
     }
 
-    private static InstructionValue EmitCallFunctionPointer(FunctionIR function, CallAst call, ScopeAst scope, InstructionValue functionPointer = null)
+    private static InstructionValue EmitCallFunctionPointer(FunctionIR function, CallAst call, IScope scope, InstructionValue functionPointer = null)
     {
         if (functionPointer == null)
         {
@@ -2056,7 +2056,7 @@ public static class ProgramIRBuilder
         return AddInstruction(function, callInstruction, call.Interface.ReturnType);
     }
 
-    private static InstructionValue EmitGetIndexPointer(FunctionIR function, IndexAst index, ScopeAst scope, IType type = null, InstructionValue variable = null)
+    private static InstructionValue EmitGetIndexPointer(FunctionIR function, IndexAst index, IScope scope, IType type = null, InstructionValue variable = null)
     {
         if (type == null)
         {
@@ -2409,7 +2409,7 @@ public static class ProgramIRBuilder
         return new InstructionValue {ValueType = InstructionValueType.Constant, Type = TypeTable.S32Type, ConstantValue = new Constant {Integer = value}};
     }
 
-    private static IAst GetScopeIdentifier(ScopeAst scope, string name, out bool global)
+    private static IAst GetScopeIdentifier(IScope scope, string name, out bool global)
     {
         do {
             if (scope.Identifiers.TryGetValue(name, out var ast))

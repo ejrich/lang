@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -66,14 +67,26 @@ public interface IDeclaration : IValues
     IType ArrayElementType { get; set; }
 }
 
-public class ScopeAst : IAst
+public interface IScope
+{
+    IScope Parent { get; set; }
+    IDictionary<string, IAst> Identifiers { get; }
+}
+
+public class GlobalScope : IScope
+{
+    public IScope Parent { get; set; }
+    public IDictionary<string, IAst> Identifiers { get; } = new ConcurrentDictionary<string, IAst>();
+}
+
+public class ScopeAst : IScope, IAst
 {
     public int FileIndex { get; set; }
     public uint Line { get; init; }
     public uint Column { get; init; }
     public bool Returns { get; set; }
-    public ScopeAst Parent { get; set; }
-    public Dictionary<string, IAst> Identifiers { get; } = new();
+    public IScope Parent { get; set; }
+    public IDictionary<string, IAst> Identifiers { get; } = new Dictionary<string, IAst>();
     public List<IAst> Children { get; } = new();
 }
 
