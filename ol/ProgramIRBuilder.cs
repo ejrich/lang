@@ -118,7 +118,7 @@ public static class ProgramIRBuilder
         return index;
     }
 
-    public static FunctionIR CreateRunnableFunction(IAst ast, IScope globalScope)
+    public static FunctionIR CreateRunnableFunction(IAst ast)
     {
         var function = new FunctionIR {Allocations = new(), Instructions = new(), BasicBlocks = new()};
         var entryBlock = AddBasicBlock(function);
@@ -127,33 +127,33 @@ public static class ProgramIRBuilder
         switch (ast)
         {
             case ReturnAst returnAst:
-                EmitReturn(function, returnAst, null, globalScope);
+                EmitReturn(function, returnAst, null, TypeChecker.GlobalScope);
                 returns = true;
                 break;
             case DeclarationAst declaration:
-                EmitDeclaration(function, declaration, globalScope);
+                EmitDeclaration(function, declaration, TypeChecker.GlobalScope);
                 break;
             case CompoundDeclarationAst compoundDeclaration:
-                EmitCompoundDeclaration(function, compoundDeclaration, globalScope);
+                EmitCompoundDeclaration(function, compoundDeclaration, TypeChecker.GlobalScope);
                 break;
             case AssignmentAst assignment:
-                EmitAssignment(function, assignment, globalScope);
+                EmitAssignment(function, assignment, TypeChecker.GlobalScope);
                 break;
             case ScopeAst childScope:
                 EmitScopeChildren(function, entryBlock, childScope, null, null, null);
                 returns = childScope.Returns;
                 break;
             case ConditionalAst conditional:
-                EmitConditional(function, entryBlock, conditional, globalScope, null, null, null, out returns);
+                EmitConditional(function, entryBlock, conditional, TypeChecker.GlobalScope, null, null, null, out returns);
                 break;
             case WhileAst whileAst:
-                EmitWhile(function, entryBlock, whileAst, globalScope, null);
+                EmitWhile(function, entryBlock, whileAst, TypeChecker.GlobalScope, null);
                 break;
             case EachAst each:
-                EmitEach(function, entryBlock, each, globalScope, null);
+                EmitEach(function, entryBlock, each, TypeChecker.GlobalScope, null);
                 break;
             default:
-                EmitIR(function, ast, globalScope);
+                EmitIR(function, ast, TypeChecker.GlobalScope);
                 break;
         }
 
@@ -165,12 +165,12 @@ public static class ProgramIRBuilder
         return function;
     }
 
-    public static FunctionIR CreateRunnableCondition(IAst ast, IScope globalScope)
+    public static FunctionIR CreateRunnableCondition(IAst ast)
     {
         var function = new FunctionIR {Allocations = new(), Instructions = new(), BasicBlocks = new()};
         var entryBlock = AddBasicBlock(function);
 
-        var value = EmitIR(function, ast, globalScope);
+        var value = EmitIR(function, ast, TypeChecker.GlobalScope);
 
         // This logic is the opposite of EmitConditionExpression because for runnable conditions the returned value
         // should be true if the result of the expression is truthy.
