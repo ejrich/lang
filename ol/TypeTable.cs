@@ -312,11 +312,11 @@ public unsafe static class TypeTable
                 enumTypeInfo.Values.Length = enumType.Values.Count;
                 var enumValues = new EnumValue[enumTypeInfo.Values.Length];
 
-                for (var i = 0; i < enumValues.Length; i++)
+                var enumIndex = 0;
+                foreach (var (valueName, value) in enumType.Values)
                 {
-                    var value = enumType.Values[i];
-                    var enumValue = new EnumValue {Name = Allocator.MakeString(value.Name), Value = value.Value};
-                    enumValues[i] = enumValue;
+                    var enumValue = new EnumValue {Name = Allocator.MakeString(valueName), Value = value.Value};
+                    enumValues[enumIndex++] = enumValue;
                 }
 
                 var enumValuesArraySize = enumValues.Length * EnumValueSize;

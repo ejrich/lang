@@ -810,14 +810,13 @@ public static unsafe class LLVMBackend
         var typeSize = LLVM.ConstInt(LLVM.Int32Type(), enumAst.Size, 0);
 
         var enumValueRefs = new LLVMValueRef[enumAst.Values.Count];
-        for (var i = 0; i < enumAst.Values.Count; i++)
+        var enumIndex = 0;
+        foreach (var (name, value) in enumAst.Values)
         {
-            var value = enumAst.Values[i];
-
-            var enumValueNameString = GetString(value.Name);
+            var enumValueNameString = GetString(name);
             var enumValue = LLVM.ConstInt(LLVM.Int32Type(), (uint)value.Value, 0);
 
-            enumValueRefs[i] = LLVMValueRef.CreateConstNamedStruct(_enumValueType, new LLVMValueRef[] {enumValueNameString, enumValue});
+            enumValueRefs[enumIndex++] = LLVMValueRef.CreateConstNamedStruct(_enumValueType, new LLVMValueRef[] {enumValueNameString, enumValue});
         }
 
         var valuesArray = CreateConstantArray(_enumValueType, _enumValueArrayType, enumValueRefs, "____enum_values");
@@ -2154,12 +2153,12 @@ public static unsafe class LLVMBackend
         var enumValues = new LLVMMetadataRef[enumAst.Values.Count];
         var isUnsigned = enumAst.BaseType.Signed ? 0 : 1;
 
-        for (var i = 0; i < enumValues.Length; i++)
+        var enumIndex = 0;
+        foreach (var (name, value) in enumAst.Values)
         {
-            var enumValue = enumAst.Values[i];
-            using var valueName = new MarshaledString(enumValue.Name);
+            using var valueName = new MarshaledString(name);
 
-            enumValues[i] = LLVM.DIBuilderCreateEnumerator(_debugBuilder, valueName.Value, (UIntPtr)valueName.Length, enumValue.Value, isUnsigned);
+            enumValues[enumIndex++] = LLVM.DIBuilderCreateEnumerator(_debugBuilder, valueName.Value, (UIntPtr)valueName.Length, value.Value, isUnsigned);
         }
 
         fixed (LLVMMetadataRef* enumValuesPointer = enumValues)

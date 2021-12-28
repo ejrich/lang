@@ -167,7 +167,7 @@ public class StructFieldRefAst : IAst
     public string ConstantName { get; set; }
     public bool ConstantStringLength { get; set; }
     public bool RawConstantString { get; set; }
-    public uint ConstantValue { get; set; }
+    public int ConstantValue { get; set; }
     public bool[] Pointers { get; set; }
     public IType[] Types { get; set; }
     public int[] ValueIndices { get; set; }
@@ -189,7 +189,7 @@ public class EnumAst : IAst, IType
     public List<string> Attributes { get; set; }
     public TypeDefinition BaseTypeDefinition { get; set; }
     public PrimitiveAst BaseType { get; set; }
-    public List<EnumValueAst> Values { get; } = new();
+    public Dictionary<string, EnumValueAst> Values { get; } = new();
 }
 
 public class EnumValueAst : IAst
