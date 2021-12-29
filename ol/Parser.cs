@@ -170,12 +170,134 @@ public static class Parser
         var enumerator = new TokenEnumerator(tokens);
         while (enumerator.MoveNext())
         {
-            var ast = ParseTopLevelAst(enumerator, directory);
-            Asts.Add(ast);
+            var attributes = ParseAttributes(enumerator);
+
+            var token = enumerator.Current;
+            switch (token.Type)
+            {
+                case TokenType.Identifier:
+                    if (enumerator.Peek(out token))
+                    {
+                        if (token.Type == TokenType.Colon)
+                        {
+                            if (attributes != null)
+                            {
+                                ErrorReporter.Report("Global variables cannot have attributes", token);
+                            }
+                            var variable = ParseDeclaration(enumerator, global: true);
+                            if (TypeChecker.AddGlobalVariable(variable))
+                            {
+                                Asts.Add(variable);
+                            }
+                        }
+                        else
+                        {
+                            var function = ParseFunction(enumerator, attributes);
+                            TypeChecker.AddFunction(function);
+                            Asts.Add(function);
+                        }
+                        break;
+                    }
+                    ErrorReporter.Report($"Unexpected token '{token.Value}'", token);
+                    break;
+                case TokenType.Struct:
+                    var structAst = ParseStruct(enumerator, attributes);
+                    if (structAst.Generics != null)
+                    {
+                        if (structAst.Name == "Array")
+                        {
+                            TypeChecker.BaseArrayType = structAst;
+                        }
+                        else if (!TypeChecker.PolymorphicStructs.TryAdd(structAst.Name, structAst))
+                        {
+                            ErrorReporter.Report($"Multiple definitions of polymorphic struct '{structAst.Name}'", structAst);
+                        }
+                    }
+                    else
+                    {
+                        structAst.BackendName = structAst.Name;
+                        if (!TypeTable.Add(structAst.Name, structAst))
+                        {
+                            ErrorReporter.Report($"Multiple definitions of type '{structAst.Name}'", structAst);
+                        }
+
+                        if (structAst.Name == "string")
+                        {
+                            TypeTable.StringType = structAst;
+                            structAst.TypeKind = TypeKind.String;
+                            structAst.Used = true;
+                            TypeChecker.VerifyStruct(structAst);
+                            TypeTable.RawStringType ??= TypeTable.Types["*.u8"];
+                        }
+                        else if (structAst.Name == "Any")
+                        {
+                            TypeTable.AnyType = structAst;
+                            structAst.TypeKind = TypeKind.Any;
+                            structAst.Used = true;
+                            Asts.Add(structAst);
+                        }
+                        else
+                        {
+                            structAst.TypeKind = TypeKind.Struct;
+                            Asts.Add(structAst);
+                        }
+                        TypeChecker.GlobalScope.Identifiers.TryAdd(structAst.Name, structAst);
+                    }
+                    break;
+                case TokenType.Enum:
+                    var enumAst = ParseEnum(enumerator, attributes);
+                    TypeChecker.VerifyEnum(enumAst);
+                    break;
+                case TokenType.Union:
+                    if (attributes != null)
+                    {
+                        ErrorReporter.Report("Unions cannot have attributes", token);
+                    }
+                    var union = ParseUnion(enumerator);
+                    TypeChecker.AddUnion(union);
+                    Asts.Add(union);
+                    break;
+                case TokenType.Pound:
+                    if (attributes != null)
+                    {
+                        ErrorReporter.Report("Compiler directives cannot have attributes", token);
+                    }
+                    var directive = ParseTopLevelDirective(enumerator, directory, true);
+                    if (directive?.Type == DirectiveType.Library)
+                    {
+                        TypeChecker.AddLibrary(directive);
+                    }
+                    else
+                    {
+                        Asts.Add(directive);
+                    }
+                    break;
+                case TokenType.Operator:
+                    if (attributes != null)
+                    {
+                        ErrorReporter.Report($"Operator overloads cannot have attributes", token);
+                    }
+                    var overload = ParseOperatorOverload(enumerator);
+                    TypeChecker.AddOverload(overload);
+                    Asts.Add(overload);
+                    break;
+                case TokenType.Interface:
+                    if (attributes != null)
+                    {
+                        ErrorReporter.Report($"Interfaces cannot have attributes", token);
+                    }
+                    var interfaceAst = ParseInterface(enumerator);
+                    TypeChecker.AddInterface(interfaceAst);
+                    Asts.Add(interfaceAst);
+                    break;
+                default:
+                    ErrorReporter.Report($"Unexpected token '{token.Value}'", token);
+                    break;
+            }
         }
     }
 
-    private static IAst ParseTopLevelAst(TokenEnumerator enumerator, string directory, bool global = true)
+    private static IAst ParseTopLevelAst(TokenEnumerator enumerator, string directory)
     {
         var attributes = ParseAttributes(enumerator);
 
@@ -212,7 +334,7 @@ public static class Parser
                 {
                     ErrorReporter.Report($"Compiler directives cannot have attributes", token);
                 }
-                return ParseTopLevelDirective(enumerator, directory, global);
+                return ParseTopLevelDirective(enumerator, directory);
             case TokenType.Operator:
                 if (attributes != null)
                 {
@@ -897,6 +1019,7 @@ public static class Parser
         var lowestAllowedValue = enumAst.BaseType.Signed ? -Math.Pow(2, 8 * enumAst.Size - 1) : 0;
         var largestAllowedValue = enumAst.BaseType.Signed ? Math.Pow(2, 8 * enumAst.Size - 1) - 1 : Math.Pow(2, 8 * enumAst.Size) - 1;
         var largestValue = -1;
+        var enumIndex = 0;
 
         EnumValueAst currentValue = null;
         var parsingValueDefault = false;
@@ -915,6 +1038,7 @@ public static class Parser
                     if (currentValue == null)
                     {
                         currentValue = CreateAst<EnumValueAst>(token);
+                        currentValue.Index = enumIndex++;
                         currentValue.Name = token.Value;
                     }
                     else if (parsingValueDefault)
@@ -1298,7 +1422,7 @@ public static class Parser
                 break;
             }
 
-            scopeAst.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory, false) : ParseLine(enumerator, currentFunction));
+            scopeAst.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory) : ParseLine(enumerator, currentFunction));
         }
 
         if (!closed)
@@ -1329,7 +1453,7 @@ public static class Parser
                 // Parse single AST
                 conditionalAst.IfBlock = CreateAst<ScopeAst>(enumerator.Current);
                 enumerator.MoveNext();
-                conditionalAst.IfBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory, false) : ParseLine(enumerator, currentFunction));
+                conditionalAst.IfBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory) : ParseLine(enumerator, currentFunction));
                 break;
             case TokenType.OpenBrace:
                 // Parse until close brace
@@ -1338,7 +1462,7 @@ public static class Parser
             default:
                 // Parse single AST
                 conditionalAst.IfBlock = CreateAst<ScopeAst>(enumerator.Current);
-                conditionalAst.IfBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory, false) : ParseLine(enumerator, currentFunction));
+                conditionalAst.IfBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory) : ParseLine(enumerator, currentFunction));
                 break;
         }
 
@@ -1363,7 +1487,7 @@ public static class Parser
                     // Parse single AST
                     conditionalAst.ElseBlock = CreateAst<ScopeAst>(enumerator.Current);
                     enumerator.MoveNext();
-                    conditionalAst.ElseBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory, false) : ParseLine(enumerator, currentFunction));
+                    conditionalAst.ElseBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory) : ParseLine(enumerator, currentFunction));
                     break;
                 case TokenType.OpenBrace:
                     // Parse until close brace
@@ -1372,7 +1496,7 @@ public static class Parser
                 default:
                     // Parse single AST
                     conditionalAst.ElseBlock = CreateAst<ScopeAst>(enumerator.Current);
-                    conditionalAst.ElseBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory, false) : ParseLine(enumerator, currentFunction));
+                    conditionalAst.ElseBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory) : ParseLine(enumerator, currentFunction));
                     break;
             }
         }
@@ -2438,7 +2562,7 @@ public static class Parser
         return index;
     }
 
-    private static IAst ParseTopLevelDirective(TokenEnumerator enumerator, string directory, bool global)
+    private static CompilerDirectiveAst ParseTopLevelDirective(TokenEnumerator enumerator, string directory, bool global = false)
     {
         var directive = CreateAst<CompilerDirectiveAst>(enumerator.Current);
 

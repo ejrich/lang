@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
@@ -6,9 +7,9 @@ namespace ol;
 
 public unsafe static class TypeTable
 {
-    public static int Count { get; set; }
-    public static Dictionary<string, IType> Types { get; } = new();
-    public static Dictionary<string, List<FunctionAst>> Functions { get; } = new();
+    public static int Count;
+    public static ConcurrentDictionary<string, IType> Types { get; } = new();
+    public static ConcurrentDictionary<string, List<FunctionAst>> Functions { get; } = new();
 
     public static IType VoidType;
     public static IType BoolType;
@@ -32,7 +33,10 @@ public unsafe static class TypeTable
         {
             type.TypeIndex = Count++;
             // Set a temporary value of null before the type data is fully determined
-            TypeInfos.Add(IntPtr.Zero);
+            lock (TypeInfos)
+            {
+                TypeInfos.Add(IntPtr.Zero);
+            }
             return true;
         }
         return false;
@@ -48,58 +52,7 @@ public unsafe static class TypeTable
         function.OverloadIndex = functions.Count;
         functions.Add(function);
 
-        // Add function to type infos
-        if (ErrorReporter.Errors.Count == 0)
-        {
-            var typeInfo = new FunctionTypeInfo {Name = Allocator.MakeString(function.Name), Type = TypeKind.Function};
-            typeInfo.ReturnType = TypeInfos[function.ReturnType.TypeIndex];
-
-            var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
-            if (argumentCount > 0)
-            {
-                typeInfo.Arguments.Length = argumentCount;
-                var arguments = new ArgumentType[argumentCount];
-
-                for (var i = 0; i < argumentCount; i++)
-                {
-                    var argument = function.Arguments[i];
-                    var argumentType = new ArgumentType {Name = Allocator.MakeString(argument.Name), TypeInfo = TypeInfos[argument.Type.TypeIndex]};
-                    arguments[i] = argumentType;
-                }
-
-                var argumentTypesArraySize = argumentCount * ArgumentTypeSize;
-                var argumentTypesPointer = Allocator.Allocate(argumentTypesArraySize);
-                fixed (ArgumentType* pointer = &arguments[0])
-                {
-                    Buffer.MemoryCopy(pointer, argumentTypesPointer.ToPointer(), argumentTypesArraySize, argumentTypesArraySize);
-                }
-                typeInfo.Arguments.Data = argumentTypesPointer;
-            }
-
-            if (function.Attributes != null)
-            {
-                typeInfo.Attributes.Length = function.Attributes.Count;
-                var attributes = new String[typeInfo.Attributes.Length];
-
-                for (var i = 0; i < attributes.Length; i++)
-                {
-                    attributes[i] = Allocator.MakeString(function.Attributes[i]);
-                }
-
-                var attributesArraySize = attributes.Length * Allocator.StringLength;
-                var attributesPointer = Allocator.Allocate(attributesArraySize);
-                fixed (String* pointer = &attributes[0])
-                {
-                    Buffer.MemoryCopy(pointer, attributesPointer.ToPointer(), attributesArraySize, attributesArraySize);
-                }
-                typeInfo.Attributes.Data = attributesPointer;
-            }
-
-            var typeInfoPointer = Allocator.Allocate(FunctionTypeInfoSize);
-            TypeInfos.Add(typeInfoPointer);
-            Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
-        }
-        else
+        lock(TypeInfos)
         {
             TypeInfos.Add(IntPtr.Zero);
         }
@@ -312,11 +265,10 @@ public unsafe static class TypeTable
                 enumTypeInfo.Values.Length = enumType.Values.Count;
                 var enumValues = new EnumValue[enumTypeInfo.Values.Length];
 
-                var enumIndex = 0;
                 foreach (var (valueName, value) in enumType.Values)
                 {
                     var enumValue = new EnumValue {Name = Allocator.MakeString(valueName), Value = value.Value};
-                    enumValues[enumIndex++] = enumValue;
+                    enumValues[value.Index] = enumValue;
                 }
 
                 var enumValuesArraySize = enumValues.Length * EnumValueSize;
@@ -493,6 +445,55 @@ public unsafe static class TypeTable
                 }
 
                 Marshal.StructureToPtr(interfaceTypeInfo, typeInfoPointer, false);
+                break;
+            case TypeKind.Function:
+                typeInfoPointer = Allocator.Allocate(FunctionTypeInfoSize);
+                var function = (FunctionAst)type;
+                var functionTypeInfo = new FunctionTypeInfo {Name = name, Type = TypeKind.Function};
+                functionTypeInfo.ReturnType = TypeInfos[function.ReturnType.TypeIndex];
+
+                var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
+                if (argumentCount > 0)
+                {
+                    functionTypeInfo.Arguments.Length = argumentCount;
+                    var arguments = new ArgumentType[argumentCount];
+
+                    for (var i = 0; i < argumentCount; i++)
+                    {
+                        var argument = function.Arguments[i];
+                        var argumentType = new ArgumentType {Name = Allocator.MakeString(argument.Name), TypeInfo = TypeInfos[argument.Type.TypeIndex]};
+                        arguments[i] = argumentType;
+                    }
+
+                    var argumentTypesArraySize = argumentCount * ArgumentTypeSize;
+                    var argumentTypesPointer = Allocator.Allocate(argumentTypesArraySize);
+                    fixed (ArgumentType* pointer = &arguments[0])
+                    {
+                        Buffer.MemoryCopy(pointer, argumentTypesPointer.ToPointer(), argumentTypesArraySize, argumentTypesArraySize);
+                    }
+                    functionTypeInfo.Arguments.Data = argumentTypesPointer;
+                }
+
+                if (function.Attributes != null)
+                {
+                    functionTypeInfo.Attributes.Length = function.Attributes.Count;
+                    var attributes = new String[functionTypeInfo.Attributes.Length];
+
+                    for (var i = 0; i < attributes.Length; i++)
+                    {
+                        attributes[i] = Allocator.MakeString(function.Attributes[i]);
+                    }
+
+                    var attributesArraySize = attributes.Length * Allocator.StringLength;
+                    var attributesPointer = Allocator.Allocate(attributesArraySize);
+                    fixed (String* pointer = &attributes[0])
+                    {
+                        Buffer.MemoryCopy(pointer, attributesPointer.ToPointer(), attributesArraySize, attributesArraySize);
+                    }
+                    functionTypeInfo.Attributes.Data = attributesPointer;
+                }
+
+                Marshal.StructureToPtr(functionTypeInfo, typeInfoPointer, false);
                 break;
         }
 

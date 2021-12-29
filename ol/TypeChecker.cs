@@ -8,18 +8,24 @@ namespace ol;
 
 public static class TypeChecker
 {
-    private static Dictionary<string, StructAst> _polymorphicStructs;
+    public static GlobalScope GlobalScope;
+    public static StructAst BaseArrayType;
+    public static Dictionary<string, StructAst> PolymorphicStructs;
+
     private static Dictionary<string, List<FunctionAst>> _polymorphicFunctions;
     private static Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> _operatorOverloads;
     private static Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads;
     private static Dictionary<string, Library> _libraries;
 
-    public static GlobalScope GlobalScope;
-    public static StructAst BaseArrayType;
-
     public static void Init()
     {
         GlobalScope = new();
+        PolymorphicStructs = new();
+
+        _polymorphicFunctions = new();
+        _operatorOverloads = new();
+        _polymorphicOperatorOverloads = new();
+        _libraries = new();
 
         // Add primitive types to global identifiers
         TypeTable.VoidType = AddPrimitive("void", TypeKind.Void, 1);
@@ -39,122 +45,25 @@ public static class TypeChecker
 
     public static void CheckTypes()
     {
-        _polymorphicStructs = new();
-        _polymorphicFunctions = new();
-        _operatorOverloads = new();
-        _polymorphicOperatorOverloads = new();
-        _libraries = new();
 
-        var mainDefined = false;
         var runQueue = new List<CompilerDirectiveAst>();
         var functionQueue = new List<FunctionAst>();
         do
         {
-            // 1. Verify enum and struct definitions
+            // 1. Verify global variables, unions, and interfaces
             var node = Parser.Asts.Head;
             Node<IAst> previous = null;
             while (node != null)
             {
                 switch (node.Data)
                 {
-                    case EnumAst enumAst:
-                        VerifyEnum(enumAst);
-                        RemoveNode(previous, node);
-                        break;
                     case StructAst structAst:
-                        if (structAst.Generics != null)
+                        if (!structAst.Verified)
                         {
-                            if (structAst.Name == "Array")
-                            {
-                                BaseArrayType = structAst;
-                            }
-                            if (_polymorphicStructs.ContainsKey(structAst.Name))
-                            {
-                                ErrorReporter.Report($"Multiple definitions of polymorphic struct '{structAst.Name}'", structAst);
-                            }
-                            _polymorphicStructs[structAst.Name] = structAst;
-                            RemoveNode(previous, node);
-                        }
-                        else
-                        {
-                            structAst.BackendName = structAst.Name;
-                            if (!TypeTable.Add(structAst.Name, structAst))
-                            {
-                                ErrorReporter.Report($"Multiple definitions of struct '{structAst.Name}'", structAst);
-                            }
-
-                            if (structAst.Name == "string")
-                            {
-                                TypeTable.StringType = structAst;
-                                structAst.TypeKind = TypeKind.String;
-                                structAst.Used = true;
-                                VerifyStruct(structAst);
-                                TypeTable.RawStringType ??= TypeTable.Types["*.u8"];
-                                RemoveNode(previous, node);
-                            }
-                            else if (structAst.Name == "Any")
-                            {
-                                TypeTable.AnyType = structAst;
-                                structAst.TypeKind = TypeKind.Any;
-                                structAst.Used = true;
-                                VerifyStruct(structAst);
-                                RemoveNode(previous, node);
-                            }
-                            else
-                            {
-                                structAst.TypeKind = TypeKind.Struct;
-                                previous = node;
-                            }
-                        }
-
-                        GlobalScope.Identifiers[structAst.Name] = structAst;
-                        break;
-                    case UnionAst union:
-                        if (!TypeTable.Add(union.Name, union))
-                        {
-                            ErrorReporter.Report($"Multiple definitions of type '{union.Name}'", union);
-                        }
-                        previous = node;
-                        break;
-                    case InterfaceAst interfaceAst:
-                        if (!TypeTable.Add(interfaceAst.Name, interfaceAst))
-                        {
-                            ErrorReporter.Report($"Multiple definitions of type '{interfaceAst.Name}'", interfaceAst);
-                        }
-                        previous = node;
-                        break;
-                    case DeclarationAst globalVariable:
-                        if (!GlobalScope.Identifiers.TryAdd(globalVariable.Name, globalVariable))
-                        {
-                            ErrorReporter.Report($"Identifier '{globalVariable.Name}' already defined", globalVariable);
-                            RemoveNode(previous, node);
-                        }
-                        break;
-                    case CompilerDirectiveAst directive when directive.Type == DirectiveType.Library:
-                        if (!File.Exists(directive.Library.AbsolutePath))
-                        {
-                            ErrorReporter.Report($"File '{directive.Library.Path}' of library '{directive.Library.Name}' was not found", directive);
-                        }
-                        else if (!_libraries.TryAdd(directive.Library.Name, directive.Library))
-                        {
-                            ErrorReporter.Report($"Library '{directive.Library.Name}' already defined", directive);
+                            VerifyStruct(structAst);
                         }
                         RemoveNode(previous, node);
                         break;
-                    default:
-                        previous = node;
-                        break;
-                }
-                node = node.Next;
-            }
-
-            // 2. Verify global variables, unions, and interfaces
-            node = Parser.Asts.Head;
-            previous = null;
-            while (node != null)
-            {
-                switch (node.Data)
-                {
                     case DeclarationAst globalVariable:
                         if (!globalVariable.Verified)
                         {
@@ -176,33 +85,9 @@ public static class TypeChecker
                         }
                         RemoveNode(previous, node);
                         break;
-                    default:
-                        previous = node;
-                        break;
-                }
-                node = node.Next;
-            }
-
-            // 3. Verify function return types/arguments
-            node = Parser.Asts.Head;
-            previous = null;
-            while (node != null)
-            {
-                switch (node.Data)
-                {
                     case FunctionAst function:
-                        var main = function.Name == "main";
-                        if (main)
-                        {
-                            if (mainDefined)
-                            {
-                                ErrorReporter.Report("Only one main function can be defined", function);
-                            }
-
-                            mainDefined = true;
-                        }
-
-                        VerifyFunctionDefinition(function, functionQueue, main);
+                        // TODO Change this to VerifyFunction and remove the function queue
+                        VerifyFunctionDefinition(function, functionQueue);
                         RemoveNode(previous, node);
                         break;
                     case OperatorOverloadAst overload:
@@ -216,28 +101,7 @@ public static class TypeChecker
                 node = node.Next;
             }
 
-            // 4. Verify struct bodies
-            node = Parser.Asts.Head;
-            previous = null;
-            while (node != null)
-            {
-                switch (node.Data)
-                {
-                    case StructAst structAst:
-                        if (!structAst.Verified)
-                        {
-                            VerifyStruct(structAst);
-                        }
-                        RemoveNode(previous, node);
-                        break;
-                    default:
-                        previous = node;
-                        break;
-                }
-                node = node.Next;
-            }
-
-            // 5. Verify and run top-level static ifs
+            // 2. Verify and run top-level static ifs
             var parsingAdditional = false;
             node = Parser.Asts.Head;
             previous = null;
@@ -298,20 +162,6 @@ public static class TypeChecker
                                     }
                                 }
                                 break;
-                            case DirectiveType.ImportModule:
-                                if (directive.Import != null)
-                                {
-                                    Parser.AddModule(directive);
-                                    parsingAdditional = true;
-                                }
-                                break;
-                            case DirectiveType.ImportFile:
-                                if (directive.Import != null)
-                                {
-                                    Parser.AddFile(directive);
-                                    parsingAdditional = true;
-                                }
-                                break;
                         }
                         break;
                     default:
@@ -326,7 +176,7 @@ public static class TypeChecker
             }
         } while (Parser.Asts.Head != null);
 
-        // 6. Execute any other compiler directives
+        // 3. Execute any other compiler directives
         foreach (var runDirective in runQueue)
         {
             VerifyAst(runDirective.Value, null, GlobalScope, false);
@@ -340,12 +190,19 @@ public static class TypeChecker
             }
         }
 
-        if (!mainDefined)
+        if (TypeTable.Functions.TryGetValue("main", out var functions))
+        {
+            if (functions.Count > 1)
+            {
+                ErrorReporter.Report("Only one main function can be defined", functions[1]);
+            }
+        }
+        else
         {
             ErrorReporter.Report("'main' function of the program is not defined");
         }
 
-        // 7. Verify operator overload bodies
+        // 4. Verify operator overload bodies
         // TODO Turn this into a job
         foreach (var overloads in _operatorOverloads.Values)
         {
@@ -358,7 +215,7 @@ public static class TypeChecker
             }
         }
 
-        // 8. Verify function bodies
+        // 5. Verify function bodies
         // TODO Turn this into a job
         foreach (var function in functionQueue)
         {
@@ -394,20 +251,65 @@ public static class TypeChecker
 
     private static void AddAdditionalAst(IAst ast, ref bool parsingAdditional)
     {
-        if (ast is CompilerDirectiveAst directive)
+        switch (ast)
         {
-            if (directive.Type == DirectiveType.ImportModule)
-            {
-                Parser.AddModule(directive);
-                parsingAdditional = true;
+            case FunctionAst function:
+                AddFunction(function);
+                break;
+            case OperatorOverloadAst overload:
+                AddOverload(overload);
+                break;
+            case EnumAst enumAst:
+                TypeChecker.VerifyEnum(enumAst);
                 return;
-            }
-            else if (directive.Type == DirectiveType.ImportFile)
-            {
-                Parser.AddFile(directive);
-                parsingAdditional = true;
-                return;
-            }
+            case StructAst structAst:
+                if (structAst.Generics != null)
+                {
+                    if (!TypeChecker.PolymorphicStructs.TryAdd(structAst.Name, structAst))
+                    {
+                        ErrorReporter.Report($"Multiple definitions of polymorphic struct '{structAst.Name}'", structAst);
+                    }
+                    return;
+                }
+                else
+                {
+                    structAst.BackendName = structAst.Name;
+                    structAst.TypeKind = TypeKind.Struct;
+                    if (!TypeTable.Add(structAst.Name, structAst))
+                    {
+                        ErrorReporter.Report($"Multiple definitions of type '{structAst.Name}'", structAst);
+                    }
+                    GlobalScope.Identifiers[structAst.Name] = structAst;
+                }
+                break;
+            case UnionAst union:
+                AddUnion(union);
+                break;
+            case InterfaceAst interfaceAst:
+                AddInterface(interfaceAst);
+                break;
+            case DeclarationAst globalVariable:
+                AddGlobalVariable(globalVariable);
+                break;
+            case CompilerDirectiveAst directive:
+                if (directive.Type == DirectiveType.ImportModule)
+                {
+                    Parser.AddModule(directive);
+                    parsingAdditional = true;
+                    return;
+                }
+                else if (directive.Type == DirectiveType.ImportFile)
+                {
+                    Parser.AddFile(directive);
+                    parsingAdditional = true;
+                    return;
+                }
+                else if (directive.Type == DirectiveType.Library)
+                {
+                    AddLibrary(directive);
+                    return;
+                }
+                break;
         }
         Parser.Asts.Add(ast);
     }
@@ -421,19 +323,135 @@ public static class TypeChecker
         return primitiveAst;
     }
 
-    private static void VerifyEnum(EnumAst enumAst)
+    public static void AddFunction(FunctionAst function)
+    {
+        if (function.Generics.Any())
+        {
+            if (!function.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) && function.Arguments.All(arg => !arg.HasGenerics))
+            {
+                ErrorReporter.Report($"Function '{function.Name}' has generic(s), but the generic(s) are not used in the argument(s) or the return type", function);
+            }
+
+            if (!_polymorphicFunctions.TryGetValue(function.Name, out var functions))
+            {
+                _polymorphicFunctions[function.Name] = functions = new List<FunctionAst>();
+            }
+            if (functions.Any() && OverloadExistsForFunction(function, functions))
+            {
+                ErrorReporter.Report($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
+            }
+            functions.Add(function);
+        }
+        else
+        {
+            var functions = TypeTable.AddFunction(function.Name, function);
+
+            if (function.Flags.HasFlag(FunctionFlags.Extern))
+            {
+                if (functions.Count > 1)
+                {
+                    ErrorReporter.Report($"Multiple definitions of extern function '{function.Name}'", function);
+                }
+            }
+            else if (function.Flags.HasFlag(FunctionFlags.Compiler))
+            {
+                if (functions.Count > 1 && OverloadExistsForFunction(function, functions, false))
+                {
+                    ErrorReporter.Report($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
+                }
+            }
+            else
+            {
+                if (functions.Count > 1 && OverloadExistsForFunction(function, functions, false))
+                {
+                    ErrorReporter.Report($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
+                }
+            }
+        }
+    }
+
+    public static void AddOverload(OperatorOverloadAst overload)
+    {
+        if (overload.Generics.Any())
+        {
+            if (!_polymorphicOperatorOverloads.TryGetValue(overload.Type.Name, out var overloads))
+            {
+                _polymorphicOperatorOverloads[overload.Type.Name] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
+            }
+            if (overloads.ContainsKey(overload.Operator))
+            {
+                ErrorReporter.Report($"Multiple definitions of overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}'", overload);
+            }
+            overloads[overload.Operator] = overload;
+        }
+        else
+        {
+            overload.Name = $"operator.{overload.Operator}.{overload.Type.GenericName}";
+            if (!_operatorOverloads.TryGetValue(overload.Type.GenericName, out var overloads))
+            {
+                _operatorOverloads[overload.Type.GenericName] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
+            }
+            if (overloads.ContainsKey(overload.Operator))
+            {
+                ErrorReporter.Report($"Multiple definitions of overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}'", overload);
+            }
+            overloads[overload.Operator] = overload;
+        }
+    }
+
+    public static bool AddGlobalVariable(DeclarationAst variable)
+    {
+        if (!GlobalScope.Identifiers.TryAdd(variable.Name, variable))
+        {
+            ErrorReporter.Report($"Identifier '{variable.Name}' already defined", variable);
+            return false;
+        }
+        return true;
+    }
+
+    public static void AddUnion(UnionAst union)
+    {
+        if (!TypeTable.Add(union.Name, union))
+        {
+            ErrorReporter.Report($"Multiple definitions of type '{union.Name}'", union);
+        }
+        GlobalScope.Identifiers.TryAdd(union.Name, union);
+    }
+
+    public static void AddInterface(InterfaceAst interfaceAst)
+    {
+        if (!TypeTable.Add(interfaceAst.Name, interfaceAst))
+        {
+            ErrorReporter.Report($"Multiple definitions of type '{interfaceAst.Name}'", interfaceAst);
+        }
+        GlobalScope.Identifiers.TryAdd(interfaceAst.Name, interfaceAst);
+    }
+
+    public static void AddLibrary(CompilerDirectiveAst directive)
+    {
+        if (!File.Exists(directive.Library.AbsolutePath))
+        {
+            ErrorReporter.Report($"File '{directive.Library.Path}' of library '{directive.Library.Name}' was not found", directive);
+        }
+        else if (!_libraries.TryAdd(directive.Library.Name, directive.Library))
+        {
+            ErrorReporter.Report($"Library '{directive.Library.Name}' already defined", directive);
+        }
+    }
+
+    public static void VerifyEnum(EnumAst enumAst)
     {
         // 1. Verify enum has not already been defined
         if (!TypeTable.Add(enumAst.Name, enumAst))
         {
-            ErrorReporter.Report($"Multiple definitions of enum '{enumAst.Name}'", enumAst);
+            ErrorReporter.Report($"Multiple definitions of type '{enumAst.Name}'", enumAst);
         }
         GlobalScope.Identifiers.TryAdd(enumAst.Name, enumAst);
 
         TypeTable.CreateTypeInfo(enumAst);
     }
 
-    private static void VerifyStruct(StructAst structAst)
+    public static void VerifyStruct(StructAst structAst)
     {
         // Verify struct fields have valid types
         var fieldNames = new HashSet<string>();
@@ -785,7 +803,7 @@ public static class TypeChecker
         union.Verified = true;
     }
 
-    private static void VerifyFunctionDefinition(FunctionAst function, List<FunctionAst> functionQueue, bool main)
+    private static void VerifyFunctionDefinition(FunctionAst function, List<FunctionAst> functionQueue)
     {
         // 1. Verify the return type of the function is valid
         if (function.ReturnTypeDefinition == null)
@@ -908,7 +926,7 @@ public static class TypeChecker
         }
 
         // 3. Verify main function return type and arguments
-        if (main)
+        if (function.Name == "main")
         {
             if (function.ReturnType?.TypeKind != TypeKind.Void)
             {
@@ -924,29 +942,17 @@ public static class TypeChecker
             {
                 ErrorReporter.Report("The main function cannot have generics", function);
             }
+
+            if (function.Flags.HasFlag(FunctionFlags.Extern))
+            {
+                ErrorReporter.Report("The main function cannot be extern", function);
+            }
         }
 
-        // 4. Load the function into the dictionary
-        if (function.Generics.Any())
+        // 4. Create the type info and verify the function if possible
+        if (!function.Generics.Any())
         {
-            if (!function.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) && function.Arguments.All(arg => !arg.HasGenerics))
-            {
-                ErrorReporter.Report($"Function '{function.Name}' has generic(s), but the generic(s) are not used in the argument(s) or the return type", function);
-            }
-
-            if (!_polymorphicFunctions.TryGetValue(function.Name, out var functions))
-            {
-                _polymorphicFunctions[function.Name] = functions = new List<FunctionAst>();
-            }
-            if (functions.Any() && OverloadExistsForFunction(function, functions))
-            {
-                ErrorReporter.Report($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
-            }
-            functions.Add(function);
-        }
-        else
-        {
-            var functions = TypeTable.AddFunction(function.Name, function);
+            TypeTable.CreateTypeInfo(function);
 
             if (function.Flags.HasFlag(FunctionFlags.Extern))
             {
@@ -962,29 +968,17 @@ public static class TypeChecker
                     }
                 }
 
-                if (functions.Count > 1)
-                {
-                    ErrorReporter.Report($"Multiple definitions of extern function '{function.Name}'", function);
-                }
                 function.Flags |= FunctionFlags.Verified;
                 ProgramIRBuilder.AddFunctionDefinition(function);
             }
             else if (function.Flags.HasFlag(FunctionFlags.Compiler))
             {
-                if (functions.Count > 1 && OverloadExistsForFunction(function, functions, false))
-                {
-                    ErrorReporter.Report($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
-                }
                 function.Flags |= FunctionFlags.Verified;
                 ProgramIRBuilder.AddFunctionDefinition(function);
             }
             else
             {
                 functionQueue.Add(function);
-                if (functions.Count > 1 && OverloadExistsForFunction(function, functions, false))
-                {
-                    ErrorReporter.Report($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
-                }
             }
         }
     }
@@ -1020,7 +1014,7 @@ public static class TypeChecker
         // 1. Verify the operator type exists and is a struct
         if (overload.Generics.Any())
         {
-            if (_polymorphicStructs.TryGetValue(overload.Type.Name, out var structDef))
+            if (PolymorphicStructs.TryGetValue(overload.Type.Name, out var structDef))
             {
                 if (structDef.Generics.Count != overload.Generics.Count)
                 {
@@ -1085,33 +1079,6 @@ public static class TypeChecker
                     ErrorReporter.Report($"Expected overload of operator '{PrintOperator(overload.Operator)}' argument type to be '{PrintTypeDefinition(overload.Type)}', but got '{PrintTypeDefinition(argument.TypeDefinition)}'", argument.TypeDefinition);
                 }
             }
-        }
-
-        // 3. Load the overload into the dictionary
-        if (overload.Generics.Any())
-        {
-            if (!_polymorphicOperatorOverloads.TryGetValue(overload.Type.Name, out var overloads))
-            {
-                _polymorphicOperatorOverloads[overload.Type.Name] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
-            }
-            if (overloads.ContainsKey(overload.Operator))
-            {
-                ErrorReporter.Report($"Multiple definitions of overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}'", overload);
-            }
-            overloads[overload.Operator] = overload;
-        }
-        else
-        {
-            overload.Name = $"operator.{overload.Operator}.{overload.Type.GenericName}";
-            if (!_operatorOverloads.TryGetValue(overload.Type.GenericName, out var overloads))
-            {
-                _operatorOverloads[overload.Type.GenericName] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
-            }
-            if (overloads.ContainsKey(overload.Operator))
-            {
-                ErrorReporter.Report($"Multiple definitions of overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}'", overload);
-            }
-            overloads[overload.Operator] = overload;
         }
     }
 
@@ -3635,6 +3602,7 @@ public static class TypeChecker
                     }
 
                     TypeTable.AddFunction(name, polymorphedFunction);
+                    TypeTable.CreateTypeInfo(polymorphedFunction);
                     VerifyFunction(polymorphedFunction);
 
                     return polymorphedFunction;
@@ -4623,7 +4591,7 @@ public static class TypeChecker
                                 isGeneric = true;
                             }
                         }
-                        if (!_polymorphicStructs.TryGetValue(type.Name, out var structDef))
+                        if (!PolymorphicStructs.TryGetValue(type.Name, out var structDef))
                         {
                             ErrorReporter.Report($"No polymorphic structs of type '{type.Name}'", type);
                             return null;
