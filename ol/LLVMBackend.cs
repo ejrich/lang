@@ -260,7 +260,7 @@ public static unsafe class LLVMBackend
 
         if (_emitDebug)
         {
-            foreach (var (_, type) in TypeTable.Types)
+            foreach (var (_, type) in TypeTable.Types.OrderBy(t => t.Value.TypeIndex))
             {
                 switch (type)
                 {
@@ -316,7 +316,7 @@ public static unsafe class LLVMBackend
         }
         else
         {
-            foreach (var (_, type) in TypeTable.Types)
+            foreach (var (_, type) in TypeTable.Types.OrderBy(t => t.Value.TypeIndex))
             {
                 switch (type)
                 {
@@ -416,7 +416,7 @@ public static unsafe class LLVMBackend
 
         if (_emitDebug)
         {
-            foreach (var (_, type) in TypeTable.Types)
+            foreach (var (_, type) in TypeTable.Types.OrderBy(t => t.Value.TypeIndex))
             {
                 if (type.Used)
                 {
@@ -470,7 +470,7 @@ public static unsafe class LLVMBackend
         }
         else
         {
-            foreach (var (_, type) in TypeTable.Types)
+            foreach (var (_, type) in TypeTable.Types.OrderBy(t => t.Value.TypeIndex))
             {
                 if (type.Used)
                 {
@@ -581,7 +581,7 @@ public static unsafe class LLVMBackend
 
         if (_emitDebug)
         {
-            foreach (var (_, type) in TypeTable.Types)
+            foreach (var (_, type) in TypeTable.Types.OrderBy(t => t.Value.TypeIndex))
             {
                 switch (type)
                 {
@@ -631,7 +631,7 @@ public static unsafe class LLVMBackend
         }
         else
         {
-            foreach (var (_, type) in TypeTable.Types)
+            foreach (var (_, type) in TypeTable.Types.OrderBy(t => t.Value.TypeIndex))
             {
                 switch (type)
                 {
@@ -810,13 +810,12 @@ public static unsafe class LLVMBackend
         var typeSize = LLVM.ConstInt(LLVM.Int32Type(), enumAst.Size, 0);
 
         var enumValueRefs = new LLVMValueRef[enumAst.Values.Count];
-        var enumIndex = 0;
         foreach (var (name, value) in enumAst.Values)
         {
             var enumValueNameString = GetString(name);
             var enumValue = LLVM.ConstInt(LLVM.Int32Type(), (uint)value.Value, 0);
 
-            enumValueRefs[enumIndex++] = LLVMValueRef.CreateConstNamedStruct(_enumValueType, new LLVMValueRef[] {enumValueNameString, enumValue});
+            enumValueRefs[value.Index] = LLVMValueRef.CreateConstNamedStruct(_enumValueType, new LLVMValueRef[] {enumValueNameString, enumValue});
         }
 
         var valuesArray = CreateConstantArray(_enumValueType, _enumValueArrayType, enumValueRefs, "____enum_values");
@@ -2153,12 +2152,11 @@ public static unsafe class LLVMBackend
         var enumValues = new LLVMMetadataRef[enumAst.Values.Count];
         var isUnsigned = enumAst.BaseType.Signed ? 0 : 1;
 
-        var enumIndex = 0;
         foreach (var (name, value) in enumAst.Values)
         {
             using var valueName = new MarshaledString(name);
 
-            enumValues[enumIndex++] = LLVM.DIBuilderCreateEnumerator(_debugBuilder, valueName.Value, (UIntPtr)valueName.Length, value.Value, isUnsigned);
+            enumValues[value.Index] = LLVM.DIBuilderCreateEnumerator(_debugBuilder, valueName.Value, (UIntPtr)valueName.Length, value.Value, isUnsigned);
         }
 
         fixed (LLVMMetadataRef* enumValuesPointer = enumValues)

@@ -197,6 +197,7 @@ public class EnumValueAst : IAst
     public int FileIndex { get; set; }
     public uint Line { get; init; }
     public uint Column { get; init; }
+    public int Index { get; set; }
     public string Name { get; set; }
     public int Value { get; set; }
     public bool Defined { get; set; }
