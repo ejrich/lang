@@ -11,6 +11,7 @@ public static class Parser
     private static string _libraryDirectory;
 
     public static SafeLinkedList<IAst> Asts = new();
+    public static SafeLinkedList<CompilerDirectiveAst> Directives = new();
 
     private class TokenEnumerator
     {
@@ -226,15 +227,12 @@ public static class Parser
                             TypeTable.StringType = structAst;
                             structAst.TypeKind = TypeKind.String;
                             structAst.Used = true;
-                            TypeChecker.VerifyStruct(structAst);
-                            TypeTable.RawStringType ??= TypeTable.Types["*.u8"];
                         }
                         else if (structAst.Name == "Any")
                         {
                             TypeTable.AnyType = structAst;
                             structAst.TypeKind = TypeKind.Any;
                             structAst.Used = true;
-                            Asts.Add(structAst);
                         }
                         else
                         {
@@ -269,7 +267,7 @@ public static class Parser
                     }
                     else
                     {
-                        Asts.Add(directive);
+                        Directives.Add(directive);
                     }
                     break;
                 case TokenType.Operator:
