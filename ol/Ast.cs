@@ -44,13 +44,14 @@ public enum FunctionFlags
     Compiler = 0x2,
     Varargs = 0x4,
     Params = 0x8,
-    Verified = 0x10,
-    HasDirectives = 0x20,
-    CallsCompiler = 0x40,
-    ReturnVoidAtEnd = 0x80,
-    ReturnTypeHasGenerics = 0x100,
-    PrintIR = 0x200,
-    ExternInitted = 0x400
+    DefinitionVerified = 0x10,
+    Verified = 0x20,
+    HasDirectives = 0x40,
+    CallsCompiler = 0x80,
+    ReturnVoidAtEnd = 0x100,
+    ReturnTypeHasGenerics = 0x200,
+    PrintIR = 0x400,
+    ExternInitted = 0x800
 }
 
 public interface IValues : IAst

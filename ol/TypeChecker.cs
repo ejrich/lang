@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
@@ -12,10 +13,10 @@ public static class TypeChecker
     public static StructAst BaseArrayType;
     public static Dictionary<string, StructAst> PolymorphicStructs;
 
-    private static Dictionary<string, List<FunctionAst>> _polymorphicFunctions;
-    private static Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> _operatorOverloads;
-    private static Dictionary<string, Dictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads;
-    private static Dictionary<string, Library> _libraries;
+    private static ConcurrentDictionary<string, List<FunctionAst>> _polymorphicFunctions;
+    private static ConcurrentDictionary<string, Dictionary<Operator, OperatorOverloadAst>> _operatorOverloads;
+    private static ConcurrentDictionary<string, Dictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads;
+    private static ConcurrentDictionary<string, Library> _libraries;
 
     public static void Init()
     {
@@ -45,127 +46,71 @@ public static class TypeChecker
 
     public static void CheckTypes()
     {
+        VerifyStruct(TypeTable.StringType);
+        VerifyStruct(TypeTable.AnyType);
+        TypeTable.RawStringType ??= TypeTable.Types["*.u8"];
 
         var runQueue = new List<CompilerDirectiveAst>();
-        var functionQueue = new List<FunctionAst>();
         do
         {
-            // 1. Verify global variables, unions, and interfaces
-            var node = Parser.Asts.Head;
-            Node<IAst> previous = null;
-            while (node != null)
-            {
-                switch (node.Data)
-                {
-                    case StructAst structAst:
-                        if (!structAst.Verified)
-                        {
-                            VerifyStruct(structAst);
-                        }
-                        RemoveNode(previous, node);
-                        break;
-                    case DeclarationAst globalVariable:
-                        if (!globalVariable.Verified)
-                        {
-                            VerifyGlobalVariable(globalVariable);
-                        }
-                        RemoveNode(previous, node);
-                        break;
-                    case UnionAst union:
-                        if (!union.Verified)
-                        {
-                            VerifyUnion(union);
-                        }
-                        RemoveNode(previous, node);
-                        break;
-                    case InterfaceAst interfaceAst:
-                        if (!interfaceAst.Verified)
-                        {
-                            VerifyInterface(interfaceAst);
-                        }
-                        RemoveNode(previous, node);
-                        break;
-                    case FunctionAst function:
-                        // TODO Change this to VerifyFunction and remove the function queue
-                        VerifyFunctionDefinition(function, functionQueue);
-                        RemoveNode(previous, node);
-                        break;
-                    case OperatorOverloadAst overload:
-                        VerifyOperatorOverloadDefinition(overload);
-                        RemoveNode(previous, node);
-                        break;
-                    default:
-                        previous = node;
-                        break;
-                }
-                node = node.Next;
-            }
-
-            // 2. Verify and run top-level static ifs
+            // 1. Verify and run top-level directives
             var parsingAdditional = false;
-            node = Parser.Asts.Head;
-            previous = null;
+            var node = Parser.Directives.Head;
+            Node<CompilerDirectiveAst> previous = null;
             while (node != null)
             {
-                switch (node.Data)
+                var directive = node.Data;
+                RemoveNode(Parser.Directives, previous, node);
+                switch (directive.Type)
                 {
-                    case CompilerDirectiveAst directive:
-                        RemoveNode(previous, node);
-                        switch (directive.Type)
+                    case DirectiveType.Run:
+                        runQueue.Add(directive);
+                        break;
+                    case DirectiveType.If:
+                        var conditional = directive.Value as ConditionalAst;
+                        if (VerifyCondition(conditional.Condition, null, GlobalScope, out var constant))
                         {
-                            case DirectiveType.Run:
-                                runQueue.Add(directive);
-                                break;
-                            case DirectiveType.If:
-                                var conditional = directive.Value as ConditionalAst;
-                                if (VerifyCondition(conditional.Condition, null, GlobalScope, out var constant))
-                                {
-                                    var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition);
-                                    ProgramRunner.Init();
-                                    if (!constant)
-                                    {
-                                        ThreadPool.CompleteWork();
-                                    }
+                            var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition);
+                            ProgramRunner.Init();
+                            if (!constant)
+                            {
+                                ThreadPool.CompleteWork();
+                            }
 
-                                    if (ProgramRunner.ExecuteCondition(condition, conditional.Condition))
+                            if (ProgramRunner.ExecuteCondition(condition, conditional.Condition))
+                            {
+                                if (conditional.IfBlock.Children.Any())
+                                {
+                                    foreach (var ast in conditional.IfBlock.Children)
                                     {
-                                        if (conditional.IfBlock.Children.Any())
-                                        {
-                                            foreach (var ast in conditional.IfBlock.Children)
-                                            {
-                                                AddAdditionalAst(ast, ref parsingAdditional);
-                                            }
-                                        }
-                                    }
-                                    else if (conditional.ElseBlock != null && conditional.ElseBlock.Children.Any())
-                                    {
-                                        foreach (var ast in conditional.ElseBlock.Children)
-                                        {
-                                            AddAdditionalAst(ast, ref parsingAdditional);
-                                        }
+                                        AddAdditionalAst(ast, ref parsingAdditional);
                                     }
                                 }
-                                break;
-                            case DirectiveType.Assert:
-                                if (VerifyCondition(directive.Value, null, GlobalScope, out constant))
+                            }
+                            else if (conditional.ElseBlock != null && conditional.ElseBlock.Children.Any())
+                            {
+                                foreach (var ast in conditional.ElseBlock.Children)
                                 {
-                                    var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value);
-                                    ProgramRunner.Init();
-                                    if (!constant)
-                                    {
-                                        ThreadPool.CompleteWork();
-                                    }
-
-                                    if (!ProgramRunner.ExecuteCondition(condition, directive.Value))
-                                    {
-                                        ErrorReporter.Report("Assertion failed", directive.Value);
-                                    }
+                                    AddAdditionalAst(ast, ref parsingAdditional);
                                 }
-                                break;
+                            }
                         }
                         break;
-                    default:
-                        previous = node;
+                    case DirectiveType.Assert:
+                        if (VerifyCondition(directive.Value, null, GlobalScope, out constant))
+                        {
+                            var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value);
+                            ProgramRunner.Init();
+                            if (!constant)
+                            {
+                                ThreadPool.CompleteWork();
+                            }
+
+                            if (!ProgramRunner.ExecuteCondition(condition, directive.Value))
+                            {
+                                ErrorReporter.Report("Assertion failed", directive.Value);
+                            }
+                        }
                         break;
                 }
                 node = node.Next;
@@ -174,7 +119,53 @@ public static class TypeChecker
             {
                 ThreadPool.CompleteWork();
             }
-        } while (Parser.Asts.Head != null);
+        } while (Parser.Directives.Head != null);
+
+        // 2. Verify the rest of the types
+        var astNode = Parser.Asts.Head;
+        while (astNode != null)
+        {
+            switch (astNode.Data)
+            {
+                case StructAst structAst:
+                    if (!structAst.Verified)
+                    {
+                        VerifyStruct(structAst);
+                    }
+                    break;
+                case DeclarationAst globalVariable:
+                    if (!globalVariable.Verified)
+                    {
+                        VerifyGlobalVariable(globalVariable);
+                    }
+                    break;
+                case UnionAst union:
+                    if (!union.Verified)
+                    {
+                        VerifyUnion(union);
+                    }
+                    break;
+                case InterfaceAst interfaceAst:
+                    if (!interfaceAst.Verified)
+                    {
+                        VerifyInterface(interfaceAst);
+                    }
+                    break;
+                case FunctionAst function:
+                    if (!function.Flags.HasFlag(FunctionFlags.Verified))
+                    {
+                        VerifyFunction(function);
+                    }
+                    break;
+                case OperatorOverloadAst overload:
+                    if (!overload.Flags.HasFlag(FunctionFlags.Verified))
+                    {
+                        VerifyOperatorOverload(overload);
+                    }
+                    break;
+            }
+            astNode = astNode.Next;
+        }
 
         // 3. Execute any other compiler directives
         foreach (var runDirective in runQueue)
@@ -202,45 +193,22 @@ public static class TypeChecker
             ErrorReporter.Report("'main' function of the program is not defined");
         }
 
-        // 4. Verify operator overload bodies
-        // TODO Turn this into a job
-        foreach (var overloads in _operatorOverloads.Values)
-        {
-            foreach (var overload in overloads.Values)
-            {
-                if (!overload.Flags.HasFlag(FunctionFlags.Verified))
-                {
-                    VerifyOperatorOverload(overload);
-                }
-            }
-        }
-
-        // 5. Verify function bodies
-        // TODO Turn this into a job
-        foreach (var function in functionQueue)
-        {
-            if (!function.Flags.HasFlag(FunctionFlags.Verified))
-            {
-                VerifyFunction(function);
-            }
-        }
-
         ThreadPool.CompleteWork();
     }
 
-    private static void RemoveNode(Node<IAst> previous, Node<IAst> current)
+    private static void RemoveNode<T>(SafeLinkedList<T> list, Node<T> previous, Node<T> current)
     {
         if (previous == null)
         {
-            Parser.Asts.Head = current.Next;
+            list.Head = current.Next;
             if (current.Next == null)
             {
-                Parser.Asts.ReplaceEnd(null);
+                list.ReplaceEnd(null);
             }
         }
         else if (current.Next == null)
         {
-            Parser.Asts.ReplaceEnd(previous);
+            list.ReplaceEnd(previous);
             previous.Next = null;
         }
         else
@@ -296,20 +264,21 @@ public static class TypeChecker
                 {
                     Parser.AddModule(directive);
                     parsingAdditional = true;
-                    return;
                 }
                 else if (directive.Type == DirectiveType.ImportFile)
                 {
                     Parser.AddFile(directive);
                     parsingAdditional = true;
-                    return;
                 }
                 else if (directive.Type == DirectiveType.Library)
                 {
                     AddLibrary(directive);
-                    return;
                 }
-                break;
+                else
+                {
+                    Parser.Directives.Add(directive);
+                }
+                return;
         }
         Parser.Asts.Add(ast);
     }
@@ -451,7 +420,7 @@ public static class TypeChecker
         TypeTable.CreateTypeInfo(enumAst);
     }
 
-    public static void VerifyStruct(StructAst structAst)
+    private static void VerifyStruct(StructAst structAst)
     {
         // Verify struct fields have valid types
         var fieldNames = new HashSet<string>();
@@ -803,8 +772,10 @@ public static class TypeChecker
         union.Verified = true;
     }
 
-    private static void VerifyFunctionDefinition(FunctionAst function, List<FunctionAst> functionQueue)
+    private static bool VerifyFunctionDefinition(FunctionAst function)
     {
+        function.Flags |= FunctionFlags.DefinitionVerified;
+
         // 1. Verify the return type of the function is valid
         if (function.ReturnTypeDefinition == null)
         {
@@ -978,9 +949,11 @@ public static class TypeChecker
             }
             else
             {
-                functionQueue.Add(function);
+                return true;
             }
         }
+
+        return false;
     }
 
     private static bool OverloadExistsForFunction(IFunction currentFunction, List<FunctionAst> existingFunctions, bool checkAll = true)
@@ -1009,8 +982,10 @@ public static class TypeChecker
         return false;
     }
 
-    private static void VerifyOperatorOverloadDefinition(OperatorOverloadAst overload)
+    private static bool VerifyOperatorOverloadDefinition(OperatorOverloadAst overload)
     {
+        overload.Flags |= FunctionFlags.DefinitionVerified;
+
         // 1. Verify the operator type exists and is a struct
         if (overload.Generics.Any())
         {
@@ -1080,6 +1055,8 @@ public static class TypeChecker
                 }
             }
         }
+
+        return !overload.Generics.Any();
     }
 
     private static void VerifyInterface(InterfaceAst interfaceAst)
@@ -1160,6 +1137,18 @@ public static class TypeChecker
 
     private static void VerifyFunction(FunctionAst function)
     {
+        if (!function.Flags.HasFlag(FunctionFlags.DefinitionVerified))
+        {
+            if (!VerifyFunctionDefinition(function))
+            {
+                return;
+            }
+        }
+        else if (function.Generics.Any())
+        {
+            return;
+        }
+
         // 1. Initialize local variables
         foreach (var argument in function.Arguments)
         {
@@ -1216,6 +1205,11 @@ public static class TypeChecker
 
     private static void VerifyOperatorOverload(OperatorOverloadAst overload)
     {
+        if (!VerifyOperatorOverloadDefinition(overload))
+        {
+            return;
+        }
+
         // 1. Initialize local variables
         foreach (var argument in overload.Arguments)
         {
@@ -2790,6 +2784,11 @@ public static class TypeChecker
     {
         if (function.Flags.HasFlag(FunctionFlags.Extern))
         {
+            if (!function.Flags.HasFlag(FunctionFlags.Verified))
+            {
+                VerifyFunctionDefinition(function);
+            }
+
             if (!function.Flags.HasFlag(FunctionFlags.Varargs) && !function.Flags.HasFlag(FunctionFlags.ExternInitted) && function.ExternLib != null)
             {
                 function.Flags |= FunctionFlags.ExternInitted;
@@ -2859,6 +2858,7 @@ public static class TypeChecker
                     case VariableAst variable:
                         return variable.Type;
                     case IType type:
+                        // TODO Verify the type if necessary
                         if (type is StructAst structAst && structAst.Generics != null)
                         {
                             ErrorReporter.Report($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
@@ -3423,6 +3423,11 @@ public static class TypeChecker
         {
             foreach (var function in functions)
             {
+                if (!function.Flags.HasFlag(FunctionFlags.DefinitionVerified))
+                {
+                    VerifyFunctionDefinition(function);
+                }
+
                 if (VerifyArguments(call, arguments, specifiedArguments, function, function.Flags.HasFlag(FunctionFlags.Varargs), function.Flags.HasFlag(FunctionFlags.Params), function.ParamsElementType, function.Flags.HasFlag(FunctionFlags.Extern)))
                 {
                     return function;
@@ -3435,6 +3440,10 @@ public static class TypeChecker
             for (var i = 0; i < polymorphicFunctions.Count; i++)
             {
                 var function = polymorphicFunctions[i];
+                if (!function.Flags.HasFlag(FunctionFlags.DefinitionVerified))
+                {
+                    VerifyFunctionDefinition(function);
+                }
 
                 if (call.Generics != null && call.Generics.Count != function.Generics.Count)
                 {
