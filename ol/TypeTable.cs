@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using System.Threading;
 
 namespace ol;
 
@@ -45,10 +44,7 @@ public unsafe static class TypeTable
 
     public static List<FunctionAst> AddFunction(string name, FunctionAst function)
     {
-        if (!Functions.TryGetValue(name, out var functions))
-        {
-            Functions[name] = functions = new List<FunctionAst>();
-        }
+        var functions = Functions.GetOrAdd(name, _ => new List<FunctionAst>());
         function.OverloadIndex = functions.Count;
         functions.Add(function);
 

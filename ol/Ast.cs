@@ -78,6 +78,7 @@ public class GlobalScope : IScope
 {
     public IScope Parent { get; set; }
     public IDictionary<string, IAst> Identifiers { get; } = new ConcurrentDictionary<string, IAst>();
+    public List<ScopeAst> PrivateScopes { get; } = new();
 }
 
 public class ScopeAst : IScope, IAst

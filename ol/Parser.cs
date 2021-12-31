@@ -2651,6 +2651,9 @@ public static class Parser
                     directive.Library.AbsolutePath = Path.Combine(directory, path);
                 }
                 break;
+            case "private":
+                // TODO Implement me
+                break;
             default:
                 ErrorReporter.Report($"Unsupported top-level compiler directive '{token.Value}'", token);
                 return null;
@@ -2684,7 +2687,7 @@ public static class Parser
                 currentFunction.Flags |= FunctionFlags.HasDirectives;
                 break;
             default:
-                ErrorReporter.Report($"Unsupported compiler directive '{token.Value}'", token);
+                ErrorReporter.Report($"Unsupported function level compiler directive '{token.Value}'", token);
                 return null;
         }
 

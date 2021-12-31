@@ -1,4 +1,6 @@
 #import compiler
+#import "import.ol"
+#import "import2.ol"
 
 main() { //#print_ir {
     // Return positive exit code
@@ -91,6 +93,10 @@ main() { //#print_ir {
     any_args();
 
     multiple_return_values();
+
+    foobar();
+    foobar_2();
+    foobaz(); // TODO This should not compile
 }
 
 global_c := global_b;
