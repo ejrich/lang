@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
-using System.IO;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
@@ -1544,6 +1543,7 @@ public static unsafe class ProgramRunner
                 // Compile the expression to a delegate
                 var delegateType = CreateDelegateType(function.Source.Name, argumentTypes, typeof(Register));
                 functionDelegate = Expression.Lambda(delegateType, call, parameters).Compile();
+                GCHandle.Alloc(functionDelegate); // Prevent the pointer from being garbage collected
             }
 
             function.FunctionPointer = Marshal.GetFunctionPointerForDelegate(functionDelegate);

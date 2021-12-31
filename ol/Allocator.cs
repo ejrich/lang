@@ -31,8 +31,9 @@ public static class Allocator
         }
 
         // Search for a memory block with open space
-        foreach (var block in _memoryBlocks)
+        for (var i = 0; i < _memoryBlocks.Count; i++)
         {
+            var block = _memoryBlocks[i];
             if (size <= block.Size - block.Cursor)
             {
                 var pointer = block.Pointer + block.Cursor;
