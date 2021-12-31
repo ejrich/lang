@@ -2,12 +2,14 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace ol;
 
 public unsafe static class TypeTable
 {
     public static int Count;
+    public static int FunctionCount;
     public static ConcurrentDictionary<string, IType> Types { get; } = new();
     public static ConcurrentDictionary<string, List<FunctionAst>> Functions { get; } = new();
 
@@ -45,7 +47,7 @@ public unsafe static class TypeTable
     public static List<FunctionAst> AddFunction(string name, FunctionAst function)
     {
         var functions = Functions.GetOrAdd(name, _ => new List<FunctionAst>());
-        function.OverloadIndex = functions.Count;
+        function.FunctionIndex = GetFunctionIndex();
         functions.Add(function);
 
         lock(TypeInfos)
@@ -57,17 +59,15 @@ public unsafe static class TypeTable
         return functions;
     }
 
-    public static IType GetType(TypeDefinition typeDef)
+    public static int GetFunctionIndex()
     {
-        var typeName = typeDef.Name switch
-        {
-            "Type" => "s32",
-            "Params" => $"Array.{typeDef.Generics[0].GenericName}",
-            _ => typeDef.GenericName
-        };
+        int index;
+        do {
+            index = FunctionCount;
+        }
+        while (Interlocked.CompareExchange(ref FunctionCount, index + 1, index) != index);
 
-        Types.TryGetValue(typeName, out var type);
-        return type;
+        return index;
     }
 
     public static List<IntPtr> TypeInfos { get; } = new();

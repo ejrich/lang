@@ -15,20 +15,18 @@ public static class ProgramIRBuilder
 
     public static void AddFunction(FunctionAst function)
     {
-        var functionName = GetFunctionName(function);
-
         var functionIR = new FunctionIR
         {
-            Index = GetFunctionIndex(), Source = function, Allocations = new(), Instructions = new(), BasicBlocks = new()
+            Source = function, Allocations = new(), Instructions = new(), BasicBlocks = new()
         };
 
-        if (functionName == "__start")
+        if (function.Name == "__start")
         {
             Program.EntryPoint = functionIR;
         }
         else
         {
-            Program.Functions[functionName] = functionIR;
+            Program.Functions[function.FunctionIndex] = functionIR;
         }
 
         var entryBlock = AddBasicBlock(functionIR);
@@ -75,17 +73,16 @@ public static class ProgramIRBuilder
 
     public static void AddFunctionDefinition(FunctionAst function)
     {
-        var functionIR = new FunctionIR {Index = GetFunctionIndex(), Source = function};
+        var functionIR = new FunctionIR {Source = function};
 
-        var functionName = GetFunctionName(function);
-        Program.Functions[functionName] = functionIR;
+        Program.Functions[function.FunctionIndex] = functionIR;
     }
 
     public static void AddOperatorOverload(OperatorOverloadAst overload)
     {
         var functionIR = new FunctionIR
         {
-            Index = GetFunctionIndex(), Source = overload, Allocations = new(), Instructions = new(), BasicBlocks = new()
+            Source = overload, Allocations = new(), Instructions = new(), BasicBlocks = new()
         };
         var entryBlock = AddBasicBlock(functionIR);
 
@@ -97,7 +94,7 @@ public static class ProgramIRBuilder
             EmitStore(functionIR, allocationIndex, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i, Type = argument.Type});
         }
 
-        Program.Functions[overload.Name] = functionIR;
+        Program.Functions[overload.FunctionIndex] = functionIR;
 
         EmitScopeChildren(functionIR, entryBlock, overload.Body, overload.ReturnType, null, null);
 
@@ -105,17 +102,6 @@ public static class ProgramIRBuilder
         {
             PrintFunction(overload.Name, functionIR);
         }
-    }
-
-    private static int GetFunctionIndex()
-    {
-        int index;
-        do {
-            index = Program.FunctionCount;
-        }
-        while (Interlocked.CompareExchange(ref Program.FunctionCount, index + 1, index) != index);
-
-        return index;
     }
 
     public static FunctionIR CreateRunnableFunction(IAst ast)
@@ -231,7 +217,8 @@ public static class ProgramIRBuilder
                         text += $"{PrintInstructionValue(instruction.Value1)}, {instruction.Value2.Type.Name}* => v{instruction.ValueIndex}";
                         break;
                     case InstructionType.Call:
-                        text += $"{instruction.String} {PrintInstructionValue(instruction.Value1)} => v{instruction.ValueIndex}";
+                        var callingFunction = Program.Functions[instruction.Index];
+                        text += $"{callingFunction.Source.Name} {PrintInstructionValue(instruction.Value1)} => v{instruction.ValueIndex}";
                         break;
                     case InstructionType.Load:
                     case InstructionType.LoadPointer:
@@ -296,7 +283,8 @@ public static class ProgramIRBuilder
             case InstructionValueType.TypeInfo:
                 return $"TypeInfo* {value.ValueIndex}";
             case InstructionValueType.Function:
-                return $"@{value.ConstantString}";
+                var callingFunction = Program.Functions[value.ValueIndex];
+                return $"@{callingFunction.Source.Name}";
             case InstructionValueType.CallArguments:
                 return string.Join(", ", value.Values.Select(PrintInstructionValue));
         }
@@ -1508,7 +1496,7 @@ public static class ProgramIRBuilder
                     var functionDef = TypeTable.Functions[identifierAst.Name][0];
                     return new InstructionValue
                     {
-                        ValueType = InstructionValueType.Function, Type = functionDef, ConstantString = identifierAst.Name
+                        ValueType = InstructionValueType.Function, Type = functionDef, ValueIndex = functionDef.FunctionIndex
                     };
                 }
             case StructFieldRefAst structField:
@@ -1623,7 +1611,7 @@ public static class ProgramIRBuilder
                     var rhs = EmitIR(function, expression.Children[i], scope);
                     if (expression.OperatorOverloads.TryGetValue(i, out var overload))
                     {
-                        expressionValue = EmitCall(function, overload.Name, new []{expressionValue, rhs}, overload.ReturnType);
+                        expressionValue = EmitCall(function, overload, new []{expressionValue, rhs}, overload.ReturnType);
                     }
                     else
                     {
@@ -1967,8 +1955,7 @@ public static class ProgramIRBuilder
             }
         }
 
-        var functionName = GetFunctionName(call.Function);
-        return EmitCall(function, functionName, arguments, call.Function.ReturnType, call.ExternIndex);
+        return EmitCall(function, call.Function, arguments, call.Function.ReturnType, call.ExternIndex);
     }
 
     private static InstructionValue GetAnyValue(FunctionIR function, InstructionValue argument)
@@ -2076,7 +2063,7 @@ public static class ProgramIRBuilder
         if (index.CallsOverload)
         {
             var value = EmitLoad(function, type, variable);
-            return EmitCall(function, index.Overload.Name, new []{value, indexValue}, index.Overload.ReturnType);
+            return EmitCall(function, index.Overload, new []{value, indexValue}, index.Overload.ReturnType);
         }
 
         IType elementType;
@@ -2421,11 +2408,6 @@ public static class ProgramIRBuilder
         return null;
     }
 
-    private static string GetFunctionName(FunctionAst function)
-    {
-        return function.OverloadIndex > 0 ? $"{function.Name}.{function.OverloadIndex}" : function.Name;
-    }
-
     private static InstructionValue EmitLoad(FunctionIR function, IType type, InstructionValue value, bool returnValue = false)
     {
         // Loading C arrays is not required, only the pointer is needed, unless it is a return value
@@ -2448,7 +2430,7 @@ public static class ProgramIRBuilder
     {
         var instruction = new Instruction
         {
-            Type = InstructionType.GetPointer, Offset = type.Size, Value1 = pointer,
+            Type = InstructionType.GetPointer, Offset = (int)type.Size, Value1 = pointer,
             Value2 = index, GetFirstPointer = getFirstPointer
         };
         return AddInstruction(function, instruction, type);
@@ -2466,15 +2448,15 @@ public static class ProgramIRBuilder
 
     private static InstructionValue EmitGetStructPointer(FunctionIR function, InstructionValue value, int fieldIndex, uint offset, IType type)
     {
-        var instruction = new Instruction {Type = InstructionType.GetStructPointer, Index = fieldIndex, Offset = offset, Value1 = value};
+        var instruction = new Instruction {Type = InstructionType.GetStructPointer, Index = fieldIndex, Offset = (int)offset, Value1 = value};
         return AddInstruction(function, instruction, type);
     }
 
-    private static InstructionValue EmitCall(FunctionIR function, string name, InstructionValue[] arguments, IType returnType, int callIndex = 0)
+    private static InstructionValue EmitCall(FunctionIR function, IFunction callingFunction, InstructionValue[] arguments, IType returnType, int callIndex = 0)
     {
         var callInstruction = new Instruction
         {
-            Type = InstructionType.Call, Index = callIndex, String = name,
+            Type = InstructionType.Call, Index = callingFunction.FunctionIndex, Offset = callIndex,
             Value1 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Values = arguments}
         };
         return AddInstruction(function, callInstruction, returnType);

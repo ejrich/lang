@@ -20,6 +20,7 @@ public static unsafe class LLVMBackend
     private static LLVMTypeRef[] _types;
     private static LLVMValueRef[] _typeInfos;
     private static LLVMValueRef[] _globals;
+    private static LLVMValueRef[] _functions;
     private static Queue<(LLVMValueRef, FunctionIR)> _functionsToWrite;
 
     private static LLVMTypeRef _structTypeInfoType;
@@ -180,6 +181,7 @@ public static unsafe class LLVMBackend
         }
 
         // 5. Write the program beginning at the entrypoint
+        _functions = new LLVMValueRef[TypeTable.FunctionCount];
         _functionsToWrite = new();
         WriteFunctionDefinition("__start", Program.EntryPoint);
         while (_functionsToWrite.Any())
@@ -229,7 +231,7 @@ public static unsafe class LLVMBackend
             AddModuleFlag("PIE Level", 2);
 
             _debugTypes = new LLVMMetadataRef[TypeTable.Count];
-            _debugFunctions = new LLVMMetadataRef[Program.FunctionCount];
+            _debugFunctions = new LLVMMetadataRef[TypeTable.FunctionCount];
         }
     }
 
@@ -1230,7 +1232,7 @@ public static unsafe class LLVMBackend
 
             var file = _debugFiles[function.Source.FileIndex];
             var functionType = _debugBuilder.CreateSubroutineType(file, debugArgumentTypes, LLVMDIFlags.LLVMDIFlagZero);
-            var debugFunction = _debugFunctions[function.Index] = _debugBuilder.CreateFunction(file, function.Source.Name, name, file, function.Source.Line, functionType, 0, 1, function.Source.Line, LLVMDIFlags.LLVMDIFlagPrototyped, 0);
+            var debugFunction = _debugFunctions[function.Source.FunctionIndex] = _debugBuilder.CreateFunction(file, function.Source.Name, name, file, function.Source.Line, functionType, 0, 1, function.Source.Line, LLVMDIFlags.LLVMDIFlagPrototyped, 0);
 
             // Declare the function
             functionPointer = _module.AddFunction(name, LLVMTypeRef.CreateFunction(_types[function.Source.ReturnType.TypeIndex], argumentTypes, varargs));
@@ -1262,15 +1264,17 @@ public static unsafe class LLVMBackend
             _functionsToWrite.Enqueue((functionPointer, function));
         }
 
+        _functions[function.Source.FunctionIndex] = functionPointer;
         return functionPointer;
     }
 
-    private static LLVMValueRef GetOrCreateFunctionDefinition(string name)
+    private static LLVMValueRef GetOrCreateFunctionDefinition(int functionIndex)
     {
-        var functionPointer = _module.GetNamedFunction(name);
+        var functionPointer = _functions[functionIndex];
         if (functionPointer.Handle == IntPtr.Zero)
         {
-            functionPointer = WriteFunctionDefinition(name, Program.Functions[name]);
+            var function = Program.Functions[functionIndex];
+            functionPointer = WriteFunctionDefinition(function.Source.Name, function);
         }
 
         return functionPointer;
@@ -1323,7 +1327,7 @@ public static unsafe class LLVMBackend
         Stack<LLVMMetadataRef> debugBlockStack = null;
         if (_emitDebug)
         {
-            debugBlock = _debugFunctions[function.Index];
+            debugBlock = _debugFunctions[function.Source.FunctionIndex];
             file = _debugFiles[function.Source.FileIndex];
             expression = LLVM.DIBuilderCreateExpression(_debugBuilder, null, UIntPtr.Zero);
             debugBlockStack = new();
@@ -1414,7 +1418,7 @@ public static unsafe class LLVMBackend
                     }
                     case InstructionType.Call:
                     {
-                        var callFunction = GetOrCreateFunctionDefinition(instruction.String);
+                        var callFunction = GetOrCreateFunctionDefinition(instruction.Index);
                         var arguments = new LLVMValueRef[instruction.Value1.Values.Length];
                         for (var i = 0; i < instruction.Value1.Values.Length; i++)
                         {
@@ -1928,7 +1932,7 @@ public static unsafe class LLVMBackend
                 var typeInfo = _typeInfos[value.ValueIndex];
                 return _builder.BuildBitCast(typeInfo, _typeInfoPointerType);
             case InstructionValueType.Function:
-                return GetOrCreateFunctionDefinition(value.ConstantString);
+                return GetOrCreateFunctionDefinition(value.ValueIndex);
         }
         return null;
     }

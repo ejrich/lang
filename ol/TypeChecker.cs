@@ -83,7 +83,7 @@ public static class TypeChecker
                                 {
                                     foreach (var ast in conditional.IfBlock.Children)
                                     {
-                                        AddAdditionalAst(ast, ref parsingAdditional);
+                                        AddAdditionalAst(ast, directive.Private, ref parsingAdditional);
                                     }
                                 }
                             }
@@ -91,7 +91,7 @@ public static class TypeChecker
                             {
                                 foreach (var ast in conditional.ElseBlock.Children)
                                 {
-                                    AddAdditionalAst(ast, ref parsingAdditional);
+                                    AddAdditionalAst(ast, directive.Private, ref parsingAdditional);
                                 }
                             }
                         }
@@ -217,23 +217,23 @@ public static class TypeChecker
         }
     }
 
-    private static void AddAdditionalAst(IAst ast, ref bool parsingAdditional)
+    private static void AddAdditionalAst(IAst ast, bool privateScope, ref bool parsingAdditional)
     {
         switch (ast)
         {
             case FunctionAst function:
-                AddFunction(function);
+                AddFunction(function, privateScope);
                 break;
             case OperatorOverloadAst overload:
                 AddOverload(overload);
                 break;
             case EnumAst enumAst:
-                TypeChecker.VerifyEnum(enumAst);
+                VerifyEnum(enumAst, privateScope);
                 return;
             case StructAst structAst:
                 if (structAst.Generics != null)
                 {
-                    if (!TypeChecker.PolymorphicStructs.TryAdd(structAst.Name, structAst))
+                    if (!PolymorphicStructs.TryAdd(structAst.Name, structAst))
                     {
                         ErrorReporter.Report($"Multiple definitions of polymorphic struct '{structAst.Name}'", structAst);
                     }
@@ -251,13 +251,13 @@ public static class TypeChecker
                 }
                 break;
             case UnionAst union:
-                AddUnion(union);
+                AddUnion(union, privateScope);
                 break;
             case InterfaceAst interfaceAst:
-                AddInterface(interfaceAst);
+                AddInterface(interfaceAst, privateScope);
                 break;
             case DeclarationAst globalVariable:
-                AddGlobalVariable(globalVariable);
+                AddGlobalVariable(globalVariable, privateScope);
                 break;
             case CompilerDirectiveAst directive:
                 if (directive.Type == DirectiveType.ImportModule)
@@ -292,7 +292,7 @@ public static class TypeChecker
         return primitiveAst;
     }
 
-    public static void AddFunction(FunctionAst function)
+    public static void AddFunction(FunctionAst function, bool privateScope)
     {
         if (function.Generics.Any())
         {
@@ -356,6 +356,7 @@ public static class TypeChecker
         else
         {
             overload.Name = $"operator.{overload.Operator}.{overload.Type.GenericName}";
+            overload.FunctionIndex = TypeTable.GetFunctionIndex();
             if (!_operatorOverloads.TryGetValue(overload.Type.GenericName, out var overloads))
             {
                 _operatorOverloads[overload.Type.GenericName] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
@@ -368,7 +369,7 @@ public static class TypeChecker
         }
     }
 
-    public static bool AddGlobalVariable(DeclarationAst variable)
+    public static bool AddGlobalVariable(DeclarationAst variable, bool privateScope)
     {
         if (!GlobalScope.Identifiers.TryAdd(variable.Name, variable))
         {
@@ -378,7 +379,7 @@ public static class TypeChecker
         return true;
     }
 
-    public static void AddUnion(UnionAst union)
+    public static void AddUnion(UnionAst union, bool privateScope)
     {
         if (!TypeTable.Add(union.Name, union))
         {
@@ -387,7 +388,7 @@ public static class TypeChecker
         GlobalScope.Identifiers.TryAdd(union.Name, union);
     }
 
-    public static void AddInterface(InterfaceAst interfaceAst)
+    public static void AddInterface(InterfaceAst interfaceAst, bool privateScope)
     {
         if (!TypeTable.Add(interfaceAst.Name, interfaceAst))
         {
@@ -408,7 +409,7 @@ public static class TypeChecker
         }
     }
 
-    public static void VerifyEnum(EnumAst enumAst)
+    public static void VerifyEnum(EnumAst enumAst, bool privateScope)
     {
         // 1. Verify enum has not already been defined
         if (!TypeTable.Add(enumAst.Name, enumAst))
@@ -481,13 +482,15 @@ public static class TypeChecker
                 {
                     ErrorReporter.Report($"Struct field '{structAst.Name}.{structField.Name}' cannot be assigned type 'void'", structField.TypeDefinition);
                 }
-                else
+                else if (structField.Type.TypeKind == TypeKind.Array)
                 {
-                    if (structField.Type.TypeKind == TypeKind.Array || structField.Type.TypeKind == TypeKind.CArray)
-                    {
-                        var elementType = structField.TypeDefinition.Generics[0];
-                        structField.ArrayElementType = TypeTable.GetType(elementType);
-                    }
+                    var arrayStruct = (StructAst)structField.Type;
+                    structField.ArrayElementType = arrayStruct.GenericTypes[0];
+                }
+                else if (structField.Type.TypeKind == TypeKind.CArray)
+                {
+                    var arrayType = (ArrayType)structField.Type;
+                    structField.ArrayElementType = arrayType.ElementType;
                 }
 
                 if (structField.Value != null)
@@ -853,7 +856,7 @@ public static class TypeChecker
                 }
                 else if (function.Flags.HasFlag(FunctionFlags.Extern) && argument.Type?.TypeKind == TypeKind.String)
                 {
-                    argument.Type = TypeTable.RawStringType ??= TypeTable.Types["*.u8"];
+                    argument.Type = TypeTable.RawStringType;
                 }
             }
 

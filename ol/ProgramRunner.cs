@@ -474,21 +474,21 @@ public static unsafe class ProgramRunner
                 {
                     var pointer = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
                     var index = GetValue(instruction.Value2, registers, stackPointer, function, arguments);
-                    var indexedPointer = pointer.Pointer + (int)instruction.Offset * index.Integer;
+                    var indexedPointer = pointer.Pointer + instruction.Offset * index.Integer;
                     registers[instruction.ValueIndex] = new Register {Pointer = indexedPointer};
                     break;
                 }
                 case InstructionType.GetStructPointer:
                 {
                     var pointer = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
-                    var structPointer = pointer.Pointer + (int)instruction.Offset;
+                    var structPointer = pointer.Pointer + instruction.Offset;
                     registers[instruction.ValueIndex] = new Register {Pointer = structPointer};
                     break;
                 }
                 case InstructionType.Call:
                 {
-                    var callingFunction = Program.Functions[instruction.String];
-                    registers[instruction.ValueIndex] = MakeCall(callingFunction, instruction.Value1.Values, registers, stackPointer, function, arguments, instruction.Index);
+                    var callingFunction = Program.Functions[instruction.Index];
+                    registers[instruction.ValueIndex] = MakeCall(callingFunction, instruction.Value1.Values, registers, stackPointer, function, arguments, instruction.Offset);
                     break;
                 }
                 case InstructionType.CallFunctionPointer:
@@ -1285,7 +1285,7 @@ public static unsafe class ProgramRunner
                 var typeInfoPointer = TypeTable.TypeInfos[value.ValueIndex];
                 return new Register {Pointer = typeInfoPointer};
             case InstructionValueType.Function:
-                var functionDef = Program.Functions[value.ConstantString];
+                var functionDef = Program.Functions[value.ValueIndex];
                 return new Register {Pointer = CreateFunctionPointer(functionDef)};
         }
 
