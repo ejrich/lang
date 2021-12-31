@@ -25,6 +25,7 @@ public static class Parser
 
         public Token Current;
         public bool Remaining = true;
+        public bool Private;
 
         public bool MoveNext()
         {
@@ -150,6 +151,7 @@ public static class Parser
 
         var fileIndex = BuildSettings.Files.Count;
         BuildSettings.Files.Add(file);
+        TypeChecker.GlobalScope.PrivateScopes.Add(new PrivateScope{Parent = TypeChecker.GlobalScope});
         ThreadPool.QueueWork(ParseFile, new ParseData {File = file, FileIndex = fileIndex});
     }
 
@@ -186,7 +188,7 @@ public static class Parser
                                 ErrorReporter.Report("Global variables cannot have attributes", token);
                             }
                             var variable = ParseDeclaration(enumerator, global: true);
-                            if (TypeChecker.AddGlobalVariable(variable))
+                            if (TypeChecker.AddGlobalVariable(variable, enumerator.Private))
                             {
                                 Asts.Add(variable);
                             }
@@ -194,7 +196,7 @@ public static class Parser
                         else
                         {
                             var function = ParseFunction(enumerator, attributes);
-                            TypeChecker.AddFunction(function);
+                            TypeChecker.AddFunction(function, enumerator.Private);
                             Asts.Add(function);
                         }
                         break;
@@ -205,13 +207,13 @@ public static class Parser
                     var structAst = ParseStruct(enumerator, attributes);
                     if (structAst.Generics != null)
                     {
-                        if (structAst.Name == "Array")
-                        {
-                            TypeChecker.BaseArrayType = structAst;
-                        }
-                        else if (!TypeChecker.PolymorphicStructs.TryAdd(structAst.Name, structAst))
+                        if (!TypeChecker.PolymorphicStructs.TryAdd(structAst.Name, structAst))
                         {
                             ErrorReporter.Report($"Multiple definitions of polymorphic struct '{structAst.Name}'", structAst);
+                        }
+                        else if (structAst.Name == "Array")
+                        {
+                            TypeChecker.BaseArrayType = structAst;
                         }
                     }
                     else
@@ -244,7 +246,7 @@ public static class Parser
                     break;
                 case TokenType.Enum:
                     var enumAst = ParseEnum(enumerator, attributes);
-                    TypeChecker.VerifyEnum(enumAst);
+                    TypeChecker.VerifyEnum(enumAst, enumerator.Private);
                     break;
                 case TokenType.Union:
                     if (attributes != null)
@@ -252,7 +254,7 @@ public static class Parser
                         ErrorReporter.Report("Unions cannot have attributes", token);
                     }
                     var union = ParseUnion(enumerator);
-                    TypeChecker.AddUnion(union);
+                    TypeChecker.AddUnion(union, enumerator.Private);
                     Asts.Add(union);
                     break;
                 case TokenType.Pound:
@@ -285,7 +287,7 @@ public static class Parser
                         ErrorReporter.Report($"Interfaces cannot have attributes", token);
                     }
                     var interfaceAst = ParseInterface(enumerator);
-                    TypeChecker.AddInterface(interfaceAst);
+                    TypeChecker.AddInterface(interfaceAst, enumerator.Private);
                     Asts.Add(interfaceAst);
                     break;
                 default:
@@ -2583,6 +2585,7 @@ public static class Parser
             case "if":
                 directive.Type = DirectiveType.If;
                 directive.Value = ParseConditional(enumerator, null, true, directory);
+                directive.Private = enumerator.Private;
                 break;
             case "assert":
                 directive.Type = DirectiveType.Assert;
@@ -2652,7 +2655,11 @@ public static class Parser
                 }
                 break;
             case "private":
-                // TODO Implement me
+                if (enumerator.Private)
+                {
+                    ErrorReporter.Report("Tried to set #private when already in private scope", token);
+                }
+                enumerator.Private = true;
                 break;
             default:
                 ErrorReporter.Report($"Unsupported top-level compiler directive '{token.Value}'", token);

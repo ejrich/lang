@@ -7,9 +7,8 @@ namespace ol;
 
 public static class Program
 {
-    public static int FunctionCount;
     public static FunctionIR EntryPoint { get; set; }
-    public static ConcurrentDictionary<string, FunctionIR> Functions { get; } = new();
+    public static ConcurrentDictionary<int, FunctionIR> Functions { get; } = new();
     public static Dictionary<string, InstructionValue> Constants { get; } = new();
     public static uint GlobalVariablesSize { get; set; }
     public static List<GlobalVariable> GlobalVariables { get; } = new();
@@ -17,7 +16,6 @@ public static class Program
 
 public class FunctionIR
 {
-    public int Index { get; set; }
     public uint StackSize { get; set; }
     public int ValueCount { get; set; }
     public bool SaveStack { get; set; }
@@ -66,7 +64,7 @@ public class Instruction
 
     // Used for Call, GetPointer, GetStructPointer, and debug locations
     public int Index { get; set; }
-    public uint Offset { get; set; }
+    public int Offset { get; set; }
     public bool GetFirstPointer { get; set; }
     public string String { get; set; }
 

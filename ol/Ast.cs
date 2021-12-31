@@ -33,6 +33,7 @@ public interface IInterface : IAst
 
 public interface IFunction : IInterface
 {
+    int FunctionIndex { get; set; }
     FunctionFlags Flags { get; set; }
     List<string> Generics { get; }
 }
@@ -76,9 +77,19 @@ public interface IScope
 
 public class GlobalScope : IScope
 {
-    public IScope Parent { get; set; }
+    public IScope Parent { get; set; } // This should never be set
     public IDictionary<string, IAst> Identifiers { get; } = new ConcurrentDictionary<string, IAst>();
-    public List<ScopeAst> PrivateScopes { get; } = new();
+    public IDictionary<string, List<FunctionAst>> Functions { get; } = new ConcurrentDictionary<string, List<FunctionAst>>();
+    public IDictionary<string, IType> Types { get; } = new ConcurrentDictionary<string, IType>();
+    public List<PrivateScope> PrivateScopes { get; } = new();
+}
+
+public class PrivateScope : IScope
+{
+    public IScope Parent { get; set; }
+    public IDictionary<string, IAst> Identifiers { get; } = new Dictionary<string, IAst>();
+    public IDictionary<string, List<FunctionAst>> Functions { get; } = new Dictionary<string, List<FunctionAst>>();
+    public IDictionary<string, IType> Types { get; } = new Dictionary<string, IType>();
 }
 
 public class ScopeAst : IScope, IAst
@@ -100,8 +111,8 @@ public class FunctionAst : IFunction, IType
     public string Name { get; set; }
     public string BackendName { get; set; }
     public int TypeIndex { get; set; }
-    public int OverloadIndex { get; set; }
     public TypeKind TypeKind { get; set; } = TypeKind.Function;
+    public int FunctionIndex { get; set; }
     public FunctionFlags Flags { get; set; }
     public uint Size { get; set; } // Will always be 0
     public uint Alignment { get; set; } // Will always be 0
@@ -473,6 +484,7 @@ public class CompilerDirectiveAst : IAst
     public IAst Value { get; set; }
     public Import Import { get; set; }
     public Library Library { get; set; }
+    public bool Private { get; set; }
 }
 
 public class Import
@@ -519,6 +531,7 @@ public class OperatorOverloadAst : IFunction
     public uint Line { get; init; }
     public uint Column { get; init; }
     public string Name { get; set; }
+    public int FunctionIndex { get; set; }
     public FunctionFlags Flags { get; set; }
     public Operator Operator { get; set; }
     public TypeDefinition Type { get; set; }

@@ -77,6 +77,7 @@ public static class Polymorpher
         overload.Operator = baseOverload.Operator;
         overload.Type = CopyType(baseOverload.Type, genericTypeDefs);
         overload.Name = $"operator.{overload.Operator}.{overload.Type.GenericName}";
+        overload.FunctionIndex = TypeTable.GetFunctionIndex();
         overload.Flags = baseOverload.Flags;
         overload.ReturnTypeDefinition = baseOverload.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? CopyType(baseOverload.ReturnTypeDefinition, genericTypeDefs) : baseOverload.ReturnTypeDefinition;
 
