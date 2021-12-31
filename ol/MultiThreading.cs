@@ -8,10 +8,8 @@ public static class ThreadPool
     private static int _completed;
     private static int _next;
     private static int _count;
-    // TODO Better way of handling this instead of max length semaphore
     private static Semaphore _semaphore = new Semaphore(0, int.MaxValue);
-
-    private static QueueItem[] _queue = new QueueItem[256];
+    private static QueueItem[] _queue = new QueueItem[64];
 
     public static void Init(bool noThreads)
     {
@@ -59,6 +57,12 @@ public static class ThreadPool
 
     public static void QueueWork(Action<object> function, object data)
     {
+        if (_count >= _queue.Length)
+        {
+            var queue = new QueueItem[_queue.Length * 2];
+            Array.Copy(_queue, queue, _queue.Length);
+            _queue = queue;
+        }
         var originalCount = _count;
         _queue[originalCount] = new QueueItem {Function = function, Data = data};
 
