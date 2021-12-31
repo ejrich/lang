@@ -2857,12 +2857,29 @@ public static class TypeChecker
                         return declaration.Type;
                     case VariableAst variable:
                         return variable.Type;
-                    case IType type:
-                        // TODO Verify the type if necessary
-                        if (type is StructAst structAst && structAst.Generics != null)
+                    case StructAst structAst:
+                        if (structAst.Generics != null)
                         {
                             ErrorReporter.Report($"Cannot reference polymorphic type '{structAst.Name}' without specifying generics", identifierAst);
                         }
+                        else if (!structAst.Verified)
+                        {
+                            VerifyStruct(structAst);
+                        }
+                        return structAst;
+                    case UnionAst union:
+                        if (!union.Verified)
+                        {
+                            VerifyUnion(union);
+                        }
+                        return union;
+                    case InterfaceAst interfaceAst:
+                        if (!interfaceAst.Verified)
+                        {
+                            VerifyInterface(interfaceAst);
+                        }
+                        return interfaceAst;
+                    case IType type:
                         return type;
                     default:
                         return null;

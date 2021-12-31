@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace ol;
 
@@ -31,10 +32,10 @@ public unsafe static class TypeTable
     {
         if (Types.TryAdd(name, type))
         {
-            type.TypeIndex = Count++;
             // Set a temporary value of null before the type data is fully determined
             lock (TypeInfos)
             {
+                type.TypeIndex = Count++;
                 TypeInfos.Add(IntPtr.Zero);
             }
             return true;
@@ -48,12 +49,12 @@ public unsafe static class TypeTable
         {
             Functions[name] = functions = new List<FunctionAst>();
         }
-        function.TypeIndex = Count++;
         function.OverloadIndex = functions.Count;
         functions.Add(function);
 
         lock(TypeInfos)
         {
+            function.TypeIndex = Count++;
             TypeInfos.Add(IntPtr.Zero);
         }
 
