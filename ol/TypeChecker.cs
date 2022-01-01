@@ -94,7 +94,7 @@ public static class TypeChecker
                                 {
                                     foreach (var ast in conditional.IfBlock.Children)
                                     {
-                                        AddAdditionalAst(ast, directive.Private, ref parsingAdditional);
+                                        AddAdditionalAst(ast, ref parsingAdditional);
                                     }
                                 }
                             }
@@ -102,7 +102,7 @@ public static class TypeChecker
                             {
                                 foreach (var ast in conditional.ElseBlock.Children)
                                 {
-                                    AddAdditionalAst(ast, directive.Private, ref parsingAdditional);
+                                    AddAdditionalAst(ast, ref parsingAdditional);
                                 }
                             }
                         }
@@ -228,18 +228,18 @@ public static class TypeChecker
         }
     }
 
-    private static void AddAdditionalAst(IAst ast, bool privateScope, ref bool parsingAdditional)
+    private static void AddAdditionalAst(IAst ast, ref bool parsingAdditional)
     {
         switch (ast)
         {
             case FunctionAst function:
-                AddFunction(function, privateScope);
+                AddFunction(function);
                 break;
             case OperatorOverloadAst overload:
                 AddOverload(overload);
                 break;
             case EnumAst enumAst:
-                VerifyEnum(enumAst, privateScope);
+                VerifyEnum(enumAst);
                 return;
             case StructAst structAst:
                 if (structAst.Generics != null)
@@ -262,13 +262,13 @@ public static class TypeChecker
                 }
                 break;
             case UnionAst union:
-                AddUnion(union, privateScope);
+                AddUnion(union);
                 break;
             case InterfaceAst interfaceAst:
-                AddInterface(interfaceAst, privateScope);
+                AddInterface(interfaceAst);
                 break;
             case DeclarationAst globalVariable:
-                AddGlobalVariable(globalVariable, privateScope);
+                AddGlobalVariable(globalVariable);
                 break;
             case CompilerDirectiveAst directive:
                 if (directive.Type == DirectiveType.ImportModule)
@@ -294,7 +294,7 @@ public static class TypeChecker
         Parser.Asts.Add(ast);
     }
 
-    public static void AddFunction(FunctionAst function, bool privateScope)
+    public static void AddFunction(FunctionAst function)
     {
         if (function.Generics.Any())
         {
@@ -371,7 +371,7 @@ public static class TypeChecker
         }
     }
 
-    public static bool AddGlobalVariable(DeclarationAst variable, bool privateScope)
+    public static bool AddGlobalVariable(DeclarationAst variable)
     {
         if (!GlobalScope.Identifiers.TryAdd(variable.Name, variable))
         {
@@ -381,7 +381,7 @@ public static class TypeChecker
         return true;
     }
 
-    public static void AddUnion(UnionAst union, bool privateScope)
+    public static void AddUnion(UnionAst union)
     {
         if (!TypeTable.Add(union.Name, union))
         {
@@ -390,7 +390,7 @@ public static class TypeChecker
         GlobalScope.Identifiers.TryAdd(union.Name, union);
     }
 
-    public static void AddInterface(InterfaceAst interfaceAst, bool privateScope)
+    public static void AddInterface(InterfaceAst interfaceAst)
     {
         if (!TypeTable.Add(interfaceAst.Name, interfaceAst))
         {
@@ -411,7 +411,7 @@ public static class TypeChecker
         }
     }
 
-    public static void VerifyEnum(EnumAst enumAst, bool privateScope)
+    public static void VerifyEnum(EnumAst enumAst)
     {
         // 1. Verify enum has not already been defined
         if (!TypeTable.Add(enumAst.Name, enumAst))
