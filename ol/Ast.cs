@@ -81,8 +81,10 @@ public class GlobalScope : IScope
 {
     public IScope Parent { get; set; } // This should never be set
     public IDictionary<string, IAst> Identifiers { get; } = new ConcurrentDictionary<string, IAst>();
-    public IDictionary<string, List<FunctionAst>> Functions { get; } = new ConcurrentDictionary<string, List<FunctionAst>>();
-    public IDictionary<string, IType> Types { get; } = new ConcurrentDictionary<string, IType>();
+    public ConcurrentDictionary<string, List<FunctionAst>> Functions { get; } = new();
+    public ConcurrentDictionary<string, IType> Types { get; } = new();
+    public ConcurrentDictionary<string, StructAst> PolymorphicStructs = new();
+    public ConcurrentDictionary<string, List<FunctionAst>> PolymorphicFunctions = new();
     public List<PrivateScope> PrivateScopes { get; } = new();
 }
 
@@ -90,8 +92,10 @@ public class PrivateScope : IScope
 {
     public IScope Parent { get; set; }
     public IDictionary<string, IAst> Identifiers { get; } = new Dictionary<string, IAst>();
-    public IDictionary<string, List<FunctionAst>> Functions { get; } = new Dictionary<string, List<FunctionAst>>();
-    public IDictionary<string, IType> Types { get; } = new Dictionary<string, IType>();
+    public Dictionary<string, List<FunctionAst>> Functions { get; } = new();
+    public Dictionary<string, IType> Types { get; } = new();
+    public Dictionary<string, StructAst> PolymorphicStructs = new();
+    public Dictionary<string, List<FunctionAst>> PolymorphicFunctions = new();
 }
 
 public class ScopeAst : IScope, IAst

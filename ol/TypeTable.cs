@@ -46,6 +46,16 @@ public unsafe static class TypeTable
         return false;
     }
 
+    public static void Add(IType type)
+    {
+        // Set a temporary value of null before the type data is fully determined
+        lock (TypeInfos)
+        {
+            type.TypeIndex = Count++;
+            TypeInfos.Add(IntPtr.Zero);
+        }
+    }
+
     public static List<FunctionAst> AddFunction(string name, FunctionAst function)
     {
         var functions = Functions.GetOrAdd(name, _ => new List<FunctionAst>());
