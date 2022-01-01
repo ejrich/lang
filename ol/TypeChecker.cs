@@ -294,6 +294,34 @@ public static class TypeChecker
         Parser.Asts.Add(ast);
     }
 
+    public static bool AddType(string name, IType type)
+    {
+        var privateScope = GlobalScope.PrivateScopes[type.FileIndex];
+
+        if (privateScope.Types.ContainsKey(name) || GlobalScope.Types.ContainsKey(name))
+        {
+            return false;
+        }
+        else if (type.Private)
+        {
+            privateScope.Types[name] = type;
+        }
+        else
+        {
+            GlobalScope.Types[name] = type;
+        }
+
+        TypeTable.Add(type);
+        return true;
+    }
+
+    private static bool GetType(string name, int fileIndex, out IType type)
+    {
+        var privateScope = GlobalScope.PrivateScopes[fileIndex];
+
+        return privateScope.Types.TryGetValue(name, out type) || GlobalScope.Types.TryGetValue(name, out type);
+    }
+
     public static void AddFunction(FunctionAst function)
     {
         if (function.Generics.Any())
