@@ -28,6 +28,8 @@ public unsafe static class TypeTable
     public static StructAst StringType;
     public static IType RawStringType;
     public static StructAst AnyType;
+    public static IType TypeInfoPointerType;
+    public static IType VoidPointerType;
 
     public static bool Add(string name, IType type)
     {

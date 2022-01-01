@@ -9,8 +9,6 @@ namespace ol;
 
 public static class ProgramIRBuilder
 {
-    private static IType _typeInfoPointerType;
-    private static IType _voidPointerType;
     private static Mutex _printFunctionMutex = new();
 
     public static void AddFunction(FunctionAst function)
@@ -1975,12 +1973,11 @@ public static class ProgramIRBuilder
 
         // Set the data pointer
         var dataPointer = EmitGetStructPointer(function, allocation, TypeTable.AnyType, 1);
-        _voidPointerType ??= TypeTable.Types["*.void"];
-        var voidPointer = new InstructionValue {ValueType = InstructionValueType.Type, Type = _voidPointerType};
+        var voidPointer = new InstructionValue {ValueType = InstructionValueType.Type, Type = TypeTable.VoidPointerType};
         // a. For pointers, set the value with the existing pointer
         if (argument.Type.TypeKind == TypeKind.Pointer)
         {
-            var voidPointerValue = EmitInstruction(InstructionType.PointerCast, function, _voidPointerType, argument, voidPointer);
+            var voidPointerValue = EmitInstruction(InstructionType.PointerCast, function, TypeTable.VoidPointerType, argument, voidPointer);
             EmitStore(function, dataPointer, voidPointerValue);
         }
         // b. Otherwise, allocate the value, store the value, and set the value with the allocated pointer
@@ -1989,7 +1986,7 @@ public static class ProgramIRBuilder
             var dataAllocation = AddAllocation(function, argument.Type);
 
             EmitStore(function, dataAllocation, argument);
-            var voidPointerValue = EmitInstruction(InstructionType.PointerCast, function, _voidPointerType, dataAllocation, voidPointer);
+            var voidPointerValue = EmitInstruction(InstructionType.PointerCast, function, TypeTable.VoidPointerType, dataAllocation, voidPointer);
             EmitStore(function, dataPointer, voidPointerValue);
         }
 
@@ -1999,8 +1996,7 @@ public static class ProgramIRBuilder
     private static InstructionValue GetTypeInfo(IType type)
     {
         type.Used = true;
-        _typeInfoPointerType ??= TypeTable.Types["*.TypeInfo"];
-        return new InstructionValue {ValueType = InstructionValueType.TypeInfo, ValueIndex = type.TypeIndex, Type = _typeInfoPointerType};
+        return new InstructionValue {ValueType = InstructionValueType.TypeInfo, ValueIndex = type.TypeIndex, Type = TypeTable.TypeInfoPointerType};
     }
 
     private static InstructionValue EmitCallFunctionPointer(FunctionIR function, CallAst call, IScope scope, InstructionValue functionPointer = null)

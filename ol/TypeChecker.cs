@@ -44,11 +44,22 @@ public static class TypeChecker
         TypeTable.TypeType = AddPrimitive("Type", TypeKind.Type, 4, true);
     }
 
+    private static PrimitiveAst AddPrimitive(string name, TypeKind typeKind, uint size = 0, bool signed = false)
+    {
+        var primitiveAst = new PrimitiveAst {Name = name, BackendName = name, TypeKind = typeKind, Size = size, Alignment = size, Signed = signed};
+        GlobalScope.Identifiers.TryAdd(name, primitiveAst);
+        TypeTable.Add(name, primitiveAst);
+        TypeTable.CreateTypeInfo(primitiveAst);
+        return primitiveAst;
+    }
+
     public static void CheckTypes()
     {
         VerifyStruct(TypeTable.StringType);
+        TypeTable.RawStringType = TypeTable.Types["*.u8"];
         VerifyStruct(TypeTable.AnyType);
-        TypeTable.RawStringType ??= TypeTable.Types["*.u8"];
+        TypeTable.TypeInfoPointerType = TypeTable.Types["*.TypeInfo"];
+        TypeTable.VoidPointerType = TypeTable.Types["*.void"];
 
         var runQueue = new List<CompilerDirectiveAst>();
         do
@@ -281,15 +292,6 @@ public static class TypeChecker
                 return;
         }
         Parser.Asts.Add(ast);
-    }
-
-    private static PrimitiveAst AddPrimitive(string name, TypeKind typeKind, uint size = 0, bool signed = false)
-    {
-        var primitiveAst = new PrimitiveAst {Name = name, BackendName = name, TypeKind = typeKind, Size = size, Alignment = size, Signed = signed};
-        GlobalScope.Identifiers.TryAdd(name, primitiveAst);
-        TypeTable.Add(name, primitiveAst);
-        TypeTable.CreateTypeInfo(primitiveAst);
-        return primitiveAst;
     }
 
     public static void AddFunction(FunctionAst function, bool privateScope)
