@@ -188,7 +188,7 @@ public static class Parser
                                 ErrorReporter.Report("Global variables cannot have attributes", token);
                             }
                             var variable = ParseDeclaration(enumerator, global: true);
-                            if (TypeChecker.AddGlobalVariable(variable, enumerator.Private))
+                            if (TypeChecker.AddGlobalVariable(variable))
                             {
                                 Asts.Add(variable);
                             }
@@ -196,7 +196,7 @@ public static class Parser
                         else
                         {
                             var function = ParseFunction(enumerator, attributes);
-                            TypeChecker.AddFunction(function, enumerator.Private);
+                            TypeChecker.AddFunction(function);
                             Asts.Add(function);
                         }
                         break;
@@ -246,7 +246,7 @@ public static class Parser
                     break;
                 case TokenType.Enum:
                     var enumAst = ParseEnum(enumerator, attributes);
-                    TypeChecker.VerifyEnum(enumAst, enumerator.Private);
+                    TypeChecker.VerifyEnum(enumAst);
                     break;
                 case TokenType.Union:
                     if (attributes != null)
@@ -254,7 +254,7 @@ public static class Parser
                         ErrorReporter.Report("Unions cannot have attributes", token);
                     }
                     var union = ParseUnion(enumerator);
-                    TypeChecker.AddUnion(union, enumerator.Private);
+                    TypeChecker.AddUnion(union);
                     Asts.Add(union);
                     break;
                 case TokenType.Pound:
@@ -287,7 +287,7 @@ public static class Parser
                         ErrorReporter.Report($"Interfaces cannot have attributes", token);
                     }
                     var interfaceAst = ParseInterface(enumerator);
-                    TypeChecker.AddInterface(interfaceAst, enumerator.Private);
+                    TypeChecker.AddInterface(interfaceAst);
                     Asts.Add(interfaceAst);
                     break;
                 default:
@@ -411,6 +411,7 @@ public static class Parser
         // 1. Determine return type and name of the function
         var function = CreateAst<FunctionAst>(enumerator.Current);
         function.Attributes = attributes;
+        function.Private = enumerator.Private;
 
         // 1a. Check if the return type is void
         if (!enumerator.Peek(out var token))
@@ -755,6 +756,7 @@ public static class Parser
     {
         var structAst = CreateAst<StructAst>(enumerator.Current);
         structAst.Attributes = attributes;
+        structAst.Private = enumerator.Private;
 
         // 1. Determine name of struct
         if (!enumerator.MoveNext())
@@ -967,6 +969,7 @@ public static class Parser
     {
         var enumAst = CreateAst<EnumAst>(enumerator.Current);
         enumAst.Attributes = attributes;
+        enumAst.Private = enumerator.Private;
 
         // 1. Determine name of enum
         if (!enumerator.MoveNext())
@@ -1196,6 +1199,7 @@ public static class Parser
     private static UnionAst ParseUnion(TokenEnumerator enumerator)
     {
         var union = CreateAst<UnionAst>(enumerator.Current);
+        union.Private = enumerator.Private;
 
         // 1. Determine name of enum
         if (!enumerator.MoveNext())
@@ -1705,6 +1709,8 @@ public static class Parser
     {
         var declaration = CreateAst<DeclarationAst>(enumerator.Current);
         declaration.Global = global;
+        declaration.Private = enumerator.Private;
+
         if (enumerator.Current.Type != TokenType.Identifier)
         {
             ErrorReporter.Report($"Expected variable name to be an identifier, but got '{enumerator.Current.Value}'", enumerator.Current);
@@ -2585,7 +2591,6 @@ public static class Parser
             case "if":
                 directive.Type = DirectiveType.If;
                 directive.Value = ParseConditional(enumerator, null, true, directory);
-                directive.Private = enumerator.Private;
                 break;
             case "assert":
                 directive.Type = DirectiveType.Assert;
@@ -2965,6 +2970,7 @@ public static class Parser
     private static InterfaceAst ParseInterface(TokenEnumerator enumerator)
     {
         var interfaceAst = CreateAst<InterfaceAst>(enumerator.Current);
+        interfaceAst.Private = enumerator.Private;
         enumerator.MoveNext();
 
         // 1a. Check if the return type is void
