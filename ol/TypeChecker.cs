@@ -285,9 +285,14 @@ public static class TypeChecker
 
     public static bool AddType(string name, IType type)
     {
+        return AddType(name, type, type.FileIndex);
+    }
+
+    public static bool AddType(string name, IType type, int fileIndex)
+    {
         if (type.Private)
         {
-            var privateScope = PrivateScopes[type.FileIndex];
+            var privateScope = PrivateScopes[fileIndex];
 
             if (privateScope.Types.ContainsKey(name) || GlobalScope.Types.ContainsKey(name))
             {
@@ -486,17 +491,17 @@ public static class TypeChecker
                 ErrorReporter.Report($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
             }
 
-            AddFunction(function.Name, function);
+            AddFunction(function.Name, function.FileIndex, function);
         }
     }
 
-    private static void AddFunction(string name, FunctionAst function)
+    private static void AddFunction(string name, int fileIndex, FunctionAst function)
     {
         function.FunctionIndex = TypeTable.GetFunctionIndex();
 
         if (function.Private)
         {
-            var privateScope = PrivateScopes[function.FileIndex];
+            var privateScope = PrivateScopes[fileIndex];
 
             if (!privateScope.Functions.TryGetValue(function.Name, out var functions))
             {
@@ -3974,7 +3979,24 @@ public static class TypeChecker
                 }
             }
 
-            if (match && genericTypes.All(t => t != null) && (function.Flags.HasFlag(FunctionFlags.Varargs) || callArgIndex == call.Arguments.Count))
+            var privateGenericTypes = false;
+            if (match)
+            {
+                foreach (var genericType in genericTypes)
+                {
+                    if (genericType == null)
+                    {
+                        match = false;
+                        break;
+                    }
+                    else if (genericType.Private)
+                    {
+                        privateGenericTypes = true;
+                    }
+                }
+            }
+
+            if (match && (function.Flags.HasFlag(FunctionFlags.Varargs) || callArgIndex == call.Arguments.Count))
             {
                 var name = $"{function.Name}<{string.Join(", ", genericTypes.Select(t => t.Name))}>";
 
@@ -3987,8 +4009,7 @@ public static class TypeChecker
                     return true;
                 }
 
-                // TODO Set the proper file index depending on the type privacy
-                polymorphedFunction = Polymorpher.CreatePolymorphedFunction(function, name, genericTypes);
+                polymorphedFunction = Polymorpher.CreatePolymorphedFunction(function, name, privateGenericTypes, genericTypes);
                 if (polymorphedFunction.ReturnType == null)
                 {
                     polymorphedFunction.ReturnType = VerifyType(polymorphedFunction.ReturnTypeDefinition, scope);
@@ -4006,8 +4027,14 @@ public static class TypeChecker
                     }
                 }
 
-                AddFunction(name, polymorphedFunction);
-                TypeTable.CreateTypeInfo(polymorphedFunction);
+                var fileIndex = function.FileIndex;
+                if (privateGenericTypes && !function.Private)
+                {
+                    fileIndex = call.FileIndex;
+                }
+
+                AddFunction(name, fileIndex, polymorphedFunction);
+                // TypeTable.CreateTypeInfo(polymorphedFunction);
                 VerifyFunction(polymorphedFunction);
 
                 return true;
@@ -4961,7 +4988,7 @@ public static class TypeChecker
                         var generics = type.Generics.ToArray();
                         var genericTypes = new IType[generics.Length];
                         var error = false;
-                        var privateType = false;
+                        var privateGenericTypes = false;
                         for (var i = 0; i < generics.Length; i++)
                         {
                             var genericType = genericTypes[i] = VerifyType(generics[i], scope, out var hasGeneric, out _, out _, depth + 1, allowParams);
@@ -4975,7 +5002,7 @@ public static class TypeChecker
                             }
                             else if (genericType.Private)
                             {
-                                privateType = true;
+                                privateGenericTypes = true;
                             }
                         }
                         if (!GetPolymorphicStruct(type.Name, type.FileIndex, out var structDef))
@@ -4995,16 +5022,14 @@ public static class TypeChecker
                         else
                         {
                             var name = PrintTypeDefinition(type);
-                            var privateStruct = structDef.Private;
                             var fileIndex = structDef.FileIndex;
-                            if (privateType && !privateStruct)
+                            if (privateGenericTypes && !structDef.Private)
                             {
-                                privateStruct = true;
                                 fileIndex = type.FileIndex;
                             }
 
-                            var polyStruct = Polymorpher.CreatePolymorphedStruct(structDef, name, genericName, TypeKind.Struct, privateStruct, fileIndex, genericTypes, generics);
-                            AddType(genericName, polyStruct);
+                            var polyStruct = Polymorpher.CreatePolymorphedStruct(structDef, name, genericName, TypeKind.Struct, privateGenericTypes, genericTypes, generics);
+                            AddType(genericName, polyStruct, fileIndex);
                             VerifyStruct(polyStruct);
                             return polyStruct;
                         }
@@ -5056,8 +5081,8 @@ public static class TypeChecker
             return null;
         }
 
-        var arrayStruct = Polymorpher.CreatePolymorphedStruct(BaseArrayType, name, backendName, TypeKind.Array, elementType.Private, elementType.Private ? elementType.FileIndex : 0, new []{elementType}, elementTypeDef);
-        AddType(backendName, arrayStruct);
+        var arrayStruct = Polymorpher.CreatePolymorphedStruct(BaseArrayType, name, backendName, TypeKind.Array, elementType.Private, new []{elementType}, elementTypeDef);
+        AddType(backendName, arrayStruct, elementType.Private ? elementType.FileIndex : 0);
         VerifyStruct(arrayStruct);
         return arrayStruct;
     }
