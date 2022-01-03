@@ -1290,7 +1290,8 @@ public static class TypeChecker
         }
 
         // 4. Loop through function body and verify all ASTs
-        var returned = VerifyScope(function.Body, function, GlobalScope, false);
+        var privateScope = PrivateScopes[function.FileIndex];
+        var returned = VerifyScope(function.Body, function, privateScope == null ? GlobalScope : privateScope, false);
 
         // 5. Verify the main function doesn't call the compiler
         if (function.Name == "main" && function.Flags.HasFlag(FunctionFlags.CallsCompiler))
