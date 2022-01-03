@@ -13,7 +13,6 @@ public static class TypeChecker
     public static List<PrivateScope> PrivateScopes;
     public static StructAst BaseArrayType;
 
-    private static ConcurrentDictionary<string, List<FunctionAst>> _polymorphicFunctions;
     private static ConcurrentDictionary<string, Dictionary<Operator, OperatorOverloadAst>> _operatorOverloads;
     private static ConcurrentDictionary<string, Dictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads;
     private static ConcurrentDictionary<string, Library> _libraries;
@@ -23,7 +22,6 @@ public static class TypeChecker
         GlobalScope = new();
         PrivateScopes = new();
 
-        _polymorphicFunctions = new();
         _operatorOverloads = new();
         _polymorphicOperatorOverloads = new();
         _libraries = new();
@@ -193,7 +191,7 @@ public static class TypeChecker
             }
         }
 
-        if (TypeTable.Functions.TryGetValue("main", out var functions))
+        if (GlobalScope.Functions.TryGetValue("main", out var functions))
         {
             if (functions.Count > 1)
             {
@@ -420,6 +418,56 @@ public static class TypeChecker
         return false;
     }
 
+    private static bool GetExistingPolymorphicFunction(string name, int fileIndex, out FunctionAst function, out int functionCount)
+    {
+        function = null;
+        var privateScope = PrivateScopes[fileIndex];
+
+        if (privateScope == null)
+        {
+            if (GlobalScope.PolymorphicFunctions.TryGetValue(name, out var functions))
+            {
+                functionCount = functions.Count;
+                if (functions.Count == 1)
+                {
+                    function = functions[0];
+                }
+                return true;
+            }
+        }
+        else
+        {
+            if (privateScope.PolymorphicFunctions.TryGetValue(name, out var functions))
+            {
+                functionCount = functions.Count;
+
+                if (GlobalScope.PolymorphicFunctions.TryGetValue(name, out var globalFunctions))
+                {
+                    functionCount += globalFunctions.Count;
+                }
+
+                if (functionCount == 1)
+                {
+                    function = functions[0];
+                }
+
+                return true;
+            }
+            else if (GlobalScope.PolymorphicFunctions.TryGetValue(name, out var globalFunctions))
+            {
+                functionCount = globalFunctions.Count;
+                if (functions.Count == 1)
+                {
+                    function = functions[0];
+                }
+                return true;
+            }
+        }
+
+        functionCount = 0;
+        return false;
+    }
+
     public static void AddFunction(FunctionAst function)
     {
         if (function.Generics.Any())
@@ -429,20 +477,29 @@ public static class TypeChecker
                 ErrorReporter.Report($"Function '{function.Name}' has generic(s), but the generic(s) are not used in the argument(s) or the return type", function);
             }
 
-            if (!_polymorphicFunctions.TryGetValue(function.Name, out var functions))
-            {
-                _polymorphicFunctions[function.Name] = functions = new List<FunctionAst>();
-            }
-            if (functions.Any() && OverloadExistsForFunction(function /* TODO get this to work */))
+            if (OverloadExistsForPolymorphicFunction(function))
             {
                 ErrorReporter.Report($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
             }
-            functions.Add(function);
+
+            if (function.Private)
+            {
+                var privateScope = PrivateScopes[function.FileIndex];
+
+                if (!privateScope.PolymorphicFunctions.TryGetValue(function.Name, out var functions))
+                {
+                    privateScope.PolymorphicFunctions[function.Name] = functions = new List<FunctionAst>();
+                }
+                functions.Add(function);
+            }
+            else
+            {
+                var functions = GlobalScope.PolymorphicFunctions.GetOrAdd(function.Name, _ => new List<FunctionAst>());
+                functions.Add(function);
+            }
         }
         else
         {
-            // var functions = TypeTable.AddFunction(function.Name, function);
-
             if (function.Flags.HasFlag(FunctionFlags.Extern))
             {
                 if (function.Private)
@@ -454,17 +511,34 @@ public static class TypeChecker
                     ErrorReporter.Report($"Multiple definitions of extern function '{function.Name}'", function);
                 }
             }
-            else if (OverloadExistsForFunction(function, false))
+            else if (OverloadExistsForFunction(function))
             {
                 ErrorReporter.Report($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
             }
+
+            AddFunction(function.Name, function);
         }
     }
 
     private static void AddFunction(string name, FunctionAst function)
     {
-        // TODO Implement me
         function.FunctionIndex = TypeTable.GetFunctionIndex();
+
+        if (function.Private)
+        {
+            var privateScope = PrivateScopes[function.FileIndex];
+
+            if (!privateScope.Functions.TryGetValue(function.Name, out var functions))
+            {
+                privateScope.Functions[function.Name] = functions = new List<FunctionAst>();
+            }
+            functions.Add(function);
+        }
+        else
+        {
+            var functions = GlobalScope.Functions.GetOrAdd(function.Name, _ => new List<FunctionAst>());
+            functions.Add(function);
+        }
     }
 
     public static void AddOverload(OperatorOverloadAst overload)
@@ -1093,6 +1167,7 @@ public static class TypeChecker
         // 4. Create the type info and verify the function if possible
         if (!function.Generics.Any())
         {
+            TypeTable.Add(function);
             TypeTable.CreateTypeInfo(function);
 
             if (function.Flags.HasFlag(FunctionFlags.Extern))
@@ -1126,30 +1201,89 @@ public static class TypeChecker
         return false;
     }
 
-    private static bool OverloadExistsForFunction(FunctionAst currentFunction, bool checkAll = true)
+    private static bool OverloadExistsForFunction(FunctionAst currentFunction)
     {
-        // TODO Implement me
-        // var functionCount = checkAll ? existingFunctions.Count : existingFunctions.Count - 1;
-        // for (var function = 0; function < functionCount; function++)
-        // {
-        //     var existingFunction = existingFunctions[function];
-        //     if (currentFunction.Arguments.Count == existingFunction.Arguments.Count)
-        //     {
-        //         var match = true;
-        //         for (var i = 0; i < currentFunction.Arguments.Count; i++)
-        //         {
-        //             if (!TypeDefinitionEquals(currentFunction.Arguments[i].TypeDefinition, existingFunction.Arguments[i].TypeDefinition))
-        //             {
-        //                 match = false;
-        //                 break;
-        //             }
-        //         }
-        //         if (match)
-        //         {
-        //             return true;
-        //         }
-        //     }
-        // }
+        var privateScope = PrivateScopes[currentFunction.FileIndex];
+
+        if (privateScope == null)
+        {
+            if (GlobalScope.Functions.TryGetValue(currentFunction.Name, out var functions))
+            {
+                return OverloadExists(currentFunction, functions);
+            }
+        }
+        else
+        {
+            if (privateScope.Functions.TryGetValue(currentFunction.Name, out var functions))
+            {
+                if (OverloadExists(currentFunction, functions))
+                {
+                    return true;
+                }
+            }
+
+            if (GlobalScope.Functions.TryGetValue(currentFunction.Name, out var globalFunctions))
+            {
+                return OverloadExists(currentFunction, globalFunctions);
+            }
+        }
+
+        return false;
+    }
+
+    private static bool OverloadExistsForPolymorphicFunction(FunctionAst currentFunction)
+    {
+        var privateScope = PrivateScopes[currentFunction.FileIndex];
+
+        if (privateScope == null)
+        {
+            if (GlobalScope.PolymorphicFunctions.TryGetValue(currentFunction.Name, out var functions))
+            {
+                return OverloadExists(currentFunction, functions);
+            }
+        }
+        else
+        {
+            if (privateScope.PolymorphicFunctions.TryGetValue(currentFunction.Name, out var functions))
+            {
+                if (OverloadExists(currentFunction, functions))
+                {
+                    return true;
+                }
+            }
+
+            if (GlobalScope.PolymorphicFunctions.TryGetValue(currentFunction.Name, out var globalFunctions))
+            {
+                return OverloadExists(currentFunction, globalFunctions);
+            }
+        }
+
+        return false;
+    }
+
+    private static bool OverloadExists(FunctionAst currentFunction, List<FunctionAst> functions)
+    {
+        for (var function = 0; function < functions.Count; function++)
+        {
+            var existingFunction = functions[function];
+            if (currentFunction.Arguments.Count == existingFunction.Arguments.Count)
+            {
+                var match = true;
+                for (var i = 0; i < currentFunction.Arguments.Count; i++)
+                {
+                    if (!TypeDefinitionEquals(currentFunction.Arguments[i].TypeDefinition, existingFunction.Arguments[i].TypeDefinition))
+                    {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match)
+                {
+                    return true;
+                }
+            }
+        }
+
         return false;
     }
 
@@ -2998,14 +3132,13 @@ public static class TypeChecker
             case IdentifierAst identifierAst:
                 if (!GetScopeIdentifier(scope, identifierAst.Name, out var identifier))
                 {
-                    if (TypeTable.Functions.TryGetValue(identifierAst.Name, out var functions))
+                    if (GetExistingFunction(identifierAst.Name, identifierAst.FileIndex, out var function, out var functionCount))
                     {
-                        if (functions.Count > 1)
+                        if (functionCount > 1)
                         {
                             ErrorReporter.Report($"Cannot determine type for function '{identifierAst.Name}' that has multiple overloads", identifierAst);
                             return null;
                         }
-                        var function = functions[0];
                         VerifyFunctionIfNecessary(function, currentFunction);
                         return function;
                     }
@@ -3428,26 +3561,16 @@ public static class TypeChecker
         {
             if (function == null)
             {
-                TypeTable.Functions.TryGetValue(call.Name, out var functions);
-                if (functions == null)
+                if (GetExistingFunction(call.Name, call.FileIndex, out var existingFunction, out _))
                 {
-                    _polymorphicFunctions.TryGetValue(call.Name, out var polymorphicFunctions);
-                    if (polymorphicFunctions == null)
-                    {
-                        ErrorReporter.Report($"Call to undefined function '{call.Name}'", call);
-                        return null;
-                    }
+                    return existingFunction?.ReturnType;
+                }
+                else if (GetExistingPolymorphicFunction(call.Name, call.FileIndex, out existingFunction, out _))
+                {
+                    return existingFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? null : existingFunction.ReturnType;
+                }
 
-                    if (polymorphicFunctions.Count == 1)
-                    {
-                        var calledFunction = polymorphicFunctions[0];
-                        return calledFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? null : calledFunction.ReturnType;
-                    }
-                }
-                else if (functions.Count == 1)
-                {
-                    return functions[0].ReturnType;
-                }
+                ErrorReporter.Report($"Call to undefined function '{call.Name}'", call);
                 return null;
             }
             return function.ReturnType;
@@ -3609,216 +3732,87 @@ public static class TypeChecker
 
     private static IInterface DetermineCallingFunction(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments, IScope scope)
     {
-        if (TypeTable.Functions.TryGetValue(call.Name, out var functions))
-        {
-            foreach (var function in functions)
-            {
-                if (!function.Flags.HasFlag(FunctionFlags.DefinitionVerified))
-                {
-                    VerifyFunctionDefinition(function);
-                }
+        var privateScope = PrivateScopes[call.FileIndex];
+        var functionCount = 0;
 
-                if (VerifyArguments(call, arguments, specifiedArguments, function, function.Flags.HasFlag(FunctionFlags.Varargs), function.Flags.HasFlag(FunctionFlags.Params), function.ParamsElementType, function.Flags.HasFlag(FunctionFlags.Extern)))
+        if (privateScope == null)
+        {
+            if (GlobalScope.Functions.TryGetValue(call.Name, out var functions))
+            {
+                if (FindFunctionThatMatchesCall(call, arguments, specifiedArguments, scope, functions, out var function))
                 {
                     return function;
                 }
+                functionCount += functions.Count;
             }
-        }
 
-        if (_polymorphicFunctions.TryGetValue(call.Name, out var polymorphicFunctions))
-        {
-            for (var i = 0; i < polymorphicFunctions.Count; i++)
+            if (GlobalScope.PolymorphicFunctions.TryGetValue(call.Name, out functions))
             {
-                var function = polymorphicFunctions[i];
-                if (!function.Flags.HasFlag(FunctionFlags.DefinitionVerified))
+                if (FindPolymorphicFunctionThatMatchesCall(call, arguments, specifiedArguments, scope, functions, out var function))
                 {
-                    VerifyFunctionDefinition(function);
+                    return function;
                 }
-
-                if (call.Generics != null && call.Generics.Count != function.Generics.Count)
-                {
-                    continue;
-                }
-
-                var match = true;
-                var callArgIndex = 0;
-                var functionArgCount = function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params) ? function.Arguments.Count - 1 : function.Arguments.Count;
-                var genericTypes = new IType[function.Generics.Count];
-
-                if (call.Generics != null)
-                {
-                    var genericsError = false;
-                    for (var index = 0; index < call.Generics.Count; index++)
-                    {
-                        var generic = call.Generics[i];
-                        genericTypes[i] = VerifyType(generic, scope);
-                        if (genericTypes[i] == null)
-                        {
-                            genericsError = true;
-                            ErrorReporter.Report($"Undefined type '{PrintTypeDefinition(generic)}' in generic function call", generic);
-                        }
-                    }
-                    if (genericsError)
-                    {
-                        continue;
-                    }
-                }
-
-                if (call.SpecifiedArguments != null)
-                {
-                    var specifiedArgsMatch = true;
-                    foreach (var (name, argument) in call.SpecifiedArguments)
-                    {
-                        var found = false;
-                        for (var argIndex = 0; argIndex < function.Arguments.Count; argIndex++)
-                        {
-                            var functionArg = function.Arguments[argIndex];
-                            if (functionArg.Name == name)
-                            {
-                                if (functionArg.HasGenerics)
-                                {
-                                    found = VerifyPolymorphicArgument(argument, specifiedArguments[name], functionArg.TypeDefinition, genericTypes);
-                                }
-                                else
-                                {
-                                    found = VerifyArgument(argument, specifiedArguments[name], functionArg.Type);
-                                }
-                                break;
-                            }
-                        }
-                        if (!found)
-                        {
-                            specifiedArgsMatch = false;
-                            break;
-                        }
-                    }
-                    if (!specifiedArgsMatch)
-                    {
-                        continue;
-                    }
-                }
-
-                for (var arg = 0; arg < functionArgCount; arg++)
-                {
-                    var functionArg = function.Arguments[arg];
-                    if (specifiedArguments.ContainsKey(functionArg.Name))
-                    {
-                        continue;
-                    }
-
-                    var argumentAst = call.Arguments.ElementAtOrDefault(callArgIndex);
-                    if (argumentAst == null)
-                    {
-                        if (functionArg.Value == null)
-                        {
-                            match = false;
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        if (functionArg.HasGenerics)
-                        {
-                            if (!VerifyPolymorphicArgument(argumentAst, arguments[callArgIndex], functionArg.TypeDefinition, genericTypes))
-                            {
-                                match = false;
-                                break;
-                            }
-                        }
-                        else
-                        {
-                            if (!VerifyArgument(argumentAst, arguments[callArgIndex],functionArg.Type))
-                            {
-                                match = false;
-                                break;
-                            }
-                        }
-                        callArgIndex++;
-                    }
-                }
-
-                if (match && function.Flags.HasFlag(FunctionFlags.Params))
-                {
-                    var paramsArgument = function.Arguments[^1];
-                    var paramsType = paramsArgument.TypeDefinition.Generics.FirstOrDefault();
-
-                    if (paramsType != null)
-                    {
-                        if (paramsArgument.HasGenerics)
-                        {
-                            for (; callArgIndex < arguments.Length; callArgIndex++)
-                            {
-                                if (!VerifyPolymorphicArgument(call.Arguments[callArgIndex], arguments[callArgIndex], paramsType, genericTypes))
-                                {
-                                    match = false;
-                                    break;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            for (; callArgIndex < arguments.Length; callArgIndex++)
-                            {
-                                if (!VerifyArgument(call.Arguments[callArgIndex], arguments[callArgIndex], function.ParamsElementType))
-                                {
-                                    match = false;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (match && genericTypes.All(t => t != null) && (function.Flags.HasFlag(FunctionFlags.Varargs) || callArgIndex == call.Arguments.Count))
-                {
-                    var name = $"{function.Name}<{string.Join(", ", genericTypes.Select(t => t.Name))}>";
-
-                    if (TypeTable.Functions.TryGetValue(name, out var implementations))
-                    {
-                        if (implementations.Count > 1)
-                        {
-                            ErrorReporter.Report($"Internal compiler error, multiple implementations of polymorphic function '{name}'", call);
-                        }
-                        return implementations[0];
-                    }
-
-                    var polymorphedFunction = Polymorpher.CreatePolymorphedFunction(function, name, genericTypes);
-                    if (polymorphedFunction.ReturnType == null)
-                    {
-                        polymorphedFunction.ReturnType = VerifyType(polymorphedFunction.ReturnTypeDefinition, scope);
-                    }
-                    foreach (var argument in polymorphedFunction.Arguments)
-                    {
-                        if (argument.Type == null)
-                        {
-                            argument.Type = VerifyType(argument.TypeDefinition, scope, out _, out _, out var isParams, allowParams: true);
-                            if (isParams)
-                            {
-                                var paramsArrayType = (StructAst)argument.Type;
-                                polymorphedFunction.ParamsElementType = paramsArrayType.GenericTypes[0];
-                            }
-                        }
-                    }
-
-                    AddFunction(name, polymorphedFunction);
-                    TypeTable.CreateTypeInfo(polymorphedFunction);
-                    VerifyFunction(polymorphedFunction);
-
-                    return polymorphedFunction;
-                }
+                functionCount += functions.Count;
             }
-        }
 
-        if (GetScopeIdentifier(scope, call.Name, out var ast))
-        {
-            var interfaceAst = VerifyInterfaceCall(call, ast, arguments, specifiedArguments);
-            if (interfaceAst != null)
+            if (GetScopeIdentifier(scope, call.Name, out var ast))
             {
-                return interfaceAst;
+                var interfaceAst = VerifyInterfaceCall(call, ast, arguments, specifiedArguments);
+                if (interfaceAst != null)
+                {
+                    return interfaceAst;
+                }
+            }
+        }
+        else
+        {
+            if (privateScope.Functions.TryGetValue(call.Name, out var functions))
+            {
+                if (FindFunctionThatMatchesCall(call, arguments, specifiedArguments, scope, functions, out var function))
+                {
+                    return function;
+                }
+                functionCount += functions.Count;
+            }
+
+            if (GlobalScope.Functions.TryGetValue(call.Name, out functions))
+            {
+                if (FindFunctionThatMatchesCall(call, arguments, specifiedArguments, scope, functions, out var function))
+                {
+                    return function;
+                }
+                functionCount += functions.Count;
+            }
+
+            if (privateScope.PolymorphicFunctions.TryGetValue(call.Name, out functions))
+            {
+                if (FindPolymorphicFunctionThatMatchesCall(call, arguments, specifiedArguments, scope, functions, out var function))
+                {
+                    return function;
+                }
+                functionCount += functions.Count;
+            }
+
+            if (GlobalScope.PolymorphicFunctions.TryGetValue(call.Name, out functions))
+            {
+                if (FindPolymorphicFunctionThatMatchesCall(call, arguments, specifiedArguments, scope, functions, out var function))
+                {
+                    return function;
+                }
+                functionCount += functions.Count;
+            }
+
+            if (GetScopeIdentifier(scope, call.Name, out var ast))
+            {
+                var interfaceAst = VerifyInterfaceCall(call, ast, arguments, specifiedArguments);
+                if (interfaceAst != null)
+                {
+                    return interfaceAst;
+                }
             }
         }
 
-        if (functions == null && polymorphicFunctions == null)
+        if (functionCount == 0)
         {
             ErrorReporter.Report($"Call to undefined function '{call.Name}'", call);
         }
@@ -3836,10 +3830,216 @@ public static class TypeChecker
             }
             else
             {
-                ErrorReporter.Report($"No overload of function '{call.Name}' found without arguments", call);
+                ErrorReporter.Report($"No overload of function '{call.Name}' found with 0 arguments", call);
             }
         }
         return null;
+    }
+
+    private static bool FindFunctionThatMatchesCall(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments, IScope scope, List<FunctionAst> functions, out FunctionAst matchedFunction)
+    {
+        foreach (var function in functions)
+        {
+            if (!function.Flags.HasFlag(FunctionFlags.DefinitionVerified))
+            {
+                VerifyFunctionDefinition(function);
+            }
+
+            if (VerifyArguments(call, arguments, specifiedArguments, function, function.Flags.HasFlag(FunctionFlags.Varargs), function.Flags.HasFlag(FunctionFlags.Params), function.ParamsElementType, function.Flags.HasFlag(FunctionFlags.Extern)))
+            {
+                matchedFunction = function;
+                return true;
+            }
+        }
+        matchedFunction = null;
+        return false;
+    }
+
+    private static bool FindPolymorphicFunctionThatMatchesCall(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments, IScope scope, List<FunctionAst> polymorphicFunctions, out FunctionAst polymorphedFunction)
+    {
+        for (var i = 0; i < polymorphicFunctions.Count; i++)
+        {
+            var function = polymorphicFunctions[i];
+            if (!function.Flags.HasFlag(FunctionFlags.DefinitionVerified))
+            {
+                VerifyFunctionDefinition(function);
+            }
+
+            if (call.Generics != null && call.Generics.Count != function.Generics.Count)
+            {
+                continue;
+            }
+
+            var match = true;
+            var callArgIndex = 0;
+            var functionArgCount = function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params) ? function.Arguments.Count - 1 : function.Arguments.Count;
+            var genericTypes = new IType[function.Generics.Count];
+
+            if (call.Generics != null)
+            {
+                var genericsError = false;
+                for (var index = 0; index < call.Generics.Count; index++)
+                {
+                    var generic = call.Generics[i];
+                    genericTypes[i] = VerifyType(generic, scope);
+                    if (genericTypes[i] == null)
+                    {
+                        genericsError = true;
+                        ErrorReporter.Report($"Undefined type '{PrintTypeDefinition(generic)}' in generic function call", generic);
+                    }
+                }
+                if (genericsError)
+                {
+                    continue;
+                }
+            }
+
+            if (call.SpecifiedArguments != null)
+            {
+                var specifiedArgsMatch = true;
+                foreach (var (name, argument) in call.SpecifiedArguments)
+                {
+                    var found = false;
+                    for (var argIndex = 0; argIndex < function.Arguments.Count; argIndex++)
+                    {
+                        var functionArg = function.Arguments[argIndex];
+                        if (functionArg.Name == name)
+                        {
+                            if (functionArg.HasGenerics)
+                            {
+                                found = VerifyPolymorphicArgument(argument, specifiedArguments[name], functionArg.TypeDefinition, genericTypes);
+                            }
+                            else
+                            {
+                                found = VerifyArgument(argument, specifiedArguments[name], functionArg.Type);
+                            }
+                            break;
+                        }
+                    }
+                    if (!found)
+                    {
+                        specifiedArgsMatch = false;
+                        break;
+                    }
+                }
+                if (!specifiedArgsMatch)
+                {
+                    continue;
+                }
+            }
+
+            for (var arg = 0; arg < functionArgCount; arg++)
+            {
+                var functionArg = function.Arguments[arg];
+                if (specifiedArguments.ContainsKey(functionArg.Name))
+                {
+                    continue;
+                }
+
+                var argumentAst = call.Arguments.ElementAtOrDefault(callArgIndex);
+                if (argumentAst == null)
+                {
+                    if (functionArg.Value == null)
+                    {
+                        match = false;
+                        break;
+                    }
+                }
+                else
+                {
+                    if (functionArg.HasGenerics)
+                    {
+                        if (!VerifyPolymorphicArgument(argumentAst, arguments[callArgIndex], functionArg.TypeDefinition, genericTypes))
+                        {
+                            match = false;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        if (!VerifyArgument(argumentAst, arguments[callArgIndex],functionArg.Type))
+                        {
+                            match = false;
+                            break;
+                        }
+                    }
+                    callArgIndex++;
+                }
+            }
+
+            if (match && function.Flags.HasFlag(FunctionFlags.Params))
+            {
+                var paramsArgument = function.Arguments[^1];
+                var paramsType = paramsArgument.TypeDefinition.Generics.FirstOrDefault();
+
+                if (paramsType != null)
+                {
+                    if (paramsArgument.HasGenerics)
+                    {
+                        for (; callArgIndex < arguments.Length; callArgIndex++)
+                        {
+                            if (!VerifyPolymorphicArgument(call.Arguments[callArgIndex], arguments[callArgIndex], paramsType, genericTypes))
+                            {
+                                match = false;
+                                break;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        for (; callArgIndex < arguments.Length; callArgIndex++)
+                        {
+                            if (!VerifyArgument(call.Arguments[callArgIndex], arguments[callArgIndex], function.ParamsElementType))
+                            {
+                                match = false;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (match && genericTypes.All(t => t != null) && (function.Flags.HasFlag(FunctionFlags.Varargs) || callArgIndex == call.Arguments.Count))
+            {
+                var name = $"{function.Name}<{string.Join(", ", genericTypes.Select(t => t.Name))}>";
+
+                // TODO Is this necessary?
+                // if (TypeTable.Functions.TryGetValue(name, out var implementations))
+                // {
+                //     if (implementations.Count > 1)
+                //     {
+                //         ErrorReporter.Report($"Internal compiler error, multiple implementations of polymorphic function '{name}'", call);
+                //     }
+                //     return implementations[0];
+                // }
+
+                polymorphedFunction = Polymorpher.CreatePolymorphedFunction(function, name, genericTypes);
+                if (polymorphedFunction.ReturnType == null)
+                {
+                    polymorphedFunction.ReturnType = VerifyType(polymorphedFunction.ReturnTypeDefinition, scope);
+                }
+                foreach (var argument in polymorphedFunction.Arguments)
+                {
+                    if (argument.Type == null)
+                    {
+                        argument.Type = VerifyType(argument.TypeDefinition, scope, out _, out _, out var isParams, allowParams: true);
+                        if (isParams)
+                        {
+                            var paramsArrayType = (StructAst)argument.Type;
+                            polymorphedFunction.ParamsElementType = paramsArrayType.GenericTypes[0];
+                        }
+                    }
+                }
+
+                AddFunction(name, polymorphedFunction);
+                TypeTable.CreateTypeInfo(polymorphedFunction);
+                VerifyFunction(polymorphedFunction);
+
+                return true;
+            }
+        }
+        polymorphedFunction = null;
+        return false;
     }
 
     private static bool VerifyArguments(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments, IInterface function, bool varargs = false, bool Params = false, IType paramsElementType = null, bool Extern = false)
