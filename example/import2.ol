@@ -3,6 +3,7 @@ foobar_2() {
     foobaz(1000);
 
     test: Test = { foo = 12; bar = 3.14; }
+    print_type_info(Test);
     poly: PolyStruct2<int, int>;
 }
 
