@@ -10,8 +10,8 @@ namespace ol;
 public static class TypeChecker
 {
     public static GlobalScope GlobalScope;
+    public static List<PrivateScope> PrivateScopes;
     public static StructAst BaseArrayType;
-    public static Dictionary<string, StructAst> PolymorphicStructs;
 
     private static ConcurrentDictionary<string, List<FunctionAst>> _polymorphicFunctions;
     private static ConcurrentDictionary<string, Dictionary<Operator, OperatorOverloadAst>> _operatorOverloads;
@@ -21,7 +21,7 @@ public static class TypeChecker
     public static void Init()
     {
         GlobalScope = new();
-        PolymorphicStructs = new();
+        PrivateScopes = new();
 
         _polymorphicFunctions = new();
         _operatorOverloads = new();
@@ -47,8 +47,9 @@ public static class TypeChecker
     private static PrimitiveAst AddPrimitive(string name, TypeKind typeKind, uint size = 0, bool signed = false)
     {
         var primitiveAst = new PrimitiveAst {Name = name, BackendName = name, TypeKind = typeKind, Size = size, Alignment = size, Signed = signed};
-        GlobalScope.Identifiers.TryAdd(name, primitiveAst);
-        TypeTable.Add(name, primitiveAst);
+        GlobalScope.Identifiers[name] = primitiveAst;
+        GlobalScope.Types[name] = primitiveAst;
+        TypeTable.Add(primitiveAst);
         TypeTable.CreateTypeInfo(primitiveAst);
         return primitiveAst;
     }
@@ -56,10 +57,10 @@ public static class TypeChecker
     public static void CheckTypes()
     {
         VerifyStruct(TypeTable.StringType);
-        TypeTable.RawStringType = TypeTable.Types["*.u8"];
+        TypeTable.RawStringType = GlobalScope.Types["*.u8"];
         VerifyStruct(TypeTable.AnyType);
-        TypeTable.TypeInfoPointerType = TypeTable.Types["*.TypeInfo"];
-        TypeTable.VoidPointerType = TypeTable.Types["*.void"];
+        TypeTable.TypeInfoPointerType = GlobalScope.Types["*.TypeInfo"];
+        TypeTable.VoidPointerType = GlobalScope.Types["*.void"];
 
         var runQueue = new List<CompilerDirectiveAst>();
         do
@@ -244,22 +245,12 @@ public static class TypeChecker
             case StructAst structAst:
                 if (structAst.Generics != null)
                 {
-                    if (!PolymorphicStructs.TryAdd(structAst.Name, structAst))
-                    {
-                        ErrorReporter.Report($"Multiple definitions of polymorphic struct '{structAst.Name}'", structAst);
-                    }
+                    AddPolymorphicStruct(structAst);
                     return;
                 }
-                else
-                {
-                    structAst.BackendName = structAst.Name;
-                    structAst.TypeKind = TypeKind.Struct;
-                    if (!TypeTable.Add(structAst.Name, structAst))
-                    {
-                        ErrorReporter.Report($"Multiple definitions of type '{structAst.Name}'", structAst);
-                    }
-                    GlobalScope.Identifiers[structAst.Name] = structAst;
-                }
+                structAst.BackendName = structAst.Name;
+                structAst.TypeKind = TypeKind.Struct;
+                AddStruct(structAst);
                 break;
             case UnionAst union:
                 AddUnion(union);
@@ -296,19 +287,59 @@ public static class TypeChecker
 
     public static bool AddType(string name, IType type)
     {
-        var privateScope = GlobalScope.PrivateScopes[type.FileIndex];
+        if (type.Private)
+        {
+            var privateScope = PrivateScopes[type.FileIndex];
 
-        if (privateScope.Types.ContainsKey(name) || GlobalScope.Types.ContainsKey(name))
-        {
-            return false;
-        }
-        else if (type.Private)
-        {
-            privateScope.Types[name] = type;
+            if (privateScope.Types.ContainsKey(name) || GlobalScope.Types.ContainsKey(name))
+            {
+                return false;
+            }
+            else
+            {
+                privateScope.Types[name] = type;
+            }
         }
         else
         {
-            GlobalScope.Types[name] = type;
+            if (!GlobalScope.Types.TryAdd(name, type))
+            {
+                return false;
+            }
+        }
+
+        TypeTable.Add(type);
+        return true;
+    }
+
+    public static bool AddTypeAndIdentifier(string name, IType type, IAst ast)
+    {
+        if (type.Private)
+        {
+            var privateScope = PrivateScopes[type.FileIndex];
+
+            if (privateScope.Types.ContainsKey(name) || GlobalScope.Types.ContainsKey(name))
+            {
+                ErrorReporter.Report($"Multiple definitions of type '{type.Name}'", ast);
+                return false;
+            }
+            else
+            {
+                privateScope.Types[name] = type;
+                privateScope.Identifiers[name] = ast;
+            }
+        }
+        else
+        {
+            if (!GlobalScope.Types.TryAdd(name, type))
+            {
+                ErrorReporter.Report($"Multiple definitions of type '{type.Name}'", ast);
+                return false;
+            }
+            else
+            {
+                GlobalScope.Identifiers[name] = ast;
+            }
         }
 
         TypeTable.Add(type);
@@ -317,9 +348,26 @@ public static class TypeChecker
 
     private static bool GetType(string name, int fileIndex, out IType type)
     {
-        var privateScope = GlobalScope.PrivateScopes[fileIndex];
+        var privateScope = PrivateScopes[fileIndex];
+
+        if (privateScope == null)
+        {
+            return GlobalScope.Types.TryGetValue(name, out type);
+        }
 
         return privateScope.Types.TryGetValue(name, out type) || GlobalScope.Types.TryGetValue(name, out type);
+    }
+
+    private static bool GetPolymorphicStruct(string name, int fileIndex, out StructAst type)
+    {
+        var privateScope = PrivateScopes[fileIndex];
+
+        if (privateScope == null)
+        {
+            return GlobalScope.PolymorphicStructs.TryGetValue(name, out type);
+        }
+
+        return privateScope.PolymorphicStructs.TryGetValue(name, out type) || GlobalScope.PolymorphicStructs.TryGetValue(name, out type);
     }
 
     public static void AddFunction(FunctionAst function)
@@ -399,32 +447,75 @@ public static class TypeChecker
         }
     }
 
+    public static bool AddPolymorphicStruct(StructAst structAst)
+    {
+        if (structAst.Private)
+        {
+            var privateScope = PrivateScopes[structAst.FileIndex];
+
+            if (privateScope.PolymorphicStructs.ContainsKey(structAst.Name) || GlobalScope.PolymorphicStructs.ContainsKey(structAst.Name))
+            {
+                ErrorReporter.Report($"Multiple definitions of polymorphic struct '{structAst.Name}'", structAst);
+                return false;
+            }
+            else
+            {
+                privateScope.PolymorphicStructs[structAst.Name] = structAst;
+            }
+        }
+        else
+        {
+            if (!GlobalScope.PolymorphicStructs.TryAdd(structAst.Name, structAst))
+            {
+                ErrorReporter.Report($"Multiple definitions of polymorphic struct '{structAst.Name}'", structAst);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static bool AddStruct(StructAst structAst)
+    {
+        return AddTypeAndIdentifier(structAst.Name, structAst, structAst);
+    }
+
     public static bool AddGlobalVariable(DeclarationAst variable)
     {
-        if (!GlobalScope.Identifiers.TryAdd(variable.Name, variable))
+        if (variable.Private)
         {
-            ErrorReporter.Report($"Identifier '{variable.Name}' already defined", variable);
-            return false;
+            var privateScope = PrivateScopes[variable.FileIndex];
+
+            if (privateScope.Identifiers.ContainsKey(variable.Name) || GlobalScope.Identifiers.ContainsKey(variable.Name))
+            {
+                ErrorReporter.Report($"Identifier '{variable.Name}' already defined", variable);
+                return false;
+            }
+            else
+            {
+                privateScope.Identifiers[variable.Name] = variable;
+            }
         }
+        else
+        {
+            if (!GlobalScope.Identifiers.TryAdd(variable.Name, variable))
+            {
+                ErrorReporter.Report($"Identifier '{variable.Name}' already defined", variable);
+                return false;
+            }
+        }
+
         return true;
     }
 
     public static void AddUnion(UnionAst union)
     {
-        if (!TypeTable.Add(union.Name, union))
-        {
-            ErrorReporter.Report($"Multiple definitions of type '{union.Name}'", union);
-        }
-        GlobalScope.Identifiers.TryAdd(union.Name, union);
+        AddTypeAndIdentifier(union.Name, union, union);
     }
 
     public static void AddInterface(InterfaceAst interfaceAst)
     {
-        if (!TypeTable.Add(interfaceAst.Name, interfaceAst))
-        {
-            ErrorReporter.Report($"Multiple definitions of type '{interfaceAst.Name}'", interfaceAst);
-        }
-        GlobalScope.Identifiers.TryAdd(interfaceAst.Name, interfaceAst);
+        AddTypeAndIdentifier(interfaceAst.Name, interfaceAst, interfaceAst);
     }
 
     public static void AddLibrary(CompilerDirectiveAst directive)
@@ -441,14 +532,10 @@ public static class TypeChecker
 
     public static void VerifyEnum(EnumAst enumAst)
     {
-        // 1. Verify enum has not already been defined
-        if (!TypeTable.Add(enumAst.Name, enumAst))
+        if (AddTypeAndIdentifier(enumAst.Name, enumAst, enumAst))
         {
-            ErrorReporter.Report($"Multiple definitions of type '{enumAst.Name}'", enumAst);
+            TypeTable.CreateTypeInfo(enumAst);
         }
-        GlobalScope.Identifiers.TryAdd(enumAst.Name, enumAst);
-
-        TypeTable.CreateTypeInfo(enumAst);
     }
 
     private static void VerifyStruct(StructAst structAst)
@@ -1022,7 +1109,7 @@ public static class TypeChecker
         // 1. Verify the operator type exists and is a struct
         if (overload.Generics.Any())
         {
-            if (PolymorphicStructs.TryGetValue(overload.Type.Name, out var structDef))
+            if (GetPolymorphicStruct(overload.Type.Name, overload.FileIndex, out var structDef))
             {
                 if (structDef.Generics.Count != overload.Generics.Count)
                 {
@@ -2843,7 +2930,7 @@ public static class TypeChecker
         {
             case ConstantAst constant:
                 isConstant = true;
-                constant.Type = TypeTable.Types[constant.TypeName];
+                constant.Type = GlobalScope.Types[constant.TypeName];
                 if (getArrayLength && constant.Type.TypeKind == TypeKind.Integer)
                 {
                     arrayLength = (uint)constant.Value.UnsignedInteger;
@@ -2959,24 +3046,20 @@ public static class TypeChecker
                     {
                         var arrayType = (ArrayType)referenceType;
                         var backendName = $"*.{arrayType.ElementType.BackendName}";
-                        if (!TypeTable.Types.TryGetValue(backendName, out var pointerType))
+                        if (!GetType(backendName, unary.FileIndex, out var pointerType))
                         {
                             var name = $"{arrayType.ElementType.Name}*";
-                            pointerType = new PrimitiveAst {Name = name, BackendName = backendName, TypeKind = TypeKind.Pointer, Size = 8, Alignment = 8, PointerType = arrayType.ElementType};
-                            TypeTable.Add(backendName, pointerType);
-                            TypeTable.CreateTypeInfo(pointerType);
+                            pointerType = CreatePointerType(name, backendName, arrayType.ElementType);
                         }
                         unary.Type = pointerType;
                     }
                     else
                     {
                         var backendName = $"*.{referenceType.BackendName}";
-                        if (!TypeTable.Types.TryGetValue(backendName, out var pointerType))
+                        if (!GetType(backendName, unary.FileIndex, out var pointerType))
                         {
                             var name = $"{referenceType.Name}*";
-                            pointerType = new PrimitiveAst {Name = name, BackendName = backendName, TypeKind = TypeKind.Pointer, Size = 8, Alignment = 8, PointerType = referenceType};
-                            TypeTable.Add(backendName, pointerType);
-                            TypeTable.CreateTypeInfo(pointerType);
+                            pointerType = CreatePointerType(name, backendName, referenceType);
                         }
                         unary.Type = pointerType;
                     }
@@ -3087,6 +3170,7 @@ public static class TypeChecker
                 var types = new IType[compoundExpression.Children.Count];
 
                 var error = false;
+                var privateType = false;
                 uint size = 0;
                 for (var i = 0; i < types.Length; i++)
                 {
@@ -3099,6 +3183,10 @@ public static class TypeChecker
                     {
                         size += type.Size;
                         types[i] = type;
+                        if (type.Private)
+                        {
+                            privateType = true;
+                        }
                     }
                 }
                 if (error)
@@ -3107,12 +3195,12 @@ public static class TypeChecker
                 }
 
                 var compoundTypeName = string.Join("-", types.Select(t => t.BackendName));
-                if (TypeTable.Types.TryGetValue(compoundTypeName, out var compoundType))
+                if (GetType(compoundTypeName, compoundExpression.FileIndex, out var compoundType))
                 {
                     return compoundType;
                 }
 
-                return CreateCompoundType(types, compoundTypeName, size);
+                return CreateCompoundType(types, compoundTypeName, size, privateType, compoundExpression.FileIndex);
             case null:
                 return null;
             default:
@@ -4439,13 +4527,14 @@ public static class TypeChecker
 
         if (type.Compound)
         {
-            if (TypeTable.Types.TryGetValue(type.GenericName, out var compoundType))
+            if (GetType(type.GenericName, type.FileIndex, out var compoundType))
             {
                 return compoundType;
             }
 
             var types = new IType[type.Generics.Count];
             var error = false;
+            var privateType = false;
             uint size = 0;
             for (var i = 0; i < types.Length; i++)
             {
@@ -4462,6 +4551,10 @@ public static class TypeChecker
                 {
                     size += subType.Size;
                     types[i] = subType;
+                    if (subType.Private)
+                    {
+                        privateType = true;
+                    }
                 }
             }
 
@@ -4470,7 +4563,7 @@ public static class TypeChecker
                 return null;
             }
 
-            return CreateCompoundType(types, type.GenericName, size);
+            return CreateCompoundType(types, type.GenericName, size, privateType, type.FileIndex);
         }
 
         if (type.Count != null && type.Name != "Array" && type.Name != "CArray")
@@ -4532,10 +4625,15 @@ public static class TypeChecker
 
                         var name = $"{PrintTypeDefinition(type)}[{arrayLength}]";
                         var backendName = $"{type.GenericName}.{arrayLength}";
-                        if (!TypeTable.Types.TryGetValue(backendName, out var arrayType))
+                        if (!GetType(backendName, type.FileIndex, out var arrayType))
                         {
-                            arrayType = new ArrayType {Name = name, BackendName = backendName, Size = elementType.Size * arrayLength, Alignment = elementType.Alignment, Length = arrayLength, ElementType = elementType};
-                            TypeTable.Add(backendName, arrayType);
+                            arrayType = new ArrayType
+                            {
+                                FileIndex = elementType.FileIndex, Name = name, BackendName = backendName,
+                                Size = elementType.Size * arrayLength, Alignment = elementType.Alignment,
+                                Private = elementType.Private, Length = arrayLength, ElementType = elementType
+                            };
+                            AddType(backendName, arrayType);
                             TypeTable.CreateTypeInfo(arrayType);
                         }
                         return arrayType;
@@ -4553,7 +4651,7 @@ public static class TypeChecker
                     ErrorReporter.Report($"pointer type should have reference to 1 type, but got {type.Generics.Count}", type);
                     return null;
                 }
-                else if (TypeTable.Types.TryGetValue(type.GenericName, out var pointerType))
+                else if (GetType(type.GenericName, type.FileIndex, out var pointerType))
                 {
                     return pointerType;
                 }
@@ -4569,11 +4667,9 @@ public static class TypeChecker
                     {
                         // There are some cases where the pointed to type is a struct that contains a field for the pointer type
                         // To account for this, the type table needs to be checked for again for the type
-                        if (!TypeTable.Types.TryGetValue(type.GenericName, out pointerType))
+                        if (!GetType(type.GenericName, type.FileIndex, out pointerType))
                         {
-                            pointerType = new PrimitiveAst {Name = PrintTypeDefinition(type), BackendName = type.GenericName, TypeKind = TypeKind.Pointer, Size = 8, Alignment = 8, PointerType = pointedToType};
-                            TypeTable.Add(type.GenericName, pointerType);
-                            TypeTable.CreateTypeInfo(pointerType);
+                            pointerType = CreatePointerType(PrintTypeDefinition(type), type.GenericName, pointedToType);
                         }
                         return pointerType;
                     }
@@ -4599,7 +4695,7 @@ public static class TypeChecker
                 {
                     isParams = true;
                     const string backendName = "Array.Any";
-                    if (TypeTable.Types.TryGetValue(backendName, out var arrayType))
+                    if (GlobalScope.Types.TryGetValue(backendName, out var arrayType))
                     {
                         return arrayType;
                     }
@@ -4629,7 +4725,7 @@ public static class TypeChecker
                 if (hasGenerics)
                 {
                     var genericName = type.GenericName;
-                    if (TypeTable.Types.TryGetValue(genericName, out var structType))
+                    if (GetType(genericName, type.FileIndex, out var structType))
                     {
                         return structType;
                     }
@@ -4638,6 +4734,7 @@ public static class TypeChecker
                         var generics = type.Generics.ToArray();
                         var genericTypes = new IType[generics.Length];
                         var error = false;
+                        var privateType = false;
                         for (var i = 0; i < generics.Length; i++)
                         {
                             var genericType = genericTypes[i] = VerifyType(generics[i], scope, out var hasGeneric, out _, out _, depth + 1, allowParams);
@@ -4649,8 +4746,12 @@ public static class TypeChecker
                             {
                                 isGeneric = true;
                             }
+                            else if (genericType.Private)
+                            {
+                                privateType = true;
+                            }
                         }
-                        if (!PolymorphicStructs.TryGetValue(type.Name, out var structDef))
+                        if (!GetPolymorphicStruct(type.Name, type.FileIndex, out var structDef))
                         {
                             ErrorReporter.Report($"No polymorphic structs of type '{type.Name}'", type);
                             return null;
@@ -4667,14 +4768,22 @@ public static class TypeChecker
                         else
                         {
                             var name = PrintTypeDefinition(type);
-                            var polyStruct = Polymorpher.CreatePolymorphedStruct(structDef, name, genericName, TypeKind.Struct, genericTypes, generics);
-                            TypeTable.Add(genericName, polyStruct);
+                            var privateStruct = structDef.Private;
+                            var fileIndex = structDef.FileIndex;
+                            if (privateType && !privateStruct)
+                            {
+                                privateStruct = true;
+                                fileIndex = type.FileIndex;
+                            }
+
+                            var polyStruct = Polymorpher.CreatePolymorphedStruct(structDef, name, genericName, TypeKind.Struct, privateStruct, fileIndex, genericTypes, generics);
+                            AddType(genericName, polyStruct);
                             VerifyStruct(polyStruct);
                             return polyStruct;
                         }
                     }
                 }
-                else if (TypeTable.Types.TryGetValue(type.Name, out var typeValue))
+                else if (GetType(type.Name, type.FileIndex, out var typeValue))
                 {
                     if (typeValue is StructAst structAst && !structAst.Verifying)
                     {
@@ -4705,7 +4814,7 @@ public static class TypeChecker
         }
 
         var backendName = $"Array.{elementType.BackendName}";
-        if (TypeTable.Types.TryGetValue(backendName, out var arrayType))
+        if (GetType(backendName, typeDef.FileIndex, out var arrayType))
         {
             return arrayType;
         }
@@ -4720,16 +4829,25 @@ public static class TypeChecker
             return null;
         }
 
-        var arrayStruct = Polymorpher.CreatePolymorphedStruct(BaseArrayType, name, backendName, TypeKind.Array, new []{elementType}, elementTypeDef);
-        TypeTable.Add(backendName, arrayStruct);
+        var arrayStruct = Polymorpher.CreatePolymorphedStruct(BaseArrayType, name, backendName, TypeKind.Array, elementType.Private, elementType.Private ? elementType.FileIndex : 0, new []{elementType}, elementTypeDef);
+        AddType(backendName, arrayStruct);
         VerifyStruct(arrayStruct);
         return arrayStruct;
     }
 
-    private static IType CreateCompoundType(IType[] types, string backendName, uint size)
+    private static IType CreatePointerType(string name, string backendName, IType pointedToType)
     {
-        var compoundType = new CompoundType {Name = string.Join(", ", types.Select(t => t.Name)), BackendName = backendName, Size = size, Types = types};
-        TypeTable.Add(backendName, compoundType);
+        var pointerType = new PrimitiveAst {FileIndex = pointedToType.FileIndex, Name = name, BackendName = backendName, TypeKind = TypeKind.Pointer, Size = 8, Alignment = 8, Private = pointedToType.Private, PointerType = pointedToType};
+        AddType(backendName, pointerType);
+        TypeTable.CreateTypeInfo(pointerType);
+
+        return pointerType;
+    }
+
+    private static IType CreateCompoundType(IType[] types, string backendName, uint size, bool privateType, int fileIndex)
+    {
+        var compoundType = new CompoundType {FileIndex = fileIndex, Name = string.Join(", ", types.Select(t => t.Name)), BackendName = backendName, Size = size, Private = privateType, Types = types};
+        AddType(backendName, compoundType);
         TypeTable.CreateTypeInfo(compoundType);
         return compoundType;
     }

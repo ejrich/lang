@@ -244,7 +244,7 @@ public static unsafe class LLVMBackend
 
     private static LLVMTypeRef CreateStruct(string typeName)
     {
-        var typeInfo = TypeTable.Types[typeName];
+        var typeInfo = TypeChecker.GlobalScope.Types[typeName];
         var typeStruct = _types[typeInfo.TypeIndex] = _context.CreateNamedStruct(typeInfo.Name);
 
         if (_emitDebug)
@@ -262,7 +262,7 @@ public static unsafe class LLVMBackend
 
         if (_emitDebug)
         {
-            foreach (var (_, type) in TypeTable.Types.OrderBy(t => t.Value.TypeIndex))
+            foreach (var type in TypeTable.Types)
             {
                 switch (type)
                 {
@@ -318,7 +318,7 @@ public static unsafe class LLVMBackend
         }
         else
         {
-            foreach (var (_, type) in TypeTable.Types.OrderBy(t => t.Value.TypeIndex))
+            foreach (var type in TypeTable.Types)
             {
                 switch (type)
                 {
@@ -418,7 +418,7 @@ public static unsafe class LLVMBackend
 
         if (_emitDebug)
         {
-            foreach (var (_, type) in TypeTable.Types.OrderBy(t => t.Value.TypeIndex))
+            foreach (var type in TypeTable.Types)
             {
                 if (type.Used)
                 {
@@ -472,7 +472,7 @@ public static unsafe class LLVMBackend
         }
         else
         {
-            foreach (var (_, type) in TypeTable.Types.OrderBy(t => t.Value.TypeIndex))
+            foreach (var type in TypeTable.Types)
             {
                 if (type.Used)
                 {
@@ -583,7 +583,7 @@ public static unsafe class LLVMBackend
 
         if (_emitDebug)
         {
-            foreach (var (_, type) in TypeTable.Types.OrderBy(t => t.Value.TypeIndex))
+            foreach (var type in TypeTable.Types)
             {
                 switch (type)
                 {
@@ -633,7 +633,7 @@ public static unsafe class LLVMBackend
         }
         else
         {
-            foreach (var (_, type) in TypeTable.Types.OrderBy(t => t.Value.TypeIndex))
+            foreach (var type in TypeTable.Types)
             {
                 switch (type)
                 {

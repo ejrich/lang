@@ -5,16 +5,15 @@ namespace ol;
 
 public static class Polymorpher
 {
-    public static StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, string backendName, TypeKind typeKind, IType[] genericTypes, params TypeDefinition[] genericTypeDefinitions)
+    public static StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, string backendName, TypeKind typeKind, bool privateType, int fileIndex, IType[] genericTypes, params TypeDefinition[] genericTypeDefinitions)
     {
-        var polyStruct = CopyAst(baseStruct);
-        polyStruct.Name = name;
-        polyStruct.BackendName = backendName;
-        polyStruct.BaseStructName = baseStruct.Name;
-        polyStruct.BaseTypeDefinition = baseStruct.BaseTypeDefinition;
-        polyStruct.BaseStruct = baseStruct.BaseStruct;
-        polyStruct.TypeKind = typeKind;
-        polyStruct.GenericTypes = genericTypes;
+        var polyStruct = new StructAst
+        {
+            FileIndex = fileIndex, Line = baseStruct.Line, Column = baseStruct.Column, Name = name,
+            BackendName = backendName, TypeKind = typeKind, Private = privateType,
+            BaseStructName = baseStruct.Name, BaseTypeDefinition = baseStruct.BaseTypeDefinition,
+            BaseStruct = baseStruct.BaseStruct, GenericTypes = genericTypes
+        };
 
         foreach (var field in baseStruct.Fields)
         {
@@ -43,6 +42,7 @@ public static class Polymorpher
         var function = CopyAst(baseFunction);
         function.Name = name;
         function.Flags = baseFunction.Flags;
+        function.Private = baseFunction.Private;
 
         if (baseFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics))
         {

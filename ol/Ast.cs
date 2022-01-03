@@ -85,7 +85,6 @@ public class GlobalScope : IScope
     public ConcurrentDictionary<string, IType> Types { get; } = new();
     public ConcurrentDictionary<string, StructAst> PolymorphicStructs = new();
     public ConcurrentDictionary<string, List<FunctionAst>> PolymorphicFunctions = new();
-    public List<PrivateScope> PrivateScopes { get; } = new();
 }
 
 public class PrivateScope : IScope

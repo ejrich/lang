@@ -151,7 +151,7 @@ public static class Parser
 
         var fileIndex = BuildSettings.Files.Count;
         BuildSettings.Files.Add(file);
-        TypeChecker.GlobalScope.PrivateScopes.Add(new PrivateScope{Parent = TypeChecker.GlobalScope});
+        TypeChecker.PrivateScopes.Add(null);
         ThreadPool.QueueWork(ParseFile, new ParseData {File = file, FileIndex = fileIndex});
     }
 
@@ -207,11 +207,7 @@ public static class Parser
                     var structAst = ParseStruct(enumerator, attributes);
                     if (structAst.Generics != null)
                     {
-                        if (!TypeChecker.PolymorphicStructs.TryAdd(structAst.Name, structAst))
-                        {
-                            ErrorReporter.Report($"Multiple definitions of polymorphic struct '{structAst.Name}'", structAst);
-                        }
-                        else if (structAst.Name == "Array")
+                        if (TypeChecker.AddPolymorphicStruct(structAst) && structAst.Name == "Array")
                         {
                             TypeChecker.BaseArrayType = structAst;
                         }
@@ -219,29 +215,26 @@ public static class Parser
                     else
                     {
                         structAst.BackendName = structAst.Name;
-                        if (!TypeTable.Add(structAst.Name, structAst))
+                        if (TypeChecker.AddStruct(structAst))
                         {
-                            ErrorReporter.Report($"Multiple definitions of type '{structAst.Name}'", structAst);
+                            if (structAst.Name == "string")
+                            {
+                                TypeTable.StringType = structAst;
+                                structAst.TypeKind = TypeKind.String;
+                                structAst.Used = true;
+                            }
+                            else if (structAst.Name == "Any")
+                            {
+                                TypeTable.AnyType = structAst;
+                                structAst.TypeKind = TypeKind.Any;
+                                structAst.Used = true;
+                            }
+                            else
+                            {
+                                structAst.TypeKind = TypeKind.Struct;
+                                Asts.Add(structAst);
+                            }
                         }
-
-                        if (structAst.Name == "string")
-                        {
-                            TypeTable.StringType = structAst;
-                            structAst.TypeKind = TypeKind.String;
-                            structAst.Used = true;
-                        }
-                        else if (structAst.Name == "Any")
-                        {
-                            TypeTable.AnyType = structAst;
-                            structAst.TypeKind = TypeKind.Any;
-                            structAst.Used = true;
-                        }
-                        else
-                        {
-                            structAst.TypeKind = TypeKind.Struct;
-                            Asts.Add(structAst);
-                        }
-                        TypeChecker.GlobalScope.Identifiers.TryAdd(structAst.Name, structAst);
                     }
                     break;
                 case TokenType.Enum:
@@ -2663,6 +2656,10 @@ public static class Parser
                 if (enumerator.Private)
                 {
                     ErrorReporter.Report("Tried to set #private when already in private scope", token);
+                }
+                else
+                {
+                    TypeChecker.PrivateScopes[token.FileIndex] = new PrivateScope{Parent = TypeChecker.GlobalScope};
                 }
                 enumerator.Private = true;
                 break;
