@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -13,7 +12,6 @@ public unsafe static class TypeTable
 
     public static List<IType> Types { get; } = new();
     public static List<IntPtr> TypeInfos { get; } = new();
-    public static ConcurrentDictionary<string, List<FunctionAst>> Functions { get; } = new();
 
     public static IType VoidType;
     public static IType BoolType;
@@ -35,29 +33,14 @@ public unsafe static class TypeTable
 
     public static void Add(IType type)
     {
-        // Set a temporary value of null before the type data is fully determined
         lock (TypeInfos)
         {
             type.TypeIndex = Count++;
             Types.Add(type);
+            // Set a temporary value of null before the type data is fully determined
             TypeInfos.Add(IntPtr.Zero);
         }
     }
-
-    /*public static List<FunctionAst> AddFunction(string name, FunctionAst function)
-    {
-        var functions = Functions.GetOrAdd(name, _ => new List<FunctionAst>());
-        function.FunctionIndex = GetFunctionIndex();
-        functions.Add(function);
-
-        lock(TypeInfos)
-        {
-            function.TypeIndex = Count++;
-            TypeInfos.Add(IntPtr.Zero);
-        }
-
-        return functions;
-    }*/
 
     public static int GetFunctionIndex()
     {

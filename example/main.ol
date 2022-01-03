@@ -96,7 +96,7 @@ main() { //#print_ir {
 
     foobar();
     foobar_2();
-    foobaz(); // TODO This should not compile
+    // foobaz(); // This is a private function that should not compile
 }
 
 global_c := global_b;

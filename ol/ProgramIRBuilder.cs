@@ -1448,6 +1448,19 @@ public static class ProgramIRBuilder
             case NullAst nullAst:
                 return new InstructionValue {ValueType = InstructionValueType.Null, Type = nullAst.TargetType};
             case IdentifierAst identifierAst:
+                if (identifierAst.TypeIndex.HasValue)
+                {
+                    return GetConstantInteger(identifierAst.TypeIndex.Value);
+                }
+                else if (identifierAst.FunctionTypeIndex.HasValue)
+                {
+                    var functionDef = (FunctionAst)TypeTable.Types[identifierAst.FunctionTypeIndex.Value];
+                    return new InstructionValue
+                    {
+                        ValueType = InstructionValueType.Function, Type = functionDef, ValueIndex = functionDef.FunctionIndex
+                    };
+                }
+
                 var identifier = GetScopeIdentifier(scope, identifierAst.Name, out var global);
                 if (identifier is DeclarationAst declaration)
                 {
@@ -1485,18 +1498,7 @@ public static class ProgramIRBuilder
                     }
                     return EmitLoad(function, variable.Type, variable.Pointer, returnValue);
                 }
-                else if (identifier is IType type)
-                {
-                    return GetConstantInteger(type.TypeIndex);
-                }
-                else
-                {
-                    var functionDef = TypeTable.Functions[identifierAst.Name][0];
-                    return new InstructionValue
-                    {
-                        ValueType = InstructionValueType.Function, Type = functionDef, ValueIndex = functionDef.FunctionIndex
-                    };
-                }
+                break;
             case StructFieldRefAst structField:
                 if (structField.IsEnum)
                 {
@@ -1622,6 +1624,8 @@ public static class ProgramIRBuilder
             case CastAst cast:
                 return EmitAndCast(function, cast.Value, scope, cast.TargetType);
         }
+
+        Debug.Assert(false, $"Expected to emit an expression");
         return null;
     }
 
@@ -1634,6 +1638,15 @@ public static class ProgramIRBuilder
             case NullAst nullAst:
                 return new InstructionValue {ValueType = InstructionValueType.Null, Type = nullAst.TargetType};
             case IdentifierAst identifierAst:
+                if (identifierAst.TypeIndex.HasValue)
+                {
+                    return GetConstantInteger(identifierAst.TypeIndex.Value);
+                }
+                else if (identifierAst.FunctionTypeIndex.HasValue)
+                {
+                    return GetConstantInteger(identifierAst.FunctionTypeIndex.Value);
+                }
+
                 var identifier = GetScopeIdentifier(scope, identifierAst.Name, out var global);
                 if (identifier is DeclarationAst declaration)
                 {
@@ -1644,14 +1657,7 @@ public static class ProgramIRBuilder
 
                     return null;
                 }
-                else if (identifierAst is IType type)
-                {
-                    return GetConstantInteger(type.TypeIndex);
-                }
-                else
-                {
-                    return GetConstantInteger(TypeTable.Functions[identifierAst.Name][0].TypeIndex);
-                }
+                break;
             case StructFieldRefAst structField:
                 if (structField.IsEnum)
                 {

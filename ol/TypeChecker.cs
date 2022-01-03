@@ -370,7 +370,6 @@ public static class TypeChecker
 
     private static bool GetExistingFunction(string name, int fileIndex, out FunctionAst function, out int functionCount)
     {
-        function = null;
         var privateScope = PrivateScopes[fileIndex];
 
         if (privateScope == null)
@@ -378,10 +377,7 @@ public static class TypeChecker
             if (GlobalScope.Functions.TryGetValue(name, out var functions))
             {
                 functionCount = functions.Count;
-                if (functions.Count == 1)
-                {
-                    function = functions[0];
-                }
+                function = functions[0];
                 return true;
             }
         }
@@ -396,29 +392,23 @@ public static class TypeChecker
                     functionCount += globalFunctions.Count;
                 }
 
-                if (functionCount == 1)
-                {
-                    function = functions[0];
-                }
-
+                function = functions[0];
                 return true;
             }
             else if (GlobalScope.Functions.TryGetValue(name, out var globalFunctions))
             {
                 functionCount = globalFunctions.Count;
-                if (functions.Count == 1)
-                {
-                    function = functions[0];
-                }
+                function = functions[0];
                 return true;
             }
         }
 
+        function = null;
         functionCount = 0;
         return false;
     }
 
-    private static bool GetExistingPolymorphicFunction(string name, int fileIndex, out FunctionAst function, out int functionCount)
+    private static bool GetExistingPolymorphicFunction(string name, int fileIndex, out FunctionAst function)
     {
         function = null;
         var privateScope = PrivateScopes[fileIndex];
@@ -427,11 +417,7 @@ public static class TypeChecker
         {
             if (GlobalScope.PolymorphicFunctions.TryGetValue(name, out var functions))
             {
-                functionCount = functions.Count;
-                if (functions.Count == 1)
-                {
-                    function = functions[0];
-                }
+                function = functions[0];
                 return true;
             }
         }
@@ -439,32 +425,16 @@ public static class TypeChecker
         {
             if (privateScope.PolymorphicFunctions.TryGetValue(name, out var functions))
             {
-                functionCount = functions.Count;
-
-                if (GlobalScope.PolymorphicFunctions.TryGetValue(name, out var globalFunctions))
-                {
-                    functionCount += globalFunctions.Count;
-                }
-
-                if (functionCount == 1)
-                {
-                    function = functions[0];
-                }
-
+                function = functions[0];
                 return true;
             }
             else if (GlobalScope.PolymorphicFunctions.TryGetValue(name, out var globalFunctions))
             {
-                functionCount = globalFunctions.Count;
-                if (functions.Count == 1)
-                {
-                    function = functions[0];
-                }
+                function = functions[0];
                 return true;
             }
         }
 
-        functionCount = 0;
         return false;
     }
 
@@ -3140,6 +3110,7 @@ public static class TypeChecker
                             return null;
                         }
                         VerifyFunctionIfNecessary(function, currentFunction);
+                        identifierAst.FunctionTypeIndex = function.TypeIndex;
                         return function;
                     }
                     ErrorReporter.Report($"Identifier '{identifierAst.Name}' not defined", identifierAst);
@@ -3171,20 +3142,24 @@ public static class TypeChecker
                         {
                             VerifyStruct(structAst);
                         }
+                        identifierAst.TypeIndex = structAst.TypeIndex;
                         return structAst;
                     case UnionAst union:
                         if (!union.Verified)
                         {
                             VerifyUnion(union);
                         }
+                        identifierAst.TypeIndex = union.TypeIndex;
                         return union;
                     case InterfaceAst interfaceAst:
                         if (!interfaceAst.Verified)
                         {
                             VerifyInterface(interfaceAst);
                         }
+                        identifierAst.TypeIndex = interfaceAst.TypeIndex;
                         return interfaceAst;
                     case IType type:
+                        identifierAst.TypeIndex = type.TypeIndex;
                         return type;
                     default:
                         return null;
@@ -3563,9 +3538,9 @@ public static class TypeChecker
             {
                 if (GetExistingFunction(call.Name, call.FileIndex, out var existingFunction, out _))
                 {
-                    return existingFunction?.ReturnType;
+                    return existingFunction.ReturnType;
                 }
-                else if (GetExistingPolymorphicFunction(call.Name, call.FileIndex, out existingFunction, out _))
+                else if (GetExistingPolymorphicFunction(call.Name, call.FileIndex, out existingFunction))
                 {
                     return existingFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? null : existingFunction.ReturnType;
                 }
@@ -4003,16 +3978,16 @@ public static class TypeChecker
             {
                 var name = $"{function.Name}<{string.Join(", ", genericTypes.Select(t => t.Name))}>";
 
-                // TODO Is this necessary?
-                // if (TypeTable.Functions.TryGetValue(name, out var implementations))
-                // {
-                //     if (implementations.Count > 1)
-                //     {
-                //         ErrorReporter.Report($"Internal compiler error, multiple implementations of polymorphic function '{name}'", call);
-                //     }
-                //     return implementations[0];
-                // }
+                if (GetExistingFunction(name, call.FileIndex, out polymorphedFunction, out var functionCount))
+                {
+                    if (functionCount > 1)
+                    {
+                        ErrorReporter.Report($"Internal compiler error, multiple implementations of polymorphic function '{name}'", call);
+                    }
+                    return true;
+                }
 
+                // TODO Set the proper file index depending on the type privacy
                 polymorphedFunction = Polymorpher.CreatePolymorphedFunction(function, name, genericTypes);
                 if (polymorphedFunction.ReturnType == null)
                 {
