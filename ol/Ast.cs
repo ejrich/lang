@@ -332,6 +332,8 @@ public class IdentifierAst : IAst
     public uint Line { get; init; }
     public uint Column { get; init; }
     public string Name { get; set; }
+    public int? TypeIndex { get; set; }
+    public int? FunctionTypeIndex { get; set; }
 }
 
 public class ExpressionAst : IAst

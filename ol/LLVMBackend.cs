@@ -313,6 +313,9 @@ public static unsafe class LLVMBackend
                         DeclareInterfaceDebugType(interfaceAst);
                         interfaceQueue.Add(interfaceAst);
                         break;
+                    case FunctionAst function:
+                        CreateFunctionTypeInfo(function);
+                        break;
                 }
             }
         }
@@ -353,6 +356,9 @@ public static unsafe class LLVMBackend
                     case InterfaceAst interfaceAst:
                         CreateTypeInfo(_interfaceTypeInfoType, interfaceAst.TypeIndex);
                         interfaceQueue.Add(interfaceAst);
+                        break;
+                    case FunctionAst function:
+                        CreateFunctionTypeInfo(function);
                         break;
                 }
             }
@@ -398,14 +404,6 @@ public static unsafe class LLVMBackend
             foreach (var union in unionQueue)
             {
                 DeclareUnionTypeInfo(union);
-            }
-        }
-
-        foreach (var (_, functions) in TypeTable.Functions)
-        {
-            foreach (var function in functions)
-            {
-                CreateFunctionTypeInfo(function);
             }
         }
     }
@@ -534,29 +532,6 @@ public static unsafe class LLVMBackend
         foreach (var union in unionQueue)
         {
             DeclareUnionDebugType(union);
-        }
-
-        foreach (var (_, functions) in TypeTable.Functions)
-        {
-            foreach (var function in functions)
-            {
-                if (function.Used)
-                {
-                    var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
-                    var argumentValues = new LLVMValueRef[argumentCount];
-                    for (var arg = 0; arg < argumentCount; arg++)
-                    {
-                        var argument = function.Arguments[arg];
-                        var argumentTypeInfo = CreateTypeInfoIfNotExists(argument.Type);
-
-                        argumentValues[arg] = CreateArgumentType(argument, argumentTypeInfo);
-                    }
-
-                    var returnType = CreateTypeInfoIfNotExists(function.ReturnType);
-
-                    CreateFunctionTypeInfo(function, argumentValues, returnType);
-                }
-            }
         }
 
         var nullTypeInfo = LLVM.ConstNull(_typeInfoPointerType);
@@ -759,6 +734,7 @@ public static unsafe class LLVMBackend
                 DeclareCompoundTypeInfo(compoundType, typeInfos);
                 break;
             case InterfaceAst interfaceAst:
+            {
                 CreateTypeInfo(_interfaceTypeInfoType, interfaceAst.TypeIndex);
 
                 var argumentValues = new LLVMValueRef[interfaceAst.Arguments.Count];
@@ -774,6 +750,24 @@ public static unsafe class LLVMBackend
 
                 DeclareInterfaceTypeInfo(interfaceAst, argumentValues, returnType);
                 break;
+            }
+            case FunctionAst function:
+            {
+                var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
+                var argumentValues = new LLVMValueRef[argumentCount];
+                for (var arg = 0; arg < argumentCount; arg++)
+                {
+                    var argument = function.Arguments[arg];
+                    var argumentTypeInfo = CreateTypeInfoIfNotExists(argument.Type);
+
+                    argumentValues[arg] = CreateArgumentType(argument, argumentTypeInfo);
+                }
+
+                var returnType = CreateTypeInfoIfNotExists(function.ReturnType);
+
+                CreateFunctionTypeInfo(function, argumentValues, returnType);
+                break;
+            }
             default:
                 Debug.Assert(false, "Unhandled type info");
                 break;
