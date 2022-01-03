@@ -370,6 +370,56 @@ public static class TypeChecker
         return privateScope.PolymorphicStructs.TryGetValue(name, out type) || GlobalScope.PolymorphicStructs.TryGetValue(name, out type);
     }
 
+    private static bool GetExistingFunction(string name, int fileIndex, out FunctionAst function, out int functionCount)
+    {
+        function = null;
+        var privateScope = PrivateScopes[fileIndex];
+
+        if (privateScope == null)
+        {
+            if (GlobalScope.Functions.TryGetValue(name, out var functions))
+            {
+                functionCount = functions.Count;
+                if (functions.Count == 1)
+                {
+                    function = functions[0];
+                }
+                return true;
+            }
+        }
+        else
+        {
+            if (privateScope.Functions.TryGetValue(name, out var functions))
+            {
+                functionCount = functions.Count;
+
+                if (GlobalScope.Functions.TryGetValue(name, out var globalFunctions))
+                {
+                    functionCount += globalFunctions.Count;
+                }
+
+                if (functionCount == 1)
+                {
+                    function = functions[0];
+                }
+
+                return true;
+            }
+            else if (GlobalScope.Functions.TryGetValue(name, out var globalFunctions))
+            {
+                functionCount = globalFunctions.Count;
+                if (functions.Count == 1)
+                {
+                    function = functions[0];
+                }
+                return true;
+            }
+        }
+
+        functionCount = 0;
+        return false;
+    }
+
     public static void AddFunction(FunctionAst function)
     {
         if (function.Generics.Any())
@@ -383,7 +433,7 @@ public static class TypeChecker
             {
                 _polymorphicFunctions[function.Name] = functions = new List<FunctionAst>();
             }
-            if (functions.Any() && OverloadExistsForFunction(function, functions))
+            if (functions.Any() && OverloadExistsForFunction(function /* TODO get this to work */))
             {
                 ErrorReporter.Report($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
             }
@@ -391,30 +441,30 @@ public static class TypeChecker
         }
         else
         {
-            var functions = TypeTable.AddFunction(function.Name, function);
+            // var functions = TypeTable.AddFunction(function.Name, function);
 
             if (function.Flags.HasFlag(FunctionFlags.Extern))
             {
-                if (functions.Count > 1)
+                if (function.Private)
+                {
+                    ErrorReporter.Report($"Extern function '{function.Name}' must be public to avoid linking failures", function);
+                }
+                else if (GetExistingFunction(function.Name, function.FileIndex, out _, out _))
                 {
                     ErrorReporter.Report($"Multiple definitions of extern function '{function.Name}'", function);
                 }
             }
-            else if (function.Flags.HasFlag(FunctionFlags.Compiler))
+            else if (OverloadExistsForFunction(function, false))
             {
-                if (functions.Count > 1 && OverloadExistsForFunction(function, functions, false))
-                {
-                    ErrorReporter.Report($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
-                }
-            }
-            else
-            {
-                if (functions.Count > 1 && OverloadExistsForFunction(function, functions, false))
-                {
-                    ErrorReporter.Report($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
-                }
+                ErrorReporter.Report($"Function '{function.Name}' has multiple overloads with arguments ({string.Join(", ", function.Arguments.Select(arg => PrintTypeDefinition(arg.TypeDefinition)))})", function);
             }
         }
+    }
+
+    private static void AddFunction(string name, FunctionAst function)
+    {
+        // TODO Implement me
+        function.FunctionIndex = TypeTable.GetFunctionIndex();
     }
 
     public static void AddOverload(OperatorOverloadAst overload)
@@ -1076,29 +1126,30 @@ public static class TypeChecker
         return false;
     }
 
-    private static bool OverloadExistsForFunction(IFunction currentFunction, List<FunctionAst> existingFunctions, bool checkAll = true)
+    private static bool OverloadExistsForFunction(FunctionAst currentFunction, bool checkAll = true)
     {
-        var functionCount = checkAll ? existingFunctions.Count : existingFunctions.Count - 1;
-        for (var function = 0; function < functionCount; function++)
-        {
-            var existingFunction = existingFunctions[function];
-            if (currentFunction.Arguments.Count == existingFunction.Arguments.Count)
-            {
-                var match = true;
-                for (var i = 0; i < currentFunction.Arguments.Count; i++)
-                {
-                    if (!TypeDefinitionEquals(currentFunction.Arguments[i].TypeDefinition, existingFunction.Arguments[i].TypeDefinition))
-                    {
-                        match = false;
-                        break;
-                    }
-                }
-                if (match)
-                {
-                    return true;
-                }
-            }
-        }
+        // TODO Implement me
+        // var functionCount = checkAll ? existingFunctions.Count : existingFunctions.Count - 1;
+        // for (var function = 0; function < functionCount; function++)
+        // {
+        //     var existingFunction = existingFunctions[function];
+        //     if (currentFunction.Arguments.Count == existingFunction.Arguments.Count)
+        //     {
+        //         var match = true;
+        //         for (var i = 0; i < currentFunction.Arguments.Count; i++)
+        //         {
+        //             if (!TypeDefinitionEquals(currentFunction.Arguments[i].TypeDefinition, existingFunction.Arguments[i].TypeDefinition))
+        //             {
+        //                 match = false;
+        //                 break;
+        //             }
+        //         }
+        //         if (match)
+        //         {
+        //             return true;
+        //         }
+        //     }
+        // }
         return false;
     }
 
@@ -3749,7 +3800,7 @@ public static class TypeChecker
                         }
                     }
 
-                    TypeTable.AddFunction(name, polymorphedFunction);
+                    AddFunction(name, polymorphedFunction);
                     TypeTable.CreateTypeInfo(polymorphedFunction);
                     VerifyFunction(polymorphedFunction);
 
