@@ -9,9 +9,9 @@ foobar() {
 
 #private
 
-// foobaz(int a = 10) {
-//     printf("Hello world - %d\n", a);
-// }
+foobaz(int a = 10) {
+    printf("Hello world - %d\n", a);
+}
 
 struct Test {
     foo := 0;

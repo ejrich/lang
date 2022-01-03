@@ -44,7 +44,7 @@ public unsafe static class TypeTable
         }
     }
 
-    public static List<FunctionAst> AddFunction(string name, FunctionAst function)
+    /*public static List<FunctionAst> AddFunction(string name, FunctionAst function)
     {
         var functions = Functions.GetOrAdd(name, _ => new List<FunctionAst>());
         function.FunctionIndex = GetFunctionIndex();
@@ -57,7 +57,7 @@ public unsafe static class TypeTable
         }
 
         return functions;
-    }
+    }*/
 
     public static int GetFunctionIndex()
     {
