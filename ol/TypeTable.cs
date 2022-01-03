@@ -10,7 +10,9 @@ public unsafe static class TypeTable
 {
     public static int Count;
     public static int FunctionCount;
-    public static ConcurrentDictionary<string, IType> Types { get; } = new();
+
+    public static List<IType> Types { get; } = new();
+    public static List<IntPtr> TypeInfos { get; } = new();
     public static ConcurrentDictionary<string, List<FunctionAst>> Functions { get; } = new();
 
     public static IType VoidType;
@@ -31,27 +33,13 @@ public unsafe static class TypeTable
     public static IType TypeInfoPointerType;
     public static IType VoidPointerType;
 
-    public static bool Add(string name, IType type)
-    {
-        if (Types.TryAdd(name, type))
-        {
-            // Set a temporary value of null before the type data is fully determined
-            lock (TypeInfos)
-            {
-                type.TypeIndex = Count++;
-                TypeInfos.Add(IntPtr.Zero);
-            }
-            return true;
-        }
-        return false;
-    }
-
     public static void Add(IType type)
     {
         // Set a temporary value of null before the type data is fully determined
         lock (TypeInfos)
         {
             type.TypeIndex = Count++;
+            Types.Add(type);
             TypeInfos.Add(IntPtr.Zero);
         }
     }
@@ -81,8 +69,6 @@ public unsafe static class TypeTable
 
         return index;
     }
-
-    public static List<IntPtr> TypeInfos { get; } = new();
 
     private const int TypeInfoSize = 24;
     [StructLayout(LayoutKind.Explicit, Size=TypeInfoSize)]
