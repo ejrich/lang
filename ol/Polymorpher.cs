@@ -5,12 +5,12 @@ namespace ol;
 
 public static class Polymorpher
 {
-    public static StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, string backendName, TypeKind typeKind, bool privateType, int fileIndex, IType[] genericTypes, params TypeDefinition[] genericTypeDefinitions)
+    public static StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, string backendName, TypeKind typeKind, bool privateGenericTypes, IType[] genericTypes, params TypeDefinition[] genericTypeDefinitions)
     {
         var polyStruct = new StructAst
         {
-            FileIndex = fileIndex, Line = baseStruct.Line, Column = baseStruct.Column, Name = name,
-            BackendName = backendName, TypeKind = typeKind, Private = privateType,
+            FileIndex = baseStruct.FileIndex, Line = baseStruct.Line, Column = baseStruct.Column, Name = name,
+            BackendName = backendName, TypeKind = typeKind, Private = baseStruct.Private || privateGenericTypes,
             BaseStructName = baseStruct.Name, BaseTypeDefinition = baseStruct.BaseTypeDefinition,
             BaseStruct = baseStruct.BaseStruct, GenericTypes = genericTypes
         };
@@ -36,13 +36,13 @@ public static class Polymorpher
         return polyStruct;
     }
 
-    public static FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, IType[] genericTypes)
+    public static FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, bool privateGenericTypes, IType[] genericTypes)
     {
         var genericTypeDefs = GetGenericTypeDefinitions(genericTypes);
         var function = CopyAst(baseFunction);
         function.Name = name;
         function.Flags = baseFunction.Flags;
-        function.Private = baseFunction.Private;
+        function.Private = baseFunction.Private || privateGenericTypes;
 
         if (baseFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics))
         {
