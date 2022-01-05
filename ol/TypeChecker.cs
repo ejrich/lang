@@ -3126,6 +3126,11 @@ public static class TypeChecker
                 isConstant = structFieldType is EnumAst;
                 return structFieldType;
             case IdentifierAst identifierAst:
+                if (identifierAst.BakedType != null)
+                {
+                    isType = true;
+                    return identifierAst.BakedType;
+                }
                 if (!GetScopeIdentifier(scope, identifierAst.Name, out var identifier))
                 {
                     if (GetExistingFunction(identifierAst.Name, identifierAst.FileIndex, out var function, out var functionCount))
@@ -4813,6 +4818,11 @@ public static class TypeChecker
         isParams = false;
         if (type == null) return null;
 
+        if (type.BakedType != null)
+        {
+            return type.BakedType;
+        }
+
         if (type.IsGeneric)
         {
             if (type.Generics.Any())
@@ -5072,7 +5082,7 @@ public static class TypeChecker
                                 fileIndex = type.FileIndex;
                             }
 
-                            var polyStruct = Polymorpher.CreatePolymorphedStruct(structDef, name, genericName, TypeKind.Struct, privateGenericTypes, genericTypes, generics);
+                            var polyStruct = Polymorpher.CreatePolymorphedStruct(structDef, name, genericName, TypeKind.Struct, privateGenericTypes, genericTypes);
                             AddType(genericName, polyStruct, fileIndex);
                             VerifyStruct(polyStruct);
                             return polyStruct;
@@ -5125,7 +5135,7 @@ public static class TypeChecker
             return null;
         }
 
-        var arrayStruct = Polymorpher.CreatePolymorphedStruct(BaseArrayType, name, backendName, TypeKind.Array, elementType.Private, new []{elementType}, elementTypeDef);
+        var arrayStruct = Polymorpher.CreatePolymorphedStruct(BaseArrayType, name, backendName, TypeKind.Array, elementType.Private, elementType);
         AddType(backendName, arrayStruct, elementType.Private ? elementType.FileIndex : 0);
         VerifyStruct(arrayStruct);
         return arrayStruct;
@@ -5152,8 +5162,12 @@ public static class TypeChecker
     {
         if (type == null) return string.Empty;
 
-        var sb = new StringBuilder();
+        if (type.BakedType != null)
+        {
+            return type.BakedType.Name;
+        }
 
+        var sb = new StringBuilder();
         if (type.Name == "*")
         {
             sb.Append($"{PrintTypeDefinition(type.Generics[0])}*");

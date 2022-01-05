@@ -332,6 +332,7 @@ public class IdentifierAst : IAst
     public uint Line { get; init; }
     public uint Column { get; init; }
     public string Name { get; set; }
+    public IType BakedType { get; set; }
     public int? TypeIndex { get; set; }
     public int? FunctionTypeIndex { get; set; }
 }
@@ -591,6 +592,7 @@ public class TypeDefinition : IAst
     public List<TypeDefinition> Generics { get; } = new();
     public IAst Count { get; set; }
     public uint? ConstCount { get; set; }
+    public IType BakedType { get; set; }
 
     private string _genericName;
     public string GenericName
