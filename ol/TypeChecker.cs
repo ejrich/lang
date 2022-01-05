@@ -4428,6 +4428,19 @@ public static class TypeChecker
             isConstant = isConstant && constant;
 
             // 3. Verify the operator and expression types are compatible and convert the expression type if necessary
+            if (isType && nextIsType)
+            {
+                if (op != Operator.Equality && op != Operator.NotEqual)
+                {
+                    ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable when comparing types", expression.Children[i]);
+                    return null;
+                }
+                expression.Type = TypeTable.BoolType;
+                expression.ResultingTypes.Add(expression.Type);
+                isType = false;
+                continue;
+            }
+
             var type = expression.Type.TypeKind;
             var nextType = nextExpressionType.TypeKind;
             if ((type == TypeKind.Struct && nextType == TypeKind.Struct) ||
