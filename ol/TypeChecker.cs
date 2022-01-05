@@ -403,7 +403,7 @@ public static class TypeChecker
             else if (GlobalScope.Functions.TryGetValue(name, out var globalFunctions))
             {
                 functionCount = globalFunctions.Count;
-                function = functions[0];
+                function = globalFunctions[0];
                 return true;
             }
         }
