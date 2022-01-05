@@ -38,7 +38,7 @@ int fread(void* buffer, u32 size, u32 length, FILE* file) #extern "c"
 int fclose(FILE* file) #extern "c"
 
 
-bool, string read_file(string file_path, allocate allocator = null) {
+bool, string read_file(string file_path, Allocate allocator = null) {
     file_contents: string;
     found: bool;
 

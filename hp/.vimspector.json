@@ -5,7 +5,7 @@
       "configuration": {
         "request": "launch",
         "program": "${workspaceRoot}/bin/hp",
-        "args": ["Xlib.h", "X11"],
+        //"args": ["Xlib.h", "X11"],
         "cwd": "${workspaceRoot}",
         "externalConsole": true,
         "MIMode": "gdb"

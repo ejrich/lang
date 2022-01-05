@@ -3611,7 +3611,7 @@ public static class TypeChecker
 
             if (!VerifyArguments(call, argumentTypes, specifiedArguments, function))
             {
-                ErrorReporter.Report($"No overload of function '{function.Name}' found with given arguments", call);
+                ReportNoFunctionForCall(function.Name, call, argumentTypes, specifiedArguments);
                 return null;
             }
         }
@@ -3834,22 +3834,27 @@ public static class TypeChecker
         }
         else
         {
-            if (arguments.Length > 0 || specifiedArguments.Any())
-            {
-                var argumentTypes = string.Join(", ", arguments.Select(type => type == null ? "null" : type.Name));
-                if (arguments.Length > 0 && specifiedArguments.Any())
-                {
-                    argumentTypes += ", ";
-                }
-                argumentTypes += string.Join(", ", specifiedArguments.Select(arg => arg.Value == null ? $"{arg.Key}: null" : $"{arg.Key}: {arg.Value.Name}"));
-                ErrorReporter.Report($"No overload of function '{call.Name}' found with arguments ({argumentTypes})", call);
-            }
-            else
-            {
-                ErrorReporter.Report($"No overload of function '{call.Name}' found with 0 arguments", call);
-            }
+            ReportNoFunctionForCall(call.Name, call, arguments, specifiedArguments);
         }
         return null;
+    }
+
+    private static void ReportNoFunctionForCall(string callName, CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments)
+    {
+        if (arguments.Length > 0 || specifiedArguments.Any())
+        {
+            var argumentTypes = string.Join(", ", arguments.Select(type => type == null ? "null" : type.Name));
+            if (arguments.Length > 0 && specifiedArguments.Any())
+            {
+                argumentTypes += ", ";
+            }
+            argumentTypes += string.Join(", ", specifiedArguments.Select(arg => arg.Value == null ? $"{arg.Key}: null" : $"{arg.Key}: {arg.Value.Name}"));
+            ErrorReporter.Report($"No overload of function '{callName}' found with arguments ({argumentTypes})", call);
+        }
+        else
+        {
+            ErrorReporter.Report($"No overload of function '{callName}' found with 0 arguments", call);
+        }
     }
 
     private static bool FindFunctionThatMatchesCall(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments, IScope scope, List<FunctionAst> functions, out FunctionAst matchedFunction)
