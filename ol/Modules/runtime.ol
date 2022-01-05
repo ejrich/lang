@@ -8,7 +8,7 @@ struct Array<T> {
 
 ARRAY_BLOCK_SIZE := 10; #const
 
-array_insert<T>(Array<T>* array, T value, allocate allocator = null, reallocate reallocator = null) {
+array_insert<T>(Array<T>* array, T value, Allocate allocator = null, Reallocate reallocator = null) {
     // Reallocate the array if necessary
     length := array.length;
     if length % ARRAY_BLOCK_SIZE == 0 {
@@ -48,7 +48,7 @@ bool array_remove<T>(Array<T>* array, int index) {
     return true;
 }
 
-array_reserve<T>(Array<T>* array, int length, allocate allocator = null, reallocate reallocator = null) {
+array_reserve<T>(Array<T>* array, int length, Allocate allocator = null, Reallocate reallocator = null) {
     if array.length >= length || length <= 0 return;
 
     reserve_length := length + ARRAY_BLOCK_SIZE - length % ARRAY_BLOCK_SIZE;
@@ -103,9 +103,9 @@ string convert_c_string(u8* string_pointer) {
     return str;
 }
 
-interface void* allocate(int size)
-interface void* reallocate(void* data, int size)
-interface void* free(void* data)
+interface void* Allocate(int size)
+interface void* Reallocate(void* data, int size)
+interface void* Free(void* data)
 
 
 // Runtime type information data
