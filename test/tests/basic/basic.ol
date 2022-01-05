@@ -1,4 +1,6 @@
 #import compiler
+#import "import.ol"
+#import "import2.ol"
 
 main() {
     basic();
@@ -40,6 +42,10 @@ main() {
     break_and_continue();
 
     any_args();
+
+    multiple_return_values();
+
+    imports();
 }
 
 basic() {
@@ -455,6 +461,37 @@ print(string format, Any arg) {
         printf(format, arg.data);
     }
     else printf(format);
+}
+
+multiple_return_values() {
+    a: int;
+    b: bool;
+
+    a, b = number_is_correct(12);
+    printf("Number = %d, Correct = %d\n", a, b);
+
+    c, d := number_is_correct(6);
+    printf("Number = %d, Correct = %d\n", c, d);
+
+    e, f: int;
+    e, f, b = hello_world();
+}
+
+int, bool number_is_correct(int a) {
+    if a > 10 {
+        return a, true;
+    }
+    return a * 10, false;
+}
+
+int, int, bool hello_world() {
+    return 1, 2, true;
+}
+
+imports() {
+    foobar();
+    foobar_2();
+    // foobaz(); // This is a private function that should not compile
 }
 
 #run main();

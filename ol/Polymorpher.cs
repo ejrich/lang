@@ -137,19 +137,23 @@ public static class Polymorpher
     private static TypeDefinition CopyType(TypeDefinition type, IType[] genericTypes)
     {
         var copyType = CopyAst(type);
-        copyType.Name = type.Name;
 
         if (type.IsGeneric)
         {
-            copyType.BakedType = genericTypes[type.GenericIndex];
+            var genericType = genericTypes[type.GenericIndex];
+            copyType.Name = genericType.BackendName;
+            copyType.BakedType = genericType;
         }
-
-        copyType.Compound = type.Compound;
-        copyType.Count = type.Count;
-
-        foreach (var generic in type.Generics)
+        else
         {
-            copyType.Generics.Add(CopyType(generic, genericTypes));
+            copyType.Name = type.Name;
+            copyType.Compound = type.Compound;
+            copyType.Count = type.Count;
+
+            foreach (var generic in type.Generics)
+            {
+                copyType.Generics.Add(CopyType(generic, genericTypes));
+            }
         }
 
         return copyType;
