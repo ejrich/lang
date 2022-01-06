@@ -45,16 +45,17 @@ public enum FunctionFlags
 {
     Extern = 0x1,
     Compiler = 0x2,
-    Varargs = 0x4,
-    Params = 0x8,
-    DefinitionVerified = 0x10,
-    Verified = 0x20,
-    HasDirectives = 0x40,
-    CallsCompiler = 0x80,
-    ReturnVoidAtEnd = 0x100,
-    ReturnTypeHasGenerics = 0x200,
-    PrintIR = 0x400,
-    ExternInitted = 0x800
+    Syscall = 0x4,
+    Varargs = 0x8,
+    Params = 0x10,
+    DefinitionVerified = 0x20,
+    Verified = 0x40,
+    HasDirectives = 0x80,
+    CallsCompiler = 0x100,
+    ReturnVoidAtEnd = 0x200,
+    ReturnTypeHasGenerics = 0x400,
+    PrintIR = 0x800,
+    ExternInitted = 0x1000
 }
 
 public interface IValues : IAst
@@ -125,6 +126,7 @@ public class FunctionAst : IFunction, IType
     public bool Private { get; set; }
     public string ExternLib { get; set; }
     public string Library { get; set; }
+    public int Syscall { get; set; }
     public IType ParamsElementType { get; set; }
     public IType ReturnType { get; set; }
     public TypeDefinition ReturnTypeDefinition { get; set; }

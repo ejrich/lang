@@ -692,10 +692,10 @@ public static class Parser
             {
                 case "extern":
                     function.Flags |= FunctionFlags.Extern;
-                    const string error = "Extern function definition should be followed by the library in use";
+                    const string externError = "Extern function definition should be followed by the library in use";
                     if (!enumerator.Peek(out token))
                     {
-                        ErrorReporter.Report(error, token);
+                        ErrorReporter.Report(externError, token);
                     }
                     else if (token.Type == TokenType.Literal)
                     {
@@ -709,11 +709,36 @@ public static class Parser
                     }
                     else
                     {
-                        ErrorReporter.Report(error, token);
+                        ErrorReporter.Report(externError, token);
                     }
                     return function;
                 case "compiler":
                     function.Flags |= FunctionFlags.Compiler;
+                    return function;
+                case "syscall":
+                    function.Flags |= FunctionFlags.Syscall;
+                    const string syscallError = "Syscall function definition should be followed by the number for the system call";
+                    if (!enumerator.Peek(out token))
+                    {
+                        ErrorReporter.Report(syscallError, token);
+                    }
+                    else if (token.Type == TokenType.Number)
+                    {
+                        enumerator.MoveNext();
+                        if (token.Flags == TokenFlags.None && int.TryParse(token.Value, out var value))
+                        {
+                            function.Syscall = value;
+                            function.ExternLib = "c";
+                        }
+                        else
+                        {
+                            ErrorReporter.Report(syscallError, token);
+                        }
+                    }
+                    else
+                    {
+                        ErrorReporter.Report(syscallError, token);
+                    }
                     return function;
                 case "print_ir":
                     function.Flags |= FunctionFlags.PrintIR;

@@ -2478,13 +2478,7 @@ public static class ProgramIRBuilder
 
     private static InstructionValue AddInstruction(FunctionIR function, Instruction instruction, IType type)
     {
-        /* #if DEBUG
-        if (instruction.Type == InstructionType.None)
-        {
-            Console.WriteLine("Instruction did not have an assigned type");
-            throw new Exception();
-        }
-        #endif */
+        Debug.Assert(instruction.Type != InstructionType.None, "Instruction did not have an assigned type");
 
         var valueIndex = function.ValueCount++;
         instruction.ValueIndex = valueIndex;
