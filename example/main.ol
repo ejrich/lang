@@ -1,4 +1,5 @@
 #import compiler
+#import linux
 #import "import.ol"
 #import "import2.ol"
 
