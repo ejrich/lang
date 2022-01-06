@@ -117,6 +117,7 @@ public enum InstructionType
     GetUnionPointer,
     Call,
     CallFunctionPointer,
+    SystemCall,
     IntegerExtend,
     UnsignedIntegerToIntegerExtend,
     UnsignedIntegerExtend,

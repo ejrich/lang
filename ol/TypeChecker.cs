@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.IO;
 using System.Text;
@@ -1162,7 +1163,7 @@ public static class TypeChecker
                 function.Flags |= FunctionFlags.Verified;
                 ProgramIRBuilder.AddFunctionDefinition(function);
             }
-            else if (function.Flags.HasFlag(FunctionFlags.Compiler))
+            else if (function.Flags.HasFlag(FunctionFlags.Compiler) || function.Flags.HasFlag(FunctionFlags.Syscall))
             {
                 function.Flags |= FunctionFlags.Verified;
                 ProgramIRBuilder.AddFunctionDefinition(function);
@@ -1428,6 +1429,8 @@ public static class TypeChecker
         {
             return;
         }
+
+        Debug.Assert(function.Body != null, "Should not verify function without body");
 
         // 1. Initialize local variables
         foreach (var argument in function.Arguments)
