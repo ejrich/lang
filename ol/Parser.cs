@@ -728,7 +728,6 @@ public static class Parser
                         if (token.Flags == TokenFlags.None && int.TryParse(token.Value, out var value))
                         {
                             function.Syscall = value;
-                            function.ExternLib = "c";
                         }
                         else
                         {

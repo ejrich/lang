@@ -504,6 +504,19 @@ public static unsafe class ProgramRunner
                     registers[instruction.ValueIndex] = ConvertToRegister(returnValue);
                     break;
                 }
+                case InstructionType.SystemCall:
+                {
+                    var args = new long[instruction.Value1.Values.Length];
+                    for (var i = 0; i < args.Length; i++)
+                    {
+                        var value = GetValue(instruction.Value1.Values[i], registers, stackPointer, function, arguments);
+                        args[i] = value.Long;
+                    }
+
+                    var returnValue = syscall(instruction.Index, args[0]);
+                    registers[instruction.ValueIndex] = new Register {Long = returnValue};
+                    break;
+                }
                 case InstructionType.IntegerExtend:
                 case InstructionType.IntegerTruncate:
                 {
@@ -1375,6 +1388,11 @@ public static unsafe class ProgramRunner
             return ExecuteFunction(callingFunction, args);
         }
     }
+
+    const string Libc = "c";
+
+    [DllImport(Libc)]
+    private static extern long syscall(long number, long arg);
 
     private static Register ConvertToRegister(object value)
     {

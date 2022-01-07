@@ -218,6 +218,12 @@ public static class ProgramIRBuilder
                         var callingFunction = Program.Functions[instruction.Index];
                         text += $"{callingFunction.Source.Name} {PrintInstructionValue(instruction.Value1)} => v{instruction.ValueIndex}";
                         break;
+                    case InstructionType.CallFunctionPointer:
+                        text += $"{PrintInstructionValue(instruction.Value1)} {PrintInstructionValue(instruction.Value2)} => v{instruction.ValueIndex}";
+                        break;
+                    case InstructionType.SystemCall:
+                        text += $"{instruction.Index} {PrintInstructionValue(instruction.Value2)} => v{instruction.ValueIndex}";
+                        break;
                     case InstructionType.Load:
                     case InstructionType.LoadPointer:
                         text += $"{PrintInstructionValue(instruction.Value1)} {instruction.Value1.Type.Name} => v{instruction.ValueIndex}";
@@ -1611,7 +1617,7 @@ public static class ProgramIRBuilder
                     var rhs = EmitIR(function, expression.Children[i], scope);
                     if (expression.OperatorOverloads.TryGetValue(i, out var overload))
                     {
-                        expressionValue = EmitCall(function, overload, new []{expressionValue, rhs}, overload.ReturnType);
+                        expressionValue = EmitCall(function, overload, new []{expressionValue, rhs});
                     }
                     else
                     {
@@ -1944,10 +1950,11 @@ public static class ProgramIRBuilder
         }
         else
         {
+            var externCall = call.Function.Flags.HasFlag(FunctionFlags.Extern);
             for (var i = 0; i < argumentCount; i++)
             {
                 var functionArg = call.Function.Arguments[i];
-                var argument = EmitIR(function, call.Arguments[i], scope, call.Function.Flags.HasFlag(FunctionFlags.Extern));
+                var argument = EmitIR(function, call.Arguments[i], scope, externCall);
                 if (functionArg.Type.TypeKind == TypeKind.Any)
                 {
                     arguments[i] = GetAnyValue(function, argument);
@@ -1957,9 +1964,14 @@ public static class ProgramIRBuilder
                     arguments[i] = EmitCastValue(function, argument, functionArg.Type);
                 }
             }
+
+            if (call.Function.Flags.HasFlag(FunctionFlags.Syscall))
+            {
+                return EmitSyscall(function, call.Function, arguments);
+            }
         }
 
-        return EmitCall(function, call.Function, arguments, call.Function.ReturnType, call.ExternIndex);
+        return EmitCall(function, call.Function, arguments, call.ExternIndex);
     }
 
     private static InstructionValue GetAnyValue(FunctionIR function, InstructionValue argument)
@@ -2065,7 +2077,7 @@ public static class ProgramIRBuilder
         if (index.CallsOverload)
         {
             var value = EmitLoad(function, type, variable);
-            return EmitCall(function, index.Overload, new []{value, indexValue}, index.Overload.ReturnType);
+            return EmitCall(function, index.Overload, new []{value, indexValue});
         }
 
         IType elementType;
@@ -2454,14 +2466,24 @@ public static class ProgramIRBuilder
         return AddInstruction(function, instruction, type);
     }
 
-    private static InstructionValue EmitCall(FunctionIR function, IFunction callingFunction, InstructionValue[] arguments, IType returnType, int callIndex = 0)
+    private static InstructionValue EmitCall(FunctionIR function, IFunction callingFunction, InstructionValue[] arguments, int callIndex = 0)
     {
         var callInstruction = new Instruction
         {
             Type = InstructionType.Call, Index = callingFunction.FunctionIndex, Offset = callIndex,
             Value1 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Values = arguments}
         };
-        return AddInstruction(function, callInstruction, returnType);
+        return AddInstruction(function, callInstruction, callingFunction.ReturnType);
+    }
+
+    private static InstructionValue EmitSyscall(FunctionIR function, FunctionAst callingFunction, InstructionValue[] arguments)
+    {
+        var callInstruction = new Instruction
+        {
+            Type = InstructionType.SystemCall, Index = callingFunction.Syscall,
+            Value1 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Values = arguments}
+        };
+        return AddInstruction(function, callInstruction, callingFunction.ReturnType);
     }
 
     private static void EmitStore(FunctionIR function, InstructionValue pointer, InstructionValue value)

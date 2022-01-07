@@ -4078,7 +4078,6 @@ public static class TypeChecker
                 }
 
                 AddFunction(name, fileIndex, polymorphedFunction);
-                // TypeTable.CreateTypeInfo(polymorphedFunction);
                 VerifyFunction(polymorphedFunction);
 
                 return true;
