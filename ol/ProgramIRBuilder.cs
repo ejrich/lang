@@ -2480,7 +2480,7 @@ public static class ProgramIRBuilder
     {
         var callInstruction = new Instruction
         {
-            Type = InstructionType.SystemCall, Index = callingFunction.Syscall,
+            Type = InstructionType.SystemCall, Source = callingFunction, Index = callingFunction.Syscall,
             Value1 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Values = arguments}
         };
         return AddInstruction(function, callInstruction, callingFunction.ReturnType);

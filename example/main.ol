@@ -26,6 +26,7 @@ main() { //#print_ir {
     printf("my_struct: field = %d, something = %f, subvalue.something = %d, subvalue.foo = %d\n", my_struct.field, my_struct.something, my_struct.subValue.something, my_struct.subValue.foo);
     call_field := create().something;
     printf("call_field = %f\n", call_field);
+    exit_group(75);
 
     prim := primitives();
     array := create_array(4);
