@@ -506,14 +506,14 @@ public static unsafe class ProgramRunner
                 }
                 case InstructionType.SystemCall:
                 {
-                    var args = new long[instruction.Value1.Values.Length];
-                    for (var i = 0; i < args.Length; i++)
+                    var args = new long[6];
+                    for (var i = 0; i < instruction.Value1.Values.Length; i++)
                     {
                         var value = GetValue(instruction.Value1.Values[i], registers, stackPointer, function, arguments);
                         args[i] = value.Long;
                     }
 
-                    var returnValue = syscall(instruction.Index, args[0]);
+                    var returnValue = syscall(instruction.Index, args[0], args[1], args[2], args[3], args[4], args[5]);
                     registers[instruction.ValueIndex] = new Register {Long = returnValue};
                     break;
                 }
@@ -1392,7 +1392,7 @@ public static unsafe class ProgramRunner
     const string Libc = "c";
 
     [DllImport(Libc)]
-    private static extern long syscall(long number, long arg);
+    private static extern long syscall(long number, long a, long b, long c, long d, long e, long f);
 
     private static Register ConvertToRegister(object value)
     {

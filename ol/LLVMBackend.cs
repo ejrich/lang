@@ -18,6 +18,7 @@ public static unsafe class LLVMBackend
     private static LLVMCodeGenOptLevel _codeGenLevel;
 
     private static LLVMTypeRef[] _types;
+    private static LLVMTypeRef[] _functionTypes;
     private static LLVMValueRef[] _typeInfos;
     private static LLVMValueRef[] _globals;
     private static LLVMValueRef[] _functions;
@@ -181,6 +182,7 @@ public static unsafe class LLVMBackend
         }
 
         // 5. Write the program beginning at the entrypoint
+        _functionTypes = new LLVMTypeRef[TypeTable.FunctionCount];
         _functions = new LLVMValueRef[TypeTable.FunctionCount];
         _functionsToWrite = new();
         WriteFunctionDefinition("__start", Program.EntryPoint);
@@ -1204,16 +1206,16 @@ public static unsafe class LLVMBackend
 
     private static LLVMValueRef WriteFunctionDefinition(string name, FunctionIR function)
     {
-        var varargs = function.Source.Flags.HasFlag(FunctionFlags.Varargs);
-        var sourceArguments = function.Source.Arguments;
-        var argumentCount = varargs ? sourceArguments.Count - 1 : sourceArguments.Count;
-
-        var argumentTypes = new LLVMTypeRef[argumentCount];
         LLVMValueRef functionPointer;
 
         if (_emitDebug && function.Instructions != null)
         {
+            var varargs = function.Source.Flags.HasFlag(FunctionFlags.Varargs);
+            var sourceArguments = function.Source.Arguments;
+            var argumentCount = varargs ? sourceArguments.Count - 1 : sourceArguments.Count;
+
             // Get the argument types and create debug symbols
+            var argumentTypes = new LLVMTypeRef[argumentCount];
             var debugArgumentTypes = new LLVMMetadataRef[argumentCount + 1];
             debugArgumentTypes[0] = _debugTypes[function.Source.ReturnType.TypeIndex];
 
@@ -1234,11 +1236,8 @@ public static unsafe class LLVMBackend
         }
         else
         {
-            for (var i = 0; i < argumentCount; i++)
-            {
-                argumentTypes[i] = _types[sourceArguments[i].Type.TypeIndex];
-            }
-            functionPointer = _module.AddFunction(name, LLVMTypeRef.CreateFunction(_types[function.Source.ReturnType.TypeIndex], argumentTypes, varargs));
+            var functionType = GetFunctionType(function.Source);
+            functionPointer = _module.AddFunction(name, functionType);
         }
 
         if (function.Instructions == null)
@@ -1260,6 +1259,26 @@ public static unsafe class LLVMBackend
 
         _functions[function.Source.FunctionIndex] = functionPointer;
         return functionPointer;
+    }
+
+    private static LLVMTypeRef GetFunctionType(IFunction function)
+    {
+        var type = _functionTypes[function.FunctionIndex];
+        if (type.Handle != IntPtr.Zero)
+        {
+            return type;
+        }
+
+        var varargs = function.Flags.HasFlag(FunctionFlags.Varargs);
+        var sourceArguments = function.Arguments;
+        var argumentCount = varargs ? sourceArguments.Count - 1 : sourceArguments.Count;
+
+        var argumentTypes = new LLVMTypeRef[argumentCount];
+        for (var i = 0; i < argumentCount; i++)
+        {
+            argumentTypes[i] = _types[sourceArguments[i].Type.TypeIndex];
+        }
+        return _functionTypes[function.FunctionIndex] = LLVMTypeRef.CreateFunction(_types[function.ReturnType.TypeIndex], argumentTypes, varargs);
     }
 
     private static LLVMValueRef GetOrCreateFunctionDefinition(int functionIndex)
@@ -1430,6 +1449,31 @@ public static unsafe class LLVMBackend
                             arguments[i] = GetValue(instruction.Value2.Values[i], values, allocations, functionPointer);
                         }
                         values[instruction.ValueIndex] = _builder.BuildCall(callFunction, arguments);
+                        break;
+                    }
+                    case InstructionType.SystemCall:
+                    {
+                        var arguments = new LLVMValueRef[instruction.Value1.Values.Length];
+                        for (var i = 0; i < instruction.Value1.Values.Length; i++)
+                        {
+                            arguments[i] = GetValue(instruction.Value1.Values[i], values, allocations, functionPointer);
+                        }
+
+                        var syscallFunction = (FunctionAst)instruction.Source;
+                        var functionType = GetFunctionType(syscallFunction);
+                        // TODO Get the correct asm string
+                        // var assemblyString = GetSyscallAssemblyString(arguments.Length);
+                        var assemblyString = $"mov rax, {instruction.Index}; mov rdi, ${{0:V}}; syscall;";
+
+                        using var assemblyStr = new MarshaledString(assemblyString);
+                        using var constraintStr = new MarshaledString("r,~{rax},~{rdi}");
+
+                        var assembly = LLVM.GetInlineAsm(functionType, assemblyStr.Value, (UIntPtr)assemblyStr.Length, constraintStr.Value, (UIntPtr)constraintStr.Length, 0, 0, LLVMInlineAsmDialect.LLVMInlineAsmDialectIntel);
+                        fixed (LLVMValueRef* pArgs = arguments.AsSpan())
+                        {
+                            using var name = new MarshaledString(string.Empty);
+                            values[instruction.ValueIndex] = LLVM.BuildCall2(_builder, functionType, assembly, (LLVMOpaqueValue**)pArgs, (uint)arguments.Length, name);
+                        }
                         break;
                     }
                     case InstructionType.IntegerExtend:
@@ -2085,6 +2129,18 @@ public static unsafe class LLVMBackend
         var target = LLVMTargetRef.Targets.FirstOrDefault(t => t.Name == "x86-64");
         var defaultTriple = LLVMTargetRef.DefaultTriple;
         _module.Target = defaultTriple;
+
+        if (outputIntermediate)
+        {
+            using var test = new MarshaledString("test");
+            using var intelString = new MarshaledString("--x86-asm-syntax=intel");
+            var args = new sbyte*[] {test.Value, intelString.Value};
+
+            fixed (sbyte** pointer = &args[0])
+            {
+                LLVM.ParseCommandLineOptions(2, pointer, null);
+            }
+        }
 
         var targetMachine = target.CreateTargetMachine(defaultTriple, "generic", string.Empty, _codeGenLevel, LLVMRelocMode.LLVMRelocDefault, LLVMCodeModel.LLVMCodeModelDefault);
 
