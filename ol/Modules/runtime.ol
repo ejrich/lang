@@ -215,7 +215,7 @@ struct Any {
 
 // Basic functions
 printf(string format, ... args) #extern "c"
-exit(int exit_code) #extern "c"
+// exit(int exit_code) #extern "c"
 void* malloc(int size) #extern "c"
 void* realloc(void* pointer, int size) #extern "c"
 free(void* data) #extern "c"

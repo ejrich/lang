@@ -16,6 +16,7 @@ int brk(void* addr) #syscall 12
 // TODO Add rest of the syscalls
 void* mremap(void* old_address, u64 old_size, u64 new_size, MremapFlags flags) #syscall 25
 exit(int status) #syscall 60
+exit_group(int status) #syscall 231
 
 enum Mode_T {
     S_IXOTH = 0x1;
