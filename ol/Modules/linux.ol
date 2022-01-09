@@ -17,10 +17,22 @@ void* mmap(void* addr, u64 length, Prot prot, MmapFlags flags, int fd, u64 offse
 int mprotect(void* addr, u64 length, Prot prot) #syscall 10
 int munmap(void* addr, u64 length) #syscall 11
 int brk(void* addr) #syscall 12
-// TODO Add rest of the syscalls
+int rt_sigaction(int sig, Sigaction* act, Sigaction* oact, u64 sigsetsize) #syscall 13
+int rt_sigprocmask(Sighow how, Sigset_T* set, Sigset_T* oset, u64 sigsetsize) #syscall 14
+int rt_sigreturn() #syscall 15
+int ioctl(u64 fd, u32 cmd, u64 arg) #syscall 16
+int pread64(u64 fd, u8* buf, u64 count, u64 pos) #syscall 17
+int pwrite64(u64 fd, u8* buf, u64 count, u64 pos) #syscall 18
+int readv(u64 fd, Iovec* vec, u64 vlen) #syscall 19
+int writev(u64 fd, Iovec* vec, u64 vlen) #syscall 20
+int access(u8* filename, int mode) #syscall 21
+int pipe(int* fildes) #syscall 22
+int select(int nfds, Fd_Set* inp, Fd_Set outp, Fd_Set* exp, Timeval* tvp) #syscall 23
+sched_yield() #syscall 24
 void* mremap(void* old_address, u64 old_size, u64 new_size, MremapFlags flags) #syscall 25
 exit(int status) #syscall 60
 exit_group(int status) #syscall 231
+// TODO Add additional syscalls when necessary
 
 enum Mode_T {
     S_IXOTH = 0x1;
@@ -38,11 +50,11 @@ enum Mode_T {
 }
 
 struct Stat {
-    // TODO Add fields
+    // @Incomplete Add fields before using
 }
 
 struct PollFd {
-    // TODO Add fields
+    // @Incomplete Add fields before using
 }
 
 enum Whence {
@@ -76,6 +88,33 @@ enum MmapFlags {
     MAP_HUGETLB         = 0x40000;
     MAP_SYNC            = 0x80000;
     MAP_FIXED_NOREPLACE = 0x100000;
+}
+
+struct Sigaction {
+    // @Incomplete Add fields before using
+}
+
+struct Sigset_T {
+    // @Incomplete Add fields before using
+}
+
+enum Sighow {
+    SIG_BLOCK;
+    SIG_UNBLOCK;
+    SIG_SETMASK;
+}
+
+struct Iovec {
+    // @Incomplete Add fields before using
+}
+
+struct Fd_Set {
+    // @Incomplete Add fields before using
+}
+
+struct Timeval {
+    tv_sec: u64;
+    tv_usec: u64;
 }
 
 enum MremapFlags {
