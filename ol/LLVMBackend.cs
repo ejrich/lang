@@ -1413,7 +1413,7 @@ public static unsafe class LLVMBackend
                     {
                         var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
                         var index = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        values[instruction.ValueIndex] = _builder.BuildGEP(pointer, instruction.GetFirstPointer ? new []{_zeroInt, index} : new []{index});
+                        values[instruction.ValueIndex] = _builder.BuildGEP(pointer, instruction.Flag ? new []{_zeroInt, index} : new []{index});
                         break;
                     }
                     case InstructionType.GetStructPointer:
@@ -1454,25 +1454,23 @@ public static unsafe class LLVMBackend
                     case InstructionType.SystemCall:
                     {
                         var arguments = new LLVMValueRef[instruction.Value1.Values.Length];
-                        for (var i = 0; i < instruction.Value1.Values.Length; i++)
+                        for (var i = 0; i < arguments.Length; i++)
                         {
                             arguments[i] = GetValue(instruction.Value1.Values[i], values, allocations, functionPointer);
                         }
 
                         var syscallFunction = (FunctionAst)instruction.Source;
                         var functionType = GetFunctionType(syscallFunction);
-                        // TODO Get the correct asm string
-                        // var assemblyString = GetSyscallAssemblyString(arguments.Length);
-                        var assemblyString = $"mov rax, {instruction.Index}; mov rdi, ${{0:V}}; syscall;";
 
-                        using var assemblyStr = new MarshaledString(assemblyString);
-                        using var constraintStr = new MarshaledString("r,~{rax},~{rdi}");
+                        var (assembly, constraint) = GetSyscallAssemblyString(instruction.Index, arguments.Length, instruction.Flag);
+                        using var assemblyString = new MarshaledString(assembly);
+                        using var constraintString = new MarshaledString(constraint);
 
-                        var assembly = LLVM.GetInlineAsm(functionType, assemblyStr.Value, (UIntPtr)assemblyStr.Length, constraintStr.Value, (UIntPtr)constraintStr.Length, 0, 0, LLVMInlineAsmDialect.LLVMInlineAsmDialectIntel);
-                        fixed (LLVMValueRef* pArgs = arguments.AsSpan())
+                        var asm = LLVM.GetInlineAsm(functionType, assemblyString.Value, (UIntPtr)assemblyString.Length, constraintString.Value, (UIntPtr)constraintString.Length, 1, 0, LLVMInlineAsmDialect.LLVMInlineAsmDialectIntel);
+                        fixed (LLVMValueRef* pArgs = &arguments[0])
                         {
                             using var name = new MarshaledString(string.Empty);
-                            values[instruction.ValueIndex] = LLVM.BuildCall2(_builder, functionType, assembly, (LLVMOpaqueValue**)pArgs, (uint)arguments.Length, name);
+                            values[instruction.ValueIndex] = LLVM.BuildCall2(_builder, functionType, asm, (LLVMOpaqueValue**)pArgs, (uint)arguments.Length, name);
                         }
                         break;
                     }
@@ -2091,10 +2089,6 @@ public static unsafe class LLVMBackend
         return LLVMValueRef.CreateConstNamedStruct(_stringType, new [] {length, stringPointer});
     }
 
-    private static void BuildStackSave()
-    {
-    }
-
     private static void BuildStackRestore(LLVMValueRef stackPointer)
     {
         const string stackRestoreIntrinsic = "llvm.stackrestore";
@@ -2107,6 +2101,27 @@ public static unsafe class LLVMBackend
 
         var stackPointerValue = _builder.BuildLoad(stackPointer);
         _builder.BuildCall(stackRestore, new []{stackPointerValue});
+    }
+
+    private static (string, string) GetSyscallAssemblyString(int syscall, int arguments, bool returnsVoid)
+    {
+        switch (arguments)
+        {
+            case 1:
+                return ($"mov rax, {syscall}; syscall;", returnsVoid ? "{di}" : "=A,{di}");
+            case 2:
+                return ($"mov rax, {syscall}; syscall;", returnsVoid ? "{di},{si}" : "=A,{di},{si}");
+            case 3:
+                return ($"mov rax, {syscall}; syscall;", returnsVoid ? "{di},{si},{dx}" : "=A,{di},{si},{dx}");
+            case 4:
+                return ($"mov rax, {syscall}; syscall;", returnsVoid ? "{di},{si},{dx},{cx}" : "=A,{di},{si},{dx},{cx}");
+            case 5:
+                return ($"mov rax, {syscall}; mov r8, ${{5:V}}; syscall;", returnsVoid ? "{di},{si},{dx},{cx},r,~{r8}" : "=A,{di},{si},{dx},{cx},r,~{r8}");
+            case 6:
+                return ($"mov rax, {syscall}; mov r8, ${{5:V}}; mov r9, ${{6:V}}; syscall;", returnsVoid ? "{di},{si},{dx},{cx},r,r,~{r8},~{r9}" : "=A,{di},{si},{dx},{cx},r,r,~{r8},~{r9}");
+            default:
+                return ($"mov rax, {syscall}; syscall;", string.Empty);
+        }
     }
 
     private static void Compile(string objectFile, bool outputIntermediate)

@@ -2444,8 +2444,8 @@ public static class ProgramIRBuilder
     {
         var instruction = new Instruction
         {
-            Type = InstructionType.GetPointer, Offset = (int)type.Size, Value1 = pointer,
-            Value2 = index, GetFirstPointer = getFirstPointer
+            Type = InstructionType.GetPointer, Index2 = (int)type.Size, Value1 = pointer,
+            Value2 = index, Flag = getFirstPointer
         };
         return AddInstruction(function, instruction, type);
     }
@@ -2462,7 +2462,7 @@ public static class ProgramIRBuilder
 
     private static InstructionValue EmitGetStructPointer(FunctionIR function, InstructionValue value, int fieldIndex, uint offset, IType type)
     {
-        var instruction = new Instruction {Type = InstructionType.GetStructPointer, Index = fieldIndex, Offset = (int)offset, Value1 = value};
+        var instruction = new Instruction {Type = InstructionType.GetStructPointer, Index = fieldIndex, Index2 = (int)offset, Value1 = value};
         return AddInstruction(function, instruction, type);
     }
 
@@ -2470,7 +2470,7 @@ public static class ProgramIRBuilder
     {
         var callInstruction = new Instruction
         {
-            Type = InstructionType.Call, Index = callingFunction.FunctionIndex, Offset = callIndex,
+            Type = InstructionType.Call, Index = callingFunction.FunctionIndex, Index2 = callIndex,
             Value1 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Values = arguments}
         };
         return AddInstruction(function, callInstruction, callingFunction.ReturnType);
@@ -2481,6 +2481,7 @@ public static class ProgramIRBuilder
         var callInstruction = new Instruction
         {
             Type = InstructionType.SystemCall, Source = callingFunction, Index = callingFunction.Syscall,
+            Flag = callingFunction.ReturnType == TypeTable.VoidType,
             Value1 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Values = arguments}
         };
         return AddInstruction(function, callInstruction, callingFunction.ReturnType);
