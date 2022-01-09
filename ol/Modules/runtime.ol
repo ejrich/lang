@@ -228,7 +228,6 @@ printf(string format, ... args) #extern "c"
 void* malloc(int size) #extern "c"
 void* realloc(void* pointer, int size) #extern "c"
 free(void* data) #extern "c"
-void* memcpy(void* dest, void* src, int length) #extern "c"
 
 
 // Runtime functions

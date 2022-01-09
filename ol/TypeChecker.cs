@@ -1163,10 +1163,14 @@ public static class TypeChecker
                 function.Flags |= FunctionFlags.Verified;
                 ProgramIRBuilder.AddFunctionDefinition(function);
             }
-            else if (function.Flags.HasFlag(FunctionFlags.Compiler) || function.Flags.HasFlag(FunctionFlags.Syscall))
+            else if (function.Flags.HasFlag(FunctionFlags.Compiler))
             {
                 function.Flags |= FunctionFlags.Verified;
                 ProgramIRBuilder.AddFunctionDefinition(function);
+            }
+            else if (function.Flags.HasFlag(FunctionFlags.Syscall))
+            {
+                function.Flags |= FunctionFlags.Verified;
             }
             else
             {
