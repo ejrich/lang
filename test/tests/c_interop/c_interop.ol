@@ -1,3 +1,5 @@
+#import standard
+
 main() {
     // This test will test c interoperability
     // and other functionality such as CArray types

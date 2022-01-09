@@ -1,3 +1,7 @@
+// This module contains functions and types only available when compiling and running programs in Linux
+
+#assert os == OS.Linux;
+
 // Linux system calls
 
 s64 read(u64 fd, u8* buf, u64 count) #syscall 0

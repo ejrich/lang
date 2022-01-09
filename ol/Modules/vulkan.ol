@@ -1,5 +1,3 @@
-#import compiler
-
 #if os == OS.Linux {
     #import X11
 

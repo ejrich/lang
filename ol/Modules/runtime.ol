@@ -1,4 +1,7 @@
 // ----------------- Runtime library with types and main function -----------------
+// --------------------------------------------------------------------------------
+// -- This module is included automatically with the build,
+// -- so it does not need to be imported.
 
 // Runtime structs
 struct Array<T> {
@@ -107,6 +110,14 @@ interface void* Allocate(int size)
 interface void* Reallocate(void* data, int size)
 interface void* Free(void* data)
 
+enum OS : u8 {
+    None;
+    Linux;
+    Windows; // Not supported
+    Mac;     // Not supported
+}
+
+os: OS; #const
 
 // Runtime type information data
 struct TypeInfo {
@@ -215,7 +226,6 @@ struct Any {
 
 // Basic functions
 printf(string format, ... args) #extern "c"
-// exit(int exit_code) #extern "c"
 void* malloc(int size) #extern "c"
 void* realloc(void* pointer, int size) #extern "c"
 free(void* data) #extern "c"
@@ -236,18 +246,3 @@ int __start(int argc, u8** argv) {
 
 command_line_arguments: Array<string>;
 exit_code := 0;
-
-assert(bool assertion, int exit_code = 1) {
-    if assertion return;
-
-    printf("Assertion failed\n");
-    exit(exit_code);
-}
-
-assert(bool assertion, string message, int exit_code = 1) {
-    if assertion return;
-
-    if message.length == 0 printf("Assertion failed\n");
-    else printf("Assertion failed: %s\n", message);
-    exit(exit_code);
-}
