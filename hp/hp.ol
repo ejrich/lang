@@ -155,9 +155,6 @@ void* allocate(int size) {
 
 void* allocate_arena(int cursor, int size = arena_size) {
     arena: Arena = {pointer = malloc(size); cursor = cursor; size = size;}
-    memset(arena.pointer, 0, size);
     array_insert(&arenas, arena);
     return arena.pointer;
 }
-
-memset(void* ptr, int value, int num) #extern "c"

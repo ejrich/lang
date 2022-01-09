@@ -217,6 +217,8 @@ public static unsafe class LLVMBackend
             LLVM.AddReassociatePass(_passManager);
             LLVM.AddGVNPass(_passManager);
             LLVM.AddCFGSimplificationPass(_passManager);
+            LLVM.AddLoopVectorizePass(_passManager);
+            LLVM.AddSLPVectorizePass(_passManager);
 
             LLVM.InitializeFunctionPassManager(_passManager);
             _codeGenLevel = LLVMCodeGenOptLevel.LLVMCodeGenLevelAggressive;
