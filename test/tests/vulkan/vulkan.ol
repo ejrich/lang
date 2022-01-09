@@ -1,5 +1,7 @@
+#import compiler
 #import vulkan
 #import file
+#import linux
 
 // This test follows vulkan-tutorial.com
 

@@ -1,12 +1,5 @@
 //------------------- Compiler module --------------------
 
-enum OS : u8 {
-    None;
-    Linux;
-    Windows; // Not supported
-    Mac;     // Not supported
-}
-
 enum BuildEnv : u8 {
     None;
     Debug;
@@ -14,7 +7,6 @@ enum BuildEnv : u8 {
     Other;
 }
 
-os: OS; #const
 build_env: BuildEnv; #const
 
 enum LinkerType : u8 {

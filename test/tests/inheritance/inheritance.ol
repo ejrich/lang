@@ -1,3 +1,5 @@
+#import standard
+
 main() {
     basic_inheritance();
 
