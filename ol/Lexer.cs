@@ -140,7 +140,6 @@ public static class Lexer
                         Column = column
                     };
 
-                    // TODO Maybe use substring to reduce allocations?
                     while (true)
                     {
                         character = fileText[++i];

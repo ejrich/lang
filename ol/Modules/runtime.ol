@@ -15,7 +15,6 @@ array_insert<T>(Array<T>* array, T value, Allocate allocator = null, Reallocate 
     // Reallocate the array if necessary
     length := array.length;
     if length % ARRAY_BLOCK_SIZE == 0 {
-        // @Future add custom allocators
         new_blocks := length / ARRAY_BLOCK_SIZE + 1;
         element_size := size_of(T);
 
