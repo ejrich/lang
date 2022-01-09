@@ -474,21 +474,21 @@ public static unsafe class ProgramRunner
                 {
                     var pointer = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
                     var index = GetValue(instruction.Value2, registers, stackPointer, function, arguments);
-                    var indexedPointer = pointer.Pointer + instruction.Offset * index.Integer;
+                    var indexedPointer = pointer.Pointer + instruction.Index2 * index.Integer;
                     registers[instruction.ValueIndex] = new Register {Pointer = indexedPointer};
                     break;
                 }
                 case InstructionType.GetStructPointer:
                 {
                     var pointer = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
-                    var structPointer = pointer.Pointer + instruction.Offset;
+                    var structPointer = pointer.Pointer + instruction.Index2;
                     registers[instruction.ValueIndex] = new Register {Pointer = structPointer};
                     break;
                 }
                 case InstructionType.Call:
                 {
                     var callingFunction = Program.Functions[instruction.Index];
-                    registers[instruction.ValueIndex] = MakeCall(callingFunction, instruction.Value1.Values, registers, stackPointer, function, arguments, instruction.Offset);
+                    registers[instruction.ValueIndex] = MakeCall(callingFunction, instruction.Value1.Values, registers, stackPointer, function, arguments, instruction.Index2);
                     break;
                 }
                 case InstructionType.CallFunctionPointer:

@@ -64,8 +64,8 @@ public class Instruction
 
     // Used for Call, GetPointer, GetStructPointer, and debug locations
     public int Index { get; set; }
-    public int Offset { get; set; }
-    public bool GetFirstPointer { get; set; }
+    public int Index2 { get; set; }
+    public bool Flag { get; set; }
     public string String { get; set; }
 
     public InstructionValue Value1 { get; set; }
