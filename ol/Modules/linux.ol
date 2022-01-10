@@ -33,6 +33,7 @@ void* mremap(void* old_address, u64 old_size, u64 new_size, MremapFlags flags) #
 int pause() #syscall 34
 int nanosleep(Timespec* req, Timespec* rem) #syscall 35
 exit(int status) #syscall 60
+int clock_gettime(ClockId clk_id, Timespec* tp) #syscall 228
 exit_group(int status) #syscall 231
 // TODO Add additional syscalls when necessary
 
@@ -128,4 +129,17 @@ enum MremapFlags {
 struct Timespec {
     tv_sec: u64;
     tv_nsec: u64;
+}
+
+enum ClockId {
+    CLOCK_REALTIME;
+    CLOCK_MONOTONIC;
+    CLOCK_PROCESS_CPUTIME_ID;
+    CLOCK_THREAD_CPUTIME_ID;
+    CLOCK_MONOTONIC_RAW;
+    CLOCK_REALTIME_COARSE;
+    CLOCK_MONOTONIC_COARSE;
+    CLOCK_BOOTTIME;
+    CLOCK_REALTIME_ALARM;
+    CLOCK_BOOTTIME_ALARM;
 }

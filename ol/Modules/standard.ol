@@ -130,6 +130,19 @@ yield() {
     }
 }
 
+u64 get_performance_counter() {
+    counter: u64;
+
+    #if os == OS.Linux {
+        now: Timespec;
+
+        clock_gettime(ClockId.CLOCK_MONOTONIC_RAW, &now);
+        counter += now.tv_sec * 1000000000 + now.tv_nsec;
+    }
+
+    return counter;
+}
+
 
 // Functions for printing and formatting strings
 print(string format, Params args) {
