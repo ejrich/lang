@@ -1,5 +1,5 @@
 #import compiler
-#import linux
+#import standard
 #import "import.ol"
 #import "import2.ol"
 
@@ -66,7 +66,7 @@ main() { //#print_ir {
     x := 0xfeABD4;
     // sdl := SDL_Init(sdl_video);
     // SDL_CreateWindow("Hello world", 805240832, 805240832, 400, 300, 0);
-    // sleep(5);
+    // sleep(5000);
 
     z := 1;
     each i in create_array(5) {
@@ -329,7 +329,6 @@ open_window() {
 
 int SDL_Init(u32 flags) #extern "SDL2"
 SDL_CreateWindow(string title, int x, int y, int w, int h, u32 flags) #extern "SDL2"
-u32 sleep(u32 seconds) #extern "c"
 
 #run {
     array_insert(&command_line_arguments, "Hello world");

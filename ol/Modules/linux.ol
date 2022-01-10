@@ -30,6 +30,8 @@ int pipe(int* fildes) #syscall 22
 int select(int nfds, Fd_Set* inp, Fd_Set outp, Fd_Set* exp, Timeval* tvp) #syscall 23
 sched_yield() #syscall 24
 void* mremap(void* old_address, u64 old_size, u64 new_size, MremapFlags flags) #syscall 25
+int pause() #syscall 34
+int nanosleep(Timespec* req, Timespec* rem) #syscall 35
 exit(int status) #syscall 60
 exit_group(int status) #syscall 231
 // TODO Add additional syscalls when necessary
@@ -121,4 +123,9 @@ enum MremapFlags {
     MREMAP_MAYMOVE   = 1;
     MREMAP_FIXED     = 2;
     MREMAP_DONTUNMAP = 4;
+}
+
+struct Timespec {
+    tv_sec: u64;
+    tv_nsec: u64;
 }
