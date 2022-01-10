@@ -1,3 +1,5 @@
+#import standard
+
 main() {
     constant_size_arrays();
 
