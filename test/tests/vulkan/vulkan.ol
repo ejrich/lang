@@ -1,7 +1,6 @@
+#import standard
 #import compiler
 #import vulkan
-#import file
-#import standard
 
 // This test follows vulkan-tutorial.com
 

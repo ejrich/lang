@@ -3150,6 +3150,7 @@ public static class TypeChecker
                         }
                         VerifyFunctionIfNecessary(function, currentFunction);
                         identifierAst.FunctionTypeIndex = function.TypeIndex;
+                        isConstant = true;
                         return function;
                     }
                     ErrorReporter.Report($"Identifier '{identifierAst.Name}' not defined", identifierAst);

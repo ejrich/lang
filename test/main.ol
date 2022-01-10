@@ -1,10 +1,10 @@
+#import standard
 #import compiler
-#import file
 
 main() {
     tests_dir := "test/tests"; #const
     dir := opendir(tests_dir);
-    command_buffer = malloc(1000);
+    command_buffer = default_allocator(1000);
     failed_test_count := 0;
     if dir {
         file := readdir(dir);
@@ -19,11 +19,11 @@ main() {
 
             file = readdir(dir);
         }
-        free(test_dir.data);
+        default_free(test_dir.data);
 
         closedir(dir);
     }
-    free(command_buffer);
+    default_free(command_buffer);
 
     if failed_test_count {
         printf("\n%d Test(s) Failed\n", failed_test_count);
@@ -48,7 +48,7 @@ string format_string(string format, Params<string> args) {
     if format.length == 0 return "";
 
     // @Cleanup This is not good, figure out a better way to do this
-    str: string = {data = cast(u8*, malloc(100));}
+    str: string = {data = cast(u8*, default_allocator(100));}
     arg_index := 0;
     format_index := 0;
 
@@ -78,7 +78,7 @@ bool run_test(string test_dir, string test) {
     command := format_string("% %/%.ol", executable, test_dir, test);
     printf("Compiling: %s", command);
     compiler_exit_code := run_command(command);
-    free(command.data);
+    default_free(command.data);
 
     if compiler_exit_code {
         printf(" -- Test Failed\n");
@@ -89,7 +89,7 @@ bool run_test(string test_dir, string test) {
     dir := opendir(bin_dir.data);
     if dir == null {
         printf(" -- Test Failed: Unable to open directory '%s'\n", bin_dir.data);
-        free(bin_dir.data);
+        default_free(bin_dir.data);
         return false;
     }
 
@@ -109,13 +109,13 @@ bool run_test(string test_dir, string test) {
 
     if !found_executable {
         printf(" -- Test Failed: Executable not found in directory '%s'\n", bin_dir.data);
-        free(bin_dir.data);
+        default_free(bin_dir.data);
         return false;
     }
 
     printf("\nRunning: %s", command);
     run_exit_code := run_command(command);
-    free(command.data);
+    default_free(command.data);
 
     if run_exit_code {
         printf(" -- Test Failed\n");
