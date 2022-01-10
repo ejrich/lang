@@ -35,6 +35,7 @@ public interface IInterface : IAst
 
 public interface IFunction : IInterface
 {
+    int ConstantCount { get; set; }
     int FunctionIndex { get; set; }
     FunctionFlags Flags { get; set; }
     List<string> Generics { get; }
@@ -118,6 +119,7 @@ public class FunctionAst : IFunction, IType
     public string BackendName { get; set; }
     public int TypeIndex { get; set; }
     public TypeKind TypeKind { get; set; } = TypeKind.Function;
+    public int ConstantCount { get; set; }
     public int FunctionIndex { get; set; }
     public FunctionFlags Flags { get; set; }
     public uint Size { get; set; } // Will always be 0
@@ -186,9 +188,9 @@ public class StructFieldRefAst : IAst
     public bool IsEnum { get; set; }
     public bool IsConstant { get; set; }
     public bool GlobalConstant { get; set; }
-    public string ConstantName { get; set; }
     public bool ConstantStringLength { get; set; }
     public bool RawConstantString { get; set; }
+    public int ConstantIndex { get; set; }
     public int ConstantValue { get; set; }
     public bool[] Pointers { get; set; }
     public IType[] Types { get; set; }
@@ -409,6 +411,7 @@ public class DeclarationAst : IDeclaration
     public IType ArrayElementType { get; set; }
     public bool HasGenerics { get; set; }
     public bool Constant { get; set; }
+    public int ConstantIndex { get; set; }
     public InstructionValue Allocation { get; set; }
     public IAst Value { get; set; }
     public Dictionary<string, AssignmentAst> Assignments { get; set; }
@@ -550,6 +553,7 @@ public class OperatorOverloadAst : IFunction
     public uint Line { get; init; }
     public uint Column { get; init; }
     public string Name { get; set; }
+    public int ConstantCount { get; set; }
     public int FunctionIndex { get; set; }
     public FunctionFlags Flags { get; set; }
     public Operator Operator { get; set; }

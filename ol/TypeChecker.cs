@@ -2084,6 +2084,7 @@ public static class TypeChecker
         // 7. Verify constant values
         if (declaration.Constant)
         {
+            declaration.ConstantIndex = currentFunction.ConstantCount++;
             switch (declaration.Value)
             {
                 case ConstantAst constant:
@@ -2811,7 +2812,7 @@ public static class TypeChecker
                         if (declaration.Constant && refType?.TypeKind == TypeKind.String)
                         {
                             structField.GlobalConstant = global;
-                            structField.ConstantName = declaration.Name;
+                            structField.ConstantIndex = declaration.ConstantIndex;
                             return VerifyConstantStringField(structField);
                         }
                         break;
@@ -2879,7 +2880,7 @@ public static class TypeChecker
                     if (identifier.Name == "length")
                     {
                         structField.ConstantStringLength = true;
-                        return TypeTable.S32Type;
+                        return TypeTable.S64Type;
                     }
                     if (identifier.Name == "data")
                     {

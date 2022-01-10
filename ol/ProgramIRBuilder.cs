@@ -15,7 +15,7 @@ public static class ProgramIRBuilder
     {
         var functionIR = new FunctionIR
         {
-            Source = function, Allocations = new(), Instructions = new(), BasicBlocks = new()
+            Source = function, Allocations = new(), Instructions = new(), BasicBlocks = new(), Constants = new InstructionValue[function.ConstantCount]
         };
 
         if (function.Name == "__start")
@@ -80,7 +80,7 @@ public static class ProgramIRBuilder
     {
         var functionIR = new FunctionIR
         {
-            Source = overload, Allocations = new(), Instructions = new(), BasicBlocks = new()
+            Source = overload, Allocations = new(), Instructions = new(), BasicBlocks = new(), Constants = new InstructionValue[overload.ConstantCount]
         };
         var entryBlock = AddBasicBlock(functionIR);
 
@@ -300,7 +300,9 @@ public static class ProgramIRBuilder
     {
         if (declaration.Constant)
         {
-            Program.Constants[declaration.Name] = EmitConstantIR(declaration.Value, scope);
+            declaration.ConstantIndex = Program.Constants.Count;
+            var constant = EmitConstantIR(declaration.Value, scope);
+            Program.Constants.Add(constant);
         }
         else
         {
@@ -576,9 +578,7 @@ public static class ProgramIRBuilder
     {
         if (declaration.Constant)
         {
-            function.Constants ??= new();
-
-            function.Constants[declaration.Name] = EmitConstantIR(declaration.Value, scope, function);
+            function.Constants[declaration.ConstantIndex] = EmitConstantIR(declaration.Value, scope, function);
         }
         else
         {
@@ -1472,7 +1472,7 @@ public static class ProgramIRBuilder
                 {
                     if (declaration.Constant)
                     {
-                        var constantValue = global ? Program.Constants[declaration.Name] : function.Constants[declaration.Name];
+                        var constantValue = global ? Program.Constants[declaration.ConstantIndex] : function.Constants[declaration.ConstantIndex];
                         if (useRawString && constantValue.Type?.TypeKind == TypeKind.String)
                         {
                             return new InstructionValue
@@ -1522,13 +1522,13 @@ public static class ProgramIRBuilder
                 }
                 else if (structField.ConstantStringLength)
                 {
-                    var constantValue = structField.GlobalConstant ? Program.Constants[structField.ConstantName] : function.Constants[structField.ConstantName];
+                    var constantValue = structField.GlobalConstant ? Program.Constants[structField.ConstantIndex] : function.Constants[structField.ConstantIndex];
 
-                    return GetConstantInteger(constantValue.ConstantString.Length);
+                    return GetConstantS64(constantValue.ConstantString.Length);
                 }
                 else if (structField.RawConstantString)
                 {
-                    var constantValue = structField.GlobalConstant ? Program.Constants[structField.ConstantName] : function.Constants[structField.ConstantName];
+                    var constantValue = structField.GlobalConstant ? Program.Constants[structField.ConstantIndex] : function.Constants[structField.ConstantIndex];
 
                     return new InstructionValue
                     {
@@ -1658,7 +1658,7 @@ public static class ProgramIRBuilder
                 {
                     if (declaration.Constant)
                     {
-                        return global ? Program.Constants[declaration.Name] : function?.Constants[declaration.Name];
+                        return global ? Program.Constants[declaration.ConstantIndex] : function?.Constants[declaration.ConstantIndex];
                     }
 
                     return null;

@@ -9,7 +9,7 @@ public static class Program
 {
     public static FunctionIR EntryPoint { get; set; }
     public static ConcurrentDictionary<int, FunctionIR> Functions { get; } = new();
-    public static Dictionary<string, InstructionValue> Constants { get; } = new();
+    public static List<InstructionValue> Constants { get; } = new();
     public static uint GlobalVariablesSize { get; set; }
     public static List<GlobalVariable> GlobalVariables { get; } = new();
 }
@@ -24,7 +24,7 @@ public class FunctionIR
     public List<Allocation> Allocations { get; set; }
     public List<Instruction> Instructions { get; set; }
     public List<BasicBlock> BasicBlocks { get; set; }
-    public Dictionary<string, InstructionValue> Constants { get; set; }
+    public InstructionValue[] Constants { get; set; }
     public IntPtr FunctionPointer { get; set; }
 }
 
