@@ -1,4 +1,4 @@
-#import file
+#import standard
 #import "parser.ol"
 
 main() {
@@ -15,7 +15,7 @@ main() {
         parse(file_contents, command_line_arguments[1], command_line_arguments[2]);
 
         each arena in arenas
-            free(arena.pointer);
+            default_free(arena.pointer);
     }
     else {
         printf("Input file '%s' not found\n", command_line_arguments[0]);
@@ -154,7 +154,7 @@ void* allocate(int size) {
 }
 
 void* allocate_arena(int cursor, int size = arena_size) {
-    arena: Arena = {pointer = malloc(size); cursor = cursor; size = size;}
+    arena: Arena = {pointer = default_allocator(size); cursor = cursor; size = size;}
     array_insert(&arenas, arena);
     return arena.pointer;
 }
