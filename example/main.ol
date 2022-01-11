@@ -21,7 +21,7 @@ main() { //#print_ir {
     g := test_each();
     h := 3 > a;
     fac6 := factorial(6);
-    printf("%d! = %d\n", 6, fac6);
+    print("%! = %, d = %\n", 6, fac6, d);
     my_struct := create();
     printf("my_struct: field = %d, something = %f, subvalue.something = %d, subvalue.foo = %d\n", my_struct.field, my_struct.something, my_struct.subValue.something, my_struct.subValue.foo);
     call_field := create().something;
@@ -414,17 +414,17 @@ break_and_continue() {
 }
 
 any_args() {
-    print("Integer value = %d\n", 8);
-    print("Float value = %.2f\n", 3.14);
+    print_value("Integer value = %d\n", 8);
+    print_value("Float value = %.2f\n", 3.14);
 
     foo := 9;
-    print("Pointer value = %p\n", &foo);
+    print_value("Pointer value = %p\n", &foo);
 
     my_struct: MyStruct;
-    print("Other value\n", my_struct);
+    print_value("Other value\n", my_struct);
 }
 
-print(string format, Any arg) {
+print_value(string format, Any arg) {
     if arg.type.type == TypeKind.Integer {
         value := cast(int*, arg.data);
         printf(format, *value);

@@ -438,17 +438,17 @@ break_and_continue() {
 }
 
 any_args() {
-    print("Integer value = %d\n", 8);
-    print("Float value = %.2f\n", 3.14);
+    print_value("Integer value = %d\n", 8);
+    print_value("Float value = %.2f\n", 3.14);
 
     foo := 9;
-    print("Pointer value = %p\n", &foo);
+    print_value("Pointer value = %p\n", &foo);
 
     my_struct: MyStruct;
-    print("Other value\n", my_struct);
+    print_value("Other value\n", my_struct);
 }
 
-print(string format, Any arg) {
+print_value(string format, Any arg) {
     if arg.type.type == TypeKind.Integer {
         value := cast(int*, arg.data);
         printf(format, *value);

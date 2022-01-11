@@ -146,7 +146,85 @@ u64 get_performance_counter() {
 
 // Functions for printing and formatting strings
 print(string format, Params args) {
-    // TODO Implement me
+    if args.length == 0 {
+        write_buffer_to_standard_out(format.data, format.length);
+        return;
+    }
+
+    buffer: StringBuffer;
+    arg_index := 0;
+
+    each i in 0..format.length-1 {
+        char := format[i];
+        if char == '%' {
+            if arg_index < args.length {
+                arg := args[arg_index++];
+                type_kind := arg.type.type;
+
+                if type_kind == TypeKind.Void {
+                    add_to_string_buffer(&buffer, "void");
+                }
+                else if type_kind == TypeKind.Boolean {
+                    value := *cast(bool*, arg.data);
+                    if value add_to_string_buffer(&buffer, "true");
+                    else add_to_string_buffer(&buffer, "false");
+                }
+                // TODO Implement me
+                else if type_kind == TypeKind.Integer {
+                }
+                else if type_kind == TypeKind.Float {
+                }
+                else if type_kind == TypeKind.String {
+                }
+                else if type_kind == TypeKind.Pointer {
+                }
+                else if type_kind == TypeKind.Array {
+                }
+                else if type_kind == TypeKind.CArray {
+                }
+                else if type_kind == TypeKind.Enum {
+                }
+                else if type_kind == TypeKind.Struct {
+                }
+                else if type_kind == TypeKind.Union {
+                }
+                else if type_kind == TypeKind.Interface {
+                }
+                else if type_kind == TypeKind.Type {
+                }
+                else if type_kind == TypeKind.Any {
+                }
+                else if type_kind == TypeKind.Compound {
+                }
+                else if type_kind == TypeKind.Function {
+                }
+            }
+        }
+        else {
+            buffer.buffer[buffer.length++] = char;
+        }
+    }
+
+    write_buffer_to_standard_out(&buffer.buffer, buffer.length);
+}
+
+write_buffer_to_standard_out(u8* buffer, s64 length) {
+    #if os == OS.Linux {
+        write(stdout, buffer, length);
+    }
+}
+
+string_buffer_max_length := 1024; #const
+
+struct StringBuffer {
+    length: s64;
+    buffer: CArray<u8>[string_buffer_max_length];
+}
+
+add_to_string_buffer(StringBuffer* buffer, string value) {
+    each i in 0..value.length-1 {
+        buffer.buffer[buffer.length++] = value[i];
+    }
 }
 
 
