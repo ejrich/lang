@@ -331,6 +331,7 @@ int SDL_Init(u32 flags) #extern "SDL2"
 SDL_CreateWindow(string title, int x, int y, int w, int h, u32 flags) #extern "SDL2"
 
 #run {
+    print("%", "This failed");
     array_insert(&command_line_arguments, "Hello world");
     main();
 
