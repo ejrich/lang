@@ -63,7 +63,7 @@ array_reserve<T>(Array<T>* array, int length, Allocate allocator = default_alloc
 assert(bool assertion, int exit_code = 1) {
     if assertion return;
 
-    printf("Assertion failed\n");
+    print("Assertion failed\n");
 
     #if os == OS.Linux {
         exit_group(exit_code);
@@ -73,8 +73,8 @@ assert(bool assertion, int exit_code = 1) {
 assert(bool assertion, string message, int exit_code = 1) {
     if assertion return;
 
-    if message.length == 0 printf("Assertion failed\n");
-    else printf("Assertion failed: %s\n", message);
+    if message.length == 0 print("Assertion failed\n");
+    else print("Assertion failed: %\n", message);
 
     #if os == OS.Linux {
         exit_group(exit_code);
@@ -175,6 +175,8 @@ print(string format, Params args) {
                 else if type_kind == TypeKind.Float {
                 }
                 else if type_kind == TypeKind.String {
+                    value := *cast(string*, arg.data);
+                    add_to_string_buffer(&buffer, value);
                 }
                 else if type_kind == TypeKind.Pointer {
                 }
