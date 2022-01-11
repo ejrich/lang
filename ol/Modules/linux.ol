@@ -13,7 +13,7 @@ int fstat(u64 fd, Stat* buf) #syscall 5
 int lstat(u64 fd, Stat* buf) #syscall 6
 int poll(PollFd* ufds, u32 nfds, int timeout) #syscall 7
 int lseek(u64 fd, u64 offset, Whence whence) #syscall 8
-void* mmap(void* addr, u64 length, Prot prot, MmapFlags flags, int fd, u64 offset) #syscall 9
+void* mmap(void* addr, u64 length, Prot prot, MmapFlags flags, u64 fd, u64 offset) #syscall 9
 int mprotect(void* addr, u64 length, Prot prot) #syscall 10
 int munmap(void* addr, u64 length) #syscall 11
 int brk(void* addr) #syscall 12
@@ -36,6 +36,10 @@ exit(int status) #syscall 60
 int clock_gettime(ClockId clk_id, Timespec* tp) #syscall 228
 exit_group(int status) #syscall 231
 // TODO Add additional syscalls when necessary
+
+stdin:  u64 = 0; #const
+stdout: u64 = 1; #const
+stderr: u64 = 2; #const
 
 enum Mode_T {
     S_IXOTH = 0x1;
