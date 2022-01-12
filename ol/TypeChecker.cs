@@ -3306,8 +3306,7 @@ public static class TypeChecker
                             if (valueType.TypeKind == TypeKind.Pointer)
                             {
                                 var pointerType = (PrimitiveAst)valueType;
-                                unary.Type = pointerType.PointerType;
-                                return unary.Type;
+                                return unary.Type = pointerType.PointerType;
                             }
                             else if (valueType != null)
                             {

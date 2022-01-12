@@ -226,7 +226,7 @@ public static class ProgramIRBuilder
                         break;
                     case InstructionType.Load:
                     case InstructionType.LoadPointer:
-                        text += $"{PrintInstructionValue(instruction.Value1)} {instruction.Value1.Type.Name} => v{instruction.ValueIndex}";
+                        text += $"{PrintInstructionValue(instruction.Value1)} {instruction.LoadType.Name} => v{instruction.ValueIndex}";
                         break;
                     case InstructionType.IsNull:
                     case InstructionType.IsNotNull:
@@ -2430,13 +2430,13 @@ public static class ProgramIRBuilder
             return value;
         }
 
-        var loadInstruction = new Instruction {Type = InstructionType.Load, Value1 = value};
+        var loadInstruction = new Instruction {Type = InstructionType.Load, LoadType = type, Value1 = value};
         return AddInstruction(function, loadInstruction, type);
     }
 
     private static InstructionValue EmitLoadPointer(FunctionIR function, IType type, InstructionValue value)
     {
-        var loadInstruction = new Instruction {Type = InstructionType.LoadPointer, Value1 = value};
+        var loadInstruction = new Instruction {Type = InstructionType.LoadPointer, LoadType = type, Value1 = value};
         return AddInstruction(function, loadInstruction, type);
     }
 
