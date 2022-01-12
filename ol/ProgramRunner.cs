@@ -316,7 +316,7 @@ public static unsafe class ProgramRunner
     private static Register ExecuteFunction(FunctionIR function, Register[] arguments)
     {
         var instructionPointer = 0;
-        var stackPointer = Allocator.Allocate(function.StackSize);
+        var (stackPointer, cursor, block) = Allocator.StackAllocate((int)function.StackSize);
         var registers = new Register[function.ValueCount];
 
         while (true)
@@ -341,10 +341,13 @@ public static unsafe class ProgramRunner
                 }
                 case InstructionType.Return:
                 {
-                    return GetValue(instruction.Value1, registers, stackPointer, function, arguments);
+                    var value = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
+                    block.Cursor = cursor;
+                    return value;
                 }
                 case InstructionType.ReturnVoid:
                 {
+                    block.Cursor = cursor;
                     return new Register();
                 }
                 case InstructionType.Load:
