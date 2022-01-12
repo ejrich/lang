@@ -15,30 +15,63 @@ public class MemoryBlock
 
 public static class Allocator
 {
-    private const int BlockSize = 20000;
+    private const int BlockSize = 50000;
 
     private static readonly List<MemoryBlock> _memoryBlocks = new();
+    private static readonly List<MemoryBlock> _stackBlocks = new();
     private static readonly List<IntPtr> _openPointers = new();
 
     public static IntPtr Allocate(uint size)
     {
+        return Allocate((int)size);
+    }
+
+    public static IntPtr Allocate(int size)
+    {
+        Debug.Assert(size > 0, "Allocation size must be positive");
+
         // Allocate separate blocks if above the block size
         if (size > BlockSize)
         {
-            var pointer = Marshal.AllocHGlobal((int)size);
+            var pointer = Marshal.AllocHGlobal(size);
             _openPointers.Add(pointer);
             return pointer;
         }
 
-        // Search for a memory block with open space
-        for (var i = 0; i < _memoryBlocks.Count; i++)
+        var (blockPointer, _, _) = FindMemoryBlock(size, _memoryBlocks);
+
+        return blockPointer;
+    }
+
+    public static (IntPtr, int, MemoryBlock) StackAllocate(int size)
+    {
+        // Allocate separate blocks if above the block size
+        if (size > BlockSize)
         {
-            var block = _memoryBlocks[i];
+            var pointer = Marshal.AllocHGlobal(size);
+            _openPointers.Add(pointer);
+
+            var block = new MemoryBlock {Pointer = pointer, Cursor = size, Size = size};
+            _stackBlocks.Add(block);
+
+            return (pointer, 0, block);
+        }
+
+        return FindMemoryBlock(size, _stackBlocks);
+    }
+
+    private static (IntPtr, int, MemoryBlock) FindMemoryBlock(int size, List<MemoryBlock> blocks)
+    {
+        // Search for a memory block with open space
+        for (var i = 0; i < blocks.Count; i++)
+        {
+            var block = blocks[i];
             if (size <= block.Size - block.Cursor)
             {
                 var pointer = block.Pointer + block.Cursor;
-                block.Cursor += (int)size;
-                return pointer;
+                var cursor = block.Cursor;
+                block.Cursor += size;
+                return (pointer, cursor, block);
             }
         }
 
@@ -46,22 +79,17 @@ public static class Allocator
         var blockPointer = Marshal.AllocHGlobal(BlockSize);
         _openPointers.Add(blockPointer);
 
-        var memoryBlock = new MemoryBlock {Pointer = blockPointer, Cursor = (int)size, Size = BlockSize};
-        _memoryBlocks.Add(memoryBlock);
+        var memoryBlock = new MemoryBlock {Pointer = blockPointer, Cursor = size, Size = BlockSize};
+        blocks.Add(memoryBlock);
 
-        return blockPointer;
+        return (blockPointer, 0, memoryBlock);
     }
 
-    public static IntPtr Allocate(int size)
-    {
-        Debug.Assert(size > 0, "Allocation size must be positive");
-        return Allocate((uint)size);
-    }
 
     public static void Free()
     {
         /* #if DEBUG
-        Console.WriteLine($"{_memoryBlocks.Count} memory blocks, {_openPointers.Count} open pointers");
+        Console.WriteLine($"{_memoryBlocks.Count} memory blocks, {_stackBlocks.Count} stack blocks, {_openPointers.Count} open pointers");
         #endif */
 
         foreach (var pointer in _openPointers)
