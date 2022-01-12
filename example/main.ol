@@ -21,7 +21,7 @@ main() { //#print_ir {
     g := test_each();
     h := 3 > a;
     fac6 := factorial(6);
-    print("%! = %, d = %\n", 6, fac6, d);
+    print("%! = %, d = %, %\n", 6, fac6, d, hello);
     my_struct := create();
     printf("my_struct: field = %d, something = %f, subvalue.something = %d, subvalue.foo = %d\n", my_struct.field, my_struct.something, my_struct.subValue.something, my_struct.subValue.foo);
     call_field := create().something;
@@ -331,7 +331,6 @@ int SDL_Init(u32 flags) #extern "SDL2"
 SDL_CreateWindow(string title, int x, int y, int w, int h, u32 flags) #extern "SDL2"
 
 #run {
-    print("%", "This failed");
     array_insert(&command_line_arguments, "Hello world");
     main();
 

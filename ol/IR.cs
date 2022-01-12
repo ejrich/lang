@@ -67,6 +67,7 @@ public class Instruction
     public int Index2 { get; set; }
     public bool Flag { get; set; }
     public string String { get; set; }
+    public IType LoadType { get; set; }
 
     public InstructionValue Value1 { get; set; }
     public InstructionValue Value2 { get; set; }
