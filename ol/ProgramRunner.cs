@@ -347,7 +347,10 @@ public static unsafe class ProgramRunner
                     stackBlock.Cursor = stackCursor;
                     foreach (var (block, cursor) in additionalBlocks)
                     {
-                        block.Cursor = cursor;
+                        if (block.Cursor > cursor)
+                        {
+                            block.Cursor = cursor;
+                        }
                     }
                     return value;
                 }
@@ -356,7 +359,10 @@ public static unsafe class ProgramRunner
                     stackBlock.Cursor = stackCursor;
                     foreach (var (block, cursor) in additionalBlocks)
                     {
-                        block.Cursor = cursor;
+                        if (block.Cursor > cursor)
+                        {
+                            block.Cursor = cursor;
+                        }
                     }
                     return new Register();
                 }
@@ -849,7 +855,6 @@ public static unsafe class ProgramRunner
                         }
                         if (add)
                         {
-                            Console.WriteLine($"Allocating array in different block of size {size}");
                             additionalBlocks.Add((arrayBlock, arrayCursor));
                         }
                     }
