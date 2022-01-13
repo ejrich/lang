@@ -1339,13 +1339,15 @@ public static unsafe class LLVMBackend
         LLVMMetadataRef debugBlock = null;
         LLVMMetadataRef file = null;
         LLVMMetadataRef expression = null;
-        Stack<LLVMMetadataRef> debugBlockStack = null;
+        IScope currentScope = null;
+        Dictionary<IScope, LLVMMetadataRef> lexicalBlocks = null;
         if (_emitDebug)
         {
             debugBlock = _debugFunctions[function.Source.FunctionIndex];
             file = _debugFiles[function.Source.FileIndex];
             expression = LLVM.DIBuilderCreateExpression(_debugBuilder, null, UIntPtr.Zero);
-            debugBlockStack = new();
+            currentScope = function.Source.Body;
+            lexicalBlocks = new() { [function.Source.Body] = debugBlock };
         }
 
         // Write the instructions
@@ -1360,6 +1362,18 @@ public static unsafe class LLVMBackend
             while (instructionIndex < instructionToStopAt)
             {
                 var instruction = function.Instructions[instructionIndex++];
+
+                // TODO Hoist this out of the loop
+                if (_emitDebug && currentScope != instruction.Scope)
+                {
+                    if (!lexicalBlocks.TryGetValue(instruction.Scope, out var newDebugBlock))
+                    {
+                        var newScope = (ScopeAst)instruction.Scope;
+                        newDebugBlock = LLVM.DIBuilderCreateLexicalBlock(_debugBuilder, debugBlock, file, newScope.Line, newScope.Column);
+                    }
+                    currentScope = instruction.Scope;
+                    debugBlock = newDebugBlock;
+                }
 
                 switch (instruction.Type)
                 {
@@ -1892,17 +1906,6 @@ public static unsafe class LLVMBackend
                     {
                         var location = LLVM.DIBuilderCreateDebugLocation(_context, instruction.Source.Line, instruction.Source.Column, debugBlock, null);
                         LLVM.SetCurrentDebugLocation2(_builder, location);
-                        break;
-                    }
-                    case InstructionType.DebugPushLexicalBlock:
-                    {
-                        debugBlockStack.Push(debugBlock);
-                        debugBlock = LLVM.DIBuilderCreateLexicalBlock(_debugBuilder, debugBlock, file, instruction.Source.Line, instruction.Source.Column);
-                        break;
-                    }
-                    case InstructionType.DebugPopLexicalBlock:
-                    {
-                        debugBlock = debugBlockStack.Pop();
                         break;
                     }
                     case InstructionType.DebugDeclareParameter:

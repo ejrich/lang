@@ -39,6 +39,7 @@ public interface IFunction : IInterface
     int FunctionIndex { get; set; }
     FunctionFlags Flags { get; set; }
     List<string> Generics { get; }
+    ScopeAst Body { get; set; }
 }
 
 [Flags]
