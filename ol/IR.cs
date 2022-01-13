@@ -61,6 +61,7 @@ public class Instruction
     public InstructionType Type { get; set; }
     public int ValueIndex { get; set; }
     public IAst Source { get; set; }
+    public IScope Scope { get; set; }
 
     // Used for Call, GetPointer, GetStructPointer, and debug locations
     public int Index { get; set; }
@@ -181,8 +182,6 @@ public enum InstructionType
     RotateRight,
     RotateLeft,
     DebugSetLocation,
-    DebugPushLexicalBlock,
-    DebugPopLexicalBlock,
     DebugDeclareParameter,
     DebugDeclareVariable
 }
