@@ -23,11 +23,13 @@ public static class Allocator
 
     public static IntPtr Allocate(uint size)
     {
+        if (size == 0) return IntPtr.Zero;
         return Allocate((int)size);
     }
 
     public static IntPtr Allocate(int size)
     {
+        if (size == 0) return IntPtr.Zero;
         Debug.Assert(size > 0, "Allocation size must be positive");
 
         // Allocate separate blocks if above the block size

@@ -316,8 +316,10 @@ public static unsafe class ProgramRunner
     private static Register ExecuteFunction(FunctionIR function, Register[] arguments)
     {
         var instructionPointer = 0;
-        var (stackPointer, cursor, block) = Allocator.StackAllocate((int)function.StackSize);
         var registers = new Register[function.ValueCount];
+
+        var (stackPointer, stackCursor, stackBlock) = Allocator.StackAllocate((int)function.StackSize);
+        var additionalBlocks = new List<(MemoryBlock block, int cursor)>();
 
         while (true)
         {
@@ -342,12 +344,20 @@ public static unsafe class ProgramRunner
                 case InstructionType.Return:
                 {
                     var value = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
-                    block.Cursor = cursor;
+                    stackBlock.Cursor = stackCursor;
+                    foreach (var (block, cursor) in additionalBlocks)
+                    {
+                        block.Cursor = cursor;
+                    }
                     return value;
                 }
                 case InstructionType.ReturnVoid:
                 {
-                    block.Cursor = cursor;
+                    stackBlock.Cursor = stackCursor;
+                    foreach (var (block, cursor) in additionalBlocks)
+                    {
+                        block.Cursor = cursor;
+                    }
                     return new Register();
                 }
                 case InstructionType.Load:
@@ -823,7 +833,27 @@ public static unsafe class ProgramRunner
                 case InstructionType.AllocateArray:
                 {
                     var length = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
-                    var arrayPointer = Allocator.Allocate(instruction.Value2.Type.Size * length.UInteger);
+                    var size = instruction.Value2.Type.Size * length.UInteger;
+                    var (arrayPointer, arrayCursor, arrayBlock) = Allocator.StackAllocate((int)size);
+
+                    if (arrayBlock != stackBlock)
+                    {
+                        var add = true;
+                        foreach (var (block, _) in additionalBlocks)
+                        {
+                            if (arrayBlock == block)
+                            {
+                                add = false;
+                                break;
+                            }
+                        }
+                        if (add)
+                        {
+                            Console.WriteLine($"Allocating array in different block of size {size}");
+                            additionalBlocks.Add((arrayBlock, arrayCursor));
+                        }
+                    }
+
                     registers[instruction.ValueIndex] = new Register {Pointer = arrayPointer};
                     break;
                 }
