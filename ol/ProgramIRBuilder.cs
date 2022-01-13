@@ -206,7 +206,7 @@ public static class ProgramIRBuilder
             {
                 var instruction = function.Instructions[instructionIndex++];
 
-                var text = $"{instructionIndex} - {file} {line}:{column}\t\t{instruction.Type} ";
+                var text = $"{file} {line}:{column}\t\t{instruction.Type} ";
                 switch (instruction.Type)
                 {
                     case InstructionType.Jump:
