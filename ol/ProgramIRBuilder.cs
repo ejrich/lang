@@ -1447,6 +1447,12 @@ public static class ProgramIRBuilder
 
     private static InstructionValue EmitIR(FunctionIR function, IAst ast, IScope scope, bool useRawString = false, bool returnValue = false)
     {
+        return EmitIR(function, ast, scope, out _, useRawString, returnValue);
+    }
+
+    private static InstructionValue EmitIR(FunctionIR function, IAst ast, IScope scope, out bool hasCall, bool useRawString = false, bool returnValue = false)
+    {
+        hasCall = false;
         switch (ast)
         {
             case ConstantAst constant:
@@ -1536,7 +1542,7 @@ public static class ProgramIRBuilder
                         ConstantString = constantValue.ConstantString, UseRawString = true
                     };
                 }
-                var structFieldPointer = EmitGetStructRefPointer(function, structField, scope, out var loaded);
+                var structFieldPointer = EmitGetStructRefPointer(function, structField, scope, out var loaded, out hasCall);
                 if (!loaded)
                 {
                     if (useRawString && structFieldPointer.Type.TypeKind == TypeKind.String)
@@ -1550,6 +1556,7 @@ public static class ProgramIRBuilder
                 }
                 return structFieldPointer;
             case CallAst call:
+                hasCall = true;
                 return EmitCall(function, call, scope);
             case ChangeByOneAst changeByOne:
                 var (pointer, pointerType) = EmitGetReference(function, changeByOne.Value, scope, out loaded);
@@ -1588,7 +1595,7 @@ public static class ProgramIRBuilder
                         var negate = value.Type.TypeKind == TypeKind.Integer ? InstructionType.IntegerNegate : InstructionType.FloatNegate;
                         return EmitInstruction(negate, function, value.Type, value);
                     case UnaryOperator.Dereference:
-                        value = EmitIR(function, unary.Value, scope);
+                        value = EmitIR(function, unary.Value, scope, out hasCall);
                         return EmitLoad(function, unary.Type, value);
                     case UnaryOperator.Reference:
                         (value, _) = EmitGetReference(function, unary.Value, scope, out _);
@@ -1714,7 +1721,7 @@ public static class ProgramIRBuilder
                 }
                 break;
             case StructFieldRefAst structField:
-                var structFieldPointer = EmitGetStructRefPointer(function, structField, scope, out loaded);
+                var structFieldPointer = EmitGetStructRefPointer(function, structField, scope, out loaded, out _);
                 return (structFieldPointer, structFieldPointer.Type);
             case IndexAst index:
                 loaded = index.CallsOverload;
@@ -1727,9 +1734,10 @@ public static class ProgramIRBuilder
         return (null, null);
     }
 
-    private static InstructionValue EmitGetStructRefPointer(FunctionIR function, StructFieldRefAst structField, IScope scope, out bool loaded)
+    private static InstructionValue EmitGetStructRefPointer(FunctionIR function, StructFieldRefAst structField, IScope scope, out bool loaded, out bool hasCall)
     {
         loaded = false;
+        hasCall = false;
         InstructionValue value = null;
         var skipPointer = false;
 
@@ -1758,6 +1766,7 @@ public static class ProgramIRBuilder
                 }
                 break;
             case CallAst call:
+                hasCall = true;
                 value = EmitCall(function, call, scope);
                 skipPointer = true;
                 if (!structField.Pointers[0])
@@ -1883,14 +1892,24 @@ public static class ProgramIRBuilder
             for (var i = 0; i < argumentCount - 1; i++)
             {
                 var functionArg = call.Function.Arguments[i];
-                var argument = EmitIR(function, call.Arguments[i], scope);
+                var argument = EmitIR(function, call.Arguments[i], scope, out var hasCall);
                 if (functionArg.Type.TypeKind == TypeKind.Any)
                 {
                     arguments[i] = GetAnyValue(function, argument);
                 }
                 else
                 {
-                    arguments[i] = EmitCastValue(function, argument, functionArg.Type);
+                    var value = EmitCastValue(function, argument, functionArg.Type);
+                    if (hasCall && value.Type is StructAst)
+                    {
+                        var allocation = AddAllocation(function, value.Type);
+                        EmitStore(function, allocation, value);
+                        arguments[i] = EmitLoad(function, value.Type, allocation);
+                    }
+                    else
+                    {
+                        arguments[i] = value;
+                    }
                 }
             }
 
@@ -1954,14 +1973,24 @@ public static class ProgramIRBuilder
             for (var i = 0; i < argumentCount; i++)
             {
                 var functionArg = call.Function.Arguments[i];
-                var argument = EmitIR(function, call.Arguments[i], scope, externCall);
+                var argument = EmitIR(function, call.Arguments[i], scope, out var hasCall, externCall);
                 if (functionArg.Type.TypeKind == TypeKind.Any)
                 {
                     arguments[i] = GetAnyValue(function, argument);
                 }
                 else
                 {
-                    arguments[i] = EmitCastValue(function, argument, functionArg.Type);
+                    var value = EmitCastValue(function, argument, functionArg.Type);
+                    if (hasCall && value.Type is StructAst)
+                    {
+                        var allocation = AddAllocation(function, value.Type);
+                        EmitStore(function, allocation, value);
+                        arguments[i] = EmitLoad(function, value.Type, allocation);
+                    }
+                    else
+                    {
+                        arguments[i] = value;
+                    }
                 }
             }
 
