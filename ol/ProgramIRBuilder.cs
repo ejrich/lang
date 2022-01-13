@@ -9,7 +9,7 @@ namespace ol;
 
 public static class ProgramIRBuilder
 {
-    private static Mutex _printFunctionMutex = new();
+    private static readonly Mutex _printFunctionMutex = new();
 
     public static void AddFunction(FunctionAst function)
     {
@@ -192,7 +192,7 @@ public static class ProgramIRBuilder
             {
                 var instruction = function.Instructions[instructionIndex++];
 
-                var text = $"{file} {line}:{column}\t\t{instruction.Type} ";
+                var text = $"{instructionIndex} - {file} {line}:{column}\t\t{instruction.Type} ";
                 switch (instruction.Type)
                 {
                     case InstructionType.Jump:
@@ -311,7 +311,7 @@ public static class ProgramIRBuilder
             if (declaration.Type is ArrayType arrayType)
             {
                 globalVariable.Array = true;
-                globalVariable.ArrayLength = declaration.TypeDefinition.ConstCount.Value;
+                globalVariable.ArrayLength = arrayType.Length;
                 globalVariable.Type = arrayType.ElementType;
                 globalVariable.Size = globalVariable.ArrayLength * arrayType.ElementType.Size;
             }
@@ -765,7 +765,7 @@ public static class ProgramIRBuilder
                         {
                             foreach (var variable in declaration.Variables)
                             {
-                                var arrayPointer = InitializeConstArray(function, variable.Pointer, arrayStruct, length, declaration.ArrayElementType);
+                                InitializeConstArray(function, variable.Pointer, arrayStruct, length, declaration.ArrayElementType);
                             }
                         }
                         else
@@ -846,10 +846,8 @@ public static class ProgramIRBuilder
         {
             return declaration.Allocation = AddArrayAllocation(function, arrayType, arrayType.ElementType, arrayType.Length);
         }
-        else
-        {
-            return declaration.Allocation = AddAllocation(function, declaration.Type);
-        }
+
+        return declaration.Allocation = AddAllocation(function, declaration.Type);
     }
 
     private static InstructionValue AddAllocation(FunctionIR function, IType type)
@@ -1221,18 +1219,26 @@ public static class ProgramIRBuilder
         var conditionJump = new Instruction {Type = InstructionType.ConditionalJump, Value1 = condition};
         function.Instructions.Add(conditionJump);
 
-        var thenBlock = AddBasicBlock(function);
-        thenBlock = EmitScope(function, thenBlock, conditional.IfBlock, returnType, breakBlock, continueBlock);
+        var bodyBlock = AddBasicBlock(function);
+        bodyBlock = EmitScope(function, bodyBlock, conditional.IfBlock, returnType, breakBlock, continueBlock);
         Instruction jumpToAfter = null;
+        BasicBlock elseBlock;
 
         // For when the the if block does not return and there is an else block, a jump to the after block is required
         if (!conditional.IfBlock.Returns && conditional.ElseBlock != null)
         {
             jumpToAfter = new Instruction {Type = InstructionType.Jump};
             function.Instructions.Add(jumpToAfter);
+            elseBlock = AddBasicBlock(function);
         }
-
-        var elseBlock = AddBasicBlock(function);
+        else if (bodyBlock.Location < function.Instructions.Count)
+        {
+            elseBlock = AddBasicBlock(function);
+        }
+        else
+        {
+            elseBlock = bodyBlock;
+        }
 
         // Jump to the else block, otherwise fall through to the then block
         conditionJump.Value2 = BasicBlockValue(elseBlock);
@@ -1271,7 +1277,7 @@ public static class ProgramIRBuilder
 
         var whileBodyBlock = AddBasicBlock(function);
         var afterBlock = new BasicBlock();
-        whileBodyBlock = EmitScope(function, whileBodyBlock, whileAst.Body, returnType, afterBlock, conditionBlock);
+        EmitScope(function, whileBodyBlock, whileAst.Body, returnType, afterBlock, conditionBlock);
         var jumpToCondition = new Instruction {Type = InstructionType.Jump, Value1 = BasicBlockValue(conditionBlock)};
         function.Instructions.Add(jumpToCondition);
 
@@ -1310,7 +1316,6 @@ public static class ProgramIRBuilder
 
         InstructionValue indexVariable;
         InstructionValue compareTarget;
-        BasicBlock afterBlock;
 
         if (each.Iteration != null)
         {
@@ -1363,7 +1368,7 @@ public static class ProgramIRBuilder
                 DeclareVariable(function, each.IterationVariable);
             }
 
-            afterBlock = EmitEachBody(function, each.Body, TypeTable.S64Type, returnType, indexValue, indexVariable, condition, conditionBlock);
+            return EmitEachBody(function, each.Body, TypeTable.S64Type, returnType, indexValue, indexVariable, condition, conditionBlock);
         }
         else
         {
@@ -1385,28 +1390,38 @@ public static class ProgramIRBuilder
             var indexValue = EmitLoad(function, TypeTable.S32Type, indexVariable);
             var condition = EmitInstruction(InstructionType.IntegerGreaterThan, function, TypeTable.BoolType, indexValue, compareTarget);
 
-            afterBlock = EmitEachBody(function, each.Body, TypeTable.S32Type, returnType, indexValue, indexVariable, condition, conditionBlock);
+            return EmitEachBody(function, each.Body, TypeTable.S32Type, returnType, indexValue, indexVariable, condition, conditionBlock);
         }
-
-        if (!BuildSettings.Release)
-        {
-            function.Instructions.Add(new Instruction {Type = InstructionType.DebugPopLexicalBlock});
-        }
-
-        return afterBlock;
     }
 
     private static BasicBlock EmitEachBody(FunctionIR function, ScopeAst eachBody, IType indexType, IType returnType, InstructionValue indexValue, InstructionValue indexVariable, InstructionValue condition, BasicBlock conditionBlock)
     {
         var conditionJump = new Instruction {Type = InstructionType.ConditionalJump, Value1 = condition};
         function.Instructions.Add(conditionJump);
+        var instructionCount = function.Instructions.Count;
 
         var eachBodyBlock = AddBasicBlock(function);
         var eachIncrementBlock = new BasicBlock();
         var afterBlock = new BasicBlock();
         eachBodyBlock = EmitScopeChildren(function, eachBodyBlock, eachBody, returnType, afterBlock, eachIncrementBlock);
 
-        AddBasicBlock(function, eachIncrementBlock);
+        if (eachBodyBlock.Location < function.Instructions.Count)
+        {
+            AddBasicBlock(function, eachIncrementBlock);
+        }
+        else
+        {
+            // Patch the jumps to the increment basic block to be the last body block that is currently empty
+            for (; instructionCount < function.Instructions.Count; instructionCount++)
+            {
+                var instruction = function.Instructions[instructionCount];
+                if (instruction.Type == InstructionType.Jump && instruction.Value1.JumpBlock == eachIncrementBlock)
+                {
+                    instruction.Value1.JumpBlock = eachBodyBlock;
+                }
+            }
+        }
+
         var incrementValue = new InstructionValue {ValueType = InstructionValueType.Constant, Type = indexType, ConstantValue = new Constant {Integer = 1}};
         var nextValue = EmitInstruction(InstructionType.IntegerAdd, function, TypeTable.S32Type, indexValue, incrementValue);
         EmitStore(function, indexVariable, nextValue);
@@ -1415,6 +1430,11 @@ public static class ProgramIRBuilder
 
         AddBasicBlock(function, afterBlock);
         conditionJump.Value2 = BasicBlockValue(afterBlock);
+
+        if (!BuildSettings.Release)
+        {
+            function.Instructions.Add(new Instruction {Type = InstructionType.DebugPopLexicalBlock});
+        }
 
         return afterBlock;
     }
@@ -1431,12 +1451,11 @@ public static class ProgramIRBuilder
         return block;
     }
 
-    private static BasicBlock AddBasicBlock(FunctionIR function, BasicBlock block)
+    private static void AddBasicBlock(FunctionIR function, BasicBlock block)
     {
         block.Index = function.BasicBlocks.Count;
         block.Location = function.Instructions.Count;
         function.BasicBlocks.Add(block);
-        return block;
     }
 
     private static InstructionValue EmitAndCast(FunctionIR function, IAst ast, IScope scope, IType type, bool useRawString = false, bool returnValue = false)
@@ -2118,14 +2137,15 @@ public static class ProgramIRBuilder
             var dataPointer = EmitLoadPointer(function, type, variable);
             return EmitGetPointer(function, dataPointer, indexValue, elementType);
         }
-        else if (type.TypeKind == TypeKind.CArray)
+
+        if (type.TypeKind == TypeKind.CArray)
         {
             var arrayType = (ArrayType)type;
             elementType = arrayType.ElementType;
 
             return EmitGetPointer(function, variable, indexValue, elementType, true);
         }
-        else
+
         {
             var structAst = (StructAst)type;
             var dataField = structAst.Fields[1];
@@ -2316,8 +2336,7 @@ public static class ProgramIRBuilder
                 break;
         }
 
-        Console.WriteLine("Unexpected type in compare");
-        Environment.Exit(ErrorCodes.BuildError);
+        Debug.Assert(false, "Unexpected type in compare");
         return null;
     }
 
@@ -2341,13 +2360,13 @@ public static class ProgramIRBuilder
         return op switch
         {
             Operator.Equality => InstructionType.FloatEquals,
-                Operator.NotEqual => InstructionType.FloatNotEquals,
-                Operator.GreaterThan => InstructionType.FloatGreaterThan,
-                Operator.GreaterThanEqual => InstructionType.FloatGreaterThanOrEqual,
-                Operator.LessThan => InstructionType.FloatLessThan,
-                Operator.LessThanEqual => InstructionType.FloatLessThanOrEqual,
-                // @Cleanup This branch should never be hit
-                _ => InstructionType.FloatEquals
+            Operator.NotEqual => InstructionType.FloatNotEquals,
+            Operator.GreaterThan => InstructionType.FloatGreaterThan,
+            Operator.GreaterThanEqual => InstructionType.FloatGreaterThanOrEqual,
+            Operator.LessThan => InstructionType.FloatLessThan,
+            Operator.LessThanEqual => InstructionType.FloatLessThanOrEqual,
+            // @Cleanup This branch should never be hit
+            _ => InstructionType.FloatEquals
         };
     }
 
@@ -2412,14 +2431,12 @@ public static class ProgramIRBuilder
             }
             return sourceType.Signed ? InstructionType.IntegerToUnsignedIntegerExtend : InstructionType.UnsignedIntegerExtend;
         }
-        else
+
+        if (targetType.Signed)
         {
-            if (targetType.Signed)
-            {
-                return sourceType.Signed ? InstructionType.IntegerTruncate : InstructionType.UnsignedIntegerToIntegerTruncate;
-            }
-            return sourceType.Signed ? InstructionType.IntegerToUnsignedIntegerTruncate : InstructionType.UnsignedIntegerTruncate;
+            return sourceType.Signed ? InstructionType.IntegerTruncate : InstructionType.UnsignedIntegerToIntegerTruncate;
         }
+        return sourceType.Signed ? InstructionType.IntegerToUnsignedIntegerTruncate : InstructionType.UnsignedIntegerTruncate;
     }
 
     private static InstructionValue GetConstantS64(long value)
