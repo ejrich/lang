@@ -2498,6 +2498,10 @@ public static class TypeChecker
                             {
                                 ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
                             }
+                            else if (assignment.Value is ConstantAst constantAst)
+                            {
+                                constantAst.Type = type;
+                            }
                             break;
                     }
                 }
@@ -3351,6 +3355,8 @@ public static class TypeChecker
                             case TypeKind.Float:
                             case TypeKind.Enum:
                             case null:
+                                break;
+                            case TypeKind.Pointer when cast.TargetType.TypeKind == TypeKind.Integer && cast.TargetType.Size == 8:
                                 break;
                             default:
                                 ErrorReporter.Report($"Unable to cast type '{valueType.Name}' to '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast.Value);
@@ -4610,6 +4616,10 @@ public static class TypeChecker
                                     expression.Type = TypeTable.S32Type;
                                 }
                             }
+                        }
+                        else if (next is ConstantAst constantAst)
+                        {
+                            constantAst.Type = expression.Type;
                         }
                         break;
                 }

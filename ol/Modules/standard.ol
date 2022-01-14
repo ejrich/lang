@@ -269,6 +269,9 @@ print(string format, Params args) {
                     add_to_string_buffer(&buffer, value);
                 }
                 else if type_kind == TypeKind.Pointer {
+                    value := cast(u64, arg.data);
+                    add_to_string_buffer(&buffer, "0x");
+                    write_hex_integer_to_buffer(&buffer, value);
                 }
                 else if type_kind == TypeKind.Array {
                 }
@@ -320,7 +323,6 @@ add_to_string_buffer(StringBuffer* buffer, string value) {
 }
 
 write_integer_to_buffer(StringBuffer* buffer, u64 value) {
-    printf("%lu\n", value);
     buffer_length := buffer.length;
     length := 0;
     while value > 0 {
@@ -330,12 +332,34 @@ write_integer_to_buffer(StringBuffer* buffer, u64 value) {
         length++;
     }
 
+    reverse_integer_characters(buffer, length, buffer_length);
+}
+
+write_hex_integer_to_buffer(StringBuffer* buffer, u64 value) {
+    buffer_length := buffer.length;
+    length := 0;
+    while value > 0 {
+        digit := value & 0xF;
+        if digit < 10 {
+            buffer.buffer[buffer.length++] = digit + '0';
+        }
+        else {
+            buffer.buffer[buffer.length++] = digit + '7';
+        }
+        value >>= 4;
+        length++;
+    }
+
+    reverse_integer_characters(buffer, length, buffer_length);
+}
+
+reverse_integer_characters(StringBuffer* buffer, int length, int original_length) {
     // Reverse the characters in the number
     // h e l l o 1 2 3
     //           5 6 7   a = o_len + i, b = len - i - 1
     //           7 6 5
     each i in 0..length / 2 - 1 {
-        a := buffer_length + i;
+        a := original_length + i;
         b := buffer.length - i - 1;
         temp := buffer.buffer[b];
         buffer.buffer[b] = buffer.buffer[a];

@@ -134,6 +134,7 @@ public enum InstructionType
     FloatToIntegerCast,
     FloatToUnsignedIntegerCast,
     PointerCast,
+    PointerToIntegerCast,
     AllocateArray,
     IsNull,
     IsNotNull,
