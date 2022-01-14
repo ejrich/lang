@@ -511,11 +511,7 @@ public static class ProgramIRBuilder
     {
         foreach (var ast in scope.Children)
         {
-            // TODO Hoist out of the loop
-            if (!BuildSettings.Release)
-            {
-                function.Instructions.Add(new Instruction {Type = InstructionType.DebugSetLocation, Source = ast, Scope = scope});
-            }
+            function.Instructions.Add(new Instruction {Type = InstructionType.DebugSetLocation, Source = ast, Scope = scope});
 
             switch (ast)
             {

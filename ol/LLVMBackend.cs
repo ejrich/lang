@@ -1363,7 +1363,6 @@ public static unsafe class LLVMBackend
             {
                 var instruction = function.Instructions[instructionIndex++];
 
-                // TODO Hoist this out of the loop
                 if (_emitDebug && currentScope != instruction.Scope)
                 {
                     if (!lexicalBlocks.TryGetValue(instruction.Scope, out var newDebugBlock))
@@ -1902,7 +1901,7 @@ public static unsafe class LLVMBackend
                         values[instruction.ValueIndex] = result.IsUndef ? mask : _builder.BuildOr(result, mask);
                         break;
                     }
-                    case InstructionType.DebugSetLocation:
+                    case InstructionType.DebugSetLocation when _emitDebug:
                     {
                         var location = LLVM.DIBuilderCreateDebugLocation(_context, instruction.Source.Line, instruction.Source.Column, debugBlock, null);
                         LLVM.SetCurrentDebugLocation2(_builder, location);
