@@ -269,29 +269,78 @@ print(string format, Params args) {
                     add_to_string_buffer(&buffer, value);
                 }
                 else if type_kind == TypeKind.Pointer {
-                    value := cast(u64, arg.data);
-                    add_to_string_buffer(&buffer, "0x");
-                    write_hex_integer_to_buffer(&buffer, value);
+                    write_pointer_to_buffer(&buffer, arg.data);
                 }
                 else if type_kind == TypeKind.Array {
                 }
                 else if type_kind == TypeKind.CArray {
                 }
                 else if type_kind == TypeKind.Enum {
+
+                    type_info := cast(EnumTypeInfo*, arg.type);
+
+                    value: u32;
+                    if type_info.size == 1 {
+                        value = *cast(u8*, arg.data);
+                    }
+                    else if type_info.size == 2 {
+                        value = *cast(u16*, arg.data);
+                    }
+                    else if type_info.size == 4 {
+                        value = *cast(u32*, arg.data);
+                    }
+                    else {
+                        value = *cast(u64*, arg.data);
+                    }
+
+                    flags := false;
+                    each attribute in type_info.attributes {
+                        if attribute == "flags" {
+                            flags = true;
+                            break;
+                        }
+                    }
+
+                    if flags {
+                        first := true;
+                        each enum_value in type_info.values {
+                            if enum_value.value & value {
+                                if !first add_to_string_buffer(&buffer, " | ");
+                                else first = false;
+
+                                add_to_string_buffer(&buffer, enum_value.name);
+                            }
+                        }
+                    }
+                    else {
+                        each enum_value in type_info.values {
+                            if enum_value.value == value {
+                                add_to_string_buffer(&buffer, enum_value.name);
+                                break;
+                            }
+                        }
+                    }
                 }
                 else if type_kind == TypeKind.Struct {
                 }
                 else if type_kind == TypeKind.Union {
                 }
                 else if type_kind == TypeKind.Interface {
+                    write_pointer_to_buffer(&buffer, arg.data);
                 }
                 else if type_kind == TypeKind.Type {
+                    value := *cast(s32*, arg.data);
+                    type_info := __type_table[value];
+                    add_to_string_buffer(&buffer, type_info.name);
                 }
                 else if type_kind == TypeKind.Any {
                 }
                 else if type_kind == TypeKind.Compound {
+                    // @Cleanup This branch should not be hit
                 }
                 else if type_kind == TypeKind.Function {
+                    type_info := cast(FunctionTypeInfo*, arg.type);
+                    add_to_string_buffer(&buffer, type_info.name);
                 }
             }
         }
@@ -335,22 +384,29 @@ write_integer_to_buffer(StringBuffer* buffer, u64 value) {
     reverse_integer_characters(buffer, length, buffer_length);
 }
 
-write_hex_integer_to_buffer(StringBuffer* buffer, u64 value) {
-    buffer_length := buffer.length;
-    length := 0;
-    while value > 0 {
-        digit := value & 0xF;
-        if digit < 10 {
-            buffer.buffer[buffer.length++] = digit + '0';
+write_pointer_to_buffer(StringBuffer* buffer, void* data) {
+    value := cast(u64, data);
+    if value {
+        add_to_string_buffer(buffer, "0x");
+        buffer_length := buffer.length;
+        length := 0;
+        while value > 0 {
+            digit := value & 0xF;
+            if digit < 10 {
+                buffer.buffer[buffer.length++] = digit + '0';
+            }
+            else {
+                buffer.buffer[buffer.length++] = digit + '7';
+            }
+            value >>= 4;
+            length++;
         }
-        else {
-            buffer.buffer[buffer.length++] = digit + '7';
-        }
-        value >>= 4;
-        length++;
-    }
 
-    reverse_integer_characters(buffer, length, buffer_length);
+        reverse_integer_characters(buffer, length, buffer_length);
+    }
+    else {
+        add_to_string_buffer(buffer, "null");
+    }
 }
 
 reverse_integer_characters(StringBuffer* buffer, int length, int original_length) {
