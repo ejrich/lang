@@ -276,22 +276,12 @@ print(string format, Params args) {
                 else if type_kind == TypeKind.CArray {
                 }
                 else if type_kind == TypeKind.Enum {
-
                     type_info := cast(EnumTypeInfo*, arg.type);
-
-                    value: u32;
-                    if type_info.size == 1 {
-                        value = *cast(u8*, arg.data);
-                    }
-                    else if type_info.size == 2 {
-                        value = *cast(u16*, arg.data);
-                    }
-                    else if type_info.size == 4 {
-                        value = *cast(u32*, arg.data);
-                    }
-                    else {
-                        value = *cast(u64*, arg.data);
-                    }
+                    value: s32;
+                    if type_info.size == 1 value = *cast(s8*, arg.data);
+                    else if type_info.size == 2 value = *cast(s16*, arg.data);
+                    else if type_info.size == 4 value = *cast(s32*, arg.data);
+                    else value = *cast(s64*, arg.data);
 
                     flags := false;
                     each attribute in type_info.attributes {
@@ -301,12 +291,12 @@ print(string format, Params args) {
                         }
                     }
 
+                    found := false;
                     if flags {
-                        first := true;
                         each enum_value in type_info.values {
                             if enum_value.value & value {
-                                if !first add_to_string_buffer(&buffer, " | ");
-                                else first = false;
+                                if found add_to_string_buffer(&buffer, " | ");
+                                else found = true;
 
                                 add_to_string_buffer(&buffer, enum_value.name);
                             }
@@ -316,9 +306,22 @@ print(string format, Params args) {
                         each enum_value in type_info.values {
                             if enum_value.value == value {
                                 add_to_string_buffer(&buffer, enum_value.name);
+                                found = true;
                                 break;
                             }
                         }
+                    }
+
+                    if !found {
+                        if value == 0 {
+                            buffer.buffer[buffer.length++] = '0';
+                            continue;
+                        }
+                        else if value < 0 {
+                            buffer.buffer[buffer.length++] = '-';
+                            value *= -1;
+                        }
+                        write_integer_to_buffer(&buffer, value);
                     }
                 }
                 else if type_kind == TypeKind.Struct {
