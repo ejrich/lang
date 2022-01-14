@@ -169,9 +169,99 @@ print(string format, Params args) {
                     if value add_to_string_buffer(&buffer, "true");
                     else add_to_string_buffer(&buffer, "false");
                 }
-                // TODO Implement me
                 else if type_kind == TypeKind.Integer {
+                    type_info := cast(IntegerTypeInfo*, arg.type);
+                    size := type_info.size;
+                    if type_info.signed {
+                        if size == 1 {
+                            value := *cast(s8*, arg.data);
+                            if value == 0 {
+                                buffer.buffer[buffer.length++] = '0';
+                                continue;
+                            }
+                            else if value < 0 {
+                                buffer.buffer[buffer.length++] = '-';
+                                value *= -1;
+                            }
+                            write_integer_to_buffer(&buffer, value);
+                        }
+                        else if size == 2 {
+                            value := *cast(s16*, arg.data);
+                            if value == 0 {
+                                buffer.buffer[buffer.length++] = '0';
+                                continue;
+                            }
+                            else if value < 0 {
+                                buffer.buffer[buffer.length++] = '-';
+                                value *= -1;
+                            }
+                            write_integer_to_buffer(&buffer, value);
+                        }
+                        else if size == 4 {
+                            value := *cast(s32*, arg.data);
+                            if value == 0 {
+                                buffer.buffer[buffer.length++] = '0';
+                                continue;
+                            }
+                            else if value < 0 {
+                                buffer.buffer[buffer.length++] = '-';
+                                value *= -1;
+                            }
+                            write_integer_to_buffer(&buffer, value);
+                        }
+                        else {
+                            value := *cast(s64*, arg.data);
+                            if value == 0 {
+                                buffer.buffer[buffer.length++] = '0';
+                                continue;
+                            }
+                            else if value < 0 {
+                                buffer.buffer[buffer.length++] = '-';
+                                value *= -1;
+                            }
+                            write_integer_to_buffer(&buffer, value);
+                        }
+                    }
+                    else {
+                        if size == 1 {
+                            value := *cast(u8*, arg.data);
+                            if value == 0 {
+                                buffer.buffer[buffer.length++] = '0';
+                            }
+                            else {
+                                write_integer_to_buffer(&buffer, value);
+                            }
+                        }
+                        else if size == 2 {
+                            value := *cast(u16*, arg.data);
+                            if value == 0 {
+                                buffer.buffer[buffer.length++] = '0';
+                            }
+                            else {
+                                write_integer_to_buffer(&buffer, value);
+                            }
+                        }
+                        else if size == 4 {
+                            value := *cast(u32*, arg.data);
+                            if value == 0 {
+                                buffer.buffer[buffer.length++] = '0';
+                            }
+                            else {
+                                write_integer_to_buffer(&buffer, value);
+                            }
+                        }
+                        else {
+                            value := *cast(u64*, arg.data);
+                            if value == 0 {
+                                buffer.buffer[buffer.length++] = '0';
+                            }
+                            else {
+                                write_integer_to_buffer(&buffer, value);
+                            }
+                        }
+                    }
                 }
+                // TODO Implement me
                 else if type_kind == TypeKind.Float {
                 }
                 else if type_kind == TypeKind.String {
@@ -226,6 +316,30 @@ struct StringBuffer {
 add_to_string_buffer(StringBuffer* buffer, string value) {
     each i in 0..value.length-1 {
         buffer.buffer[buffer.length++] = value[i];
+    }
+}
+
+write_integer_to_buffer(StringBuffer* buffer, u64 value) {
+    printf("%lu\n", value);
+    buffer_length := buffer.length;
+    length := 0;
+    while value > 0 {
+        digit := value % 10;
+        buffer.buffer[buffer.length++] = digit + '0';
+        value /= 10;
+        length++;
+    }
+
+    // Reverse the characters in the number
+    // h e l l o 1 2 3
+    //           5 6 7   a = o_len + i, b = len - i - 1
+    //           7 6 5
+    each i in 0..length / 2 - 1 {
+        a := buffer_length + i;
+        b := buffer.length - i - 1;
+        temp := buffer.buffer[b];
+        buffer.buffer[b] = buffer.buffer[a];
+        buffer.buffer[a] = temp;
     }
 }
 

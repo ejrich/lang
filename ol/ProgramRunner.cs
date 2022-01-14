@@ -1015,7 +1015,12 @@ public static unsafe class ProgramRunner
                 {
                     var lhs = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
                     var rhs = GetValue(instruction.Value2, registers, stackPointer, function, arguments);
-                    var greaterThan = lhs.Long > rhs.Long;
+                    var greaterThan = instruction.Value1.Type.Size switch {
+                        1 => lhs.SByte > rhs.SByte,
+                        2 => lhs.Short > rhs.Short,
+                        4 => lhs.Integer > rhs.Integer,
+                        _ => lhs.Long > rhs.Long,
+                    };
                     registers[instruction.ValueIndex] = new Register {Bool = greaterThan};
                     break;
                 }
@@ -1039,7 +1044,12 @@ public static unsafe class ProgramRunner
                 {
                     var lhs = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
                     var rhs = GetValue(instruction.Value2, registers, stackPointer, function, arguments);
-                    var greaterThanOrEqual = lhs.Long >= rhs.Long;
+                    var greaterThanOrEqual = instruction.Value1.Type.Size switch {
+                        1 => lhs.SByte >= rhs.SByte,
+                        2 => lhs.Short >= rhs.Short,
+                        4 => lhs.Integer >= rhs.Integer,
+                        _ => lhs.Long >= rhs.Long,
+                    };
                     registers[instruction.ValueIndex] = new Register {Bool = greaterThanOrEqual};
                     break;
                 }
@@ -1063,7 +1073,12 @@ public static unsafe class ProgramRunner
                 {
                     var lhs = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
                     var rhs = GetValue(instruction.Value2, registers, stackPointer, function, arguments);
-                    var lessThan = lhs.Long < rhs.Long;
+                    var lessThan = instruction.Value1.Type.Size switch {
+                        1 => lhs.SByte < rhs.SByte,
+                        2 => lhs.Short < rhs.Short,
+                        4 => lhs.Integer < rhs.Integer,
+                        _ => lhs.Long < rhs.Long,
+                    };
                     registers[instruction.ValueIndex] = new Register {Bool = lessThan};
                     break;
                 }
@@ -1087,7 +1102,12 @@ public static unsafe class ProgramRunner
                 {
                     var lhs = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
                     var rhs = GetValue(instruction.Value2, registers, stackPointer, function, arguments);
-                    var lessThanOrEqual = lhs.Long <= rhs.Long;
+                    var lessThanOrEqual = instruction.Value1.Type.Size switch {
+                        1 => lhs.SByte <= rhs.SByte,
+                        2 => lhs.Short <= rhs.Short,
+                        4 => lhs.Integer <= rhs.Integer,
+                        _ => lhs.Long <= rhs.Long,
+                    };
                     registers[instruction.ValueIndex] = new Register {Bool = lessThanOrEqual};
                     break;
                 }
