@@ -1115,15 +1115,14 @@ public static class ProgramIRBuilder
     {
         if (assignment.Value != null)
         {
-            var value = EmitIR(function, assignment.Value, scope);
+            var value = EmitAndCast(function, assignment.Value, scope, type);
             if (assignment.Operator != Operator.None)
             {
                 var previousValue = EmitLoad(function, type, pointer, scope);
                 value = EmitExpression(function, previousValue, value, assignment.Operator, type, scope);
             }
 
-            var castValue = EmitCastValue(function, value, type, scope);
-            EmitStore(function, pointer, castValue, scope);
+            EmitStore(function, pointer, value, scope);
         }
         else if (assignment.Assignments != null)
         {
@@ -2173,12 +2172,16 @@ public static class ProgramIRBuilder
             case Operator.Or:
                 return EmitInstruction(InstructionType.Or, function, type, scope, lhs, rhs);
             case Operator.ShiftLeft:
+                rhs = EmitCastValue(function, rhs, type, scope);
                 return EmitInstruction(InstructionType.ShiftLeft, function, type, scope, lhs, rhs);
             case Operator.ShiftRight:
+                rhs = EmitCastValue(function, rhs, type, scope);
                 return EmitInstruction(InstructionType.ShiftRight, function, type, scope, lhs, rhs);
             case Operator.RotateLeft:
+                rhs = EmitCastValue(function, rhs, type, scope);
                 return EmitInstruction(InstructionType.RotateLeft, function, type, scope, lhs, rhs);
             case Operator.RotateRight:
+                rhs = EmitCastValue(function, rhs, type, scope);
                 return EmitInstruction(InstructionType.RotateRight, function, type, scope, lhs, rhs);
             case Operator.Equality:
             case Operator.NotEqual:
@@ -2385,6 +2388,9 @@ public static class ProgramIRBuilder
                         break;
                     case TypeKind.Float:
                         castInstruction.Type = targetIntegerType.Signed ? InstructionType.FloatToIntegerCast: InstructionType.FloatToUnsignedIntegerCast;
+                        break;
+                    case TypeKind.Pointer:
+                        castInstruction.Type = InstructionType.PointerToIntegerCast;
                         break;
                 }
                 break;
