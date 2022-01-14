@@ -2028,7 +2028,7 @@ public static class ProgramIRBuilder
         var dataPointer = EmitGetStructPointer(function, allocation, scope, TypeTable.AnyType, 1);
         var voidPointer = new InstructionValue {ValueType = InstructionValueType.Type, Type = TypeTable.VoidPointerType};
         // a. For pointers, set the value with the existing pointer
-        if (argument.Type.TypeKind == TypeKind.Pointer)
+        if (argument.Type.TypeKind == TypeKind.Pointer || argument.Type.TypeKind == TypeKind.Pointer)
         {
             var voidPointerValue = EmitInstruction(InstructionType.PointerCast, function, TypeTable.VoidPointerType, scope, argument, voidPointer);
             EmitStore(function, dataPointer, voidPointerValue, scope);
