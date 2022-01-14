@@ -21,7 +21,7 @@ main() { //#print_ir {
     g := test_each();
     h := 3 > a;
     fac6 := factorial(6);
-    print("%! = %, d = %, %\n", 6, fac6, d, hello);
+    print("%! = %, d = %, % %\n", 6, fac6, d, hello, -1234567);
     my_struct := create();
     printf("my_struct: field = %d, something = %f, subvalue.something = %d, subvalue.foo = %d\n", my_struct.field, my_struct.something, my_struct.subValue.something, my_struct.subValue.foo);
     call_field := create().something;
