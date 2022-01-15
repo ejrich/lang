@@ -261,8 +261,53 @@ print(string format, Params args) {
                         }
                     }
                 }
-                // TODO Implement me
                 else if type_kind == TypeKind.Float {
+                    if arg.type.size == 4 {
+                        value := *cast(float*, arg.data);
+                        whole := cast(s64, value);
+                        if whole == 0 {
+                            buffer.buffer[buffer.length++] = '0';
+                        }
+                        else {
+                            if value < 0 {
+                                buffer.buffer[buffer.length++] = '-';
+                                value *= -1;
+                            }
+                            write_integer_to_buffer(&buffer, whole);
+                        }
+                        buffer.buffer[buffer.length++] = '.';
+                        value -= whole;
+
+                        each x in 0..3 {
+                            value *= 10;
+                            digit := cast(u8, value);
+                            buffer.buffer[buffer.length++] = digit + '0';
+                            value -= digit;
+                        }
+                    }
+                    else {
+                        value := *cast(float64*, arg.data);
+                        whole := cast(s64, value);
+                        if whole == 0 {
+                            buffer.buffer[buffer.length++] = '0';
+                        }
+                        else {
+                            if value < 0 {
+                                buffer.buffer[buffer.length++] = '-';
+                                value *= -1;
+                            }
+                            write_integer_to_buffer(&buffer, whole);
+                        }
+                        buffer.buffer[buffer.length++] = '.';
+                        value -= whole;
+
+                        each x in 0..3 {
+                            value *= 10;
+                            digit := cast(u8, value);
+                            buffer.buffer[buffer.length++] = digit + '0';
+                            value -= digit;
+                        }
+                    }
                 }
                 else if type_kind == TypeKind.String {
                     value := *cast(string*, arg.data);
@@ -271,6 +316,7 @@ print(string format, Params args) {
                 else if type_kind == TypeKind.Pointer {
                     write_pointer_to_buffer(&buffer, arg.data);
                 }
+                // TODO Implement me
                 else if type_kind == TypeKind.Array {
                 }
                 else if type_kind == TypeKind.CArray {
