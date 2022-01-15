@@ -159,6 +159,11 @@ print(string format, Params args) {
         if char == '%' {
             if arg_index < args.length {
                 arg := args[arg_index++];
+                if arg.data == null {
+                    add_to_string_buffer(&buffer, "null");
+                    continue;
+                }
+
                 type_kind := arg.type.type;
 
                 if type_kind == TypeKind.Void {
@@ -173,141 +178,21 @@ print(string format, Params args) {
                     type_info := cast(IntegerTypeInfo*, arg.type);
                     size := type_info.size;
                     if type_info.signed {
-                        if size == 1 {
-                            value := *cast(s8*, arg.data);
-                            if value == 0 {
-                                buffer.buffer[buffer.length++] = '0';
-                                continue;
-                            }
-                            else if value < 0 {
-                                buffer.buffer[buffer.length++] = '-';
-                                value *= -1;
-                            }
-                            write_integer_to_buffer(&buffer, value);
-                        }
-                        else if size == 2 {
-                            value := *cast(s16*, arg.data);
-                            if value == 0 {
-                                buffer.buffer[buffer.length++] = '0';
-                                continue;
-                            }
-                            else if value < 0 {
-                                buffer.buffer[buffer.length++] = '-';
-                                value *= -1;
-                            }
-                            write_integer_to_buffer(&buffer, value);
-                        }
-                        else if size == 4 {
-                            value := *cast(s32*, arg.data);
-                            if value == 0 {
-                                buffer.buffer[buffer.length++] = '0';
-                                continue;
-                            }
-                            else if value < 0 {
-                                buffer.buffer[buffer.length++] = '-';
-                                value *= -1;
-                            }
-                            write_integer_to_buffer(&buffer, value);
-                        }
-                        else {
-                            value := *cast(s64*, arg.data);
-                            if value == 0 {
-                                buffer.buffer[buffer.length++] = '0';
-                                continue;
-                            }
-                            else if value < 0 {
-                                buffer.buffer[buffer.length++] = '-';
-                                value *= -1;
-                            }
-                            write_integer_to_buffer(&buffer, value);
-                        }
+                        if size == 1 write_integer<s8>(&buffer, arg.data);
+                        else if size == 2 write_integer<s16>(&buffer, arg.data);
+                        else if size == 4 write_integer<s32>(&buffer, arg.data);
+                        else write_integer<s64>(&buffer, arg.data);
                     }
                     else {
-                        if size == 1 {
-                            value := *cast(u8*, arg.data);
-                            if value == 0 {
-                                buffer.buffer[buffer.length++] = '0';
-                            }
-                            else {
-                                write_integer_to_buffer(&buffer, value);
-                            }
-                        }
-                        else if size == 2 {
-                            value := *cast(u16*, arg.data);
-                            if value == 0 {
-                                buffer.buffer[buffer.length++] = '0';
-                            }
-                            else {
-                                write_integer_to_buffer(&buffer, value);
-                            }
-                        }
-                        else if size == 4 {
-                            value := *cast(u32*, arg.data);
-                            if value == 0 {
-                                buffer.buffer[buffer.length++] = '0';
-                            }
-                            else {
-                                write_integer_to_buffer(&buffer, value);
-                            }
-                        }
-                        else {
-                            value := *cast(u64*, arg.data);
-                            if value == 0 {
-                                buffer.buffer[buffer.length++] = '0';
-                            }
-                            else {
-                                write_integer_to_buffer(&buffer, value);
-                            }
-                        }
+                        if size == 1 write_integer<u8>(&buffer, arg.data);
+                        else if size == 2 write_integer<u16>(&buffer, arg.data);
+                        else if size == 4 write_integer<u32>(&buffer, arg.data);
+                        else write_integer<u64>(&buffer, arg.data);
                     }
                 }
                 else if type_kind == TypeKind.Float {
-                    if arg.type.size == 4 {
-                        value := *cast(float*, arg.data);
-                        whole := cast(s64, value);
-                        if whole == 0 {
-                            buffer.buffer[buffer.length++] = '0';
-                        }
-                        else {
-                            if value < 0 {
-                                buffer.buffer[buffer.length++] = '-';
-                                value *= -1;
-                            }
-                            write_integer_to_buffer(&buffer, whole);
-                        }
-                        buffer.buffer[buffer.length++] = '.';
-                        value -= whole;
-
-                        each x in 0..3 {
-                            value *= 10;
-                            digit := cast(u8, value);
-                            buffer.buffer[buffer.length++] = digit + '0';
-                            value -= digit;
-                        }
-                    }
-                    else {
-                        value := *cast(float64*, arg.data);
-                        whole := cast(s64, value);
-                        if whole == 0 {
-                            buffer.buffer[buffer.length++] = '0';
-                        }
-                        else {
-                            if value < 0 {
-                                buffer.buffer[buffer.length++] = '-';
-                                value *= -1;
-                            }
-                            write_integer_to_buffer(&buffer, whole);
-                        }
-                        buffer.buffer[buffer.length++] = '.';
-                        value -= whole;
-
-                        each x in 0..3 {
-                            value *= 10;
-                            digit := cast(u8, value);
-                            buffer.buffer[buffer.length++] = digit + '0';
-                            value -= digit;
-                        }
-                    }
+                    if arg.type.size == 4 write_float<float>(&buffer, arg.data);
+                    else write_float<float64>(&buffer, arg.data);
                 }
                 else if type_kind == TypeKind.String {
                     value := *cast(string*, arg.data);
@@ -417,6 +302,44 @@ struct StringBuffer {
 add_to_string_buffer(StringBuffer* buffer, string value) {
     each i in 0..value.length-1 {
         buffer.buffer[buffer.length++] = value[i];
+    }
+}
+
+write_integer<T>(StringBuffer* buffer, void* data) {
+    value := *cast(T*, data);
+    if value == 0 {
+        buffer.buffer[buffer.length++] = '0';
+    }
+    else {
+        if value < 0 {
+            buffer.buffer[buffer.length++] = '-';
+            value *= -1;
+        }
+        write_integer_to_buffer(buffer, value);
+    }
+}
+
+write_float<T>(StringBuffer* buffer, void* data) {
+    value := *cast(T*, data);
+    whole := cast(s64, value);
+    if whole == 0 {
+        buffer.buffer[buffer.length++] = '0';
+    }
+    else {
+        if value < 0 {
+            buffer.buffer[buffer.length++] = '-';
+            value *= -1;
+        }
+        write_integer_to_buffer(buffer, whole);
+    }
+    buffer.buffer[buffer.length++] = '.';
+    value -= whole;
+
+    each x in 0..3 {
+        value *= 10;
+        digit := cast(u8, value);
+        buffer.buffer[buffer.length++] = digit + '0';
+        value -= digit;
     }
 }
 

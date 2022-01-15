@@ -448,10 +448,10 @@ public static class TypeChecker
     {
         if (function.Generics.Any())
         {
-            if (!function.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) && function.Arguments.All(arg => !arg.HasGenerics))
-            {
-                ErrorReporter.Report($"Function '{function.Name}' has generic(s), but the generic(s) are not used in the argument(s) or the return type", function);
-            }
+            // if (!function.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) && function.Arguments.All(arg => !arg.HasGenerics))
+            // {
+            //     ErrorReporter.Report($"Function '{function.Name}' has generic(s), but the generic(s) are not used in the argument(s) or the return type", function);
+            // }
 
             if (OverloadExistsForPolymorphicFunction(function))
             {
