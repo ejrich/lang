@@ -302,7 +302,7 @@ write_value_to_buffer(StringBuffer* buffer, TypeInfo* type, void* data) {
         each field in type_info.fields {
             add_to_string_buffer(buffer, field.name);
             add_to_string_buffer(buffer, ": ");
-            write_value_to_buffer(buffer, field.type, data);
+            write_value_to_buffer(buffer, field.type_info, data);
             add_to_string_buffer(buffer, ", ");
         }
 
@@ -451,7 +451,7 @@ write_struct_to_buffer(StringBuffer* buffer, StructTypeInfo* type_info, void* da
         add_to_string_buffer(buffer, field.name);
         add_to_string_buffer(buffer, ": ");
         element_data := data + field.offset;
-        write_value_to_buffer(buffer, field.type, element_data);
+        write_value_to_buffer(buffer, field.type_info, element_data);
         add_to_string_buffer(buffer, ", ");
     }
 

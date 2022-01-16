@@ -57,7 +57,8 @@ public enum FunctionFlags
     ReturnVoidAtEnd = 0x200,
     ReturnTypeHasGenerics = 0x400,
     PrintIR = 0x800,
-    ExternInitted = 0x1000
+    ExternInitted = 0x1000,
+    Queued = 0x2000
 }
 
 public interface IValues : IAst
