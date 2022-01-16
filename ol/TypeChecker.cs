@@ -18,6 +18,8 @@ public static class TypeChecker
     private static ConcurrentDictionary<string, Dictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads;
     private static ConcurrentDictionary<string, Library> _libraries;
 
+    private static Queue<IAst> _astCompleteQueue = new();
+
     public static void Init()
     {
         GlobalScope = new();
@@ -81,12 +83,13 @@ public static class TypeChecker
                         var conditional = directive.Value as ConditionalAst;
                         if (VerifyCondition(conditional.Condition, null, GlobalScope, out var constant))
                         {
-                            var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition);
-                            ProgramRunner.Init();
                             if (!constant)
                             {
+                                ClearAstQueue();
                                 ThreadPool.CompleteWork();
                             }
+                            var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition);
+                            ProgramRunner.Init();
 
                             if (ProgramRunner.ExecuteCondition(condition, conditional.Condition))
                             {
@@ -110,12 +113,13 @@ public static class TypeChecker
                     case DirectiveType.Assert:
                         if (VerifyCondition(directive.Value, null, GlobalScope, out constant))
                         {
-                            var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value);
-                            ProgramRunner.Init();
                             if (!constant)
                             {
+                                ClearAstQueue();
                                 ThreadPool.CompleteWork();
                             }
+                            var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value);
+                            ProgramRunner.Init();
 
                             if (!ProgramRunner.ExecuteCondition(condition, directive.Value))
                             {
@@ -136,54 +140,60 @@ public static class TypeChecker
         var astNode = Parser.Asts.Head;
         while (astNode != null)
         {
-            switch (astNode.Data)
-            {
-                case StructAst structAst:
-                    if (!structAst.Verified)
-                    {
-                        VerifyStruct(structAst);
-                    }
-                    break;
-                case DeclarationAst globalVariable:
-                    if (!globalVariable.Verified)
-                    {
-                        VerifyGlobalVariable(globalVariable);
-                    }
-                    break;
-                case UnionAst union:
-                    if (!union.Verified)
-                    {
-                        VerifyUnion(union);
-                    }
-                    break;
-                case InterfaceAst interfaceAst:
-                    if (!interfaceAst.Verified)
-                    {
-                        VerifyInterface(interfaceAst);
-                    }
-                    break;
-                case FunctionAst function:
-                    if (!function.Flags.HasFlag(FunctionFlags.Verified))
-                    {
-                        VerifyFunction(function);
-                    }
-                    break;
-                case OperatorOverloadAst overload:
-                    if (!overload.Flags.HasFlag(FunctionFlags.Verified))
-                    {
-                        VerifyOperatorOverload(overload);
-                    }
-                    break;
-            }
+            VerifyAst(astNode.Data);
             astNode = astNode.Next;
         }
 
         // 3. Execute any other compiler directives
         foreach (var runDirective in runQueue)
         {
-            VerifyAst(runDirective.Value, null, GlobalScope, false);
+            FunctionQueueItem queueItem;
+            var queuedAsts = new List<FunctionQueueItem>();
+            var privateScope = PrivateScopes[runDirective.FileIndex];
+            IScope scope = privateScope == null ? GlobalScope : privateScope;
+            switch (runDirective.Value)
+            {
+                case ScopeAst childScope:
+                    childScope.Parent = scope;
+                    QueueFunctionAsts(childScope, null, queuedAsts);
+                    break;
+                case WhileAst whileAst:
+                    queueItem = new FunctionQueueItem(null, scope, whileAst);
+                    queuedAsts.Add(queueItem);
+                    whileAst.Body.Parent = scope;
+                    QueueFunctionAsts(whileAst.Body, null, queuedAsts, true);
+                    break;
+                case EachAst each:
+                    queueItem = new FunctionQueueItem(null, scope, each);
+                    queuedAsts.Add(queueItem);
+                    each.Body.Parent = scope;
+                    QueueFunctionAsts(each.Body, null, queuedAsts, true);
+                    break;
+                case ConditionalAst conditional:
+                    queueItem = new FunctionQueueItem(null, scope, conditional);
+                    queuedAsts.Add(queueItem);
+                    conditional.IfBlock.Parent = scope;
+                    QueueFunctionAsts(conditional.IfBlock, null, queuedAsts);
+                    if (conditional.ElseBlock != null)
+                    {
+                        conditional.ElseBlock.Parent = scope;
+                        QueueFunctionAsts(conditional.ElseBlock, null, queuedAsts);
+                    }
+                    break;
+                default:
+                    queueItem = new FunctionQueueItem(null, scope, runDirective.Value);
+                    queuedAsts.Add(queueItem);
+                    break;
+            }
+
+            foreach (var item in queuedAsts)
+            {
+                VerifyAst(item.Ast, item.Function, item.Scope, item.CanBreak);
+            }
+
             if (!ErrorReporter.Errors.Any())
             {
+                ClearAstQueue();
                 var function = ProgramIRBuilder.CreateRunnableFunction(runDirective.Value);
 
                 ProgramRunner.Init();
@@ -225,6 +235,57 @@ public static class TypeChecker
         else
         {
             previous.Next = current.Next;
+        }
+    }
+
+    private static void ClearAstQueue()
+    {
+        while (_astCompleteQueue.TryDequeue(out var ast))
+        {
+            VerifyAst(ast);
+        }
+    }
+
+    private static void VerifyAst(IAst ast)
+    {
+        switch (ast)
+        {
+            case StructAst structAst:
+                if (!structAst.Verified)
+                {
+                    VerifyStruct(structAst);
+                }
+                break;
+            case DeclarationAst globalVariable:
+                if (!globalVariable.Verified)
+                {
+                    VerifyGlobalVariable(globalVariable);
+                }
+                break;
+            case UnionAst union:
+                if (!union.Verified)
+                {
+                    VerifyUnion(union);
+                }
+                break;
+            case InterfaceAst interfaceAst:
+                if (!interfaceAst.Verified)
+                {
+                    VerifyInterface(interfaceAst);
+                }
+                break;
+            case FunctionAst function:
+                if (!function.Flags.HasFlag(FunctionFlags.Verified))
+                {
+                    VerifyFunction(function);
+                }
+                break;
+            case OperatorOverloadAst overload:
+                if (!overload.Flags.HasFlag(FunctionFlags.Verified))
+                {
+                    VerifyOperatorOverload(overload);
+                }
+                break;
         }
     }
 
@@ -1340,6 +1401,7 @@ public static class TypeChecker
                 }
             }
         }
+        overload.ReturnType = VerifyType(overload.ReturnTypeDefinition, GlobalScope);
 
         return !overload.Generics.Any();
     }
@@ -1434,6 +1496,8 @@ public static class TypeChecker
             return;
         }
 
+        // Set the function as verified to prevent multiple verifications
+        function.Flags |= FunctionFlags.Verified;
         Debug.Assert(function.Body != null, "Should not verify function without body");
 
         // 1. Initialize local variables
@@ -1450,15 +1514,20 @@ public static class TypeChecker
             function.Body.Identifiers[argument.Name] = argument;
         }
 
-        // 3. Resolve the compiler directives in the function
-        if (function.Flags.HasFlag(FunctionFlags.HasDirectives))
-        {
-            ResolveCompilerDirectives(function.Body.Children, function);
-        }
+        // 3. Resolve the compiler directives in the function and queue the asts to be typechecked
+        var queuedAsts = new List<FunctionQueueItem>();
+        var privateScope = PrivateScopes[function.FileIndex];
+        function.Body.Parent = privateScope == null ? GlobalScope : privateScope;
+        QueueFunctionAsts(function.Body, function, queuedAsts);
 
         // 4. Loop through function body and verify all ASTs
-        var privateScope = PrivateScopes[function.FileIndex];
-        var returned = VerifyScope(function.Body, function, privateScope == null ? GlobalScope : privateScope, false);
+        foreach (var item in queuedAsts)
+        {
+            if (VerifyAst(item.Ast, item.Function, item.Scope, item.CanBreak))
+            {
+                // item.Scope.Returns = true;
+            }
+        }
 
         // 5. Verify the main function doesn't call the compiler
         if (function.Name == "main" && function.Flags.HasFlag(FunctionFlags.CallsCompiler))
@@ -1467,18 +1536,18 @@ public static class TypeChecker
         }
 
         // 6. Verify the function returns on all paths
-        if (!returned)
+        // TODO Figure this out
+        // if (!returned)
         {
             if (function.ReturnType?.TypeKind != TypeKind.Void)
             {
-                ErrorReporter.Report($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnTypeDefinition)}' on all paths", function);
+                // ErrorReporter.Report($"Function '{function.Name}' does not return type '{PrintTypeDefinition(function.ReturnTypeDefinition)}' on all paths", function);
             }
             else
             {
                 function.Flags |= FunctionFlags.ReturnVoidAtEnd;
             }
         }
-        function.Flags |= FunctionFlags.Verified;
 
         if (!ErrorReporter.Errors.Any())
         {
@@ -1498,6 +1567,9 @@ public static class TypeChecker
             return;
         }
 
+        // Set the overload as verified to prevent multiple verifications
+        overload.Flags |= FunctionFlags.Verified;
+
         // 1. Initialize local variables
         foreach (var argument in overload.Arguments)
         {
@@ -1514,23 +1586,28 @@ public static class TypeChecker
                 overload.Body.Identifiers[argument.Name] = argument;
             }
         }
-        overload.ReturnType = VerifyType(overload.ReturnTypeDefinition, GlobalScope);
 
-        // 2. Resolve the compiler directives in the body
-        if (overload.Flags.HasFlag(FunctionFlags.HasDirectives))
-        {
-            ResolveCompilerDirectives(overload.Body.Children, overload);
-        }
+        // 2. Resolve the compiler directives in the function and queue the asts to be typechecked
+        var queuedAsts = new List<FunctionQueueItem>();
+        var privateScope = PrivateScopes[overload.FileIndex];
+        overload.Body.Parent = privateScope == null ? GlobalScope : privateScope;
+        QueueFunctionAsts(overload.Body, overload, queuedAsts);
 
         // 3. Loop through body and verify all ASTs
-        var returned = VerifyScope(overload.Body, overload, GlobalScope, false);
+        foreach (var item in queuedAsts)
+        {
+            if (VerifyAst(item.Ast, item.Function, item.Scope, item.CanBreak))
+            {
+                // item.Scope.Returns = true;
+            }
+        }
 
         // 4. Verify the body returns on all paths
-        if (!returned)
-        {
-            ErrorReporter.Report($"Overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}' does not return type '{PrintTypeDefinition(overload.ReturnTypeDefinition)}' on all paths", overload);
-        }
-        overload.Flags |= FunctionFlags.Verified;
+        // TODO Figure this out
+        // if (!returned)
+        // {
+        //     ErrorReporter.Report($"Overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}' does not return type '{PrintTypeDefinition(overload.ReturnTypeDefinition)}' on all paths", overload);
+        // }
 
         if (!ErrorReporter.Errors.Any())
         {
@@ -1543,60 +1620,93 @@ public static class TypeChecker
         ProgramIRBuilder.AddOperatorOverload((OperatorOverloadAst)overload);
     }
 
-    private static void ResolveCompilerDirectives(List<IAst> asts, IFunction function)
+    private struct FunctionQueueItem
     {
-        for (int i = 0; i < asts.Count; i++)
+        public FunctionQueueItem(IFunction function, IScope scope, IAst ast, bool canBreak = false)
         {
-            var ast = asts[i];
+            Function = function;
+            Scope = scope;
+            Ast = ast;
+            CanBreak = canBreak;
+        }
+
+        public IFunction Function;
+        public IScope Scope;
+        public IAst Ast;
+        public bool CanBreak;
+    }
+
+    private static void QueueFunctionAsts(ScopeAst scope, IFunction function, List<FunctionQueueItem> queuedAsts, bool canBreak = false)
+    {
+        FunctionQueueItem item;
+        for (var i = 0; i < scope.Children.Count; i++)
+        {
+            var ast = scope.Children[i];
             switch (ast)
             {
-                case ScopeAst scope:
-                    ResolveCompilerDirectives(scope.Children, function);
+                case ScopeAst childScope:
+                    childScope.Parent = scope;
+                    QueueFunctionAsts(childScope, function, queuedAsts, canBreak);
                     break;
                 case WhileAst whileAst:
-                    ResolveCompilerDirectives(whileAst.Body.Children, function);
+                    item = new FunctionQueueItem(function, scope, whileAst, canBreak);
+                    queuedAsts.Add(item);
+                    whileAst.Body.Parent = scope;
+                    QueueFunctionAsts(whileAst.Body, function, queuedAsts, true);
                     break;
                 case EachAst each:
-                    ResolveCompilerDirectives(each.Body.Children, function);
+                    item = new FunctionQueueItem(function, scope, each, canBreak);
+                    queuedAsts.Add(item);
+                    each.Body.Parent = scope;
+                    QueueFunctionAsts(each.Body, function, queuedAsts, true);
                     break;
                 case ConditionalAst conditional:
-                    if (conditional.IfBlock != null) ResolveCompilerDirectives(conditional.IfBlock.Children, function);
-                    if (conditional.ElseBlock != null) ResolveCompilerDirectives(conditional.ElseBlock.Children, function);
+                    item = new FunctionQueueItem(function, scope, conditional, canBreak);
+                    queuedAsts.Add(item);
+                    conditional.IfBlock.Parent = scope;
+                    QueueFunctionAsts(conditional.IfBlock, function, queuedAsts, canBreak);
+                    if (conditional.ElseBlock != null)
+                    {
+                        conditional.ElseBlock.Parent = scope;
+                        QueueFunctionAsts(conditional.ElseBlock, function, queuedAsts, canBreak);
+                    }
                     break;
                 case CompilerDirectiveAst directive:
-                    asts.RemoveAt(i);
+                    scope.Children.RemoveAt(i);
                     switch (directive.Type)
                     {
                         case DirectiveType.If:
                             var conditional = directive.Value as ConditionalAst;
                             if (VerifyCondition(conditional.Condition, null, GlobalScope, out var constant))
                             {
-                                var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition);
-                                ProgramRunner.Init();
                                 if (!constant)
                                 {
+                                    ClearAstQueue();
                                     ThreadPool.CompleteWork();
                                 }
+                                var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition);
+                                ProgramRunner.Init();
 
                                 if (ProgramRunner.ExecuteCondition(condition, conditional.Condition))
                                 {
-                                    asts.InsertRange(i, conditional.IfBlock.Children);
+                                    scope.Children.InsertRange(i, conditional.IfBlock.Children);
                                 }
                                 else if (conditional.ElseBlock != null)
                                 {
-                                    asts.InsertRange(i, conditional.ElseBlock.Children);
+                                    scope.Children.InsertRange(i, conditional.ElseBlock.Children);
                                 }
                             }
                             break;
                         case DirectiveType.Assert:
                             if (VerifyCondition(directive.Value, null, GlobalScope, out constant))
                             {
-                                var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value);
-                                ProgramRunner.Init();
                                 if (!constant)
                                 {
+                                    ClearAstQueue();
                                     ThreadPool.CompleteWork();
                                 }
+                                var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value);
+                                ProgramRunner.Init();
 
                                 if (!ProgramRunner.ExecuteCondition(condition, directive.Value))
                                 {
@@ -1614,30 +1724,17 @@ public static class TypeChecker
                     }
                     i--;
                     break;
+                default:
+                    item = new FunctionQueueItem(function, scope, ast, canBreak);
+                    queuedAsts.Add(item);
+                    break;
             }
         }
     }
 
-    private static bool VerifyScope(ScopeAst scope, IFunction currentFunction, IScope parentScope, bool canBreak)
+    private static bool VerifyAst(IAst ast, IFunction currentFunction, IScope scope, bool canBreak)
     {
-        // 1. Set the parent scope
-        scope.Parent = parentScope;
-
-        // 2. Verify function lines
-        var returns = false;
-        foreach (var ast in scope.Children)
-        {
-            if (VerifyAst(ast, currentFunction, scope, canBreak))
-            {
-                returns = true;
-            }
-        }
-        return returns;
-    }
-
-    private static bool VerifyAst(IAst syntaxTree, IFunction currentFunction, IScope scope, bool canBreak)
-    {
-        switch (syntaxTree)
+        switch (ast)
         {
             case ReturnAst returnAst:
                 VerifyReturnStatement(returnAst, currentFunction, scope);
@@ -1651,8 +1748,6 @@ public static class TypeChecker
             case AssignmentAst assignment:
                 VerifyAssignment(assignment, currentFunction, scope);
                 break;
-            case ScopeAst newScope:
-                return VerifyScope(newScope, currentFunction, scope, canBreak);
             case ConditionalAst conditional:
                 return VerifyConditional(conditional, currentFunction, scope, canBreak);
             case WhileAst whileAst:
@@ -1664,17 +1759,17 @@ public static class TypeChecker
             case BreakAst:
                 if (!canBreak)
                 {
-                    ErrorReporter.Report("No parent loop to break", syntaxTree);
+                    ErrorReporter.Report("No parent loop to break", ast);
                 }
                 break;
             case ContinueAst:
                 if (!canBreak)
                 {
-                    ErrorReporter.Report("No parent loop to continue", syntaxTree);
+                    ErrorReporter.Report("No parent loop to continue", ast);
                 }
                 break;
             default:
-                VerifyExpression(syntaxTree, currentFunction, scope);
+                VerifyExpression(ast, currentFunction, scope);
                 break;
         }
 
@@ -1685,8 +1780,12 @@ public static class TypeChecker
     {
         var returnValueType = VerifyExpression(returnAst.Value, currentFunction, scope);
 
+        if (currentFunction == null)
+        {
+            ErrorReporter.Report("Cannot return in #run directive", returnAst);
+        }
         // Handle void case since it's the easiest to interpret
-        if (currentFunction.ReturnType?.TypeKind == TypeKind.Void)
+        else if (currentFunction.ReturnType?.TypeKind == TypeKind.Void)
         {
             if (returnAst.Value != null)
             {
@@ -2974,13 +3073,13 @@ public static class TypeChecker
         VerifyCondition(conditional.Condition, currentFunction, scope, out _);
 
         // 2. Verify the conditional scope
-        var ifReturns = VerifyScope(conditional.IfBlock, currentFunction, scope, canBreak);
+        // var ifReturns = VerifyScope(conditional.IfBlock, currentFunction, scope, canBreak);
 
         // 3. Verify the else block if necessary
         if (conditional.ElseBlock != null)
         {
-            var elseReturns = VerifyScope(conditional.ElseBlock, currentFunction, scope, canBreak);
-            return ifReturns && elseReturns;
+            // var elseReturns = VerifyScope(conditional.ElseBlock, currentFunction, scope, canBreak);
+            // return ifReturns && elseReturns;
         }
 
         return false;
@@ -2992,7 +3091,7 @@ public static class TypeChecker
         VerifyCondition(whileAst.Condition, currentFunction, scope, out _);
 
         // 2. Verify the scope of the while block
-        VerifyScope(whileAst.Body, currentFunction, scope, true);
+        // VerifyScope(whileAst.Body, currentFunction, scope, true);
     }
 
     private static bool VerifyCondition(IAst ast, IFunction currentFunction, IScope scope, out bool constant)
@@ -3017,7 +3116,6 @@ public static class TypeChecker
 
     private static void VerifyEach(EachAst each, IFunction currentFunction, IScope scope)
     {
-        // 1. Verify the iterator or range
         if (GetScopeIdentifier(scope, each.IterationVariable.Name, out _))
         {
             ErrorReporter.Report($"Iteration variable '{each.IterationVariable.Name}' already exists in scope", each);
@@ -3068,9 +3166,6 @@ public static class TypeChecker
             each.IterationVariable.Type = TypeTable.S32Type;
             each.Body.Identifiers.TryAdd(each.IterationVariable.Name, each.IterationVariable);
         }
-
-        // 2. Verify the scope of the each block
-        VerifyScope(each.Body, currentFunction, scope, true);
     }
 
     private static void VerifyFunctionIfNecessary(FunctionAst function, IFunction currentFunction)
@@ -3088,9 +3183,14 @@ public static class TypeChecker
                 ProgramRunner.InitExternFunction(function);
             }
         }
-        else if (!function.Flags.HasFlag(FunctionFlags.Verified) && function != currentFunction)
+        else if (!function.Flags.HasFlag(FunctionFlags.Verified) && function != currentFunction && !function.Flags.HasFlag(FunctionFlags.Queued))
         {
-            VerifyFunction(function);
+            if (!function.Flags.HasFlag(FunctionFlags.DefinitionVerified))
+            {
+                VerifyFunctionDefinition(function);
+            }
+            function.Flags |= FunctionFlags.Queued;
+            _astCompleteQueue.Enqueue(function);
         }
     }
 
@@ -4089,7 +4189,8 @@ public static class TypeChecker
                 }
 
                 AddFunction(name, fileIndex, polymorphedFunction);
-                VerifyFunction(polymorphedFunction);
+                polymorphedFunction.Flags |= FunctionFlags.Queued;
+                _astCompleteQueue.Enqueue(polymorphedFunction);
 
                 return true;
             }
@@ -4706,9 +4807,10 @@ public static class TypeChecker
     {
         if (_operatorOverloads.TryGetValue(type.BackendName, out var overloads) && overloads.TryGetValue(op, out var overload))
         {
-            if (!overload.Flags.HasFlag(FunctionFlags.Verified) && overload != currentFunction)
+            if (!overload.Flags.HasFlag(FunctionFlags.Verified) && overload != currentFunction && !overload.Flags.HasFlag(FunctionFlags.DefinitionVerified))
             {
-                VerifyOperatorOverload(overload);
+                VerifyOperatorOverloadDefinition(overload);
+                _astCompleteQueue.Enqueue(overload);
             }
             return overload;
         }
@@ -4728,7 +4830,9 @@ public static class TypeChecker
                 }
             }
 
-            VerifyOperatorOverload(polymorphedOverload);
+            VerifyOperatorOverloadDefinition(polymorphedOverload);
+            _astCompleteQueue.Enqueue(polymorphedOverload);
+
             return polymorphedOverload;
         }
         else

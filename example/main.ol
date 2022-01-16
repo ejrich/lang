@@ -300,7 +300,7 @@ struct StateStruct {
 
 State current_state(int a) {
     state: StateStruct;
-    printf("State is %d\n", state.state);
+    print("State is %\n", state);
 
     if a > 5 return State.Running;
     else if a == 5 return State.Starting;
