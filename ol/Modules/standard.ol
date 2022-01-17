@@ -156,14 +156,13 @@ print(string format, Params args) {
     write_buffer_to_standard_out(&buffer.buffer, buffer.length);
 }
 
-// TODO Get this to work without having to specify the allocator
 string format_string(string format, Allocate allocator = default_allocator, Params args) {
     buffer: StringBuffer;
     format_string_arguments(&buffer, format, args);
 
     value: string = { length = buffer.length; data = allocator(buffer.length + 1); }
     memory_copy(value.data, &buffer.buffer, buffer.length);
-    value[buffer.length] = 0; // TODO Make this just length
+    value[buffer.length] = 0; // @Cleanup Make this just length
     return value;
 }
 

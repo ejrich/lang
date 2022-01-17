@@ -12,7 +12,7 @@ main() {
         while file {
             dir_name := get_file_name(file);
             if file.d_type == FileType.DT_DIR && dir_name != "." && dir_name != ".." {
-                test_dir = format_string("%/%", default_allocator, tests_dir, dir_name);
+                test_dir = format_string("%/%", tests_dir, dir_name);
 
                 if !run_test(test_dir, dir_name) failed_test_count++;
             }
@@ -47,7 +47,7 @@ string get_file_name(dirent* file) {
 bool run_test(string test_dir, string test) {
     executable := "./ol/bin/Debug/net6.0/ol"; #const
 
-    command := format_string("% %/%.ol", default_allocator, executable, test_dir, test);
+    command := format_string("% %/%.ol", executable, test_dir, test);
     print("Compiling: %", command);
     compiler_exit_code := run_command(command);
     default_free(command.data);
@@ -57,7 +57,7 @@ bool run_test(string test_dir, string test) {
         return false;
     }
 
-    bin_dir := format_string("%/bin", default_allocator, test_dir);
+    bin_dir := format_string("%/bin", test_dir);
     dir := opendir(bin_dir.data);
     if dir == null {
         print(" -- Test Failed: Unable to open directory '%'\n", bin_dir.data);
@@ -70,7 +70,7 @@ bool run_test(string test_dir, string test) {
     while !found_executable && file != null {
         if file.d_type == FileType.DT_REG {
             file_name := get_file_name(file);
-            command = format_string("./%/%", default_allocator, bin_dir, file_name);
+            command = format_string("./%/%", bin_dir, file_name);
             found_executable = true;
         }
 

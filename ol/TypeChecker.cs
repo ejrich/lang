@@ -3636,6 +3636,9 @@ public static class TypeChecker
 
         if (function == null)
         {
+            if (call.Name == "format_string")
+            {
+            }
             function = DetermineCallingFunction(call, argumentTypes, specifiedArguments, scope);
 
             if (function == null)
@@ -4180,12 +4183,16 @@ public static class TypeChecker
             }
             else
             {
-                if (!VerifyArgument(argumentAst, arguments[callArgIndex], functionArg.Type, Extern))
+                if (VerifyArgument(argumentAst, arguments[callArgIndex], functionArg.Type, Extern))
+                {
+                    callArgIndex++;
+                }
+                // If the function argument is null or the argument is the last, then break
+                else if (functionArg.Value == null || callArgIndex >= call.Arguments.Count)
                 {
                     match = false;
                     break;
                 }
-                callArgIndex++;
             }
         }
 
@@ -4322,7 +4329,7 @@ public static class TypeChecker
             {
                 nullAst.TargetType = functionArg.Type;
             }
-            else
+            else if (functionArg.Type.TypeKind != TypeKind.Any)
             {
                 var argument = argumentTypes[i];
                 if (argument != null)
@@ -4336,6 +4343,10 @@ public static class TypeChecker
                             call.Arguments[i] = typeIndex;
                             argumentTypes[i] = typeIndex.Type;
                         }
+                    }
+                    else if (!TypeEquals(functionArg.Type, argument) && functionArg.Value != null)
+                    {
+                        call.Arguments.Insert(i, functionArg.Value);
                     }
                     else
                     {
