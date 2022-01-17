@@ -1395,7 +1395,7 @@ create_vertex_buffer(Array<Vertex> vertices, VkBuffer** vertex_buffer, VkDeviceM
 
     data: void*;
     vkMapMemory(device, staging_buffer_memory, 0, size, 0, &data);
-    mem_copy(data, vertices.data, size);
+    memory_copy(data, vertices.data, size);
     vkUnmapMemory(device, staging_buffer_memory);
 
     create_buffer(size, VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_DST_BIT | VkBufferUsageFlagBits.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, vertex_buffer, vertex_buffer_memory);
@@ -1481,7 +1481,7 @@ create_index_buffer(Array<u32> indices, VkBuffer** index_buffer, VkDeviceMemory*
 
     data: void*;
     vkMapMemory(device, staging_buffer_memory, 0, size, 0, &data);
-    mem_copy(data, indices.data, size);
+    memory_copy(data, indices.data, size);
     vkUnmapMemory(device, staging_buffer_memory);
 
     create_buffer(size, VkBufferUsageFlagBits.VK_BUFFER_USAGE_TRANSFER_DST_BIT | VkBufferUsageFlagBits.VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, index_buffer, index_buffer_memory);
@@ -1577,7 +1577,7 @@ update_uniform_buffer(u32 current_image) {
 
     data: void*;
     vkMapMemory(device, uniform_buffers_memory[current_image], 0, size, 0, &data);
-    mem_copy(data, &ubo, size);
+    memory_copy(data, &ubo, size);
     vkUnmapMemory(device, uniform_buffers_memory[current_image]);
 }
 
@@ -1813,7 +1813,7 @@ int create_texture_image(string file, VkImage** texture_image, VkDeviceMemory** 
 
     data: void*;
     vkMapMemory(device, staging_buffer_memory, 0, image_size, 0, &data);
-    mem_copy(data, pixels, image_size);
+    memory_copy(data, pixels, image_size);
     vkUnmapMemory(device, staging_buffer_memory);
 
     stbi_image_free(pixels);
