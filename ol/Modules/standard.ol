@@ -99,7 +99,7 @@ void* malloc(int size) #extern "c"
 void* realloc(void* pointer, int size) #extern "c"
 free(void* data) #extern "c"
 
-void* mem_copy(void* dest, void* src, int length) {
+void* memory_copy(void* dest, void* src, int length) {
     dest_buffer := cast(u8*, dest);
     src_buffer := cast(u8*, src);
 
@@ -152,6 +152,22 @@ print(string format, Params args) {
     }
 
     buffer: StringBuffer;
+    format_string_arguments(&buffer, format, args);
+    write_buffer_to_standard_out(&buffer.buffer, buffer.length);
+}
+
+// TODO Get this to work without having to specify the allocator
+string format_string(string format, Allocate allocator = default_allocator, Params args) {
+    buffer: StringBuffer;
+    format_string_arguments(&buffer, format, args);
+
+    value: string = { length = buffer.length; data = allocator(buffer.length + 1); }
+    memory_copy(value.data, &buffer.buffer, buffer.length);
+    value[buffer.length] = 0; // TODO Make this just length
+    return value;
+}
+
+format_string_arguments(StringBuffer* buffer, string format, Array<Any> args) {
     arg_index := 0;
 
     each i in 0..format.length-1 {
@@ -159,20 +175,12 @@ print(string format, Params args) {
         if char == '%' {
             if arg_index < args.length {
                 arg := args[arg_index++];
-                write_value_to_buffer(&buffer, arg.type, arg.data);
+                write_value_to_buffer(buffer, arg.type, arg.data);
             }
         }
         else {
             buffer.buffer[buffer.length++] = char;
         }
-    }
-
-    write_buffer_to_standard_out(&buffer.buffer, buffer.length);
-}
-
-write_buffer_to_standard_out(u8* buffer, s64 length) {
-    #if os == OS.Linux {
-        write(stdout, buffer, length);
     }
 }
 
@@ -181,6 +189,12 @@ string_buffer_max_length := 1024; #const
 struct StringBuffer {
     length: s64;
     buffer: CArray<u8>[string_buffer_max_length];
+}
+
+write_buffer_to_standard_out(u8* buffer, s64 length) {
+    #if os == OS.Linux {
+        write(stdout, buffer, length);
+    }
 }
 
 write_value_to_buffer(StringBuffer* buffer, TypeInfo* type, void* data) {
