@@ -52,7 +52,7 @@ dynamic_arrays() {
     }
 
     print_array("Array<int>", a);
-    free(a.data);
+    default_free(a.data);
 
     array_struct: DynamicArrayStruct;
     each i in 12..16 {
@@ -61,7 +61,7 @@ dynamic_arrays() {
     array_remove(&array_struct.array, 2);
 
     print_array("DynamicArrayStruct.array", array_struct.array);
-    free(array_struct.array.data);
+    default_free(array_struct.array.data);
 }
 
 struct DynamicArrayStruct {
