@@ -376,7 +376,7 @@ struct StructField {
     names: Array<string>;
 }
 
-Node<Token>* parse_struct(Node<Token>* node, FILE* file, string type_name = "struct", bool alias = true, string struct_name = "", bool typedef = false, bool internal = false) #print_ir {
+Node<Token>* parse_struct(Node<Token>* node, FILE* file, string type_name = "struct", bool alias = true, string struct_name = "", bool typedef = false, bool internal = false) {
     node = node.next;
 
     if node {
