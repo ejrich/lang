@@ -1,3 +1,5 @@
+#import standard
+
 main() {
     run_specified_function();
 }

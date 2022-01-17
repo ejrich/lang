@@ -206,6 +206,8 @@ public static class TypeChecker
             }
         }
 
+        ClearAstQueue();
+
         if (GlobalScope.Functions.TryGetValue("main", out var functions))
         {
             if (functions.Count > 1)
@@ -1709,12 +1711,14 @@ public static class TypeChecker
                     VerifyAssignment(assignment, function, scope);
                     break;
                 case BreakAst:
+                    scope.Returns = true;
                     if (!canBreak)
                     {
                         ErrorReporter.Report("No parent loop to break", ast);
                     }
                     break;
                 case ContinueAst:
+                    scope.Returns = true;
                     if (!canBreak)
                     {
                         ErrorReporter.Report("No parent loop to continue", ast);

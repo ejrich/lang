@@ -1,11 +1,11 @@
 foo() {
-    printf("Fizz\n");
+    print("Fizz\n");
 }
 
 bar() {
-    printf("Buzz\n");
+    print("Buzz\n");
 }
 
 baz() {
-    printf("FizzBuzz\n");
+    print("FizzBuzz\n");
 }

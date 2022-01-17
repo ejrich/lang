@@ -38,7 +38,7 @@ parse(string file_contents, string library, string output_file) {
         fclose(lib_file);
     }
     else {
-        printf("Unable to create file '%s'\n", library);
+        print("Unable to create file '%'\n", library);
     }
 }
 
@@ -376,7 +376,7 @@ struct StructField {
     names: Array<string>;
 }
 
-Node<Token>* parse_struct(Node<Token>* node, FILE* file, string type_name = "struct", bool alias = true, string struct_name = "", bool typedef = false, bool internal = false) {
+Node<Token>* parse_struct(Node<Token>* node, FILE* file, string type_name = "struct", bool alias = true, string struct_name = "", bool typedef = false, bool internal = false) #print_ir {
     node = node.next;
 
     if node {

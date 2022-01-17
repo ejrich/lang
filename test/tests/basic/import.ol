@@ -1,5 +1,5 @@
 foobar() {
-    printf("Printing from another file\n");
+    print("Printing from another file\n");
     foobaz(100);
 
     test: Test = { foo = 12; baz = 3.14; }
@@ -13,7 +13,7 @@ foobar() {
 #private
 
 foobaz(int a = 10) {
-    printf("Hello world - %d\n", a);
+    print("Hello world - %\n", a);
 }
 
 struct Test {
@@ -28,5 +28,5 @@ struct PolyStruct2<T, U> {
 
 using_test<T>(T foo) {
     foo.baz = 8.5;
-    printf("foo.baz = %.2f\n", foo.baz);
+    print("foo.baz = %\n", foo.baz);
 }

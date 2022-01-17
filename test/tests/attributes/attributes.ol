@@ -1,3 +1,5 @@
+#import standard
+
 main() {
     a := foo();
     b := bar();
@@ -26,7 +28,7 @@ print_function_attributes(Type type) {
     function_type_info := cast(FunctionTypeInfo*, type_info);
 
     each attribute, i in function_type_info.attributes {
-        printf("Function %s attribute %d: %s\n", type_info.name, i, attribute);
+        print("Function % attribute %: %\n", type_info.name, i, attribute);
     }
 }
 
@@ -48,12 +50,12 @@ print_struct_attributes(Type type) {
     struct_type_info := cast(StructTypeInfo*, type_info);
 
     each attribute, i in struct_type_info.attributes {
-        printf("Struct %s attribute %d: %s\n", type_info.name, i, attribute);
+        print("Struct % attribute %: %\n", type_info.name, i, attribute);
     }
 
     each field in struct_type_info.fields {
         each attribute, i in field.attributes {
-            printf("Struct %s field %s attribute %d: %s\n", type_info.name, field.name, i, attribute);
+            print("Struct % field % attribute %: %\n", type_info.name, field.name, i, attribute);
         }
     }
 }
@@ -70,7 +72,7 @@ print_enum_attributes(Type type) {
     enum_type_info := cast(EnumTypeInfo*, type_info);
 
     each attribute, i in enum_type_info.attributes {
-        printf("Enum %s attribute %d: %s\n", type_info.name, i, attribute);
+        print("Enum % attribute %: %\n", type_info.name, i, attribute);
     }
 }
 

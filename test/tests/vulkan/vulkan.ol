@@ -88,7 +88,7 @@ instance: VkInstance*;
 
 create_instance() {
     if enable_validation_layers && !check_validation_layer_support() {
-        printf("Validation layers requested, but not available\n");
+        print("Validation layers requested, but not available\n");
         exit(1);
     }
 
@@ -117,10 +117,10 @@ create_instance() {
         instance_create_info.ppEnabledLayerNames = &validation_layers[0].data; // Not pretty, but works
     }
 
-    printf("Creating vulkan instance\n");
+    print("Creating vulkan instance\n");
     result := vkCreateInstance(&instance_create_info, null, &instance);
     if result != VkResult.VK_SUCCESS {
-        printf("Unable to create vulkan instance %d\n", result);
+        print("Unable to create vulkan instance %\n", result);
         exit(1);
     }
 }
@@ -129,7 +129,7 @@ Array<u8*> get_required_extensions() {
     extension_count: u32;
     result := vkEnumerateInstanceExtensionProperties(null, &extension_count, null);
     if result != VkResult.VK_SUCCESS {
-        printf("Unable to get vulkan extensions\n");
+        print("Unable to get vulkan extensions\n");
         exit(1);
     }
 
@@ -139,7 +139,7 @@ Array<u8*> get_required_extensions() {
     extension_names: Array<u8*>;
     each extension, i in extensions {
         name := convert_c_string(&extension.extensionName);
-        printf("Extension - %s\n", name);
+        print("Extension - %\n", name);
 
         #if os == OS.Linux {
             if name == VK_KHR_SURFACE_EXTENSION_NAME {
@@ -250,22 +250,22 @@ setup_debug_messenger() {
     if func != null {
         result := func(instance, &messenger_create_info, null, &debug_messenger);
         if result != VkResult.VK_SUCCESS {
-            printf("Failed to set up debug messenger %d\n", result);
+            print("Failed to set up debug messenger %\n", result);
             exit(1);
         }
     }
     else {
-        printf("Failed to set up debug messenger\n");
+        print("Failed to set up debug messenger\n");
         exit(1);
     }
 }
 
 u32 debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagBitsEXT type, VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data) {
     if severity == VkDebugUtilsMessageSeverityFlagBitsEXT.VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT {
-        printf("Warning - %s\n", callback_data.pMessage);
+        print("Warning - %\n", convert_c_string(callback_data.pMessage));
     }
     else if severity == VkDebugUtilsMessageSeverityFlagBitsEXT.VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT {
-        printf("Error - %s\n", callback_data.pMessage);
+        print("Error - %\n", convert_c_string(callback_data.pMessage));
     }
 
     return VK_FALSE;
@@ -280,7 +280,7 @@ pick_physical_device() {
     vkEnumeratePhysicalDevices(instance, &device_count, null);
 
     if device_count == 0 {
-        printf("Failed to find GPUs with Vulkan support\n");
+        print("Failed to find GPUs with Vulkan support\n");
         exit(1);
     }
 
@@ -298,7 +298,7 @@ pick_physical_device() {
     }
 
     if physical_device == null {
-        printf("Failed to find a suitable GPU\n");
+        print("Failed to find a suitable GPU\n");
         exit(1);
     }
 
@@ -325,7 +325,7 @@ int is_device_suitable(VkPhysicalDevice* device) {
     else if !swap_chain_adequate(device) score = 0;
     else if features.samplerAnisotropy == VK_FALSE score = 0;
 
-    printf("Device - %s, Score = %d\n", properties.deviceName, score);
+    print("Device - %, Score = %\n", convert_c_string(&properties.deviceName), score);
 
     return score;
 }
@@ -411,7 +411,7 @@ create_logical_device() {
 
     result := vkCreateDevice(physical_device, &device_create_info, null, &device);
     if result != VkResult.VK_SUCCESS {
-        printf("Unable to create vulkan device %d\n", result);
+        print("Unable to create vulkan device %\n", result);
         exit(1);
     }
 
@@ -435,7 +435,7 @@ create_surface() {
     }
 
     if result != VkResult.VK_SUCCESS {
-        printf("Unable to create window surface %d\n", result);
+        print("Unable to create window surface %\n", result);
         exit(1);
     }
 }
@@ -628,7 +628,7 @@ create_swap_chain() {
 
     result := vkCreateSwapchainKHR(device, &swapchain_create_info, null, &swap_chain);
     if result != VkResult.VK_SUCCESS {
-        printf("Unable to create swap chain %d\n", result);
+        print("Unable to create swap chain %\n", result);
         exit(1);
     }
 
@@ -705,7 +705,7 @@ create_image_views() {
 
         result := vkCreateImageView(device, &view_create_info, null, &swap_chain_image_views[i]);
         if result != VkResult.VK_SUCCESS {
-            printf("Unable to create image view %d\n", result);
+            print("Unable to create image view %\n", result);
             exit(1);
         }
     }
@@ -842,7 +842,7 @@ create_graphics_pipeline() {
 
     result := vkCreatePipelineLayout(device, &pipeline_layout_info, null, &pipeline_layout);
     if result != VkResult.VK_SUCCESS {
-        printf("Unable to create pipeline layout %d\n", result);
+        print("Unable to create pipeline layout %\n", result);
         exit(1);
     }
 
@@ -879,7 +879,7 @@ create_graphics_pipeline() {
 
     result = vkCreateGraphicsPipelines(device, null, 1, &pipeline_info, null, &graphics_pipeline);
     if result != VkResult.VK_SUCCESS {
-        printf("Unable to create graphics pipeline %d\n", result);
+        print("Unable to create graphics pipeline %\n", result);
         exit(1);
     }
 
@@ -903,7 +903,7 @@ VkShaderModule* create_shader_module(string file) {
     shader_module: VkShaderModule*;
     result := vkCreateShaderModule(device, &shader_create_info, null, &shader_module);
     if result != VkResult.VK_SUCCESS {
-        printf("Unable to create shader module %d\n", result);
+        print("Unable to create shader module %\n", result);
         exit(1);
     }
 
@@ -993,7 +993,7 @@ create_render_pass() {
 
     result := vkCreateRenderPass(device, &render_pass_info, null, &render_pass);
     if result != VkResult.VK_SUCCESS {
-        printf("Unable to create render pass %d\n", result);
+        print("Unable to create render pass %\n", result);
         exit(1);
     }
 }
@@ -1024,7 +1024,7 @@ create_framebuffers() {
 
         result := vkCreateFramebuffer(device, &framebuffer_info, null, &swap_chain_framebuffers[i]);
         if result != VkResult.VK_SUCCESS {
-            printf("Unable to create framebuffer %d\n", result);
+            print("Unable to create framebuffer %\n", result);
             exit(1);
         }
     }
@@ -1045,7 +1045,7 @@ create_command_pool() {
 
     result := vkCreateCommandPool(device, &pool_info, null, &command_pool);
     if result != VkResult.VK_SUCCESS {
-        printf("Unable to create command pool %d\n", result);
+        print("Unable to create command pool %\n", result);
         exit(1);
     }
 }
@@ -1061,7 +1061,7 @@ create_command_buffers() {
 
     result := vkAllocateCommandBuffers(device, &alloc_info, command_buffers.data);
     if result != VkResult.VK_SUCCESS {
-        printf("Unable to create command pool %d\n", result);
+        print("Unable to create command pool %\n", result);
         exit(1);
     }
 
@@ -1087,7 +1087,7 @@ create_command_buffers() {
     each command_buffer, i in command_buffers {
         result = vkBeginCommandBuffer(command_buffer, &begin_info);
         if result != VkResult.VK_SUCCESS {
-            printf("Unable to begin recording command buffer %d\n", result);
+            print("Unable to begin recording command buffer %\n", result);
             exit(1);
         }
 
@@ -1113,7 +1113,7 @@ create_command_buffers() {
 
         result = vkEndCommandBuffer(command_buffer);
         if result != VkResult.VK_SUCCESS {
-            printf("Unable to record command buffer %d\n", result);
+            print("Unable to record command buffer %\n", result);
             exit(1);
         }
     }
@@ -1142,19 +1142,19 @@ create_sync_objects() {
     each i in 0..MAX_FRAMES_IN_FLIGHT-1 {
         result := vkCreateSemaphore(device, &semaphore_info, null, &image_available_semaphores[i]);
         if result != VkResult.VK_SUCCESS {
-            printf("Unable to create semaphore %d\n", result);
+            print("Unable to create semaphore %\n", result);
             exit(1);
         }
 
         result = vkCreateSemaphore(device, &semaphore_info, null, &render_finished_semaphores[i]);
         if result != VkResult.VK_SUCCESS {
-            printf("Unable to create semaphore %d\n", result);
+            print("Unable to create semaphore %\n", result);
             exit(1);
         }
 
         result = vkCreateFence(device, &fence_info, null, &in_flight_fences[i]);
         if result != VkResult.VK_SUCCESS {
-            printf("Unable to create fence %d\n", result);
+            print("Unable to create fence %\n", result);
             exit(1);
         }
     }
@@ -1174,7 +1174,7 @@ draw_frame() {
         return;
     }
     else if result != VkResult.VK_SUCCESS && result != VkResult.VK_SUBOPTIMAL_KHR {
-        printf("Failed to acquire swap chain image %d\n", result);
+        print("Failed to acquire swap chain image %\n", result);
         exit(1);
     }
 
@@ -1200,7 +1200,7 @@ draw_frame() {
 
     result = vkQueueSubmit(graphics_queue, 1, &submit_info, in_flight_fences[current_frame]);
     if result != VkResult.VK_SUCCESS {
-        printf("Failed to submit draw command buffer %d\n", result);
+        print("Failed to submit draw command buffer %\n", result);
         exit(1);
     }
 
@@ -1218,7 +1218,7 @@ draw_frame() {
         recreate_swap_chain();
     }
     else if result != VkResult.VK_SUCCESS {
-        printf("Failed to present swap chain image %d\n", result);
+        print("Failed to present swap chain image %\n", result);
         exit(1);
     }
 
@@ -1415,7 +1415,7 @@ u32 find_memory_type(u32 type_filter, VkMemoryPropertyFlagBits properties) {
             return i;
     }
 
-    printf("Failed to find a suitable memory type\n");
+    print("Failed to find a suitable memory type\n");
     exit(1);
     return 0;
 }
@@ -1431,7 +1431,7 @@ create_buffer(u64 size, VkBufferUsageFlagBits usage, VkMemoryPropertyFlagBits pr
 
     result := vkCreateBuffer(device, &buffer_info, null, buffer);
     if result != VkResult.VK_SUCCESS {
-        printf("Unable to create buffer %d\n", result);
+        print("Unable to create buffer %\n", result);
         exit(1);
     }
 
@@ -1445,7 +1445,7 @@ create_buffer(u64 size, VkBufferUsageFlagBits usage, VkMemoryPropertyFlagBits pr
 
     result = vkAllocateMemory(device, &alloc_info, null, buffer_memory);
     if result != VkResult.VK_SUCCESS {
-        printf("Unable to allocate buffer memory %d\n", result);
+        print("Unable to allocate buffer memory %\n", result);
         exit(1);
     }
 
@@ -1541,7 +1541,7 @@ create_descriptor_set_layout() {
 
     result := vkCreateDescriptorSetLayout(device, &layout_info, null, &descriptor_set_layout);
     if result != VkResult.VK_SUCCESS {
-        printf("Failed to create descriptor set layout %d", result);
+        print("Failed to create descriptor set layout %", result);
         exit(1);
     }
 }
@@ -1723,7 +1723,7 @@ create_descriptor_pool() {
 
     result := vkCreateDescriptorPool(device, &pool_info, null, &descriptor_pool);
     if result != VkResult.VK_SUCCESS {
-        printf("Unable to create descriptor pool %d\n", result);
+        print("Unable to create descriptor pool %\n", result);
         exit(1);
     }
 }
@@ -1744,7 +1744,7 @@ create_descriptor_sets(Array<VkDescriptorSet*>* descriptor_sets, VkImageView* te
 
     result := vkAllocateDescriptorSets(device, &alloc_info, descriptor_sets.data);
     if result != VkResult.VK_SUCCESS {
-        printf("Unable to allocate descriptor sets %d\n", result);
+        print("Unable to allocate descriptor sets %\n", result);
         exit(1);
     }
 
@@ -1802,7 +1802,7 @@ int create_texture_image(string file, VkImage** texture_image, VkDeviceMemory** 
     mip_levels: u32 = cast(u32, floor(log2(cast(float64, max)))) + 1;
 
     if pixels == null {
-        printf("Failed to load texture image\n");
+        print("Failed to load texture image\n");
         exit(1);
     }
 
@@ -1853,7 +1853,7 @@ create_image(u32 width, u32 height, VkFormat format, VkImageTiling tiling, VkIma
 
     result := vkCreateImage(device, &image_info, null, image);
     if result != VkResult.VK_SUCCESS {
-        printf("Failed to create image %d\n", result);
+        print("Failed to create image %\n", result);
         exit(1);
     }
 
@@ -1867,7 +1867,7 @@ create_image(u32 width, u32 height, VkFormat format, VkImageTiling tiling, VkIma
 
     result = vkAllocateMemory(device, &alloc_info, null, image_memory);
     if result != VkResult.VK_SUCCESS {
-        printf("Failed to allocate image memory %d\n", result);
+        print("Failed to allocate image memory %\n", result);
         exit(1);
     }
 
@@ -1954,7 +1954,7 @@ transition_image_layout(VkImage* image, VkFormat format, VkImageLayout old_layou
         destination_stage = VkPipelineStageFlagBits.VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     }
     else {
-        printf("Unsupported layout transition\n");
+        print("Unsupported layout transition\n");
         exit(1);
     }
 
@@ -2009,7 +2009,7 @@ create_texture_image_view(VkImage* texture_image, VkImageView** texture_image_vi
 
     result := vkCreateImageView(device, &view_info, null, texture_image_view);
     if result != VkResult.VK_SUCCESS {
-        printf("Unable to create image view %d\n", result);
+        print("Unable to create image view %\n", result);
         exit(1);
     }
 }
@@ -2038,7 +2038,7 @@ create_texture_sampler() {
 
     result := vkCreateSampler(device, &sampler_info, null, &texture_sampler);
     if result != VkResult.VK_SUCCESS {
-        printf("Unable to create image sampler %d\n", result);
+        print("Unable to create image sampler %\n", result);
         exit(1);
     }
 }
@@ -2076,7 +2076,7 @@ create_depth_resources() {
 
     result := vkCreateImageView(device, &view_create_info, null, &depth_image_view);
     if result != VkResult.VK_SUCCESS {
-        printf("Unable to create image view %d\n", result);
+        print("Unable to create image view %\n", result);
         exit(1);
     }
 
@@ -2094,7 +2094,7 @@ VkFormat find_supported_format(Array<VkFormat> candidates, VkImageTiling tiling,
             return format;
     }
 
-    printf("Failed to find supported format\n");
+    print("Failed to find supported format\n");
     exit(1);
     return VkFormat.VK_FORMAT_UNDEFINED;
 }
@@ -2276,7 +2276,7 @@ generate_mipmaps(VkImage* image, VkFormat image_format, int width, int height, i
     vkGetPhysicalDeviceFormatProperties(physical_device, image_format, &format_properties);
 
     if (format_properties.optimalTilingFeatures & VkFormatFeatureFlagBits.VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT) != VkFormatFeatureFlagBits.VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT {
-        printf("Texture image format does not support linear blitting\n");
+        print("Texture image format does not support linear blitting\n");
         exit(1);
     }
 
@@ -2414,7 +2414,7 @@ create_color_resources() {
 
     result := vkCreateImageView(device, &view_create_info, null, &color_image_view);
     if result != VkResult.VK_SUCCESS {
-        printf("Unable to create image view %d\n", result);
+        print("Unable to create image view %\n", result);
         exit(1);
     }
 }

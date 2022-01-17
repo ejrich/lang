@@ -163,10 +163,6 @@ struct Any {
 }
 
 
-// Basic functions
-printf(string format, ... args) #extern "c"
-
-
 // Runtime functions
 int __start(int argc, u8** argv) {
     args: Array<string>[argc-1];

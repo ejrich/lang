@@ -38,11 +38,11 @@ variables() {
 }
 
 foo_impl(int x, int y) {
-    printf("%d %d\n", x, y);
+    print("% %\n", x, y);
 }
 
 int bar_impl(int x, float y) {
-    printf("%d %.2f\n", x, y);
+    print("% %\n", x, y);
     return 9;
 }
 
@@ -56,7 +56,7 @@ use_interface(foo pointer) {
 }
 
 foo_impl2(int x, int y) {
-    printf("This is foo_impl2 %d %d\n", x, y);
+    print("This is foo_impl2 % %\n", x, y);
 }
 
 struct FunctionPointers {
@@ -69,13 +69,13 @@ struct FunctionPointers {
 
 Foo foobar_impl(s64 x, float y) {
     a: Foo = { bar = x; baz = y; }
-    printf("foobar_impl %d, %.2f\n", x, y);
+    print("foobar_impl %, %\n", x, y);
     return a;
 }
 
 Foo* baz_impl(s64 x, float y) {
     a: Foo = { bar = x; baz = y; }
-    printf("baz_impl %d, %.2f\n", x, y);
+    print("baz_impl %, %\n", x, y);
     return &a;
 }
 
@@ -89,7 +89,7 @@ structs() {
     b := pointers.d(230, 42.0).bar;
     c := pointers.e(2300, 420.0).baz;
 
-    printf("Values %d %d %.2f\n", a.bar, b, c);
+    print("Values % % %\n", a.bar, b, c);
 }
 
 #run main();

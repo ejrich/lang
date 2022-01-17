@@ -3,14 +3,14 @@
 
 main() {
     if command_line_arguments.length != 3 {
-        printf("Please provide an input file, library name, and output file\n");
+        print("Please provide an input file, library name, and output file\n");
         exit_code = 1;
         return;
     }
 
     found, file_contents := read_file(command_line_arguments[0], allocate);
     if found {
-        printf("Parsing file '%s', size %d\n", command_line_arguments[0], file_contents.length);
+        print("Parsing file '%', size %\n", command_line_arguments[0], file_contents.length);
 
         parse(file_contents, command_line_arguments[1], command_line_arguments[2]);
 
@@ -18,7 +18,7 @@ main() {
             default_free(arena.pointer);
     }
     else {
-        printf("Input file '%s' not found\n", command_line_arguments[0]);
+        print("Input file '%' not found\n", command_line_arguments[0]);
         exit_code = 2;
     }
 }
