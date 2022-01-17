@@ -22,32 +22,32 @@ c_arrays() {
     array: CArray<int>[array_size]; // Correct
 
     // array.length = 9; // Does not compile due to length being a constant value
-    printf("Array size = %d, should be %d. Array pointer = %p\n", array.length, array_size, &array);
+    print("Array size = %, should be %. Array pointer = %\n", array.length, array_size, &array);
     each i in 0..array_size-1 {
         array[i] = 5 * i;
-        printf("Array value %d = %d\n", i, array[i]);
+        print("Array value % = %\n", i, array[i]);
     }
 
-    each x in array printf("Array value: %d\n", x);
+    each x in array print("Array value: %\n", x);
 
     init_array: CArray<int> = [1, 2, 3, 4, 5]
 
-    each x in init_array printf("Initialized array value: %d\n", x);
+    each x in init_array print("Initialized array value: %\n", x);
 }
 
 c_array_structs() {
     array_struct: ArrayStruct;
 
     // array_struct.array.length = 90; // Does not compile due to length being a constant value
-    printf("ArrayStruct array size = %d, should be %d. Array pointer = %p, Type size = %d\n", array_struct.array.length, struct_array_size, &array_struct.array, size_of(array_struct));
+    print("ArrayStruct array size = %, should be %. Array pointer = %, Type size = %\n", array_struct.array.length, struct_array_size, &array_struct.array, size_of(array_struct));
     each i in 0..struct_array_size-1 {
         array_struct.array[i] = 5 * i;
-        printf("Struct array value %d = %d\n", i, array_struct.array[i - 1]);
+        print("Struct array value % = %\n", i, array_struct.array[i - 1]);
     }
 
-    each x in array_struct.array printf("Struct array value: %d\n", x);
+    each x in array_struct.array print("Struct array value: %\n", x);
 
-    each x in array_struct.init_array printf("Struct init_array value: %d\n", x);
+    each x in array_struct.init_array print("Struct init_array value: %\n", x);
 }
 
 struct_array_size := 5; #const
@@ -61,12 +61,12 @@ struct ArrayStruct {
 function_calls() {
     array := returns_c_array();
     each i in array {
-        printf("Return c array value %d\n", i);
+        print("Return c array value %\n", i);
     }
 
     struct_array := returns_c_array_from_struct();
     each i in struct_array {
-        printf("Return c array value from struct %d\n", i);
+        print("Return c array value from struct %\n", i);
     }
 }
 
@@ -115,7 +115,7 @@ unions() {
 
     assert(event.key_event.foo == event.button_event.foo);
 
-    printf("Union assertions passed\n");
+    print("Union assertions passed\n");
 }
 
 #run main();

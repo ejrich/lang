@@ -76,13 +76,13 @@ array_literals() {
 }
 
 print_array(string name, Array<int> array) {
-    printf("------- %s -------\n\n", name);
+    print("------- % -------\n\n", name);
 
     each value, i in array {
-        printf("array[%d] = %d\n", i, value);
+        print("array[%] = %\n", i, value);
     }
 
-    printf("\n");
+    print("\n");
 }
 
 int rand() #extern "c"

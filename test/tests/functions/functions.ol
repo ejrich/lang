@@ -1,3 +1,5 @@
+#import standard
+
 main() {
     function_overloads();
 
@@ -19,8 +21,8 @@ function_overloads() {
     sum_list[6] = 23;
     // type_of(sum); // Does not compile due to multiple overloads of 'sum'
 
-    printf("Sum of Array  = %d\n", sum(sum_list));
-    printf("Sum of Params = %d\n", sum(4, 41, 544, 244, 42, 14, 23));
+    print("Sum of Array  = %\n", sum(sum_list));
+    print("Sum of Params = %\n", sum(4, 41, 544, 244, 42, 14, 23));
 }
 
 int sum(Array<int> args) {
@@ -53,21 +55,21 @@ default_arguments() {
 }
 
 foo(int a, s16 b = 8, bool c = true) {
-    printf("a = %d, b = %d, c = %d\n", a, b, c);
+    print("a = %, b = %, c = %\n", a, b, c);
 }
 
 foo_params(int a, int b = 8, Params<float> args) {
     sum: float;
     each i in args sum += i;
-    printf("a = %d, b = %d, sum = %.2f\n", a, b, sum);
+    print("a = %, b = %, sum = %\n", a, b, sum);
 }
 
 polymorphic_functions() {
     float_value := add_int(3.1, 2);
     int_value := add_int(35, 10);
     int_value2 := add_int(12, 10);
-    printf("float_value = %.2f, should be 5.10\n", float_value);
-    printf("int_value = %d, should be 45\n", int_value);
+    print("float_value = %, should be 5.10\n", float_value);
+    print("int_value = %, should be 45\n", int_value);
 
     int_list: Array<int>[8];
     string_list: Array<string>[8];
@@ -77,7 +79,7 @@ polymorphic_functions() {
 
     thing := create<Thing>();
     create<Thing>();
-    printf("thing.a = %d, thing.b = %.2f\n", thing.a, thing.b);
+    print("thing.a = %, thing.b = %\n", thing.a, thing.b);
 
     a: PolyStruct<int> = { a = 2; }
     foobar(a, 1, 2, 3);
@@ -92,10 +94,10 @@ T add_int<T>(T a, int b) {
 
 baz<T, U>(Array<T> list, U* b) {
     #assert U == float || U == s32;
-    #if U == float printf("b = %.2f\n", *b);
+    #if U == float print("b = %\n", *b);
     else {
-        if T == s32 printf("T is an int\n");
-        else printf("T is not an int\n");
+        if T == s32 print("T is an int\n");
+        else print("T is not an int\n");
     }
 }
 
@@ -116,12 +118,12 @@ struct PolyStruct<I> {
 foobar<T, U>(PolyStruct<T> c, Params<U> args) {
     #if T == U {
         each arg in args {
-            printf("Compare without casting: c.a == arg = %d, arg = %d\n", c.a == arg, arg);
+            print("Compare without casting: c.a == arg = %, arg = %\n", c.a == arg, arg);
         }
     }
     else {
         each arg in args {
-            printf("Compare with casting: c.a == arg = %d, arg = %.2f\n", c.a == cast(T, arg), arg);
+            print("Compare with casting: c.a == arg = %, arg = %\n", c.a == cast(T, arg), arg);
         }
     }
 }
@@ -131,10 +133,10 @@ multiple_return_values() {
     b: bool;
 
     a, b = number_is_correct(12);
-    printf("Number = %d, Correct = %d\n", a, b);
+    print("Number = %, Correct = %\n", a, b);
 
     c, d := number_is_correct(6);
-    printf("Number = %d, Correct = %d\n", c, d);
+    print("Number = %, Correct = %\n", c, d);
 
     e, f: int;
     e, f, b = hello_world();

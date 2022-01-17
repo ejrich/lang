@@ -12,8 +12,8 @@ basics() {
     a := "Hello sailor!";
     b := "Hello world!"; #const
 
-    printf("a: length = %d, value = %s\n", a.length, a);
-    printf("b: length = %d, value = %s\n", b.length, b.data);
+    print("a: length = %, value = %\n", a.length, a);
+    print("b: length = %, value = %\n", b.length, b.data);
 }
 
 string_compare() {
@@ -26,20 +26,20 @@ string_compare() {
     assert("123456" == "123456", "Numbers are not equal");
     assert("123456" != "123457", "Numbers are equal");
 
-    printf("Assertions passed\n");
+    print("Assertions passed\n");
 }
 
 string_indexing() {
     a := "Hello world!";
     a[2] = 'e';
 
-    printf("%s\n", a);
+    print("%\n", a);
     assert(a == "Heelo world!");
 
     b: StringStruct = {foo = 12; bar = "Hey what's up";}
     b.bar[2] = 'e';
 
-    printf("%s\n", b.bar);
+    print("%\n", b.bar);
     assert(b.bar == "Hee what's up");
 }
 

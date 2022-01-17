@@ -1,3 +1,4 @@
+#import standard
 #import compiler
 #import "import.ol"
 #import "import2.ol"
@@ -6,12 +7,12 @@ main() {
     basic();
 
     ptr := pointers();
-    printf("Pointer = %p, Value = %d\n", ptr, *ptr);
+    print("Pointer = %, Value = %\n", ptr, *ptr);
     *ptr = 76;
-    printf("Pointer = %p, Value = %d\n", ptr, *ptr);
+    print("Pointer = %, Value = %\n", ptr, *ptr);
 
     str := string_test();
-    printf("%s - Hello world %d, %d\n", str, 1, 2);
+    print("% - Hello world %, %\n", str, 1, 2);
 
     sum_test();
 
@@ -62,13 +63,13 @@ basic() {
     h := 3 > a;
     i := b % 8;
     j := a % 2;
-    printf("Modulus outputs: i = %d, j = %.2f\n", i, j);
+    print("Modulus outputs: i = %, j = %\n", i, j);
     fac6 := factorial(6);
-    printf("%d! = %d\n", 6, fac6);
+    print("%! = %\n", 6, fac6);
     my_struct := create();
-    printf("my_struct: field = %d, something = %f, subvalue.something = %d\n", my_struct.field, my_struct.something, my_struct.subValue.something);
+    print("my_struct: field = %, something = %, subvalue.something = %\n", my_struct.field, my_struct.something, my_struct.subValue.something);
     call_field := create().something;
-    printf("call_field = %f\n", call_field);
+    print("call_field = %\n", call_field);
 
     prim := primitives();
 }
@@ -181,7 +182,7 @@ manipulate_array_struct() {
     s: ArrayStruct;
     s.array[0] = 8.9;
     ++s.array[0];
-    printf("%.2f\n", s.array[0]);
+    print("%\n", s.array[0]);
 }
 
 struct Node {
@@ -197,7 +198,7 @@ int* pointers() {
     loop_node := &node;
     i := 1;
     while loop_node {
-        printf("Value %d = %d\n", i++, loop_node.value);
+        print("Value % = %\n", i++, loop_node.value);
         loop_node = loop_node.next;
     }
 
@@ -217,8 +218,8 @@ string string_test() {
 sum_test() {
     sum_array: Array<int> = [4, 41, 544, 244, 42, 14, 23]
 
-    printf("Sum of Array   = %d\n", sum(sum_array));
-    printf("Sum of Params = %d\n", sum2(4, 41, 544, 244, 42, 14, 23));
+    print("Sum of Array   = %\n", sum(sum_array));
+    print("Sum of Params = %\n", sum2(4, 41, 544, 244, 42, 14, 23));
 }
 
 int sum(Array<int> args) {
@@ -236,19 +237,19 @@ int sum2(Params<int> args) {
 overflow_test() {
     each i in 1..1000000 {
         a := i * 9;
-        printf("%d\n", a);
+        print("%\n", a);
     }
     a := 4;
 }
 
 globals() {
-    printf("Initial array values %d, %p\n", global_array.length, global_array.data);
-    printf("Initial PolyStruct values %d, %.2f\n", global_poly_struct.field1, global_poly_struct.field2);
-    printf("Initial MyStruct values %d, %.2f, {%d}\n", global_struct.field, global_struct.something, global_struct.subValue.something);
+    print("Initial array values %, %\n", global_array.length, global_array.data);
+    print("Initial PolyStruct values %, %\n", global_poly_struct.field1, global_poly_struct.field2);
+    print("Initial MyStruct values %, %, {%}\n", global_struct.field, global_struct.something, global_struct.subValue.something);
 
     set_global(8);
-    printf("'global_a' = %d\n", global_a);
-    printf("'global_b' = %d\n", global_b);
+    print("'global_a' = %\n", global_a);
+    print("'global_b' = %\n", global_b);
 }
 
 struct PolyStruct<T, U> {
@@ -260,14 +261,14 @@ poly_test() {
     a: PolyStruct<int, float>;
     a.field1 = 87;
     a.field2 = 3.14159;
-    printf("%d, %f\n", a.field1, a.field2);
+    print("%, %\n", a.field1, a.field2);
 }
 
 enums() {
     state := current_state(7);
-    printf("Current state - %d\n", state);
-    if state == State.Running printf("The state is Running\n");
-    else if state != State.Running printf("The state is not Running\n");
+    print("Current state - %\n", state);
+    if state == State.Running print("The state is Running\n");
+    else if state != State.Running print("The state is not Running\n");
 }
 
 enum State {
@@ -285,7 +286,7 @@ struct StateStruct {
 
 State current_state(int a) {
     state: StateStruct;
-    printf("State is %d\n", state.state);
+    print("State is %\n", state.state);
 
     if a > 5 return State.Running;
     else if a == 5 return State.Starting;
@@ -301,12 +302,12 @@ nulls() {
 }
 
 null_test(int* value_ptr) {
-    if value_ptr == null printf("Pointer is null\n");
-    else printf("Pointer value is %d\n", *value_ptr);
+    if value_ptr == null print("Pointer is null\n");
+    else print("Pointer value is %\n", *value_ptr);
 }
 
 default_args(int val = 5) {
-    printf("Value = %d\n", val);
+    print("Value = %\n", val);
 }
 
 arrays() {
@@ -314,25 +315,25 @@ arrays() {
 
     z := 1;
     each i in create_array(5) {
-        printf("Value %d = %d\n", z++, i);
+        print("Value % = %\n", z++, i);
     }
 }
 
 open_window() {
     #if os == OS.Linux {
         XOpenDisplay("Hello");
-        printf("Opening X11 window\n");
+        print("Opening X11 window\n");
     }
 }
 
 compiler_directives() {
     const_value := 7; #const
-    printf("Constant value = %d\n", const_value);
+    print("Constant value = %\n", const_value);
     #assert factorial(6) == 720;
     #if build_env == BuildEnv.Debug
-        printf("Running Debug code\n");
+        print("Running Debug code\n");
     #if build_env == BuildEnv.Release
-        printf("Running Release code\n");
+        print("Running Release code\n");
 
     open_window();
 }
@@ -370,25 +371,25 @@ type_information() {
 
 print_type_info(Type type) {
     type_info := type_of(type);
-    printf("Type Name = %s, Type Kind = %d, Type Size = %d\n", type_info.name, type_info.type, type_info.size);
+    print("Type Name = %, Type Kind = %, Type Size = %\n", type_info.name, type_info.type, type_info.size);
 
     if type_info.type == TypeKind.Struct {
         struct_type_info := cast(StructTypeInfo*, type_info);
         each field in struct_type_info.fields {
-            printf("Field name = %s, Field offset = %d, Field type name = %s\n", field.name, field.offset, field.type_info.name);
+            print("Field name = %, Field offset = %, Field type name = %\n", field.name, field.offset, field.type_info.name);
         }
     }
     else if type_info.type == TypeKind.Enum {
         enum_type_info := cast(EnumTypeInfo*, type_info);
         each enum_value in enum_type_info.values {
-            printf("Enum value name = %s, Value = %d\n", enum_value.name, enum_value.value);
+            print("Enum value name = %, Value = %\n", enum_value.name, enum_value.value);
         }
     }
     else if type_info.type == TypeKind.Function {
         function_type_info := cast(FunctionTypeInfo*, type_info);
-        printf("Return type = %s\n", function_type_info.return_type.name);
+        print("Return type = %\n", function_type_info.return_type.name);
         each arg in function_type_info.arguments {
-            printf("Argument name = %s, Argument type name = %s, Argument type kind = %d\n", arg.name, arg.type_info.name, arg.type_info.type);
+            print("Argument name = %, Argument type name = %, Argument type kind = %\n", arg.name, arg.type_info.name, arg.type_info.type);
         }
     }
 }
@@ -398,24 +399,24 @@ type_casts() {
     b := cast(s32, a);
     c := cast(float64, a);
     d := cast(u8, State.Running);
-    printf("a = %llu, b = %d, c = %f, d = %d\n", a, b, c, d);
+    print("a = %, b = %, c = %, d = %\n", a, b, c, d);
 }
 
 shifts() {
     // Standard shifting
     a := 34 << 3;
     b := 12345 >> 5;
-    printf("a = %d, b = %d\n", a, b);
+    print("a = %, b = %\n", a, b);
 
     // Shifting negative numbers
     c := -13 << 2;
     d := -13 >> 2;
-    printf("c = %d, d = %d\n", c, d);
+    print("c = %, d = %\n", c, d);
 
     // Rotating
     e: u32 = 123456789 <<< 7;
     f := 34 >>> 32; // Full rotation
-    printf("e = %u, f = %d\n", e, f);
+    print("e = %, f = %\n", e, f);
 }
 
 break_and_continue() {
@@ -430,19 +431,19 @@ break_and_continue() {
     each i in 1..10 {
         if i > 5 break;
         if i > 3 {
-            printf("Special Value = %d\n", i);
+            print("Special Value = %\n", i);
             continue;
         }
-        printf("Value = %d\n", i);
+        print("Value = %\n", i);
    }
 }
 
 any_args() {
-    print_value("Integer value = %d\n", 8);
-    print_value("Float value = %.2f\n", 3.14);
+    print_value("Integer value = %\n", 8);
+    print_value("Float value = %\n", 3.14);
 
     foo := 9;
-    print_value("Pointer value = %p\n", &foo);
+    print_value("Pointer value = %\n", &foo);
 
     my_struct: MyStruct;
     print_value("Other value\n", my_struct);
@@ -451,16 +452,16 @@ any_args() {
 print_value(string format, Any arg) {
     if arg.type.type == TypeKind.Integer {
         value := cast(int*, arg.data);
-        printf(format, *value);
+        print(format, *value);
     }
     else if arg.type.type == TypeKind.Float {
         value := cast(float*, arg.data);
-        printf(format, *value);
+        print(format, *value);
     }
     else if arg.type.type == TypeKind.Pointer {
-        printf(format, arg.data);
+        print(format, arg.data);
     }
-    else printf(format);
+    else print(format);
 }
 
 multiple_return_values() {
@@ -468,10 +469,10 @@ multiple_return_values() {
     b: bool;
 
     a, b = number_is_correct(12);
-    printf("Number = %d, Correct = %d\n", a, b);
+    print("Number = %, Correct = %\n", a, b);
 
     c, d := number_is_correct(6);
-    printf("Number = %d, Correct = %d\n", c, d);
+    print("Number = %, Correct = %\n", c, d);
 
     e, f: int;
     e, f, b = hello_world();

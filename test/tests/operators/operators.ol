@@ -13,40 +13,40 @@ operator_overloading() {
     b: Vector3 = { x = 2.0; y = 2.0; z = 2.0; }
 
     add := a + b;
-    printf("Add: x = %.2f, y = %.2f, z = %.2f\n", add.x, add.y, add.z);
+    print("Add: x = %, y = %, z = %\n", add.x, add.y, add.z);
 
     sub := a - b;
-    printf("Subtract: x = %.2f, y = %.2f, z = %.2f\n", sub.x, sub.y, sub.z);
+    print("Subtract: x = %, y = %, z = %\n", sub.x, sub.y, sub.z);
 
     mult := a * b;
-    printf("Multiply: x = %.2f, y = %.2f, z = %.2f\n", mult.x, mult.y, mult.z);
+    print("Multiply: x = %, y = %, z = %\n", mult.x, mult.y, mult.z);
 
     div := a / b;
-    printf("Divide: x = %.2f, y = %.2f, z = %.2f\n", div.x, div.y, div.z);
+    print("Divide: x = %, y = %, z = %\n", div.x, div.y, div.z);
 
     mod := a % b;
-    printf("Modulus: x = %.2f, y = %.2f, z = %.2f\n", mod.x, mod.y, mod.z);
+    print("Modulus: x = %, y = %, z = %\n", mod.x, mod.y, mod.z);
 
     a_int: Vector3I = { x = 1; y = 1; z = 1; }
     b_int: Vector3I = { x = 2; y = 2; z = 2; }
 
     bitwise_or := a_int | b_int;
-    printf("Bitwise bitwise_or: x = %d, y = %d, z = %d\n", bitwise_or.x, bitwise_or.y, bitwise_or.z);
+    print("Bitwise bitwise_or: x = %, y = %, z = %\n", bitwise_or.x, bitwise_or.y, bitwise_or.z);
 
     bitwise_and := a_int & b_int;
-    printf("Bitwise and: x = %d, y = %d, z = %d\n", bitwise_and.x, bitwise_and.y, bitwise_and.z);
+    print("Bitwise and: x = %, y = %, z = %\n", bitwise_and.x, bitwise_and.y, bitwise_and.z);
 
     shift_right := a_int >> b_int;
-    printf("Shift right: x = %d, y = %d, z = %d\n", shift_right.x, shift_right.y, shift_right.z);
+    print("Shift right: x = %, y = %, z = %\n", shift_right.x, shift_right.y, shift_right.z);
 
     shift_left := a_int << b_int;
-    printf("Shift left: x = %d, y = %d, z = %d\n", shift_left.x, shift_left.y, shift_left.z);
+    print("Shift left: x = %, y = %, z = %\n", shift_left.x, shift_left.y, shift_left.z);
 
     rotate_right := a_int >>> b_int;
-    printf("Rotate right: x = %d, y = %d, z = %d\n", rotate_right.x, rotate_right.y, rotate_right.z);
+    print("Rotate right: x = %, y = %, z = %\n", rotate_right.x, rotate_right.y, rotate_right.z);
 
     rotate_left := a_int <<< b_int;
-    printf("Rotate left: x = %d, y = %d, z = %d\n", rotate_left.x, rotate_left.y, rotate_left.z);
+    print("Rotate left: x = %, y = %, z = %\n", rotate_left.x, rotate_left.y, rotate_left.z);
 
     and := a && b;
     assert(and, "and");
@@ -58,7 +58,7 @@ operator_overloading() {
     assert(!equals, "==");
     not_equals := a != b;
     assert(not_equals, "!=");
-    printf("And: %d, Or: %d, Xor: %d, Equals: %d, Not Equals: %d\n", and, or, xor, equals, not_equals);
+    print("And: %, Or: %, Xor: %, Equals: %, Not Equals: %\n", and, or, xor, equals, not_equals);
 
     gte := a >= b;
     assert(!gte, ">=");
@@ -68,7 +68,7 @@ operator_overloading() {
     assert(!gt, ">");
     lt := a < b;
     assert(lt, "<");
-    printf("Greater than or equal: %d, Less than or equal: %d, Greater than: %d, Less than: %d\n", gte, lte, gt, lt);
+    print("Greater than or equal: %, Less than or equal: %, Greater than: %, Less than: %\n", gte, lte, gt, lt);
 }
 
 struct Vector3 {
@@ -195,7 +195,7 @@ generic_overloads() {
     b: PolyStruct<int, float> = { a = 5; b = 1.5; }
 
     add := a + b;
-    printf("Polymorphic Add: a = %d, b = %.2f\n", add.a, add.b);
+    print("Polymorphic Add: a = %, b = %\n", add.a, add.b);
 }
 
 struct PolyStruct<T, U> {
@@ -217,8 +217,8 @@ index_overloading() {
     a.x[3] = 5.0;
 
     vector := a[2];
-    printf("Vector values: x = %.2f, y = %.2f, z = %.2f\n", vector.x, vector.y, vector.z);
-    printf("Vector value: x = %.2f\n", a[3].x);
+    print("Vector values: x = %, y = %, z = %\n", vector.x, vector.y, vector.z);
+    print("Vector value: x = %\n", a[3].x);
 
     b: ArrayStruct<int>;
     b[8] = 7;
@@ -226,7 +226,7 @@ index_overloading() {
     b[5] = 5;
     b[5]--;
     // j := &b[7]; // Does not compile, pointer unknown
-    printf("Integer values: b[5] = %d, b[8] = %d\n", *b[5], *b[8]);
+    print("Integer values: b[5] = %, b[8] = %\n", *b[5], *b[8]);
 
     c: NestedStruct<Vector3>;
     initial_vector: Vector3 = { x = 1.0; y = 2.0; z = 3.0; }
@@ -234,13 +234,13 @@ index_overloading() {
     c.inner_list[2].y = 1.5;
     c.inner_list[2].x++;
     new_vec := c.inner_list[2];
-    printf("Inner list vector values: x = %.2f, y = %.2f, z = %.2f\n", c.inner_list[2].x, new_vec.y, new_vec.z);
+    print("Inner list vector values: x = %, y = %, z = %\n", c.inner_list[2].x, new_vec.y, new_vec.z);
 
     d: NestedStruct<float>;
     d.inner_list[1] = 3.7;
     d.inner_list[1]++;
     d.inner_list[1] -= 2.0;
-    printf("Inner list float value: d.inner_list[1] = %.2f\n", *d.inner_list[1]);
+    print("Inner list float value: d.inner_list[1] = %\n", *d.inner_list[1]);
 }
 
 struct SOAVector3 {

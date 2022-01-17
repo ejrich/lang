@@ -26,11 +26,11 @@ main() {
     default_free(command_buffer);
 
     if failed_test_count {
-        printf("\n%d Test(s) Failed\n", failed_test_count);
+        print("\n% Test(s) Failed\n", failed_test_count);
         exit_code = -1;
     }
     else {
-        printf("\nAll Tests Passed\n");
+        print("\nAll Tests Passed\n");
     }
 }
 
@@ -76,19 +76,19 @@ bool run_test(string test_dir, string test) {
     executable := "./ol/bin/Debug/net6.0/ol"; #const
 
     command := format_string("% %/%.ol", executable, test_dir, test);
-    printf("Compiling: %s", command);
+    print("Compiling: %", command);
     compiler_exit_code := run_command(command);
     default_free(command.data);
 
     if compiler_exit_code {
-        printf(" -- Test Failed\n");
+        print(" -- Test Failed\n");
         return false;
     }
 
     bin_dir := format_string("%/bin", test_dir);
     dir := opendir(bin_dir.data);
     if dir == null {
-        printf(" -- Test Failed: Unable to open directory '%s'\n", bin_dir.data);
+        print(" -- Test Failed: Unable to open directory '%'\n", bin_dir.data);
         default_free(bin_dir.data);
         return false;
     }
@@ -108,20 +108,20 @@ bool run_test(string test_dir, string test) {
     closedir(dir);
 
     if !found_executable {
-        printf(" -- Test Failed: Executable not found in directory '%s'\n", bin_dir.data);
+        print(" -- Test Failed: Executable not found in directory '%'\n", bin_dir.data);
         default_free(bin_dir.data);
         return false;
     }
 
-    printf("\nRunning: %s", command);
+    print("\nRunning: %", command);
     run_exit_code := run_command(command);
     default_free(command.data);
 
     if run_exit_code {
-        printf(" -- Test Failed\n");
+        print(" -- Test Failed\n");
         return false;
     }
-    printf("\n");
+    print("\n");
     return true;
 }
 
@@ -130,7 +130,7 @@ command_buffer: void*;
 int run_command(string command) {
     handle := popen(command, "r");
     if handle == null {
-        printf(" -- Test Failed: Unable to run '%s'\n", command);
+        print(" -- Test Failed: Unable to run '%'\n", command);
         return -1;
     }
 
