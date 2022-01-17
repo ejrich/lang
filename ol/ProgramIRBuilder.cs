@@ -517,7 +517,6 @@ public static class ProgramIRBuilder
             {
                 case ReturnAst returnAst:
                     EmitReturn(function, returnAst, returnType, scope);
-                    scope.Returns = true;
                     return block;
                 case DeclarationAst declaration:
                     EmitDeclaration(function, declaration, scope);
@@ -532,7 +531,6 @@ public static class ProgramIRBuilder
                     block = EmitScope(function, block, childScope, returnType, breakBlock, continueBlock);
                     if (childScope.Returns)
                     {
-                        scope.Returns = true;
                         return block;
                     }
                     break;
@@ -540,7 +538,6 @@ public static class ProgramIRBuilder
                     block = EmitConditional(function, block, conditional, scope, returnType, breakBlock, continueBlock, out var returns);
                     if (returns)
                     {
-                        scope.Returns = true;
                         return block;
                     }
                     break;
@@ -553,12 +550,10 @@ public static class ProgramIRBuilder
                 case BreakAst:
                     var breakJump = new Instruction {Type = InstructionType.Jump, Scope = scope, Value1 = BasicBlockValue(breakBlock)};
                     function.Instructions.Add(breakJump);
-                    scope.Returns = true;
                     return block;
                 case ContinueAst:
                     var continueJump = new Instruction {Type = InstructionType.Jump, Scope = scope, Value1 = BasicBlockValue(continueBlock)};
                     function.Instructions.Add(continueJump);
-                    scope.Returns = true;
                     return block;
                 default:
                     EmitIR(function, ast, scope);
