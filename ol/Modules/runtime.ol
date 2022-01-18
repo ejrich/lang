@@ -181,12 +181,12 @@ int __start(int argc, u8** argv) {
 
 interface ExitCallback()
 
-// exit_callbacks: Array<ExitCallback>;
+exit_callbacks: Array<ExitCallback>;
 
 run_exit_callbacks() {
-    // each callback in exit_callbacks {
-    //     callback();
-    // }
+    each callback in exit_callbacks {
+        callback();
+    }
 }
 
 command_line_arguments: Array<string>;

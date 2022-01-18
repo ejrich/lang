@@ -260,6 +260,7 @@ public static unsafe class LLVMBackend
 
     private static void DeclareAllTypesAndTypeInfos()
     {
+        var pointersToResolve = new List<PointerType>();
         var interfaceQueue = new List<InterfaceAst>();
         var structQueue = new List<StructAst>();
         var unionQueue = new List<UnionAst>();
@@ -298,7 +299,7 @@ public static unsafe class LLVMBackend
                         CreateDebugBasicType(primitive, primitive.Name);
                         break;
                     case PointerType pointerType:
-                        DeclarePointerType(pointerType);
+                        DeclarePointerType(pointerType, pointersToResolve);
                         DeclarePointerTypeInfo(pointerType);
                         CreatePointerDebugType(pointerType);
                         break;
@@ -351,7 +352,7 @@ public static unsafe class LLVMBackend
                         DeclarePrimitiveTypeInfo(primitive);
                         break;
                     case PointerType pointerType:
-                        DeclarePointerType(pointerType);
+                        DeclarePointerType(pointerType, pointersToResolve);
                         DeclarePointerTypeInfo(pointerType);
                         break;
                     case ArrayType arrayType:
@@ -399,6 +400,11 @@ public static unsafe class LLVMBackend
             DeclareInterfaceTypeInfo(interfaceAst, argumentValues, returnType);
         }
 
+        foreach (var pointerType in pointersToResolve)
+        {
+            _types[pointerType.TypeIndex] = LLVM.PointerType(_types[pointerType.PointedType.TypeIndex], 0);
+        }
+
         foreach (var structAst in structQueue)
         {
             SetStructTypeFieldsAndTypeInfo(structAst);
@@ -423,6 +429,7 @@ public static unsafe class LLVMBackend
 
     private static void DeclareAllTypesAndUsedTypeInfos()
     {
+        var pointersToResolve = new List<PointerType>();
         var interfaceQueue = new List<InterfaceAst>();
         var structQueue = new List<StructAst>();
         var unionQueue = new List<UnionAst>();
@@ -462,7 +469,7 @@ public static unsafe class LLVMBackend
                         CreateDebugBasicType(primitive, primitive.Name);
                         break;
                     case PointerType pointerType:
-                        DeclarePointerType(pointerType);
+                        DeclarePointerType(pointerType, pointersToResolve);
                         CreatePointerDebugType(pointerType);
                         break;
                     case ArrayType arrayType:
@@ -513,7 +520,7 @@ public static unsafe class LLVMBackend
                         DeclarePrimitive(primitive);
                         break;
                     case PointerType pointerType:
-                        DeclarePointerType(pointerType);
+                        DeclarePointerType(pointerType, pointersToResolve);
                         break;
                     case ArrayType arrayType:
                         DeclareArrayType(arrayType);
@@ -542,6 +549,11 @@ public static unsafe class LLVMBackend
 
             var functionType = LLVMTypeRef.CreateFunction(_types[interfaceAst.ReturnType.TypeIndex], argumentTypes, false);
             _types[interfaceAst.TypeIndex] = LLVM.PointerType(functionType, 0);
+        }
+
+        foreach (var pointerType in pointersToResolve)
+        {
+            _types[pointerType.TypeIndex] = LLVM.PointerType(_types[pointerType.PointedType.TypeIndex], 0);
         }
 
         foreach (var structAst in structQueue)
@@ -571,7 +583,7 @@ public static unsafe class LLVMBackend
         {
             _typeInfos[i] = nullTypeInfo;
         }
-
+        var pointersToResolve = new List<PointerType>();
         var interfaceQueue = new List<InterfaceAst>();
         var structQueue = new List<StructAst>();
         var unionQueue = new List<UnionAst>();
@@ -607,7 +619,7 @@ public static unsafe class LLVMBackend
                         CreateDebugBasicType(primitive, primitive.Name);
                         break;
                     case PointerType pointerType:
-                        DeclarePointerType(pointerType);
+                        DeclarePointerType(pointerType, pointersToResolve);
                         CreatePointerDebugType(pointerType);
                         break;
                     case ArrayType arrayType:
@@ -654,7 +666,7 @@ public static unsafe class LLVMBackend
                         DeclarePrimitive(primitive);
                         break;
                     case PointerType pointerType:
-                        DeclarePointerType(pointerType);
+                        DeclarePointerType(pointerType, pointersToResolve);
                         break;
                     case ArrayType arrayType:
                         DeclareArrayType(arrayType);
@@ -683,6 +695,11 @@ public static unsafe class LLVMBackend
 
             var functionType = LLVMTypeRef.CreateFunction(_types[interfaceAst.ReturnType.TypeIndex], argumentTypes, false);
             _types[interfaceAst.TypeIndex] = LLVM.PointerType(functionType, 0);
+        }
+
+        foreach (var pointerType in pointersToResolve)
+        {
+            _types[pointerType.TypeIndex] = LLVM.PointerType(_types[pointerType.PointedType.TypeIndex], 0);
         }
 
         foreach (var structAst in structQueue)
@@ -891,7 +908,7 @@ public static unsafe class LLVMBackend
         }
     }
 
-    private static void DeclarePointerType(PointerType pointerType)
+    private static void DeclarePointerType(PointerType pointerType, List<PointerType> pointersToResolve)
     {
         if (pointerType.PointedType.TypeKind == TypeKind.Void)
         {
@@ -899,7 +916,15 @@ public static unsafe class LLVMBackend
         }
         else
         {
-            _types[pointerType.TypeIndex] = LLVM.PointerType(_types[pointerType.PointedType.TypeIndex], 0);
+            var pointedType = _types[pointerType.PointedType.TypeIndex];
+            if (pointedType.Handle == IntPtr.Zero)
+            {
+                pointersToResolve.Add(pointerType);
+            }
+            else
+            {
+                _types[pointerType.TypeIndex] = LLVM.PointerType(pointedType, 0);
+            }
         }
     }
 
