@@ -81,11 +81,10 @@ public static class TypeChecker
                         break;
                     case DirectiveType.If:
                         var conditional = directive.Value as ConditionalAst;
-                        if (VerifyCondition(conditional.Condition, null, GlobalScope, out var constant))
+                        if (VerifyCondition(conditional.Condition, null, GlobalScope, out var constant, true))
                         {
                             if (!constant)
                             {
-                                ClearAstQueue();
                                 ThreadPool.CompleteWork();
                             }
                             var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition);
@@ -111,11 +110,10 @@ public static class TypeChecker
                         }
                         break;
                     case DirectiveType.Assert:
-                        if (VerifyCondition(directive.Value, null, GlobalScope, out constant))
+                        if (VerifyCondition(directive.Value, null, GlobalScope, out constant, true))
                         {
                             if (!constant)
                             {
-                                ClearAstQueue();
                                 ThreadPool.CompleteWork();
                             }
                             var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value);
@@ -198,10 +196,11 @@ public static class TypeChecker
             if (!ErrorReporter.Errors.Any())
             {
                 ClearAstQueue();
-                var function = ProgramIRBuilder.CreateRunnableFunction(runDirective.Value);
-
-                ProgramRunner.Init();
                 ThreadPool.CompleteWork();
+
+                var function = ProgramIRBuilder.CreateRunnableFunction(runDirective.Value);
+                ProgramRunner.Init();
+
                 ProgramRunner.RunProgram(function, runDirective.Value);
             }
         }
@@ -1650,11 +1649,10 @@ public static class TypeChecker
                     {
                         case DirectiveType.If:
                             var conditional = directive.Value as ConditionalAst;
-                            if (VerifyCondition(conditional.Condition, null, GlobalScope, out var constant))
+                            if (VerifyCondition(conditional.Condition, null, GlobalScope, out var constant, true))
                             {
                                 if (!constant)
                                 {
-                                    ClearAstQueue();
                                     ThreadPool.CompleteWork();
                                 }
                                 var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition);
@@ -1671,11 +1669,10 @@ public static class TypeChecker
                             }
                             break;
                         case DirectiveType.Assert:
-                            if (VerifyCondition(directive.Value, null, GlobalScope, out constant))
+                            if (VerifyCondition(directive.Value, null, GlobalScope, out constant, true))
                             {
                                 if (!constant)
                                 {
-                                    ClearAstQueue();
                                     ThreadPool.CompleteWork();
                                 }
                                 var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value);
@@ -3022,9 +3019,16 @@ public static class TypeChecker
         return null;
     }
 
-    private static bool VerifyCondition(IAst ast, IFunction currentFunction, IScope scope, out bool constant)
+    private static bool VerifyCondition(IAst ast, IFunction currentFunction, IScope scope, out bool constant, bool willRun = false)
     {
         var conditionalType = VerifyExpression(ast, currentFunction, scope, out constant);
+
+        if (willRun)
+        {
+            // If the expression will be run, then all functions must be verified before generating the IR for the function
+            VerifyNecessaryConditionExpressions(ast, currentFunction);
+        }
+
         switch (conditionalType?.TypeKind)
         {
             case TypeKind.Boolean:
@@ -3039,6 +3043,76 @@ public static class TypeChecker
             default:
                 ErrorReporter.Report($"Expected condition to be bool, int, float, or pointer, but got '{conditionalType.TypeKind}'", ast);
                 return false;
+        }
+    }
+
+    private static void VerifyNecessaryConditionExpressions(IAst ast, IFunction currentFunction)
+    {
+        switch (ast)
+        {
+            case StructFieldRefAst structField:
+                foreach (var child in structField.Children)
+                {
+                    VerifyNecessaryConditionExpressions(child, currentFunction);
+                }
+                break;
+            case ChangeByOneAst changeByOne:
+                VerifyNecessaryConditionExpressions(changeByOne.Value, currentFunction);
+                break;
+            case UnaryAst unary:
+                VerifyNecessaryConditionExpressions(unary.Value, currentFunction);
+                break;
+            case CallAst call:
+                if (call.Function != null && !call.Function.Flags.HasFlag(FunctionFlags.Verified))
+                {
+                    if (call.Function == currentFunction)
+                    {
+                        ErrorReporter.Report("Cannot call the function being verifying in condition expression", call);
+                    }
+                    else
+                    {
+                        VerifyFunction(call.Function);
+                    }
+                }
+                break;
+            case ExpressionAst expression:
+                for (var i = 0; i < expression.Children.Count; i++)
+                {
+                    var expr = expression.Children[i];
+                    VerifyNecessaryConditionExpressions(expr, currentFunction);
+                    if (expression.OperatorOverloads.TryGetValue(i, out var overload))
+                    {
+                        if (!overload.Flags.HasFlag(FunctionFlags.Verified))
+                        {
+                            if (overload == currentFunction)
+                            {
+                                ErrorReporter.Report("Cannot call the function being verifying in condition expression", expr);
+                            }
+                            else
+                            {
+                                VerifyOperatorOverload(overload);
+                            }
+                        }
+                    }
+                }
+                break;
+            case IndexAst index:
+                if (index.Overload != null && !index.Overload.Flags.HasFlag(FunctionFlags.Verified))
+                {
+                    if (index.Overload == currentFunction)
+                    {
+                        ErrorReporter.Report("Cannot call the function being verifying in condition expression", index);
+                    }
+                    else
+                    {
+                        VerifyOperatorOverload(index.Overload);
+                    }
+                }
+                VerifyNecessaryConditionExpressions(index.Index, currentFunction);
+                break;
+            case CastAst cast:
+                VerifyNecessaryConditionExpressions(cast.Value, currentFunction);
+                break;
         }
     }
 
