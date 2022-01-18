@@ -878,27 +878,29 @@ public static unsafe class LLVMBackend
         var typeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)primitive.TypeKind, 0);
         var typeSize = LLVM.ConstInt(LLVM.Int32Type(), primitive.Size, 0);
 
-        switch (primitive.TypeKind)
+        if (primitive.TypeKind == TypeKind.Integer)
         {
-            case TypeKind.Integer:
-            {
-                var signed = LLVM.ConstInt(LLVM.Int1Type(), (byte)(primitive.Signed ? 1 : 0), 0);
-                var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, signed};
-                CreateAndSetTypeInfo(_integerTypeInfoType, fields, primitive.TypeIndex);
-                break;
-            }
-            default:
-            {
-                var fields = new LLVMValueRef[]{typeName, typeKind, typeSize};
-                CreateAndSetTypeInfo(_typeInfoType, fields, primitive.TypeIndex);
-                break;
-            }
+            var signed = LLVM.ConstInt(LLVM.Int1Type(), (byte)(primitive.Signed ? 1 : 0), 0);
+            var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, signed};
+            CreateAndSetTypeInfo(_integerTypeInfoType, fields, primitive.TypeIndex);
+        }
+        else
+        {
+            var fields = new LLVMValueRef[]{typeName, typeKind, typeSize};
+            CreateAndSetTypeInfo(_typeInfoType, fields, primitive.TypeIndex);
         }
     }
 
     private static void DeclarePointerType(PointerType pointerType)
     {
-        _types[pointerType.TypeIndex] = GetPointerType(pointerType.PointedType);
+        if (pointerType.PointedType.TypeKind == TypeKind.Void)
+        {
+            _types[pointerType.TypeIndex] = LLVM.PointerType(LLVM.Int8Type(), 0);
+        }
+        else
+        {
+            _types[pointerType.TypeIndex] = LLVM.PointerType(_types[pointerType.PointedType.TypeIndex], 0);
+        }
     }
 
     private static void DeclarePointerTypeInfo(PointerType pointerType)
@@ -1214,16 +1216,6 @@ public static unsafe class LLVMBackend
             8 => LLVM.Int64Type(),
             _ => LLVM.Int32Type()
         };
-    }
-
-    private static LLVMTypeRef GetPointerType(IType pointerType)
-    {
-        if (pointerType.TypeKind == TypeKind.Void)
-        {
-            return LLVM.PointerType(LLVM.Int8Type(), 0);
-        }
-
-        return LLVM.PointerType(_types[pointerType.TypeIndex], 0);
     }
 
     private static void SetPrivateConstant(LLVMValueRef variable)
