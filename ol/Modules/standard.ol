@@ -65,9 +65,7 @@ assert(bool assertion, int exit_code = 1) {
 
     print("Assertion failed\n");
 
-    #if os == OS.Linux {
-        exit_group(exit_code);
-    }
+    exit_program(exit_code);
 }
 
 assert(bool assertion, string message, int exit_code = 1) {
@@ -75,6 +73,12 @@ assert(bool assertion, string message, int exit_code = 1) {
 
     if message.length == 0 print("Assertion failed\n");
     else print("Assertion failed: %\n", message);
+
+    exit_program(exit_code);
+}
+
+exit_program(int exit_code) {
+    run_exit_callbacks();
 
     #if os == OS.Linux {
         exit_group(exit_code);
@@ -84,6 +88,7 @@ assert(bool assertion, string message, int exit_code = 1) {
 
 // Memory operations
 void* default_allocator(int size) {
+    // The default allocator is a basic chunk allocator that has a standard chunk size
     return malloc(size);
 }
 
