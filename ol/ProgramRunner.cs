@@ -1132,8 +1132,8 @@ public static unsafe class ProgramRunner
                 {
                     var lhs = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
                     var rhs = GetValue(instruction.Value2, registers, stackPointer, function, arguments);
-                    var pointerType = (PrimitiveAst)instruction.Value1.Type;
-                    var pointerAdd = lhs.Pointer + (rhs.Integer * (int)pointerType.PointerType.Size);
+                    var pointerType = (PointerType)instruction.Value1.Type;
+                    var pointerAdd = lhs.Pointer + (rhs.Integer * (int)pointerType.PointedType.Size);
                     registers[instruction.ValueIndex] = new Register {Pointer = pointerAdd};
                     break;
                 }
@@ -1165,8 +1165,8 @@ public static unsafe class ProgramRunner
                 {
                     var lhs = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
                     var rhs = GetValue(instruction.Value2, registers, stackPointer, function, arguments);
-                    var pointerType = (PrimitiveAst)instruction.Value1.Type;
-                    var pointerSubtract = lhs.Pointer - (rhs.Integer * (int)pointerType.PointerType.Size);
+                    var pointerType = (PointerType)instruction.Value1.Type;
+                    var pointerSubtract = lhs.Pointer - (rhs.Integer * (int)pointerType.PointedType.Size);
                     registers[instruction.ValueIndex] = new Register {Pointer = pointerSubtract};
                     break;
                 }

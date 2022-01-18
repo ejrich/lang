@@ -89,51 +89,6 @@ public static class Polymorpher
         return overload;
     }
 
-    private static TypeDefinition GetTypeDefinition(IType type)
-    {
-        var typeDef = new TypeDefinition();
-        switch (type.TypeKind)
-        {
-            case TypeKind.Void:
-            case TypeKind.Boolean:
-            case TypeKind.Integer:
-            case TypeKind.Float:
-            case TypeKind.String:
-            case TypeKind.Enum:
-            case TypeKind.Type:
-            case TypeKind.Function:
-                typeDef.Name = type.Name;
-                break;
-            case TypeKind.Pointer:
-                var pointerType = (PrimitiveAst)type;
-                typeDef.Name = "*";
-                typeDef.Generics.Add(GetTypeDefinition(pointerType.PointerType));
-                break;
-            case TypeKind.CArray:
-                var arrayType = (ArrayType)type;
-                typeDef.Name = "CArray";
-                typeDef.Generics.Add(GetTypeDefinition(arrayType.ElementType));
-                break;
-            case TypeKind.Array:
-            case TypeKind.Struct:
-                var structDef = (StructAst)type;
-                if (structDef.GenericTypes != null)
-                {
-                    typeDef.Name = structDef.BaseStructName;
-                    foreach (var genericType in structDef.GenericTypes)
-                    {
-                        typeDef.Generics.Add(GetTypeDefinition(genericType));
-                    }
-                }
-                else
-                {
-                    typeDef.Name = structDef.Name;
-                }
-                break;
-        }
-        return typeDef;
-    }
-
     private static TypeDefinition CopyType(TypeDefinition type, IType[] genericTypes)
     {
         var copyType = CopyAst(type);

@@ -2689,8 +2689,8 @@ public static class TypeChecker
                         return null;
                     }
                     hasPointer = false;
-                    var pointerType = (PrimitiveAst)type;
-                    return pointerType.PointerType;
+                    var pointerType = (PointerType)type;
+                    return pointerType.PointedType;
                 }
                 return type;
             }
@@ -2763,8 +2763,8 @@ public static class TypeChecker
                                     if (i == structFieldRef.Children.Count - 1)
                                     {
                                         hasPointer = false;
-                                        var pointerType = (PrimitiveAst)refType;
-                                        refType = pointerType.PointerType;
+                                        var pointerType = (PointerType)refType;
+                                        refType = pointerType.PointedType;
                                     }
                                 }
                                 else
@@ -2809,8 +2809,8 @@ public static class TypeChecker
                     ErrorReporter.Report("Expected to get pointer to dereference", unary.Value);
                     return null;
                 }
-                var pointerType = (PrimitiveAst)reference;
-                return unary.Type = pointerType.PointerType;
+                var pointerType = (PointerType)reference;
+                return unary.Type = pointerType.PointedType;
             }
             default:
                 ErrorReporter.Report("Expected to have a reference to a variable, field, or pointer", ast);
@@ -2956,8 +2956,8 @@ public static class TypeChecker
     {
         if (structType.TypeKind == TypeKind.Pointer)
         {
-            var pointerType = (PrimitiveAst)structType;
-            structType = pointerType.PointerType;
+            var pointerType = (PointerType)structType;
+            structType = pointerType.PointedType;
             structField.Pointers[fieldIndex] = true;
         }
 
@@ -3337,8 +3337,8 @@ public static class TypeChecker
                         case UnaryOperator.Dereference:
                             if (valueType.TypeKind == TypeKind.Pointer)
                             {
-                                var pointerType = (PrimitiveAst)valueType;
-                                return unary.Type = pointerType.PointerType;
+                                var pointerType = (PointerType)valueType;
+                                return unary.Type = pointerType.PointedType;
                             }
                             else if (valueType != null)
                             {
@@ -4430,8 +4430,8 @@ public static class TypeChecker
                         {
                             return false;
                         }
-                        var pointerType = (PrimitiveAst)callType;
-                        return VerifyPolymorphicArgument(pointerType.PointerType, argumentType.Generics[0], genericTypes);
+                        var pointerType = (PointerType)callType;
+                        return VerifyPolymorphicArgument(pointerType.PointedType, argumentType.Generics[0], genericTypes);
                     case TypeKind.Array:
                     case TypeKind.Struct:
                         var structDef = (StructAst)callType;
@@ -4719,8 +4719,8 @@ public static class TypeChecker
                 elementType = arrayType.ElementType;
                 break;
             case TypeKind.Pointer:
-                var pointerType = (PrimitiveAst)type;
-                elementType = pointerType.PointerType;
+                var pointerType = (PointerType)type;
+                elementType = pointerType.PointedType;
                 break;
             case TypeKind.String:
                 elementType = TypeTable.U8Type;
@@ -4790,8 +4790,8 @@ public static class TypeChecker
             if (source is InterfaceAst) return false;
             if (source.TypeKind == TypeKind.Pointer)
             {
-                var primitive = (PrimitiveAst)source;
-                return primitive.PointerType == TypeTable.VoidType;
+                var primitive = (PointerType)source;
+                return primitive.PointedType == TypeTable.VoidType;
             }
 
             if (source is not FunctionAst function) return false;
@@ -4830,10 +4830,10 @@ public static class TypeChecker
                 {
                     return false;
                 }
-                var targetPointer = (PrimitiveAst)target;
-                var targetPointerType = targetPointer.PointerType;
-                var sourcePointer = (PrimitiveAst)source;
-                var sourcePointerType = sourcePointer.PointerType;
+                var targetPointer = (PointerType)target;
+                var targetPointerType = targetPointer.PointedType;
+                var sourcePointer = (PointerType)source;
+                var sourcePointerType = sourcePointer.PointedType;
 
                 if (targetPointerType == TypeTable.VoidType || sourcePointerType == TypeTable.VoidType)
                 {
@@ -5208,7 +5208,7 @@ public static class TypeChecker
 
     private static IType CreatePointerType(string name, string backendName, IType pointedToType)
     {
-        var pointerType = new PrimitiveAst {FileIndex = pointedToType.FileIndex, Name = name, BackendName = backendName, TypeKind = TypeKind.Pointer, Size = 8, Alignment = 8, Private = pointedToType.Private, PointerType = pointedToType};
+        var pointerType = new PointerType {FileIndex = pointedToType.FileIndex, Name = name, BackendName = backendName, Private = pointedToType.Private, PointedType = pointedToType};
         AddType(backendName, pointerType);
         TypeTable.CreateTypeInfo(pointerType);
 

@@ -225,8 +225,8 @@ public unsafe static class TypeTable
                 break;
             case TypeKind.Pointer:
                 typeInfoPointer = Allocator.Allocate(PointerTypeInfoSize);
-                var pointerType = (PrimitiveAst)type;
-                var pointerTypeInfo = new PointerTypeInfo {Name = name, Type = TypeKind.Pointer, PointerType = TypeInfos[pointerType.PointerType.TypeIndex]};
+                var pointerType = (PointerType)type;
+                var pointerTypeInfo = new PointerTypeInfo {Name = name, Type = TypeKind.Pointer, PointerType = TypeInfos[pointerType.PointedType.TypeIndex]};
                 Marshal.StructureToPtr(pointerTypeInfo, typeInfoPointer, false);
                 break;
             case TypeKind.CArray:
