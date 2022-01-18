@@ -1039,8 +1039,8 @@ public static class ProgramIRBuilder
                 var (pointer, type) = EmitGetReference(function, compoundReference.Children[i], scope, out var loaded);
                 if (loaded && type.TypeKind == TypeKind.Pointer)
                 {
-                    var pointerType = (PrimitiveAst)type;
-                    type = pointerType.PointerType;
+                    var pointerType = (PointerType)type;
+                    type = pointerType.PointedType;
                 }
                 pointers[i] = pointer;
                 types[i] = type;
@@ -1098,8 +1098,8 @@ public static class ProgramIRBuilder
             var (pointer, type) = EmitGetReference(function, assignment.Reference, scope, out var loaded);
             if (loaded && type.TypeKind == TypeKind.Pointer)
             {
-                var pointerType = (PrimitiveAst)type;
-                type = pointerType.PointerType;
+                var pointerType = (PointerType)type;
+                type = pointerType.PointedType;
             }
 
             EmitAssignments(function, assignment, scope, pointer, type);
@@ -1563,8 +1563,8 @@ public static class ProgramIRBuilder
                 var (pointer, pointerType) = EmitGetReference(function, changeByOne.Value, scope, out loaded);
                 if (loaded && pointerType.TypeKind == TypeKind.Pointer)
                 {
-                    var pointerTypeDef = (PrimitiveAst)pointerType;
-                    pointerType = pointerTypeDef.PointerType;
+                    var pointerTypeDef = (PointerType)pointerType;
+                    pointerType = pointerTypeDef.PointedType;
                 }
                 var previousValue = EmitLoad(function, pointerType, pointer, scope);
 
@@ -2114,8 +2114,8 @@ public static class ProgramIRBuilder
         IType elementType;
         if (type.TypeKind == TypeKind.Pointer)
         {
-            var pointerType = (PrimitiveAst)type;
-            elementType = pointerType.PointerType;
+            var pointerType = (PointerType)type;
+            elementType = pointerType.PointedType;
 
             var dataPointer = EmitLoadPointer(function, type, variable, scope);
             return EmitGetPointer(function, dataPointer, indexValue, elementType, scope);
@@ -2138,8 +2138,8 @@ public static class ProgramIRBuilder
             }
             else
             {
-                var pointerType = (PrimitiveAst)dataField.Type;
-                elementType = pointerType.PointerType;
+                var pointerType = (PointerType)dataField.Type;
+                elementType = pointerType.PointedType;
             }
 
             var data = EmitGetStructPointer(function, variable, scope, structAst, 1, dataField);

@@ -297,6 +297,11 @@ public static unsafe class LLVMBackend
                         DeclarePrimitiveTypeInfo(primitive);
                         CreateDebugBasicType(primitive, primitive.Name);
                         break;
+                    case PointerType pointerType:
+                        DeclarePointerType(pointerType);
+                        DeclarePointerTypeInfo(pointerType);
+                        CreatePointerDebugType(pointerType);
+                        break;
                     case ArrayType arrayType:
                         DeclareArrayType(arrayType);
                         DeclareArrayTypeInfo(arrayType);
@@ -344,6 +349,10 @@ public static unsafe class LLVMBackend
                     case PrimitiveAst primitive:
                         DeclarePrimitive(primitive);
                         DeclarePrimitiveTypeInfo(primitive);
+                        break;
+                    case PointerType pointerType:
+                        DeclarePointerType(pointerType);
+                        DeclarePointerTypeInfo(pointerType);
                         break;
                     case ArrayType arrayType:
                         DeclareArrayType(arrayType);
@@ -452,6 +461,10 @@ public static unsafe class LLVMBackend
                         DeclarePrimitive(primitive);
                         CreateDebugBasicType(primitive, primitive.Name);
                         break;
+                    case PointerType pointerType:
+                        DeclarePointerType(pointerType);
+                        CreatePointerDebugType(pointerType);
+                        break;
                     case ArrayType arrayType:
                         DeclareArrayType(arrayType);
                         CreateArrayDebugType(arrayType);
@@ -498,6 +511,9 @@ public static unsafe class LLVMBackend
                         break;
                     case PrimitiveAst primitive:
                         DeclarePrimitive(primitive);
+                        break;
+                    case PointerType pointerType:
+                        DeclarePointerType(pointerType);
                         break;
                     case ArrayType arrayType:
                         DeclareArrayType(arrayType);
@@ -590,6 +606,10 @@ public static unsafe class LLVMBackend
                         DeclarePrimitive(primitive);
                         CreateDebugBasicType(primitive, primitive.Name);
                         break;
+                    case PointerType pointerType:
+                        DeclarePointerType(pointerType);
+                        CreatePointerDebugType(pointerType);
+                        break;
                     case ArrayType arrayType:
                         DeclareArrayType(arrayType);
                         CreateArrayDebugType(arrayType);
@@ -632,6 +652,9 @@ public static unsafe class LLVMBackend
                         break;
                     case PrimitiveAst primitive:
                         DeclarePrimitive(primitive);
+                        break;
+                    case PointerType pointerType:
+                        DeclarePointerType(pointerType);
                         break;
                     case ArrayType arrayType:
                         DeclareArrayType(arrayType);
@@ -690,24 +713,20 @@ public static unsafe class LLVMBackend
                 DeclareEnumTypeInfo(enumAst);
                 break;
             case PrimitiveAst primitive:
-                if (primitive.TypeKind == TypeKind.Pointer)
-                {
-                    var typeName = GetString(primitive.Name);
-                    var typeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)primitive.TypeKind, 0);
-                    var typeSize = LLVM.ConstInt(LLVM.Int32Type(), primitive.Size, 0);
+                DeclarePrimitiveTypeInfo(primitive);
+                break;
+            case PointerType pointerType:
+                var typeName = GetString(pointerType.Name);
+                var typeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Pointer, 0);
+                var typeSize = LLVM.ConstInt(LLVM.Int32Type(), 8, 0);
 
-                    typeInfo = CreateTypeInfo(_pointerTypeInfoType, primitive.TypeIndex);
+                typeInfo = CreateTypeInfo(_pointerTypeInfoType, pointerType.TypeIndex);
 
-                    var pointerTypeInfo = CreateTypeInfoIfNotExists(primitive.PointerType);
-                    var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, pointerTypeInfo};
+                var pointerTypeInfo = CreateTypeInfoIfNotExists(pointerType.PointedType);
+                var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, pointerTypeInfo};
 
-                    var typeInfoStruct = LLVMValueRef.CreateConstNamedStruct(_pointerTypeInfoType, fields);
-                    LLVM.SetInitializer(typeInfo, typeInfoStruct);
-                }
-                else
-                {
-                    DeclarePrimitiveTypeInfo(primitive);
-                }
+                var typeInfoStruct = LLVMValueRef.CreateConstNamedStruct(_pointerTypeInfoType, fields);
+                LLVM.SetInitializer(typeInfo, typeInfoStruct);
                 break;
             case ArrayType arrayType:
                 CreateTypeInfoIfNotExists(arrayType.ElementType);
@@ -848,7 +867,6 @@ public static unsafe class LLVMBackend
             TypeKind.Boolean => LLVM.Int1Type(),
             TypeKind.Integer => GetIntegerType(primitive.Size),
             TypeKind.Float => primitive.Size == 4 ? LLVM.FloatType() : LLVM.DoubleType(),
-            TypeKind.Pointer => GetPointerType(primitive.PointerType),
             TypeKind.Type => LLVM.Int32Type(),
             _ => null
         };
@@ -869,12 +887,6 @@ public static unsafe class LLVMBackend
                 CreateAndSetTypeInfo(_integerTypeInfoType, fields, primitive.TypeIndex);
                 break;
             }
-            case TypeKind.Pointer:
-            {
-                var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, _typeInfos[primitive.PointerType.TypeIndex]};
-                CreateAndSetTypeInfo(_pointerTypeInfoType, fields, primitive.TypeIndex);
-                break;
-            }
             default:
             {
                 var fields = new LLVMValueRef[]{typeName, typeKind, typeSize};
@@ -882,6 +894,21 @@ public static unsafe class LLVMBackend
                 break;
             }
         }
+    }
+
+    private static void DeclarePointerType(PointerType pointerType)
+    {
+        _types[pointerType.TypeIndex] = GetPointerType(pointerType.PointedType);
+    }
+
+    private static void DeclarePointerTypeInfo(PointerType pointerType)
+    {
+        var typeName = GetString(pointerType.Name);
+        var typeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Pointer, 0);
+        var typeSize = LLVM.ConstInt(LLVM.Int32Type(), 8, 0);
+
+        var fields = new LLVMValueRef[]{typeName, typeKind, typeSize, _typeInfos[pointerType.PointedType.TypeIndex]};
+        CreateAndSetTypeInfo(_pointerTypeInfoType, fields, pointerType.TypeIndex);
     }
 
     private static void DeclareArrayType(ArrayType arrayType)
@@ -2265,10 +2292,15 @@ public static unsafe class LLVMBackend
                 _debugTypes[type.TypeIndex] = LLVM.DIBuilderCreateBasicType(_debugBuilder, name.Value, (UIntPtr)name.Length, type.Size * 8, (uint)DwarfTypeEncoding.Float, LLVMDIFlags.LLVMDIFlagZero);
                 break;
             case TypeKind.Pointer:
-                var pointerType = _debugTypes[type.PointerType.TypeIndex];
-                _debugTypes[type.TypeIndex] = LLVM.DIBuilderCreatePointerType(_debugBuilder, pointerType, 64, 0, 0, name.Value, (UIntPtr)name.Length);
                 break;
         }
+    }
+
+    private static void CreatePointerDebugType(PointerType pointerType)
+    {
+        using var name = new MarshaledString(pointerType.Name);
+        var pointedType = _debugTypes[pointerType.PointedType.TypeIndex];
+        _debugTypes[pointerType.TypeIndex] = LLVM.DIBuilderCreatePointerType(_debugBuilder, pointedType, 64, 0, 0, name.Value, (UIntPtr)name.Length);
     }
 
     private static void CreateArrayDebugType(ArrayType arrayType)

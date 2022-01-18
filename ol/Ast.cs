@@ -244,7 +244,20 @@ public class PrimitiveAst : IAst, IType
     public bool Used { get; set; }
     public bool Private { get; set; }
     public bool Signed { get; set; }
-    public IType PointerType { get; set; }
+}
+
+public class PointerType : IType
+{
+    public int FileIndex { get; set; }
+    public string Name { get; set; }
+    public string BackendName { get; set; }
+    public int TypeIndex { get; set; }
+    public TypeKind TypeKind { get; set; } = TypeKind.Pointer;
+    public uint Size { get; set; } = 8;
+    public uint Alignment { get; set; } = 8;
+    public bool Used { get; set; }
+    public bool Private { get; set; }
+    public IType PointedType { get; set; }
 }
 
 public class ArrayType : IType
