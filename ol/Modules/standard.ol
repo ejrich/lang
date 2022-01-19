@@ -1,7 +1,8 @@
 // This module contains the standard library for the language
 
-#if os == OS.Linux
+#if os == OS.Linux {
     #import linux
+}
 
 
 // Array support functions
@@ -87,18 +88,91 @@ exit_program(int exit_code) {
 
 
 // Memory operations
+void* allocate_memory(int size) {
+    pointer: void*;
+    #if os == OS.Linux {
+        pointer = mmap(null, size, Prot.PROT_NONE, MmapFlags.MAP_PRIVATE | MmapFlags.MAP_ANONYMOUS | MmapFlags.MAP_NORESERVE, 0, 0);
+    }
+
+    return pointer;
+}
+
 void* default_allocator(int size) {
-    // The default allocator is a basic chunk allocator that has a standard chunk size
     return malloc(size);
+
+    // The default allocator is a crude allocation method that will always request memory from the operating system
+    pointer := allocate_memory(size);
+
+    allocation: DefaultAllocation = { size = size; pointer = pointer; }
+
+    if default_allocations.length == 0 {
+        default_allocations.length = 10;
+        default_allocations.data = allocate_memory(10 * size_of(DefaultAllocation));
+        default_allocations[0] = allocation;
+    }
+    else {
+        resize := true;
+        each alloc, i in default_allocations {
+            if alloc.pointer == null {
+                default_allocations[i] = allocation;
+                resize = false;
+                break;
+            }
+        }
+        if resize {
+            new_pointer: DefaultAllocation*;
+            old_size := default_allocations.length * size_of(DefaultAllocation);
+            #if os == OS.Linux {
+                new_pointer = mremap(default_allocations.data, old_size, (default_allocations.length + 10) * size_of(DefaultAllocation), MremapFlags.MREMAP_MAYMOVE);
+            }
+
+            if new_pointer != default_allocations.data {
+                memory_copy(new_pointer, default_allocations.data, old_size);
+                #if os == OS.Linux {
+                    munmap(default_allocations.data, old_size);
+                }
+
+                default_allocations.data = new_pointer;
+            }
+
+            default_allocations.length += 10;
+        }
+    }
+
+    return pointer;
 }
 
 void* default_reallocator(void* pointer, int size) {
     return realloc(pointer, size);
+
+    // Try to reallocate the memory from the os
+    // If reallocation returns a new pointer:
+    // - Find the pointer in the list of allocations
+    // - Copy the data from the old pointer to the new pointer
+    // - and free the old pointer and clear out the old allocation
 }
 
 default_free(void* data) {
     free(data);
+
+    each allocation in default_allocations {
+        if allocation.pointer == data {
+            #if os == OS.Linux {
+                munmap(allocation.pointer, allocation.size);
+            }
+
+            allocation.pointer = null;
+        }
+    }
 }
+
+struct DefaultAllocation {
+    size: u64;
+    pointer: void*;
+}
+
+default_allocations: Array<DefaultAllocation>;
+
 // TODO Remove these functions once the above functions have been implemented
 void* malloc(int size) #extern "c"
 void* realloc(void* pointer, int size) #extern "c"
@@ -118,7 +192,7 @@ void* memory_copy(void* dest, void* src, int length) {
 
 // Sleep and timing related functions
 sleep(int milliseconds) {
-    if milliseconds < 0 return;
+    if milliseconds <= 0 return;
 
     seconds := milliseconds / 1000;
     ms := milliseconds % 1000;
