@@ -93,14 +93,13 @@ public static class ol
         ThreadPool.Init(noThreads);
         TypeChecker.Init();
         Parser.Parse(entrypoint);
-
         ErrorReporter.ListErrorsAndExit(ErrorCodes.ParsingError);
 
         // 3. Check types and build the program ir
         TypeChecker.CheckTypes();
-        var frontEndTime = stopwatch.Elapsed;
-
         ErrorReporter.ListErrorsAndExit(ErrorCodes.CompilationError);
+        ThreadPool.CompleteWork();
+        var frontEndTime = stopwatch.Elapsed;
 
         // 4. Build program
         stopwatch.Restart();
