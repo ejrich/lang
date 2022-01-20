@@ -90,16 +90,17 @@ exit_program(int exit_code) {
 // Memory operations
 void* allocate_memory(int size) {
     pointer: void*;
+    size = 4096;
     #if os == OS.Linux {
         pointer = mmap(null, size, Prot.PROT_NONE, MmapFlags.MAP_PRIVATE | MmapFlags.MAP_ANONYMOUS | MmapFlags.MAP_NORESERVE, 0, 0);
     }
+    print("%\n", size);
+    print("% - %\n", pointer, size);
 
     return pointer;
 }
 
 void* default_allocator(int size) {
-    return malloc(size);
-
     // The default allocator is a crude allocation method that will always request memory from the operating system
     pointer := allocate_memory(size);
 
@@ -143,18 +144,37 @@ void* default_allocator(int size) {
 }
 
 void* default_reallocator(void* pointer, int size) {
-    return realloc(pointer, size);
+    each allocation in default_allocations {
+        if allocation.pointer == pointer {
+            // Try to reallocate the memory from the os
+            new_pointer: void*;
+            #if os == OS.Linux {
+                new_pointer = mremap(pointer, allocation.size, size, MremapFlags.MREMAP_MAYMOVE);
+            }
 
-    // Try to reallocate the memory from the os
-    // If reallocation returns a new pointer:
-    // - Find the pointer in the list of allocations
-    // - Copy the data from the old pointer to the new pointer
-    // - and free the old pointer and clear out the old allocation
+            // If reallocation returns a new pointer:
+            // - Copy the data from the old pointer to the new pointer
+            // - and free the old pointer and clear out the old allocation
+            if new_pointer != pointer {
+                memory_copy(new_pointer, pointer, allocation.size);
+                #if os == OS.Linux {
+                    munmap(pointer, allocation.size);
+                }
+
+                allocation.pointer = new_pointer;
+            }
+
+            allocation.size = size;
+            return new_pointer;
+        }
+    }
+
+    // If the pointer in not in the list of allocations, exit
+    assert(false, "Pointer not found in list of allocations\n");
+    return pointer;
 }
 
 default_free(void* data) {
-    free(data);
-
     each allocation in default_allocations {
         if allocation.pointer == data {
             #if os == OS.Linux {
@@ -172,11 +192,6 @@ struct DefaultAllocation {
 }
 
 default_allocations: Array<DefaultAllocation>;
-
-// TODO Remove these functions once the above functions have been implemented
-void* malloc(int size) #extern "c"
-void* realloc(void* pointer, int size) #extern "c"
-free(void* data) #extern "c"
 
 void* memory_copy(void* dest, void* src, int length) {
     dest_buffer := cast(u8*, dest);
@@ -494,6 +509,7 @@ write_pointer_to_buffer(StringBuffer* buffer, void* data) {
                 buffer.buffer[buffer.length++] = digit + '7';
             }
             value >>= 4;
+            value &= 0x0FFFFFFFFFFFFFFF;
             length++;
         }
 
