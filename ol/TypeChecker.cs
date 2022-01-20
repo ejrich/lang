@@ -193,9 +193,9 @@ public static class TypeChecker
                     break;
             }
 
+            ClearAstQueue();
             if (!ErrorReporter.Errors.Any())
             {
-                ClearAstQueue();
                 ThreadPool.CompleteWork();
 
                 var function = ProgramIRBuilder.CreateRunnableFunction(runDirective.Value);
@@ -218,8 +218,6 @@ public static class TypeChecker
         {
             ErrorReporter.Report("'main' function of the program is not defined");
         }
-
-        ThreadPool.CompleteWork();
     }
 
     private static void RemoveNode<T>(SafeLinkedList<T> list, Node<T> previous, Node<T> current)
@@ -3023,10 +3021,12 @@ public static class TypeChecker
     {
         var conditionalType = VerifyExpression(ast, currentFunction, scope, out constant);
 
-        if (willRun)
+        if (willRun && !constant)
         {
+            ClearAstQueue();
+
             // If the expression will be run, then all functions must be verified before generating the IR for the function
-            VerifyNecessaryConditionExpressions(ast, currentFunction);
+            // VerifyNecessaryConditionExpressions(ast, currentFunction);
         }
 
         switch (conditionalType?.TypeKind)
