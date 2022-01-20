@@ -206,7 +206,7 @@ public static class ProgramIRBuilder
             {
                 var instruction = function.Instructions[instructionIndex++];
 
-                var text = $"{file} {line}:{column}\t\t{instruction.Type} ";
+                var text = $"{instructionIndex} {file} {line}:{column}\t\t{instruction.Type} ";
                 switch (instruction.Type)
                 {
                     case InstructionType.Jump:
@@ -229,14 +229,13 @@ public static class ProgramIRBuilder
                         text += $"{PrintInstructionValue(instruction.Value1)}, {instruction.Value2.Type.Name}* => v{instruction.ValueIndex}";
                         break;
                     case InstructionType.Call:
-                        var callingFunction = Program.Functions[instruction.Index];
-                        text += $"{callingFunction.Source.Name} {PrintInstructionValue(instruction.Value1)} => v{instruction.ValueIndex}";
+                        text += $"{instruction.String} {PrintInstructionValue(instruction.Value1)} => v{instruction.ValueIndex}";
                         break;
                     case InstructionType.CallFunctionPointer:
                         text += $"{PrintInstructionValue(instruction.Value1)} {PrintInstructionValue(instruction.Value2)} => v{instruction.ValueIndex}";
                         break;
                     case InstructionType.SystemCall:
-                        text += $"{instruction.Index} {PrintInstructionValue(instruction.Value2)} => v{instruction.ValueIndex}";
+                        text += $"{instruction.Index} {PrintInstructionValue(instruction.Value1)} => v{instruction.ValueIndex}";
                         break;
                     case InstructionType.Load:
                     case InstructionType.LoadPointer:
@@ -2506,7 +2505,7 @@ public static class ProgramIRBuilder
         var callInstruction = new Instruction
         {
             Type = InstructionType.Call, Scope = scope, Index = callingFunction.FunctionIndex, Index2 = callIndex,
-            Value1 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Values = arguments}
+            String = callingFunction.Name, Value1 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Values = arguments}
         };
         return AddInstruction(function, callInstruction, callingFunction.ReturnType);
     }
