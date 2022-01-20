@@ -2222,7 +2222,7 @@ load_model() {
         i++;
     }
 
-    free(model_file.data);
+    default_free(model_file.data);
 
     create_vertex_buffer(model_vertices, &model_vertex_buffer, &model_vertex_buffer_memory);
     create_index_buffer(model_indices, &model_index_buffer, &model_index_buffer_memory);

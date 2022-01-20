@@ -88,16 +88,39 @@ exit_program(int exit_code) {
 
 
 // Memory operations
-void* allocate_memory(int size) {
-    pointer: void*;
-    size = 4096;
-    #if os == OS.Linux {
-        pointer = mmap(null, size, Prot.PROT_NONE, MmapFlags.MAP_PRIVATE | MmapFlags.MAP_ANONYMOUS | MmapFlags.MAP_NORESERVE, 0, 0);
+void* memory_copy(void* dest, void* src, int length) {
+    dest_buffer := cast(u8*, dest);
+    src_buffer := cast(u8*, src);
+
+    each i in 0..length-1 {
+        dest_buffer[i] = src_buffer[i];
     }
-    print("%\n", size);
-    print("% - %\n", pointer, size);
+
+    return dest;
+}
+
+void* allocate_memory(u64 size) {
+    pointer: void*;
+    #if os == OS.Linux {
+        pointer = mmap(null, size, Prot.PROT_READ | Prot.PROT_WRITE, MmapFlags.MAP_PRIVATE | MmapFlags.MAP_ANONYMOUS | MmapFlags.MAP_NORESERVE, 0, 0);
+    }
 
     return pointer;
+}
+
+void* reallocate_memory(void* pointer, u64 old_size, u64 new_size) {
+    new_pointer: void*;
+    #if os == OS.Linux {
+        new_pointer = mremap(pointer, old_size, new_size, MremapFlags.MREMAP_MAYMOVE);
+    }
+
+    return new_pointer;
+}
+
+free_memory(void* pointer, u64 size) {
+    #if os == OS.Linux {
+        munmap(pointer, size);
+    }
 }
 
 void* default_allocator(int size) {
@@ -110,6 +133,7 @@ void* default_allocator(int size) {
         default_allocations.length = 10;
         default_allocations.data = allocate_memory(10 * size_of(DefaultAllocation));
         default_allocations[0] = allocation;
+        // array_insert(&exit_callbacks, free_default_allocations); TODO
     }
     else {
         resize := true;
@@ -121,17 +145,12 @@ void* default_allocator(int size) {
             }
         }
         if resize {
-            new_pointer: DefaultAllocation*;
             old_size := default_allocations.length * size_of(DefaultAllocation);
-            #if os == OS.Linux {
-                new_pointer = mremap(default_allocations.data, old_size, (default_allocations.length + 10) * size_of(DefaultAllocation), MremapFlags.MREMAP_MAYMOVE);
-            }
+            new_pointer: DefaultAllocation* = reallocate_memory(default_allocations.data, old_size, (default_allocations.length + 10) * size_of(DefaultAllocation));
 
             if new_pointer != default_allocations.data {
                 memory_copy(new_pointer, default_allocations.data, old_size);
-                #if os == OS.Linux {
-                    munmap(default_allocations.data, old_size);
-                }
+                free_memory(default_allocations.data, old_size);
 
                 default_allocations.data = new_pointer;
             }
@@ -147,20 +166,14 @@ void* default_reallocator(void* pointer, int size) {
     each allocation in default_allocations {
         if allocation.pointer == pointer {
             // Try to reallocate the memory from the os
-            new_pointer: void*;
-            #if os == OS.Linux {
-                new_pointer = mremap(pointer, allocation.size, size, MremapFlags.MREMAP_MAYMOVE);
-            }
+            new_pointer := reallocate_memory(pointer, allocation.size, size);
 
             // If reallocation returns a new pointer:
             // - Copy the data from the old pointer to the new pointer
             // - and free the old pointer and clear out the old allocation
             if new_pointer != pointer {
                 memory_copy(new_pointer, pointer, allocation.size);
-                #if os == OS.Linux {
-                    munmap(pointer, allocation.size);
-                }
-
+                free_memory(pointer, allocation.size);
                 allocation.pointer = new_pointer;
             }
 
@@ -177,10 +190,7 @@ void* default_reallocator(void* pointer, int size) {
 default_free(void* data) {
     each allocation in default_allocations {
         if allocation.pointer == data {
-            #if os == OS.Linux {
-                munmap(allocation.pointer, allocation.size);
-            }
-
+            free_memory(allocation.pointer, allocation.size);
             allocation.pointer = null;
         }
     }
@@ -193,15 +203,16 @@ struct DefaultAllocation {
 
 default_allocations: Array<DefaultAllocation>;
 
-void* memory_copy(void* dest, void* src, int length) {
-    dest_buffer := cast(u8*, dest);
-    src_buffer := cast(u8*, src);
-
-    each i in 0..length-1 {
-        dest_buffer[i] = src_buffer[i];
+free_default_allocations() {
+    print("% allocations to free\n", default_allocations.length);
+    each allocation in default_allocations {
+        if allocation.pointer != null {
+            print("Freeing %, length %\n", allocation.pointer, allocation.size);
+            free_memory(allocation.pointer, allocation.size);
+        }
     }
 
-    return dest;
+    free_memory(default_allocations.data, default_allocations.length * size_of(DefaultAllocation));
 }
 
 

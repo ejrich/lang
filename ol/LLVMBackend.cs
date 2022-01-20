@@ -2169,11 +2169,11 @@ public static unsafe class LLVMBackend
             case 3:
                 return ($"mov rax, {syscall}; syscall;", returnsVoid ? "{di},{si},{dx}" : "=A,{di},{si},{dx}");
             case 4:
-                return ($"mov rax, {syscall}; syscall;", returnsVoid ? "{di},{si},{dx},{cx}" : "=A,{di},{si},{dx},{cx}");
+                return ($"mov r10, ${{4:V}}; mov rax, {syscall}; syscall;", returnsVoid ? "{di},{si},{dx},r,~{r10}" : "=A,{di},{si},{dx},r,~{r10}");
             case 5:
-                return ($"mov rax, {syscall}; mov r8, ${{5:V}}; syscall;", returnsVoid ? "{di},{si},{dx},{cx},r,~{r8}" : "=A,{di},{si},{dx},{cx},r,~{r8}");
+                return ($"mov r10, ${{4:V}}; mov r8, ${{5:V}}; mov rax, {syscall}; syscall;", returnsVoid ? "{di},{si},{dx},r,r,~{r10},~{r8}" : "=A,{di},{si},{dx},r,r,~{r10},~{r8}");
             case 6:
-                return ($"mov rax, {syscall}; mov r8, ${{5:V}}; mov r9, ${{6:V}}; syscall;", returnsVoid ? "{di},{si},{dx},{cx},r,r,~{r8},~{r9}" : "=A,{di},{si},{dx},{cx},r,r,~{r8},~{r9}");
+                return ($"mov r10, ${{4:V}}; mov r8, ${{5:V}}; mov r9, ${{6:V}}; mov rax, {syscall}; syscall;", returnsVoid ? "{di},{si},{dx},r,r,r,~{r10},~{r8},~{r9}" : "=A,{di},{si},{dx},r,r,r,~{r10},~{r8},~{r9}");
             default:
                 return ($"mov rax, {syscall}; syscall;", string.Empty);
         }
