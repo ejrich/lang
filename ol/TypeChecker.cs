@@ -4858,6 +4858,8 @@ public static class TypeChecker
     private static bool TypeEquals(IType target, IType source, bool checkPrimitives = false)
     {
         if (target == null || source == null) return false;
+        if (target == source) return true;
+
         if (target is InterfaceAst interfaceAst)
         {
             // Cannot assign interfaces to interface types
@@ -4879,7 +4881,6 @@ public static class TypeChecker
             }
             return true;
         }
-        if (target == source) return true;
 
         switch (target.TypeKind)
         {

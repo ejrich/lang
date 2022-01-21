@@ -133,7 +133,7 @@ void* default_allocator(int size) {
         default_allocations.length = 10;
         default_allocations.data = allocate_memory(10 * size_of(DefaultAllocation));
         default_allocations[0] = allocation;
-        // array_insert(&exit_callbacks, free_default_allocations); TODO
+        array_insert(&exit_callbacks, free_default_allocations);
     }
     else {
         resize := true;
@@ -204,10 +204,8 @@ struct DefaultAllocation {
 default_allocations: Array<DefaultAllocation>;
 
 free_default_allocations() {
-    print("% allocations to free\n", default_allocations.length);
     each allocation in default_allocations {
         if allocation.pointer != null {
-            print("Freeing %, length %\n", allocation.pointer, allocation.size);
             free_memory(allocation.pointer, allocation.size);
         }
     }
