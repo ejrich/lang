@@ -16,7 +16,8 @@ public static class Lexer
         {'n', '\n'},
         {'r', '\r'},
         {'t', '\t'},
-        {'v', '\v'}
+        {'v', '\v'},
+        {'0', '\0'}
     };
 
     private static readonly IDictionary<string, TokenType> _reservedTokens = new Dictionary<string, TokenType>
