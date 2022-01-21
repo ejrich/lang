@@ -89,7 +89,7 @@ instance: VkInstance*;
 create_instance() {
     if enable_validation_layers && !check_validation_layer_support() {
         print("Validation layers requested, but not available\n");
-        exit(1);
+        exit_program(1);
     }
 
     version := vk_make_api_version(0, 1, 0, 0);
@@ -121,7 +121,7 @@ create_instance() {
     result := vkCreateInstance(&instance_create_info, null, &instance);
     if result != VkResult.VK_SUCCESS {
         print("Unable to create vulkan instance %\n", result);
-        exit(1);
+        exit_program(1);
     }
 }
 
@@ -130,7 +130,7 @@ Array<u8*> get_required_extensions() {
     result := vkEnumerateInstanceExtensionProperties(null, &extension_count, null);
     if result != VkResult.VK_SUCCESS {
         print("Unable to get vulkan extensions\n");
-        exit(1);
+        exit_program(1);
     }
 
     extensions: Array<VkExtensionProperties>[extension_count];
@@ -251,12 +251,12 @@ setup_debug_messenger() {
         result := func(instance, &messenger_create_info, null, &debug_messenger);
         if result != VkResult.VK_SUCCESS {
             print("Failed to set up debug messenger %\n", result);
-            exit(1);
+            exit_program(1);
         }
     }
     else {
         print("Failed to set up debug messenger\n");
-        exit(1);
+        exit_program(1);
     }
 }
 
@@ -281,7 +281,7 @@ pick_physical_device() {
 
     if device_count == 0 {
         print("Failed to find GPUs with Vulkan support\n");
-        exit(1);
+        exit_program(1);
     }
 
     devices: Array<VkPhysicalDevice*>[device_count];
@@ -299,7 +299,7 @@ pick_physical_device() {
 
     if physical_device == null {
         print("Failed to find a suitable GPU\n");
-        exit(1);
+        exit_program(1);
     }
 
     msaa_samples = get_max_usable_sample_count();
@@ -412,7 +412,7 @@ create_logical_device() {
     result := vkCreateDevice(physical_device, &device_create_info, null, &device);
     if result != VkResult.VK_SUCCESS {
         print("Unable to create vulkan device %\n", result);
-        exit(1);
+        exit_program(1);
     }
 
     vkGetDeviceQueue(device, graphics_family, 0, &graphics_queue);
@@ -436,7 +436,7 @@ create_surface() {
 
     if result != VkResult.VK_SUCCESS {
         print("Unable to create window surface %\n", result);
-        exit(1);
+        exit_program(1);
     }
 }
 
@@ -629,7 +629,7 @@ create_swap_chain() {
     result := vkCreateSwapchainKHR(device, &swapchain_create_info, null, &swap_chain);
     if result != VkResult.VK_SUCCESS {
         print("Unable to create swap chain %\n", result);
-        exit(1);
+        exit_program(1);
     }
 
     vkGetSwapchainImagesKHR(device, swap_chain, &image_count, null);
@@ -706,7 +706,7 @@ create_image_views() {
         result := vkCreateImageView(device, &view_create_info, null, &swap_chain_image_views[i]);
         if result != VkResult.VK_SUCCESS {
             print("Unable to create image view %\n", result);
-            exit(1);
+            exit_program(1);
         }
     }
 }
@@ -843,7 +843,7 @@ create_graphics_pipeline() {
     result := vkCreatePipelineLayout(device, &pipeline_layout_info, null, &pipeline_layout);
     if result != VkResult.VK_SUCCESS {
         print("Unable to create pipeline layout %\n", result);
-        exit(1);
+        exit_program(1);
     }
 
     depth_stencil: VkPipelineDepthStencilStateCreateInfo = {
@@ -880,7 +880,7 @@ create_graphics_pipeline() {
     result = vkCreateGraphicsPipelines(device, null, 1, &pipeline_info, null, &graphics_pipeline);
     if result != VkResult.VK_SUCCESS {
         print("Unable to create graphics pipeline %\n", result);
-        exit(1);
+        exit_program(1);
     }
 
 
@@ -904,7 +904,7 @@ VkShaderModule* create_shader_module(string file) {
     result := vkCreateShaderModule(device, &shader_create_info, null, &shader_module);
     if result != VkResult.VK_SUCCESS {
         print("Unable to create shader module %\n", result);
-        exit(1);
+        exit_program(1);
     }
 
     return shader_module;
@@ -994,7 +994,7 @@ create_render_pass() {
     result := vkCreateRenderPass(device, &render_pass_info, null, &render_pass);
     if result != VkResult.VK_SUCCESS {
         print("Unable to create render pass %\n", result);
-        exit(1);
+        exit_program(1);
     }
 }
 
@@ -1025,7 +1025,7 @@ create_framebuffers() {
         result := vkCreateFramebuffer(device, &framebuffer_info, null, &swap_chain_framebuffers[i]);
         if result != VkResult.VK_SUCCESS {
             print("Unable to create framebuffer %\n", result);
-            exit(1);
+            exit_program(1);
         }
     }
 }
@@ -1046,7 +1046,7 @@ create_command_pool() {
     result := vkCreateCommandPool(device, &pool_info, null, &command_pool);
     if result != VkResult.VK_SUCCESS {
         print("Unable to create command pool %\n", result);
-        exit(1);
+        exit_program(1);
     }
 }
 
@@ -1062,7 +1062,7 @@ create_command_buffers() {
     result := vkAllocateCommandBuffers(device, &alloc_info, command_buffers.data);
     if result != VkResult.VK_SUCCESS {
         print("Unable to create command pool %\n", result);
-        exit(1);
+        exit_program(1);
     }
 
     begin_info: VkCommandBufferBeginInfo = {
@@ -1088,7 +1088,7 @@ create_command_buffers() {
         result = vkBeginCommandBuffer(command_buffer, &begin_info);
         if result != VkResult.VK_SUCCESS {
             print("Unable to begin recording command buffer %\n", result);
-            exit(1);
+            exit_program(1);
         }
 
         render_pass_info.framebuffer = swap_chain_framebuffers[i];
@@ -1114,7 +1114,7 @@ create_command_buffers() {
         result = vkEndCommandBuffer(command_buffer);
         if result != VkResult.VK_SUCCESS {
             print("Unable to record command buffer %\n", result);
-            exit(1);
+            exit_program(1);
         }
     }
 }
@@ -1143,19 +1143,19 @@ create_sync_objects() {
         result := vkCreateSemaphore(device, &semaphore_info, null, &image_available_semaphores[i]);
         if result != VkResult.VK_SUCCESS {
             print("Unable to create semaphore %\n", result);
-            exit(1);
+            exit_program(1);
         }
 
         result = vkCreateSemaphore(device, &semaphore_info, null, &render_finished_semaphores[i]);
         if result != VkResult.VK_SUCCESS {
             print("Unable to create semaphore %\n", result);
-            exit(1);
+            exit_program(1);
         }
 
         result = vkCreateFence(device, &fence_info, null, &in_flight_fences[i]);
         if result != VkResult.VK_SUCCESS {
             print("Unable to create fence %\n", result);
-            exit(1);
+            exit_program(1);
         }
     }
 }
@@ -1175,7 +1175,7 @@ draw_frame() {
     }
     else if result != VkResult.VK_SUCCESS && result != VkResult.VK_SUBOPTIMAL_KHR {
         print("Failed to acquire swap chain image %\n", result);
-        exit(1);
+        exit_program(1);
     }
 
     if images_in_flight[image_index] {
@@ -1201,7 +1201,7 @@ draw_frame() {
     result = vkQueueSubmit(graphics_queue, 1, &submit_info, in_flight_fences[current_frame]);
     if result != VkResult.VK_SUCCESS {
         print("Failed to submit draw command buffer %\n", result);
-        exit(1);
+        exit_program(1);
     }
 
     present_info: VkPresentInfoKHR = {
@@ -1219,7 +1219,7 @@ draw_frame() {
     }
     else if result != VkResult.VK_SUCCESS {
         print("Failed to present swap chain image %\n", result);
-        exit(1);
+        exit_program(1);
     }
 
     current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
@@ -1416,7 +1416,7 @@ u32 find_memory_type(u32 type_filter, VkMemoryPropertyFlagBits properties) {
     }
 
     print("Failed to find a suitable memory type\n");
-    exit(1);
+    exit_program(1);
     return 0;
 }
 
@@ -1432,7 +1432,7 @@ create_buffer(u64 size, VkBufferUsageFlagBits usage, VkMemoryPropertyFlagBits pr
     result := vkCreateBuffer(device, &buffer_info, null, buffer);
     if result != VkResult.VK_SUCCESS {
         print("Unable to create buffer %\n", result);
-        exit(1);
+        exit_program(1);
     }
 
     memory_requirements: VkMemoryRequirements;
@@ -1446,7 +1446,7 @@ create_buffer(u64 size, VkBufferUsageFlagBits usage, VkMemoryPropertyFlagBits pr
     result = vkAllocateMemory(device, &alloc_info, null, buffer_memory);
     if result != VkResult.VK_SUCCESS {
         print("Unable to allocate buffer memory %\n", result);
-        exit(1);
+        exit_program(1);
     }
 
     vkBindBufferMemory(device, *buffer, *buffer_memory, 0);
@@ -1542,7 +1542,7 @@ create_descriptor_set_layout() {
     result := vkCreateDescriptorSetLayout(device, &layout_info, null, &descriptor_set_layout);
     if result != VkResult.VK_SUCCESS {
         print("Failed to create descriptor set layout %", result);
-        exit(1);
+        exit_program(1);
     }
 }
 
@@ -1724,7 +1724,7 @@ create_descriptor_pool() {
     result := vkCreateDescriptorPool(device, &pool_info, null, &descriptor_pool);
     if result != VkResult.VK_SUCCESS {
         print("Unable to create descriptor pool %\n", result);
-        exit(1);
+        exit_program(1);
     }
 }
 
@@ -1745,7 +1745,7 @@ create_descriptor_sets(Array<VkDescriptorSet*>* descriptor_sets, VkImageView* te
     result := vkAllocateDescriptorSets(device, &alloc_info, descriptor_sets.data);
     if result != VkResult.VK_SUCCESS {
         print("Unable to allocate descriptor sets %\n", result);
-        exit(1);
+        exit_program(1);
     }
 
     buffer_info: VkDescriptorBufferInfo = {
@@ -1803,7 +1803,7 @@ int create_texture_image(string file, VkImage** texture_image, VkDeviceMemory** 
 
     if pixels == null {
         print("Failed to load texture image\n");
-        exit(1);
+        exit_program(1);
     }
 
     staging_buffer: VkBuffer*;
@@ -1854,7 +1854,7 @@ create_image(u32 width, u32 height, VkFormat format, VkImageTiling tiling, VkIma
     result := vkCreateImage(device, &image_info, null, image);
     if result != VkResult.VK_SUCCESS {
         print("Failed to create image %\n", result);
-        exit(1);
+        exit_program(1);
     }
 
     memory_requirements: VkMemoryRequirements;
@@ -1868,7 +1868,7 @@ create_image(u32 width, u32 height, VkFormat format, VkImageTiling tiling, VkIma
     result = vkAllocateMemory(device, &alloc_info, null, image_memory);
     if result != VkResult.VK_SUCCESS {
         print("Failed to allocate image memory %\n", result);
-        exit(1);
+        exit_program(1);
     }
 
     vkBindImageMemory(device, *image, *image_memory, 0);
@@ -1955,7 +1955,7 @@ transition_image_layout(VkImage* image, VkFormat format, VkImageLayout old_layou
     }
     else {
         print("Unsupported layout transition\n");
-        exit(1);
+        exit_program(1);
     }
 
     vkCmdPipelineBarrier(command_buffer, source_stage, destination_stage, 0, 0, null, 0, null, 1, &barrier);
@@ -2010,7 +2010,7 @@ create_texture_image_view(VkImage* texture_image, VkImageView** texture_image_vi
     result := vkCreateImageView(device, &view_info, null, texture_image_view);
     if result != VkResult.VK_SUCCESS {
         print("Unable to create image view %\n", result);
-        exit(1);
+        exit_program(1);
     }
 }
 
@@ -2039,7 +2039,7 @@ create_texture_sampler() {
     result := vkCreateSampler(device, &sampler_info, null, &texture_sampler);
     if result != VkResult.VK_SUCCESS {
         print("Unable to create image sampler %\n", result);
-        exit(1);
+        exit_program(1);
     }
 }
 
@@ -2077,7 +2077,7 @@ create_depth_resources() {
     result := vkCreateImageView(device, &view_create_info, null, &depth_image_view);
     if result != VkResult.VK_SUCCESS {
         print("Unable to create image view %\n", result);
-        exit(1);
+        exit_program(1);
     }
 
     transition_image_layout(depth_image, depth_format, VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED, VkImageLayout.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
@@ -2095,7 +2095,7 @@ VkFormat find_supported_format(Array<VkFormat> candidates, VkImageTiling tiling,
     }
 
     print("Failed to find supported format\n");
-    exit(1);
+    exit_program(1);
     return VkFormat.VK_FORMAT_UNDEFINED;
 }
 
@@ -2277,7 +2277,7 @@ generate_mipmaps(VkImage* image, VkFormat image_format, int width, int height, i
 
     if (format_properties.optimalTilingFeatures & VkFormatFeatureFlagBits.VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT) != VkFormatFeatureFlagBits.VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT {
         print("Texture image format does not support linear blitting\n");
-        exit(1);
+        exit_program(1);
     }
 
     command_buffer := begin_single_time_commands();
@@ -2415,7 +2415,7 @@ create_color_resources() {
     result := vkCreateImageView(device, &view_create_info, null, &color_image_view);
     if result != VkResult.VK_SUCCESS {
         print("Unable to create image view %\n", result);
-        exit(1);
+        exit_program(1);
     }
 }
 
