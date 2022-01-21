@@ -192,8 +192,11 @@ default_free(void* data) {
         if allocation.pointer == data {
             free_memory(allocation.pointer, allocation.size);
             allocation.pointer = null;
+            return;
         }
     }
+
+    assert(false, "Pointer not found in list of allocations\n");
 }
 
 struct DefaultAllocation {
