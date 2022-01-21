@@ -6,10 +6,9 @@ namespace ol;
 public static class ThreadPool
 {
     private static int _completed;
-    private static int _next;
     private static int _count;
     private static Semaphore _semaphore = new Semaphore(0, int.MaxValue);
-    private static QueueItem[] _queue = new QueueItem[64];
+    private static SafeLinkedList<QueueItem> _queue = new();
 
     public static void Init(bool noThreads)
     {
@@ -37,17 +36,17 @@ public static class ThreadPool
 
     private static bool ExecuteQueuedItem()
     {
-        var next = _next;
-        if (next >= _count)
+        var head = _queue.Head;
+        if (head == null)
         {
             return true;
         }
 
-        var index = Interlocked.CompareExchange(ref _next, next + 1, next);
+        var value = Interlocked.CompareExchange(ref _queue.Head, head.Next, head);
 
-        if (index == next)
+        if (value == head)
         {
-            var queueItem = _queue[index];
+            var queueItem = head.Data;
             queueItem.Function(queueItem.Data);
             Interlocked.Increment(ref _completed);
         }
@@ -57,16 +56,8 @@ public static class ThreadPool
 
     public static void QueueWork(Action<object> function, object data)
     {
-        if (_count >= _queue.Length)
-        {
-            var queue = new QueueItem[_queue.Length * 2];
-            Array.Copy(_queue, queue, _queue.Length);
-            _queue = queue;
-        }
-        var originalCount = _count;
-        _queue[originalCount] = new QueueItem {Function = function, Data = data};
-
-        Interlocked.CompareExchange(ref _count, originalCount + 1, originalCount);
+        _queue.AddToHead(new QueueItem {Function = function, Data = data});
+        Interlocked.Increment(ref _count);
         _semaphore.Release();
     }
 
@@ -84,7 +75,6 @@ public static class ThreadPool
         }
 
         _completed = 0;
-        _next = 0;
         _count = 0;
     }
 }
@@ -107,6 +97,16 @@ public class SafeLinkedList<T>
         {
             var originalEnd = ReplaceEnd(node);
             originalEnd.Next = node;
+        }
+    }
+
+    public void AddToHead(T data)
+    {
+        var node = new Node<T> {Data = data, Next = Head};
+
+        while (Interlocked.CompareExchange(ref Head, node, node.Next) != node.Next)
+        {
+            node.Next = Head;
         }
     }
 
