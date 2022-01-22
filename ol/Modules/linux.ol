@@ -4,27 +4,27 @@
 
 // Linux system calls
 
-s64 read(u64 fd, u8* buf, u64 count) #syscall 0
-s64 write(u64 fd, u8* buf, u64 count) #syscall 1
-int open(u8* pathname, int flags, Mode_T mode) #syscall 2
-int close(u64 fd) #syscall 3
+s64 read(int fd, u8* buf, u64 count) #syscall 0
+s64 write(int fd, u8* buf, u64 count) #syscall 1
+int open(u8* pathname, OpenFlags flags, OpenMode mode) #syscall 2
+int close(int fd) #syscall 3
 int stat(u8* path, Stat* buf) #syscall 4
-int fstat(u64 fd, Stat* buf) #syscall 5
-int lstat(u64 fd, Stat* buf) #syscall 6
+int fstat(int fd, Stat* buf) #syscall 5
+int lstat(int fd, Stat* buf) #syscall 6
 int poll(PollFd* ufds, u32 nfds, int timeout) #syscall 7
-int lseek(u64 fd, u64 offset, Whence whence) #syscall 8
-void* mmap(void* addr, u64 length, Prot prot, MmapFlags flags, u64 fd, u64 offset) #syscall 9
+int lseek(int fd, u64 offset, Whence whence) #syscall 8
+void* mmap(void* addr, u64 length, Prot prot, MmapFlags flags, int fd, u64 offset) #syscall 9
 int mprotect(void* addr, u64 length, Prot prot) #syscall 10
 int munmap(void* addr, u64 length) #syscall 11
 int brk(void* addr) #syscall 12
 int rt_sigaction(int sig, Sigaction* act, Sigaction* oact, u64 sigsetsize) #syscall 13
 int rt_sigprocmask(Sighow how, Sigset_T* set, Sigset_T* oset, u64 sigsetsize) #syscall 14
 int rt_sigreturn() #syscall 15
-int ioctl(u64 fd, u32 cmd, u64 arg) #syscall 16
-int pread64(u64 fd, u8* buf, u64 count, u64 pos) #syscall 17
-int pwrite64(u64 fd, u8* buf, u64 count, u64 pos) #syscall 18
-int readv(u64 fd, Iovec* vec, u64 vlen) #syscall 19
-int writev(u64 fd, Iovec* vec, u64 vlen) #syscall 20
+int ioctl(int fd, u32 cmd, u64 arg) #syscall 16
+int pread64(int fd, u8* buf, u64 count, u64 pos) #syscall 17
+int pwrite64(int fd, u8* buf, u64 count, u64 pos) #syscall 18
+int readv(int fd, Iovec* vec, u64 vlen) #syscall 19
+int writev(int fd, Iovec* vec, u64 vlen) #syscall 20
 int access(u8* filename, int mode) #syscall 21
 int pipe(int* fildes) #syscall 22
 int select(int nfds, Fd_Set* inp, Fd_Set outp, Fd_Set* exp, Timeval* tvp) #syscall 23
@@ -37,23 +37,48 @@ int clock_gettime(ClockId clk_id, Timespec* tp) #syscall 228
 exit_group(int status) #syscall 231
 // TODO Add additional syscalls when necessary
 
-stdin:  u64 = 0; #const
-stdout: u64 = 1; #const
-stderr: u64 = 2; #const
+stdin  := 0; #const
+stdout := 1; #const
+stderr := 2; #const
 
-enum Mode_T {
-    S_IXOTH = 0x1;
-    S_IWOTH = 0x2;
-    S_IROTH = 0x4;
-    S_IRWXO = 0x7;
-    S_IXGRP = 0x10;
-    S_IWGRP = 0x20;
-    S_IRGRP = 0x40;
-    S_IRWXG = 0x70;
-    S_IXUSR = 0x100;
-    S_IWUSR = 0x200;
-    S_IRUSR = 0x400;
-    S_IRWXU = 0x700;
+enum OpenFlags {
+    O_RDONLY    = 00000000;
+    O_WRONLY    = 00000001;
+    O_RDWR      = 00000002;
+    O_ACCMODE   = 00000003;
+    O_CREAT     = 00000100;
+    O_EXCL      = 00000200;
+    O_NOCTTY    = 00000400;
+    O_TRUNC     = 00001000;
+    O_APPEND    = 00002000;
+    O_NONBLOCK  = 00004000;
+    O_DSYNC     = 00010000;
+    O_ASYNC     = 00020000;
+    O_DIRECT    = 00040000;
+    O_LARGEFILE = 00100000;
+    O_DIRECTORY = 00200000;
+    O_NOFOLLOW  = 00400000;
+    O_NOATIME   = 01000000;
+    O_CLOEXEC   = 02000000;
+    O_SYNC      = 04010000;
+    O_PATH      = 10000000;
+    O_TMPFILE   = 20200000;
+}
+
+enum OpenMode {
+    S_IXOTH = 1;
+    S_IWOTH = 2;
+    S_IROTH = 4;
+    S_IRWXO = 7;
+    S_IXGRP = 10;
+    S_IWGRP = 20;
+    S_IRGRP = 40;
+    S_IRWXG = 70;
+    S_IXUSR = 100;
+    S_IWUSR = 200;
+    S_IRUSR = 400;
+    S_IRWXU = 700;
+    S_RWALL = 666;
 }
 
 struct Stat {
