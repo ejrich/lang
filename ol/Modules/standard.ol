@@ -145,8 +145,9 @@ void* default_allocator(int size) {
             }
         }
         if resize {
-            old_size := default_allocations.length * size_of(DefaultAllocation);
-            new_pointer: DefaultAllocation* = reallocate_memory(default_allocations.data, old_size, (default_allocations.length + 10) * size_of(DefaultAllocation));
+            old_length := default_allocations.length;
+            old_size := old_length * size_of(DefaultAllocation);
+            new_pointer: DefaultAllocation* = reallocate_memory(default_allocations.data, old_size, (old_length + 10) * size_of(DefaultAllocation));
 
             if new_pointer != default_allocations.data {
                 memory_copy(new_pointer, default_allocations.data, old_size);
@@ -155,6 +156,7 @@ void* default_allocator(int size) {
                 default_allocations.data = new_pointer;
             }
 
+            default_allocations[old_length] = allocation;
             default_allocations.length += 10;
         }
     }
@@ -188,7 +190,7 @@ void* default_reallocator(void* pointer, int size) {
 }
 
 default_free(void* data) {
-    each allocation in default_allocations {
+    each allocation, i in default_allocations {
         if allocation.pointer == data {
             free_memory(allocation.pointer, allocation.size);
             allocation.pointer = null;
@@ -586,7 +588,6 @@ write_struct_to_buffer(StringBuffer* buffer, StructTypeInfo* type_info, void* da
 
 
 // File and IO functions and types
-struct FILE {}
 struct DIR {}
 
 D_NAME_LENGTH := 256; #const
@@ -617,28 +618,84 @@ int closedir(DIR* dir) #extern "c"
 dirent* readdir(DIR* dir) #extern "c"
 
 // File operations
-FILE* fopen(string file, string type) #extern "c"
-int fseek(FILE* file, s64 offset, int origin) #extern "c"
-s64 ftell(FILE* file) #extern "c"
-int fread(void* buffer, u32 size, u32 length, FILE* file) #extern "c"
-int fclose(FILE* file) #extern "c"
+struct File {
+    handle: int;
+}
+
+enum FileFlags {
+    None   = 0;
+    Read   = 1;
+    Write  = 2;
+    Create = 4;
+    Append = 8;
+}
+
+bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
+    file: File;
+
+    #if os == OS.Linux {
+        open_flags: OpenFlags;
+
+        if flags & FileFlags.Read {
+            open_flags |= OpenFlags.O_RDONLY;
+        }
+        if flags & FileFlags.Write {
+            if flags & FileFlags.Read {
+                open_flags |= OpenFlags.O_RDWR;
+            }
+            else {
+                open_flags |= OpenFlags.O_WRONLY;
+            }
+        }
+        if flags & FileFlags.Create {
+            if (flags & FileFlags.Write) == FileFlags.None {
+                open_flags |= OpenFlags.O_WRONLY;
+            }
+            open_flags |= OpenFlags.O_CREAT | OpenFlags.O_TRUNC;
+        }
+        if flags & FileFlags.Append {
+            if (flags & FileFlags.Write) == FileFlags.None {
+                open_flags |= OpenFlags.O_WRONLY;
+            }
+            open_flags |= OpenFlags.O_CREAT | OpenFlags.O_APPEND;
+        }
+
+        file.handle = open(path.data, open_flags, OpenMode.S_RWALL);
+
+        if file.handle == -1 {
+            return false, file;
+        }
+        else if flags & FileFlags.Append {
+            lseek(file.handle, 0, Whence.SEEK_END);
+        }
+    }
+
+    return true, file;
+}
+
+bool close_file(File file) {
+    #if os == OS.Linux {
+        success := close(file.handle);
+        return success == 0;
+    }
+}
 
 bool, string read_file(string file_path, Allocate allocator = default_allocator) {
     file_contents: string;
-    found: bool;
 
-    file := fopen(file_path, "r");
-    if file {
-        found = true;
-        fseek(file, 0, 2);
-        size := ftell(file);
-        fseek(file, 0, 0);
+    success, file := open_file(file_path);
+    if success {
+        #if os == OS.Linux {
+            size := lseek(file.handle, 0, Whence.SEEK_END);
+            lseek(file.handle, 0, Whence.SEEK_SET);
 
-        file_contents = { length = size; data = allocator(size); }
+            file_contents = { length = size; data = allocator(size); }
 
-        fread(file_contents.data, 1, size, file);
-        fclose(file);
+            read(file.handle, file_contents.data, size);
+        }
+
+        close_file(file);
     }
 
-    return found, file_contents;
+    return success, file_contents;
 }

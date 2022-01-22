@@ -8,18 +8,18 @@ main() {
     failed_test_count := 0;
     if dir {
         file := readdir(dir);
-        test_dir: string;
         while file {
             dir_name := get_file_name(file);
             if file.d_type == FileType.DT_DIR && dir_name != "." && dir_name != ".." {
-                test_dir = format_string("%/%", tests_dir, dir_name);
+                test_dir := format_string("%/%", tests_dir, dir_name);
 
                 if !run_test(test_dir, dir_name) failed_test_count++;
+
+                default_free(test_dir.data);
             }
 
             file = readdir(dir);
         }
-        default_free(test_dir.data);
 
         closedir(dir);
     }
@@ -60,7 +60,7 @@ bool run_test(string test_dir, string test) {
     bin_dir := format_string("%/bin", test_dir);
     dir := opendir(bin_dir.data);
     if dir == null {
-        print(" -- Test Failed: Unable to open directory '%'\n", bin_dir.data);
+        print(" -- Test Failed: Unable to open directory '%'\n", bin_dir);
         default_free(bin_dir.data);
         return false;
     }
@@ -80,13 +80,14 @@ bool run_test(string test_dir, string test) {
     closedir(dir);
 
     if !found_executable {
-        print(" -- Test Failed: Executable not found in directory '%'\n", bin_dir.data);
+        print(" -- Test Failed: Executable not found in directory '%'\n", bin_dir);
         default_free(bin_dir.data);
         return false;
     }
 
     print("\nRunning: %", command);
     run_exit_code := run_command(command);
+    default_free(bin_dir.data);
     default_free(command.data);
 
     if run_exit_code {
@@ -110,6 +111,8 @@ int run_command(string command) {
 
     return pclose(handle);
 }
+
+struct FILE {}
 
 FILE* popen(string command, string type) #extern "c"
 int pclose(FILE* stream) #extern "c"
