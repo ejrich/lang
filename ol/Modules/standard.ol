@@ -150,14 +150,14 @@ void* default_allocator(int size) {
             new_pointer: DefaultAllocation* = reallocate_memory(default_allocations.data, old_size, (old_length + 10) * size_of(DefaultAllocation));
 
             if new_pointer != default_allocations.data {
-                memory_copy(new_pointer, default_allocations.data, old_size);
-                free_memory(default_allocations.data, old_size);
+                // memory_copy(new_pointer, default_allocations.data, old_size);
+                // free_memory(default_allocations.data, old_size);
 
                 default_allocations.data = new_pointer;
             }
 
             default_allocations[old_length] = allocation;
-            default_allocations.length += 10;
+            default_allocations.length += 1000000;
         }
     }
 
@@ -174,8 +174,8 @@ void* default_reallocator(void* pointer, int size) {
             // - Copy the data from the old pointer to the new pointer
             // - and free the old pointer and clear out the old allocation
             if new_pointer != pointer {
-                memory_copy(new_pointer, pointer, allocation.size);
-                free_memory(pointer, allocation.size);
+                // memory_copy(new_pointer, pointer, allocation.size);
+                // free_memory(pointer, allocation.size);
                 allocation.pointer = new_pointer;
             }
 
@@ -662,7 +662,7 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
 
         file.handle = open(path.data, open_flags, OpenMode.S_RWALL);
 
-        if file.handle == -1 {
+        if file.handle < 0 {
             return false, file;
         }
         else if flags & FileFlags.Append {
@@ -678,6 +678,8 @@ bool close_file(File file) {
         success := close(file.handle);
         return success == 0;
     }
+
+    return false;
 }
 
 bool, string read_file(string file_path, Allocate allocator = default_allocator) {
@@ -698,4 +700,25 @@ bool, string read_file(string file_path, Allocate allocator = default_allocator)
     }
 
     return success, file_contents;
+}
+
+write_to_file(File file, string format, Params args) {
+    if args.length == 0 {
+        write_buffer_to_file(file, format.data, format.length);
+        return;
+    }
+
+    buffer: StringBuffer;
+    format_string_arguments(&buffer, format, args);
+    write_buffer_to_file(file, &buffer.buffer, buffer.length);
+}
+
+write_to_file(File file, u8 char) {
+    write_buffer_to_file(file, &char, 1);
+}
+
+write_buffer_to_file(File file, u8* buffer, s64 length) {
+    #if os == OS.Linux {
+        write(file.handle, buffer, length);
+    }
 }
