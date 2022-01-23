@@ -3,9 +3,9 @@
 parse(string file_contents, string library, string output_file) {
     tokens := get_file_tokens(file_contents);
 
-    lib_file := fopen(output_file, "w+");
+    success, lib_file := open_file(output_file, FileFlags.Create);
 
-    if lib_file {
+    if success {
         node := tokens.head;
 
         while node {
@@ -35,10 +35,10 @@ parse(string file_contents, string library, string output_file) {
             }
         }
 
-        fclose(lib_file);
+        close_file(lib_file);
     }
     else {
-        print("Unable to create file '%'\n", library);
+        print("Unable to create file '%'\n", output_file);
     }
 }
 
@@ -190,7 +190,7 @@ TypeDefinition, Node<Token>* check_for_pointers(string type, Node<Token>* node) 
     return type_def, node;
 }
 
-Node<Token>* parse_constant(Node<Token>* node, FILE* file) {
+Node<Token>* parse_constant(Node<Token>* node, File file) {
     type_def: TypeDefinition;
     type_def, node = parse_type(node);
 
@@ -200,12 +200,9 @@ Node<Token>* parse_constant(Node<Token>* node, FILE* file) {
 
     value := node.data.value;
 
-    print_string(name, file);
-    print_string(": ", file);
+    write_to_file(file, "%: ", name);
     print_type(type_def, file);
-    print_string(" = ", file);
-    print_string(value, file);
-    print_string("; #const\n", file);
+    write_to_file(file, " = %; #const\n", value);
 
     return move_over(node.next, TokenType.SemiColon);
 }
@@ -222,7 +219,7 @@ struct Function {
     arguments: Array<Argument>;
 }
 
-Node<Token>* parse_function(Node<Token>* node, FILE* file, string library) {
+Node<Token>* parse_function(Node<Token>* node, File file, string library) {
     function: Function;
     function.return_type, node = parse_type(node);
     function.name = node.data.value;
@@ -236,36 +233,34 @@ Node<Token>* parse_function(Node<Token>* node, FILE* file, string library) {
     // Print function definition to file
     if function.return_type.name != "void" || function.return_type.pointer_count > 0 {
         print_type(function.return_type, file);
-        fputc(' ', file);
+        write_to_file(file, ' ');
     }
 
-    print_string(function.name, file);
-    fputc('(', file);
+    write_to_file(file, function.name);
+    write_to_file(file, '(');
 
     each arg, i in function.arguments {
         if !string_is_empty(arg.array_length) {
-            print_string("CArray<", file);
+            write_to_file(file, "CArray<");
             print_type(arg.type, file);
-            print_string(">[", file);
-            print_string(arg.array_length, file);
-            print_string("]", file);
+            write_to_file(file, ">[%]", arg.array_length);
         }
         else print_type(arg.type, file);
-        fputc(' ', file);
+        write_to_file(file, ' ');
 
         if string_is_empty(arg.name) {
-            fputc('a' + i, file);
+            write_to_file(file, 'a' + i);
         }
         else {
-            print_string(arg.name, file);
+            write_to_file(file, arg.name);
         }
 
         if i < function.arguments.length - 1 {
-            print_string(", ", file);
+            write_to_file(file, ", ");
         }
     }
 
-    fprintf(file, ") #extern \"%s\"\n\n", library);
+    write_to_file(file, ") #extern \"%s\"\n\n", library);
 
     return node;
 }
@@ -323,7 +318,7 @@ Node<Token>* parse_arguments(Node<Token>* node, Function* function, bool interna
     return node;
 }
 
-Node<Token>* parse_typedef(Node<Token>* node, FILE* file) {
+Node<Token>* parse_typedef(Node<Token>* node, File file) {
     node = node.next;
 
     if node {
@@ -376,7 +371,7 @@ struct StructField {
     names: Array<string>;
 }
 
-Node<Token>* parse_struct(Node<Token>* node, FILE* file, string type_name = "struct", bool alias = true, string struct_name = "", bool typedef = false, bool internal = false) {
+Node<Token>* parse_struct(Node<Token>* node, File file, string type_name = "struct", bool alias = true, string struct_name = "", bool typedef = false, bool internal = false) {
     node = node.next;
 
     if node {
@@ -480,7 +475,7 @@ Node<Token>* parse_struct(Node<Token>* node, FILE* file, string type_name = "str
     return node;
 }
 
-Node<Token>* finish_struct_and_print(Node<Token>* node, FILE* file, string type_name, bool alias, Struct struct_def, bool internal) {
+Node<Token>* finish_struct_and_print(Node<Token>* node, File file, string type_name, bool alias, Struct struct_def, bool internal) {
     struct_type_def: TypeDefinition;
 
     if node.data.type == TokenType.Star {
@@ -498,36 +493,29 @@ Node<Token>* finish_struct_and_print(Node<Token>* node, FILE* file, string type_
     if !internal node = move_over(node, TokenType.SemiColon);
 
     // Print struct definition to file
-    print_string(type_name, file);
-    fputc(' ', file);
-    print_string(struct_def.name, file);
-    print_string(" {", file);
+    write_to_file(file, "% % {", type_name, struct_def.name);
 
     if struct_def.fields.length {
-        fputc('\n', file);
+        write_to_file(file, '\n');
     }
 
     each field in struct_def.fields {
         each name in field.names {
-            print_string("    ", file);
-            print_string(name, file);
-            print_string(": ", file);
+            write_to_file(file, "    %: ", name);
             if !string_is_empty(field.array_length) {
-                print_string("CArray<", file);
+                write_to_file(file, "CArray<");
                 print_type(field.type, file);
-                print_string(">[", file);
-                print_string(field.array_length, file);
-                print_string("]", file);
+                write_to_file(file, ">[%]", field.array_length);
             }
             else print_type(field.type, file);
 
-            print_string(";\n", file);
+            write_to_file(file, ";\n");
         }
     }
-    print_string("}\n", file);
+    write_to_file(file, "}\n");
 
     if struct_def.fields.length {
-        fputc('\n', file);
+        write_to_file(file, '\n');
     }
 
     return node;
@@ -552,7 +540,7 @@ struct Enum_Value {
     value: string;
 }
 
-Node<Token>* parse_enum(Node<Token>* node, FILE* file) {
+Node<Token>* parse_enum(Node<Token>* node, File file) {
     node = node.next;
 
     if node {
@@ -602,28 +590,24 @@ Node<Token>* parse_enum(Node<Token>* node, FILE* file) {
         node = node.next;
 
         // Print struct definition to file
-        print_string("enum ", file);
-        print_string(enum_def.name, file);
-        print_string(" {\n", file);
+        write_to_file(file, "enum % {\n", enum_def.name);
 
         each value in enum_def.values {
-            print_string("    ", file);
-            print_string(value.name, file);
+            write_to_file(file, "    %", value.name);
 
             if !string_is_empty(value.value) {
-                print_string(" = ", file);
-                print_string(value.value, file);
+                write_to_file(file, " = %", value.value);
             }
 
-            print_string(";\n", file);
+            write_to_file(file, ";\n");
         }
-        print_string("}\n\n", file);
+        write_to_file(file, "}\n\n");
     }
 
     return node;
 }
 
-Node<Token>* parse_interface(Node<Token>* node, FILE* file, TypeDefinition return_type, bool internal = false) {
+Node<Token>* parse_interface(Node<Token>* node, File file, TypeDefinition return_type, bool internal = false) {
     node = node.next.next;
 
     function: Function = { return_type = return_type; name = node.data.value; }
@@ -631,55 +615,43 @@ Node<Token>* parse_interface(Node<Token>* node, FILE* file, TypeDefinition retur
     node = parse_arguments(node.next.next.next, &function, internal);
 
     // Print interface definition to file
-    print_string("interface ", file);
+    write_to_file(file, "interface ");
     if function.return_type.name != "void" || function.return_type.pointer_count > 0 {
         print_type(function.return_type, file);
-        fputc(' ', file);
+        write_to_file(file, ' ');
     }
 
-    print_string(function.name, file);
-    fputc('(', file);
+    write_to_file(file, "%(", function.name);
 
     each arg, i in function.arguments {
         if !string_is_empty(arg.array_length) {
-            print_string("CArray<", file);
+            write_to_file(file, "CArray<");
             print_type(arg.type, file);
-            print_string(">[", file);
-            print_string(arg.array_length, file);
-            print_string("]", file);
+            write_to_file(file, ">[%]", arg.array_length);
         }
         else print_type(arg.type, file);
-        fputc(' ', file);
+        write_to_file(file, ' ');
 
         if string_is_empty(arg.name) {
-            fputc('a' + i, file);
+            write_to_file(file, 'a' + i);
         }
         else {
-            print_string(arg.name, file);
+            write_to_file(file, arg.name);
         }
 
         if i < function.arguments.length - 1 {
-            print_string(", ", file);
+            write_to_file(file, ", ");
         }
     }
 
-    print_string(")\n\n", file);
+    write_to_file(file, ")\n\n");
 
     return node;
 }
 
-print_type(TypeDefinition type, FILE* file) {
-    print_string(type.name, file);
+print_type(TypeDefinition type, File file) {
+    write_to_file(file, type.name);
     each i in 1..type.pointer_count {
-        fputc('*', file);
+        write_to_file(file, '*');
     }
 }
-
-print_string(string value, FILE* file) {
-    fwrite(value.data, 1, value.length, file);
-}
-
-
-fputc(u8 char, FILE* file) #extern "c"
-fwrite(void* ptr, int size, int count, FILE* file) #extern "c"
-fprintf(FILE* file, string format, ... args) #extern "c"

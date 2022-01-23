@@ -12,7 +12,7 @@ int stat(u8* path, Stat* buf) #syscall 4
 int fstat(int fd, Stat* buf) #syscall 5
 int lstat(int fd, Stat* buf) #syscall 6
 int poll(PollFd* ufds, u32 nfds, int timeout) #syscall 7
-int lseek(int fd, u64 offset, Whence whence) #syscall 8
+s64 lseek(int fd, u64 offset, Whence whence) #syscall 8
 void* mmap(void* addr, u64 length, Prot prot, MmapFlags flags, int fd, u64 offset) #syscall 9
 int mprotect(void* addr, u64 length, Prot prot) #syscall 10
 int munmap(void* addr, u64 length) #syscall 11
@@ -42,27 +42,27 @@ stdout := 1; #const
 stderr := 2; #const
 
 enum OpenFlags {
-    O_RDONLY    = 00000000;
-    O_WRONLY    = 00000001;
-    O_RDWR      = 00000002;
-    O_ACCMODE   = 00000003;
-    O_CREAT     = 00000100;
-    O_EXCL      = 00000200;
-    O_NOCTTY    = 00000400;
-    O_TRUNC     = 00001000;
-    O_APPEND    = 00002000;
-    O_NONBLOCK  = 00004000;
-    O_DSYNC     = 00010000;
-    O_ASYNC     = 00020000;
-    O_DIRECT    = 00040000;
-    O_LARGEFILE = 00100000;
-    O_DIRECTORY = 00200000;
-    O_NOFOLLOW  = 00400000;
-    O_NOATIME   = 01000000;
-    O_CLOEXEC   = 02000000;
-    O_SYNC      = 04010000;
-    O_PATH      = 10000000;
-    O_TMPFILE   = 20200000;
+    O_RDONLY    = 0x00000000;
+    O_WRONLY    = 0x00000001;
+    O_RDWR      = 0x00000002;
+    O_ACCMODE   = 0x00000003;
+    O_CREAT     = 0x00000100;
+    O_EXCL      = 0x00000200;
+    O_NOCTTY    = 0x00000400;
+    O_TRUNC     = 0x00001000;
+    O_APPEND    = 0x00002000;
+    O_NONBLOCK  = 0x00004000;
+    O_DSYNC     = 0x00010000;
+    O_ASYNC     = 0x00020000;
+    O_DIRECT    = 0x00040000;
+    O_LARGEFILE = 0x00100000;
+    O_DIRECTORY = 0x00200000;
+    O_NOFOLLOW  = 0x00400000;
+    O_NOATIME   = 0x01000000;
+    O_CLOEXEC   = 0x02000000;
+    O_SYNC      = 0x04010000;
+    O_PATH      = 0x10000000;
+    O_TMPFILE   = 0x20200000;
 }
 
 enum OpenMode {

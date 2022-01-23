@@ -696,6 +696,13 @@ public static class TypeChecker
 
     public static void VerifyEnum(EnumAst enumAst)
     {
+        // if (enumAst.Name == "OpenFlags")
+        // {
+        //     foreach(var (_, value) in enumAst.Values)
+        //     {
+        //         Console.WriteLine($"{value.Name} {value.Value}");
+        //     }
+        // }
         if (AddTypeAndIdentifier(enumAst.Name, enumAst, enumAst))
         {
             TypeTable.CreateTypeInfo(enumAst);
@@ -3038,7 +3045,7 @@ public static class TypeChecker
             case null:
                 return false;
             default:
-                ErrorReporter.Report($"Expected condition to be bool, int, float, or pointer, but got '{conditionalType.TypeKind}'", ast);
+                ErrorReporter.Report($"Expected condition to be bool, int, float, or pointer, but got '{conditionalType.Name}'", ast);
                 return false;
         }
     }
