@@ -157,7 +157,7 @@ void* default_allocator(int size) {
             }
 
             default_allocations[old_length] = allocation;
-            default_allocations.length += 1000000;
+            default_allocations.length += 10;
         }
     }
 
@@ -641,7 +641,7 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
         }
         if flags & FileFlags.Write {
             if flags & FileFlags.Read {
-                open_flags |= OpenFlags.O_RDWR;
+                open_flags = OpenFlags.O_RDWR;
             }
             else {
                 open_flags |= OpenFlags.O_WRONLY;
