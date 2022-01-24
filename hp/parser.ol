@@ -260,7 +260,9 @@ Node<Token>* parse_function(Node<Token>* node, File file, string library) {
         }
     }
 
-    write_to_file(file, ") #extern \"%s\"\n\n", library);
+    if function.arguments.length default_free(function.arguments.data);
+
+    write_to_file(file, ") #extern \"%\"\n\n", library);
 
     return node;
 }
@@ -511,11 +513,13 @@ Node<Token>* finish_struct_and_print(Node<Token>* node, File file, string type_n
 
             write_to_file(file, ";\n");
         }
+        if field.names.length default_free(field.names.data);
     }
     write_to_file(file, "}\n");
 
     if struct_def.fields.length {
         write_to_file(file, '\n');
+        default_free(struct_def.fields.data);
     }
 
     return node;
@@ -601,6 +605,9 @@ Node<Token>* parse_enum(Node<Token>* node, File file) {
 
             write_to_file(file, ";\n");
         }
+
+        if enum_def.values.length default_free(enum_def.values.data);
+
         write_to_file(file, "}\n\n");
     }
 
@@ -644,6 +651,7 @@ Node<Token>* parse_interface(Node<Token>* node, File file, TypeDefinition return
         }
     }
 
+    if function.arguments.length default_free(function.arguments.data);
     write_to_file(file, ")\n\n");
 
     return node;

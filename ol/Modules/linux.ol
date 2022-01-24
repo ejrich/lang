@@ -42,43 +42,43 @@ stdout := 1; #const
 stderr := 2; #const
 
 enum OpenFlags {
-    O_RDONLY    = 0x00000000;
-    O_WRONLY    = 0x00000001;
-    O_RDWR      = 0x00000002;
-    O_ACCMODE   = 0x00000003;
-    O_CREAT     = 0x00000100;
-    O_EXCL      = 0x00000200;
-    O_NOCTTY    = 0x00000400;
-    O_TRUNC     = 0x00001000;
-    O_APPEND    = 0x00002000;
-    O_NONBLOCK  = 0x00004000;
-    O_DSYNC     = 0x00010000;
-    O_ASYNC     = 0x00020000;
-    O_DIRECT    = 0x00040000;
-    O_LARGEFILE = 0x00100000;
-    O_DIRECTORY = 0x00200000;
-    O_NOFOLLOW  = 0x00400000;
-    O_NOATIME   = 0x01000000;
-    O_CLOEXEC   = 0x02000000;
-    O_SYNC      = 0x04010000;
-    O_PATH      = 0x10000000;
-    O_TMPFILE   = 0x20200000;
+    O_RDONLY    = 0x000000;
+    O_WRONLY    = 0x000001;
+    O_RDWR      = 0x000002;
+    O_ACCMODE   = 0x000003;
+    O_CREAT     = 0x000040;
+    O_EXCL      = 0x000080;
+    O_NOCTTY    = 0x000100;
+    O_TRUNC     = 0x000200;
+    O_APPEND    = 0x000400;
+    O_NONBLOCK  = 0x000800;
+    O_DSYNC     = 0x001000;
+    O_ASYNC     = 0x002000;
+    O_DIRECT    = 0x004000;
+    O_LARGEFILE = 0x008000;
+    O_DIRECTORY = 0x010000;
+    O_NOFOLLOW  = 0x020000;
+    O_NOATIME   = 0x040000;
+    O_CLOEXEC   = 0x080000;
+    O_SYNC      = 0x101000;
+    O_PATH      = 0x200000;
+    O_TMPFILE   = 0x410000;
 }
 
 enum OpenMode {
-    S_IXOTH = 1;
-    S_IWOTH = 2;
-    S_IROTH = 4;
-    S_IRWXO = 7;
-    S_IXGRP = 10;
-    S_IWGRP = 20;
-    S_IRGRP = 40;
-    S_IRWXG = 70;
-    S_IXUSR = 100;
-    S_IWUSR = 200;
-    S_IRUSR = 400;
-    S_IRWXU = 700;
-    S_RWALL = 666;
+    S_IXOTH = 0x1;
+    S_IWOTH = 0x2;
+    S_IROTH = 0x4;
+    S_IRWXO = 0x7;
+    S_IXGRP = 0x8;
+    S_IWGRP = 0x10;
+    S_IRGRP = 0x20;
+    S_IRWXG = 0x38;
+    S_IXUSR = 0x40;
+    S_IWUSR = 0x80;
+    S_IRUSR = 0x100;
+    S_IRWXU = 0x1C0;
+    S_RWALL = 0x1B6;
 }
 
 struct Stat {
@@ -107,7 +107,7 @@ enum MmapFlags {
     MAP_PRIVATE         = 0x2;
     MAP_FIXED           = 0x10;
     MAP_ANONYMOUS       = 0x20;
-    MAP_HUGE_SHIFT      = 26;
+    MAP_HUGE_SHIFT      = 0x1A;
     MAP_HUGE_MASK       = 0x3f;
     MAP_GROWSDOWN       = 0x100;
     MAP_DENYWRITE       = 0x800;
