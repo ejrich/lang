@@ -35,6 +35,7 @@ int nanosleep(Timespec* req, Timespec* rem) #syscall 35
 exit(int status) #syscall 60
 int clock_gettime(ClockId clk_id, Timespec* tp) #syscall 228
 exit_group(int status) #syscall 231
+s64 getrandom(void* buf, u64 buflen, RandomFlags flags) #syscall 318
 // TODO Add additional syscalls when necessary
 
 stdin  := 0; #const
@@ -171,4 +172,10 @@ enum ClockId {
     CLOCK_BOOTTIME;
     CLOCK_REALTIME_ALARM;
     CLOCK_BOOTTIME_ALARM;
+}
+
+enum RandomFlags {
+    GRND_NONBLOCK = 1;
+    GRND_RANDOM   = 2;
+    GRND_INSECURE = 4;
 }

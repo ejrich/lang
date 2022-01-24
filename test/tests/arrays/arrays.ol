@@ -1,5 +1,4 @@
 #import standard
-#import compiler
 
 main() {
     constant_size_arrays();
@@ -39,9 +38,9 @@ variable_size_arrays() {
 
     print_array("Array<int>[size]", a);
 
-    random_size := rand() % 10;
+    random_size := random_integer() % 10;
     b: Array<int>[random_size];
-    each arg in b arg = rand() % 100;
+    each arg in b arg = random_integer() % 100;
 
     print_array("Array<int>[random_size]", b);
 }
@@ -86,9 +85,4 @@ print_array(string name, Array<int> array) {
     print("\n");
 }
 
-int rand() #extern "c"
-
-#run {
-    set_linker(LinkerType.Dynamic);
-    main();
-}
+#run main();
