@@ -1210,6 +1210,11 @@ public static class Parser
             ErrorReporter.Report($"Unexpected token '{token.Value}' in enum", token);
         }
 
+        if (enumAst.Values.Count == 0)
+        {
+            ErrorReporter.Report("Expected enum to have 1 or more values", enumAst);
+        }
+
         return enumAst;
     }
 

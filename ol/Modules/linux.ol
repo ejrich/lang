@@ -33,6 +33,7 @@ void* mremap(void* old_address, u64 old_size, u64 new_size, MremapFlags flags) #
 int pause() #syscall 34
 int nanosleep(Timespec* req, Timespec* rem) #syscall 35
 exit(int status) #syscall 60
+int getdents64(int fd, Dirent* dirp, u32 count) #syscall 217
 int clock_gettime(ClockId clk_id, Timespec* tp) #syscall 228
 exit_group(int status) #syscall 231
 s64 getrandom(void* buf, u64 buflen, RandomFlags flags) #syscall 318
@@ -154,6 +155,26 @@ enum MremapFlags {
     MREMAP_MAYMOVE   = 1;
     MREMAP_FIXED     = 2;
     MREMAP_DONTUNMAP = 4;
+}
+
+struct Dirent {
+    d_ino: u64;
+    d_off: u64;
+    d_reclen: u16;
+    d_type: DirentType;
+    d_name: CArray<u8>[256];
+}
+
+enum DirentType : u8 {
+    DT_UNKNOWN = 0;
+    DT_FIFO = 1;
+    DT_CHR = 2;
+    DT_DIR = 4;
+    DT_BLK = 6;
+    DT_REG = 8;
+    DT_LNK = 10;
+    DT_SOCK = 12;
+    DT_WHT = 14;
 }
 
 struct Timespec {

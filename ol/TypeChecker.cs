@@ -562,6 +562,8 @@ public static class TypeChecker
 
     private static void AddFunction(string name, int fileIndex, FunctionAst function)
     {
+        if (name == null) return;
+
         function.FunctionIndex = TypeTable.GetFunctionIndex();
 
         if (function.Private)
@@ -696,13 +698,6 @@ public static class TypeChecker
 
     public static void VerifyEnum(EnumAst enumAst)
     {
-        // if (enumAst.Name == "OpenFlags")
-        // {
-        //     foreach(var (_, value) in enumAst.Values)
-        //     {
-        //         Console.WriteLine($"{value.Name} {value.Value}");
-        //     }
-        // }
         if (AddTypeAndIdentifier(enumAst.Name, enumAst, enumAst))
         {
             TypeTable.CreateTypeInfo(enumAst);
@@ -1254,6 +1249,8 @@ public static class TypeChecker
 
     private static bool OverloadExistsForFunction(FunctionAst currentFunction)
     {
+        if (currentFunction.Name == null) return false;
+
         var privateScope = PrivateScopes[currentFunction.FileIndex];
 
         if (privateScope == null)

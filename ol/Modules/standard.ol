@@ -596,37 +596,7 @@ write_struct_to_buffer(StringBuffer* buffer, StructTypeInfo* type_info, void* da
 }
 
 
-// File and IO functions and types
-struct DIR {}
-
-D_NAME_LENGTH := 256; #const
-
-struct dirent {
-    d_ino: u64;
-    d_off: u64;
-    d_reclen: u16;
-    d_type: FileType;
-    d_name: CArray<u8>[D_NAME_LENGTH];
-}
-
-enum FileType : u8 {
-    DT_UNKNOWN = 0;
-    DT_FIFO = 1;
-    DT_CHR = 2;
-    DT_DIR = 4;
-    DT_BLK = 6;
-    DT_REG = 8;
-    DT_LNK = 10;
-    DT_SOCK = 12;
-    DT_WHT = 14;
-}
-
-// Directory operations
-DIR* opendir(string dirname) #extern "c"
-int closedir(DIR* dir) #extern "c"
-dirent* readdir(DIR* dir) #extern "c"
-
-// File operations
+// File and directory operations and types
 struct File {
     handle: int;
 }
@@ -680,6 +650,56 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
     }
 
     return true, file;
+}
+
+struct FileEntry {
+    type: FileType;
+    name: string;
+}
+
+enum FileType {
+    Unknown;
+    File;
+    Directory;
+}
+
+bool, Array<FileEntry> get_files_in_directory(string path, Allocate allocator = default_allocator, Reallocate reallocator = default_reallocator) {
+    directory: File;
+    files: Array<FileEntry>;
+    #if os == OS.Linux {
+        open_flags := OpenFlags.O_RDONLY | OpenFlags.O_NONBLOCK | OpenFlags.O_DIRECTORY | OpenFlags.O_LARGEFILE | OpenFlags.O_CLOEXEC;
+        directory.handle = open(path.data, open_flags, OpenMode.S_RWALL);
+
+        if directory.handle < 0 {
+            return false, files;
+        }
+
+        buffer: CArray<u8>[5600];
+        while true {
+            bytes := getdents64(directory.handle, cast(Dirent*, &buffer), buffer.length);
+
+            if bytes == 0 break;
+
+            position := 0;
+            while position < bytes {
+                dirent := cast(Dirent*, &buffer + position);
+
+                file_entry: FileEntry = { name = convert_c_string(&dirent.d_name); }
+                if dirent.d_type == DirentType.DT_REG {
+                    file_entry.type = FileType.File;
+                }
+                else if dirent.d_type == DirentType.DT_DIR {
+                    file_entry.type = FileType.Directory;
+                }
+
+                array_insert(&files, file_entry, allocator, reallocator);
+                position += dirent.d_reclen;
+            }
+        }
+    }
+
+    close_file(directory);
+    return true, files;
 }
 
 bool close_file(File file) {
