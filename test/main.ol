@@ -120,5 +120,6 @@ u8* fgets(u8* buffer, int n, FILE* stream) #extern "c"
 
 #run {
     set_executable_name("tests");
+    set_linker(LinkerType.Dynamic);
     // main();
 }

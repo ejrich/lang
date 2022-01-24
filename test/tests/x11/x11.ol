@@ -1,4 +1,5 @@
 #import X11
+#import compiler
 
 main() {
     window := create_window();
@@ -44,4 +45,7 @@ close_window(Window window) {
     XCloseDisplay(window.handle);
 }
 
-#run main();
+#run {
+    set_linker(LinkerType.Dynamic);
+    main();
+}
