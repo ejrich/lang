@@ -251,6 +251,15 @@ u64 get_performance_counter() {
     return counter;
 }
 
+int random_integer() {
+    value: int;
+    #if os == OS.Linux {
+        getrandom(&value, 4, RandomFlags.GRND_RANDOM);
+    }
+
+    return value;
+}
+
 
 // Functions for printing and formatting strings
 print(string format, Params args) {

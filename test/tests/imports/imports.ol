@@ -13,7 +13,7 @@ run_specified_function() {
 }
 
 int pick_one() {
-    value := rand();
+    value := random_integer();
     return value % 2;
 }
 
@@ -23,7 +23,5 @@ int pick_one() {
 else {
     #import "b.ol"
 }
-
-int rand() #extern "c"
 
 #run main();
