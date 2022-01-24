@@ -63,7 +63,7 @@ basic() {
     g := test_each();
     h := 3 > a;
     i := b % 8;
-    j := float_mod(a, 2.0); // TODO Use fmod
+    j := float_mod(a, 2.0);
     print("Modulus outputs: i = %, j = %\n", i, j);
     fac6 := factorial(6);
     print("%! = %\n", 6, fac6);
