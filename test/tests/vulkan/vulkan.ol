@@ -2422,5 +2422,6 @@ create_color_resources() {
 
 #run {
     main();
+    set_linker(LinkerType.Dynamic);
     set_output_type_table(OutputTypeTableConfiguration.Used);
 }

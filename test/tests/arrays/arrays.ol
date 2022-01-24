@@ -1,4 +1,5 @@
 #import standard
+#import compiler
 
 main() {
     constant_size_arrays();
@@ -87,4 +88,7 @@ print_array(string name, Array<int> array) {
 
 int rand() #extern "c"
 
-#run main();
+#run {
+    set_linker(LinkerType.Dynamic);
+    main();
+}

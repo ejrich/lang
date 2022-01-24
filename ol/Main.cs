@@ -8,7 +8,7 @@ namespace ol;
 public static class BuildSettings
 {
     public static string Name { get; set; }
-    public static LinkerType Linker { get; set; } = LinkerType.Dynamic; // TODO How to remove libc
+    public static LinkerType Linker { get; set; }
     public static OutputTypeTableConfiguration OutputTypeTable { get; set; }
     public static bool Release { get; set; }
     public static bool OutputAssembly { get; set; }
@@ -114,9 +114,9 @@ public static class ol
         var linkTime = stopwatch.Elapsed;
 
         // 6. Log statistics
-        Console.WriteLine($"Front-end time: {frontEndTime.TotalSeconds} seconds\n" +
-                          $"LLVM build time: {buildTime.TotalSeconds} seconds\n" +
-                          $"Linking time: {linkTime.TotalSeconds} seconds");
+        Console.WriteLine($"Front-end time: {frontEndTime.TotalSeconds} seconds");
+        Console.WriteLine($"LLVM build time: {buildTime.TotalSeconds} seconds");
+        Console.WriteLine($"Linking time: {linkTime.TotalSeconds} seconds");
 
         Allocator.Free();
         Environment.Exit(0);

@@ -1,4 +1,5 @@
 #import standard
+#import compiler
 
 main() {
     operator_overloading();
@@ -270,4 +271,7 @@ struct NestedStruct<T> {
     inner_list: ArrayStruct<T>;
 }
 
-#run main();
+#run {
+    set_linker(LinkerType.Dynamic);
+    main();
+}
