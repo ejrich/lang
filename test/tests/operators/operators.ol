@@ -1,5 +1,5 @@
 #import standard
-#import compiler
+#import math
 
 main() {
     operator_overloading();
@@ -106,7 +106,7 @@ operator / (Vector3 a, Vector3 b) {
 }
 
 operator % (Vector3 a, Vector3 b) {
-    c: Vector3;// TODO fmod functions = { x = a.x % b.x; y = a.y % b.y; z = a.z % b.z; }
+    c: Vector3 = { x = float_mod(a.x, b.x); y = float_mod(a.y, b.y); z = float_mod(a.z, b.z); }
     return c;
 }
 
@@ -271,7 +271,4 @@ struct NestedStruct<T> {
     inner_list: ArrayStruct<T>;
 }
 
-#run {
-    set_linker(LinkerType.Dynamic);
-    main();
-}
+#run main();
