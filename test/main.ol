@@ -3,25 +3,20 @@
 
 main() {
     tests_dir := "test/tests"; #const
-    dir := opendir(tests_dir);
     command_buffer = default_allocator(1000);
     failed_test_count := 0;
-    if dir {
-        file := readdir(dir);
-        while file {
-            dir_name := get_file_name(file);
-            if file.d_type == FileType.DT_DIR && dir_name != "." && dir_name != ".." {
-                test_dir := format_string("%/%", tests_dir, dir_name);
 
-                if !run_test(test_dir, dir_name) failed_test_count++;
+    success, files := get_files_in_directory(tests_dir);
+    if success {
+        each file in files {
+            if file.type == FileType.Directory && file.name != "." && file.name != ".." {
+                test_dir := format_string("%/%", tests_dir, file.name);
+
+                if !run_test(test_dir, file.name) failed_test_count++;
 
                 default_free(test_dir.data);
             }
-
-            file = readdir(dir);
         }
-
-        closedir(dir);
     }
     default_free(command_buffer);
 
@@ -32,16 +27,6 @@ main() {
     else {
         print("\nAll Tests Passed\n");
     }
-}
-
-string get_file_name(dirent* file) {
-    name: string = { data = &file.d_name; }
-
-    each i in 0..D_NAME_LENGTH-1 {
-        if file.d_name[i] != 0 name.length++;
-        else return name;
-    }
-    return name;
 }
 
 bool run_test(string test_dir, string test) {
@@ -57,37 +42,10 @@ bool run_test(string test_dir, string test) {
         return false;
     }
 
-    bin_dir := format_string("%/bin", test_dir);
-    dir := opendir(bin_dir.data);
-    if dir == null {
-        print(" -- Test Failed: Unable to open directory '%'\n", bin_dir);
-        default_free(bin_dir.data);
-        return false;
-    }
-
-    file := readdir(dir);
-    found_executable := false;
-    while !found_executable && file != null {
-        if file.d_type == FileType.DT_REG {
-            file_name := get_file_name(file);
-            command = format_string("./%/%", bin_dir, file_name);
-            found_executable = true;
-        }
-
-        file = readdir(dir);
-    }
-
-    closedir(dir);
-
-    if !found_executable {
-        print(" -- Test Failed: Executable not found in directory '%'\n", bin_dir);
-        default_free(bin_dir.data);
-        return false;
-    }
+    command = format_string("./%/bin/%", test_dir, test);
 
     print("\nRunning: %", command);
     run_exit_code := run_command(command);
-    default_free(bin_dir.data);
     default_free(command.data);
 
     if run_exit_code {
