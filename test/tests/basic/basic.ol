@@ -62,8 +62,8 @@ basic() {
     g := test_each();
     h := 3 > a;
     i := b % 8;
-    j := a % 2;
-    print("Modulus outputs: i = %, j = %\n", i, j);
+    // j := a % 2; // TODO Use fmod
+    print("Modulus outputs: i = %, j = %\n", i, a); //j);
     fac6 := factorial(6);
     print("%! = %\n", 6, fac6);
     my_struct := create();

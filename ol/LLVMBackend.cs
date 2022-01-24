@@ -1900,14 +1900,6 @@ public static unsafe class LLVMBackend
                         values[instruction.ValueIndex] = _builder.BuildURem(lhs, rhs);
                         break;
                     }
-                    case InstructionType.FloatModulus:
-                    {
-                        BuildSettings.Libraries.Add("m");
-                        var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        values[instruction.ValueIndex] = _builder.BuildFRem(lhs, rhs);
-                        break;
-                    }
                     case InstructionType.ShiftRight:
                     {
                         var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);

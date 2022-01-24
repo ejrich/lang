@@ -177,7 +177,6 @@ public enum InstructionType
     FloatDivide,
     IntegerModulus,
     UnsignedIntegerModulus,
-    FloatModulus,
     ShiftRight,
     ShiftLeft,
     RotateRight,

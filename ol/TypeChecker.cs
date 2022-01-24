@@ -2519,9 +2519,14 @@ public static class TypeChecker
                         case Operator.Subtract:
                         case Operator.Multiply:
                         case Operator.Divide:
-                        case Operator.Modulus:
                             if (!(lhs == TypeKind.Integer && rhs == TypeKind.Integer) &&
                                 !(lhs == TypeKind.Float && (rhs == TypeKind.Float || rhs == TypeKind.Integer)))
+                            {
+                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
+                            }
+                            break;
+                        case Operator.Modulus:
+                            if (lhs != TypeKind.Integer || rhs != TypeKind.Integer)
                             {
                                 ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
                             }
@@ -4569,7 +4574,6 @@ public static class TypeChecker
                     case Operator.Subtract:
                     case Operator.Multiply:
                     case Operator.Divide:
-                    case Operator.Modulus:
                         if (((type == TypeKind.Pointer && nextType == TypeKind.Integer) ||
                             (type == TypeKind.Integer && nextType == TypeKind.Pointer)) &&
                             (op == Operator.Add || op == Operator.Subtract))
@@ -4608,6 +4612,17 @@ public static class TypeChecker
                         else
                         {
                             ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{expression.Type.Name}' and '{nextExpressionType.Name}'", expression.Children[i]);
+                        }
+                        break;
+                    case Operator.Modulus:
+                        if (type != TypeKind.Integer || nextType != TypeKind.Integer)
+                        {
+                            ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{expression.Type.Name}' and '{nextExpressionType.Name}'", expression.Children[i]);
+                            return null;
+                        }
+                        else
+                        {
+                            expression.Type = GetNextIntegerType(expression.Type, nextExpressionType);
                         }
                         break;
                     // Requires both integer or bool types and returns more same type
