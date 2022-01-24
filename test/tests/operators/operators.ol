@@ -106,7 +106,7 @@ operator / (Vector3 a, Vector3 b) {
 }
 
 operator % (Vector3 a, Vector3 b) {
-    c: Vector3 = { x = a.x % b.x; y = a.y % b.y; z = a.z % b.z; }
+    c: Vector3;// TODO fmod functions = { x = a.x % b.x; y = a.y % b.y; z = a.z % b.z; }
     return c;
 }
 

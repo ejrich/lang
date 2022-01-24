@@ -1266,22 +1266,6 @@ public static unsafe class ProgramRunner
                     registers[instruction.ValueIndex] = new Register {ULong = modulus};
                     break;
                 }
-                case InstructionType.FloatModulus:
-                {
-                    var lhs = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
-                    var rhs = GetValue(instruction.Value2, registers, stackPointer, function, arguments);
-                    var register = new Register();
-                    if (instruction.Value1.Type.Size == 4)
-                    {
-                        register.Float = lhs.Float % rhs.Float;
-                    }
-                    else
-                    {
-                        register.Double = lhs.Double % rhs.Double;
-                    }
-                    registers[instruction.ValueIndex] = register;
-                    break;
-                }
                 case InstructionType.ShiftRight:
                 {
                     var lhs = GetValue(instruction.Value1, registers, stackPointer, function, arguments);

@@ -2225,7 +2225,6 @@ public static class ProgramIRBuilder
                 Operator.Subtract => InstructionType.FloatSubtract,
                 Operator.Multiply => InstructionType.FloatMultiply,
                 Operator.Divide => InstructionType.FloatDivide,
-                Operator.Modulus => InstructionType.FloatModulus,
                 // @Cleanup this branch should never be hit
                 _ => InstructionType.FloatAdd
             };
