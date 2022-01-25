@@ -1,8 +1,11 @@
 // General math module
 
-T float_mod<T>(T a, T b) {
+T float_mod<T>(T x, T y) {
     #assert T == float || T == float64;
 
-    // TODO Implement me
-    return a;
+    result := x / y;
+    whole := cast(int, result);
+    remainder := result - whole;
+
+    return remainder * y;
 }
