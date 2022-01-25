@@ -1524,12 +1524,19 @@ public static unsafe class LLVMBackend
                         var (assembly, constraint) = GetSyscallAssemblyString(instruction.Index, arguments.Length, instruction.Flag);
                         using var assemblyString = new MarshaledString(assembly);
                         using var constraintString = new MarshaledString(constraint);
+                        using var name = new MarshaledString(string.Empty);
 
                         var asm = LLVM.GetInlineAsm(functionType, assemblyString.Value, (UIntPtr)assemblyString.Length, constraintString.Value, (UIntPtr)constraintString.Length, 1, 0, LLVMInlineAsmDialect.LLVMInlineAsmDialectIntel);
-                        fixed (LLVMValueRef* pArgs = &arguments[0])
+                        if (arguments.Length > 0)
                         {
-                            using var name = new MarshaledString(string.Empty);
-                            values[instruction.ValueIndex] = LLVM.BuildCall2(_builder, functionType, asm, (LLVMOpaqueValue**)pArgs, (uint)arguments.Length, name);
+                            fixed (LLVMValueRef* pArgs = &arguments[0])
+                            {
+                                values[instruction.ValueIndex] = LLVM.BuildCall2(_builder, functionType, asm, (LLVMOpaqueValue**)pArgs, (uint)arguments.Length, name);
+                            }
+                        }
+                        else
+                        {
+                            values[instruction.ValueIndex] = LLVM.BuildCall2(_builder, functionType, asm, null, 0, name);
                         }
                         break;
                     }
