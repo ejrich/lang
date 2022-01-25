@@ -59,22 +59,14 @@ bool run_test(string test_dir, string test) {
 command_buffer: void*;
 
 int run_command(string command) {
-    handle := popen(command, "r");
-    if handle == null {
-        print(" -- Test Failed: Unable to run '%'\n", command);
-        return -1;
-    }
+    command = format_string("% > /dev/null", command);
+    status := system(command);
+    default_free(command.data);
 
-    while fgets(cast(u8*, command_buffer), 1000, handle) != null {}
-
-    return pclose(handle);
+    return status;
 }
 
-struct FILE {}
-
-FILE* popen(string command, string type) #extern "c"
-int pclose(FILE* stream) #extern "c"
-u8* fgets(u8* buffer, int n, FILE* stream) #extern "c"
+int system(string command) #extern "c"
 
 #run {
     set_executable_name("tests");
