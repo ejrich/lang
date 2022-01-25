@@ -32,7 +32,11 @@ sched_yield() #syscall 24
 void* mremap(void* old_address, u64 old_size, u64 new_size, MremapFlags flags) #syscall 25
 int pause() #syscall 34
 int nanosleep(Timespec* req, Timespec* rem) #syscall 35
+int fork() #syscall 57
+int vfork() #syscall 58
+int execve(u8* pathname, u8** argv, u8** envp) #syscall 59
 exit(int status) #syscall 60
+int wait4(int pid, int* status, int options, void* rusage) #syscall 61
 int getdents64(int fd, Dirent* dirp, u32 count) #syscall 217
 int clock_gettime(ClockId clk_id, Timespec* tp) #syscall 228
 exit_group(int status) #syscall 231
