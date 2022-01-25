@@ -142,13 +142,13 @@ public static class ProgramIRBuilder
                 returns = childScope.Returns;
                 break;
             case ConditionalAst conditional:
-                EmitConditional(function, entryBlock, conditional, TypeChecker.GlobalScope, null, null, null, out returns);
+                EmitConditional(function, conditional, TypeChecker.GlobalScope, null, null, null, out returns);
                 break;
             case WhileAst whileAst:
                 EmitWhile(function, entryBlock, whileAst, TypeChecker.GlobalScope, null);
                 break;
             case EachAst each:
-                EmitEach(function, entryBlock, each, TypeChecker.GlobalScope, null);
+                EmitEach(function, each, TypeChecker.GlobalScope, null);
                 break;
             default:
                 EmitIR(function, ast, TypeChecker.GlobalScope);
@@ -206,7 +206,7 @@ public static class ProgramIRBuilder
             {
                 var instruction = function.Instructions[instructionIndex++];
 
-                var text = $"{instructionIndex} {file} {line}:{column}\t\t{instruction.Type} ";
+                var text = $"{file} {line}:{column}\t\t{instruction.Type} ";
                 switch (instruction.Type)
                 {
                     case InstructionType.Jump:
@@ -534,7 +534,7 @@ public static class ProgramIRBuilder
                     }
                     break;
                 case ConditionalAst conditional:
-                    block = EmitConditional(function, block, conditional, scope, returnType, breakBlock, continueBlock, out var returns);
+                    block = EmitConditional(function, conditional, scope, returnType, breakBlock, continueBlock, out var returns);
                     if (returns)
                     {
                         return block;
@@ -544,7 +544,7 @@ public static class ProgramIRBuilder
                     block = EmitWhile(function, block, whileAst, scope, returnType);
                     break;
                 case EachAst each:
-                    block = EmitEach(function, block, each, scope, returnType);
+                    block = EmitEach(function, each, scope, returnType);
                     break;
                 case BreakAst:
                     var breakJump = new Instruction {Type = InstructionType.Jump, Scope = scope, Value1 = BasicBlockValue(breakBlock)};
@@ -1199,37 +1199,44 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static BasicBlock EmitConditional(FunctionIR function, BasicBlock block, ConditionalAst conditional, IScope scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock, out bool returns)
+    private static BasicBlock EmitConditional(FunctionIR function, ConditionalAst conditional, IScope scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock, out bool returns)
     {
         // Run the condition expression in the current basic block and then jump to the following
-        var condition = EmitConditionExpression(function, conditional.Condition, scope);
-        var conditionJump = new Instruction {Type = InstructionType.ConditionalJump, Scope = scope, Value1 = condition};
-        function.Instructions.Add(conditionJump);
+        var bodyBlock = new BasicBlock();
+        var elseBlock = new BasicBlock();
+        var instructionCount = function.Instructions.Count;
+        EmitConditionExpression(function, conditional.Condition, scope, bodyBlock, elseBlock);
 
-        var bodyBlock = AddBasicBlock(function);
+        AddBasicBlock(function, bodyBlock);
         bodyBlock = EmitScope(function, bodyBlock, conditional.IfBlock, returnType, breakBlock, continueBlock);
         Instruction jumpToAfter = null;
-        BasicBlock elseBlock;
 
         // For when the the if block does not return and there is an else block, a jump to the after block is required
         if (!conditional.IfBlock.Returns && conditional.ElseBlock != null)
         {
             jumpToAfter = new Instruction {Type = InstructionType.Jump, Scope = scope};
             function.Instructions.Add(jumpToAfter);
-            elseBlock = AddBasicBlock(function);
+            AddBasicBlock(function, elseBlock);
         }
         else if (bodyBlock.Location < function.Instructions.Count)
         {
-            elseBlock = AddBasicBlock(function);
+            AddBasicBlock(function, elseBlock);
         }
         else
         {
+            // Patch the conditional jumps to the else basic block to be the last body block that is currently empty
+            for (; instructionCount < function.Instructions.Count; instructionCount++)
+            {
+                var instruction = function.Instructions[instructionCount];
+                if (instruction.Type == InstructionType.ConditionalJump && instruction.Value2.JumpBlock == elseBlock)
+                {
+                    instruction.Value2.JumpBlock = bodyBlock;
+                }
+            }
             elseBlock = bodyBlock;
         }
 
         // Jump to the else block, otherwise fall through to the then block
-        conditionJump.Value2 = BasicBlockValue(elseBlock);
-
         returns = false;
         if (conditional.ElseBlock == null)
         {
@@ -1258,48 +1265,73 @@ public static class ProgramIRBuilder
     {
         // Create a block for the condition expression and then jump to the following
         var conditionBlock = block.Location < function.Instructions.Count ? AddBasicBlock(function) : block;
-        var condition = EmitConditionExpression(function, whileAst.Condition, scope);
-        var conditionJump = new Instruction {Type = InstructionType.ConditionalJump, Scope = scope, Value1 = condition};
-        function.Instructions.Add(conditionJump);
-
-        var whileBodyBlock = AddBasicBlock(function);
+        var whileBodyBlock = new BasicBlock();
         var afterBlock = new BasicBlock();
+        EmitConditionExpression(function, whileAst.Condition, scope, whileBodyBlock, afterBlock);
+
+        AddBasicBlock(function, whileBodyBlock);
         EmitScope(function, whileBodyBlock, whileAst.Body, returnType, afterBlock, conditionBlock);
         var jumpToCondition = new Instruction {Type = InstructionType.Jump, Scope = scope, Value1 = BasicBlockValue(conditionBlock)};
         function.Instructions.Add(jumpToCondition);
 
         AddBasicBlock(function, afterBlock);
-        conditionJump.Value2 = BasicBlockValue(afterBlock);
 
         return afterBlock;
     }
 
-    private static InstructionValue EmitConditionExpression(FunctionIR function, IAst ast, IScope scope)
+    private static void EmitConditionExpression(FunctionIR function, IAst ast, IScope scope, BasicBlock bodyBlock, BasicBlock elseBlock)
     {
-        var value = EmitIR(function, ast, scope);
-
-        switch (value.Type.TypeKind)
+        InstructionValue value;
+        if (ast is ExpressionAst expression)
         {
-            case TypeKind.Integer:
-            case TypeKind.Enum:
-                return EmitInstruction(InstructionType.IntegerEquals, function, TypeTable.BoolType, scope, value, GetDefaultConstant(value.Type));
-            case TypeKind.Float:
-                return EmitInstruction(InstructionType.FloatEquals, function, TypeTable.BoolType, scope, value, GetDefaultConstant(value.Type));
-            case TypeKind.Pointer:
-                return EmitInstruction(InstructionType.IsNull, function, TypeTable.BoolType, scope, value);
-            // Will be type bool
-            default:
-                return EmitInstruction(InstructionType.Not, function, TypeTable.BoolType, scope, value);
+            value = EmitIR(function, expression.Children[0], scope);
+            for (var i = 1; i < expression.Children.Count; i++)
+            {
+                if (expression.OperatorOverloads.TryGetValue(i, out var overload))
+                {
+                    var rhs = EmitIR(function, expression.Children[i], scope);
+                    value = EmitCall(function, overload, new []{value, rhs}, scope);
+                }
+                else
+                {
+                    var op = expression.Operators[i - 1];
+                    switch (op)
+                    {
+                        case Operator.And:
+                            var not = EmitInstruction(InstructionType.Not, function, TypeTable.BoolType, scope, value);
+                            EmitConditionalJump(function, scope, not, elseBlock);
+                            AddBasicBlock(function);
+                            break;
+                        case Operator.Or:
+                            EmitConditionalJump(function, scope, value, bodyBlock);
+                            AddBasicBlock(function);
+                            break;
+                    }
+
+                    var rhs = EmitIR(function, expression.Children[i], scope);
+                    value = EmitExpression(function, value, rhs, op, expression.ResultingTypes[i - 1], scope);
+                }
+            }
         }
+        else
+        {
+            value = EmitIR(function, ast, scope);
+        }
+
+        var condition =  value.Type.TypeKind switch
+        {
+            TypeKind.Integer or TypeKind.Enum => EmitInstruction(InstructionType.IntegerEquals, function, TypeTable.BoolType, scope, value, GetDefaultConstant(value.Type)),
+            TypeKind.Float => EmitInstruction(InstructionType.FloatEquals, function, TypeTable.BoolType, scope, value, GetDefaultConstant(value.Type)),
+            TypeKind.Pointer => EmitInstruction(InstructionType.IsNull, function, TypeTable.BoolType, scope, value),
+            // Will be type bool
+            _ => EmitInstruction(InstructionType.Not, function, TypeTable.BoolType, scope, value)
+        };
+
+        EmitConditionalJump(function, scope, condition, elseBlock);
     }
 
-    private static BasicBlock EmitEach(FunctionIR function, BasicBlock block, EachAst each, IScope scope, IType returnType)
+    private static BasicBlock EmitEach(FunctionIR function, EachAst each, IScope scope, IType returnType)
     {
-        if (!BuildSettings.Release)
-        {
-            function.Instructions.Add(new Instruction {Type = InstructionType.DebugSetLocation, Scope = scope, Source = each});
-        }
-
         InstructionValue indexVariable;
         InstructionValue compareTarget;
 
@@ -2523,6 +2555,16 @@ public static class ProgramIRBuilder
     {
         var store = new Instruction {Type = InstructionType.Store, Scope = scope, Value1 = pointer, Value2 = value};
         function.Instructions.Add(store);
+    }
+
+    private static void EmitConditionalJump(FunctionIR function, IScope scope, InstructionValue condition, BasicBlock block)
+    {
+        var conditionJump = new Instruction
+        {
+            Type = InstructionType.ConditionalJump, Scope = scope, Value1 = condition,
+            Value2 = new InstructionValue {ValueType = InstructionValueType.BasicBlock, JumpBlock = block}
+        };
+        function.Instructions.Add(conditionJump);
     }
 
     private static InstructionValue EmitInstruction(InstructionType instructionType, FunctionIR function, IType type, IScope scope, InstructionValue value1, InstructionValue value2 = null)

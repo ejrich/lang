@@ -288,11 +288,9 @@ format_string_arguments(StringBuffer* buffer, string format, Array<Any> args) {
 
     each i in 0..format.length-1 {
         char := format[i];
-        if char == '%' {
-            if arg_index < args.length {
-                arg := args[arg_index++];
-                write_value_to_buffer(buffer, arg.type, arg.data);
-            }
+        if char == '%' && arg_index < args.length {
+            arg := args[arg_index++];
+            write_value_to_buffer(buffer, arg.type, arg.data);
         }
         else {
             buffer.buffer[buffer.length++] = char;
