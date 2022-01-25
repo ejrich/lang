@@ -483,16 +483,20 @@ write_integer<T>(StringBuffer* buffer, void* data) {
 write_float<T>(StringBuffer* buffer, void* data) {
     value := *cast(T*, data);
     whole := cast(s64, value);
+
+    if value < 0 {
+        buffer.buffer[buffer.length++] = '-';
+        value *= -1;
+        whole *= -1;
+    }
+
     if whole == 0 {
         buffer.buffer[buffer.length++] = '0';
     }
     else {
-        if value < 0 {
-            buffer.buffer[buffer.length++] = '-';
-            value *= -1;
-        }
         write_integer_to_buffer(buffer, whole);
     }
+
     buffer.buffer[buffer.length++] = '.';
     value -= whole;
 
