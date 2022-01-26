@@ -182,6 +182,9 @@ public static class TypeChecker
                 case AssignmentAst assignment:
                     VerifyAssignment(assignment, null, scope);
                     break;
+                case AssemblyAst assembly:
+                    VerifyInlineAssembly(assembly, scope);
+                    break;
                 case BreakAst:
                     ErrorReporter.Report("No parent loop to break", runDirective.Value);
                     break;
@@ -1709,6 +1712,9 @@ public static class TypeChecker
                 case AssignmentAst assignment:
                     VerifyAssignment(assignment, function, scope);
                     break;
+                case AssemblyAst assembly:
+                    VerifyInlineAssembly(assembly, scope);
+                    break;
                 case BreakAst:
                     scope.Returns = true;
                     if (!canBreak)
@@ -3104,6 +3110,11 @@ public static class TypeChecker
             each.IterationVariable.Type = TypeTable.S32Type;
             each.Body.Identifiers.TryAdd(each.IterationVariable.Name, each.IterationVariable);
         }
+    }
+
+    private static void VerifyInlineAssembly(AssemblyAst assembly, IScope scope)
+    {
+        // TODO Implement me
     }
 
     private static void VerifyFunctionIfNecessary(FunctionAst function, IFunction currentFunction)
