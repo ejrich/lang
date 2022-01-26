@@ -1429,6 +1429,8 @@ public static class Parser
                     ErrorReporter.Report("End of file reached without closing scope", enumerator.Last);
                 }
                 return continueAst;
+            case TokenType.Asm:
+                return ParseInlineAssembly(enumerator, currentFunction);
             default:
                 ErrorReporter.Report($"Unexpected token '{token.Value}'", token);
                 return null;
@@ -2730,6 +2732,43 @@ public static class Parser
         }
 
         return directive;
+    }
+
+    private static AssemblyAst ParseInlineAssembly(TokenEnumerator enumerator, IFunction currentFunction)
+    {
+        var assembly = CreateAst<AssemblyAst>(enumerator.Current);
+
+        // First move over the opening '{'
+        if (!enumerator.MoveNext())
+        {
+            ErrorReporter.Report("Expected an opening '{' at asm block", enumerator.Last);
+            return null;
+        }
+
+        if (enumerator.Current.Type != TokenType.OpenBrace)
+        {
+            ErrorReporter.Report("Expected an opening '{' at asm block", enumerator.Current);
+            return null;
+        }
+
+        var closed = false;
+        while (enumerator.MoveNext())
+        {
+            if (enumerator.Current.Type == TokenType.CloseBrace)
+            {
+                closed = true;
+                break;
+            }
+
+            // TODO Implement me
+        }
+
+        if (!closed)
+        {
+            ErrorReporter.Report("Assembly block not closed by '}'", enumerator.Current);
+        }
+
+        return assembly;
     }
 
     private static OperatorOverloadAst ParseOperatorOverload(TokenEnumerator enumerator)
