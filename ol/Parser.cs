@@ -1430,7 +1430,7 @@ public static class Parser
                 }
                 return continueAst;
             case TokenType.Asm:
-                return ParseInlineAssembly(enumerator, currentFunction);
+                return ParseInlineAssembly(enumerator);
             default:
                 ErrorReporter.Report($"Unexpected token '{token.Value}'", token);
                 return null;
@@ -2734,7 +2734,7 @@ public static class Parser
         return directive;
     }
 
-    private static AssemblyAst ParseInlineAssembly(TokenEnumerator enumerator, IFunction currentFunction)
+    private static AssemblyAst ParseInlineAssembly(TokenEnumerator enumerator)
     {
         var assembly = CreateAst<AssemblyAst>(enumerator.Current);
 
@@ -2760,7 +2760,17 @@ public static class Parser
                 break;
             }
 
-            // TODO Implement me
+            var instruction = ParseAssemblyInstruction(enumerator);
+
+            if (instruction == null)
+            {
+                // Parse through the next ';' or '}'
+                while ((enumerator.Current.Type != TokenType.SemiColon || enumerator.Current.Type != TokenType.SemiColon) && enumerator.MoveNext());
+            }
+            else
+            {
+                assembly.Instructions.Add(instruction);
+            }
         }
 
         if (!closed)
@@ -2769,6 +2779,92 @@ public static class Parser
         }
 
         return assembly;
+    }
+
+    private static AssemblyInstructionAst ParseAssemblyInstruction(TokenEnumerator enumerator)
+    {
+        var instruction = CreateAst<AssemblyInstructionAst>(enumerator.Current);
+
+        switch (enumerator.Current.Type)
+        {
+            case TokenType.In:
+                instruction.In = true;
+                break;
+            case TokenType.Out:
+                instruction.Out = true;
+                break;
+            case TokenType.Identifier:
+                instruction.Instruction = enumerator.Current.Value;
+                break;
+            default:
+                ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.Current);
+                return null;
+        }
+
+        if (!enumerator.MoveNext())
+        {
+            ErrorReporter.Report("Expected value or semicolon in instruction", enumerator.Last);
+            return null;
+        }
+
+        switch (enumerator.Current.Type)
+        {
+            case TokenType.Identifier:
+                instruction.Value1 = enumerator.Current.Value;
+                break;
+            case TokenType.SemiColon:
+                return instruction;
+            default:
+                ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.Current);
+                return null;
+        }
+
+        if (!enumerator.MoveNext())
+        {
+            ErrorReporter.Report("Expected comma or semicolon in instruction", enumerator.Last);
+            return null;
+        }
+
+        switch (enumerator.Current.Type)
+        {
+            case TokenType.Comma:
+                break;
+            case TokenType.SemiColon:
+                return instruction;
+            default:
+                ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.Current);
+                return null;
+        }
+
+        if (!enumerator.MoveNext())
+        {
+            ErrorReporter.Report("Expected value in instruction", enumerator.Last);
+            return null;
+        }
+
+        switch (enumerator.Current.Type)
+        {
+            case TokenType.Identifier:
+                instruction.Value2 = enumerator.Current.Value;
+                break;
+            default:
+                ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.Current);
+                return null;
+        }
+
+        if (!enumerator.MoveNext())
+        {
+            ErrorReporter.Report("Expected semicolon in instruction", enumerator.Last);
+            return null;
+        }
+
+        if (enumerator.Current.Type != TokenType.SemiColon)
+        {
+            ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.Current);
+            return null;
+        }
+
+        return instruction;
     }
 
     private static OperatorOverloadAst ParseOperatorOverload(TokenEnumerator enumerator)
