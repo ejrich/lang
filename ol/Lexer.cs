@@ -31,6 +31,7 @@ public static class Lexer
         {"while", TokenType.While},
         {"each", TokenType.Each},
         {"in", TokenType.In},
+        {"out", TokenType.Out},
         {"struct", TokenType.Struct},
         {"enum", TokenType.Enum},
         {"union", TokenType.Union},
@@ -39,7 +40,8 @@ public static class Lexer
         {"cast", TokenType.Cast},
         {"operator", TokenType.Operator},
         {"break", TokenType.Break},
-        {"continue", TokenType.Continue}
+        {"continue", TokenType.Continue},
+        {"asm", TokenType.Asm}
     };
 
     public static List<Token> LoadFileTokens(string filePath, int fileIndex)
@@ -774,6 +776,8 @@ public enum TokenType
     CloseBrace = '}',   // 125
     VarArgs = 256,
     Interface,
+    Out,
+    Asm
 }
 
 [Flags]
