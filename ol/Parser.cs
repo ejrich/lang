@@ -1401,6 +1401,8 @@ public static class Parser
                 return ParseScope(enumerator, currentFunction);
             case TokenType.Pound:
                 return ParseCompilerDirective(enumerator, currentFunction);
+            case TokenType.Asm:
+                return ParseInlineAssembly(enumerator);
             case TokenType.Break:
                 var breakAst = CreateAst<BreakAst>(token);
                 if (enumerator.MoveNext())
@@ -1429,8 +1431,6 @@ public static class Parser
                     ErrorReporter.Report("End of file reached without closing scope", enumerator.Last);
                 }
                 return continueAst;
-            case TokenType.Asm:
-                return ParseInlineAssembly(enumerator);
             default:
                 ErrorReporter.Report($"Unexpected token '{token.Value}'", token);
                 return null;

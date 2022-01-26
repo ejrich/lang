@@ -150,6 +150,9 @@ public static class ProgramIRBuilder
             case EachAst each:
                 EmitEach(function, each, TypeChecker.GlobalScope, null);
                 break;
+            case AssemblyAst assembly:
+                EmitInlineAssembly(function, assembly, TypeChecker.GlobalScope);
+                break;
             default:
                 EmitIR(function, ast, TypeChecker.GlobalScope);
                 break;
@@ -545,6 +548,9 @@ public static class ProgramIRBuilder
                     break;
                 case EachAst each:
                     block = EmitEach(function, each, scope, returnType);
+                    break;
+                case AssemblyAst assembly:
+                    EmitInlineAssembly(function, assembly, scope);
                     break;
                 case BreakAst:
                     var breakJump = new Instruction {Type = InstructionType.Jump, Scope = scope, Value1 = BasicBlockValue(breakBlock)};
@@ -1450,6 +1456,11 @@ public static class ProgramIRBuilder
         conditionJump.Value2 = BasicBlockValue(afterBlock);
 
         return afterBlock;
+    }
+
+    private static void EmitInlineAssembly(FunctionIR function, AssemblyAst assembly, IScope scope)
+    {
+        // TODO Implement me
     }
 
     private static InstructionValue BasicBlockValue(BasicBlock jumpBlock)
