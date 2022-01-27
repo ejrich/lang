@@ -2787,7 +2787,14 @@ public static class Parser
                     else if (outRegister)
                     {
                         ErrorReporter.Report("Expected instructions before out registers", instruction);
-                        assembly.OutRegisters.TryAdd(instruction.Value2, instruction);
+                        if (instruction.Value1 == null || instruction.Value2 == null)
+                        {
+                            ErrorReporter.Report("Expected out instruction to have output value and source register", instruction);
+                        }
+                        else
+                        {
+                            assembly.OutValues.TryAdd(instruction.Value2, instruction);
+                        }
                         parsingInRegisters = false;
                         parsingOutRegisters = true;
                     }
@@ -2805,9 +2812,9 @@ public static class Parser
                         {
                             ErrorReporter.Report("Expected out instruction to have output value and source register", instruction);
                         }
-                        else if (!assembly.OutRegisters.TryAdd(instruction.Value2, instruction))
+                        else if (!assembly.OutValues.TryAdd(instruction.Value1, instruction))
                         {
-                            ErrorReporter.Report($"Duplicate in register '{instruction.Value1}'", instruction);
+                            ErrorReporter.Report($"Duplicate out value '{instruction.Value1}'", instruction);
                         }
                     }
                     else if (inRegister)
@@ -2816,7 +2823,7 @@ public static class Parser
                     }
                     else
                     {
-                        ErrorReporter.Report("Expected instructions before out registers", instruction);
+                        ErrorReporter.Report("Expected body instructions before out registers", instruction);
                     }
                 }
                 else
@@ -2831,9 +2838,9 @@ public static class Parser
                         {
                             ErrorReporter.Report("Expected out instruction to have output value and source register", instruction);
                         }
-                        else if (!assembly.OutRegisters.TryAdd(instruction.Value2, instruction))
+                        else if (!assembly.OutValues.TryAdd(instruction.Value1, instruction))
                         {
-                            ErrorReporter.Report($"Duplicate in register '{instruction.Value1}'", instruction);
+                            ErrorReporter.Report($"Duplicate out value '{instruction.Value1}'", instruction);
                         }
                         parsingOutRegisters = true;
                     }

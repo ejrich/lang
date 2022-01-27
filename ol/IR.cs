@@ -181,6 +181,7 @@ public enum InstructionType
     ShiftLeft,
     RotateRight,
     RotateLeft,
+    InlineAssembly,
     DebugSetLocation,
     DebugDeclareParameter,
     DebugDeclareVariable

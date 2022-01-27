@@ -1312,6 +1312,11 @@ public static unsafe class ProgramRunner
                     registers[instruction.ValueIndex] = new Register {ULong = result};
                     break;
                 }
+                case InstructionType.InlineAssembly:
+                {
+                    // TODO Implement me
+                    break;
+                }
             }
         }
     }

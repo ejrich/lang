@@ -251,6 +251,8 @@ public static class ProgramIRBuilder
                     case InstructionType.FloatNegate:
                         text += $"{PrintInstructionValue(instruction.Value1)} => v{instruction.ValueIndex}";
                         break;
+                    case InstructionType.InlineAssembly:
+                        break;
                     case InstructionType.DebugSetLocation:
                         line = instruction.Source.Line;
                         column = instruction.Source.Column;
@@ -1460,7 +1462,20 @@ public static class ProgramIRBuilder
 
     private static void EmitInlineAssembly(FunctionIR function, AssemblyAst assembly, IScope scope)
     {
-        // TODO Implement me
+        // Get the values to place in the input registers
+        foreach (var (_, instruction) in assembly.InRegisters)
+        {
+            instruction.Value = EmitIdentifier(function, instruction.Value2, scope);
+        }
+
+        // Get the output values from the registers
+        foreach (var (_, instruction) in assembly.OutValues)
+        {
+            instruction.Value = EmitGetVariableReference(instruction.Value1, scope).value;
+        }
+
+        var asmInstruction = new Instruction {Type = InstructionType.InlineAssembly, Scope = scope, Source = assembly};
+        function.Instructions.Add(asmInstruction);
     }
 
     private static InstructionValue BasicBlockValue(BasicBlock jumpBlock)
@@ -1516,44 +1531,7 @@ public static class ProgramIRBuilder
                     };
                 }
 
-                var identifier = GetScopeIdentifier(scope, identifierAst.Name, out var global);
-                if (identifier is DeclarationAst declaration)
-                {
-                    if (declaration.Constant)
-                    {
-                        var constantValue = global ? Program.Constants[declaration.ConstantIndex] : function.Constants[declaration.ConstantIndex];
-                        if (useRawString && constantValue.Type?.TypeKind == TypeKind.String)
-                        {
-                            return new InstructionValue
-                            {
-                                ValueType = InstructionValueType.Constant, Type = TypeTable.RawStringType,
-                                ConstantString = constantValue.ConstantString, UseRawString = true
-                            };
-                        }
-                        return constantValue;
-                    }
-
-                    if (useRawString && declaration.Type.TypeKind == TypeKind.String)
-                    {
-                        var dataField = TypeTable.StringType.Fields[1];
-
-                        var dataPointer = EmitGetStructPointer(function, declaration.Allocation, scope, TypeTable.StringType, 1, dataField);
-                        return EmitLoadPointer(function, dataField.Type, dataPointer, scope);
-                    }
-                    return EmitLoad(function, declaration.Type, declaration.Allocation, scope, returnValue);
-                }
-                else if (identifier is VariableAst variable)
-                {
-                    if (useRawString && variable.Type.TypeKind == TypeKind.String)
-                    {
-                        var dataField = TypeTable.StringType.Fields[1];
-
-                        var dataPointer = EmitGetStructPointer(function, variable.Pointer, scope, TypeTable.StringType, 1, dataField);
-                        return EmitLoadPointer(function, dataField.Type, dataPointer, scope);
-                    }
-                    return EmitLoad(function, variable.Type, variable.Pointer, scope, returnValue);
-                }
-                break;
+                return EmitIdentifier(function, identifierAst.Name, scope, useRawString, returnValue);
             case StructFieldRefAst structField:
                 if (structField.IsEnum)
                 {
@@ -1681,7 +1659,7 @@ public static class ProgramIRBuilder
                 return EmitAndCast(function, cast.Value, scope, cast.TargetType);
         }
 
-        Debug.Assert(false, $"Expected to emit an expression");
+        Debug.Assert(false, "Expected to emit an expression");
         return null;
     }
 
@@ -1746,23 +1724,57 @@ public static class ProgramIRBuilder
         return value;
     }
 
+    private static InstructionValue EmitIdentifier(FunctionIR function, string name, IScope scope, bool useRawString = false, bool returnValue = false)
+    {
+        var identifier = GetScopeIdentifier(scope, name, out var global);
+        if (identifier is DeclarationAst declaration)
+        {
+            if (declaration.Constant)
+            {
+                var constantValue = global ? Program.Constants[declaration.ConstantIndex] : function.Constants[declaration.ConstantIndex];
+                if (useRawString && constantValue.Type?.TypeKind == TypeKind.String)
+                {
+                    return new InstructionValue
+                    {
+                        ValueType = InstructionValueType.Constant, Type = TypeTable.RawStringType,
+                        ConstantString = constantValue.ConstantString, UseRawString = true
+                    };
+                }
+                return constantValue;
+            }
+
+            if (useRawString && declaration.Type.TypeKind == TypeKind.String)
+            {
+                var dataField = TypeTable.StringType.Fields[1];
+
+                var dataPointer = EmitGetStructPointer(function, declaration.Allocation, scope, TypeTable.StringType, 1, dataField);
+                return EmitLoadPointer(function, dataField.Type, dataPointer, scope);
+            }
+            return EmitLoad(function, declaration.Type, declaration.Allocation, scope, returnValue);
+        }
+        else if (identifier is VariableAst variable)
+        {
+            if (useRawString && variable.Type.TypeKind == TypeKind.String)
+            {
+                var dataField = TypeTable.StringType.Fields[1];
+
+                var dataPointer = EmitGetStructPointer(function, variable.Pointer, scope, TypeTable.StringType, 1, dataField);
+                return EmitLoadPointer(function, dataField.Type, dataPointer, scope);
+            }
+            return EmitLoad(function, variable.Type, variable.Pointer, scope, returnValue);
+        }
+
+        Debug.Assert(false, "Expected to emit an expression");
+        return null;
+    }
+
     private static (InstructionValue, IType) EmitGetReference(FunctionIR function, IAst ast, IScope scope, out bool loaded)
     {
         loaded = false;
         switch (ast)
         {
             case IdentifierAst identifier:
-                var ident = GetScopeIdentifier(scope, identifier.Name, out var global);
-                switch (ident)
-                {
-                    case DeclarationAst declaration:
-                    {
-                        return (declaration.Allocation, declaration.Type);
-                    }
-                    case VariableAst variable:
-                        return (variable.Pointer, variable.Type);
-                }
-                break;
+                return EmitGetVariableReference(identifier.Name, scope);
             case StructFieldRefAst structField:
                 var structFieldPointer = EmitGetStructRefPointer(function, structField, scope, out loaded, out _);
                 return (structFieldPointer, structFieldPointer.Type);
@@ -1775,6 +1787,22 @@ public static class ProgramIRBuilder
                 return (pointer, unary.Type);
         }
         return (null, null);
+    }
+
+    private static (InstructionValue value, IType type) EmitGetVariableReference(string name, IScope scope)
+    {
+        var ident = GetScopeIdentifier(scope, name, out var _);
+        switch (ident)
+        {
+            case DeclarationAst declaration:
+            {
+                return (declaration.Allocation, declaration.Type);
+            }
+            case VariableAst variable:
+                return (variable.Pointer, variable.Type);
+            default:
+                return (null, null);
+        }
     }
 
     private static InstructionValue EmitGetStructRefPointer(FunctionIR function, StructFieldRefAst structField, IScope scope, out bool loaded, out bool hasCall)
