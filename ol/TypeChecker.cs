@@ -3145,13 +3145,17 @@ public static class TypeChecker
         }
 
         // Verify the out instructions for getting values from the registers
-        foreach (var (register, instruction) in assembly.OutRegisters)
+        foreach (var (value, instruction) in assembly.OutValues)
         {
-            var outputType = GetVariable(instruction.Value1, instruction, scope, out _);
-
-            if (!Assembly.Registers.Contains(register))
+            var outputType = GetVariable(value, instruction, scope, out var constant);
+            if (constant)
             {
-                ErrorReporter.Report($"Expected a source register, but got '{register}'", instruction);
+                ErrorReporter.Report($"Cannot reassign value of constant variable '{value}'", instruction);
+            }
+
+            if (!Assembly.Registers.Contains(instruction.Value2))
+            {
+                ErrorReporter.Report($"Expected a source register, but got '{instruction.Value2}'", instruction);
             }
         }
     }

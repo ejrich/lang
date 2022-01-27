@@ -1951,6 +1951,11 @@ public static unsafe class LLVMBackend
                         values[instruction.ValueIndex] = result.IsUndef ? mask : _builder.BuildOr(result, mask);
                         break;
                     }
+                    case InstructionType.InlineAssembly:
+                    {
+                        // TODO Implement me
+                        break;
+                    }
                     case InstructionType.DebugSetLocation when _emitDebug:
                     {
                         var location = LLVM.DIBuilderCreateDebugLocation(_context, instruction.Source.Line, instruction.Source.Column, debugBlock, null);
