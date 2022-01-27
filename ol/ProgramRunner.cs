@@ -536,6 +536,11 @@ public static unsafe class ProgramRunner
                     registers[instruction.ValueIndex] = new Register {Long = returnValue};
                     break;
                 }
+                case InstructionType.InlineAssembly:
+                {
+                    // TODO Implement me
+                    break;
+                }
                 case InstructionType.IntegerExtend:
                 case InstructionType.IntegerTruncate:
                 {
@@ -1310,11 +1315,6 @@ public static unsafe class ProgramRunner
 
                     var result = shift | mask;
                     registers[instruction.ValueIndex] = new Register {ULong = result};
-                    break;
-                }
-                case InstructionType.InlineAssembly:
-                {
-                    // TODO Implement me
                     break;
                 }
             }

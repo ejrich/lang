@@ -3122,6 +3122,7 @@ public static class TypeChecker
                 ErrorReporter.Report($"Expected a target register, but got '{register}'", instruction);
             }
 
+            // TODO Verify the type is compatible with the given register
             var inputType = GetVariable(instruction.Value2, instruction, scope, out _);
         }
 
@@ -3147,6 +3148,7 @@ public static class TypeChecker
         // Verify the out instructions for getting values from the registers
         foreach (var (value, instruction) in assembly.OutValues)
         {
+            // TODO Verify the type is compatible with the given register
             var outputType = GetVariable(value, instruction, scope, out var constant);
             if (constant)
             {

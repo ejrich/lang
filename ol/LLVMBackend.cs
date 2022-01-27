@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using LLVMSharp.Interop;
 
 namespace ol;
@@ -1540,6 +1541,50 @@ public static unsafe class LLVMBackend
                         }
                         break;
                     }
+                    case InstructionType.InlineAssembly:
+                    {
+                        // Get the inputs to the assembly call
+                        var assemblyAst = (AssemblyAst)instruction.Source;
+                        var argumentCount = assemblyAst.InRegisters.Count + assemblyAst.OutValues.Count;
+                        var arguments = new LLVMValueRef[argumentCount];
+                        var argumentTypes = new LLVMTypeRef[argumentCount];
+
+                        var i = 0;
+                        foreach (var (_, instr) in assemblyAst.InRegisters)
+                        {
+                            arguments[i] = GetValue(instr.Value, values, allocations, functionPointer);
+                            argumentTypes[i] = _types[instr.Value.Type.TypeIndex];
+                            i++;
+                        }
+
+                        foreach (var (_, instr) in assemblyAst.OutValues)
+                        {
+                            arguments[i] = GetValue(instr.Value, values, allocations, functionPointer);
+                            argumentTypes[i] = _types[instr.Value.Type.TypeIndex];
+                            i++;
+                        }
+
+                        // Declare the assembly function type and write out the assembly instructions
+                        var functionType = LLVMTypeRef.CreateFunction(_types[0], argumentTypes);
+                        var (assembly, constraint) = GetInlineAssemblyString(assemblyAst);
+                        using var assemblyString = new MarshaledString(assembly);
+                        using var constraintString = new MarshaledString(constraint);
+                        using var name = new MarshaledString(string.Empty);
+
+                        var asm = LLVM.GetInlineAsm(functionType, assemblyString.Value, (UIntPtr)assemblyString.Length, constraintString.Value, (UIntPtr)constraintString.Length, 1, 0, LLVMInlineAsmDialect.LLVMInlineAsmDialectIntel);
+                        if (arguments.Length > 0)
+                        {
+                            fixed (LLVMValueRef* pArgs = &arguments[0])
+                            {
+                                LLVM.BuildCall2(_builder, functionType, asm, (LLVMOpaqueValue**)pArgs, (uint)arguments.Length, name);
+                            }
+                        }
+                        else
+                        {
+                            LLVM.BuildCall2(_builder, functionType, asm, null, 0, name);
+                        }
+                        break;
+                    }
                     case InstructionType.IntegerExtend:
                     case InstructionType.UnsignedIntegerToIntegerExtend:
                     {
@@ -1951,11 +1996,6 @@ public static unsafe class LLVMBackend
                         values[instruction.ValueIndex] = result.IsUndef ? mask : _builder.BuildOr(result, mask);
                         break;
                     }
-                    case InstructionType.InlineAssembly:
-                    {
-                        // TODO Implement me
-                        break;
-                    }
                     case InstructionType.DebugSetLocation when _emitDebug:
                     {
                         var location = LLVM.DIBuilderCreateDebugLocation(_context, instruction.Source.Line, instruction.Source.Column, debugBlock, null);
@@ -2181,6 +2221,15 @@ public static unsafe class LLVMBackend
             default:
                 return ($"mov rax, {syscall}; syscall;", string.Empty);
         }
+    }
+
+    private static (string, string) GetInlineAssemblyString(AssemblyAst assembly)
+    {
+        var assemblyString = new StringBuilder();
+        var constraintString = new StringBuilder();
+
+        // TODO Implement me
+        return (assemblyString.ToString(), constraintString.ToString());
     }
 
     private static void Compile(string objectFile, bool outputIntermediate)
