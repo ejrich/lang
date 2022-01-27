@@ -120,6 +120,7 @@ public enum InstructionType
     Call,
     CallFunctionPointer,
     SystemCall,
+    InlineAssembly,
     IntegerExtend,
     UnsignedIntegerToIntegerExtend,
     UnsignedIntegerExtend,
@@ -181,7 +182,6 @@ public enum InstructionType
     ShiftLeft,
     RotateRight,
     RotateLeft,
-    InlineAssembly,
     DebugSetLocation,
     DebugDeclareParameter,
     DebugDeclareVariable
