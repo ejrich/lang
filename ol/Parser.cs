@@ -2752,6 +2752,8 @@ public static class Parser
         }
 
         var closed = false;
+        var parsingInRegisters = true;
+        var parsingOutRegisters = false;
         while (enumerator.MoveNext())
         {
             if (enumerator.Current.Type == TokenType.CloseBrace)
@@ -2760,7 +2762,7 @@ public static class Parser
                 break;
             }
 
-            var instruction = ParseAssemblyInstruction(enumerator);
+            var instruction = ParseAssemblyInstruction(enumerator, out var inRegister, out var outRegister);
 
             if (instruction == null)
             {
@@ -2769,7 +2771,77 @@ public static class Parser
             }
             else
             {
-                assembly.Instructions.Add(instruction);
+                if (parsingInRegisters)
+                {
+                    if (inRegister)
+                    {
+                        if (instruction.Value1 == null || instruction.Value2 == null)
+                        {
+                            ErrorReporter.Report("Expected in instruction to have target register and input value", instruction);
+                        }
+                        else if (!assembly.InRegisters.TryAdd(instruction.Value1, instruction))
+                        {
+                            ErrorReporter.Report($"Duplicate in register '{instruction.Value1}'", instruction);
+                        }
+                    }
+                    else if (outRegister)
+                    {
+                        ErrorReporter.Report("Expected instructions before out registers", instruction);
+                        assembly.OutRegisters.TryAdd(instruction.Value2, instruction);
+                        parsingInRegisters = false;
+                        parsingOutRegisters = true;
+                    }
+                    else
+                    {
+                        assembly.Instructions.Add(instruction);
+                        parsingInRegisters = false;
+                    }
+                }
+                else if (parsingOutRegisters)
+                {
+                    if (outRegister)
+                    {
+                        if (instruction.Value1 == null || instruction.Value2 == null)
+                        {
+                            ErrorReporter.Report("Expected out instruction to have output value and source register", instruction);
+                        }
+                        else if (!assembly.OutRegisters.TryAdd(instruction.Value2, instruction))
+                        {
+                            ErrorReporter.Report($"Duplicate in register '{instruction.Value1}'", instruction);
+                        }
+                    }
+                    else if (inRegister)
+                    {
+                        ErrorReporter.Report("In instructions should be declared before body instructions", instruction);
+                    }
+                    else
+                    {
+                        ErrorReporter.Report("Expected instructions before out registers", instruction);
+                    }
+                }
+                else
+                {
+                    if (inRegister)
+                    {
+                        ErrorReporter.Report("In instructions should be declared before body instructions", instruction);
+                    }
+                    else if (outRegister)
+                    {
+                        if (instruction.Value1 == null || instruction.Value2 == null)
+                        {
+                            ErrorReporter.Report("Expected out instruction to have output value and source register", instruction);
+                        }
+                        else if (!assembly.OutRegisters.TryAdd(instruction.Value2, instruction))
+                        {
+                            ErrorReporter.Report($"Duplicate in register '{instruction.Value1}'", instruction);
+                        }
+                        parsingOutRegisters = true;
+                    }
+                    else
+                    {
+                        assembly.Instructions.Add(instruction);
+                    }
+                }
             }
         }
 
@@ -2781,17 +2853,19 @@ public static class Parser
         return assembly;
     }
 
-    private static AssemblyInstructionAst ParseAssemblyInstruction(TokenEnumerator enumerator)
+    private static AssemblyInstructionAst ParseAssemblyInstruction(TokenEnumerator enumerator, out bool inRegister, out bool outRegister)
     {
         var instruction = CreateAst<AssemblyInstructionAst>(enumerator.Current);
+        inRegister = false;
+        outRegister = false;
 
         switch (enumerator.Current.Type)
         {
             case TokenType.In:
-                instruction.In = true;
+                inRegister = true;
                 break;
             case TokenType.Out:
-                instruction.Out = true;
+                outRegister = true;
                 break;
             case TokenType.Identifier:
                 instruction.Instruction = enumerator.Current.Value;

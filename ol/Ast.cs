@@ -606,6 +606,8 @@ public class AssemblyAst : IAst
     public uint Line { get; init; }
     public uint Column { get; init; }
     public List<AssemblyInstructionAst> Instructions { get; } = new();
+    public Dictionary<string, AssemblyInstructionAst> InRegisters { get; } = new();
+    public Dictionary<string, AssemblyInstructionAst> OutRegisters { get; } = new();
 }
 
 public class AssemblyInstructionAst : IAst
@@ -613,8 +615,6 @@ public class AssemblyInstructionAst : IAst
     public int FileIndex { get; set; }
     public uint Line { get; init; }
     public uint Column { get; init; }
-    public bool In { get; set; }
-    public bool Out { get; set; }
     public string Instruction { get; set; }
     public string Value1 { get; set; }
     public string Value2 { get; set; }

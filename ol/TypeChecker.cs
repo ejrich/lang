@@ -3114,78 +3114,44 @@ public static class TypeChecker
 
     private static void VerifyInlineAssembly(AssemblyAst assembly, IScope scope)
     {
-        var i = 0;
         // Verify the instructions for capturing values
-        for (; i < assembly.Instructions.Count; i++)
+        foreach (var (register, instruction) in assembly.InRegisters)
         {
-            var instruction = assembly.Instructions[i];
-            if (instruction.In)
+            if (!Assembly.Registers.Contains(register))
             {
-                if (!Assembly.Registers.Contains(instruction.Value1))
-                {
-                    ErrorReporter.Report($"Expected a target register, but got '{instruction.Value1}'", instruction);
-                }
-                var inputType = GetVariable(instruction.Value2, instruction, scope, out _);
+                ErrorReporter.Report($"Expected a target register, but got '{register}'", instruction);
             }
-            else if (instruction.Out)
-            {
-                i++;
-                ErrorReporter.Report("Expected an in instruction", instruction);
-                break;
-            }
-            else
-            {
-                break;
-            }
+
+            var inputType = GetVariable(instruction.Value2, instruction, scope, out _);
         }
 
         // Verify the instructions for capturing values
-        for (; i < assembly.Instructions.Count; i++)
+        foreach (var instruction in assembly.Instructions)
         {
-            var instruction = assembly.Instructions[i];
-            if (instruction.In)
+            if (!Assembly.Instructions.Contains(instruction.Instruction))
             {
-                ErrorReporter.Report("Expected an instruction with registers", instruction);
+                ErrorReporter.Report($"Unknown instruction '{instruction.Instruction}'", instruction);
             }
-            else if (instruction.Out)
+
+            if (!Assembly.Registers.Contains(instruction.Value1))
             {
-                break;
+                ErrorReporter.Report($"Unknown register '{instruction.Value1}'", instruction);
             }
-            else
+
+            if (!Assembly.Registers.Contains(instruction.Value2))
             {
-                if (!Assembly.Instructions.Contains(instruction.Instruction))
-                {
-                    ErrorReporter.Report($"Unknown instruction '{instruction.Instruction}'", instruction);
-                }
-
-                if (!Assembly.Registers.Contains(instruction.Value1))
-                {
-                    ErrorReporter.Report($"Unknown register '{instruction.Value1}'", instruction);
-                }
-
-                if (!Assembly.Registers.Contains(instruction.Value2))
-                {
-                    ErrorReporter.Report($"Unknown register '{instruction.Value2}'", instruction);
-                }
+                ErrorReporter.Report($"Unknown register '{instruction.Value2}'", instruction);
             }
         }
 
         // Verify the out instructions for getting values from the registers
-        for (; i < assembly.Instructions.Count; i++)
+        foreach (var (register, instruction) in assembly.OutRegisters)
         {
-            var instruction = assembly.Instructions[i];
-            if (!instruction.Out)
-            {
-                ErrorReporter.Report("Expected an out instruction", instruction);
-            }
-            else
-            {
-                var outputType = GetVariable(instruction.Value1, instruction, scope, out _);
+            var outputType = GetVariable(instruction.Value1, instruction, scope, out _);
 
-                if (!Assembly.Registers.Contains(instruction.Value2))
-                {
-                    ErrorReporter.Report($"Expected a target register, but got '{instruction.Value2}'", instruction);
-                }
+            if (!Assembly.Registers.Contains(register))
+            {
+                ErrorReporter.Report($"Expected a source register, but got '{register}'", instruction);
             }
         }
     }
