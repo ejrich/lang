@@ -3114,7 +3114,80 @@ public static class TypeChecker
 
     private static void VerifyInlineAssembly(AssemblyAst assembly, IScope scope)
     {
-        // TODO Implement me
+        var i = 0;
+        // Verify the instructions for capturing values
+        for (; i < assembly.Instructions.Count; i++)
+        {
+            var instruction = assembly.Instructions[i];
+            if (instruction.In)
+            {
+                if (!Assembly.Registers.Contains(instruction.Value1))
+                {
+                    ErrorReporter.Report($"Expected a target register, but got '{instruction.Value1}'", instruction);
+                }
+                var inputType = GetVariable(instruction.Value2, instruction, scope, out _);
+            }
+            else if (instruction.Out)
+            {
+                i++;
+                ErrorReporter.Report("Expected an in instruction", instruction);
+                break;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        // Verify the instructions for capturing values
+        for (; i < assembly.Instructions.Count; i++)
+        {
+            var instruction = assembly.Instructions[i];
+            if (instruction.In)
+            {
+                ErrorReporter.Report("Expected an instruction with registers", instruction);
+            }
+            else if (instruction.Out)
+            {
+                break;
+            }
+            else
+            {
+                if (!Assembly.Instructions.Contains(instruction.Instruction))
+                {
+                    ErrorReporter.Report($"Unknown instruction '{instruction.Instruction}'", instruction);
+                }
+
+                if (!Assembly.Registers.Contains(instruction.Value1))
+                {
+                    ErrorReporter.Report($"Unknown register '{instruction.Value1}'", instruction);
+                }
+
+                if (!Assembly.Registers.Contains(instruction.Value2))
+                {
+                    ErrorReporter.Report($"Unknown register '{instruction.Value2}'", instruction);
+                }
+            }
+        }
+
+        // Verify the out instructions for getting values from the registers
+        for (; i < assembly.Instructions.Count; i++)
+        {
+            var instruction = assembly.Instructions[i];
+            if (!instruction.Out)
+            {
+                ErrorReporter.Report("Expected an out instruction", instruction);
+            }
+            else
+            {
+                var outputType = GetVariable(instruction.Value1, instruction, scope, out _);
+
+                if (!Assembly.Registers.Contains(instruction.Value2))
+                {
+                    ErrorReporter.Report($"Expected a target register, but got '{instruction.Value2}'", instruction);
+                }
+            }
+        }
     }
 
     private static void VerifyFunctionIfNecessary(FunctionAst function, IFunction currentFunction)
