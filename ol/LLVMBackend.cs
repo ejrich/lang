@@ -1523,66 +1523,41 @@ public static unsafe class LLVMBackend
                         var functionType = GetFunctionType(syscallFunction);
 
                         var (assembly, constraint) = GetSyscallAssemblyString(instruction.Index, arguments.Length, instruction.Flag);
-                        using var assemblyString = new MarshaledString(assembly);
-                        using var constraintString = new MarshaledString(constraint);
-                        using var name = new MarshaledString(string.Empty);
-
-                        var asm = LLVM.GetInlineAsm(functionType, assemblyString.Value, (UIntPtr)assemblyString.Length, constraintString.Value, (UIntPtr)constraintString.Length, 1, 0, LLVMInlineAsmDialect.LLVMInlineAsmDialectIntel);
-                        if (arguments.Length > 0)
-                        {
-                            fixed (LLVMValueRef* pArgs = &arguments[0])
-                            {
-                                values[instruction.ValueIndex] = LLVM.BuildCall2(_builder, functionType, asm, (LLVMOpaqueValue**)pArgs, (uint)arguments.Length, name);
-                            }
-                        }
-                        else
-                        {
-                            values[instruction.ValueIndex] = LLVM.BuildCall2(_builder, functionType, asm, null, 0, name);
-                        }
+                        values[instruction.ValueIndex] = BuildAssemblyCall(assembly, constraint, functionType, arguments);
                         break;
                     }
                     case InstructionType.InlineAssembly:
                     {
-                        // Get the inputs to the assembly call
+                        // Get the inputs and outputs to the assembly call
                         var assemblyAst = (AssemblyAst)instruction.Source;
-                        var argumentCount = assemblyAst.InRegisters.Count + assemblyAst.OutValues.Count;
-                        var arguments = new LLVMValueRef[argumentCount];
-                        var argumentTypes = new LLVMTypeRef[argumentCount];
+                        var inputArguments = new LLVMValueRef[assemblyAst.InRegisters.Count];
+                        var inputTypes = new LLVMTypeRef[assemblyAst.InRegisters.Count];
 
                         var i = 0;
                         foreach (var (_, instr) in assemblyAst.InRegisters)
                         {
-                            arguments[i] = GetValue(instr.Value, values, allocations, functionPointer);
-                            argumentTypes[i] = _types[instr.Value.Type.TypeIndex];
-                            i++;
+                            inputArguments[i] = GetValue(instr.Value, values, allocations, functionPointer);
+                            inputTypes[i++] = _types[instr.Value.Type.TypeIndex];
                         }
 
+                        i = 0;
+                        var outputArguments = new LLVMValueRef[assemblyAst.OutValues.Count];
+                        var outputTypes = new LLVMTypeRef[assemblyAst.OutValues.Count];
                         foreach (var (_, instr) in assemblyAst.OutValues)
                         {
-                            arguments[i] = GetValue(instr.Value, values, allocations, functionPointer);
-                            argumentTypes[i] = _types[instr.Value.Type.TypeIndex];
-                            i++;
+                            outputArguments[i] = GetValue(instr.Value, values, allocations, functionPointer);
+                            outputTypes[i++] = LLVM.PointerType(_types[instr.Value.Type.TypeIndex], 0);
                         }
 
                         // Declare the assembly function type and write out the assembly instructions
-                        var functionType = LLVMTypeRef.CreateFunction(_types[0], argumentTypes);
-                        var (assembly, constraint) = GetInlineAssemblyString(assemblyAst);
-                        using var assemblyString = new MarshaledString(assembly);
-                        using var constraintString = new MarshaledString(constraint);
-                        using var name = new MarshaledString(string.Empty);
+                        var assemblyBodyType = LLVMTypeRef.CreateFunction(LLVM.VoidType(), inputTypes);
+                        var (assembly, constraint) = GetAssemblyBodyString(assemblyAst);
+                        BuildAssemblyCall(assembly, constraint, assemblyBodyType, inputArguments);
 
-                        var asm = LLVM.GetInlineAsm(functionType, assemblyString.Value, (UIntPtr)assemblyString.Length, constraintString.Value, (UIntPtr)constraintString.Length, 1, 0, LLVMInlineAsmDialect.LLVMInlineAsmDialectIntel);
-                        if (arguments.Length > 0)
-                        {
-                            fixed (LLVMValueRef* pArgs = &arguments[0])
-                            {
-                                LLVM.BuildCall2(_builder, functionType, asm, (LLVMOpaqueValue**)pArgs, (uint)arguments.Length, name);
-                            }
-                        }
-                        else
-                        {
-                            LLVM.BuildCall2(_builder, functionType, asm, null, 0, name);
-                        }
+                        // Capture the output registers
+                        var assemblyOutputType = LLVMTypeRef.CreateFunction(LLVM.VoidType(), outputTypes);
+                        (assembly, constraint) = GetAssemblyOutputString(assemblyAst);
+                        BuildAssemblyCall(assembly, constraint, assemblyOutputType, inputArguments, LLVMInlineAsmDialect.LLVMInlineAsmDialectATT);
                         break;
                     }
                     case InstructionType.IntegerExtend:
@@ -2223,13 +2198,60 @@ public static unsafe class LLVMBackend
         }
     }
 
-    private static (string, string) GetInlineAssemblyString(AssemblyAst assembly)
+    private static (string, string) GetAssemblyBodyString(AssemblyAst assembly)
+    {
+        var assemblyString = new StringBuilder();
+        var constraintString = new StringBuilder();
+
+        foreach (var (register, instruction) in assembly.InRegisters)
+        {
+            // TODO Implement me
+        }
+
+        foreach (var instruction in assembly.Instructions)
+        {
+            assemblyString.Append(instruction.Instruction);
+            if (instruction.Value1 != null)
+            {
+                assemblyString.AppendFormat(" {0}", instruction.Value1);
+            }
+            if (instruction.Value2 != null)
+            {
+                assemblyString.AppendFormat(", {0}", instruction.Value2);
+            }
+            assemblyString.Append("; ");
+        }
+
+        return (assemblyString.ToString(), constraintString.ToString());
+    }
+
+    private static (string, string) GetAssemblyOutputString(AssemblyAst assembly)
     {
         var assemblyString = new StringBuilder();
         var constraintString = new StringBuilder();
 
         // TODO Implement me
         return (assemblyString.ToString(), constraintString.ToString());
+    }
+
+    private static LLVMValueRef BuildAssemblyCall(string assembly, string constraint, LLVMTypeRef assemblyFunctionType, LLVMValueRef[] arguments, LLVMInlineAsmDialect dialect = LLVMInlineAsmDialect.LLVMInlineAsmDialectIntel)
+    {
+        using var assemblyString = new MarshaledString(assembly);
+        using var constraintString = new MarshaledString(constraint);
+        using var name = new MarshaledString(string.Empty);
+
+        var asm = LLVM.GetInlineAsm(assemblyFunctionType, assemblyString.Value, (UIntPtr)assemblyString.Length, constraintString.Value, (UIntPtr)constraintString.Length, 1, 0, dialect);
+        if (arguments.Length > 0)
+        {
+            fixed (LLVMValueRef* pArgs = &arguments[0])
+            {
+                return LLVM.BuildCall2(_builder, assemblyFunctionType, asm, (LLVMOpaqueValue**)pArgs, (uint)arguments.Length, name);
+            }
+        }
+        else
+        {
+            return LLVM.BuildCall2(_builder, assemblyFunctionType, asm, null, 0, name);
+        }
     }
 
     private static void Compile(string objectFile, bool outputIntermediate)
