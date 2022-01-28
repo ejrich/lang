@@ -1522,42 +1522,89 @@ public static unsafe class LLVMBackend
                         var syscallFunction = (FunctionAst)instruction.Source;
                         var functionType = GetFunctionType(syscallFunction);
 
-                        var (assembly, constraint) = GetSyscallAssemblyString(instruction.Index, arguments.Length, instruction.Flag);
+                        var assembly = $"mov rax, {instruction.Index}; syscall;";
+
+                        string constraint;
+                        if (instruction.Flag)
+                        {
+                            constraint = arguments.Length switch
+                            {
+                                1 => "{di}",
+                                2 => "{di},{si}",
+                                3 => "{di},{si},{dx}",
+                                4 => "{di},{si},{dx},{r10}",
+                                5 => "{di},{si},{dx},{r10},{r8}",
+                                6 => "{di},{si},{dx},{r10},{r8},{r9}",
+                                _ => string.Empty
+                            };
+                        }
+                        else
+                        {
+                            constraint = arguments.Length switch
+                            {
+                                1 => "=A,{di}",
+                                2 => "=A,{di},{si}",
+                                3 => "=A,{di},{si},{dx}",
+                                4 => "=A,{di},{si},{dx},{r10}",
+                                5 => "=A,{di},{si},{dx},{r10},{r8}",
+                                6 => "=A,{di},{si},{dx},{r10},{r8},{r9}",
+                                _ => "=A"
+                            };
+                        }
+
                         values[instruction.ValueIndex] = BuildAssemblyCall(assembly, constraint, functionType, arguments);
                         break;
                     }
                     case InstructionType.InlineAssembly:
                     {
                         // Get the inputs and outputs to the assembly call
-                        var assemblyAst = (AssemblyAst)instruction.Source;
-                        var inputArguments = new LLVMValueRef[assemblyAst.InRegisters.Count];
-                        var inputTypes = new LLVMTypeRef[assemblyAst.InRegisters.Count];
+                        var assembly = (AssemblyAst)instruction.Source;
 
                         var i = 0;
-                        foreach (var (_, instr) in assemblyAst.InRegisters)
+                        var inputArguments = new LLVMValueRef[assembly.InRegisters.Count];
+                        var inputTypes = new LLVMTypeRef[assembly.InRegisters.Count];
+                        var bodyAssembly = new StringBuilder();
+                        var bodyConstraint = new StringBuilder();
+                        foreach (var (register, instr) in assembly.InRegisters)
                         {
                             inputArguments[i] = GetValue(instr.Value, values, allocations, functionPointer);
                             inputTypes[i++] = _types[instr.Value.Type.TypeIndex];
+                            bodyConstraint.AppendFormat("{{{0}}}", register);
                         }
 
                         i = 0;
-                        var outputArguments = new LLVMValueRef[assemblyAst.OutValues.Count];
-                        var outputTypes = new LLVMTypeRef[assemblyAst.OutValues.Count];
-                        foreach (var (_, instr) in assemblyAst.OutValues)
+                        var outputArguments = new LLVMValueRef[assembly.OutValues.Count];
+                        var outputTypes = new LLVMTypeRef[assembly.OutValues.Count];
+                        var outputAssembly = new StringBuilder();
+                        var outputConstraint = new StringBuilder();
+                        foreach (var (_, instr) in assembly.OutValues)
                         {
                             outputArguments[i] = GetValue(instr.Value, values, allocations, functionPointer);
                             outputTypes[i++] = LLVM.PointerType(_types[instr.Value.Type.TypeIndex], 0);
+                            // TODO Implement setting output registers
+                        }
+
+                        foreach (var instr in assembly.Instructions)
+                        {
+                            bodyAssembly.Append(instr.Instruction);
+                            if (instr.Value1 != null)
+                            {
+                                bodyAssembly.AppendFormat(" {0}", instr.Value1);
+                            }
+                            if (instr.Value2 != null)
+                            {
+                                bodyAssembly.AppendFormat(", {0}", instr.Value2);
+                            }
+                            bodyAssembly.Append("; ");
                         }
 
                         // Declare the assembly function type and write out the assembly instructions
                         var assemblyBodyType = LLVMTypeRef.CreateFunction(LLVM.VoidType(), inputTypes);
-                        var (assembly, constraint) = GetAssemblyBodyString(assemblyAst);
-                        BuildAssemblyCall(assembly, constraint, assemblyBodyType, inputArguments);
+                        BuildAssemblyCall(bodyAssembly.ToString(), bodyConstraint.ToString(), assemblyBodyType, inputArguments);
 
                         // Capture the output registers
-                        var assemblyOutputType = LLVMTypeRef.CreateFunction(LLVM.VoidType(), outputTypes);
-                        (assembly, constraint) = GetAssemblyOutputString(assemblyAst);
-                        BuildAssemblyCall(assembly, constraint, assemblyOutputType, inputArguments, LLVMInlineAsmDialect.LLVMInlineAsmDialectATT);
+                        // var assemblyOutputType = LLVMTypeRef.CreateFunction(LLVM.VoidType(), outputTypes);
+                        // BuildAssemblyCall(outputAssembly.ToString(), outputConstraint.ToString(), assemblyOutputType, inputArguments, LLVMInlineAsmDialect.LLVMInlineAsmDialectATT);
                         break;
                     }
                     case InstructionType.IntegerExtend:
@@ -2175,63 +2222,6 @@ public static unsafe class LLVMBackend
 
         var stackPointerValue = _builder.BuildLoad(stackPointer);
         _builder.BuildCall(stackRestore, new []{stackPointerValue});
-    }
-
-    private static (string, string) GetSyscallAssemblyString(int syscall, int arguments, bool returnsVoid)
-    {
-        switch (arguments)
-        {
-            case 1:
-                return ($"mov rax, {syscall}; syscall;", returnsVoid ? "{di}" : "=A,{di}");
-            case 2:
-                return ($"mov rax, {syscall}; syscall;", returnsVoid ? "{di},{si}" : "=A,{di},{si}");
-            case 3:
-                return ($"mov rax, {syscall}; syscall;", returnsVoid ? "{di},{si},{dx}" : "=A,{di},{si},{dx}");
-            case 4:
-                return ($"mov r10, ${{4:V}}; mov rax, {syscall}; syscall;", returnsVoid ? "{di},{si},{dx},r,~{r10}" : "=A,{di},{si},{dx},r,~{r10}");
-            case 5:
-                return ($"mov r10, ${{4:V}}; mov r8, ${{5:V}}; mov rax, {syscall}; syscall;", returnsVoid ? "{di},{si},{dx},r,r,~{r10},~{r8}" : "=A,{di},{si},{dx},r,r,~{r10},~{r8}");
-            case 6:
-                return ($"mov r10, ${{4:V}}; mov r8, ${{5:V}}; mov r9, ${{6:V}}; mov rax, {syscall}; syscall;", returnsVoid ? "{di},{si},{dx},r,r,r,~{r10},~{r8},~{r9}" : "=A,{di},{si},{dx},r,r,r,~{r10},~{r8},~{r9}");
-            default:
-                return ($"mov rax, {syscall}; syscall;", string.Empty);
-        }
-    }
-
-    private static (string, string) GetAssemblyBodyString(AssemblyAst assembly)
-    {
-        var assemblyString = new StringBuilder();
-        var constraintString = new StringBuilder();
-
-        foreach (var (register, instruction) in assembly.InRegisters)
-        {
-            // TODO Implement me
-        }
-
-        foreach (var instruction in assembly.Instructions)
-        {
-            assemblyString.Append(instruction.Instruction);
-            if (instruction.Value1 != null)
-            {
-                assemblyString.AppendFormat(" {0}", instruction.Value1);
-            }
-            if (instruction.Value2 != null)
-            {
-                assemblyString.AppendFormat(", {0}", instruction.Value2);
-            }
-            assemblyString.Append("; ");
-        }
-
-        return (assemblyString.ToString(), constraintString.ToString());
-    }
-
-    private static (string, string) GetAssemblyOutputString(AssemblyAst assembly)
-    {
-        var assemblyString = new StringBuilder();
-        var constraintString = new StringBuilder();
-
-        // TODO Implement me
-        return (assemblyString.ToString(), constraintString.ToString());
     }
 
     private static LLVMValueRef BuildAssemblyCall(string assembly, string constraint, LLVMTypeRef assemblyFunctionType, LLVMValueRef[] arguments, LLVMInlineAsmDialect dialect = LLVMInlineAsmDialect.LLVMInlineAsmDialectIntel)
