@@ -1557,54 +1557,88 @@ public static unsafe class LLVMBackend
                     }
                     case InstructionType.InlineAssembly:
                     {
-                        // Get the inputs and outputs to the assembly call
                         var assembly = (AssemblyAst)instruction.Source;
 
                         var i = 0;
-                        var inputArguments = new LLVMValueRef[assembly.InRegisters.Count];
-                        var inputTypes = new LLVMTypeRef[assembly.InRegisters.Count];
-                        var bodyAssembly = new StringBuilder();
-                        var bodyConstraint = new StringBuilder();
-                        foreach (var (register, instr) in assembly.InRegisters)
-                        {
-                            inputArguments[i] = GetValue(instr.Value, values, allocations, functionPointer);
-                            inputTypes[i++] = _types[instr.Value.Type.TypeIndex];
-                            bodyConstraint.AppendFormat("{{{0}}}", register);
-                        }
+                        var arguments = new LLVMValueRef[assembly.InRegisters.Count];
+                        var argumentTypes = new LLVMTypeRef[assembly.InRegisters.Count];
+                        var assemblyString = new StringBuilder();
+                        var constraintString = new StringBuilder();
 
-                        i = 0;
-                        var outputArguments = new LLVMValueRef[assembly.OutValues.Count];
-                        var outputTypes = new LLVMTypeRef[assembly.OutValues.Count];
-                        var outputAssembly = new StringBuilder();
-                        var outputConstraint = new StringBuilder();
-                        foreach (var (_, instr) in assembly.OutValues)
+                        // Declare the inputs and write the assembly instructions
+                        if (arguments.Length > 0)
                         {
-                            outputArguments[i] = GetValue(instr.Value, values, allocations, functionPointer);
-                            outputTypes[i++] = LLVM.PointerType(_types[instr.Value.Type.TypeIndex], 0);
-                            // TODO Implement setting output registers
+                            foreach (var (register, instr) in assembly.InRegisters)
+                            {
+                                arguments[i] = GetValue(instr.Value, values, allocations, functionPointer);
+                                argumentTypes[i++] = _types[instr.Value.Type.TypeIndex];
+                                constraintString.AppendFormat("{{{0}}},", register);
+                            }
+                            constraintString.Remove(constraintString.Length-1, 1);
                         }
 
                         foreach (var instr in assembly.Instructions)
                         {
-                            bodyAssembly.Append(instr.Instruction);
+                            assemblyString.Append(instr.Instruction);
                             if (instr.Value1 != null)
                             {
-                                bodyAssembly.AppendFormat(" {0}", instr.Value1);
+                                assemblyString.AppendFormat(" {0}", instr.Value1);
                             }
                             if (instr.Value2 != null)
                             {
-                                bodyAssembly.AppendFormat(", {0}", instr.Value2);
+                                assemblyString.AppendFormat(", {0}", instr.Value2);
                             }
-                            bodyAssembly.Append("; ");
+                            assemblyString.Append("; ");
                         }
 
-                        // Declare the assembly function type and write out the assembly instructions
-                        var assemblyBodyType = LLVMTypeRef.CreateFunction(LLVM.VoidType(), inputTypes);
-                        BuildAssemblyCall(bodyAssembly.ToString(), bodyConstraint.ToString(), assemblyBodyType, inputArguments);
+                        var assemblyBodyType = LLVMTypeRef.CreateFunction(LLVM.VoidType(), argumentTypes);
+                        BuildAssemblyCall(assemblyString.ToString(), constraintString.ToString(), assemblyBodyType, arguments);
 
-                        // Capture the output registers
-                        // var assemblyOutputType = LLVMTypeRef.CreateFunction(LLVM.VoidType(), outputTypes);
-                        // BuildAssemblyCall(outputAssembly.ToString(), outputConstraint.ToString(), assemblyOutputType, inputArguments, LLVMInlineAsmDialect.LLVMInlineAsmDialectATT);
+                        // Capture the output registers if necessary
+                        if (assembly.OutValues.Count > 0)
+                        {
+                            i = 0;
+                            arguments = new LLVMValueRef[assembly.OutValues.Count];
+                            argumentTypes = new LLVMTypeRef[assembly.OutValues.Count];
+                            assemblyString = new StringBuilder();
+                            constraintString = new StringBuilder();
+                            foreach (var (_, instr) in assembly.OutValues)
+                            {
+                                var argument = arguments[i] = GetValue(instr.Value, values, allocations, functionPointer);
+                                var type = instr.Value.Type;
+                                argumentTypes[i] = LLVM.PointerType(_types[type.TypeIndex], 0);
+
+                                switch (type.TypeKind)
+                                {
+                                    case TypeKind.Void:
+                                    case TypeKind.Boolean:
+                                    case TypeKind.Integer:
+                                    case TypeKind.Enum:
+                                    case TypeKind.Type:
+                                        assemblyString.Append("mov ");
+                                        break;
+                                    case TypeKind.Float:
+                                        if (type.Size == 4)
+                                        {
+                                            assemblyString.Append("movss ");
+                                        }
+                                        else
+                                        {
+                                            assemblyString.Append("movsd ");
+                                        }
+                                        break;
+                                    default:
+                                        assemblyString.Append("movq ");
+                                        break;
+                                }
+                                assemblyString.AppendFormat("%{0}, ${1}; ", instr.Value2, i++);
+                                constraintString.Append("=*m,");
+                            }
+                            constraintString.Remove(constraintString.Length-1, 1);
+
+                            var assemblyOutputType = LLVMTypeRef.CreateFunction(LLVM.VoidType(), argumentTypes);
+                            BuildAssemblyCall(assemblyString.ToString(), constraintString.ToString(), assemblyOutputType, arguments, LLVMInlineAsmDialect.LLVMInlineAsmDialectATT);
+                        }
                         break;
                     }
                     case InstructionType.IntegerExtend:
