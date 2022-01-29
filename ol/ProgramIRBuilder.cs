@@ -1465,7 +1465,8 @@ public static class ProgramIRBuilder
         // Get the values to place in the input registers
         foreach (var (_, instruction) in assembly.InRegisters)
         {
-            instruction.Value = EmitIdentifier(function, instruction.Value2, scope);
+            instruction.Value = instruction.GetPointer ? EmitGetVariableReference(instruction.Value1, scope).value :
+                EmitIdentifier(function, instruction.Value2, scope);
         }
 
         // Get the output values from the registers

@@ -618,6 +618,7 @@ public class AssemblyInstructionAst : IAst
     public string Instruction { get; set; }
     public string Value1 { get; set; }
     public string Value2 { get; set; }
+    public bool GetPointer { get; set; }
     public InstructionValue Value { get; set; }
 }
 

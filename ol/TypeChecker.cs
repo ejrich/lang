@@ -3124,6 +3124,11 @@ public static class TypeChecker
 
             // TODO Verify the type is compatible with the given register
             var inputType = GetVariable(instruction.Value2, instruction, scope, out _);
+
+            if (inputType is StructAst || inputType is UnionAst)
+            {
+                instruction.GetPointer = true;
+            }
         }
 
         // Verify the instructions for capturing values
