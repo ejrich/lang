@@ -1582,11 +1582,33 @@ public static unsafe class LLVMBackend
                             assemblyString.Append(instr.Instruction);
                             if (instr.Value1 != null)
                             {
-                                assemblyString.AppendFormat(" {0}", instr.Value1);
+                                if (instr.Value1.Pointer)
+                                {
+                                    assemblyString.AppendFormat(" qword ptr [{0}]", instr.Value1.Register);
+                                }
+                                else if (instr.Value1.Register != null)
+                                {
+                                    assemblyString.AppendFormat(" {0}", instr.Value1.Register);
+                                }
+                                else
+                                {
+                                    assemblyString.AppendFormat(" {0}", instr.Value1.Constant);
+                                }
                             }
                             if (instr.Value2 != null)
                             {
-                                assemblyString.AppendFormat(", {0}", instr.Value2);
+                                if (instr.Value2.Pointer)
+                                {
+                                    assemblyString.AppendFormat(", qword ptr [{0}]", instr.Value2.Register);
+                                }
+                                else if (instr.Value2.Register != null)
+                                {
+                                    assemblyString.AppendFormat(", {0}", instr.Value2.Register);
+                                }
+                                else
+                                {
+                                    assemblyString.AppendFormat(", {0}", instr.Value2.Constant);
+                                }
                             }
                             assemblyString.Append("; ");
                         }

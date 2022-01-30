@@ -12,6 +12,6 @@ public static class Assembly
     };
 
     public static readonly HashSet<string> Instructions = new() {
-        "sqrtsd" // TODO Add more
+        "fcos", "fld", "fptan", "fsin", "fst", "fstp", "sqrtsd" // TODO Add more
     };
 }

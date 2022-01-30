@@ -3139,14 +3139,14 @@ public static class TypeChecker
                 ErrorReporter.Report($"Unknown instruction '{instruction.Instruction}'", instruction);
             }
 
-            if (instruction.Value1 != null && !Assembly.Registers.Contains(instruction.Value1))
+            if (instruction.Value1?.Register != null && !Assembly.Registers.Contains(instruction.Value1.Register))
             {
-                ErrorReporter.Report($"Unknown register '{instruction.Value1}'", instruction);
+                ErrorReporter.Report($"Unknown register '{instruction.Value1.Register}'", instruction.Value1);
             }
 
-            if (instruction.Value2 != null && !Assembly.Registers.Contains(instruction.Value2))
+            if (instruction.Value2?.Register != null && !Assembly.Registers.Contains(instruction.Value2.Register))
             {
-                ErrorReporter.Report($"Unknown register '{instruction.Value2}'", instruction);
+                ErrorReporter.Report($"Unknown register '{instruction.Value2.Register}'", instruction.Value2);
             }
         }
 

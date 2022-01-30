@@ -627,8 +627,18 @@ public class AssemblyInstructionAst : IAst
     public uint Line { get; init; }
     public uint Column { get; init; }
     public string Instruction { get; set; }
-    public string Value1 { get; set; }
-    public string Value2 { get; set; }
+    public AssemblyValueAst Value1 { get; set; }
+    public AssemblyValueAst Value2 { get; set; }
+}
+
+public class AssemblyValueAst : IAst
+{
+    public int FileIndex { get; set; }
+    public uint Line { get; init; }
+    public uint Column { get; init; }
+    public bool Pointer { get; set; }
+    public string Register { get; set; }
+    public string Constant { get; set; }
 }
 
 public class TypeDefinition : IAst

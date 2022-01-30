@@ -1,6 +1,7 @@
 #import standard
 #import compiler
 #import vulkan
+#import math
 
 // This test follows vulkan-tutorial.com
 
@@ -1603,8 +1604,8 @@ Vector4 vec4(float x = 0.0, float y = 0.0, float z = 0.0, float w = 0.0) {
 
 // rotate, look_at, and perspective borrowed from https://github.com/g-truc/glm
 Matrix4 mat4_rotate_z(float angle) {
-    sin := sin(angle);
-    cos := cos(angle);
+    sin := sine(angle);
+    cos := cosine(angle);
 
     matrix := mat4_ident();
     matrix.a.x = cos;
@@ -1644,7 +1645,7 @@ Matrix4 look_at(Vector3 eye, Vector3 center, Vector3 up) {
 }
 
 Matrix4 perspective(float fovy, float aspect, float z_near, float z_far) {
-    tan_half_fovy := tan(fovy / 2.0);
+    tan_half_fovy := tangent(fovy / 2.0);
 
     result: Matrix4;
 
@@ -1658,7 +1659,7 @@ Matrix4 perspective(float fovy, float aspect, float z_near, float z_far) {
 }
 
 Vector3 normalize(Vector3 vec) {
-    magnitude := sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
+    magnitude := square_root(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
 
     result: Vector3 = {
         x = vec.x / magnitude;
@@ -1694,11 +1695,6 @@ Vector3 vec3(float x = 0.0, float y = 0.0, float z = 0.0) {
     vector: Vector3 = { x = x; y = y; z = z; }
     return vector;
 }
-
-float64 sqrt(float64 value) #extern "m-2.33"
-float64 sin(float64 angle) #extern "m-2.33"
-float64 cos(float64 angle) #extern "m-2.33"
-float64 tan(float64 angle) #extern "m-2.33"
 
 
 // Part 22: https://vulkan-tutorial.com/en/Uniform_buffers/Descriptor_pool_and_sets
