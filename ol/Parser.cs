@@ -2776,7 +2776,7 @@ public static class Parser
                     else
                     {
                         // Skip through the next ';' or '}'
-                        while ((enumerator.Current.Type != TokenType.SemiColon || enumerator.Current.Type != TokenType.CloseBrace) && enumerator.MoveNext());
+                        while (enumerator.Current.Type != TokenType.SemiColon && enumerator.Current.Type != TokenType.CloseBrace && enumerator.MoveNext());
 
                         if (enumerator.Current.Type == TokenType.CloseBrace)
                         {
@@ -2801,7 +2801,7 @@ public static class Parser
                     else
                     {
                         // Skip through the next ';' or '}'
-                        while ((enumerator.Current.Type != TokenType.SemiColon || enumerator.Current.Type != TokenType.CloseBrace) && enumerator.MoveNext());
+                        while (enumerator.Current.Type != TokenType.SemiColon && enumerator.Current.Type != TokenType.CloseBrace && enumerator.MoveNext());
 
                         if (enumerator.Current.Type == TokenType.CloseBrace)
                         {
@@ -2814,7 +2814,7 @@ public static class Parser
                     if (instruction == null)
                     {
                         // Skip through the next ';' or '}'
-                        while ((enumerator.Current.Type != TokenType.SemiColon || enumerator.Current.Type != TokenType.CloseBrace) && enumerator.MoveNext());
+                        while (enumerator.Current.Type != TokenType.SemiColon && enumerator.Current.Type != TokenType.CloseBrace && enumerator.MoveNext());
 
                         if (enumerator.Current.Type == TokenType.CloseBrace)
                         {
@@ -2829,7 +2829,7 @@ public static class Parser
                         }
                         else if (parsingOutRegisters)
                         {
-                            ErrorReporter.Report("Expected body instructions before out vales", instruction);
+                            ErrorReporter.Report("Expected body instructions before out values", instruction);
                         }
                         assembly.Instructions.Add(instruction);
                     }
@@ -2983,10 +2983,20 @@ public static class Parser
             return null;
         }
 
+        instruction.Value1 = CreateAst<AssemblyValueAst>(enumerator.Current);
         switch (enumerator.Current.Type)
         {
             case TokenType.Identifier:
-                instruction.Value1 = enumerator.Current.Value;
+                instruction.Value1 = new() { Register = enumerator.Current.Value };
+                break;
+            case TokenType.Number:
+                instruction.Value1 = new() { Register = enumerator.Current.Value };
+                break;
+            case TokenType.OpenBracket:
+                if (!ParseAssemblyPointer(instruction.Value1, enumerator))
+                {
+                    return null;
+                }
                 break;
             case TokenType.SemiColon:
                 return instruction;
@@ -3018,10 +3028,20 @@ public static class Parser
             return null;
         }
 
+        instruction.Value2 = CreateAst<AssemblyValueAst>(enumerator.Current);
         switch (enumerator.Current.Type)
         {
             case TokenType.Identifier:
-                instruction.Value2 = enumerator.Current.Value;
+                instruction.Value2.Register = enumerator.Current.Value;
+                break;
+            case TokenType.Number:
+                instruction.Value2.Constant = enumerator.Current.Value;
+                break;
+            case TokenType.OpenBracket:
+                if (!ParseAssemblyPointer(instruction.Value2, enumerator))
+                {
+                    return null;
+                }
                 break;
             default:
                 ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.Current);
@@ -3041,6 +3061,25 @@ public static class Parser
         }
 
         return instruction;
+    }
+
+    private static bool ParseAssemblyPointer(AssemblyValueAst value, TokenEnumerator enumerator)
+    {
+        if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Identifier)
+        {
+            ErrorReporter.Report("Expected register after pointer in instruction", enumerator.Current);
+            return false;
+        }
+        value.Pointer = true;
+        value.Register = enumerator.Current.Value;
+
+        if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.CloseBracket)
+        {
+            ErrorReporter.Report("Expected to close pointer to register with ']'", enumerator.Current);
+            return false;
+        }
+
+        return true;
     }
 
     private static OperatorOverloadAst ParseOperatorOverload(TokenEnumerator enumerator)
