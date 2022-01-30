@@ -1568,10 +1568,10 @@ public static unsafe class LLVMBackend
                         // Declare the inputs and write the assembly instructions
                         if (arguments.Length > 0)
                         {
-                            foreach (var (register, instr) in assembly.InRegisters)
+                            foreach (var (register, input) in assembly.InRegisters)
                             {
-                                arguments[i] = GetValue(instr.Value, values, allocations, functionPointer);
-                                argumentTypes[i++] = _types[instr.Value.Type.TypeIndex];
+                                arguments[i] = GetValue(input.Value, values, allocations, functionPointer);
+                                argumentTypes[i++] = _types[input.Value.Type.TypeIndex];
                                 constraintString.AppendFormat("{{{0}}},", register);
                             }
                             constraintString.Remove(constraintString.Length-1, 1);
@@ -1602,10 +1602,10 @@ public static unsafe class LLVMBackend
                             argumentTypes = new LLVMTypeRef[assembly.OutValues.Count];
                             assemblyString = new StringBuilder();
                             constraintString = new StringBuilder();
-                            foreach (var (_, instr) in assembly.OutValues)
+                            foreach (var output in assembly.OutValues)
                             {
-                                var argument = arguments[i] = GetValue(instr.Value, values, allocations, functionPointer);
-                                var type = instr.Value.Type;
+                                var argument = arguments[i] = GetValue(output.Value, values, allocations, functionPointer);
+                                var type = output.Value.Type;
                                 argumentTypes[i] = LLVM.PointerType(_types[type.TypeIndex], 0);
 
                                 switch (type.TypeKind)
@@ -1631,7 +1631,7 @@ public static unsafe class LLVMBackend
                                         assemblyString.Append("movq ");
                                         break;
                                 }
-                                assemblyString.AppendFormat("%{0}, ${1}; ", instr.Value2, i++);
+                                assemblyString.AppendFormat("%{0}, ${1}; ", output.Register, i++);
                                 constraintString.Append("=*m,");
                             }
                             constraintString.Remove(constraintString.Length-1, 1);

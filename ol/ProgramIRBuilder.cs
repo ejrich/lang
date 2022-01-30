@@ -1463,16 +1463,16 @@ public static class ProgramIRBuilder
     private static void EmitInlineAssembly(FunctionIR function, AssemblyAst assembly, IScope scope)
     {
         // Get the values to place in the input registers
-        foreach (var (_, instruction) in assembly.InRegisters)
+        foreach (var (_, input) in assembly.InRegisters)
         {
-            instruction.Value = instruction.GetPointer ? EmitGetVariableReference(instruction.Value1, scope).value :
-                EmitIdentifier(function, instruction.Value2, scope);
+            input.Value = input.GetPointer ? EmitGetReference(function, input.Ast, scope, out _).value :
+                EmitIR(function, input.Ast, scope);
         }
 
         // Get the output values from the registers
-        foreach (var (_, instruction) in assembly.OutValues)
+        foreach (var output in assembly.OutValues)
         {
-            instruction.Value = EmitGetVariableReference(instruction.Value1, scope).value;
+            output.Value = EmitGetReference(function, output.Ast, scope, out _).value;
         }
 
         var asmInstruction = new Instruction {Type = InstructionType.InlineAssembly, Scope = scope, Source = assembly};
@@ -1769,7 +1769,7 @@ public static class ProgramIRBuilder
         return null;
     }
 
-    private static (InstructionValue, IType) EmitGetReference(FunctionIR function, IAst ast, IScope scope, out bool loaded)
+    private static (InstructionValue value, IType type) EmitGetReference(FunctionIR function, IAst ast, IScope scope, out bool loaded)
     {
         loaded = false;
         switch (ast)

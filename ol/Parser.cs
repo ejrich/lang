@@ -2756,99 +2756,95 @@ public static class Parser
         var parsingOutRegisters = false;
         while (enumerator.MoveNext())
         {
-            if (enumerator.Current.Type == TokenType.CloseBrace)
+            var token = enumerator.Current;
+            if (token.Type == TokenType.CloseBrace)
             {
                 closed = true;
                 break;
             }
 
-            var instruction = ParseAssemblyInstruction(enumerator, out var inRegister, out var outRegister);
+            switch (token.Type)
+            {
+                case TokenType.In:
+                    if (ParseInRegister(assembly, enumerator))
+                    {
+                        if (parsingOutRegisters || !parsingInRegisters)
+                        {
+                            ErrorReporter.Report("In instructions should be declared before body instructions", token);
+                        }
+                    }
+                    else
+                    {
+                        // Skip through the next ';' or '}'
+                        while ((enumerator.Current.Type != TokenType.SemiColon || enumerator.Current.Type != TokenType.CloseBrace) && enumerator.MoveNext());
 
-            if (instruction == null)
-            {
-                // Parse through the next ';' or '}'
-                while ((enumerator.Current.Type != TokenType.SemiColon || enumerator.Current.Type != TokenType.SemiColon) && enumerator.MoveNext());
-            }
-            else
-            {
-                if (parsingInRegisters)
-                {
-                    if (inRegister)
-                    {
-                        if (instruction.Value1 == null || instruction.Value2 == null)
+                        if (enumerator.Current.Type == TokenType.CloseBrace)
                         {
-                            ErrorReporter.Report("Expected in instruction to have target register and input value", instruction);
-                        }
-                        else if (!assembly.InRegisters.TryAdd(instruction.Value1, instruction))
-                        {
-                            ErrorReporter.Report($"Duplicate in register '{instruction.Value1}'", instruction);
+                            return assembly;
                         }
                     }
-                    else if (outRegister)
+                    break;
+                case TokenType.Out:
+                    if (ParseOutValue(assembly, enumerator))
                     {
-                        ErrorReporter.Report("Expected instructions before out registers", instruction);
-                        if (instruction.Value1 == null || instruction.Value2 == null)
+                        if (parsingInRegisters)
                         {
-                            ErrorReporter.Report("Expected out instruction to have output value and source register", instruction);
+                            parsingInRegisters = false;
+                            parsingOutRegisters = true;
+                            ErrorReporter.Report("Expected instructions before out registers", token);
                         }
-                        else
+                        else if (!parsingOutRegisters)
                         {
-                            assembly.OutValues.TryAdd(instruction.Value2, instruction);
+                            parsingOutRegisters = true;
                         }
-                        parsingInRegisters = false;
-                        parsingOutRegisters = true;
                     }
                     else
                     {
-                        assembly.Instructions.Add(instruction);
-                        parsingInRegisters = false;
-                    }
-                }
-                else if (parsingOutRegisters)
-                {
-                    if (outRegister)
-                    {
-                        if (instruction.Value1 == null || instruction.Value2 == null)
+                        // Skip through the next ';' or '}'
+                        while ((enumerator.Current.Type != TokenType.SemiColon || enumerator.Current.Type != TokenType.CloseBrace) && enumerator.MoveNext());
+
+                        if (enumerator.Current.Type == TokenType.CloseBrace)
                         {
-                            ErrorReporter.Report("Expected out instruction to have output value and source register", instruction);
-                        }
-                        else if (!assembly.OutValues.TryAdd(instruction.Value1, instruction))
-                        {
-                            ErrorReporter.Report($"Duplicate out value '{instruction.Value1}'", instruction);
+                            return assembly;
                         }
                     }
-                    else if (inRegister)
+                    break;
+                case TokenType.Identifier:
+                    var instruction = ParseAssemblyInstruction(enumerator);
+                    if (instruction == null)
                     {
-                        ErrorReporter.Report("In instructions should be declared before body instructions", instruction);
+                        // Skip through the next ';' or '}'
+                        while ((enumerator.Current.Type != TokenType.SemiColon || enumerator.Current.Type != TokenType.CloseBrace) && enumerator.MoveNext());
+
+                        if (enumerator.Current.Type == TokenType.CloseBrace)
+                        {
+                            return assembly;
+                        }
                     }
                     else
                     {
-                        ErrorReporter.Report("Expected body instructions before out registers", instruction);
-                    }
-                }
-                else
-                {
-                    if (inRegister)
-                    {
-                        ErrorReporter.Report("In instructions should be declared before body instructions", instruction);
-                    }
-                    else if (outRegister)
-                    {
-                        if (instruction.Value1 == null || instruction.Value2 == null)
+                        if (parsingInRegisters)
                         {
-                            ErrorReporter.Report("Expected out instruction to have output value and source register", instruction);
+                            parsingInRegisters = false;
                         }
-                        else if (!assembly.OutValues.TryAdd(instruction.Value1, instruction))
+                        else if (parsingOutRegisters)
                         {
-                            ErrorReporter.Report($"Duplicate out value '{instruction.Value1}'", instruction);
+                            ErrorReporter.Report("Expected body instructions before out vales", instruction);
                         }
-                        parsingOutRegisters = true;
-                    }
-                    else
-                    {
                         assembly.Instructions.Add(instruction);
                     }
-                }
+                    break;
+                default:
+                    ErrorReporter.Report($"Expected instruction in assembly block, but got '{enumerator.Current.Value}'", enumerator.Current);
+
+                    // Skip through the next ';' or '}'
+                    while ((enumerator.Current.Type != TokenType.SemiColon || enumerator.Current.Type != TokenType.CloseBrace) && enumerator.MoveNext());
+
+                    if (enumerator.Current.Type == TokenType.CloseBrace)
+                    {
+                        return assembly;
+                    }
+                    break;
             }
         }
 
@@ -2860,27 +2856,126 @@ public static class Parser
         return assembly;
     }
 
-    private static AssemblyInstructionAst ParseAssemblyInstruction(TokenEnumerator enumerator, out bool inRegister, out bool outRegister)
+    private static bool ParseInRegister(AssemblyAst assembly, TokenEnumerator enumerator)
+    {
+        if (!enumerator.MoveNext())
+        {
+            ErrorReporter.Report("Expected value or semicolon in instruction", enumerator.Last);
+            return false;
+        }
+
+        if (enumerator.Current.Type != TokenType.Identifier)
+        {
+            ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.Current);
+            return false;
+        }
+
+        var register = enumerator.Current.Value;
+        if (assembly.InRegisters.ContainsKey(register))
+        {
+            ErrorReporter.Report($"Duplicate in register '{register}'", enumerator.Current);
+            return false;
+        }
+        var input = CreateAst<AssemblyInputAst>(enumerator.Current);
+        input.Register = register;
+
+        if (!enumerator.MoveNext())
+        {
+            ErrorReporter.Report("Expected comma or semicolon in instruction", enumerator.Last);
+            return false;
+        }
+
+        if (enumerator.Current.Type != TokenType.Comma)
+        {
+            ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.Current);
+            return false;
+        }
+
+        if (!enumerator.MoveNext())
+        {
+            ErrorReporter.Report("Expected value in instruction", enumerator.Last);
+            return false;
+        }
+
+        input.Ast = ParseNextExpressionUnit(enumerator, null, out _);
+
+        if (!enumerator.MoveNext())
+        {
+            ErrorReporter.Report("Expected semicolon in instruction", enumerator.Last);
+            return false;
+        }
+
+        if (enumerator.Current.Type != TokenType.SemiColon)
+        {
+            ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.Current);
+            return false;
+        }
+
+        assembly.InRegisters[register] = input;
+        return true;
+    }
+
+    private static bool ParseOutValue(AssemblyAst assembly, TokenEnumerator enumerator)
+    {
+        if (!enumerator.MoveNext())
+        {
+            ErrorReporter.Report("Expected value or semicolon in instruction", enumerator.Last);
+            return false;
+        }
+
+        var output = CreateAst<AssemblyInputAst>(enumerator.Current);
+
+        output.Ast = ParseNextExpressionUnit(enumerator, null, out _);
+        if (output.Ast == null)
+        {
+            return false;
+        }
+
+        if (!enumerator.MoveNext())
+        {
+            ErrorReporter.Report("Expected comma or semicolon in instruction", enumerator.Last);
+            return false;
+        }
+
+        if (enumerator.Current.Type != TokenType.Comma)
+        {
+            ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.Current);
+            return false;
+        }
+
+        if (!enumerator.MoveNext())
+        {
+            ErrorReporter.Report("Expected value in instruction", enumerator.Last);
+            return false;
+        }
+
+        if (enumerator.Current.Type != TokenType.Identifier)
+        {
+            ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.Current);
+            return false;
+        }
+        output.Register = enumerator.Current.Value;
+
+        if (!enumerator.MoveNext())
+        {
+            ErrorReporter.Report("Expected semicolon in instruction", enumerator.Last);
+            return false;
+        }
+
+        if (enumerator.Current.Type != TokenType.SemiColon)
+        {
+            ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.Current);
+            return false;
+        }
+
+        assembly.OutValues.Add(output);
+        return true;
+    }
+
+    private static AssemblyInstructionAst ParseAssemblyInstruction(TokenEnumerator enumerator)
     {
         var instruction = CreateAst<AssemblyInstructionAst>(enumerator.Current);
-        inRegister = false;
-        outRegister = false;
-
-        switch (enumerator.Current.Type)
-        {
-            case TokenType.In:
-                inRegister = true;
-                break;
-            case TokenType.Out:
-                outRegister = true;
-                break;
-            case TokenType.Identifier:
-                instruction.Instruction = enumerator.Current.Value;
-                break;
-            default:
-                ErrorReporter.Report($"Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.Current);
-                return null;
-        }
+        instruction.Instruction = enumerator.Current.Value;
 
         if (!enumerator.MoveNext())
         {
