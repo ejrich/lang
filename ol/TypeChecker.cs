@@ -3115,19 +3115,19 @@ public static class TypeChecker
     private static void VerifyInlineAssembly(AssemblyAst assembly, IScope scope)
     {
         // Verify the instructions for capturing values
-        foreach (var (register, instruction) in assembly.InRegisters)
+        foreach (var (register, input) in assembly.InRegisters)
         {
             if (!Assembly.Registers.Contains(register))
             {
-                ErrorReporter.Report($"Expected a target register, but got '{register}'", instruction);
+                ErrorReporter.Report($"Expected a target register, but got '{register}'", input);
             }
 
             // TODO Verify the type is compatible with the given register
-            var inputType = GetVariable(instruction.Value2, instruction, scope, out _);
+            var inputType = VerifyExpression(input.Ast, null, scope);
 
             if (inputType is StructAst || inputType is UnionAst)
             {
-                instruction.GetPointer = true;
+                input.GetPointer = true;
             }
         }
 
@@ -3139,30 +3139,30 @@ public static class TypeChecker
                 ErrorReporter.Report($"Unknown instruction '{instruction.Instruction}'", instruction);
             }
 
-            if (!Assembly.Registers.Contains(instruction.Value1))
+            if (instruction.Value1 != null && !Assembly.Registers.Contains(instruction.Value1))
             {
                 ErrorReporter.Report($"Unknown register '{instruction.Value1}'", instruction);
             }
 
-            if (!Assembly.Registers.Contains(instruction.Value2))
+            if (instruction.Value2 != null && !Assembly.Registers.Contains(instruction.Value2))
             {
                 ErrorReporter.Report($"Unknown register '{instruction.Value2}'", instruction);
             }
         }
 
         // Verify the out instructions for getting values from the registers
-        foreach (var (value, instruction) in assembly.OutValues)
+        foreach (var output in assembly.OutValues)
         {
             // TODO Verify the type is compatible with the given register
-            var outputType = GetVariable(value, instruction, scope, out var constant);
-            if (constant)
+            var outputType = GetReference(output.Ast, null, scope, out var hasPointer);
+            if (!hasPointer)
             {
-                ErrorReporter.Report($"Cannot reassign value of constant variable '{value}'", instruction);
+                ErrorReporter.Report("Cannot dereference pointer to assign value", output.Ast);
             }
 
-            if (!Assembly.Registers.Contains(instruction.Value2))
+            if (!Assembly.Registers.Contains(output.Register))
             {
-                ErrorReporter.Report($"Expected a source register, but got '{instruction.Value2}'", instruction);
+                ErrorReporter.Report($"Expected a source register, but got '{output.Register}'", output);
             }
         }
     }
