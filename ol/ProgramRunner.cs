@@ -549,46 +549,52 @@ public static unsafe class ProgramRunner
                     var assemblyCode = new List<byte>(estimatedBytes);
 
                     // Declare the inputs and write the assembly instructions
-                    foreach (var (_, input) in assembly.InRegisters)
+                    foreach (var (register, input) in assembly.InRegisters)
                     {
                         var value = GetValue(input.Value, registers, stackPointer, function, arguments);
                     }
 
-                    foreach (var instr in assembly.Instructions)
+                    if (assembly.AssemblyBytes == null)
                     {
-                        // assemblyString.Append(instr.Instruction);
-                        if (instr.Value1 != null)
+                        var bodyAssembly = new List<byte>(assembly.Instructions.Count * 3);
+                        foreach (var instr in assembly.Instructions)
                         {
-                            if (instr.Value1.Pointer)
+                            // assemblyString.Append(instr.Instruction);
+                            if (instr.Value1 != null)
                             {
-                                // assemblyString.AppendFormat(" qword ptr [{0}]", instr.Value1.Register);
+                                if (instr.Value1.Pointer)
+                                {
+                                    // assemblyString.AppendFormat(" qword ptr [{0}]", instr.Value1.Register);
+                                }
+                                else if (instr.Value1.Register != null)
+                                {
+                                    // assemblyString.AppendFormat(" {0}", instr.Value1.Register);
+                                }
+                                else
+                                {
+                                    // assemblyString.AppendFormat(" {0}", instr.Value1.Constant);
+                                }
                             }
-                            else if (instr.Value1.Register != null)
+                            if (instr.Value2 != null)
                             {
-                                // assemblyString.AppendFormat(" {0}", instr.Value1.Register);
+                                if (instr.Value2.Pointer)
+                                {
+                                    // assemblyString.AppendFormat(", qword ptr [{0}]", instr.Value2.Register);
+                                }
+                                else if (instr.Value2.Register != null)
+                                {
+                                    // assemblyString.AppendFormat(", {0}", instr.Value2.Register);
+                                }
+                                else
+                                {
+                                    // assemblyString.AppendFormat(", {0}", instr.Value2.Constant);
+                                }
                             }
-                            else
-                            {
-                                // assemblyString.AppendFormat(" {0}", instr.Value1.Constant);
-                            }
+                            // assemblyString.Append("; ");
                         }
-                        if (instr.Value2 != null)
-                        {
-                            if (instr.Value2.Pointer)
-                            {
-                                // assemblyString.AppendFormat(", qword ptr [{0}]", instr.Value2.Register);
-                            }
-                            else if (instr.Value2.Register != null)
-                            {
-                                // assemblyString.AppendFormat(", {0}", instr.Value2.Register);
-                            }
-                            else
-                            {
-                                // assemblyString.AppendFormat(", {0}", instr.Value2.Constant);
-                            }
-                        }
-                        // assemblyString.Append("; ");
+                        assembly.AssemblyBytes = bodyAssembly.ToArray();
                     }
+                    assemblyCode.AddRange(assembly.AssemblyBytes);
 
                     // Capture the output registers if necessary
                     foreach (var output in assembly.OutValues)
