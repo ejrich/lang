@@ -4,6 +4,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace ol;
 
@@ -39,6 +40,9 @@ public static unsafe class ProgramRunner
 
     private static uint _globalVariablesSize;
     private static IntPtr[] _globals;
+
+    private static int _assemblyDataLength;
+    private static IntPtr _assemblyDataPointer;
 
     static ProgramRunner()
     {
@@ -539,6 +543,102 @@ public static unsafe class ProgramRunner
                 case InstructionType.InlineAssembly:
                 {
                     // TODO Implement me
+                    var assembly = (AssemblyAst)instruction.Source;
+
+                    var estimatedBytes = assembly.InRegisters.Count * 5 + assembly.Instructions.Count * 3 + assembly.OutValues.Count * 5;
+                    var assemblyCode = new List<byte>(estimatedBytes);
+
+                    // Declare the inputs and write the assembly instructions
+                    foreach (var (_, input) in assembly.InRegisters)
+                    {
+                        var value = GetValue(input.Value, registers, stackPointer, function, arguments);
+                    }
+
+                    foreach (var instr in assembly.Instructions)
+                    {
+                        // assemblyString.Append(instr.Instruction);
+                        if (instr.Value1 != null)
+                        {
+                            if (instr.Value1.Pointer)
+                            {
+                                // assemblyString.AppendFormat(" qword ptr [{0}]", instr.Value1.Register);
+                            }
+                            else if (instr.Value1.Register != null)
+                            {
+                                // assemblyString.AppendFormat(" {0}", instr.Value1.Register);
+                            }
+                            else
+                            {
+                                // assemblyString.AppendFormat(" {0}", instr.Value1.Constant);
+                            }
+                        }
+                        if (instr.Value2 != null)
+                        {
+                            if (instr.Value2.Pointer)
+                            {
+                                // assemblyString.AppendFormat(", qword ptr [{0}]", instr.Value2.Register);
+                            }
+                            else if (instr.Value2.Register != null)
+                            {
+                                // assemblyString.AppendFormat(", {0}", instr.Value2.Register);
+                            }
+                            else
+                            {
+                                // assemblyString.AppendFormat(", {0}", instr.Value2.Constant);
+                            }
+                        }
+                        // assemblyString.Append("; ");
+                    }
+
+                    // Capture the output registers if necessary
+                    foreach (var output in assembly.OutValues)
+                    {
+                        var value = GetValue(output.Value, registers, stackPointer, function, arguments);
+
+                        switch (output.Value.Type.TypeKind)
+                        {
+                            case TypeKind.Void:
+                            case TypeKind.Boolean:
+                            case TypeKind.Integer:
+                            case TypeKind.Enum:
+                            case TypeKind.Type:
+                                // assemblyString.Append("mov ");
+                                break;
+                            case TypeKind.Float:
+                                if (output.Value.Type.Size == 4)
+                                {
+                                    // assemblyString.Append("movss ");
+                                }
+                                else
+                                {
+                                    // assemblyString.Append("movsd ");
+                                }
+                                break;
+                            default:
+                                // assemblyString.Append("movq ");
+                                break;
+                        }
+                    }
+
+                    // Add ret instruction
+                    assemblyCode.Add(0xC3);
+
+                    var assemblyBytes = assemblyCode.ToArray();
+
+                    if (assemblyBytes.Length > _assemblyDataLength)
+                    {
+                        if (_assemblyDataPointer != IntPtr.Zero)
+                        {
+                            munmap(_assemblyDataPointer, _assemblyDataLength);
+                        }
+                        _assemblyDataPointer = mmap(IntPtr.Zero, assemblyBytes.Length, 0x7, 0x4022, 0, 0);
+                        _assemblyDataLength = assemblyBytes.Length;
+                    }
+
+                    Marshal.Copy(assemblyBytes, 0, _assemblyDataPointer, assemblyBytes.Length);
+
+                    var inlineAssembly = Marshal.GetDelegateForFunctionPointer<InlineAssembly>(_assemblyDataPointer);
+                    inlineAssembly();
                     break;
                 }
                 case InstructionType.IntegerExtend:
@@ -1441,6 +1541,14 @@ public static unsafe class ProgramRunner
 
     [DllImport(Libc)]
     private static extern long syscall(long number, long a, long b, long c, long d, long e, long f);
+
+    [DllImport(Libc)]
+    private static extern IntPtr mmap(IntPtr addr, long length, int prot, int flags, int fd, long offset);
+
+    [DllImport(Libc)]
+    private static extern int munmap(IntPtr addr, long length);
+
+    private delegate void InlineAssembly();
 
     private static Register ConvertToRegister(object value)
     {
