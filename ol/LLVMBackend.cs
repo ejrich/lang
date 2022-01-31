@@ -1592,7 +1592,7 @@ public static unsafe class LLVMBackend
                                 }
                                 else
                                 {
-                                    assemblyString.AppendFormat(" {0}", instr.Value1.Constant);
+                                    assemblyString.AppendFormat(" {0:x}", instr.Value1.Constant.Value.UnsignedInteger);
                                 }
                             }
                             if (instr.Value2 != null)
@@ -1607,10 +1607,10 @@ public static unsafe class LLVMBackend
                                 }
                                 else
                                 {
-                                    assemblyString.AppendFormat(", {0}", instr.Value2.Constant);
+                                    assemblyString.AppendFormat(", {0:x}", instr.Value2.Constant.Value.UnsignedInteger);
                                 }
                             }
-                            assemblyString.Append("; ");
+                            assemblyString.Append(";\n");
                         }
 
                         var assemblyBodyType = LLVMTypeRef.CreateFunction(LLVM.VoidType(), argumentTypes);
