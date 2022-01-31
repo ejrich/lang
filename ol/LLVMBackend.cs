@@ -1619,13 +1619,13 @@ public static unsafe class LLVMBackend
                         // Capture the output registers if necessary
                         if (assembly.OutValues.Count > 0)
                         {
-                            i = 0;
                             arguments = new LLVMValueRef[assembly.OutValues.Count];
                             argumentTypes = new LLVMTypeRef[assembly.OutValues.Count];
                             assemblyString = new StringBuilder();
                             constraintString = new StringBuilder();
-                            foreach (var output in assembly.OutValues)
+                            for (i = 0; i < assembly.OutValues.Count; i++)
                             {
+                                var output = assembly.OutValues[i];
                                 var argument = arguments[i] = GetValue(output.Value, values, allocations, functionPointer);
                                 var type = output.Value.Type;
                                 argumentTypes[i] = LLVM.PointerType(_types[type.TypeIndex], 0);
@@ -1653,7 +1653,7 @@ public static unsafe class LLVMBackend
                                         assemblyString.Append("movq ");
                                         break;
                                 }
-                                assemblyString.AppendFormat("%{0}, ${1}; ", output.Register, i++);
+                                assemblyString.AppendFormat("%{0}, ${1}; ", output.Register, i);
                                 constraintString.Append("=*m,");
                             }
                             constraintString.Remove(constraintString.Length-1, 1);
