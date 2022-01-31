@@ -2987,10 +2987,10 @@ public static class Parser
         switch (enumerator.Current.Type)
         {
             case TokenType.Identifier:
-                instruction.Value1 = new() { Register = enumerator.Current.Value };
+                instruction.Value1.Register = enumerator.Current.Value;
                 break;
             case TokenType.Number:
-                instruction.Value1 = new() { Register = enumerator.Current.Value };
+                instruction.Value1.Constant = ParseConstant(enumerator.Current);
                 break;
             case TokenType.OpenBracket:
                 if (!ParseAssemblyPointer(instruction.Value1, enumerator))
@@ -3035,7 +3035,7 @@ public static class Parser
                 instruction.Value2.Register = enumerator.Current.Value;
                 break;
             case TokenType.Number:
-                instruction.Value2.Constant = enumerator.Current.Value;
+                instruction.Value2.Constant = ParseConstant(enumerator.Current);
                 break;
             case TokenType.OpenBracket:
                 if (!ParseAssemblyPointer(instruction.Value2, enumerator))

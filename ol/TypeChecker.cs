@@ -3139,14 +3139,28 @@ public static class TypeChecker
                 ErrorReporter.Report($"Unknown instruction '{instruction.Instruction}'", instruction);
             }
 
-            if (instruction.Value1?.Register != null && !Assembly.Registers.Contains(instruction.Value1.Register))
+            if (instruction.Value1 != null)
             {
-                ErrorReporter.Report($"Unknown register '{instruction.Value1.Register}'", instruction.Value1);
+                if (instruction.Value1.Register != null && !Assembly.Registers.Contains(instruction.Value1.Register))
+                {
+                    ErrorReporter.Report($"Unknown register '{instruction.Value1.Register}'", instruction.Value1);
+                }
+                else if (instruction.Value1.Constant != null)
+                {
+                    instruction.Value1.Constant.Type = GlobalScope.Types[instruction.Value1.Constant.TypeName];
+                }
             }
 
-            if (instruction.Value2?.Register != null && !Assembly.Registers.Contains(instruction.Value2.Register))
+            if (instruction.Value2 != null)
             {
-                ErrorReporter.Report($"Unknown register '{instruction.Value2.Register}'", instruction.Value2);
+                if (instruction.Value2.Register != null && !Assembly.Registers.Contains(instruction.Value2.Register))
+                {
+                    ErrorReporter.Report($"Unknown register '{instruction.Value2.Register}'", instruction.Value2);
+                }
+                else if (instruction.Value2.Constant != null)
+                {
+                    instruction.Value2.Constant.Type = GlobalScope.Types[instruction.Value2.Constant.TypeName];
+                }
             }
         }
 

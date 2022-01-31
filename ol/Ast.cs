@@ -639,7 +639,7 @@ public class AssemblyValueAst : IAst
     public uint Column { get; init; }
     public bool Pointer { get; set; }
     public string Register { get; set; }
-    public string Constant { get; set; }
+    public ConstantAst Constant { get; set; }
 }
 
 public class TypeDefinition : IAst
