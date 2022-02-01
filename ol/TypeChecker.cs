@@ -3117,7 +3117,7 @@ public static class TypeChecker
         // Verify the instructions for capturing values
         foreach (var (register, input) in assembly.InRegisters)
         {
-            if (!Assembly.Registers.Contains(register))
+            if (!Assembly.Registers.ContainsKey(register))
             {
                 ErrorReporter.Report($"Expected a target register, but got '{register}'", input);
             }
@@ -3134,14 +3134,14 @@ public static class TypeChecker
         // Verify the instructions for capturing values
         foreach (var instruction in assembly.Instructions)
         {
-            if (!Assembly.Instructions.Contains(instruction.Instruction))
+            if (!Assembly.Instructions.TryGetValue(instruction.Instruction, out var definitions))
             {
                 ErrorReporter.Report($"Unknown instruction '{instruction.Instruction}'", instruction);
             }
 
             if (instruction.Value1 != null)
             {
-                if (instruction.Value1.Register != null && !Assembly.Registers.Contains(instruction.Value1.Register))
+                if (instruction.Value1.Register != null && !Assembly.Registers.ContainsKey(instruction.Value1.Register))
                 {
                     ErrorReporter.Report($"Unknown register '{instruction.Value1.Register}'", instruction.Value1);
                 }
@@ -3153,7 +3153,7 @@ public static class TypeChecker
 
             if (instruction.Value2 != null)
             {
-                if (instruction.Value2.Register != null && !Assembly.Registers.Contains(instruction.Value2.Register))
+                if (instruction.Value2.Register != null && !Assembly.Registers.ContainsKey(instruction.Value2.Register))
                 {
                     ErrorReporter.Report($"Unknown register '{instruction.Value2.Register}'", instruction.Value2);
                 }
@@ -3174,7 +3174,7 @@ public static class TypeChecker
                 ErrorReporter.Report("Cannot dereference pointer to assign value", output.Ast);
             }
 
-            if (!Assembly.Registers.Contains(output.Register))
+            if (!Assembly.Registers.ContainsKey(output.Register))
             {
                 ErrorReporter.Report($"Expected a source register, but got '{output.Register}'", output);
             }
