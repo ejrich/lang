@@ -1582,7 +1582,7 @@ public static unsafe class LLVMBackend
                             assemblyString.Append(instr.Instruction);
                             if (instr.Value1 != null)
                             {
-                                if (instr.Value1.Pointer)
+                                if (instr.Value1.Dereference)
                                 {
                                     assemblyString.AppendFormat(" qword ptr [{0}]", instr.Value1.Register);
                                 }
@@ -1597,7 +1597,7 @@ public static unsafe class LLVMBackend
                             }
                             if (instr.Value2 != null)
                             {
-                                if (instr.Value2.Pointer)
+                                if (instr.Value2.Dereference)
                                 {
                                     assemblyString.AppendFormat(", qword ptr [{0}]", instr.Value2.Register);
                                 }

@@ -545,7 +545,7 @@ public static unsafe class ProgramRunner
                     // TODO Implement me
                     var assembly = (AssemblyAst)instruction.Source;
 
-                    var estimatedBytes = assembly.InRegisters.Count * 5 + assembly.Instructions.Count * 3 + assembly.OutValues.Count * 5;
+                    var estimatedBytes = assembly.InRegisters.Count * 10 + assembly.Instructions.Count * 3 + assembly.OutValues.Count * 10;
                     var assemblyCode = new List<byte>(estimatedBytes);
 
                     // Declare the inputs and write the assembly instructions
@@ -562,7 +562,7 @@ public static unsafe class ProgramRunner
                             // assemblyString.Append(instr.Instruction);
                             if (instr.Value1 != null)
                             {
-                                if (instr.Value1.Pointer)
+                                if (instr.Value1.Dereference)
                                 {
                                     // assemblyString.AppendFormat(" qword ptr [{0}]", instr.Value1.Register);
                                 }
@@ -577,7 +577,7 @@ public static unsafe class ProgramRunner
                             }
                             if (instr.Value2 != null)
                             {
-                                if (instr.Value2.Pointer)
+                                if (instr.Value2.Dereference)
                                 {
                                     // assemblyString.AppendFormat(", qword ptr [{0}]", instr.Value2.Register);
                                 }
