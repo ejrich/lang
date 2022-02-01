@@ -637,7 +637,7 @@ public class AssemblyValueAst : IAst
     public int FileIndex { get; set; }
     public uint Line { get; init; }
     public uint Column { get; init; }
-    public bool Pointer { get; set; }
+    public bool Dereference { get; set; }
     public string Register { get; set; }
     public ConstantAst Constant { get; set; }
 }

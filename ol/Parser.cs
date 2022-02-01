@@ -2983,16 +2983,18 @@ public static class Parser
             return null;
         }
 
-        instruction.Value1 = CreateAst<AssemblyValueAst>(enumerator.Current);
         switch (enumerator.Current.Type)
         {
             case TokenType.Identifier:
+                instruction.Value1 = CreateAst<AssemblyValueAst>(enumerator.Current);
                 instruction.Value1.Register = enumerator.Current.Value;
                 break;
             case TokenType.Number:
+                instruction.Value1 = CreateAst<AssemblyValueAst>(enumerator.Current);
                 instruction.Value1.Constant = ParseConstant(enumerator.Current);
                 break;
             case TokenType.OpenBracket:
+                instruction.Value1 = CreateAst<AssemblyValueAst>(enumerator.Current);
                 if (!ParseAssemblyPointer(instruction.Value1, enumerator))
                 {
                     return null;
@@ -3070,7 +3072,7 @@ public static class Parser
             ErrorReporter.Report("Expected register after pointer in instruction", enumerator.Current);
             return false;
         }
-        value.Pointer = true;
+        value.Dereference = true;
         value.Register = enumerator.Current.Value;
 
         if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.CloseBracket)
