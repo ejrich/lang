@@ -617,6 +617,7 @@ public class AssemblyInputAst : IAst
     public uint Line { get; init; }
     public uint Column { get; init; }
     public string Register { get; set; }
+    public RegisterDefinition RegisterDefinition { get; set; }
     public IAst Ast { get; set; }
     public bool GetPointer { get; set; }
     public InstructionValue Value { get; set; }
@@ -640,6 +641,7 @@ public class AssemblyValueAst : IAst
     public uint Column { get; init; }
     public bool Dereference { get; set; }
     public string Register { get; set; }
+    public RegisterDefinition RegisterDefinition { get; set; }
     public ConstantAst Constant { get; set; }
 }
 
