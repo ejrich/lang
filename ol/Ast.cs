@@ -630,6 +630,7 @@ public class AssemblyInstructionAst : IAst
     public string Instruction { get; set; }
     public AssemblyValueAst Value1 { get; set; }
     public AssemblyValueAst Value2 { get; set; }
+    public InstructionDefinition Definition { get; set; }
 }
 
 public class AssemblyValueAst : IAst

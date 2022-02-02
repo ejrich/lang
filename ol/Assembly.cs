@@ -84,12 +84,19 @@ public enum RegisterType : byte
     AVX
 }
 
+public class RegisterDefinition
+{
+    public RegisterType Type;
+    public byte Offset;
+}
+
 public struct InstructionDefinition
 {
     public byte Prefix;
     public bool OF;
     public byte Opcode;
     public byte Opcode2;
+    public byte Extension;
     public InstructionArgument Value1;
     public InstructionArgument Value2;
 }
