@@ -552,102 +552,15 @@ public static unsafe class ProgramRunner
                     foreach (var (register, input) in assembly.InRegisters)
                     {
                         var value = GetValue(input.Value, registers, stackPointer, function, arguments);
+                        WriteAssemblyInstruction(mov, input.RegisterDefinition, null, assemblyCode, null, value.ULong);
                     }
 
                     if (assembly.AssemblyBytes == null)
                     {
                         var bodyAssembly = new List<byte>(assembly.Instructions.Count * 3);
-                        var i = 0;
                         foreach (var instr in assembly.Instructions)
                         {
-                            var definition = instr.Definition;
-                            // Handle instructions with prefixes
-                            if (definition.Prefix != 0)
-                            {
-                                bodyAssembly.Add(instr.Definition.Prefix);
-                            }
-
-                            // Handle rex addressing
-                            var rex = definition.Rex;
-                            if (instr.Value1?.RegisterDefinition != null)
-                            {
-                                rex |= instr.Value1.RegisterDefinition.Rex;
-                            }
-                            if (instr.Value2?.RegisterDefinition != null)
-                            {
-                                rex |= instr.Value2.RegisterDefinition.Rex;
-                            }
-                            if (rex != 0)
-                            {
-                                bodyAssembly.Add(rex);
-                            }
-
-                            // Write 0x0F if the instruction requires
-                            if (definition.OF)
-                            {
-                                bodyAssembly.Add(0x0F);
-                            }
-
-                            // Determine the opcode(s)
-                            var opcode = definition.Opcode;
-                            if (definition.AddRegisterToOpcode)
-                            {
-                                opcode |= instr.Value1.RegisterDefinition.Offset;
-                            }
-                            bodyAssembly.Add(opcode);
-                            if (definition.Opcode2 != 0)
-                            {
-                                bodyAssembly.Add(definition.Opcode2);
-                            }
-
-                            // Write the ModR/M byte
-                            if (!definition.AddRegisterToOpcode)
-                            {
-                                var modrm = definition.Mod;
-
-                                if (definition.HasExtension)
-                                {
-                                    modrm |= definition.Extension;
-                                    modrm |= instr.Value1.RegisterDefinition.Offset;
-                                    bodyAssembly.Add(modrm);
-                                }
-                                else if (instr.Value1 != null && instr.Value2 != null)
-                                {
-                                    modrm |= (byte)(instr.Value1.RegisterDefinition.Offset << 3);
-                                    modrm |= instr.Value2.RegisterDefinition.Offset; // TODO Check this will not fail
-                                    bodyAssembly.Add(modrm);
-                                }
-                            }
-
-                            // Write constants if necessary
-                            if (instr.Value1?.Constant != null)
-                            {
-                                var value = instr.Value1.Constant.Value.UnsignedInteger;
-                                for (var x = 0; x < 8; x++)
-                                {
-                                    var b = value & 0xFF;
-                                    bodyAssembly.Add((byte)b);
-                                    value >>= 8;
-                                }
-                            }
-                            else if (instr.Value2?.Constant != null)
-                            {
-                                var value = instr.Value2.Constant.Value.UnsignedInteger;
-                                for (var x = 0; x < 8; x++)
-                                {
-                                    var b = value & 0xFF;
-                                    bodyAssembly.Add((byte)b);
-                                    value >>= 8;
-                                }
-                            }
-
-                            #if false
-                            for (; i < bodyAssembly.Count; i++)
-                            {
-                                Console.Write($"{bodyAssembly[i]:x} ");
-                            }
-                            Console.Write("\n");
-                            #endif
+                            WriteAssemblyInstruction(instr.Definition, instr.Value1?.RegisterDefinition, instr.Value2?.RegisterDefinition, bodyAssembly, instr.Value1?.Constant?.Value.UnsignedInteger, instr.Value2?.Constant?.Value.UnsignedInteger);
                         }
                         assembly.AssemblyBytes = bodyAssembly.ToArray();
                     }
@@ -1597,6 +1510,97 @@ public static unsafe class ProgramRunner
             }
 
             return ExecuteFunction(callingFunction, args);
+        }
+    }
+
+    private static void WriteAssemblyInstruction(InstructionDefinition definition, RegisterDefinition register1, RegisterDefinition register2, List<byte> code, ulong? value1, ulong? value2)
+    {
+        var codeIndex = code.Count;
+
+        // Handle instructions with prefixes
+        if (definition.Prefix != 0)
+        {
+            code.Add(definition.Prefix);
+        }
+
+        // Handle rex addressing
+        var rex = definition.Rex;
+        if (register1 != null)
+        {
+            rex |= register1.Rex;
+        }
+        if (register2 != null)
+        {
+            rex |= register2.Rex;
+        }
+        if (rex != 0)
+        {
+            code.Add(rex);
+        }
+
+        // Write 0x0F if the instruction requires
+        if (definition.OF)
+        {
+            code.Add(0x0F);
+        }
+
+        // Determine the opcode(s)
+        var opcode = definition.Opcode;
+        if (definition.AddRegisterToOpcode)
+        {
+            opcode |= register1.Offset;
+        }
+        code.Add(opcode);
+        if (definition.Opcode2 != 0)
+        {
+            code.Add(definition.Opcode2);
+        }
+
+        // Write the ModR/M byte
+        if (!definition.AddRegisterToOpcode)
+        {
+            var modrm = definition.Mod;
+
+            if (definition.HasExtension)
+            {
+                modrm |= definition.Extension;
+                modrm |= register1.Offset;
+                code.Add(modrm);
+            }
+            else if (register1 != null && register2 != null)
+            {
+                modrm |= (byte)(register1.Offset << 3);
+                modrm |= register2.Offset;
+                code.Add(modrm);
+            }
+        }
+
+        // Write constants if necessary
+        if (value1.HasValue)
+        {
+            WriteConstant(code, value1.Value);
+        }
+        else if (value2.HasValue)
+        {
+            WriteConstant(code, value2.Value);
+        }
+
+        // #if false
+        for (; codeIndex < code.Count; codeIndex++)
+        {
+            Console.Write($"{code[codeIndex]:x} ");
+        }
+        Console.Write("\n");
+        // #endif
+    }
+
+    private static void WriteConstant(List<byte> code, ulong value)
+    {
+        for (var x = 0; x < 8; x++)
+        {
+            var b = value & 0xFF;
+            code.Add((byte)b);
+            value >>= 8;
         }
     }
 
