@@ -3254,6 +3254,10 @@ public static class TypeChecker
         {
             return value.Constant != null;
         }
+        else if (value.Constant != null)
+        {
+            return false;
+        }
 
         return value.Dereference == arg.Memory && value.RegisterDefinition.Type == arg.Type;
     }
