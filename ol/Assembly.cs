@@ -64,14 +64,16 @@ public static class Assembly
         {"ymm15", new(RegisterType.AVX, 7, 0x44)}
     };
 
-    public static readonly Dictionary<string, InstructionDefinition[]> Instructions = new() {
+    public static readonly Dictionary<string, InstructionDefinition[]> Instructions = new()
+    {
         {"fcos",   new InstructionDefinition[]{ new() {Opcode = 0xD9, Opcode2 = 0xFF} }},
         {"fld",    new InstructionDefinition[]{ new() {Opcode = 0xDD, HasExtension = true, Value1 = new(true)} }},
         {"fptan",  new InstructionDefinition[]{ new() {Opcode = 0xD9, Opcode2 = 0xF2} }},
         {"fsin",   new InstructionDefinition[]{ new() {Opcode = 0xD9, Opcode2 = 0xFE} }},
         {"fst",    new InstructionDefinition[]{ new() {Opcode = 0xDD, HasExtension = true, Extension = 0x10, Value1 = new(true)} }},
         {"fstp",   new InstructionDefinition[]{ new() {Opcode = 0xDD, HasExtension = true, Extension = 0x18, Value1 = new(true)} }},
-        {"sqrtsd", new InstructionDefinition[]{ new() {Prefix = 0xF2, OF = true, Opcode = 0x51, Value1 = new(type: RegisterType.SSE), Value2 = new(type: RegisterType.SSE)} }},
+        {"mov",    new InstructionDefinition[]{ new() {Rex = 0x48, Opcode = 0xB8, AddRegisterToOpcode = true, Value1 = new(), Value2 = new(constant: true)} }},
+        {"sqrtsd", new InstructionDefinition[]{ new() {Prefix = 0xF2, OF = true, Opcode = 0x51, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new(type: RegisterType.SSE)} }},
         // TODO Add more
     };
 }
@@ -101,11 +103,14 @@ public class RegisterDefinition
 public class InstructionDefinition
 {
     public byte Prefix;
+    public byte Rex;
     public bool OF;
     public byte Opcode;
+    public bool AddRegisterToOpcode;
     public byte Opcode2;
     public bool HasExtension;
     public byte Extension;
+    public byte Mod;
     public InstructionArgument Value1;
     public InstructionArgument Value2;
 }
@@ -115,6 +120,7 @@ public class InstructionArgument
     public InstructionArgument(bool memory = false, bool constant = false, RegisterType type = RegisterType.General)
     {
         Memory = memory;
+        Constant = constant;
         Type = type;
     }
 

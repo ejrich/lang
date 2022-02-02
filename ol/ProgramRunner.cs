@@ -546,6 +546,7 @@ public static unsafe class ProgramRunner
 
                     var estimatedBytes = assembly.InRegisters.Count * 10 + assembly.Instructions.Count * 3 + assembly.OutValues.Count * 10;
                     var assemblyCode = new List<byte>(estimatedBytes);
+                    var mov = Assembly.Instructions["mov"][0];
 
                     // Declare the inputs and write the assembly instructions
                     foreach (var (register, input) in assembly.InRegisters)
@@ -556,40 +557,97 @@ public static unsafe class ProgramRunner
                     if (assembly.AssemblyBytes == null)
                     {
                         var bodyAssembly = new List<byte>(assembly.Instructions.Count * 3);
+                        var i = 0;
                         foreach (var instr in assembly.Instructions)
                         {
-                            // assemblyString.Append(instr.Instruction);
-                            if (instr.Value1 != null)
+                            var definition = instr.Definition;
+                            // Handle instructions with prefixes
+                            if (definition.Prefix != 0)
                             {
-                                if (instr.Value1.Dereference)
+                                bodyAssembly.Add(instr.Definition.Prefix);
+                            }
+
+                            // Handle rex addressing
+                            var rex = definition.Rex;
+                            if (instr.Value1?.RegisterDefinition != null)
+                            {
+                                rex |= instr.Value1.RegisterDefinition.Rex;
+                            }
+                            if (instr.Value2?.RegisterDefinition != null)
+                            {
+                                rex |= instr.Value2.RegisterDefinition.Rex;
+                            }
+                            if (rex != 0)
+                            {
+                                bodyAssembly.Add(rex);
+                            }
+
+                            // Write 0x0F if the instruction requires
+                            if (definition.OF)
+                            {
+                                bodyAssembly.Add(0x0F);
+                            }
+
+                            // Determine the opcode(s)
+                            var opcode = definition.Opcode;
+                            if (definition.AddRegisterToOpcode)
+                            {
+                                opcode |= instr.Value1.RegisterDefinition.Offset;
+                            }
+                            bodyAssembly.Add(opcode);
+                            if (definition.Opcode2 != 0)
+                            {
+                                bodyAssembly.Add(definition.Opcode2);
+                            }
+
+                            // Write the ModR/M byte
+                            if (!definition.AddRegisterToOpcode)
+                            {
+                                var modrm = definition.Mod;
+
+                                if (definition.HasExtension)
                                 {
-                                    // assemblyString.AppendFormat(" qword ptr [{0}]", instr.Value1.Register);
+                                    modrm |= definition.Extension;
+                                    modrm |= instr.Value1.RegisterDefinition.Offset;
+                                    bodyAssembly.Add(modrm);
                                 }
-                                else if (instr.Value1.Register != null)
+                                else if (instr.Value1 != null && instr.Value2 != null)
                                 {
-                                    // assemblyString.AppendFormat(" {0}", instr.Value1.Register);
-                                }
-                                else
-                                {
-                                    // assemblyString.AppendFormat(" {0}", instr.Value1.Constant);
+                                    modrm |= (byte)(instr.Value1.RegisterDefinition.Offset << 3);
+                                    modrm |= instr.Value2.RegisterDefinition.Offset; // TODO Check this will not fail
+                                    bodyAssembly.Add(modrm);
                                 }
                             }
-                            if (instr.Value2 != null)
+
+                            // Write constants if necessary
+                            if (instr.Value1?.Constant != null)
                             {
-                                if (instr.Value2.Dereference)
+                                var value = instr.Value1.Constant.Value.UnsignedInteger;
+                                for (var x = 0; x < 8; x++)
                                 {
-                                    // assemblyString.AppendFormat(", qword ptr [{0}]", instr.Value2.Register);
-                                }
-                                else if (instr.Value2.Register != null)
-                                {
-                                    // assemblyString.AppendFormat(", {0}", instr.Value2.Register);
-                                }
-                                else
-                                {
-                                    // assemblyString.AppendFormat(", {0}", instr.Value2.Constant);
+                                    var b = value & 0xFF;
+                                    bodyAssembly.Add((byte)b);
+                                    value >>= 8;
                                 }
                             }
-                            // assemblyString.Append("; ");
+                            else if (instr.Value2?.Constant != null)
+                            {
+                                var value = instr.Value2.Constant.Value.UnsignedInteger;
+                                for (var x = 0; x < 8; x++)
+                                {
+                                    var b = value & 0xFF;
+                                    bodyAssembly.Add((byte)b);
+                                    value >>= 8;
+                                }
+                            }
+
+                            #if false
+                            for (; i < bodyAssembly.Count; i++)
+                            {
+                                Console.Write($"{bodyAssembly[i]:x} ");
+                            }
+                            Console.Write("\n");
+                            #endif
                         }
                         assembly.AssemblyBytes = bodyAssembly.ToArray();
                     }
