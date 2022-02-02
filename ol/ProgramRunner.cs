@@ -549,7 +549,7 @@ public static unsafe class ProgramRunner
                     var mov = Assembly.Instructions["mov"][0];
 
                     // Declare the inputs and write the assembly instructions
-                    foreach (var (register, input) in assembly.InRegisters)
+                    foreach (var (_, input) in assembly.InRegisters)
                     {
                         var value = GetValue(input.Value, registers, stackPointer, function, arguments);
                         WriteAssemblyInstruction(mov, input.RegisterDefinition, null, assemblyCode, null, value.ULong);
@@ -1585,13 +1585,13 @@ public static unsafe class ProgramRunner
             WriteConstant(code, value2.Value);
         }
 
-        // #if false
+        #if DEBUG
         for (; codeIndex < code.Count; codeIndex++)
         {
             Console.Write($"{code[codeIndex]:x} ");
         }
         Console.Write("\n");
-        // #endif
+        #endif
     }
 
     private static void WriteConstant(List<byte> code, ulong value)
