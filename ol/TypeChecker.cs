@@ -3139,10 +3139,12 @@ public static class TypeChecker
                 ErrorReporter.Report($"Unknown instruction '{instruction.Instruction}'", instruction);
             }
 
+            var valid = true;
             if (instruction.Value1 != null)
             {
                 if (instruction.Value1.Register != null && !Assembly.Registers.ContainsKey(instruction.Value1.Register))
                 {
+                    valid = false;
                     ErrorReporter.Report($"Unknown register '{instruction.Value1.Register}'", instruction.Value1);
                 }
                 else if (instruction.Value1.Constant != null)
@@ -3155,12 +3157,18 @@ public static class TypeChecker
             {
                 if (instruction.Value2.Register != null && !Assembly.Registers.ContainsKey(instruction.Value2.Register))
                 {
+                    valid = false;
                     ErrorReporter.Report($"Unknown register '{instruction.Value2.Register}'", instruction.Value2);
                 }
                 else if (instruction.Value2.Constant != null)
                 {
                     instruction.Value2.Constant.Type = GlobalScope.Types[instruction.Value2.Constant.TypeName];
                 }
+            }
+
+            if (valid && definitions != null)
+            {
+                // TODO Implement me
             }
         }
 
