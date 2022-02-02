@@ -3117,7 +3117,11 @@ public static class TypeChecker
         // Verify the instructions for capturing values
         foreach (var (register, input) in assembly.InRegisters)
         {
-            if (!Assembly.Registers.ContainsKey(register))
+            if (Assembly.Registers.TryGetValue(register, out var registerDefinition))
+            {
+                input.RegisterDefinition = registerDefinition;
+            }
+            else
             {
                 ErrorReporter.Report($"Expected a target register, but got '{register}'", input);
             }
@@ -3142,12 +3146,19 @@ public static class TypeChecker
             var valid = true;
             if (instruction.Value1 != null)
             {
-                if (instruction.Value1.Register != null && !Assembly.Registers.ContainsKey(instruction.Value1.Register))
+                if (instruction.Value1.Register != null)
                 {
-                    valid = false;
-                    ErrorReporter.Report($"Unknown register '{instruction.Value1.Register}'", instruction.Value1);
+                    if (Assembly.Registers.TryGetValue(instruction.Value1.Register, out var register))
+                    {
+                        instruction.Value1.RegisterDefinition = register;
+                    }
+                    else
+                    {
+                        valid = false;
+                        ErrorReporter.Report($"Unknown register '{instruction.Value1.Register}'", instruction.Value1);
+                    }
                 }
-                else if (instruction.Value1.Constant != null)
+                else
                 {
                     instruction.Value1.Constant.Type = GlobalScope.Types[instruction.Value1.Constant.TypeName];
                 }
@@ -3155,10 +3166,17 @@ public static class TypeChecker
 
             if (instruction.Value2 != null)
             {
-                if (instruction.Value2.Register != null && !Assembly.Registers.ContainsKey(instruction.Value2.Register))
+                if (instruction.Value2.Register != null)
                 {
-                    valid = false;
-                    ErrorReporter.Report($"Unknown register '{instruction.Value2.Register}'", instruction.Value2);
+                    if (Assembly.Registers.TryGetValue(instruction.Value2.Register, out var register))
+                    {
+                        instruction.Value2.RegisterDefinition = register;
+                    }
+                    else
+                    {
+                        valid = false;
+                        ErrorReporter.Report($"Unknown register '{instruction.Value2.Register}'", instruction.Value2);
+                    }
                 }
                 else if (instruction.Value2.Constant != null)
                 {
@@ -3168,7 +3186,44 @@ public static class TypeChecker
 
             if (valid && definitions != null)
             {
-                // TODO Implement me
+                foreach (var definition in definitions)
+                {
+                    if (definition.Value1 == null)
+                    {
+                        if (instruction.Value1 == null)
+                        {
+                            instruction.Definition = definition;
+                            break;
+                        }
+                        continue;
+                    }
+
+                    if (!AssemblyArgumentMatches(instruction.Value1, definition.Value1))
+                    {
+                        continue;
+                    }
+
+                    if (definition.Value2 == null)
+                    {
+                        if (instruction.Value2 == null)
+                        {
+                            instruction.Definition = definition;
+                            break;
+                        }
+                        continue;
+                    }
+
+                    if (AssemblyArgumentMatches(instruction.Value2, definition.Value2))
+                    {
+                        instruction.Definition = definition;
+                        break;
+                    }
+                }
+
+                if (instruction.Definition == null)
+                {
+                    ErrorReporter.Report($"No instruction found for '{instruction.Instruction}' with given arguments", instruction);
+                }
             }
         }
 
@@ -3182,11 +3237,25 @@ public static class TypeChecker
                 ErrorReporter.Report("Cannot dereference pointer to assign value", output.Ast);
             }
 
-            if (!Assembly.Registers.ContainsKey(output.Register))
+            if (Assembly.Registers.TryGetValue(output.Register, out var registerDefinition))
+            {
+                output.RegisterDefinition = registerDefinition;
+            }
+            else
             {
                 ErrorReporter.Report($"Expected a source register, but got '{output.Register}'", output);
             }
         }
+    }
+
+    private static bool AssemblyArgumentMatches(AssemblyValueAst value, InstructionArgument arg)
+    {
+        if (arg.Constant)
+        {
+            return value.Constant != null;
+        }
+
+        return value.Dereference == arg.Memory && value.RegisterDefinition.Type == arg.Type;
     }
 
     private static void VerifyFunctionIfNecessary(FunctionAst function, IFunction currentFunction)

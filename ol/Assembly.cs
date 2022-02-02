@@ -4,75 +4,75 @@ namespace ol;
 
 public static class Assembly
 {
-    public static readonly Dictionary<string, RegisterType> Registers = new()
+    public static readonly Dictionary<string, RegisterDefinition> Registers = new()
     {
-        {"rax",   RegisterType.General},
-        {"rcx",   RegisterType.General},
-        {"rdx",   RegisterType.General},
-        {"rbx",   RegisterType.General},
-        {"rsi",   RegisterType.General},
-        {"rdi",   RegisterType.General},
-        {"rsp",   RegisterType.General},
-        {"rbp",   RegisterType.General},
-        {"r8",    RegisterType.General},
-        {"r9",    RegisterType.General},
-        {"r10",   RegisterType.General},
-        {"r11",   RegisterType.General},
-        {"r12",   RegisterType.General},
-        {"r13",   RegisterType.General},
-        {"r14",   RegisterType.General},
-        {"r15",   RegisterType.General},
-        {"mm0",   RegisterType.MMX},
-        {"mm1",   RegisterType.MMX},
-        {"mm2",   RegisterType.MMX},
-        {"mm3",   RegisterType.MMX},
-        {"mm4",   RegisterType.MMX},
-        {"mm5",   RegisterType.MMX},
-        {"mm6",   RegisterType.MMX},
-        {"mm7",   RegisterType.MMX},
-        {"xmm0",  RegisterType.SSE},
-        {"xmm1",  RegisterType.SSE},
-        {"xmm2",  RegisterType.SSE},
-        {"xmm3",  RegisterType.SSE},
-        {"xmm4",  RegisterType.SSE},
-        {"xmm5",  RegisterType.SSE},
-        {"xmm6",  RegisterType.SSE},
-        {"xmm7",  RegisterType.SSE},
-        {"xmm8",  RegisterType.SSE},
-        {"xmm9",  RegisterType.SSE},
-        {"xmm10", RegisterType.SSE},
-        {"xmm11", RegisterType.SSE},
-        {"xmm12", RegisterType.SSE},
-        {"xmm13", RegisterType.SSE},
-        {"xmm14", RegisterType.SSE},
-        {"xmm15", RegisterType.SSE},
-        {"ymm0",  RegisterType.AVX},
-        {"ymm1",  RegisterType.AVX},
-        {"ymm2",  RegisterType.AVX},
-        {"ymm3",  RegisterType.AVX},
-        {"ymm4",  RegisterType.AVX},
-        {"ymm5",  RegisterType.AVX},
-        {"ymm6",  RegisterType.AVX},
-        {"ymm7",  RegisterType.AVX},
-        {"ymm8",  RegisterType.AVX},
-        {"ymm9",  RegisterType.AVX},
-        {"ymm10", RegisterType.AVX},
-        {"ymm11", RegisterType.AVX},
-        {"ymm12", RegisterType.AVX},
-        {"ymm13", RegisterType.AVX},
-        {"ymm14", RegisterType.AVX},
-        {"ymm15", RegisterType.AVX}
+        {"rax",   new()},
+        {"rcx",   new(offset: 1)},
+        {"rdx",   new(offset: 2)},
+        {"rbx",   new(offset: 3)},
+        {"rsp",   new(offset: 4)},
+        {"rbp",   new(offset: 5)},
+        {"rsi",   new(offset: 6)},
+        {"rdi",   new(offset: 7)},
+        {"r8",    new(rex: 0x41)},
+        {"r9",    new(offset: 1, rex: 0x41)},
+        {"r10",   new(offset: 2, rex: 0x41)},
+        {"r11",   new(offset: 3, rex: 0x41)},
+        {"r12",   new(offset: 4, rex: 0x41)},
+        {"r13",   new(offset: 5, rex: 0x41)},
+        {"r14",   new(offset: 6, rex: 0x41)},
+        {"r15",   new(offset: 7, rex: 0x41)},
+        {"mm0",   new(RegisterType.MMX)},
+        {"mm1",   new(RegisterType.MMX, 1)},
+        {"mm2",   new(RegisterType.MMX, 2)},
+        {"mm3",   new(RegisterType.MMX, 3)},
+        {"mm4",   new(RegisterType.MMX, 4)},
+        {"mm5",   new(RegisterType.MMX, 5)},
+        {"mm6",   new(RegisterType.MMX, 6)},
+        {"mm7",   new(RegisterType.MMX, 7)},
+        {"xmm0",  new(RegisterType.SSE)},
+        {"xmm1",  new(RegisterType.SSE, 1)},
+        {"xmm2",  new(RegisterType.SSE, 2)},
+        {"xmm3",  new(RegisterType.SSE, 3)},
+        {"xmm4",  new(RegisterType.SSE, 4)},
+        {"xmm5",  new(RegisterType.SSE, 5)},
+        {"xmm6",  new(RegisterType.SSE, 6)},
+        {"xmm7",  new(RegisterType.SSE, 7)},
+        {"xmm8",  new(RegisterType.SSE, 0, 0x44)},
+        {"xmm9",  new(RegisterType.SSE, 1, 0x44)},
+        {"xmm10", new(RegisterType.SSE, 2, 0x44)},
+        {"xmm11", new(RegisterType.SSE, 3, 0x44)},
+        {"xmm12", new(RegisterType.SSE, 4, 0x44)},
+        {"xmm13", new(RegisterType.SSE, 5, 0x44)},
+        {"xmm14", new(RegisterType.SSE, 6, 0x44)},
+        {"xmm15", new(RegisterType.SSE, 7, 0x44)},
+        {"ymm0",  new(RegisterType.AVX)},
+        {"ymm1",  new(RegisterType.AVX, 1)},
+        {"ymm2",  new(RegisterType.AVX, 2)},
+        {"ymm3",  new(RegisterType.AVX, 3)},
+        {"ymm4",  new(RegisterType.AVX, 4)},
+        {"ymm5",  new(RegisterType.AVX, 5)},
+        {"ymm6",  new(RegisterType.AVX, 6)},
+        {"ymm7",  new(RegisterType.AVX, 7)},
+        {"ymm8",  new(RegisterType.AVX, 0, 0x44)},
+        {"ymm9",  new(RegisterType.AVX, 1, 0x44)},
+        {"ymm10", new(RegisterType.AVX, 2, 0x44)},
+        {"ymm11", new(RegisterType.AVX, 3, 0x44)},
+        {"ymm12", new(RegisterType.AVX, 4, 0x44)},
+        {"ymm13", new(RegisterType.AVX, 5, 0x44)},
+        {"ymm14", new(RegisterType.AVX, 6, 0x44)},
+        {"ymm15", new(RegisterType.AVX, 7, 0x44)}
     };
 
     public static readonly Dictionary<string, InstructionDefinition[]> Instructions = new() {
-        // TODO Add more
         {"fcos",   new InstructionDefinition[]{ new() {Opcode = 0xD9, Opcode2 = 0xFF} }},
-        {"fld",    new InstructionDefinition[]{ new() {Opcode = 0xDD, Value1 = new(true)} }},
+        {"fld",    new InstructionDefinition[]{ new() {Opcode = 0xDD, HasExtension = true, Value1 = new(true)} }},
         {"fptan",  new InstructionDefinition[]{ new() {Opcode = 0xD9, Opcode2 = 0xF2} }},
         {"fsin",   new InstructionDefinition[]{ new() {Opcode = 0xD9, Opcode2 = 0xFE} }},
-        {"fst",    new InstructionDefinition[]{ new() {Opcode = 0xDD, Value1 = new(true)} }},
-        {"fstp",   new InstructionDefinition[]{ new() {Opcode = 0xDD, Value1 = new(true)} }},
+        {"fst",    new InstructionDefinition[]{ new() {Opcode = 0xDD, HasExtension = true, Extension = 0x10, Value1 = new(true)} }},
+        {"fstp",   new InstructionDefinition[]{ new() {Opcode = 0xDD, HasExtension = true, Extension = 0x18, Value1 = new(true)} }},
         {"sqrtsd", new InstructionDefinition[]{ new() {Prefix = 0xF2, OF = true, Opcode = 0x51, Value1 = new(type: RegisterType.SSE), Value2 = new(type: RegisterType.SSE)} }},
+        // TODO Add more
     };
 }
 
@@ -86,16 +86,25 @@ public enum RegisterType : byte
 
 public class RegisterDefinition
 {
+    public RegisterDefinition(RegisterType type = RegisterType.General, byte offset = 0, byte rex = 0)
+    {
+        Type = type;
+        Offset = offset;
+        Rex = rex;
+    }
+
     public RegisterType Type;
     public byte Offset;
+    public byte Rex;
 }
 
-public struct InstructionDefinition
+public class InstructionDefinition
 {
     public byte Prefix;
     public bool OF;
     public byte Opcode;
     public byte Opcode2;
+    public bool HasExtension;
     public byte Extension;
     public InstructionArgument Value1;
     public InstructionArgument Value2;
