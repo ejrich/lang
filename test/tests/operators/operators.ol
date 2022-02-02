@@ -12,7 +12,7 @@ main() {
 operator_overloading() {
     a: Vector3 = { x = 1.0; y = 1.0; z = 1.0; }
     b: Vector3 = { x = 2.0; y = 2.0; z = 2.0; }
-    snthsnt := sine(45.0); // TODO Remove
+    snthsnt := square_root(45.0); // TODO Remove
     print("%\n", snthsnt);
 
     add := a + b;
