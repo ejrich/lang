@@ -2,9 +2,12 @@
 
 float64 square_root(float64 value) {
     asm {
-        in xmm0, value;
+        in rax, &value;
+        movsd xmm0, [rax];
+        // in xmm0, value;
         sqrtsd xmm0, xmm0;
-        out value, xmm0;
+        movsd [rax], xmm0;
+        // out value, xmm0;
     }
 
     return value;

@@ -541,7 +541,6 @@ public static unsafe class ProgramRunner
                 }
                 case InstructionType.InlineAssembly:
                 {
-                    // TODO Implement me
                     var assembly = (AssemblyAst)instruction.Source;
 
                     var estimatedBytes = assembly.InRegisters.Count * 10 + assembly.Instructions.Count * 3 + assembly.OutValues.Count * 10;
@@ -567,6 +566,7 @@ public static unsafe class ProgramRunner
                     assemblyCode.AddRange(assembly.AssemblyBytes);
 
                     // Capture the output registers if necessary
+                    // TODO Implement me
                     foreach (var output in assembly.OutValues)
                     {
                         var value = GetValue(output.Value, registers, stackPointer, function, arguments);
@@ -1585,13 +1585,13 @@ public static unsafe class ProgramRunner
             WriteConstant(code, value2.Value);
         }
 
-        #if DEBUG
+        /*#if DEBUG
         for (; codeIndex < code.Count; codeIndex++)
         {
             Console.Write($"{code[codeIndex]:x} ");
         }
         Console.Write("\n");
-        #endif
+        #endif*/
     }
 
     private static void WriteConstant(List<byte> code, ulong value)

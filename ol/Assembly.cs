@@ -73,6 +73,10 @@ public static class Assembly
         {"fst",    new InstructionDefinition[]{ new() {Opcode = 0xDD, HasExtension = true, Extension = 0x10, Value1 = new(true)} }},
         {"fstp",   new InstructionDefinition[]{ new() {Opcode = 0xDD, HasExtension = true, Extension = 0x18, Value1 = new(true)} }},
         {"mov",    new InstructionDefinition[]{ new() {Rex = 0x48, Opcode = 0xB8, AddRegisterToOpcode = true, Value1 = new(), Value2 = new(constant: true)} }},
+        {"movsd",    new InstructionDefinition[]{
+            new() {Prefix = 0x0F2, OF = true, Opcode = 0x10, Value1 = new(type: RegisterType.SSE), Value2 = new(true)},
+            new() {Prefix = 0x0F2, OF = true, Opcode = 0x11, Value1 = new(true), Value2 = new(type: RegisterType.SSE)}
+        }},
         {"sqrtsd", new InstructionDefinition[]{ new() {Prefix = 0xF2, OF = true, Opcode = 0x51, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new(type: RegisterType.SSE)} }},
         // TODO Add more
     };
