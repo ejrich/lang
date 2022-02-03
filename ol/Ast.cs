@@ -608,6 +608,8 @@ public class AssemblyAst : IAst
     public List<AssemblyInstructionAst> Instructions { get; } = new();
     public Dictionary<string, AssemblyInputAst> InRegisters { get; } = new();
     public List<AssemblyInputAst> OutValues { get; } = new();
+    public bool FindStagingInputRegister { get; set; }
+    public bool FindStagingOutputRegister { get; set; }
     public Byte[] AssemblyBytes { get; set; }
 }
 
