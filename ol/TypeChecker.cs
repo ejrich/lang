@@ -3126,16 +3126,29 @@ public static class TypeChecker
                 ErrorReporter.Report($"Expected a target register, but got '{register}'", input);
             }
 
-            // TODO Verify the type is compatible with the given register
             var inputType = VerifyExpression(input.Ast, null, scope);
 
-            if (inputType is StructAst || inputType is UnionAst)
+            if (registerDefinition != null && inputType != null)
             {
-                input.GetPointer = true;
+                if (registerDefinition.Type != RegisterType.General)
+                {
+                    if (inputType.TypeKind == TypeKind.Float)
+                    {
+                        assembly.FindStagingInputRegister = true;
+                    }
+                    else
+                    {
+                        ErrorReporter.Report($"Unable to assign type '{inputType.Name}' to register '{register}'", input);
+                    }
+                }
+                else if (inputType is StructAst || inputType is UnionAst)
+                {
+                    input.GetPointer = true;
+                }
             }
         }
 
-        // Verify the instructions for capturing values
+        // Verify the instructions in the body of the assembly block
         foreach (var instruction in assembly.Instructions)
         {
             if (!Assembly.Instructions.TryGetValue(instruction.Instruction, out var definitions))
@@ -3230,7 +3243,6 @@ public static class TypeChecker
         // Verify the out instructions for getting values from the registers
         foreach (var output in assembly.OutValues)
         {
-            // TODO Verify the type is compatible with the given register
             var outputType = GetReference(output.Ast, null, scope, out var hasPointer);
             if (!hasPointer)
             {
@@ -3240,6 +3252,21 @@ public static class TypeChecker
             if (Assembly.Registers.TryGetValue(output.Register, out var registerDefinition))
             {
                 output.RegisterDefinition = registerDefinition;
+
+                if (outputType != null)
+                {
+                    if (registerDefinition.Type != RegisterType.General)
+                    {
+                        if (outputType.TypeKind == TypeKind.Float)
+                        {
+                            assembly.FindStagingOutputRegister = true;
+                        }
+                        else
+                        {
+                            ErrorReporter.Report($"Unable to assign from register '{output.Register}' to type '{outputType.Name}'", output);
+                        }
+                    }
+                }
             }
             else
             {
