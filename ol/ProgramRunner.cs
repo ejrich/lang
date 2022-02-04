@@ -564,6 +564,7 @@ public static unsafe class ProgramRunner
                                 break;
                             }
                         }
+                        Debug.Assert(stagingRegister != null, "Unable to set staging register for capturing inputs");
                     }
 
                     foreach (var (_, input) in assembly.InRegisters)

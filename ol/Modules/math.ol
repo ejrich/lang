@@ -44,6 +44,18 @@ float64 tangent(float64 value) {
     return value;
 }
 
+float64 log_2(float64 value) {
+    asm {
+        in rax, &value;
+        fld1;
+        fld [rax];
+        fyl2x;
+        fstp[rax];
+    }
+
+    return value;
+}
+
 T float_mod<T>(T x, T y) {
     #assert T == float || T == float64;
 
@@ -52,4 +64,11 @@ T float_mod<T>(T x, T y) {
     remainder := result - whole;
 
     return remainder * y;
+}
+
+T floor<T>(T value) {
+    #assert T == float || T == float64;
+
+    result := cast(s64, value);
+    return cast(T, result);
 }
