@@ -1650,7 +1650,7 @@ public static unsafe class LLVMBackend
                                         }
                                         break;
                                     default:
-                                        assemblyString.Append("movq ");
+                                        assemblyString.Append("mov ");
                                         break;
                                 }
                                 assemblyString.AppendFormat("%{0}, ${1}; ", output.Register, i);

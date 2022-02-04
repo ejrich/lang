@@ -22,14 +22,6 @@ public static class Assembly
         {"r13",   new(offset: 5, rex: 0x41)},
         {"r14",   new(offset: 6, rex: 0x41)},
         {"r15",   new(offset: 7, rex: 0x41)},
-        {"mm0",   new(RegisterType.MMX)},
-        {"mm1",   new(RegisterType.MMX, 1)},
-        {"mm2",   new(RegisterType.MMX, 2)},
-        {"mm3",   new(RegisterType.MMX, 3)},
-        {"mm4",   new(RegisterType.MMX, 4)},
-        {"mm5",   new(RegisterType.MMX, 5)},
-        {"mm6",   new(RegisterType.MMX, 6)},
-        {"mm7",   new(RegisterType.MMX, 7)},
         {"xmm0",  new(RegisterType.SSE)},
         {"xmm1",  new(RegisterType.SSE, 1)},
         {"xmm2",  new(RegisterType.SSE, 2)},
@@ -72,11 +64,21 @@ public static class Assembly
         {"fsin",   new InstructionDefinition[]{ new() {Opcode = 0xD9, Opcode2 = 0xFE} }},
         {"fst",    new InstructionDefinition[]{ new() {Opcode = 0xDD, HasExtension = true, Extension = 0x10, Value1 = new(true)} }},
         {"fstp",   new InstructionDefinition[]{ new() {Opcode = 0xDD, HasExtension = true, Extension = 0x18, Value1 = new(true)} }},
-        {"mov",    new InstructionDefinition[]{ new() {Rex = 0x48, Opcode = 0xB8, AddRegisterToOpcode = true, Value1 = new(), Value2 = new(constant: true)} }},
-        {"movsd",    new InstructionDefinition[]{
-            new() {Prefix = 0x0F2, OF = true, Opcode = 0x10, Value1 = new(type: RegisterType.SSE), Value2 = new(true)},
-            new() {Prefix = 0x0F2, OF = true, Opcode = 0x11, Value1 = new(true), Value2 = new(type: RegisterType.SSE)}
+        {"mov",    new InstructionDefinition[]{
+            new() {Rex = 0x48, Opcode = 0xB8, AddRegisterToOpcode = true, Value1 = new(), Value2 = new(constant: true)},
+            new() {Rex = 0x48, Opcode = 0x89, Value1 = new(true), Value2 = new()}
         }},
+        {"movsd",  new InstructionDefinition[]{
+            new() {Prefix = 0x0F2, OF = true, Opcode = 0x11, Value1 = new(true), Value2 = new(type: RegisterType.SSE)},
+            new() {Prefix = 0x0F2, OF = true, Opcode = 0x10, Value1 = new(type: RegisterType.SSE), Value2 = new(true)},
+            new() {Prefix = 0x0F2, OF = true, Opcode = 0x10, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new(type: RegisterType.SSE)}
+        }},
+        {"movss",  new InstructionDefinition[]{
+            new() {Prefix = 0x0F3, OF = true, Opcode = 0x11, Value1 = new(true), Value2 = new(type: RegisterType.SSE)},
+            new() {Prefix = 0x0F3, OF = true, Opcode = 0x10, Value1 = new(type: RegisterType.SSE), Value2 = new(true)},
+            new() {Prefix = 0x0F3, OF = true, Opcode = 0x10, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new(type: RegisterType.SSE)}
+        }},
+        {"movq",   new InstructionDefinition[]{ new() {Prefix = 0x66, Rex = 0x48, OF = true, Opcode = 0x6E, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new()} }},
         {"sqrtsd", new InstructionDefinition[]{ new() {Prefix = 0xF2, OF = true, Opcode = 0x51, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new(type: RegisterType.SSE)} }},
         // TODO Add more
     };
@@ -85,7 +87,6 @@ public static class Assembly
 public enum RegisterType : byte
 {
     General,
-    MMX,
     SSE,
     AVX
 }

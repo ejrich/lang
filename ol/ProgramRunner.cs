@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -548,10 +549,35 @@ public static unsafe class ProgramRunner
                     var mov = Assembly.Instructions["mov"][0];
 
                     // Declare the inputs and write the assembly instructions
+                    RegisterDefinition stagingRegister = null;
+                    if (assembly.FindStagingInputRegister)
+                    {
+                        foreach (var (register, definition) in Assembly.Registers)
+                        {
+                            if (definition.Type != RegisterType.General)
+                            {
+                                break;
+                            }
+                            else if (!assembly.InRegisters.ContainsKey(register))
+                            {
+                                stagingRegister = definition;
+                                break;
+                            }
+                        }
+                    }
+
                     foreach (var (_, input) in assembly.InRegisters)
                     {
                         var value = GetValue(input.Value, registers, stackPointer, function, arguments);
-                        WriteAssemblyInstruction(mov, input.RegisterDefinition, null, assemblyCode, null, value.ULong);
+                        if (input.RegisterDefinition.Type == RegisterType.General)
+                        {
+                            WriteAssemblyInstruction(mov, input.RegisterDefinition, null, assemblyCode, null, value.ULong);
+                        }
+                        else
+                        {
+                            WriteAssemblyInstruction(mov, stagingRegister, null, assemblyCode, null, value.ULong);
+                            WriteAssemblyInstruction(Assembly.Instructions["movq"][0], input.RegisterDefinition, stagingRegister, assemblyCode);
+                        }
                     }
 
                     if (assembly.AssemblyBytes == null)
@@ -566,33 +592,53 @@ public static unsafe class ProgramRunner
                     assemblyCode.AddRange(assembly.AssemblyBytes);
 
                     // Capture the output registers if necessary
-                    // TODO Implement me
-                    foreach (var output in assembly.OutValues)
+                    if (assembly.OutValues.Count > 0)
                     {
-                        var value = GetValue(output.Value, registers, stackPointer, function, arguments);
-
-                        switch (output.Value.Type.TypeKind)
+                        stagingRegister = null;
+                        foreach (var (register, definition) in Assembly.Registers)
                         {
-                            case TypeKind.Void:
-                            case TypeKind.Boolean:
-                            case TypeKind.Integer:
-                            case TypeKind.Enum:
-                            case TypeKind.Type:
-                                // assemblyString.Append("mov ");
+                            if (definition.Type != RegisterType.General)
+                            {
                                 break;
-                            case TypeKind.Float:
+                            }
+                            var inOutputs = false;
+                            foreach (var output in assembly.OutValues)
+                            {
+                                if (output.RegisterDefinition == definition)
+                                {
+                                    inOutputs = true;
+                                    break;
+                                }
+                            }
+                            if (!inOutputs)
+                            {
+                                stagingRegister = definition;
+                                break;
+                            }
+                        }
+                        Debug.Assert(stagingRegister != null, "Unable to set staging register for capturing outputs");
+
+                        var movPointer = Assembly.Instructions["mov"][1];
+                        foreach (var output in assembly.OutValues)
+                        {
+                            var value = GetValue(output.Value, registers, stackPointer, function, arguments);
+
+                            WriteAssemblyInstruction(mov, stagingRegister, null, assemblyCode, null, value.ULong);
+                            if (output.Value.Type.TypeKind == TypeKind.Float)
+                            {
                                 if (output.Value.Type.Size == 4)
                                 {
-                                    // assemblyString.Append("movss ");
+                                    WriteAssemblyInstruction(Assembly.Instructions["movss"][0], stagingRegister, output.RegisterDefinition, assemblyCode);
                                 }
                                 else
                                 {
-                                    // assemblyString.Append("movsd ");
+                                    WriteAssemblyInstruction(Assembly.Instructions["movsd"][0], stagingRegister, output.RegisterDefinition, assemblyCode);
                                 }
-                                break;
-                            default:
-                                // assemblyString.Append("movq ");
-                                break;
+                            }
+                            else
+                            {
+                                WriteAssemblyInstruction(movPointer, stagingRegister, output.RegisterDefinition, assemblyCode);
+                            }
                         }
                     }
 
@@ -1513,7 +1559,7 @@ public static unsafe class ProgramRunner
         }
     }
 
-    private static void WriteAssemblyInstruction(InstructionDefinition definition, RegisterDefinition register1, RegisterDefinition register2, List<byte> code, ulong? value1, ulong? value2)
+    private static void WriteAssemblyInstruction(InstructionDefinition definition, RegisterDefinition register1, RegisterDefinition register2, List<byte> code, ulong? value1 = null, ulong? value2 = null)
     {
         var codeIndex = code.Count;
 
