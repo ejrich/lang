@@ -60,10 +60,12 @@ public static class Assembly
     {
         {"fcos",   new InstructionDefinition[]{ new() {Opcode = 0xD9, Opcode2 = 0xFF} }},
         {"fld",    new InstructionDefinition[]{ new() {Opcode = 0xDD, HasExtension = true, Value1 = new(true)} }},
+        {"fld1",   new InstructionDefinition[]{ new() {Opcode = 0xD9, Opcode2 = 0xE8} }},
         {"fptan",  new InstructionDefinition[]{ new() {Opcode = 0xD9, Opcode2 = 0xF2} }},
         {"fsin",   new InstructionDefinition[]{ new() {Opcode = 0xD9, Opcode2 = 0xFE} }},
         {"fst",    new InstructionDefinition[]{ new() {Opcode = 0xDD, HasExtension = true, Extension = 0x10, Value1 = new(true)} }},
         {"fstp",   new InstructionDefinition[]{ new() {Opcode = 0xDD, HasExtension = true, Extension = 0x18, Value1 = new(true)} }},
+        {"fyl2x",  new InstructionDefinition[]{ new() {Opcode = 0xD9, Opcode2 = 0xF1} }},
         {"mov",    new InstructionDefinition[]{
             new() {Rex = 0x48, Opcode = 0xB8, AddRegisterToOpcode = true, Value1 = new(), Value2 = new(constant: true)},
             new() {Rex = 0x48, Opcode = 0x89, Value1 = new(true), Value2 = new()}

@@ -505,7 +505,7 @@ window: Window;
                 }
             }
         }
-        // return true;
+        return true;
         return false;
     }
 
@@ -1794,7 +1794,7 @@ int create_texture_image(string file, VkImage** texture_image, VkDeviceMemory** 
     if width > height max = width;
     else max = height;
 
-    mip_levels: u32 = cast(u32, floor(log2(cast(float64, max)))) + 1;
+    mip_levels: u32 = cast(u32, floor(log_2(cast(float64, max)))) + 1;
 
     if pixels == null {
         print("Failed to load texture image\n");
@@ -2262,9 +2262,6 @@ int find_remaining_lines(string value, s64 index = 0) {
 
 
 // Part 28: https://vulkan-tutorial.com/Generating_Mipmaps
-float64 log2(float64 value) #extern "m-2.33"
-float64 floor(float64 value) #extern "m-2.33"
-
 generate_mipmaps(VkImage* image, VkFormat image_format, int width, int height, int mip_levels) {
     // Check if image format supports linear blitting
     format_properties: VkFormatProperties;
