@@ -12,9 +12,17 @@ public static class Linker
     public static void Link(string objectFile)
     {
         // 1. Verify bin directory exists
-        var binaryPath = Path.Combine(BuildSettings.Path, BinaryDirectory);
-        if (!Directory.Exists(binaryPath))
-            Directory.CreateDirectory(binaryPath);
+        string binaryPath;
+        if (BuildSettings.OutputDirectory == null)
+        {
+            binaryPath = Path.Combine(BuildSettings.Path, BinaryDirectory);
+            if (!Directory.Exists(binaryPath))
+                Directory.CreateDirectory(binaryPath);
+        }
+        else
+        {
+            binaryPath = BuildSettings.OutputDirectory;
+        }
 
         // 2. Determine lib directories
         var libDirectory = DetermineLibDirectory();

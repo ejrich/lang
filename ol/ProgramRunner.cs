@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -309,12 +310,30 @@ public static unsafe class ProgramRunner
 
     private static void SetExecutableName(String name)
     {
-        BuildSettings.Name = Marshal.PtrToStringAnsi(name.Data);
+        BuildSettings.Name = Marshal.PtrToStringAnsi(name.Data, (int)name.Length);
     }
 
     private static void SetOutputTypeTable(byte config)
     {
         BuildSettings.OutputTypeTable = (OutputTypeTableConfiguration)config;
+    }
+
+    private static void SetOutputDirectory(String directory)
+    {
+        var directoryPath = Marshal.PtrToStringAnsi(directory.Data, (int)directory.Length);
+        if (Path.IsPathRooted(directoryPath))
+        {
+            BuildSettings.OutputDirectory = directoryPath;
+        }
+        else
+        {
+            BuildSettings.OutputDirectory = Path.Combine(BuildSettings.Path, directoryPath);
+        }
+
+        if (!Directory.Exists(BuildSettings.OutputDirectory))
+        {
+            ErrorReporter.Report($"Directory '{directoryPath}' not found, unable to set as output directory");
+        }
     }
 
     private static Register ExecuteFunction(FunctionIR function, Register[] arguments)
@@ -1540,6 +1559,13 @@ public static unsafe class ProgramRunner
                 {
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
                     SetOutputTypeTable(value.Byte);
+                    break;
+                }
+                case "set_output_directory":
+                {
+                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    var directory = Marshal.PtrToStructure<String>(value.Pointer);
+                    SetOutputDirectory(directory);
                     break;
                 }
                 default:
