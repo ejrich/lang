@@ -3253,19 +3253,9 @@ public static class TypeChecker
             {
                 output.RegisterDefinition = registerDefinition;
 
-                if (outputType != null)
+                if (outputType?.TypeKind != TypeKind.Float && registerDefinition.Type != RegisterType.General)
                 {
-                    if (registerDefinition.Type != RegisterType.General)
-                    {
-                        if (outputType.TypeKind == TypeKind.Float)
-                        {
-                            assembly.FindStagingOutputRegister = true;
-                        }
-                        else
-                        {
-                            ErrorReporter.Report($"Unable to assign from register '{output.Register}' to type '{outputType.Name}'", output);
-                        }
-                    }
+                    ErrorReporter.Report($"Unable to assign from register '{output.Register}' to type '{outputType.Name}'", output);
                 }
             }
             else
