@@ -24,4 +24,16 @@
     </Content>
   </ItemGroup>
 
+  <PropertyGroup Condition="'$(OS)' == 'Windows_NT' ">
+    <DefineConstants>_WINDOWS</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(OS)' == 'Unix' ">
+    <DefineConstants>_LINUX</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(OS)' == 'OSX' ">
+    <DefineConstants>_MAC</DefineConstants>
+  </PropertyGroup>
+
 </Project>
