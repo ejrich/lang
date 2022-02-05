@@ -671,9 +671,13 @@ public static unsafe class ProgramRunner
                     {
                         if (_assemblyDataPointer != IntPtr.Zero)
                         {
+                            #if _LINUX
                             munmap(_assemblyDataPointer, _assemblyDataLength);
+                            #endif
                         }
+                        #if _LINUX
                         _assemblyDataPointer = mmap(IntPtr.Zero, assemblyBytes.Length, 0x7, 0x4022, 0, 0);
+                        #endif
                         _assemblyDataLength = assemblyBytes.Length;
                     }
 
@@ -1679,6 +1683,7 @@ public static unsafe class ProgramRunner
 
     const string Libc = "c";
 
+    #if _LINUX
     [DllImport(Libc)]
     private static extern long syscall(long number, long a, long b, long c, long d, long e, long f);
 
@@ -1687,6 +1692,7 @@ public static unsafe class ProgramRunner
 
     [DllImport(Libc)]
     private static extern int munmap(IntPtr addr, long length);
+    #endif
 
     private delegate void InlineAssembly();
 
