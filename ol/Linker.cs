@@ -9,6 +9,12 @@ public static class Linker
 {
     private const string BinaryDirectory = "bin";
 
+    #if _LINUX
+    private const string LinkerName = "ld";
+    #elif _WINDOWS
+    private const string LinkerName = "lld-link";
+    #endif
+
     public static void Link(string objectFile)
     {
         // 1. Verify bin directory exists
@@ -27,7 +33,7 @@ public static class Linker
         // 2. Determine lib directories
         var libDirectory = DetermineLibDirectory();
         var linker = DetermineLinker(BuildSettings.Linker, libDirectory);
-        var defaultObjects = DefaultObjects(libDirectory);
+        var defaultObjects = DefaultObjects();
 
         // 3. Run the linker
         #if _LINUX
@@ -38,9 +44,13 @@ public static class Linker
         var linkerArguments = $"{linker} -o {executableFile} {objectFile} {defaultObjects} --start-group {libraries} {dependencies} --end-group";
 
         Console.WriteLine($"Linking: ld {linkerArguments}\n");
-        var buildProcess = new Process {StartInfo = {FileName = "ld", Arguments = linkerArguments}};
+        #elif _WINDOWS
+        var linkerArguments = $" ";
+
+        Console.WriteLine($"Linking: lld-link {linkerArguments}\n");
         #endif
 
+        var buildProcess = new Process {StartInfo = {FileName = LinkerName, Arguments = linkerArguments}};
         buildProcess.Start();
         buildProcess.WaitForExit();
 
@@ -55,14 +65,20 @@ public static class Linker
     {
         #if _LINUX
         return new("/usr/lib");
+        #elif _WINDOWS
+        return null;
         #endif
     }
 
-    private static string DefaultObjects(DirectoryInfo libDirectory)
+    private static string DefaultObjects()
     {
         #if _LINUX
-        return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Runtime/runtime.o");
+        const string runtime = "Runtime/runtime.o";
+        #elif _WINDOWS
+        const string runtime = "Runtime/runtime.obj";
         #endif
+
+        return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, runtime);
     }
 
     private static string DetermineLinker(LinkerType linkerType, DirectoryInfo libDirectory)
@@ -94,6 +110,8 @@ public static class Linker
         }
 
         return $"-dynamic-linker {linker.FullName}";
+        #elif _WINDOWS
+        return string.Empty;
         #endif
     }
 }

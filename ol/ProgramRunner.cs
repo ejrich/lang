@@ -546,6 +546,7 @@ public static unsafe class ProgramRunner
                     registers[instruction.ValueIndex] = ConvertToRegister(returnValue);
                     break;
                 }
+                #if _LINUX
                 case InstructionType.SystemCall:
                 {
                     var args = new long[6];
@@ -559,6 +560,7 @@ public static unsafe class ProgramRunner
                     registers[instruction.ValueIndex] = new Register {Long = returnValue};
                     break;
                 }
+                #endif
                 case InstructionType.InlineAssembly:
                 {
                     var assembly = (AssemblyAst)instruction.Source;
@@ -673,10 +675,14 @@ public static unsafe class ProgramRunner
                         {
                             #if _LINUX
                             munmap(_assemblyDataPointer, _assemblyDataLength);
+                            #elif _WINDOWS
+                            VirtualFree(_assemblyDataPointer, 0, 0x8000);
                             #endif
                         }
                         #if _LINUX
                         _assemblyDataPointer = mmap(IntPtr.Zero, assemblyBytes.Length, 0x7, 0x4022, 0, 0);
+                        #elif _WINDOWS
+                        _assemblyDataPointer = VirtualAlloc(IntPtr.Zero, assemblyBytes.Length, 0x3000, 0x40);
                         #endif
                         _assemblyDataLength = assemblyBytes.Length;
                     }
@@ -1681,7 +1687,7 @@ public static unsafe class ProgramRunner
         }
     }
 
-    const string Libc = "c";
+    private const string Libc = "c";
 
     #if _LINUX
     [DllImport(Libc)]
@@ -1692,6 +1698,15 @@ public static unsafe class ProgramRunner
 
     [DllImport(Libc)]
     private static extern int munmap(IntPtr addr, long length);
+
+    #elif _WINDOWS
+    private const string Kernel32 = "Kernel32";
+
+    [DllImport(Kernel32)]
+    private static extern IntPtr VirtualAlloc(IntPtr lpAddress, long dwSize, int flAllocationType, int flProtect);
+
+    [DllImport(Kernel32)]
+    private static extern bool VirtualFree(IntPtr lpAddress, long dwSize, int dwFreeType);
     #endif
 
     private delegate void InlineAssembly();

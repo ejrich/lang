@@ -198,10 +198,8 @@ public static unsafe class LLVMBackend
         LLVM.SetInitializer(typeTable, typeArray);
 
         // 7. Compile to object file
-        var objectFile = Path.Combine(objectPath, $"{BuildSettings.Name}.o");
-        Compile(objectFile, BuildSettings.OutputAssembly);
-
-        return objectFile;
+        var baseFileName = Path.Combine(objectPath, BuildSettings.Name);
+        return Compile(baseFileName, BuildSettings.OutputAssembly);
     }
 
     private static void InitLLVM(string objectPath)
@@ -2300,7 +2298,7 @@ public static unsafe class LLVMBackend
         }
     }
 
-    private static void Compile(string objectFile, bool outputIntermediate)
+    private static string Compile(string baseFileName, bool outputIntermediate)
     {
         if (_emitDebug)
         {
@@ -2337,18 +2335,26 @@ public static unsafe class LLVMBackend
 
         if (outputIntermediate)
         {
-            var llvmIrFile = objectFile[..^1] + "ll";
+            var llvmIrFile = $"{baseFileName}.ll";
             _module.PrintToFile(llvmIrFile);
 
-            var assemblyFile = objectFile[..^1] + "s";
+            var assemblyFile = $"{baseFileName}.s";
             targetMachine.TryEmitToFile(_module, assemblyFile, LLVMCodeGenFileType.LLVMAssemblyFile, out _);
         }
+
+        #if _LINUX
+        var objectFile = $"{baseFileName}.o";
+        #elif _WINDOWS
+        var objectFile = $"{baseFileName}.obj";
+        #endif
 
         if (!targetMachine.TryEmitToFile(_module, objectFile, LLVMCodeGenFileType.LLVMObjectFile, out var errorMessage))
         {
             Console.WriteLine($"LLVM Build error: {errorMessage}");
             Environment.Exit(ErrorCodes.BuildError);
         }
+
+        return objectFile;
     }
 
     private static void CreateTemporaryDebugStructType(StructAst structAst)
