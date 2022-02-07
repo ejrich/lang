@@ -609,14 +609,7 @@ public static class ProgramIRBuilder
                     else if (declaration.TypeDefinition.Count != null)
                     {
                         function.SaveStack = true;
-                        var count = EmitAndCast(function, declaration.TypeDefinition.Count, scope, TypeTable.S64Type);
-                        var countPointer = EmitGetStructPointer(function, allocation, scope, arrayStruct, 0);
-                        EmitStore(function, countPointer, count, scope);
-
-                        var elementType = new InstructionValue {ValueType = InstructionValueType.Type, Type = declaration.ArrayElementType};
-                        var arrayData = EmitInstruction(InstructionType.AllocateArray, function, arrayStruct.Fields[1].Type, scope, count, elementType);
-                        var dataPointer = EmitGetStructPointer(function, allocation, scope, arrayStruct, 1);
-                        EmitStore(function, dataPointer, arrayData, scope);
+                        EmitAllocateArray(function, arrayStruct, scope, allocation, declaration.TypeDefinition.Count, declaration.ArrayElementType);
                     }
                     else
                     {
@@ -778,14 +771,7 @@ public static class ProgramIRBuilder
                         function.SaveStack = true;
                         foreach (var variable in declaration.Variables)
                         {
-                            var count = EmitIR(function, declaration.TypeDefinition.Count, scope);
-                            var countPointer = EmitGetStructPointer(function, variable.Pointer, scope, arrayStruct, 0);
-                            EmitStore(function, countPointer, count, scope);
-
-                            var elementType = new InstructionValue {ValueType = InstructionValueType.Type, Type = declaration.ArrayElementType};
-                            var arrayData = EmitInstruction(InstructionType.AllocateArray, function, arrayStruct.Fields[1].Type, scope, count, elementType);
-                            var dataPointer = EmitGetStructPointer(function, variable.Pointer, scope, arrayStruct, 1);
-                            EmitStore(function, dataPointer, arrayData, scope);
+                            EmitAllocateArray(function, arrayStruct, scope, variable.Pointer, declaration.TypeDefinition.Count, declaration.ArrayElementType);
                         }
                     }
                     else
@@ -2595,6 +2581,21 @@ public static class ProgramIRBuilder
     {
         var store = new Instruction {Type = InstructionType.Store, Scope = scope, Value1 = pointer, Value2 = value};
         function.Instructions.Add(store);
+    }
+
+    private static void EmitAllocateArray(FunctionIR function, StructAst arrayStruct, IScope scope, InstructionValue pointer, IAst arrayLength, IType elementType)
+    {
+        var count = EmitAndCast(function, arrayLength, scope, TypeTable.S64Type);
+        var countPointer = EmitGetStructPointer(function, pointer, scope, arrayStruct, 0);
+        EmitStore(function, countPointer, count, scope);
+
+        var dataPointer = EmitGetStructPointer(function, pointer, scope, arrayStruct, 1);
+        var instruction = new Instruction
+        {
+            Type = InstructionType.AllocateArray, Scope = scope, LoadType = elementType,
+            Value1 = dataPointer, Value2 = count
+        };
+        function.Instructions.Add(instruction);
     }
 
     private static void EmitConditionalJump(FunctionIR function, IScope scope, InstructionValue condition, BasicBlock block)
