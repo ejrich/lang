@@ -1738,9 +1738,12 @@ public static unsafe class LLVMBackend
                     }
                     case InstructionType.AllocateArray:
                     {
-                        var length = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        var elementType = _types[instruction.Value2.Type.TypeIndex];
-                        values[instruction.ValueIndex] = _builder.BuildArrayAlloca(elementType, length);
+                        var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
+                        var length = GetValue(instruction.Value2, values, allocations, functionPointer);
+
+                        var elementType =_types[instruction.LoadType.TypeIndex]; ;
+                        var arrayData = _builder.BuildArrayAlloca(elementType, length);
+                        _builder.BuildStore(arrayData, pointer);
                         break;
                     }
                     case InstructionType.IsNull:

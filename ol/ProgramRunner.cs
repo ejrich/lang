@@ -996,9 +996,12 @@ public static unsafe class ProgramRunner
                 }
                 case InstructionType.AllocateArray:
                 {
-                    var length = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
-                    var size = instruction.Value2.Type.Size * length.UInteger;
+                    var pointer = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
+                    var length = GetValue(instruction.Value2, registers, stackPointer, function, arguments);
+
+                    var size = instruction.LoadType.Size * length.Long;
                     var (arrayPointer, arrayCursor, arrayBlock) = Allocator.StackAllocate((int)size);
+                    Marshal.StructureToPtr(arrayPointer, pointer.Pointer, false);
 
                     if (arrayBlock != stackBlock)
                     {
@@ -1016,8 +1019,6 @@ public static unsafe class ProgramRunner
                             additionalBlocks.Add((arrayBlock, arrayCursor));
                         }
                     }
-
-                    registers[instruction.ValueIndex] = new Register {Pointer = arrayPointer};
                     break;
                 }
                 case InstructionType.IsNull:
