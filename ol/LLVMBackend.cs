@@ -1741,7 +1741,7 @@ public static unsafe class LLVMBackend
                         var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
                         var length = GetValue(instruction.Value2, values, allocations, functionPointer);
 
-                        var elementType =_types[instruction.LoadType.TypeIndex]; ;
+                        var elementType =_types[instruction.LoadType.TypeIndex];
                         var arrayData = _builder.BuildArrayAlloca(elementType, length);
                         _builder.BuildStore(arrayData, pointer);
                         break;
