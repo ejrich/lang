@@ -3,6 +3,9 @@
 #if os == OS.Linux {
     #import linux
 }
+#if os == OS.Windows {
+    #import windows
+}
 
 
 // Array support functions
@@ -84,6 +87,9 @@ exit_program(int exit_code) {
     #if os == OS.Linux {
         exit_group(exit_code);
     }
+    #if os == OS.Windows {
+        ExitProcess(exit_code);
+    }
 }
 
 
@@ -104,6 +110,9 @@ void* allocate_memory(u64 size) {
     #if os == OS.Linux {
         pointer = mmap(null, size, Prot.PROT_READ | Prot.PROT_WRITE, MmapFlags.MAP_PRIVATE | MmapFlags.MAP_ANONYMOUS | MmapFlags.MAP_NORESERVE, 0, 0);
     }
+    #if os == OS.Windows {
+        pointer = VirtualAlloc(null, size, AllocationType.MEM_COMMIT | AllocationType.MEM_RESERVE, ProtectionType.PAGE_READWRITE);
+    }
 
     return pointer;
 }
@@ -120,6 +129,9 @@ void* reallocate_memory(void* pointer, u64 old_size, u64 new_size) {
 free_memory(void* pointer, u64 size) {
     #if os == OS.Linux {
         munmap(pointer, size);
+    }
+    #if os == OS.Windows {
+        VirtualFree(pointer, 0, FreeType.MEM_RELEASE);
     }
 }
 
@@ -223,18 +235,24 @@ free_default_allocations() {
 sleep(int milliseconds) {
     if milliseconds <= 0 return;
 
-    seconds := milliseconds / 1000;
-    ms := milliseconds % 1000;
-
     #if os == OS.Linux {
+        seconds := milliseconds / 1000;
+        ms := milliseconds % 1000;
+
         ts: Timespec = { tv_sec = seconds; tv_nsec = ms * 1000000; }
         nanosleep(&ts, &ts);
+    }
+    #if os == OS.Windows {
+        Sleep(milliseconds);
     }
 }
 
 yield() {
     #if os == OS.Linux {
         sched_yield();
+    }
+    #if os == OS.Windows {
+        YieldProcessor();
     }
 }
 
@@ -246,6 +264,9 @@ u64 get_performance_counter() {
 
         clock_gettime(ClockId.CLOCK_MONOTONIC_RAW, &now);
         counter += now.tv_sec * 1000000000 + now.tv_nsec;
+    }
+    #if os == OS.Windows {
+        QueryPerformanceCounter(&counter);
     }
 
     return counter;
@@ -308,6 +329,14 @@ struct StringBuffer {
 write_buffer_to_standard_out(u8* buffer, s64 length) {
     #if os == OS.Linux {
         write(stdout, buffer, length);
+    }
+    #if os == OS.Windows {
+        stdOut := GetStdHandle(STD_OUTPUT_HANDLE);
+        if (stdOut != null)
+        {
+            written: int;
+            WriteConsole(stdOut, buffer, length, &written, null);
+        }
     }
 }
 

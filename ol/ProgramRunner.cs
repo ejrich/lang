@@ -1701,7 +1701,7 @@ public static unsafe class ProgramRunner
     private static extern int munmap(IntPtr addr, long length);
 
     #elif _WINDOWS
-    private const string Kernel32 = "Kernel32";
+    private const string Kernel32 = "kernel32";
 
     [DllImport(Kernel32)]
     private static extern IntPtr VirtualAlloc(IntPtr lpAddress, long dwSize, int flAllocationType, int flProtect);
