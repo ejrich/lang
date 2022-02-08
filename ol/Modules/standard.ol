@@ -277,6 +277,14 @@ int random_integer() {
     #if os == OS.Linux {
         getrandom(&value, 4, RandomFlags.GRND_RANDOM);
     }
+    #if os == OS.Windows {
+        // TODO Figure this out
+        // handle: Handle*;
+        // if CryptAcquireContextA(&handle, null, null, 1, 0) {
+        //     CryptGenRandom(handle, 4, &value);
+        //     print("%\n", value);
+        // }
+    }
 
     return value;
 }
@@ -629,7 +637,7 @@ write_struct_to_buffer(StringBuffer* buffer, StructTypeInfo* type_info, void* da
 
 // File and directory operations and types
 struct File {
-    handle: int;
+    handle: u64;
 }
 
 enum FileFlags {
@@ -678,6 +686,52 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
         else if flags & FileFlags.Append {
             lseek(file.handle, 0, Whence.SEEK_END);
         }
+    }
+    #if os == OS.Windows {
+        open_type: OpenFileType;
+        file_info: OfStruct;
+
+        if flags & FileFlags.Read {
+            open_type |= OpenFileType.OF_READ;
+        }
+        if flags & FileFlags.Write {
+            if flags & FileFlags.Read {
+                open_type = OpenFileType.OF_READWRITE;
+            }
+            else {
+                open_type |= OpenFileType.OF_WRITE;
+            }
+        }
+        if flags & FileFlags.Create {
+            if (flags & FileFlags.Write) == FileFlags.None {
+                open_type |= OpenFileType.OF_WRITE;
+            }
+            open_type |= OpenFileType.OF_CREATE;
+        }
+        if flags & FileFlags.Append {
+            if (flags & FileFlags.Write) == FileFlags.None {
+                open_type |= OpenFileType.OF_WRITE;
+            }
+            test_handle := OpenFile(path, &file_info, OpenFileType.OF_EXIST);
+
+            if test_handle {
+                open_type |= OpenFileType.OF_WRITE;
+            }
+            else {
+                open_type |= OpenFileType.OF_CREATE;
+            }
+        }
+
+        file_handle := OpenFile(path, &file_info, open_type);
+
+        if file_handle == null {
+            return false, file;
+        }
+        else if flags & FileFlags.Append {
+            SetFilePointer(file_handle, 0, null, MoveMethod.FILE_END);
+        }
+
+        file.handle = cast(u64, file_handle);
     }
 
     return true, file;
@@ -737,6 +791,10 @@ bool close_file(File file) {
     #if os == OS.Linux {
         success := close(file.handle);
         return success == 0;
+    }
+    #if os == OS.Windows {
+        handle := cast(Handle*, file.handle);
+        return CloseHandle(handle);
     }
 
     return false;
