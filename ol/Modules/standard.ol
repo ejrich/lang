@@ -290,12 +290,13 @@ int random_integer() {
         getrandom(&value, 4, RandomFlags.GRND_RANDOM);
     }
     #if os == OS.Windows {
-        // TODO Figure this out
-        // handle: Handle*;
-        // if CryptAcquireContextA(&handle, null, null, 1, 0) {
-        //     CryptGenRandom(handle, 4, &value);
-        //     print("%\n", value);
-        // }
+        handle: Handle*;
+        rng: CArray<u16> = ['R', 'N', 'G', 0]
+
+        if BCryptOpenAlgorithmProvider(&handle, &rng, null, 0) == NtStatus.STATUS_SUCCESS {
+            BCryptGenRandom(handle, &value, 4, 0);
+            BCryptCloseAlgorithmProvider(handle, 0);
+        }
     }
 
     return value;
