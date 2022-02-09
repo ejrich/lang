@@ -6,6 +6,7 @@
 
 void* VirtualAlloc(void* lpAddress, u64 dwSize, AllocationType flAllocationType, ProtectionType flProtect) #extern "kernel32"
 bool VirtualFree(void* lpAddress, u64 dwSize, FreeType dwFreeType) #extern "kernel32"
+s64 VirtualQuery(void* lpAddress, MemoryBasicInformation* lpBuffer, int dwLength) #extern "kernel32"
 ExitProcess(int uExitCode) #extern "kernel32"
 
 Sleep(int dwMilliseconds) #extern "kernel32"
@@ -18,6 +19,12 @@ bool WriteConsole(Handle* hConsoleOutput, void* lpBuffer, int nNumberOfCharsToWr
 Handle* OpenFile(string lpFileName, OfStruct* lpReOpenBuff, OpenFileType uStyle) #extern "kernel32"
 bool CloseHandle(Handle* hObject) #extern "kernel32"
 int SetFilePointer(Handle* hFile, u64 lDistanceToMove, u64* lpDistanceToMoveHigh, MoveMethod dwMoveMethod) #extern "kernel32"
+bool ReadFile(Handle* hFile, void* lpBuffer, int nNumberOfBytesToRead, int* nNumberOfBytesRead, void* lpOverlapped) #extern "kernel32"
+bool WriteFile(Handle* hFile, void* lpBuffer, int nNumberOfBytesToWrite, int* nNumberOfBytesWritten, void* lpOverlapped) #extern "kernel32"
+
+Handle* FindFirstFileA(string lpFileName, Win32FindData* lpFindFileData) #extern "kernel32"
+bool FindNextFileA(string lpFileName, Win32FindData* lpFindFileData) #extern "kernel32"
+bool FindClose(Handle* hFindFile) #extern "kernel32"
 
 bool CryptAcquireContextA(Handle** phProv, string szContainer, string szProvider, int dwProvType, int dwFlags) #extern "advapi32"
 bool CryptGenRandom(Handle* hProv, int dwLen, void* pbBuffer) #extern "advapi32"
@@ -49,6 +56,17 @@ enum ProtectionType {
 enum FreeType {
     MEM_DECOMMIT = 0x4000;
     MEM_RELEASE  = 0x8000;
+}
+
+struct MemoryBasicInformation {
+    BaseAddress: void*;
+    AllocationBase: void*;
+    AllocationProtect: ProtectionType;
+    PartitionId: s16;
+    RegionSize: s64;
+    State: int;
+    Protect: ProtectionType;
+    Type: int;
 }
 
 struct OfStruct {
