@@ -767,7 +767,7 @@ bool, Array<FileEntry> get_files_in_directory(string path, Allocate allocator = 
         open_flags := OpenFlags.O_RDONLY | OpenFlags.O_NONBLOCK | OpenFlags.O_DIRECTORY | OpenFlags.O_LARGEFILE | OpenFlags.O_CLOEXEC;
         directory := open(path.data, open_flags, OpenMode.S_RWALL);
 
-        if directory.handle < 0 {
+        if directory < 0 {
             return false, files;
         }
 
