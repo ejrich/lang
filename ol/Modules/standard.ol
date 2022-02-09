@@ -761,12 +761,11 @@ enum FileType {
 }
 
 bool, Array<FileEntry> get_files_in_directory(string path, Allocate allocator = default_allocator, Reallocate reallocator = default_reallocator) {
-    directory: File;
     files: Array<FileEntry>;
 
     #if os == OS.Linux {
         open_flags := OpenFlags.O_RDONLY | OpenFlags.O_NONBLOCK | OpenFlags.O_DIRECTORY | OpenFlags.O_LARGEFILE | OpenFlags.O_CLOEXEC;
-        directory.handle = open(path.data, open_flags, OpenMode.S_RWALL);
+        directory := open(path.data, open_flags, OpenMode.S_RWALL);
 
         if directory.handle < 0 {
             return false, files;
@@ -774,7 +773,7 @@ bool, Array<FileEntry> get_files_in_directory(string path, Allocate allocator = 
 
         buffer: CArray<u8>[5600];
         while true {
-            bytes := getdents64(directory.handle, cast(Dirent*, &buffer), buffer.length);
+            bytes := getdents64(directory, cast(Dirent*, &buffer), buffer.length);
 
             if bytes == 0 break;
 
@@ -794,13 +793,34 @@ bool, Array<FileEntry> get_files_in_directory(string path, Allocate allocator = 
                 position += dirent.d_reclen;
             }
         }
+
+        close(directory);
     }
     #if os == OS.Windows {
-        // TODO Implement me
-        // https://docs.microsoft.com/en-us/windows/win32/fileio/listing-the-files-in-a-directory
+        find_data: Win32FindData;
+        find_handle := FindFirstFileA(path, &find_data);
+
+        if cast(s64, find_handle) == -1 {
+            return false, files;
+        }
+
+        while true {
+            file_entry: FileEntry = { name = convert_c_string(&find_data.cFileName); }
+            if find_data.dwFileAttributes == FileAttribute.FILE_ATTRIBUTE_NORMAL {
+                file_entry.type = FileType.File;
+            }
+            else if find_data.dwFileAttributes == FileAttribute.FILE_ATTRIBUTE_DIRECTORY {
+                file_entry.type = FileType.Directory;
+            }
+
+            array_insert(&files, file_entry, allocator, reallocator);
+
+            if !FindNextFileA(find_handle, &find_data) break;
+        }
+
+        FindClose(find_handle);
     }
 
-    close_file(directory);
     return true, files;
 }
 
