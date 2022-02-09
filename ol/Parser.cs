@@ -196,8 +196,11 @@ public static class Parser
                         else
                         {
                             var function = ParseFunction(enumerator, attributes);
-                            TypeChecker.AddFunction(function);
-                            Asts.Add(function);
+                            if (function != null)
+                            {
+                                TypeChecker.AddFunction(function);
+                                Asts.Add(function);
+                            }
                         }
                         break;
                     }
