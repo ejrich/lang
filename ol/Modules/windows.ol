@@ -26,8 +26,9 @@ Handle* FindFirstFileA(string lpFileName, Win32FindData* lpFindFileData) #extern
 bool FindNextFileA(Handle* hFindHandle, Win32FindData* lpFindFileData) #extern "kernel32"
 bool FindClose(Handle* hFindFile) #extern "kernel32"
 
-int BCryptOpenAlgorithmProvider(Handle** phAlgorithm, string pszAlgId, string pszImplementation, u64 dwFlags) #extern "bcrypt"
-int BCryptGenRandom(Handle* hProv, void* pbBuffer, u64 cbBuffer, u64 dwFlags) #extern "bcrypt"
+NtStatus BCryptOpenAlgorithmProvider(Handle** phAlgorithm, u16* pszAlgId, u16* pszImplementation, u64 dwFlags) #extern "bcrypt"
+NtStatus BCryptCloseAlgorithmProvider(Handle* phAlgorithm, u64 dwFlags) #extern "bcrypt"
+NtStatus BCryptGenRandom(Handle* hProv, void* pbBuffer, u64 cbBuffer, u64 dwFlags) #extern "bcrypt"
 
 STD_INPUT_HANDLE  := -10; #const
 STD_OUTPUT_HANDLE := -11; #const
@@ -143,4 +144,12 @@ enum FileAttribute {
 struct FileTime {
     dwLowDateTime: int;
     dwHighDateTime: int;
+}
+
+enum NtStatus {
+    STATUS_SUCCESS           = 0x0;
+    STATUS_INVALID_HANDLE    = 0xC0000008;
+    STATUS_INVALID_PARAMETER = 0xC000000D;
+    STATUS_NO_MEMORY         = 0xC0000017;
+    STATUS_NOT_FOUND         = 0xC0000225;
 }
