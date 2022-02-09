@@ -122,6 +122,18 @@ void* reallocate_memory(void* pointer, u64 old_size, u64 new_size) {
     #if os == OS.Linux {
         new_pointer = mremap(pointer, old_size, new_size, MremapFlags.MREMAP_MAYMOVE);
     }
+    #if os == OS.Windows {
+        memory_info: MemoryBasicInformation;
+        VirtualQuery(pointer, &memory_info, size_of(memory_info));
+
+        if new_size > memory_info.RegionSize {
+            VirtualFree(pointer, 0, FreeType.MEM_RELEASE);
+            new_pointer = VirtualAlloc(null, new_size, AllocationType.MEM_COMMIT | AllocationType.MEM_RESERVE, ProtectionType.PAGE_READWRITE);
+        }
+        else {
+            new_pointer = pointer;
+        }
+    }
 
     return new_pointer;
 }
@@ -751,6 +763,7 @@ enum FileType {
 bool, Array<FileEntry> get_files_in_directory(string path, Allocate allocator = default_allocator, Reallocate reallocator = default_reallocator) {
     directory: File;
     files: Array<FileEntry>;
+
     #if os == OS.Linux {
         open_flags := OpenFlags.O_RDONLY | OpenFlags.O_NONBLOCK | OpenFlags.O_DIRECTORY | OpenFlags.O_LARGEFILE | OpenFlags.O_CLOEXEC;
         directory.handle = open(path.data, open_flags, OpenMode.S_RWALL);
@@ -781,6 +794,10 @@ bool, Array<FileEntry> get_files_in_directory(string path, Allocate allocator = 
                 position += dirent.d_reclen;
             }
         }
+    }
+    #if os == OS.Windows {
+        // TODO Implement me
+        // https://docs.microsoft.com/en-us/windows/win32/fileio/listing-the-files-in-a-directory
     }
 
     close_file(directory);
@@ -813,6 +830,16 @@ bool, string read_file(string file_path, Allocate allocator = default_allocator)
 
             read(file.handle, file_contents.data, size);
         }
+        #if os == OS.Windows {
+            handle := cast(Handle*, file.handle);
+            size := SetFilePointer(handle, 0, null, MoveMethod.FILE_END);
+            SetFilePointer(handle, 0, null, MoveMethod.FILE_BEGIN);
+
+            file_contents = { length = size; data = allocator(size); }
+
+            read: int;
+            ReadFile(handle, file_contents.data, size, &read, null);
+        }
 
         close_file(file);
     }
@@ -838,5 +865,10 @@ write_to_file(File file, u8 char) {
 write_buffer_to_file(File file, u8* buffer, s64 length) {
     #if os == OS.Linux {
         write(file.handle, buffer, length);
+    }
+    #if os == OS.Windows {
+        handle := cast(Handle*, file.handle);
+        written: int;
+        WriteFile(handle, buffer, length, &written, null);
     }
 }
