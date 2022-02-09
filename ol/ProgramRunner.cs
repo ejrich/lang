@@ -989,6 +989,7 @@ public static unsafe class ProgramRunner
                 case InstructionType.GetUnionPointer:
                 case InstructionType.PointerCast:
                 case InstructionType.PointerToIntegerCast:
+                case InstructionType.IntegerToPointerCast:
                 {
                     // These instructions are for LLVM, so this is a no-op
                     registers[instruction.ValueIndex] = GetValue(instruction.Value1, registers, stackPointer, function, arguments);

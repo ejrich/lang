@@ -3575,7 +3575,7 @@ public static class TypeChecker
                         }
                         break;
                     case TypeKind.Pointer:
-                        if (valueType != null && valueType.TypeKind != TypeKind.Pointer)
+                        if (valueType != null && valueType.TypeKind != TypeKind.Pointer && valueType != TypeTable.U64Type)
                         {
                             ErrorReporter.Report($"Unable to cast type '{valueType.Name}' to '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast.Value);
                         }

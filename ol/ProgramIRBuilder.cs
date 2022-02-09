@@ -2460,7 +2460,7 @@ public static class ProgramIRBuilder
                 break;
             case TypeKind.Pointer:
             case TypeKind.Interface:
-                castInstruction.Type = InstructionType.PointerCast;
+                castInstruction.Type = value.Type == TypeTable.U64Type ? InstructionType.IntegerToPointerCast : InstructionType.PointerCast;
                 break;
         }
 
