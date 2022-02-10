@@ -356,7 +356,7 @@ write_buffer_to_standard_out(u8* buffer, s64 length) {
         if (stdOut != null)
         {
             written: int;
-            WriteConsole(stdOut, buffer, length, &written, null);
+            WriteConsoleA(stdOut, buffer, length, &written, null);
         }
     }
 }

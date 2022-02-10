@@ -14,7 +14,7 @@ YieldProcessor() #extern "kernel32"
 bool QueryPerformanceCounter(u64* lpPerformanceCount) #extern "kernel32"
 
 Handle* GetStdHandle(int nStdHandle) #extern "kernel32"
-bool WriteConsole(Handle* hConsoleOutput, void* lpBuffer, int nNumberOfCharsToWrite, int* lpNumberOfCharsWritten, void* lpReserved) #extern "kernel32"
+bool WriteConsoleA(Handle* hConsoleOutput, void* lpBuffer, int nNumberOfCharsToWrite, int* lpNumberOfCharsWritten, void* lpReserved) #extern "kernel32"
 
 Handle* OpenFile(string lpFileName, OfStruct* lpReOpenBuff, OpenFileType uStyle) #extern "kernel32"
 bool CloseHandle(Handle* hObject) #extern "kernel32"
