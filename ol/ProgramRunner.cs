@@ -336,6 +336,25 @@ public static unsafe class ProgramRunner
         }
     }
 
+    private static void AddLibraryDirectory(String directory)
+    {
+        var directoryPath = Marshal.PtrToStringAnsi(directory.Data, (int)directory.Length);
+        if (Path.IsPathRooted(directoryPath))
+        {
+            BuildSettings.LibraryDirectories.Add(directoryPath);
+        }
+        else
+        {
+            directoryPath = Path.Combine(BuildSettings.Path, directoryPath);
+            BuildSettings.LibraryDirectories.Add(directoryPath);
+        }
+
+        if (!Directory.Exists(directoryPath))
+        {
+            ErrorReporter.Report($"Directory '{directoryPath}' not found, unable to set as library directory");
+        }
+    }
+
     private static Register ExecuteFunction(FunctionIR function, Register[] arguments)
     {
         var instructionPointer = 0;
@@ -1578,6 +1597,13 @@ public static unsafe class ProgramRunner
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
                     var directory = Marshal.PtrToStructure<String>(value.Pointer);
                     SetOutputDirectory(directory);
+                    break;
+                }
+                case "add_library_directory":
+                {
+                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    var directory = Marshal.PtrToStructure<String>(value.Pointer);
+                    AddLibraryDirectory(directory);
                     break;
                 }
                 default:

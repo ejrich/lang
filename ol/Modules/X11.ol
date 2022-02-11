@@ -1,3 +1,5 @@
+#assert os == OS.Linux;
+
 struct GC {}
 struct Display {}
 struct _XrmHashBucketRec {}

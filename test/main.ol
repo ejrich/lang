@@ -59,17 +59,26 @@ bool run_test(string test_dir, string test) {
 command_buffer: void*;
 
 int run_command(string command) {
-    command = format_string("% > /dev/null", command);
+    #if os == OS.Windows {
+        command = format_string("% > NUL", command);
+    }
+    else {
+        command = format_string("% > /dev/null", command);
+    }
     status := system(command);
     default_free(command.data);
 
     return status;
 }
 
-int system(string command) #extern "c"
+#if os != OS.Windows {
+    int system(string command) #extern "c"
+}
 
 #run {
     set_executable_name("tests");
-    set_linker(LinkerType.Dynamic);
-    // main();
+
+    if os != OS.Windows {
+        set_linker(LinkerType.Dynamic);
+    }
 }
