@@ -32,20 +32,24 @@ public static class Linker
 
         // 2. Determine lib directories
         var libDirectory = DetermineLibDirectory();
-        var linker = DetermineLinker(BuildSettings.Linker, libDirectory);
         var defaultObjects = DefaultObjects();
         var executableFile = Path.Combine(binaryPath, BuildSettings.Name);
+        var dependencies = string.Join(' ', BuildSettings.Dependencies);
 
         // 3. Run the linker
         #if _LINUX
-        var libraries = string.Join(' ', BuildSettings.Libraries.Select(d => $"-l{d}"));
-        var dependencies = string.Join(' ', BuildSettings.Dependencies);
+        var linker = DetermineLinker(BuildSettings.Linker, libDirectory);
+        var libraries = string.Join(' ', BuildSettings.Libraries.Select(lib => $"-l{lib}"));
 
         var linkerArguments = $"{linker} -o {executableFile} {objectFile} {defaultObjects} --start-group {libraries} {dependencies} --end-group";
 
         Console.WriteLine($"Linking: ld {linkerArguments}\n");
         #elif _WINDOWS
-        var linkerArguments = $"/entry:_start /out:{executableFile} {objectFile} {defaultObjects}";
+        var debug = BuildSettings.Release ? string.Empty : "-debug ";
+        var libraryDirectories = string.Join(' ', BuildSettings.LibraryDirectories.Select(d => $"/libpath:\"{d}\""));
+        var libraries = string.Join(' ', BuildSettings.Libraries.Select(lib => $"{lib}.lib"));
+
+        var linkerArguments = $"/entry:_start {debug}/out:{executableFile}.exe {objectFile} {defaultObjects} /libpath:\"{libDirectory.FullName}\" {libraryDirectories} {libraries} {dependencies}";
 
         Console.WriteLine($"Linking: lld-link {linkerArguments}\n");
         #endif
@@ -66,7 +70,55 @@ public static class Linker
         #if _LINUX
         return new("/usr/lib");
         #elif _WINDOWS
-        return null;
+        var windowsKits = new DirectoryInfo("\\Program Files (x86)\\Windows Kits");
+
+        if (!windowsKits.Exists)
+        {
+            Console.WriteLine($"Cannot find 'Windows Kits' directory '{windowsKits.FullName}'");
+            Environment.Exit(ErrorCodes.LinkError);
+        }
+
+        var latestVersion = windowsKits.GetDirectories().FirstOrDefault();
+
+        if (latestVersion == null)
+        {
+            Console.WriteLine($"Cannot find Windows SDK version in directory '{windowsKits.FullName}'");
+            Environment.Exit(ErrorCodes.LinkError);
+        }
+
+        var libDirectory = latestVersion.GetDirectories("Lib").FirstOrDefault();
+
+        if (libDirectory == null)
+        {
+            Console.WriteLine($"Cannot find 'lib' directory in '{latestVersion.FullName}'");
+            Environment.Exit(ErrorCodes.LinkError);
+        }
+
+        latestVersion = libDirectory.GetDirectories().LastOrDefault();
+
+        if (latestVersion == null)
+        {
+            Console.WriteLine($"Cannot find Windows SDK version in directory '{libDirectory.FullName}'");
+            Environment.Exit(ErrorCodes.LinkError);
+        }
+
+        libDirectory = latestVersion.GetDirectories("um").FirstOrDefault();
+
+        if (libDirectory == null)
+        {
+            Console.WriteLine($"Cannot find 'um' directory in '{latestVersion.FullName}'");
+            Environment.Exit(ErrorCodes.LinkError);
+        }
+
+        var x64LibDirectory = libDirectory.GetDirectories("x64").FirstOrDefault();
+
+        if (x64LibDirectory == null)
+        {
+            Console.WriteLine($"Cannot find 'x64' directory in '{libDirectory.FullName}'");
+            Environment.Exit(ErrorCodes.LinkError);
+        }
+
+        return x64LibDirectory;
         #endif
     }
 
@@ -75,15 +127,15 @@ public static class Linker
         #if _LINUX
         const string runtime = "Runtime/runtime.o";
         #elif _WINDOWS
-        const string runtime = "Runtime/runtime.obj";
+        const string runtime = "Runtime\\runtime.obj";
         #endif
 
         return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, runtime);
     }
 
+    #if _LINUX
     private static string DetermineLinker(LinkerType linkerType, DirectoryInfo libDirectory)
     {
-        #if _LINUX
         if (linkerType == LinkerType.Static)
         {
             return "-static";
@@ -110,8 +162,6 @@ public static class Linker
         }
 
         return $"-dynamic-linker {linker.FullName}";
-        #elif _WINDOWS
-        return string.Empty;
-        #endif
     }
+    #endif
 }

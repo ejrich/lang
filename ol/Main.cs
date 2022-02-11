@@ -17,6 +17,8 @@ public static class BuildSettings
     public static List<string> Files { get; } = new();
     // These are the libraries that are linked in with -l{name}
     public static HashSet<string> Libraries { get; } = new();
+    // These are the paths the linker should look for libraries in
+    public static HashSet<string> LibraryDirectories { get; } = new();
     // These are additional dependencies that need to be linked with the executable
     public static HashSet<string> Dependencies { get; } = new();
 }

@@ -27,3 +27,5 @@ enum OutputTypeTableConfiguration : u8 {
 set_output_type_table(OutputTypeTableConfiguration config) #compiler
 
 set_output_directory(string path) #compiler
+
+add_library_directory(string path) #compiler
