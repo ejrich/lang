@@ -22,6 +22,11 @@ int SetFilePointer(Handle* hFile, u64 lDistanceToMove, u64* lpDistanceToMoveHigh
 bool ReadFile(Handle* hFile, void* lpBuffer, int nNumberOfBytesToRead, int* nNumberOfBytesRead, void* lpOverlapped) #extern "kernel32"
 bool WriteFile(Handle* hFile, void* lpBuffer, int nNumberOfBytesToWrite, int* nNumberOfBytesWritten, void* lpOverlapped) #extern "kernel32"
 
+bool CreatePipe(Handle** hReadPipe, Handle** hWritePipe, SecurityAttributes* lpPipeAttributes, int nSize) #extern "kernel32"
+bool SetHandleInformation(Handle* hObject, HandleFlags dwMask, HandleFlags dwFlags) #extern "kernel32"
+bool CreateProcessA(string lpApplicationName, string lpCommandLine, SecurityAttributes* lpProcessAttributes, SecurityAttributes* lpThreadAttributes, bool bInheritHandles, int dwCreationFlags, void* lpEnvironment, string lpCurrentDirectory, StartupInfo* lpStartupInfo, ProcessInformation* lpProcessInformation) #extern "kernel32"
+bool GetExitCodeProcess(Handle* hProcess, int* lpExitCode) #extern "kernel32"
+
 Handle* FindFirstFileA(string lpFileName, Win32FindData* lpFindFileData) #extern "kernel32"
 bool FindNextFileA(Handle* hFindHandle, Win32FindData* lpFindFileData) #extern "kernel32"
 bool FindClose(Handle* hFindFile) #extern "kernel32"
@@ -100,6 +105,46 @@ enum MoveMethod {
     FILE_BEGIN;
     FILE_CURRENT;
     FILE_END;
+}
+
+struct SecurityAttributes {
+    nLength: int;
+    lpSecurityDescriptor: void*;
+    bInheritHandle: bool;
+}
+
+enum HandleFlags {
+    None;
+    HANDLE_FLAG_INHERIT;
+    HANDLE_FLAG_PROTECT_FROM_CLOSE;
+}
+
+struct StartupInfo {
+    cb: int;
+    lpReserved: u8*;
+    lpDesktop: u8*;
+    lpTitle: u8*;
+    dwX: int;
+    dwY: int;
+    dwXSize: int;
+    dwYSize: int;
+    dwXCountChars: int;
+    dwYCountChars: int;
+    dwFillAttribute: int;
+    dwFlags: int;
+    wShowWindow: s16;
+    cbReserved2: s16;
+    lpReserved2: u8*;
+    hStdInput: Handle*;
+    hStdOutput: Handle*;
+    hStdError: Handle*;
+}
+
+struct ProcessInformation {
+    hProcess: Handle*;
+    hThread: Handle*;
+    dwProcessId: int;
+    dwThreadId: int;
 }
 
 struct Win32FindData {
