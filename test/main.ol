@@ -70,31 +70,24 @@ command_buffer: void*;
 int run_command(string command) {
     #if os == OS.Windows {
         sa: SecurityAttributes = { nLength = size_of(SecurityAttributes); bInheritHandle = true; }
-        stdOutRd, stdOutWr, stdErrRd, stdErrWr: Handle*;
+        stdOutRd, stdOutWr: Handle*;
 
         if !CreatePipe(&stdOutRd, &stdOutWr, &sa, 0) {
             return -1;
         }
-        if !CreatePipe(&stdErrRd, &stdErrWr, &sa, 0) {
-            return -1;
-        }
         SetHandleInformation(stdOutRd, HandleFlags.HANDLE_FLAG_INHERIT, HandleFlags.None);
-        SetHandleInformation(stdErrRd, HandleFlags.HANDLE_FLAG_INHERIT, HandleFlags.None);
 
-        si: StartupInfo = { cb = size_of(StartupInfo); dwFlags = 0x100; hStdInput = GetStdHandle(STD_INPUT_HANDLE); hStdOutput = stdOutWr; hStdError = stdErrWr; }
+        si: StartupInfo = { cb = size_of(StartupInfo); dwFlags = 0x100; hStdInput = GetStdHandle(STD_INPUT_HANDLE); hStdOutput = stdOutWr; }
         pi: ProcessInformation;
 
         if !CreateProcessA(null, command, null, null, true, 0, null, null, &si, &pi) {
             CloseHandle(stdOutRd);
             CloseHandle(stdOutWr);
-            CloseHandle(stdErrRd);
-            CloseHandle(stdErrWr);
             return -1;
         }
 
         CloseHandle(si.hStdInput);
         CloseHandle(stdOutWr);
-        CloseHandle(stdErrWr);
 
         buf: CArray<u8>[1000];
         parentStdOut := GetStdHandle(STD_OUTPUT_HANDLE);
@@ -111,7 +104,6 @@ int run_command(string command) {
         CloseHandle(pi.hThread);
         CloseHandle(pi.hProcess);
         CloseHandle(stdOutRd);
-        CloseHandle(stdErrRd);
 
         return status;
     }
