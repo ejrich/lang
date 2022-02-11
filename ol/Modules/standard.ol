@@ -780,14 +780,18 @@ bool, Array<FileEntry> get_files_in_directory(string path, Allocate allocator = 
     }
     #if os == OS.Windows {
         find_data: Win32FindData;
-        find_handle := FindFirstFileA(path, &find_data);
+        path_with_wildcard := format_string("%/*", path);
+        find_handle := FindFirstFileA(path_with_wildcard, &find_data);
+        default_free(path_with_wildcard.data);
 
         if cast(s64, find_handle) == -1 {
             return false, files;
         }
 
         while true {
-            file_entry: FileEntry = { name = convert_c_string(&find_data.cFileName); }
+            file_name := convert_c_string(&find_data.cFileName);
+            file_entry: FileEntry = { name = format_string("%", allocator, file_name); }
+
             if find_data.dwFileAttributes == FileAttribute.FILE_ATTRIBUTE_NORMAL {
                 file_entry.type = FileType.File;
             }
