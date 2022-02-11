@@ -1,13 +1,5 @@
 // This module contains the standard library for the language
 
-#if os == OS.Linux {
-    #import linux
-}
-#if os == OS.Windows {
-    #import windows
-}
-
-
 // Array support functions
 ARRAY_BLOCK_SIZE := 10; #const
 
@@ -79,17 +71,6 @@ assert(bool assertion, string message, int exit_code = 1) {
     else print("Assertion failed: %\n", message);
 
     exit_program(exit_code);
-}
-
-exit_program(int exit_code) {
-    run_exit_callbacks();
-
-    #if os == OS.Linux {
-        exit_group(exit_code);
-    }
-    #if os == OS.Windows {
-        ExitProcess(exit_code);
-    }
 }
 
 

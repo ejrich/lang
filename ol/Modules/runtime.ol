@@ -3,6 +3,13 @@
 // -- This module is included automatically with the build,
 // -- so it does not need to be imported.
 
+#if os == OS.Linux {
+    #import linux
+}
+#if os == OS.Windows {
+    #import windows
+}
+
 // Runtime structs and supporting functions
 struct Array<T> {
     length: s64;
@@ -164,7 +171,7 @@ struct Any {
 
 
 // Runtime functions
-int __start(int argc, u8** argv) {
+void __start(int argc, u8** argv) {
     args: Array<string>[argc-1];
     each i in 1..argc-1 {
         args[i-1] = convert_c_string(argv[i]);
@@ -174,9 +181,18 @@ int __start(int argc, u8** argv) {
 
     #if true main();
 
+    exit_program(exit_code);
+}
+
+exit_program(int exit_code) {
     run_exit_callbacks();
 
-    return exit_code;
+    #if os == OS.Linux {
+        exit_group(exit_code);
+    }
+    #if os == OS.Windows {
+        ExitProcess(exit_code);
+    }
 }
 
 interface ExitCallback()
