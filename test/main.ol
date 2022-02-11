@@ -60,15 +60,47 @@ command_buffer: void*;
 
 int run_command(string command) {
     #if os == OS.Windows {
-        command = format_string("% > NUL", command);
+        sa: SecurityAttributes = { nLength = size_of(SecurityAttributes); bInheritHandle = true; }
+        stdOutRd, stdOutWr: Handle*;
+
+        if !CreatePipe(&stdOutRd, &stdOutWr, &sa, 0) {
+            return -1;
+        }
+        SetHandleInformation(stdOutRd, HandleFlags.HANDLE_FLAG_INHERIT, HandleFlags.None);
+
+        si: StartupInfo = { cbSize = size_of(StartupInfo); dwFlags = 0x100; hStdInput = GetStdHandle(STD_INPUT_HANDLE); hStdOutput = stdOutWr; }
+        pi: ProcessInformation;
+
+        if !CreateProcessA(null, command, null, null, true, 0, null, null, &si, &pi) {
+            CloseHandle(hStdOutRd);
+            CloseHandle(hStdOutWr);
+            return -1;
+        }
+
+        buf: CArray<u8>[1000];
+        while true {
+            read: int;
+            success := ReadFile(stdOutRd, &buf, 1000, &read, null);
+
+            if !success || read == 0 break;
+        }
+
+        status: int;
+        GetExitCodeProcess(pi.hProcess, &status);
+
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+        CloseHandle(hStdOutRd);
+        CloseHandle(hStdOutWr);
     }
     else {
         command = format_string("% > /dev/null", command);
-    }
-    status := system(command);
-    default_free(command.data);
 
-    return status;
+        status := system(command);
+        default_free(command.data);
+
+        return status;
+    }
 }
 
 #if os != OS.Windows {
