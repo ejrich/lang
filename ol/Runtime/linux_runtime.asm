@@ -7,7 +7,3 @@ _start:
     mov rsi, rsp
     add rsp, 8
     call __start
-
-    mov rdi, rax
-    mov rax, 60
-    syscall

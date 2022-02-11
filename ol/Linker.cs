@@ -34,10 +34,10 @@ public static class Linker
         var libDirectory = DetermineLibDirectory();
         var linker = DetermineLinker(BuildSettings.Linker, libDirectory);
         var defaultObjects = DefaultObjects();
+        var executableFile = Path.Combine(binaryPath, BuildSettings.Name);
 
         // 3. Run the linker
         #if _LINUX
-        var executableFile = Path.Combine(binaryPath, BuildSettings.Name);
         var libraries = string.Join(' ', BuildSettings.Libraries.Select(d => $"-l{d}"));
         var dependencies = string.Join(' ', BuildSettings.Dependencies);
 
@@ -45,7 +45,7 @@ public static class Linker
 
         Console.WriteLine($"Linking: ld {linkerArguments}\n");
         #elif _WINDOWS
-        var linkerArguments = $" ";
+        var linkerArguments = $"/entry:_start /out:{executableFile} {objectFile} {defaultObjects}";
 
         Console.WriteLine($"Linking: lld-link {linkerArguments}\n");
         #endif
