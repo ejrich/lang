@@ -426,13 +426,23 @@ surface: VkSurfaceKHR*;
 present_queue: VkQueue*;
 
 create_surface() {
+    result: VkResult;
+
     #if os == OS.Linux {
         surface_create_info: VkXlibSurfaceCreateInfoKHR = {
             dpy = window.handle;
             window = window.window;
         }
 
-        result := vkCreateXlibSurfaceKHR(instance, &surface_create_info, null, &surface);
+        result = vkCreateXlibSurfaceKHR(instance, &surface_create_info, null, &surface);
+    }
+    #if os == OS.Windows {
+        surface_create_info: VkWin32SurfaceCreateInfoKHR = {
+            hinstance = window.handle;
+            hwnd = cast(Handle*, window.window);
+        }
+
+        result = vkCreateWin32SurfaceKHR(instance, &surface_create_info, null, &surface);
     }
 
     if result != VkResult.VK_SUCCESS {
@@ -445,14 +455,14 @@ struct Window {
     handle: void*;
     window: u64;
     graphics_context: void*;
-    width: s32;
-    height: s32;
+    width := 960;
+    height := 720;
 }
 
 window: Window;
 
-#if os == OS.Linux {
-    create_window() {
+create_window() {
+    #if os == OS.Linux {
         XInitThreads();
 
         display := XOpenDisplay(null);
@@ -461,8 +471,6 @@ window: Window;
         white := XWhitePixel(display, screen);
 
         default_window := XDefaultRootWindow(display);
-        window.width = 960;
-        window.height = 720;
         x_win := XCreateSimpleWindow(display, default_window, 0, 0, window.width, window.height, 0, white, black);
         XSetStandardProperties(display, x_win, "Vulkan Window", "", 0, null, 0, null);
 
@@ -480,8 +488,14 @@ window: Window;
         window.window = x_win;
         window.graphics_context = gc;
     }
+    #if os == OS.Windows {
+        window.handle = GetModuleHandleA(null);
+        window.window = cast(u64, CreateWindowExA(0, null, null, 0, 0, 0, window.width, window.width, null, null, window.handle, null));
+    }
+}
 
-    bool handle_inputs() {
+bool handle_inputs() {
+    #if os == OS.Linux {
         while XPending(window.handle) {
             event: XEvent;
 
@@ -505,14 +519,24 @@ window: Window;
                 }
             }
         }
-        // return true;
-        return false;
+    }
+    #if os == OS.Windows {
+        // TODO Implement me
     }
 
-    close_window() {
+    // return true;
+    return false;
+}
+
+close_window() {
+    #if os == OS.Linux {
         XFreeGC(window.handle, window.graphics_context);
         XDestroyWindow(window.handle, window.window);
         XCloseDisplay(window.handle);
+    }
+    #if os == OS.Windows {
+        window_handle := cast(Handle*, window.window);
+        CloseWindow(window_handle);
     }
 }
 

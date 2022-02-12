@@ -1,3 +1,5 @@
+// Module for functions and types in the Vulkan library
+
 #if os == OS.Linux {
     #import X11
 
@@ -18,6 +20,25 @@
     VkResult vkCreateXlibSurfaceKHR(VkInstance* instance, VkXlibSurfaceCreateInfoKHR* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSurfaceKHR** pSurface) #extern "vulkan"
 
     u32 vkGetPhysicalDeviceXlibPresentationSupportKHR(VkPhysicalDevice* physicalDevice, u32 queueFamilyIndex, Display* dpy, u64 visualID) #extern "vulkan"
+}
+#if os == OS.Windows {
+    VK_KHR_WIN32_SURFACE_EXTENSION_NAME := "VK_KHR_win32_surface"; #const
+
+    struct VkWin32SurfaceCreateInfoKHR {
+        sType := VkStructureType.VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+        pNext: void*;
+        flags: u32;
+        hinstance: Handle*;
+        hwnd: Handle*;
+    }
+
+    interface VkResult PFN_vkCreateWin32SurfaceKHR(VkInstance* instance, VkWin32SurfaceCreateInfoKHR* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSurfaceKHR** pSurface)
+
+    interface u32 PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR(VkPhysicalDevice* physicalDevice, u32 queueFamilyIndex)
+
+    VkResult vkCreateWin32SurfaceKHR(VkInstance* instance, VkWin32SurfaceCreateInfoKHR* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSurfaceKHR** pSurface) #extern "vulkan"
+
+    u32 vkGetPhysicalDeviceWin32PresentationSupportKHR(VkPhysicalDevice* physicalDevice, u32 queueFamilyIndex) #extern "vulkan"
 }
 
 VK_TRUE := 1; #const

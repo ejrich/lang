@@ -32,6 +32,10 @@ Handle* FindFirstFileA(string lpFileName, Win32FindData* lpFindFileData) #extern
 bool FindNextFileA(Handle* hFindHandle, Win32FindData* lpFindFileData) #extern "kernel32"
 bool FindClose(Handle* hFindFile) #extern "kernel32"
 
+Handle* GetModuleHandleA(string lpModuleName) #extern "kernel32"
+Handle* CreateWindowExA(int dwExStyle, string lpClassName, string lpWindowName, int dwStyle, int x, int y, int nWidth, int nWeight, Handle* hWndParent, Handle* hMenu, Handle* hInstance, void* lpParam) #extern "user32"
+bool CloseWindow(Handle* hWnd) #extern "kernel32"
+
 NtStatus BCryptOpenAlgorithmProvider(Handle** phAlgorithm, u16* pszAlgId, u16* pszImplementation, u64 dwFlags) #extern "bcrypt"
 NtStatus BCryptCloseAlgorithmProvider(Handle* phAlgorithm, u64 dwFlags) #extern "bcrypt"
 NtStatus BCryptGenRandom(Handle* hProv, void* pbBuffer, u64 cbBuffer, u64 dwFlags) #extern "bcrypt"
