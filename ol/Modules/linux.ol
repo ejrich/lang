@@ -88,7 +88,21 @@ enum OpenMode {
 }
 
 struct Stat {
-    // @Incomplete Add fields before using
+    st_dev: u64;
+    st_ino: u64;
+    st_nlink: u64;
+    st_mode: int;
+    st_uid: int;
+    st_gid: int;
+    __pad0: int;
+    st_rdev: u64;
+    st_size: u64;
+    st_blksize: u64;
+    st_blocks: u64;
+    st_atim: Timespec;
+    st_mtim: Timespec;
+    st_ctim: Timespec;
+    __reserved: CArray<u64>[3];
 }
 
 struct PollFd {
