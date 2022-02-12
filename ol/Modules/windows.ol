@@ -4,6 +4,7 @@
 
 // Windows kernel functions
 
+int GetLastError() #extern "kernel32"
 void* VirtualAlloc(void* lpAddress, u64 dwSize, AllocationType flAllocationType, ProtectionType flProtect) #extern "kernel32"
 bool VirtualFree(void* lpAddress, u64 dwSize, FreeType dwFreeType) #extern "kernel32"
 s64 VirtualQuery(void* lpAddress, MemoryBasicInformation* lpBuffer, int dwLength) #extern "kernel32"
@@ -33,8 +34,12 @@ bool FindNextFileA(Handle* hFindHandle, Win32FindData* lpFindFileData) #extern "
 bool FindClose(Handle* hFindFile) #extern "kernel32"
 
 Handle* GetModuleHandleA(string lpModuleName) #extern "kernel32"
-Handle* CreateWindowExA(int dwExStyle, string lpClassName, string lpWindowName, int dwStyle, int x, int y, int nWidth, int nWeight, Handle* hWndParent, Handle* hMenu, Handle* hInstance, void* lpParam) #extern "user32"
-bool CloseWindow(Handle* hWnd) #extern "kernel32"
+bool RegisterClassExA(WndClassEx* wndClass) #extern "user32"
+s64 DefWindowProcA(Handle* hWnd, u32 uMsg, u32 wParam, s64 lParam) #extern "user32"
+Handle* CreateWindowExA(int dwExStyle, string lpClassName, string lpWindowName, WindowStyle dwStyle, u32 x, u32 y, u32 nWidth, u32 nWeight, Handle* hWndParent, Handle* hMenu, Handle* hInstance, void* lpParam) #extern "user32"
+bool ShowWindow(Handle* hWnd, WindowShow nCmdShow) #extern "user32"
+bool UpdateWindow(Handle* hWnd) #extern "user32"
+bool CloseWindow(Handle* hWnd) #extern "user32"
 
 NtStatus BCryptOpenAlgorithmProvider(Handle** phAlgorithm, u16* pszAlgId, u16* pszImplementation, u64 dwFlags) #extern "bcrypt"
 NtStatus BCryptCloseAlgorithmProvider(Handle* phAlgorithm, u64 dwFlags) #extern "bcrypt"
@@ -194,6 +199,85 @@ enum FileAttribute {
 struct FileTime {
     dwLowDateTime: int;
     dwHighDateTime: int;
+}
+
+interface s64 WndProc(Handle* hWnd, u32 uMsg, u32 wParam, s64 lParam)
+
+struct WndClassEx {
+    cbSize: u32;
+    style: WindowClassStyle;
+    lpfnWndProc: WndProc;
+    cbClsExtra: int;
+    cbWndExtra: int;
+    hInstance: Handle*;
+    hIcon: Handle*;
+    hCursor: Handle*;
+    hbrBackground: Handle*;
+    lpszMenuName: u8*;
+    lpszClassName: u8*;
+    hIconSm: Handle*;
+}
+
+enum WindowClassStyle {
+    CS_VREDRAW         = 0x1;
+    CS_HREDRAW         = 0x2;
+    CS_DBLCLKS         = 0x8;
+    CS_OWNDC           = 0x20;
+    CS_CLASSDC         = 0x40;
+    CS_PARENTDC        = 0x80;
+    CS_NOCLOSE         = 0x200;
+    CS_SAVEBITS        = 0x800;
+    CS_BYTEALIGNCLIENT = 0x1000;
+    CS_BYTEALIGNWINDOW = 0x2000;
+    CS_GLOBALCLASS     = 0x4000;
+    CS_DROPSHADOW      = 0x20000;
+}
+
+CW_USEDEFAULT: u32 = 0x80000000; #const
+
+enum WindowStyle {
+    WS_OVERLAPPED       = 0x0;
+    WS_TILED            = 0x0;
+    WS_MAXIMIZEBOX      = 0x10000;
+    WS_TABSTOP          = 0x10000;
+    WS_GROUP            = 0x20000;
+    WS_MINIMIZEBOX      = 0x20000;
+    WS_SIZEBOX          = 0x40000;
+    WS_THICKFRAME       = 0x40000;
+    WS_SYSMENU          = 0x80000;
+    WS_HSCROLL          = 0x100000;
+    WS_VSCROLL          = 0x200000;
+    WS_DLGFRAME         = 0x400000;
+    WS_BORDER           = 0x800000;
+    WS_CAPTION          = 0xC00000;
+    WS_MAXIMIZE         = 0x1000000;
+    WS_CLIPCHILDREN     = 0x2000000;
+    WS_CLIPSIBLINGS     = 0x4000000;
+    WS_DISABLED         = 0x8000000;
+    WS_VISIBLE          = 0x10000000;
+    WS_ICONIC           = 0x20000000;
+    WS_MINIMIZE         = 0x20000000;
+    WS_CHILD            = 0x40000000;
+    WS_CHILDWINDOW      = 0x40000000;
+    WS_POPUP            = 0x80000000;
+    WS_POPUPWINDOW      = 0x80880000;
+    WS_OVERLAPPEDWINDOW = 0xCF0000;
+    WS_TILEDWINDOW      = 0x0CF0000;
+}
+
+enum WindowShow {
+    SW_HIDE;
+    SW_NORMAL;
+    SW_SHOWMINIMIZED;
+    SW_MAXIMIZE;
+    SW_SHOWNOACTIVATE;
+    SW_SHOW;
+    SW_MINIMIZE;
+    SW_SHOWMINNOACTIVE;
+    SW_SHOWNA;
+    SW_RESTORE;
+    SW_SHOWDEFAULT;
+    SW_FORCEMINIMIZE;
 }
 
 enum NtStatus {

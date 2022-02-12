@@ -455,13 +455,14 @@ struct Window {
     handle: void*;
     window: u64;
     graphics_context: void*;
-    width := 960;
-    height := 720;
+    width: u32 = 960;
+    height: u32 = 720;
 }
 
 window: Window;
 
 create_window() {
+    window_name := "Vulkan Window"; #const
     #if os == OS.Linux {
         XInitThreads();
 
@@ -472,7 +473,7 @@ create_window() {
 
         default_window := XDefaultRootWindow(display);
         x_win := XCreateSimpleWindow(display, default_window, 0, 0, window.width, window.height, 0, white, black);
-        XSetStandardProperties(display, x_win, "Vulkan Window", "", 0, null, 0, null);
+        XSetStandardProperties(display, x_win, window_name, "", 0, null, 0, null);
 
         XSelectInput(display, x_win, XInputMasks.ButtonPressMask|XInputMasks.KeyPressMask|XInputMasks.ExposureMask|XInputMasks.StructureNotifyMask);
 
@@ -485,12 +486,18 @@ create_window() {
         XMapRaised(display, x_win);
 
         window.handle = display;
-        window.window = x_win;
-        window.graphics_context = gc;
+        window.window = x_win; window.graphics_context = gc;
     }
     #if os == OS.Windows {
-        window.handle = GetModuleHandleA(null);
-        window.window = cast(u64, CreateWindowExA(0, null, null, 0, 0, 0, window.width, window.width, null, null, window.handle, null));
+        class_name := "MainWClass";
+
+        hinstance := GetModuleHandleA(null);
+        window_class: WndClassEx = { cbSize = size_of(WndClassEx); style = WindowClassStyle.CS_VREDRAW | WindowClassStyle.CS_HREDRAW; lpfnWndProc = DefWindowProcA; hInstance = hinstance; lpszClassName = class_name.data; }
+        RegisterClassExA(&window_class);
+
+        window.handle = CreateWindowExA(0, class_name, window_name, WindowStyle.WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, window.width, window.height, null, null, hinstance, null);
+        ShowWindow(window.handle, WindowShow.SW_NORMAL);
+        UpdateWindow(window.handle);
     }
 }
 
@@ -535,8 +542,7 @@ close_window() {
         XCloseDisplay(window.handle);
     }
     #if os == OS.Windows {
-        window_handle := cast(Handle*, window.window);
-        CloseWindow(window_handle);
+        CloseWindow(window.handle);
     }
 }
 
@@ -2438,6 +2444,9 @@ create_color_resources() {
 
 #run {
     main();
-    set_linker(LinkerType.Dynamic);
     set_output_type_table(OutputTypeTableConfiguration.Used);
+
+    if os != OS.Windows {
+        set_linker(LinkerType.Dynamic);
+    }
 }
