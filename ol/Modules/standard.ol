@@ -630,6 +630,20 @@ write_struct_to_buffer(StringBuffer* buffer, StructTypeInfo* type_info, void* da
 
 
 // File and directory operations and types
+bool file_exists(string path) {
+    exists: bool;
+
+    #if os == OS.Linux {
+        stat_buf: Stat;
+        exists = stat(path.data, &stat_buf) == 0;
+    }
+    #if os == OS.Windows {
+        exists = PathFileExistsA(path);
+    }
+
+    return exists;
+}
+
 struct File {
     handle: u64;
 }
@@ -706,9 +720,8 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
             if (flags & FileFlags.Write) == FileFlags.None {
                 open_type |= OpenFileType.OF_WRITE;
             }
-            test_handle := OpenFile(path, &file_info, OpenFileType.OF_EXIST);
 
-            if test_handle {
+            if PathFileExistsA(path) {
                 open_type |= OpenFileType.OF_WRITE;
             }
             else {

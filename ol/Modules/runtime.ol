@@ -54,7 +54,7 @@ string convert_c_string(u8* string_pointer) {
 enum OS : u8 {
     None;
     Linux;
-    Windows; // Not supported
+    Windows;
     Mac;     // Not supported
 }
 
