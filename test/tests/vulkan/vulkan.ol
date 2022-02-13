@@ -150,6 +150,14 @@ Array<u8*> get_required_extensions() {
                 array_insert(&extension_names, VK_KHR_XLIB_SURFACE_EXTENSION_NAME.data);
             }
         }
+        #if os == OS.Windows {
+            if name == VK_KHR_SURFACE_EXTENSION_NAME {
+                array_insert(&extension_names, VK_KHR_SURFACE_EXTENSION_NAME.data);
+            }
+            else if name == VK_KHR_WIN32_SURFACE_EXTENSION_NAME {
+                array_insert(&extension_names, VK_KHR_WIN32_SURFACE_EXTENSION_NAME.data);
+            }
+        }
     }
 
     if enable_validation_layers {
@@ -492,7 +500,7 @@ create_window() {
         class_name := "MainWClass";
 
         hinstance := GetModuleHandleA(null);
-        window_class: WndClassEx = { cbSize = size_of(WndClassEx); style = WindowClassStyle.CS_VREDRAW | WindowClassStyle.CS_HREDRAW; lpfnWndProc = DefWindowProcA; hInstance = hinstance; lpszClassName = class_name.data; }
+        window_class: WNDCLASSEXA = { cbSize = size_of(WNDCLASSEXA); style = WindowClassStyle.CS_VREDRAW | WindowClassStyle.CS_HREDRAW; lpfnWndProc = DefWindowProcA; hInstance = hinstance; lpszClassName = class_name.data; }
         RegisterClassExA(&window_class);
 
         window.handle = CreateWindowExA(0, class_name, window_name, WindowStyle.WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, window.width, window.height, null, null, hinstance, null);
@@ -528,7 +536,7 @@ bool handle_inputs() {
         }
     }
     #if os == OS.Windows {
-        message: WindowsMessage;
+        message: MSG;
 
         while PeekMessageA(&message, null, 0, 0, RemoveMsg.PM_REMOVE) {
             TranslateMessage(&message);
@@ -715,6 +723,13 @@ VkExtent2D choose_swap_extent(VkSurfaceCapabilitiesKHR capabilities) {
 
         extent.width = attributes.width;
         extent.height = attributes.height;
+    }
+    #if os == OS.Windows {
+        rect: RECT;
+        GetWindowRect(window.handle, &rect);
+
+        extent.width = rect.right - rect.left;
+        extent.height = rect.top - rect.bottom;
     }
 
     extent.width = clamp(extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
@@ -1828,7 +1843,12 @@ create_descriptor_sets(Array<VkDescriptorSet*>* descriptor_sets, VkImageView* te
 texture_image: VkImage*;
 texture_image_memory: VkDeviceMemory*;
 
-#library stb_image "lib/stb_image.so"
+// #if os == OS.Windows {
+//     #library stb_image "lib/stb_image"
+// }
+// else {
+    #library stb_image "lib/stb_image.so"
+// }
 
 u8* stbi_load(string filename, int* x, int* y, int* comp, int req_comp) #extern stb_image
 stbi_image_free(void* image) #extern stb_image
