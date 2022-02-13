@@ -528,7 +528,24 @@ bool handle_inputs() {
         }
     }
     #if os == OS.Windows {
-        // TODO Implement me
+        message: WindowsMessage;
+
+        while PeekMessageA(&message, null, 0, 0, RemoveMsg.PM_REMOVE) {
+            TranslateMessage(&message);
+
+            if message.message == MessageType.WM_CLOSE {
+                print("Quitting\n");
+                return false;
+            }
+            if message.message == MessageType.WM_CHAR {
+                if message.wParam == 'q' {
+                    return false;
+                }
+            }
+            else if message.message == MessageType.EM_REQUESTRESIZE {
+                // TODO Implement me
+            }
+        }
     }
 
     // return true;
