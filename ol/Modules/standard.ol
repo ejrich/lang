@@ -104,7 +104,7 @@ void* reallocate_memory(void* pointer, u64 old_size, u64 new_size) {
         new_pointer = mremap(pointer, old_size, new_size, MremapFlags.MREMAP_MAYMOVE);
     }
     #if os == OS.Windows {
-        memory_info: MemoryBasicInformation;
+        memory_info: MEMORY_BASIC_INFORMATION;
         VirtualQuery(pointer, &memory_info, size_of(memory_info));
 
         if new_size > memory_info.RegionSize {
@@ -697,7 +697,7 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
     }
     #if os == OS.Windows {
         open_type: OpenFileType;
-        file_info: OfStruct;
+        file_info: OFSTRUCT;
 
         if flags & FileFlags.Read {
             open_type |= OpenFileType.OF_READ;
@@ -792,7 +792,7 @@ bool, Array<FileEntry> get_files_in_directory(string path, Allocate allocator = 
         close(directory);
     }
     #if os == OS.Windows {
-        find_data: Win32FindData;
+        find_data: WIN32_FIND_DATAA;
         path_with_wildcard := format_string("%/*", path);
         find_handle := FindFirstFileA(path_with_wildcard, &find_data);
         default_free(path_with_wildcard.data);

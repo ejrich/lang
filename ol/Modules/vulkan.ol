@@ -3,7 +3,7 @@
 #if os == OS.Linux {
     #import X11
 
-    VK_KHR_XLIB_SURFACE_EXTENSION_NAME := "VK_KHR_xlib_surface"; #const
+    VK_KHR_XLIB_SURFACE_EXTENSION_NAME := "VK_KHR_xlib_surface";
 
     struct VkXlibSurfaceCreateInfoKHR {
         sType := VkStructureType.VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
@@ -22,7 +22,7 @@
     u32 vkGetPhysicalDeviceXlibPresentationSupportKHR(VkPhysicalDevice* physicalDevice, u32 queueFamilyIndex, Display* dpy, u64 visualID) #extern "vulkan"
 }
 #if os == OS.Windows {
-    VK_KHR_WIN32_SURFACE_EXTENSION_NAME := "VK_KHR_win32_surface"; #const
+    VK_KHR_WIN32_SURFACE_EXTENSION_NAME := "VK_KHR_win32_surface";
 
     struct VkWin32SurfaceCreateInfoKHR {
         sType := VkStructureType.VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
@@ -5176,7 +5176,7 @@ u64 vkGetDeviceMemoryOpaqueCaptureAddress(VkDevice* device, VkDeviceMemoryOpaque
 
 struct VkSurfaceKHR {}
 
-VK_KHR_SURFACE_EXTENSION_NAME := "VK_KHR_surface"; #const
+VK_KHR_SURFACE_EXTENSION_NAME := "VK_KHR_surface";
 
 enum VkPresentModeKHR {
     VK_PRESENT_MODE_IMMEDIATE_KHR = 0;

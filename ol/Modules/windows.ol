@@ -7,7 +7,7 @@
 int GetLastError() #extern "kernel32"
 void* VirtualAlloc(void* lpAddress, u64 dwSize, AllocationType flAllocationType, ProtectionType flProtect) #extern "kernel32"
 bool VirtualFree(void* lpAddress, u64 dwSize, FreeType dwFreeType) #extern "kernel32"
-s64 VirtualQuery(void* lpAddress, MemoryBasicInformation* lpBuffer, int dwLength) #extern "kernel32"
+s64 VirtualQuery(void* lpAddress, MEMORY_BASIC_INFORMATION* lpBuffer, int dwLength) #extern "kernel32"
 ExitProcess(int uExitCode) #extern "kernel32"
 
 Sleep(int dwMilliseconds) #extern "kernel32"
@@ -18,32 +18,33 @@ Handle* GetStdHandle(int nStdHandle) #extern "kernel32"
 bool WriteConsoleA(Handle* hConsoleOutput, void* lpBuffer, int nNumberOfCharsToWrite, int* lpNumberOfCharsWritten, void* lpReserved) #extern "kernel32"
 
 bool PathFileExistsA(string pszPath) #extern "shlwapi"
-Handle* OpenFile(string lpFileName, OfStruct* lpReOpenBuff, OpenFileType uStyle) #extern "kernel32"
+Handle* OpenFile(string lpFileName, OFSTRUCT* lpReOpenBuff, OpenFileType uStyle) #extern "kernel32"
 bool CloseHandle(Handle* hObject) #extern "kernel32"
 int SetFilePointer(Handle* hFile, u64 lDistanceToMove, u64* lpDistanceToMoveHigh, MoveMethod dwMoveMethod) #extern "kernel32"
 bool ReadFile(Handle* hFile, void* lpBuffer, int nNumberOfBytesToRead, int* nNumberOfBytesRead, void* lpOverlapped) #extern "kernel32"
 bool WriteFile(Handle* hFile, void* lpBuffer, int nNumberOfBytesToWrite, int* nNumberOfBytesWritten, void* lpOverlapped) #extern "kernel32"
 
-bool CreatePipe(Handle** hReadPipe, Handle** hWritePipe, SecurityAttributes* lpPipeAttributes, int nSize) #extern "kernel32"
+bool CreatePipe(Handle** hReadPipe, Handle** hWritePipe, SECURITY_ATTRIBUTES* lpPipeAttributes, int nSize) #extern "kernel32"
 bool SetHandleInformation(Handle* hObject, HandleFlags dwMask, HandleFlags dwFlags) #extern "kernel32"
-bool CreateProcessA(string lpApplicationName, string lpCommandLine, SecurityAttributes* lpProcessAttributes, SecurityAttributes* lpThreadAttributes, bool bInheritHandles, int dwCreationFlags, void* lpEnvironment, string lpCurrentDirectory, StartupInfo* lpStartupInfo, ProcessInformation* lpProcessInformation) #extern "kernel32"
+bool CreateProcessA(string lpApplicationName, string lpCommandLine, SECURITY_ATTRIBUTES* lpProcessAttributes, SECURITY_ATTRIBUTES* lpThreadAttributes, bool bInheritHandles, int dwCreationFlags, void* lpEnvironment, string lpCurrentDirectory, STARTUPINFOA* lpStartupInfo, PROCESS_INFORMATION* lpProcessInformation) #extern "kernel32"
 bool GetExitCodeProcess(Handle* hProcess, int* lpExitCode) #extern "kernel32"
 
-Handle* FindFirstFileA(string lpFileName, Win32FindData* lpFindFileData) #extern "kernel32"
-bool FindNextFileA(Handle* hFindHandle, Win32FindData* lpFindFileData) #extern "kernel32"
+Handle* FindFirstFileA(string lpFileName, WIN32_FIND_DATAA* lpFindFileData) #extern "kernel32"
+bool FindNextFileA(Handle* hFindHandle, WIN32_FIND_DATAA* lpFindFileData) #extern "kernel32"
 bool FindClose(Handle* hFindFile) #extern "kernel32"
 
 Handle* GetModuleHandleA(string lpModuleName) #extern "kernel32"
-bool RegisterClassExA(WndClassEx* wndClass) #extern "user32"
+bool RegisterClassExA(WNDCLASSEXA* wndClass) #extern "user32"
 s64 DefWindowProcA(Handle* hWnd, MessageType uMsg, u64 wParam, s64 lParam) #extern "user32"
 Handle* CreateWindowExA(int dwExStyle, string lpClassName, string lpWindowName, WindowStyle dwStyle, u32 x, u32 y, u32 nWidth, u32 nWeight, Handle* hWndParent, Handle* hMenu, Handle* hInstance, void* lpParam) #extern "user32"
 bool ShowWindow(Handle* hWnd, WindowShow nCmdShow) #extern "user32"
 bool UpdateWindow(Handle* hWnd) #extern "user32"
 bool CloseWindow(Handle* hWnd) #extern "user32"
-bool GetMessage(WindowsMessage* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax) #extern "user32"
-bool PeekMessageA(WindowsMessage* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax, RemoveMsg wRemoveMsg) #extern "user32"
-bool TranslateMessage(WindowsMessage* lpMsg)  #extern "user32"
-s64 DispatchMessage(WindowsMessage* lpMsg)  #extern "user32"
+bool GetMessage(MSG* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax) #extern "user32"
+bool PeekMessageA(MSG* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax, RemoveMsg wRemoveMsg) #extern "user32"
+bool TranslateMessage(MSG* lpMsg)  #extern "user32"
+s64 DispatchMessage(MSG* lpMsg)  #extern "user32"
+bool GetWindowRect(Handle* hWnd, RECT* lpRect) #extern "user32"
 
 NtStatus BCryptOpenAlgorithmProvider(Handle** phAlgorithm, u16* pszAlgId, u16* pszImplementation, u64 dwFlags) #extern "bcrypt"
 NtStatus BCryptCloseAlgorithmProvider(Handle* phAlgorithm, u64 dwFlags) #extern "bcrypt"
@@ -78,7 +79,7 @@ enum FreeType {
     MEM_RELEASE  = 0x8000;
 }
 
-struct MemoryBasicInformation {
+struct MEMORY_BASIC_INFORMATION {
     BaseAddress: void*;
     AllocationBase: void*;
     AllocationProtect: ProtectionType;
@@ -89,7 +90,7 @@ struct MemoryBasicInformation {
     Type: int;
 }
 
-struct OfStruct {
+struct OFSTRUCT {
     cBytes: u8;
     fFixedDisk: u8;
     nErrCode: s16;
@@ -121,7 +122,7 @@ enum MoveMethod {
     FILE_END;
 }
 
-struct SecurityAttributes {
+struct SECURITY_ATTRIBUTES {
     nLength: int;
     lpSecurityDescriptor: void*;
     bInheritHandle: bool;
@@ -133,7 +134,7 @@ enum HandleFlags {
     HANDLE_FLAG_PROTECT_FROM_CLOSE;
 }
 
-struct StartupInfo {
+struct STARTUPINFOA {
     cb: int;
     lpReserved: u8*;
     lpDesktop: u8*;
@@ -154,18 +155,18 @@ struct StartupInfo {
     hStdError: Handle*;
 }
 
-struct ProcessInformation {
+struct PROCESS_INFORMATION {
     hProcess: Handle*;
     hThread: Handle*;
     dwProcessId: int;
     dwThreadId: int;
 }
 
-struct Win32FindData {
+struct WIN32_FIND_DATAA {
     dwFileAttributes: FileAttribute;
-    ftCreationTime: FileTime;
-    ftLastAccessTime: FileTime;
-    ftLastWriteTime: FileTime;
+    ftCreationTime: FILETIME;
+    ftLastAccessTime: FILETIME;
+    ftLastWriteTime: FILETIME;
     nFileSizeHigh: int;
     nFileSizeLow: int;
     dwReserved0: int;
@@ -200,17 +201,17 @@ enum FileAttribute {
     FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS = 0x400000;
 }
 
-struct FileTime {
+struct FILETIME {
     dwLowDateTime: int;
     dwHighDateTime: int;
 }
 
-interface s64 WndProc(Handle* hWnd, MessageType uMsg, u64 wParam, s64 lParam)
+interface s64 WNDPROC(Handle* hWnd, MessageType uMsg, u64 wParam, s64 lParam)
 
-struct WndClassEx {
+struct WNDCLASSEXA {
     cbSize: u32;
     style: WindowClassStyle;
-    lpfnWndProc: WndProc;
+    lpfnWndProc: WNDPROC;
     cbClsExtra: int;
     cbWndExtra: int;
     hInstance: Handle*;
@@ -284,17 +285,17 @@ enum WindowShow {
     SW_FORCEMINIMIZE;
 }
 
-struct WindowsMessage {
+struct MSG {
     hwnd: Handle*;
     message: MessageType;
     wParam: u64;
     lParam: s64;
     time: int;
-    pt: MessagePoint;
+    pt: POINT;
     lPrivate: int;
 }
 
-struct MessagePoint {
+struct POINT {
     x: s64;
     y: s64;
 }
@@ -1343,6 +1344,13 @@ enum RemoveMsg {
     PM_NOREMOVE;
     PM_REMOVE;
     PM_NOYIELD;
+}
+
+struct RECT {
+    left: s64;
+    top: s64;
+    right: s64;
+    bottom: s64;
 }
 
 enum NtStatus {
