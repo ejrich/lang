@@ -708,7 +708,7 @@ public static class Parser
                     else if (token.Type == TokenType.Identifier)
                     {
                         enumerator.MoveNext();
-                        function.Library = token.Value;
+                        function.LibraryName = token.Value;
                     }
                     else
                     {

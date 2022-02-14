@@ -2540,7 +2540,7 @@ create_color_resources() {
 
 
 #run {
-    // main();
+    main();
     set_output_type_table(OutputTypeTableConfiguration.Used);
 
     if os != OS.Windows {
