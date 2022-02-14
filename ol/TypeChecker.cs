@@ -689,13 +689,26 @@ public static class TypeChecker
 
     public static void AddLibrary(CompilerDirectiveAst directive)
     {
-        if (!File.Exists(directive.Library.AbsolutePath))
+        var library = directive.Library;
+        #if _LINUX
+        library.HasLib = File.Exists($"{library.AbsolutePath}.a");
+        library.HasDll = File.Exists($"{library.AbsolutePath}.so");
+        if (!library.HasLib && !library.HasDll)
         {
-            ErrorReporter.Report($"File '{directive.Library.Path}' of library '{directive.Library.Name}' was not found", directive);
+            ErrorReporter.Report($"Unable to find .a/.so '{library.Path}' of library '{library.Name}'", directive);
         }
-        else if (!_libraries.TryAdd(directive.Library.Name, directive.Library))
+        #elif _WINDOWS
+        library.HasLib = File.Exists($"{library.AbsolutePath}.lib");
+        library.HasDll = File.Exists($"{library.AbsolutePath}.dll");
+        if (!library.HasLib && !library.HasDll)
         {
-            ErrorReporter.Report($"Library '{directive.Library.Name}' already defined", directive);
+            ErrorReporter.Report($"Unable to find .lib/.dll '{library.Path}' of library '{library.Name}'", directive);
+        }
+        #endif
+
+        if (!_libraries.TryAdd(library.Name, library))
+        {
+            ErrorReporter.Report($"Library '{library.Name}' already defined", directive);
         }
     }
 
