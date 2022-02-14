@@ -43,7 +43,7 @@ bool CloseWindow(Handle* hWnd) #extern "user32"
 bool GetMessage(MSG* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax) #extern "user32"
 bool PeekMessageA(MSG* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax, RemoveMsg wRemoveMsg) #extern "user32"
 bool TranslateMessage(MSG* lpMsg)  #extern "user32"
-s64 DispatchMessage(MSG* lpMsg)  #extern "user32"
+s64 DispatchMessageA(MSG* lpMsg)  #extern "user32"
 bool GetWindowRect(Handle* hWnd, RECT* lpRect) #extern "user32"
 
 NtStatus BCryptOpenAlgorithmProvider(Handle** phAlgorithm, u16* pszAlgId, u16* pszImplementation, u64 dwFlags) #extern "bcrypt"
