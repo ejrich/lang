@@ -1230,15 +1230,15 @@ public static class TypeChecker
 
             if (function.Flags.HasFlag(FunctionFlags.Extern))
             {
-                if (function.Library != null)
+                if (function.LibraryName != null)
                 {
-                    if (_libraries.TryGetValue(function.Library, out var library))
+                    if (_libraries.TryGetValue(function.LibraryName, out var library))
                     {
-                        function.ExternLib = library.AbsolutePath;
+                        function.Library = library;
                     }
                     else
                     {
-                        ErrorReporter.Report($"Function '{function.Name}' references undefined library '{function.Library}'", function);
+                        ErrorReporter.Report($"Function '{function.Name}' references undefined library '{function.LibraryName}'", function);
                     }
                 }
 
@@ -3301,7 +3301,7 @@ public static class TypeChecker
                 VerifyFunctionDefinition(function);
             }
 
-            if (!function.Flags.HasFlag(FunctionFlags.Varargs) && !function.Flags.HasFlag(FunctionFlags.ExternInitted) && function.ExternLib != null)
+            if (!function.Flags.HasFlag(FunctionFlags.Varargs) && !function.Flags.HasFlag(FunctionFlags.ExternInitted) && (function.ExternLib != null || function.Library != null))
             {
                 function.Flags |= FunctionFlags.ExternInitted;
                 ProgramRunner.InitExternFunction(function);

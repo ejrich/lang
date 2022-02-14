@@ -62,12 +62,12 @@ public static unsafe class ProgramRunner
             argumentTypes[i] = GetType(argument.Type);
         }
 
-        CreateFunction(function.Name, function.ExternLib, argumentTypes, GetType(function.ReturnType));
+        CreateFunction(function, argumentTypes, GetType(function.ReturnType));
     }
 
     public static void InitVarargsFunction(FunctionAst function, Type[] types)
     {
-        CreateFunction(function.Name, function.ExternLib, types, GetType(function.ReturnType));
+        CreateFunction(function, types, GetType(function.ReturnType));
     }
 
     public static Type GetType(IType type)
@@ -106,11 +106,18 @@ public static unsafe class ProgramRunner
         }
     }
 
-    private static void CreateFunction(string name, string library, Type[] argumentTypes, Type returnType)
+    private static void CreateFunction(FunctionAst function, Type[] argumentTypes, Type returnType)
     {
         _functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
 
-        var method = _functionTypeBuilder.DefineMethod(name, MethodAttributes.Public | MethodAttributes.Static, returnType, argumentTypes);
+        var method = _functionTypeBuilder.DefineMethod(function.Name, MethodAttributes.Public | MethodAttributes.Static, returnType, argumentTypes);
+
+        var library = function.Library == null ? function.ExternLib :
+        #if _LINUX
+            $"{function.Library.AbsolutePath}.so";
+        #elif _WINDOWS
+            $"{function.Library.AbsolutePath}.dll";
+        #endif
 
         if (!_libraries.TryGetValue(library, out var libraryDllImport))
         {
@@ -118,11 +125,6 @@ public static unsafe class ProgramRunner
             libraryDllImport = _libraries[library] = new CustomAttributeBuilder(_dllImportConstructor, new []{library});
         }
 
-        /* @Future Uncomment this for when shipping on Windows
-        var dllImport = typeof(DllImportAttribute);
-        var callingConvention = dllImport.GetField("CallingConvention");
-        var caBuilder = new CustomAttributeBuilder(dllImport.GetConstructor(new []{typeof(string)}), new []{library}, new []{callingConvention}, new object[]{CallingConvention.Cdecl});
-        */
         method.SetCustomAttribute(libraryDllImport);
     }
 

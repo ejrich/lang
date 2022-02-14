@@ -129,7 +129,8 @@ public class FunctionAst : IFunction, IType
     public bool Used { get; set; }
     public bool Private { get; set; }
     public string ExternLib { get; set; }
-    public string Library { get; set; }
+    public string LibraryName { get; set; }
+    public Library Library { get; set; }
     public int Syscall { get; set; }
     public IType ParamsElementType { get; set; }
     public IType ReturnType { get; set; }

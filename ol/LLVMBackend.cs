@@ -1294,7 +1294,7 @@ public static unsafe class LLVMBackend
             }
             else
             {
-                BuildSettings.Dependencies.Add(functionAst.ExternLib);
+                BuildSettings.Dependencies.Add(functionAst.Library.AbsolutePath);
             }
         }
         else
