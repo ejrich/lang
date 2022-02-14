@@ -512,7 +512,7 @@ create_window() {
 #if os == OS.Windows {
     running := true;
 
-    s64 handle_window_inputs(Handle* window, MessageType message, u64 wParam, s64 lParam) {
+    s64 handle_window_inputs(Handle* handle, MessageType message, u64 wParam, s64 lParam) {
         result: s64 = 0;
 
         if message == MessageType.WM_CLOSE {
@@ -524,10 +524,12 @@ create_window() {
             }
         }
         else if message == MessageType.WM_SIZE {
-            // TODO Implement me
+            window.width = lParam & 0xFFFF;
+            window.height = (lParam & 0xFFFF0000) >> 16;
+            framebuffer_resized = true;
         }
         else {
-            result = DefWindowProcA(window, message, wParam, lParam);
+            result = DefWindowProcA(handle, message, wParam, lParam);
         }
 
         return result;
