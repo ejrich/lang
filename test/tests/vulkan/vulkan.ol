@@ -446,8 +446,8 @@ create_surface() {
     }
     #if os == OS.Windows {
         surface_create_info: VkWin32SurfaceCreateInfoKHR = {
-            hinstance = window.handle;
-            hwnd = cast(Handle*, window.window);
+            hinstance = GetModuleHandleA(null);
+            hwnd = window.handle;
         }
 
         result = vkCreateWin32SurfaceKHR(instance, &surface_create_info, null, &surface);
@@ -497,15 +497,40 @@ create_window() {
         window.window = x_win; window.graphics_context = gc;
     }
     #if os == OS.Windows {
-        class_name := "MainWClass";
+        class_name := "VulkanWindowClass";
 
         hinstance := GetModuleHandleA(null);
-        window_class: WNDCLASSEXA = { cbSize = size_of(WNDCLASSEXA); style = WindowClassStyle.CS_VREDRAW | WindowClassStyle.CS_HREDRAW; lpfnWndProc = DefWindowProcA; hInstance = hinstance; lpszClassName = class_name.data; }
+        window_class: WNDCLASSEXA = { cbSize = size_of(WNDCLASSEXA); style = WindowClassStyle.CS_VREDRAW | WindowClassStyle.CS_HREDRAW; lpfnWndProc = handle_window_inputs; hInstance = hinstance; lpszClassName = class_name.data; }
         RegisterClassExA(&window_class);
 
         window.handle = CreateWindowExA(0, class_name, window_name, WindowStyle.WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, window.width, window.height, null, null, hinstance, null);
         ShowWindow(window.handle, WindowShow.SW_NORMAL);
         UpdateWindow(window.handle);
+    }
+}
+
+#if os == OS.Windows {
+    running := true;
+
+    s64 handle_window_inputs(Handle* window, MessageType message, u64 wParam, s64 lParam) {
+        result: s64 = 0;
+
+        if message == MessageType.WM_CLOSE {
+            running = false;
+        }
+        else if message == MessageType.WM_KEYDOWN {
+            if wParam == 'Q' {
+                running = false;
+            }
+        }
+        else if message == MessageType.WM_SIZE {
+            // TODO Implement me
+        }
+        else {
+            result = DefWindowProcA(window, message, wParam, lParam);
+        }
+
+        return result;
     }
 }
 
@@ -539,21 +564,16 @@ bool handle_inputs() {
         message: MSG;
 
         while PeekMessageA(&message, null, 0, 0, RemoveMsg.PM_REMOVE) {
-            TranslateMessage(&message);
-
-            if message.message == MessageType.WM_CLOSE {
+            if message.message == MessageType.WM_QUIT {
                 print("Quitting\n");
                 return false;
             }
-            if message.message == MessageType.WM_CHAR {
-                if message.wParam == 'q' {
-                    return false;
-                }
-            }
-            else if message.message == MessageType.EM_REQUESTRESIZE {
-                // TODO Implement me
-            }
+
+            TranslateMessage(&message);
+            DispatchMessageA(&message);
         }
+
+        if !running return false;
     }
 
     // return true;
@@ -1851,6 +1871,12 @@ stbi_image_free(void* image) #extern stb_image
 int create_texture_image(string file, VkImage** texture_image, VkDeviceMemory** texture_image_memory) {
     width, height, max, channels: int;
     pixels := stbi_load(file, &width, &height, &channels, 4);
+
+    if pixels == null {
+        print("Failed to load texture image\n");
+        exit_program(1);
+    }
+
     image_size := width * height * 4;
 
     if width > height max = width;
@@ -1858,10 +1884,6 @@ int create_texture_image(string file, VkImage** texture_image, VkDeviceMemory** 
 
     mip_levels: u32 = cast(u32, floor(log_2(cast(float64, max)))) + 1;
 
-    if pixels == null {
-        print("Failed to load texture image\n");
-        exit_program(1);
-    }
 
     staging_buffer: VkBuffer*;
     staging_buffer_memory: VkDeviceMemory*;
