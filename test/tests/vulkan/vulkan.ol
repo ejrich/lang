@@ -2267,35 +2267,26 @@ load_model() {
         i += 2;
         v, t, n: int;
 
-        parse_obj_line(model_file.data + i, ' ', &v, &t, &n);
+        i += parse_obj_line(model_file.data + i, ' ', &v, &t, &n);
         vertex.position = model_vertex_array[v-1];
         vertex.texture_coord = model_texture_coordinates[t-1];
         model_vertices[index] = vertex;
         model_indices[index] = index;
         index++;
 
-        while model_file[++i] != ' ' {}
-        i++;
-
-        parse_obj_line(model_file.data + i, ' ', &v, &t, &n);
+        i += parse_obj_line(model_file.data + i, ' ', &v, &t, &n);
         vertex.position = model_vertex_array[v-1];
         vertex.texture_coord = model_texture_coordinates[t-1];
         model_vertices[index] = vertex;
         model_indices[index] = index;
         index++;
 
-        while model_file[++i] != ' ' {}
-        i++;
-
-        parse_obj_line(model_file.data + i, '\n', &v, &t, &n);
+        i += parse_obj_line(model_file.data + i, '\n', &v, &t, &n);
         vertex.position = model_vertex_array[v-1];
         vertex.texture_coord = model_texture_coordinates[t-1];
         model_vertices[index] = vertex;
         model_indices[index] = index;
         index++;
-
-        while model_file[++i] != '\n' {}
-        i++;
     }
 
     default_free(model_file.data);

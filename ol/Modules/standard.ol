@@ -256,10 +256,11 @@ u64 get_performance_counter() {
         now: Timespec;
 
         clock_gettime(ClockId.CLOCK_MONOTONIC_RAW, &now);
-        counter += now.tv_sec * 1000000000 + now.tv_nsec;
+        counter = now.tv_sec * 1000000000 + now.tv_nsec;
     }
     #if os == OS.Windows {
         QueryPerformanceCounter(&counter);
+        counter *= 100; // Convert to ns
     }
 
     return counter;
