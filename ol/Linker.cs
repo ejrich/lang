@@ -34,12 +34,14 @@ public static class Linker
         var libDirectory = DetermineLibDirectory();
         var defaultObjects = DefaultObjects();
         var executableFile = Path.Combine(binaryPath, BuildSettings.Name);
-        var dependencies = string.Join(' ', BuildSettings.Dependencies);
 
         // 3. Run the linker
         #if _LINUX
         var linker = DetermineLinker(BuildSettings.Linker, libDirectory);
         var libraries = string.Join(' ', BuildSettings.Libraries.Select(lib => $"-l{lib}"));
+        var dependencies = BuildSettings.Linker == LinkerType.Static ?
+            string.Join(' ', BuildSettings.Dependencies.Select(lib => $"{lib}.a")) :
+            string.Join(' ', BuildSettings.Dependencies.Select(lib => $"{lib}.so"));
 
         var linkerArguments = $"{linker} -o {executableFile} {objectFile} {defaultObjects} --start-group {libraries} {dependencies} --end-group";
 
@@ -48,6 +50,7 @@ public static class Linker
         var debug = BuildSettings.Release ? string.Empty : "-debug ";
         var libraryDirectories = string.Join(' ', BuildSettings.LibraryDirectories.Select(d => $"/libpath:\"{d}\""));
         var libraries = string.Join(' ', BuildSettings.Libraries.Select(lib => $"{lib}.lib"));
+        var dependencies = string.Join(' ', BuildSettings.Dependencies.Select(lib => $"{lib}.lib"));
 
         var linkerArguments = $"/entry:_start {debug}/out:{executableFile}.exe {objectFile} {defaultObjects} /libpath:\"{libDirectory.FullName}\" {libraryDirectories} {libraries} {dependencies}";
 

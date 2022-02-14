@@ -535,6 +535,8 @@ public class Library
     public string Name { get; set; }
     public string Path { get; set; }
     public string AbsolutePath { get; set; }
+    public bool HasLib { get; set; }
+    public bool HasDll { get; set; }
 }
 
 public class CastAst : IAst

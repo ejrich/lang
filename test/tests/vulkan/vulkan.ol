@@ -1843,12 +1843,7 @@ create_descriptor_sets(Array<VkDescriptorSet*>* descriptor_sets, VkImageView* te
 texture_image: VkImage*;
 texture_image_memory: VkDeviceMemory*;
 
-// #if os == OS.Windows {
-//     #library stb_image "lib/stb_image"
-// }
-// else {
-    #library stb_image "lib/stb_image.so"
-// }
+#library stb_image "lib/stb_image"
 
 u8* stbi_load(string filename, int* x, int* y, int* comp, int req_comp) #extern stb_image
 stbi_image_free(void* image) #extern stb_image
@@ -2185,9 +2180,6 @@ model_descriptor_sets: Array<VkDescriptorSet*>;
 model_vertices: Array<Vertex>;
 model_indices: Array<u32>;
 
-float strtof(u8* str, u8** end) #extern "c"
-int sscanf(string str, string format, ... args) #extern "c"
-
 load_model() {
     _, model_file := read_file("test/tests/vulkan/models/viking_room.obj");
 
@@ -2206,15 +2198,15 @@ load_model() {
     while i < vt {
         // Move over 'v '
         i += 2;
-        x := strtof(model_file.data + i, null);
+        x := parse_float(model_file.data + i);
         while model_file[++i] != ' ' {}
         i++;
 
-        y := strtof(model_file.data + i, null);
+        y := parse_float(model_file.data + i);
         while model_file[++i] != ' ' {}
         i++;
 
-        z := strtof(model_file.data + i, null) + 0.5;
+        z := parse_float(model_file.data + i) + 0.5;
         while model_file[++i] != '\n' {}
         i++;
 
@@ -2227,11 +2219,11 @@ load_model() {
     while i < vn {
         // Move over 'vt '
         i += 3;
-        x := strtof(model_file.data + i, null);
+        x := parse_float(model_file.data + i);
         while model_file[++i] != ' ' {}
         i++;
 
-        y := 1.0 - strtof(model_file.data + i, null);
+        y := 1.0 - parse_float(model_file.data + i);
         while model_file[++i] != '\n' {}
         i++;
 
@@ -2253,7 +2245,7 @@ load_model() {
         i += 2;
         v, t, n: int;
 
-        sscanf(model_file.data + i, "%d/%d/%d", &v, &t, &n);
+        parse_obj_line(model_file.data + i, ' ', &v, &t, &n);
         vertex.position = model_vertex_array[v-1];
         vertex.texture_coord = model_texture_coordinates[t-1];
         model_vertices[index] = vertex;
@@ -2263,7 +2255,7 @@ load_model() {
         while model_file[++i] != ' ' {}
         i++;
 
-        sscanf(model_file.data + i, "%d/%d/%d", &v, &t, &n);
+        parse_obj_line(model_file.data + i, ' ', &v, &t, &n);
         vertex.position = model_vertex_array[v-1];
         vertex.texture_coord = model_texture_coordinates[t-1];
         model_vertices[index] = vertex;
@@ -2273,7 +2265,7 @@ load_model() {
         while model_file[++i] != ' ' {}
         i++;
 
-        sscanf(model_file.data + i, "%d/%d/%d", &v, &t, &n);
+        parse_obj_line(model_file.data + i, '\n', &v, &t, &n);
         vertex.position = model_vertex_array[v-1];
         vertex.texture_coord = model_texture_coordinates[t-1];
         model_vertices[index] = vertex;
@@ -2325,6 +2317,74 @@ int find_remaining_lines(string value, s64 index = 0) {
     }
 
     return lines;
+}
+
+float parse_float(u8* str) {
+    whole := 0;
+    decimal := 0.0;
+    i := 0;
+
+    negative := false;
+    digit := str[i++];
+    if digit == '-' {
+        negative = true;
+        digit = str[i++];
+    }
+
+    parsing_decimal := false;
+    decimal_factor := 0.1;
+    while digit == '.' || (digit >= '0' && digit <= '9') {
+        if digit == '.' {
+            parsing_decimal = true;
+        }
+        else if parsing_decimal {
+            decimal += decimal_factor * (digit - '0');
+            decimal_factor /= 10.0;
+        }
+        else {
+            whole *= 10;
+            whole += digit - '0';
+        }
+        digit = str[i++];
+    }
+
+    value := whole + decimal;
+    if negative value *= -1.0;
+
+    return value;
+}
+
+int parse_obj_line(u8* str, u8 end_char, int* x, int* y, int* z) {
+    value := 0;
+    i := 0;
+
+    digit := str[i++];
+    while digit != '/' {
+        value *= 10;
+        value += digit - '0';
+        digit = str[i++];
+    }
+    *x = value;
+
+    value = 0;
+    digit = str[i++];
+    while digit != '/' {
+        value *= 10;
+        value += digit - '0';
+        digit = str[i++];
+    }
+    *y = value;
+
+    value = 0;
+    digit = str[i++];
+    while digit != end_char {
+        value *= 10;
+        value += digit - '0';
+        digit = str[i++];
+    }
+    *z = value;
+
+    return i;
 }
 
 
@@ -2480,7 +2540,7 @@ create_color_resources() {
 
 
 #run {
-    main();
+    // main();
     set_output_type_table(OutputTypeTableConfiguration.Used);
 
     if os != OS.Windows {
