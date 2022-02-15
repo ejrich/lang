@@ -29,3 +29,5 @@ set_output_type_table(OutputTypeTableConfiguration config) #compiler
 set_output_directory(string path) #compiler
 
 add_library_directory(string path) #compiler
+
+copy_to_output_directory(string file) #compiler

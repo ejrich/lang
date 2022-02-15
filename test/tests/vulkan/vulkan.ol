@@ -2558,7 +2558,10 @@ create_color_resources() {
     main();
     set_output_type_table(OutputTypeTableConfiguration.Used);
 
-    if os != OS.Windows {
+    if os == OS.Windows {
+        copy_to_output_directory("lib/stb_image.dll");
+    }
+    else {
         set_linker(LinkerType.Dynamic);
     }
 }

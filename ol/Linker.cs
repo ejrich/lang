@@ -7,7 +7,7 @@ namespace ol;
 
 public static class Linker
 {
-    private const string BinaryDirectory = "bin";
+    private const string DefaultOutputDirectory = "bin";
 
     #if _LINUX
     private const string LinkerName = "ld";
@@ -18,24 +18,31 @@ public static class Linker
     public static void Link(string objectFile)
     {
         // 1. Verify bin directory exists
-        string binaryPath;
+        string outputDirectory;
         if (BuildSettings.OutputDirectory == null)
         {
-            binaryPath = Path.Combine(BuildSettings.Path, BinaryDirectory);
-            if (!Directory.Exists(binaryPath))
-                Directory.CreateDirectory(binaryPath);
+            outputDirectory = Path.Combine(BuildSettings.Path, DefaultOutputDirectory);
+            if (!Directory.Exists(outputDirectory))
+                Directory.CreateDirectory(outputDirectory);
         }
         else
         {
-            binaryPath = BuildSettings.OutputDirectory;
+            outputDirectory = BuildSettings.OutputDirectory;
         }
 
-        // 2. Determine lib directories
+        // 2. Copy files to the output directory
+        foreach (var file in BuildSettings.FilesToCopy)
+        {
+            var outputPath = Path.Combine(outputDirectory, file.Name);
+            File.Copy(file.FullName, outputPath, true);
+        }
+
+        // 3. Determine lib directories
         var libDirectory = DetermineLibDirectory();
         var defaultObjects = DefaultObjects();
-        var executableFile = Path.Combine(binaryPath, BuildSettings.Name);
+        var executableFile = Path.Combine(outputDirectory, BuildSettings.Name);
 
-        // 3. Run the linker
+        // 4. Run the linker
         #if _LINUX
         var linker = DetermineLinker(BuildSettings.Linker, libDirectory);
         var libraries = string.Join(' ', BuildSettings.Libraries.Select(lib => $"-l{lib}"));
