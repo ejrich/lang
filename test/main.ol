@@ -76,7 +76,7 @@ command_buffer: void*;
 
 int run_command(string command) {
     #if os == OS.Windows {
-        sa: SecurityAttributes = { nLength = size_of(SecurityAttributes); bInheritHandle = true; }
+        sa: SECURITY_ATTRIBUTES = { nLength = size_of(SECURITY_ATTRIBUTES); bInheritHandle = true; }
         stdOutRd, stdOutWr: Handle*;
 
         if !CreatePipe(&stdOutRd, &stdOutWr, &sa, 0) {
@@ -84,8 +84,8 @@ int run_command(string command) {
         }
         SetHandleInformation(stdOutRd, HandleFlags.HANDLE_FLAG_INHERIT, HandleFlags.None);
 
-        si: StartupInfo = { cb = size_of(StartupInfo); dwFlags = 0x100; hStdInput = GetStdHandle(STD_INPUT_HANDLE); hStdOutput = stdOutWr; }
-        pi: ProcessInformation;
+        si: STARTUPINFOA = { cb = size_of(STARTUPINFOA); dwFlags = 0x100; hStdInput = GetStdHandle(STD_INPUT_HANDLE); hStdOutput = stdOutWr; }
+        pi: PROCESS_INFORMATION;
 
         if !CreateProcessA(null, command, null, null, true, 0, null, null, &si, &pi) {
             CloseHandle(stdOutRd);
