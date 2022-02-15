@@ -229,7 +229,12 @@ public static unsafe class LLVMBackend
             _debugFiles = BuildSettings.Files.Select(file => _debugBuilder.CreateFile(Path.GetFileName(file), Path.GetDirectoryName(file))).ToList();
             _debugCompilationUnit = _debugBuilder.CreateCompileUnit(LLVMDWARFSourceLanguage.LLVMDWARFSourceLanguageC, _debugFiles[0], "ol", 0, string.Empty, 0, string.Empty, LLVMDWARFEmissionKind.LLVMDWARFEmissionFull, 0, 0, 0, string.Empty, string.Empty);
 
+            #if _LINUX
             AddModuleFlag("Dwarf Version", 4);
+            #elif _WINDOWS
+            AddModuleFlag("CodeView", 1);
+            AddModuleFlag("uwtable", 1);
+            #endif
             AddModuleFlag("Debug Info Version", LLVM.DebugMetadataVersion());
             AddModuleFlag("PIE Level", 2);
 
