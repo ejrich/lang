@@ -112,12 +112,13 @@ public static unsafe class ProgramRunner
 
         var method = _functionTypeBuilder.DefineMethod(function.Name, MethodAttributes.Public | MethodAttributes.Static, returnType, argumentTypes);
 
-        var library = function.Library == null ? function.ExternLib :
+        var library = function.Library == null ? function.ExternLib : function.Library.FileName == null ?
         #if _LINUX
-            $"{function.Library.AbsolutePath}.so";
+            $"{function.Library.AbsolutePath}.so" :
         #elif _WINDOWS
-            $"{function.Library.AbsolutePath}.dll";
+            $"{function.Library.AbsolutePath}.dll" :
         #endif
+            function.Library.FileName;
 
         if (!_libraries.TryGetValue(library, out var libraryDllImport))
         {

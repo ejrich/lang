@@ -342,6 +342,10 @@ public static class TypeChecker
                 {
                     AddLibrary(directive);
                 }
+                else if (directive.Type == DirectiveType.SystemLibrary)
+                {
+                    AddSystemLibrary(directive);
+                }
                 else
                 {
                     Parser.Directives.Add(directive);
@@ -705,6 +709,20 @@ public static class TypeChecker
             ErrorReporter.Report($"Unable to find .lib/.dll '{library.Path}' of library '{library.Name}'", directive);
         }
         #endif
+
+        if (!_libraries.TryAdd(library.Name, library))
+        {
+            ErrorReporter.Report($"Library '{library.Name}' already defined", directive);
+        }
+    }
+
+    public static void AddSystemLibrary(CompilerDirectiveAst directive)
+    {
+        var library = directive.Library;
+        if (library.LibPath != null && !Directory.Exists(library.LibPath))
+        {
+            ErrorReporter.Report($"Libary path '{library.LibPath}' of library '{library.Name}' does not exist", directive);
+        }
 
         if (!_libraries.TryAdd(library.Name, library))
         {

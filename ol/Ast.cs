@@ -536,6 +536,8 @@ public class Library
     public string Name { get; set; }
     public string Path { get; set; }
     public string AbsolutePath { get; set; }
+    public string FileName { get; set; }
+    public string LibPath { get; set; }
     public bool HasLib { get; set; }
     public bool HasDll { get; set; }
 }
@@ -727,7 +729,8 @@ public enum DirectiveType
     Assert,
     ImportModule,
     ImportFile,
-    Library
+    Library,
+    SystemLibrary
 }
 
 public enum TypeKind
