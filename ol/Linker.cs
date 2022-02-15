@@ -34,7 +34,7 @@ public static class Linker
         foreach (var file in BuildSettings.FilesToCopy)
         {
             var outputPath = Path.Combine(outputDirectory, file.Name);
-            File.Copy(file.FullName, outputPath, true);
+            file.CopyTo(outputPath, true);
         }
 
         // 3. Determine lib directories
