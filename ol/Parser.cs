@@ -259,13 +259,20 @@ public static class Parser
                         ErrorReporter.Report("Compiler directives cannot have attributes", token);
                     }
                     var directive = ParseTopLevelDirective(enumerator, directory, true);
-                    if (directive?.Type == DirectiveType.Library)
+                    if (directive != null)
                     {
-                        TypeChecker.AddLibrary(directive);
-                    }
-                    else
-                    {
-                        Directives.Add(directive);
+                        if (directive.Type == DirectiveType.Library)
+                        {
+                            TypeChecker.AddLibrary(directive);
+                        }
+                        else if (directive.Type == DirectiveType.SystemLibrary)
+                        {
+                            TypeChecker.AddSystemLibrary(directive);
+                        }
+                        else
+                        {
+                            Directives.Add(directive);
+                        }
                     }
                     break;
                 case TokenType.Operator:
@@ -2684,6 +2691,27 @@ public static class Parser
                 else
                 {
                     directive.Library.AbsolutePath = Path.Combine(directory, path);
+                }
+                break;
+            case "system_library":
+                directive.Type = DirectiveType.SystemLibrary;
+                if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Identifier)
+                {
+                    ErrorReporter.Report($"Expected library name, but got '{enumerator.Current.Value}'", enumerator.Current);
+                    return null;
+                }
+                name = enumerator.Current.Value;
+                if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Literal)
+                {
+                    ErrorReporter.Report($"Expected library file name, but got '{enumerator.Current.Value}'", enumerator.Current);
+                    return null;
+                }
+                var fileName = enumerator.Current.Value;
+                directive.Library = new Library {Name = name, FileName = fileName};
+                if (enumerator.Peek(out token) && token.Type == TokenType.Literal)
+                {
+                    directive.Library.LibPath = token.Value;
+                    enumerator.MoveNext();
                 }
                 break;
             case "private":

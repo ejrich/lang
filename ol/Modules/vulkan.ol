@@ -1,6 +1,7 @@
 // Module for functions and types in the Vulkan library
 
 #if os == OS.Linux {
+    #system_library vulkan "vulkan"
     #import X11
 
     VK_KHR_XLIB_SURFACE_EXTENSION_NAME := "VK_KHR_xlib_surface";
@@ -17,11 +18,13 @@
 
     interface u32 PFN_vkGetPhysicalDeviceXlibPresentationSupportKHR(VkPhysicalDevice* physicalDevice, u32 queueFamilyIndex, Display* dpy, u64 visualID)
 
-    VkResult vkCreateXlibSurfaceKHR(VkInstance* instance, VkXlibSurfaceCreateInfoKHR* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSurfaceKHR** pSurface) #extern "vulkan"
+    VkResult vkCreateXlibSurfaceKHR(VkInstance* instance, VkXlibSurfaceCreateInfoKHR* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSurfaceKHR** pSurface) #extern vulkan
 
-    u32 vkGetPhysicalDeviceXlibPresentationSupportKHR(VkPhysicalDevice* physicalDevice, u32 queueFamilyIndex, Display* dpy, u64 visualID) #extern "vulkan"
+    u32 vkGetPhysicalDeviceXlibPresentationSupportKHR(VkPhysicalDevice* physicalDevice, u32 queueFamilyIndex, Display* dpy, u64 visualID) #extern vulkan
 }
 #if os == OS.Windows {
+    #system_library vulkan "vulkan-1" "C:/VulkanSDK/1.2.198.1/Lib"
+
     VK_KHR_WIN32_SURFACE_EXTENSION_NAME := "VK_KHR_win32_surface";
 
     struct VkWin32SurfaceCreateInfoKHR {
@@ -36,9 +39,9 @@
 
     interface u32 PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR(VkPhysicalDevice* physicalDevice, u32 queueFamilyIndex)
 
-    VkResult vkCreateWin32SurfaceKHR(VkInstance* instance, VkWin32SurfaceCreateInfoKHR* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSurfaceKHR** pSurface) #extern "vulkan"
+    VkResult vkCreateWin32SurfaceKHR(VkInstance* instance, VkWin32SurfaceCreateInfoKHR* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSurfaceKHR** pSurface) #extern vulkan
 
-    u32 vkGetPhysicalDeviceWin32PresentationSupportKHR(VkPhysicalDevice* physicalDevice, u32 queueFamilyIndex) #extern "vulkan"
+    u32 vkGetPhysicalDeviceWin32PresentationSupportKHR(VkPhysicalDevice* physicalDevice, u32 queueFamilyIndex) #extern vulkan
 }
 
 VK_TRUE := 1; #const
@@ -3419,279 +3422,279 @@ interface PFN_vkCmdEndRenderPass(VkCommandBuffer* commandBuffer)
 
 interface PFN_vkCmdExecuteCommands(VkCommandBuffer* commandBuffer, u32 commandBufferCount, VkCommandBuffer** pCommandBuffers)
 
-VkResult vkCreateInstance(VkInstanceCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkInstance** pInstance) #extern "vulkan"
+VkResult vkCreateInstance(VkInstanceCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkInstance** pInstance) #extern vulkan
 
-vkDestroyInstance(VkInstance* instance, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyInstance(VkInstance* instance, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkEnumeratePhysicalDevices(VkInstance* instance, u32* pPhysicalDeviceCount, VkPhysicalDevice** pPhysicalDevices) #extern "vulkan"
+VkResult vkEnumeratePhysicalDevices(VkInstance* instance, u32* pPhysicalDeviceCount, VkPhysicalDevice** pPhysicalDevices) #extern vulkan
 
-vkGetPhysicalDeviceFeatures(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceFeatures* pFeatures) #extern "vulkan"
+vkGetPhysicalDeviceFeatures(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceFeatures* pFeatures) #extern vulkan
 
-vkGetPhysicalDeviceFormatProperties(VkPhysicalDevice* physicalDevice, VkFormat format, VkFormatProperties* pFormatProperties) #extern "vulkan"
+vkGetPhysicalDeviceFormatProperties(VkPhysicalDevice* physicalDevice, VkFormat format, VkFormatProperties* pFormatProperties) #extern vulkan
 
-VkResult vkGetPhysicalDeviceImageFormatProperties(VkPhysicalDevice* physicalDevice, VkFormat format, VkImageType type, VkImageTiling tiling, u32 usage, u32 flags, VkImageFormatProperties* pImageFormatProperties) #extern "vulkan"
+VkResult vkGetPhysicalDeviceImageFormatProperties(VkPhysicalDevice* physicalDevice, VkFormat format, VkImageType type, VkImageTiling tiling, u32 usage, u32 flags, VkImageFormatProperties* pImageFormatProperties) #extern vulkan
 
-vkGetPhysicalDeviceProperties(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceProperties* pProperties) #extern "vulkan"
+vkGetPhysicalDeviceProperties(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceProperties* pProperties) #extern vulkan
 
-vkGetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice* physicalDevice, u32* pQueueFamilyPropertyCount, VkQueueFamilyProperties* pQueueFamilyProperties) #extern "vulkan"
+vkGetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice* physicalDevice, u32* pQueueFamilyPropertyCount, VkQueueFamilyProperties* pQueueFamilyProperties) #extern vulkan
 
-vkGetPhysicalDeviceMemoryProperties(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceMemoryProperties* pMemoryProperties) #extern "vulkan"
+vkGetPhysicalDeviceMemoryProperties(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceMemoryProperties* pMemoryProperties) #extern vulkan
 
-void* vkGetInstanceProcAddr(VkInstance* instance, u8* pName) #extern "vulkan"
+void* vkGetInstanceProcAddr(VkInstance* instance, u8* pName) #extern vulkan
 
-void* vkGetDeviceProcAddr(VkDevice* device, u8* pName) #extern "vulkan"
+void* vkGetDeviceProcAddr(VkDevice* device, u8* pName) #extern vulkan
 
-VkResult vkCreateDevice(VkPhysicalDevice* physicalDevice, VkDeviceCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkDevice** pDevice) #extern "vulkan"
+VkResult vkCreateDevice(VkPhysicalDevice* physicalDevice, VkDeviceCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkDevice** pDevice) #extern vulkan
 
-vkDestroyDevice(VkDevice* device, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyDevice(VkDevice* device, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkEnumerateInstanceExtensionProperties(u8* pLayerName, u32* pPropertyCount, VkExtensionProperties* pProperties) #extern "vulkan"
+VkResult vkEnumerateInstanceExtensionProperties(u8* pLayerName, u32* pPropertyCount, VkExtensionProperties* pProperties) #extern vulkan
 
-VkResult vkEnumerateDeviceExtensionProperties(VkPhysicalDevice* physicalDevice, u8* pLayerName, u32* pPropertyCount, VkExtensionProperties* pProperties) #extern "vulkan"
+VkResult vkEnumerateDeviceExtensionProperties(VkPhysicalDevice* physicalDevice, u8* pLayerName, u32* pPropertyCount, VkExtensionProperties* pProperties) #extern vulkan
 
-VkResult vkEnumerateInstanceLayerProperties(u32* pPropertyCount, VkLayerProperties* pProperties) #extern "vulkan"
+VkResult vkEnumerateInstanceLayerProperties(u32* pPropertyCount, VkLayerProperties* pProperties) #extern vulkan
 
-VkResult vkEnumerateDeviceLayerProperties(VkPhysicalDevice* physicalDevice, u32* pPropertyCount, VkLayerProperties* pProperties) #extern "vulkan"
+VkResult vkEnumerateDeviceLayerProperties(VkPhysicalDevice* physicalDevice, u32* pPropertyCount, VkLayerProperties* pProperties) #extern vulkan
 
-vkGetDeviceQueue(VkDevice* device, u32 queueFamilyIndex, u32 queueIndex, VkQueue** pQueue) #extern "vulkan"
+vkGetDeviceQueue(VkDevice* device, u32 queueFamilyIndex, u32 queueIndex, VkQueue** pQueue) #extern vulkan
 
-VkResult vkQueueSubmit(VkQueue* queue, u32 submitCount, VkSubmitInfo* pSubmits, VkFence* fence) #extern "vulkan"
+VkResult vkQueueSubmit(VkQueue* queue, u32 submitCount, VkSubmitInfo* pSubmits, VkFence* fence) #extern vulkan
 
-VkResult vkQueueWaitIdle(VkQueue* queue) #extern "vulkan"
+VkResult vkQueueWaitIdle(VkQueue* queue) #extern vulkan
 
-VkResult vkDeviceWaitIdle(VkDevice* device) #extern "vulkan"
+VkResult vkDeviceWaitIdle(VkDevice* device) #extern vulkan
 
-VkResult vkAllocateMemory(VkDevice* device, VkMemoryAllocateInfo* pAllocateInfo, VkAllocationCallbacks* pAllocator, VkDeviceMemory** pMemory) #extern "vulkan"
+VkResult vkAllocateMemory(VkDevice* device, VkMemoryAllocateInfo* pAllocateInfo, VkAllocationCallbacks* pAllocator, VkDeviceMemory** pMemory) #extern vulkan
 
-vkFreeMemory(VkDevice* device, VkDeviceMemory* memory, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkFreeMemory(VkDevice* device, VkDeviceMemory* memory, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkMapMemory(VkDevice* device, VkDeviceMemory* memory, u64 offset, u64 size, u32 flags, void** ppData) #extern "vulkan"
+VkResult vkMapMemory(VkDevice* device, VkDeviceMemory* memory, u64 offset, u64 size, u32 flags, void** ppData) #extern vulkan
 
-vkUnmapMemory(VkDevice* device, VkDeviceMemory* memory) #extern "vulkan"
+vkUnmapMemory(VkDevice* device, VkDeviceMemory* memory) #extern vulkan
 
-VkResult vkFlushMappedMemoryRanges(VkDevice* device, u32 memoryRangeCount, VkMappedMemoryRange* pMemoryRanges) #extern "vulkan"
+VkResult vkFlushMappedMemoryRanges(VkDevice* device, u32 memoryRangeCount, VkMappedMemoryRange* pMemoryRanges) #extern vulkan
 
-VkResult vkInvalidateMappedMemoryRanges(VkDevice* device, u32 memoryRangeCount, VkMappedMemoryRange* pMemoryRanges) #extern "vulkan"
+VkResult vkInvalidateMappedMemoryRanges(VkDevice* device, u32 memoryRangeCount, VkMappedMemoryRange* pMemoryRanges) #extern vulkan
 
-vkGetDeviceMemoryCommitment(VkDevice* device, VkDeviceMemory* memory, u64* pCommittedMemoryInBytes) #extern "vulkan"
+vkGetDeviceMemoryCommitment(VkDevice* device, VkDeviceMemory* memory, u64* pCommittedMemoryInBytes) #extern vulkan
 
-VkResult vkBindBufferMemory(VkDevice* device, VkBuffer* buffer, VkDeviceMemory* memory, u64 memoryOffset) #extern "vulkan"
+VkResult vkBindBufferMemory(VkDevice* device, VkBuffer* buffer, VkDeviceMemory* memory, u64 memoryOffset) #extern vulkan
 
-VkResult vkBindImageMemory(VkDevice* device, VkImage* image, VkDeviceMemory* memory, u64 memoryOffset) #extern "vulkan"
+VkResult vkBindImageMemory(VkDevice* device, VkImage* image, VkDeviceMemory* memory, u64 memoryOffset) #extern vulkan
 
-vkGetBufferMemoryRequirements(VkDevice* device, VkBuffer* buffer, VkMemoryRequirements* pMemoryRequirements) #extern "vulkan"
+vkGetBufferMemoryRequirements(VkDevice* device, VkBuffer* buffer, VkMemoryRequirements* pMemoryRequirements) #extern vulkan
 
-vkGetImageMemoryRequirements(VkDevice* device, VkImage* image, VkMemoryRequirements* pMemoryRequirements) #extern "vulkan"
+vkGetImageMemoryRequirements(VkDevice* device, VkImage* image, VkMemoryRequirements* pMemoryRequirements) #extern vulkan
 
-vkGetImageSparseMemoryRequirements(VkDevice* device, VkImage* image, u32* pSparseMemoryRequirementCount, VkSparseImageMemoryRequirements* pSparseMemoryRequirements) #extern "vulkan"
+vkGetImageSparseMemoryRequirements(VkDevice* device, VkImage* image, u32* pSparseMemoryRequirementCount, VkSparseImageMemoryRequirements* pSparseMemoryRequirements) #extern vulkan
 
-vkGetPhysicalDeviceSparseImageFormatProperties(VkPhysicalDevice* physicalDevice, VkFormat format, VkImageType type, VkSampleCountFlagBits samples, u32 usage, VkImageTiling tiling, u32* pPropertyCount, VkSparseImageFormatProperties* pProperties) #extern "vulkan"
+vkGetPhysicalDeviceSparseImageFormatProperties(VkPhysicalDevice* physicalDevice, VkFormat format, VkImageType type, VkSampleCountFlagBits samples, u32 usage, VkImageTiling tiling, u32* pPropertyCount, VkSparseImageFormatProperties* pProperties) #extern vulkan
 
-VkResult vkQueueBindSparse(VkQueue* queue, u32 bindInfoCount, VkBindSparseInfo* pBindInfo, VkFence* fence) #extern "vulkan"
+VkResult vkQueueBindSparse(VkQueue* queue, u32 bindInfoCount, VkBindSparseInfo* pBindInfo, VkFence* fence) #extern vulkan
 
-VkResult vkCreateFence(VkDevice* device, VkFenceCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkFence** pFence) #extern "vulkan"
+VkResult vkCreateFence(VkDevice* device, VkFenceCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkFence** pFence) #extern vulkan
 
-vkDestroyFence(VkDevice* device, VkFence* fence, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyFence(VkDevice* device, VkFence* fence, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkResetFences(VkDevice* device, u32 fenceCount, VkFence** pFences) #extern "vulkan"
+VkResult vkResetFences(VkDevice* device, u32 fenceCount, VkFence** pFences) #extern vulkan
 
-VkResult vkGetFenceStatus(VkDevice* device, VkFence* fence) #extern "vulkan"
+VkResult vkGetFenceStatus(VkDevice* device, VkFence* fence) #extern vulkan
 
-VkResult vkWaitForFences(VkDevice* device, u32 fenceCount, VkFence** pFences, u32 waitAll, u64 timeout) #extern "vulkan"
+VkResult vkWaitForFences(VkDevice* device, u32 fenceCount, VkFence** pFences, u32 waitAll, u64 timeout) #extern vulkan
 
-VkResult vkCreateSemaphore(VkDevice* device, VkSemaphoreCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSemaphore** pSemaphore) #extern "vulkan"
+VkResult vkCreateSemaphore(VkDevice* device, VkSemaphoreCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSemaphore** pSemaphore) #extern vulkan
 
-vkDestroySemaphore(VkDevice* device, VkSemaphore* semaphore, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroySemaphore(VkDevice* device, VkSemaphore* semaphore, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkCreateEvent(VkDevice* device, VkEventCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkEvent** pEvent) #extern "vulkan"
+VkResult vkCreateEvent(VkDevice* device, VkEventCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkEvent** pEvent) #extern vulkan
 
-vkDestroyEvent(VkDevice* device, VkEvent* event, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyEvent(VkDevice* device, VkEvent* event, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkGetEventStatus(VkDevice* device, VkEvent* event) #extern "vulkan"
+VkResult vkGetEventStatus(VkDevice* device, VkEvent* event) #extern vulkan
 
-VkResult vkSetEvent(VkDevice* device, VkEvent* event) #extern "vulkan"
+VkResult vkSetEvent(VkDevice* device, VkEvent* event) #extern vulkan
 
-VkResult vkResetEvent(VkDevice* device, VkEvent* event) #extern "vulkan"
+VkResult vkResetEvent(VkDevice* device, VkEvent* event) #extern vulkan
 
-VkResult vkCreateQueryPool(VkDevice* device, VkQueryPoolCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkQueryPool** pQueryPool) #extern "vulkan"
+VkResult vkCreateQueryPool(VkDevice* device, VkQueryPoolCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkQueryPool** pQueryPool) #extern vulkan
 
-vkDestroyQueryPool(VkDevice* device, VkQueryPool* queryPool, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyQueryPool(VkDevice* device, VkQueryPool* queryPool, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkGetQueryPoolResults(VkDevice* device, VkQueryPool* queryPool, u32 firstQuery, u32 queryCount, u64 dataSize, void* pData, u64 stride, u32 flags) #extern "vulkan"
+VkResult vkGetQueryPoolResults(VkDevice* device, VkQueryPool* queryPool, u32 firstQuery, u32 queryCount, u64 dataSize, void* pData, u64 stride, u32 flags) #extern vulkan
 
-VkResult vkCreateBuffer(VkDevice* device, VkBufferCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkBuffer** pBuffer) #extern "vulkan"
+VkResult vkCreateBuffer(VkDevice* device, VkBufferCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkBuffer** pBuffer) #extern vulkan
 
-vkDestroyBuffer(VkDevice* device, VkBuffer* buffer, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyBuffer(VkDevice* device, VkBuffer* buffer, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkCreateBufferView(VkDevice* device, VkBufferViewCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkBufferView** pView) #extern "vulkan"
+VkResult vkCreateBufferView(VkDevice* device, VkBufferViewCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkBufferView** pView) #extern vulkan
 
-vkDestroyBufferView(VkDevice* device, VkBufferView* bufferView, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyBufferView(VkDevice* device, VkBufferView* bufferView, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkCreateImage(VkDevice* device, VkImageCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkImage** pImage) #extern "vulkan"
+VkResult vkCreateImage(VkDevice* device, VkImageCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkImage** pImage) #extern vulkan
 
-vkDestroyImage(VkDevice* device, VkImage* image, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyImage(VkDevice* device, VkImage* image, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-vkGetImageSubresourceLayout(VkDevice* device, VkImage* image, VkImageSubresource* pSubresource, VkSubresourceLayout* pLayout) #extern "vulkan"
+vkGetImageSubresourceLayout(VkDevice* device, VkImage* image, VkImageSubresource* pSubresource, VkSubresourceLayout* pLayout) #extern vulkan
 
-VkResult vkCreateImageView(VkDevice* device, VkImageViewCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkImageView** pView) #extern "vulkan"
+VkResult vkCreateImageView(VkDevice* device, VkImageViewCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkImageView** pView) #extern vulkan
 
-vkDestroyImageView(VkDevice* device, VkImageView* imageView, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyImageView(VkDevice* device, VkImageView* imageView, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkCreateShaderModule(VkDevice* device, VkShaderModuleCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkShaderModule** pShaderModule) #extern "vulkan"
+VkResult vkCreateShaderModule(VkDevice* device, VkShaderModuleCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkShaderModule** pShaderModule) #extern vulkan
 
-vkDestroyShaderModule(VkDevice* device, VkShaderModule* shaderModule, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyShaderModule(VkDevice* device, VkShaderModule* shaderModule, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkCreatePipelineCache(VkDevice* device, VkPipelineCacheCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkPipelineCache** pPipelineCache) #extern "vulkan"
+VkResult vkCreatePipelineCache(VkDevice* device, VkPipelineCacheCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkPipelineCache** pPipelineCache) #extern vulkan
 
-vkDestroyPipelineCache(VkDevice* device, VkPipelineCache* pipelineCache, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyPipelineCache(VkDevice* device, VkPipelineCache* pipelineCache, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkGetPipelineCacheData(VkDevice* device, VkPipelineCache* pipelineCache, u64* pDataSize, void* pData) #extern "vulkan"
+VkResult vkGetPipelineCacheData(VkDevice* device, VkPipelineCache* pipelineCache, u64* pDataSize, void* pData) #extern vulkan
 
-VkResult vkMergePipelineCaches(VkDevice* device, VkPipelineCache* dstCache, u32 srcCacheCount, VkPipelineCache** pSrcCaches) #extern "vulkan"
+VkResult vkMergePipelineCaches(VkDevice* device, VkPipelineCache* dstCache, u32 srcCacheCount, VkPipelineCache** pSrcCaches) #extern vulkan
 
-VkResult vkCreateGraphicsPipelines(VkDevice* device, VkPipelineCache* pipelineCache, u32 createInfoCount, VkGraphicsPipelineCreateInfo* pCreateInfos, VkAllocationCallbacks* pAllocator, VkPipeline** pPipelines) #extern "vulkan"
+VkResult vkCreateGraphicsPipelines(VkDevice* device, VkPipelineCache* pipelineCache, u32 createInfoCount, VkGraphicsPipelineCreateInfo* pCreateInfos, VkAllocationCallbacks* pAllocator, VkPipeline** pPipelines) #extern vulkan
 
-VkResult vkCreateComputePipelines(VkDevice* device, VkPipelineCache* pipelineCache, u32 createInfoCount, VkComputePipelineCreateInfo* pCreateInfos, VkAllocationCallbacks* pAllocator, VkPipeline** pPipelines) #extern "vulkan"
+VkResult vkCreateComputePipelines(VkDevice* device, VkPipelineCache* pipelineCache, u32 createInfoCount, VkComputePipelineCreateInfo* pCreateInfos, VkAllocationCallbacks* pAllocator, VkPipeline** pPipelines) #extern vulkan
 
-vkDestroyPipeline(VkDevice* device, VkPipeline* pipeline, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyPipeline(VkDevice* device, VkPipeline* pipeline, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkCreatePipelineLayout(VkDevice* device, VkPipelineLayoutCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkPipelineLayout** pPipelineLayout) #extern "vulkan"
+VkResult vkCreatePipelineLayout(VkDevice* device, VkPipelineLayoutCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkPipelineLayout** pPipelineLayout) #extern vulkan
 
-vkDestroyPipelineLayout(VkDevice* device, VkPipelineLayout* pipelineLayout, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyPipelineLayout(VkDevice* device, VkPipelineLayout* pipelineLayout, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkCreateSampler(VkDevice* device, VkSamplerCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSampler** pSampler) #extern "vulkan"
+VkResult vkCreateSampler(VkDevice* device, VkSamplerCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSampler** pSampler) #extern vulkan
 
-vkDestroySampler(VkDevice* device, VkSampler* sampler, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroySampler(VkDevice* device, VkSampler* sampler, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkCreateDescriptorSetLayout(VkDevice* device, VkDescriptorSetLayoutCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkDescriptorSetLayout** pSetLayout) #extern "vulkan"
+VkResult vkCreateDescriptorSetLayout(VkDevice* device, VkDescriptorSetLayoutCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkDescriptorSetLayout** pSetLayout) #extern vulkan
 
-vkDestroyDescriptorSetLayout(VkDevice* device, VkDescriptorSetLayout* descriptorSetLayout, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyDescriptorSetLayout(VkDevice* device, VkDescriptorSetLayout* descriptorSetLayout, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkCreateDescriptorPool(VkDevice* device, VkDescriptorPoolCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkDescriptorPool** pDescriptorPool) #extern "vulkan"
+VkResult vkCreateDescriptorPool(VkDevice* device, VkDescriptorPoolCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkDescriptorPool** pDescriptorPool) #extern vulkan
 
-vkDestroyDescriptorPool(VkDevice* device, VkDescriptorPool* descriptorPool, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyDescriptorPool(VkDevice* device, VkDescriptorPool* descriptorPool, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkResetDescriptorPool(VkDevice* device, VkDescriptorPool* descriptorPool, u32 flags) #extern "vulkan"
+VkResult vkResetDescriptorPool(VkDevice* device, VkDescriptorPool* descriptorPool, u32 flags) #extern vulkan
 
-VkResult vkAllocateDescriptorSets(VkDevice* device, VkDescriptorSetAllocateInfo* pAllocateInfo, VkDescriptorSet** pDescriptorSets) #extern "vulkan"
+VkResult vkAllocateDescriptorSets(VkDevice* device, VkDescriptorSetAllocateInfo* pAllocateInfo, VkDescriptorSet** pDescriptorSets) #extern vulkan
 
-VkResult vkFreeDescriptorSets(VkDevice* device, VkDescriptorPool* descriptorPool, u32 descriptorSetCount, VkDescriptorSet** pDescriptorSets) #extern "vulkan"
+VkResult vkFreeDescriptorSets(VkDevice* device, VkDescriptorPool* descriptorPool, u32 descriptorSetCount, VkDescriptorSet** pDescriptorSets) #extern vulkan
 
-vkUpdateDescriptorSets(VkDevice* device, u32 descriptorWriteCount, VkWriteDescriptorSet* pDescriptorWrites, u32 descriptorCopyCount, VkCopyDescriptorSet* pDescriptorCopies) #extern "vulkan"
+vkUpdateDescriptorSets(VkDevice* device, u32 descriptorWriteCount, VkWriteDescriptorSet* pDescriptorWrites, u32 descriptorCopyCount, VkCopyDescriptorSet* pDescriptorCopies) #extern vulkan
 
-VkResult vkCreateFramebuffer(VkDevice* device, VkFramebufferCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkFramebuffer** pFramebuffer) #extern "vulkan"
+VkResult vkCreateFramebuffer(VkDevice* device, VkFramebufferCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkFramebuffer** pFramebuffer) #extern vulkan
 
-vkDestroyFramebuffer(VkDevice* device, VkFramebuffer* framebuffer, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyFramebuffer(VkDevice* device, VkFramebuffer* framebuffer, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkCreateRenderPass(VkDevice* device, VkRenderPassCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkRenderPass** pRenderPass) #extern "vulkan"
+VkResult vkCreateRenderPass(VkDevice* device, VkRenderPassCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkRenderPass** pRenderPass) #extern vulkan
 
-vkDestroyRenderPass(VkDevice* device, VkRenderPass* renderPass, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyRenderPass(VkDevice* device, VkRenderPass* renderPass, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-vkGetRenderAreaGranularity(VkDevice* device, VkRenderPass* renderPass, VkExtent2D* pGranularity) #extern "vulkan"
+vkGetRenderAreaGranularity(VkDevice* device, VkRenderPass* renderPass, VkExtent2D* pGranularity) #extern vulkan
 
-VkResult vkCreateCommandPool(VkDevice* device, VkCommandPoolCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkCommandPool** pCommandPool) #extern "vulkan"
+VkResult vkCreateCommandPool(VkDevice* device, VkCommandPoolCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkCommandPool** pCommandPool) #extern vulkan
 
-vkDestroyCommandPool(VkDevice* device, VkCommandPool* commandPool, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyCommandPool(VkDevice* device, VkCommandPool* commandPool, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkResetCommandPool(VkDevice* device, VkCommandPool* commandPool, u32 flags) #extern "vulkan"
+VkResult vkResetCommandPool(VkDevice* device, VkCommandPool* commandPool, u32 flags) #extern vulkan
 
-VkResult vkAllocateCommandBuffers(VkDevice* device, VkCommandBufferAllocateInfo* pAllocateInfo, VkCommandBuffer** pCommandBuffers) #extern "vulkan"
+VkResult vkAllocateCommandBuffers(VkDevice* device, VkCommandBufferAllocateInfo* pAllocateInfo, VkCommandBuffer** pCommandBuffers) #extern vulkan
 
-vkFreeCommandBuffers(VkDevice* device, VkCommandPool* commandPool, u32 commandBufferCount, VkCommandBuffer** pCommandBuffers) #extern "vulkan"
+vkFreeCommandBuffers(VkDevice* device, VkCommandPool* commandPool, u32 commandBufferCount, VkCommandBuffer** pCommandBuffers) #extern vulkan
 
-VkResult vkBeginCommandBuffer(VkCommandBuffer* commandBuffer, VkCommandBufferBeginInfo* pBeginInfo) #extern "vulkan"
+VkResult vkBeginCommandBuffer(VkCommandBuffer* commandBuffer, VkCommandBufferBeginInfo* pBeginInfo) #extern vulkan
 
-VkResult vkEndCommandBuffer(VkCommandBuffer* commandBuffer) #extern "vulkan"
+VkResult vkEndCommandBuffer(VkCommandBuffer* commandBuffer) #extern vulkan
 
-VkResult vkResetCommandBuffer(VkCommandBuffer* commandBuffer, u32 flags) #extern "vulkan"
+VkResult vkResetCommandBuffer(VkCommandBuffer* commandBuffer, u32 flags) #extern vulkan
 
-vkCmdBindPipeline(VkCommandBuffer* commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipeline* pipeline) #extern "vulkan"
+vkCmdBindPipeline(VkCommandBuffer* commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipeline* pipeline) #extern vulkan
 
-vkCmdSetViewport(VkCommandBuffer* commandBuffer, u32 firstViewport, u32 viewportCount, VkViewport* pViewports) #extern "vulkan"
+vkCmdSetViewport(VkCommandBuffer* commandBuffer, u32 firstViewport, u32 viewportCount, VkViewport* pViewports) #extern vulkan
 
-vkCmdSetScissor(VkCommandBuffer* commandBuffer, u32 firstScissor, u32 scissorCount, VkRect2D* pScissors) #extern "vulkan"
+vkCmdSetScissor(VkCommandBuffer* commandBuffer, u32 firstScissor, u32 scissorCount, VkRect2D* pScissors) #extern vulkan
 
-vkCmdSetLineWidth(VkCommandBuffer* commandBuffer, float lineWidth) #extern "vulkan"
+vkCmdSetLineWidth(VkCommandBuffer* commandBuffer, float lineWidth) #extern vulkan
 
-vkCmdSetDepthBias(VkCommandBuffer* commandBuffer, float depthBiasConstantFactor, float depthBiasClamp, float depthBiasSlopeFactor) #extern "vulkan"
+vkCmdSetDepthBias(VkCommandBuffer* commandBuffer, float depthBiasConstantFactor, float depthBiasClamp, float depthBiasSlopeFactor) #extern vulkan
 
-vkCmdSetBlendConstants(VkCommandBuffer* commandBuffer, CArray<float>[4] blendConstants) #extern "vulkan"
+vkCmdSetBlendConstants(VkCommandBuffer* commandBuffer, CArray<float>[4] blendConstants) #extern vulkan
 
-vkCmdSetDepthBounds(VkCommandBuffer* commandBuffer, float minDepthBounds, float maxDepthBounds) #extern "vulkan"
+vkCmdSetDepthBounds(VkCommandBuffer* commandBuffer, float minDepthBounds, float maxDepthBounds) #extern vulkan
 
-vkCmdSetStencilCompareMask(VkCommandBuffer* commandBuffer, u32 faceMask, u32 compareMask) #extern "vulkan"
+vkCmdSetStencilCompareMask(VkCommandBuffer* commandBuffer, u32 faceMask, u32 compareMask) #extern vulkan
 
-vkCmdSetStencilWriteMask(VkCommandBuffer* commandBuffer, u32 faceMask, u32 writeMask) #extern "vulkan"
+vkCmdSetStencilWriteMask(VkCommandBuffer* commandBuffer, u32 faceMask, u32 writeMask) #extern vulkan
 
-vkCmdSetStencilReference(VkCommandBuffer* commandBuffer, u32 faceMask, u32 reference) #extern "vulkan"
+vkCmdSetStencilReference(VkCommandBuffer* commandBuffer, u32 faceMask, u32 reference) #extern vulkan
 
-vkCmdBindDescriptorSets(VkCommandBuffer* commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout* layout, u32 firstSet, u32 descriptorSetCount, VkDescriptorSet** pDescriptorSets, u32 dynamicOffsetCount, u32* pDynamicOffsets) #extern "vulkan"
+vkCmdBindDescriptorSets(VkCommandBuffer* commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout* layout, u32 firstSet, u32 descriptorSetCount, VkDescriptorSet** pDescriptorSets, u32 dynamicOffsetCount, u32* pDynamicOffsets) #extern vulkan
 
-vkCmdBindIndexBuffer(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkIndexType indexType) #extern "vulkan"
+vkCmdBindIndexBuffer(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkIndexType indexType) #extern vulkan
 
-vkCmdBindVertexBuffers(VkCommandBuffer* commandBuffer, u32 firstBinding, u32 bindingCount, VkBuffer** pBuffers, u64* pOffsets) #extern "vulkan"
+vkCmdBindVertexBuffers(VkCommandBuffer* commandBuffer, u32 firstBinding, u32 bindingCount, VkBuffer** pBuffers, u64* pOffsets) #extern vulkan
 
-vkCmdDraw(VkCommandBuffer* commandBuffer, u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance) #extern "vulkan"
+vkCmdDraw(VkCommandBuffer* commandBuffer, u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance) #extern vulkan
 
-vkCmdDrawIndexed(VkCommandBuffer* commandBuffer, u32 indexCount, u32 instanceCount, u32 firstIndex, s32 vertexOffset, u32 firstInstance) #extern "vulkan"
+vkCmdDrawIndexed(VkCommandBuffer* commandBuffer, u32 indexCount, u32 instanceCount, u32 firstIndex, s32 vertexOffset, u32 firstInstance) #extern vulkan
 
-vkCmdDrawIndirect(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, u32 drawCount, u32 stride) #extern "vulkan"
+vkCmdDrawIndirect(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, u32 drawCount, u32 stride) #extern vulkan
 
-vkCmdDrawIndexedIndirect(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, u32 drawCount, u32 stride) #extern "vulkan"
+vkCmdDrawIndexedIndirect(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, u32 drawCount, u32 stride) #extern vulkan
 
-vkCmdDispatch(VkCommandBuffer* commandBuffer, u32 groupCountX, u32 groupCountY, u32 groupCountZ) #extern "vulkan"
+vkCmdDispatch(VkCommandBuffer* commandBuffer, u32 groupCountX, u32 groupCountY, u32 groupCountZ) #extern vulkan
 
-vkCmdDispatchIndirect(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset) #extern "vulkan"
+vkCmdDispatchIndirect(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset) #extern vulkan
 
-vkCmdCopyBuffer(VkCommandBuffer* commandBuffer, VkBuffer* srcBuffer, VkBuffer* dstBuffer, u32 regionCount, VkBufferCopy* pRegions) #extern "vulkan"
+vkCmdCopyBuffer(VkCommandBuffer* commandBuffer, VkBuffer* srcBuffer, VkBuffer* dstBuffer, u32 regionCount, VkBufferCopy* pRegions) #extern vulkan
 
-vkCmdCopyImage(VkCommandBuffer* commandBuffer, VkImage* srcImage, VkImageLayout srcImageLayout, VkImage* dstImage, VkImageLayout dstImageLayout, u32 regionCount, VkImageCopy* pRegions) #extern "vulkan"
+vkCmdCopyImage(VkCommandBuffer* commandBuffer, VkImage* srcImage, VkImageLayout srcImageLayout, VkImage* dstImage, VkImageLayout dstImageLayout, u32 regionCount, VkImageCopy* pRegions) #extern vulkan
 
-vkCmdBlitImage(VkCommandBuffer* commandBuffer, VkImage* srcImage, VkImageLayout srcImageLayout, VkImage* dstImage, VkImageLayout dstImageLayout, u32 regionCount, VkImageBlit* pRegions, VkFilter filter) #extern "vulkan"
+vkCmdBlitImage(VkCommandBuffer* commandBuffer, VkImage* srcImage, VkImageLayout srcImageLayout, VkImage* dstImage, VkImageLayout dstImageLayout, u32 regionCount, VkImageBlit* pRegions, VkFilter filter) #extern vulkan
 
-vkCmdCopyBufferToImage(VkCommandBuffer* commandBuffer, VkBuffer* srcBuffer, VkImage* dstImage, VkImageLayout dstImageLayout, u32 regionCount, VkBufferImageCopy* pRegions) #extern "vulkan"
+vkCmdCopyBufferToImage(VkCommandBuffer* commandBuffer, VkBuffer* srcBuffer, VkImage* dstImage, VkImageLayout dstImageLayout, u32 regionCount, VkBufferImageCopy* pRegions) #extern vulkan
 
-vkCmdCopyImageToBuffer(VkCommandBuffer* commandBuffer, VkImage* srcImage, VkImageLayout srcImageLayout, VkBuffer* dstBuffer, u32 regionCount, VkBufferImageCopy* pRegions) #extern "vulkan"
+vkCmdCopyImageToBuffer(VkCommandBuffer* commandBuffer, VkImage* srcImage, VkImageLayout srcImageLayout, VkBuffer* dstBuffer, u32 regionCount, VkBufferImageCopy* pRegions) #extern vulkan
 
-vkCmdUpdateBuffer(VkCommandBuffer* commandBuffer, VkBuffer* dstBuffer, u64 dstOffset, u64 dataSize, void* pData) #extern "vulkan"
+vkCmdUpdateBuffer(VkCommandBuffer* commandBuffer, VkBuffer* dstBuffer, u64 dstOffset, u64 dataSize, void* pData) #extern vulkan
 
-vkCmdFillBuffer(VkCommandBuffer* commandBuffer, VkBuffer* dstBuffer, u64 dstOffset, u64 size, u32 data) #extern "vulkan"
+vkCmdFillBuffer(VkCommandBuffer* commandBuffer, VkBuffer* dstBuffer, u64 dstOffset, u64 size, u32 data) #extern vulkan
 
-vkCmdClearColorImage(VkCommandBuffer* commandBuffer, VkImage* image, VkImageLayout imageLayout, VkClearColorValue* pColor, u32 rangeCount, VkImageSubresourceRange* pRanges) #extern "vulkan"
+vkCmdClearColorImage(VkCommandBuffer* commandBuffer, VkImage* image, VkImageLayout imageLayout, VkClearColorValue* pColor, u32 rangeCount, VkImageSubresourceRange* pRanges) #extern vulkan
 
-vkCmdClearDepthStencilImage(VkCommandBuffer* commandBuffer, VkImage* image, VkImageLayout imageLayout, VkClearDepthStencilValue* pDepthStencil, u32 rangeCount, VkImageSubresourceRange* pRanges) #extern "vulkan"
+vkCmdClearDepthStencilImage(VkCommandBuffer* commandBuffer, VkImage* image, VkImageLayout imageLayout, VkClearDepthStencilValue* pDepthStencil, u32 rangeCount, VkImageSubresourceRange* pRanges) #extern vulkan
 
-vkCmdClearAttachments(VkCommandBuffer* commandBuffer, u32 attachmentCount, VkClearAttachment* pAttachments, u32 rectCount, VkClearRect* pRects) #extern "vulkan"
+vkCmdClearAttachments(VkCommandBuffer* commandBuffer, u32 attachmentCount, VkClearAttachment* pAttachments, u32 rectCount, VkClearRect* pRects) #extern vulkan
 
-vkCmdResolveImage(VkCommandBuffer* commandBuffer, VkImage* srcImage, VkImageLayout srcImageLayout, VkImage* dstImage, VkImageLayout dstImageLayout, u32 regionCount, VkImageResolve* pRegions) #extern "vulkan"
+vkCmdResolveImage(VkCommandBuffer* commandBuffer, VkImage* srcImage, VkImageLayout srcImageLayout, VkImage* dstImage, VkImageLayout dstImageLayout, u32 regionCount, VkImageResolve* pRegions) #extern vulkan
 
-vkCmdSetEvent(VkCommandBuffer* commandBuffer, VkEvent* event, u32 stageMask) #extern "vulkan"
+vkCmdSetEvent(VkCommandBuffer* commandBuffer, VkEvent* event, u32 stageMask) #extern vulkan
 
-vkCmdResetEvent(VkCommandBuffer* commandBuffer, VkEvent* event, u32 stageMask) #extern "vulkan"
+vkCmdResetEvent(VkCommandBuffer* commandBuffer, VkEvent* event, u32 stageMask) #extern vulkan
 
-vkCmdWaitEvents(VkCommandBuffer* commandBuffer, u32 eventCount, VkEvent** pEvents, u32 srcStageMask, u32 dstStageMask, u32 memoryBarrierCount, VkMemoryBarrier* pMemoryBarriers, u32 bufferMemoryBarrierCount, VkBufferMemoryBarrier* pBufferMemoryBarriers, u32 imageMemoryBarrierCount, VkImageMemoryBarrier* pImageMemoryBarriers) #extern "vulkan"
+vkCmdWaitEvents(VkCommandBuffer* commandBuffer, u32 eventCount, VkEvent** pEvents, u32 srcStageMask, u32 dstStageMask, u32 memoryBarrierCount, VkMemoryBarrier* pMemoryBarriers, u32 bufferMemoryBarrierCount, VkBufferMemoryBarrier* pBufferMemoryBarriers, u32 imageMemoryBarrierCount, VkImageMemoryBarrier* pImageMemoryBarriers) #extern vulkan
 
-vkCmdPipelineBarrier(VkCommandBuffer* commandBuffer, VkPipelineStageFlagBits srcStageMask, VkPipelineStageFlagBits dstStageMask, u32 dependencyFlags, u32 memoryBarrierCount, VkMemoryBarrier* pMemoryBarriers, u32 bufferMemoryBarrierCount, VkBufferMemoryBarrier* pBufferMemoryBarriers, u32 imageMemoryBarrierCount, VkImageMemoryBarrier* pImageMemoryBarriers) #extern "vulkan"
+vkCmdPipelineBarrier(VkCommandBuffer* commandBuffer, VkPipelineStageFlagBits srcStageMask, VkPipelineStageFlagBits dstStageMask, u32 dependencyFlags, u32 memoryBarrierCount, VkMemoryBarrier* pMemoryBarriers, u32 bufferMemoryBarrierCount, VkBufferMemoryBarrier* pBufferMemoryBarriers, u32 imageMemoryBarrierCount, VkImageMemoryBarrier* pImageMemoryBarriers) #extern vulkan
 
-vkCmdBeginQuery(VkCommandBuffer* commandBuffer, VkQueryPool* queryPool, u32 query, u32 flags) #extern "vulkan"
+vkCmdBeginQuery(VkCommandBuffer* commandBuffer, VkQueryPool* queryPool, u32 query, u32 flags) #extern vulkan
 
-vkCmdEndQuery(VkCommandBuffer* commandBuffer, VkQueryPool* queryPool, u32 query) #extern "vulkan"
+vkCmdEndQuery(VkCommandBuffer* commandBuffer, VkQueryPool* queryPool, u32 query) #extern vulkan
 
-vkCmdResetQueryPool(VkCommandBuffer* commandBuffer, VkQueryPool* queryPool, u32 firstQuery, u32 queryCount) #extern "vulkan"
+vkCmdResetQueryPool(VkCommandBuffer* commandBuffer, VkQueryPool* queryPool, u32 firstQuery, u32 queryCount) #extern vulkan
 
-vkCmdWriteTimestamp(VkCommandBuffer* commandBuffer, VkPipelineStageFlagBits pipelineStage, VkQueryPool* queryPool, u32 query) #extern "vulkan"
+vkCmdWriteTimestamp(VkCommandBuffer* commandBuffer, VkPipelineStageFlagBits pipelineStage, VkQueryPool* queryPool, u32 query) #extern vulkan
 
-vkCmdCopyQueryPoolResults(VkCommandBuffer* commandBuffer, VkQueryPool* queryPool, u32 firstQuery, u32 queryCount, VkBuffer* dstBuffer, u64 dstOffset, u64 stride, u32 flags) #extern "vulkan"
+vkCmdCopyQueryPoolResults(VkCommandBuffer* commandBuffer, VkQueryPool* queryPool, u32 firstQuery, u32 queryCount, VkBuffer* dstBuffer, u64 dstOffset, u64 stride, u32 flags) #extern vulkan
 
-vkCmdPushConstants(VkCommandBuffer* commandBuffer, VkPipelineLayout* layout, u32 stageFlags, u32 offset, u32 size, void* pValues) #extern "vulkan"
+vkCmdPushConstants(VkCommandBuffer* commandBuffer, VkPipelineLayout* layout, u32 stageFlags, u32 offset, u32 size, void* pValues) #extern vulkan
 
-vkCmdBeginRenderPass(VkCommandBuffer* commandBuffer, VkRenderPassBeginInfo* pRenderPassBegin, VkSubpassContents contents) #extern "vulkan"
+vkCmdBeginRenderPass(VkCommandBuffer* commandBuffer, VkRenderPassBeginInfo* pRenderPassBegin, VkSubpassContents contents) #extern vulkan
 
-vkCmdNextSubpass(VkCommandBuffer* commandBuffer, VkSubpassContents contents) #extern "vulkan"
+vkCmdNextSubpass(VkCommandBuffer* commandBuffer, VkSubpassContents contents) #extern vulkan
 
-vkCmdEndRenderPass(VkCommandBuffer* commandBuffer) #extern "vulkan"
+vkCmdEndRenderPass(VkCommandBuffer* commandBuffer) #extern vulkan
 
-vkCmdExecuteCommands(VkCommandBuffer* commandBuffer, u32 commandBufferCount, VkCommandBuffer** pCommandBuffers) #extern "vulkan"
+vkCmdExecuteCommands(VkCommandBuffer* commandBuffer, u32 commandBufferCount, VkCommandBuffer** pCommandBuffers) #extern vulkan
 
 struct VkSamplerYcbcrConversion {}
 struct VkDescriptorUpdateTemplate {}
@@ -4413,61 +4416,61 @@ interface PFN_vkGetPhysicalDeviceExternalSemaphoreProperties(VkPhysicalDevice* p
 
 interface PFN_vkGetDescriptorSetLayoutSupport(VkDevice* device, VkDescriptorSetLayoutCreateInfo* pCreateInfo, VkDescriptorSetLayoutSupport* pSupport)
 
-VkResult vkEnumerateInstanceVersion(u32* pApiVersion) #extern "vulkan"
+VkResult vkEnumerateInstanceVersion(u32* pApiVersion) #extern vulkan
 
-VkResult vkBindBufferMemory2(VkDevice* device, u32 bindInfoCount, VkBindBufferMemoryInfo* pBindInfos) #extern "vulkan"
+VkResult vkBindBufferMemory2(VkDevice* device, u32 bindInfoCount, VkBindBufferMemoryInfo* pBindInfos) #extern vulkan
 
-VkResult vkBindImageMemory2(VkDevice* device, u32 bindInfoCount, VkBindImageMemoryInfo* pBindInfos) #extern "vulkan"
+VkResult vkBindImageMemory2(VkDevice* device, u32 bindInfoCount, VkBindImageMemoryInfo* pBindInfos) #extern vulkan
 
-vkGetDeviceGroupPeerMemoryFeatures(VkDevice* device, u32 heapIndex, u32 localDeviceIndex, u32 remoteDeviceIndex, u32* pPeerMemoryFeatures) #extern "vulkan"
+vkGetDeviceGroupPeerMemoryFeatures(VkDevice* device, u32 heapIndex, u32 localDeviceIndex, u32 remoteDeviceIndex, u32* pPeerMemoryFeatures) #extern vulkan
 
-vkCmdSetDeviceMask(VkCommandBuffer* commandBuffer, u32 deviceMask) #extern "vulkan"
+vkCmdSetDeviceMask(VkCommandBuffer* commandBuffer, u32 deviceMask) #extern vulkan
 
-vkCmdDispatchBase(VkCommandBuffer* commandBuffer, u32 baseGroupX, u32 baseGroupY, u32 baseGroupZ, u32 groupCountX, u32 groupCountY, u32 groupCountZ) #extern "vulkan"
+vkCmdDispatchBase(VkCommandBuffer* commandBuffer, u32 baseGroupX, u32 baseGroupY, u32 baseGroupZ, u32 groupCountX, u32 groupCountY, u32 groupCountZ) #extern vulkan
 
-VkResult vkEnumeratePhysicalDeviceGroups(VkInstance* instance, u32* pPhysicalDeviceGroupCount, VkPhysicalDeviceGroupProperties* pPhysicalDeviceGroupProperties) #extern "vulkan"
+VkResult vkEnumeratePhysicalDeviceGroups(VkInstance* instance, u32* pPhysicalDeviceGroupCount, VkPhysicalDeviceGroupProperties* pPhysicalDeviceGroupProperties) #extern vulkan
 
-vkGetImageMemoryRequirements2(VkDevice* device, VkImageMemoryRequirementsInfo2* pInfo, VkMemoryRequirements2* pMemoryRequirements) #extern "vulkan"
+vkGetImageMemoryRequirements2(VkDevice* device, VkImageMemoryRequirementsInfo2* pInfo, VkMemoryRequirements2* pMemoryRequirements) #extern vulkan
 
-vkGetBufferMemoryRequirements2(VkDevice* device, VkBufferMemoryRequirementsInfo2* pInfo, VkMemoryRequirements2* pMemoryRequirements) #extern "vulkan"
+vkGetBufferMemoryRequirements2(VkDevice* device, VkBufferMemoryRequirementsInfo2* pInfo, VkMemoryRequirements2* pMemoryRequirements) #extern vulkan
 
-vkGetImageSparseMemoryRequirements2(VkDevice* device, VkImageSparseMemoryRequirementsInfo2* pInfo, u32* pSparseMemoryRequirementCount, VkSparseImageMemoryRequirements2* pSparseMemoryRequirements) #extern "vulkan"
+vkGetImageSparseMemoryRequirements2(VkDevice* device, VkImageSparseMemoryRequirementsInfo2* pInfo, u32* pSparseMemoryRequirementCount, VkSparseImageMemoryRequirements2* pSparseMemoryRequirements) #extern vulkan
 
-vkGetPhysicalDeviceFeatures2(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceFeatures2* pFeatures) #extern "vulkan"
+vkGetPhysicalDeviceFeatures2(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceFeatures2* pFeatures) #extern vulkan
 
-vkGetPhysicalDeviceProperties2(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceProperties2* pProperties) #extern "vulkan"
+vkGetPhysicalDeviceProperties2(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceProperties2* pProperties) #extern vulkan
 
-vkGetPhysicalDeviceFormatProperties2(VkPhysicalDevice* physicalDevice, VkFormat format, VkFormatProperties2* pFormatProperties) #extern "vulkan"
+vkGetPhysicalDeviceFormatProperties2(VkPhysicalDevice* physicalDevice, VkFormat format, VkFormatProperties2* pFormatProperties) #extern vulkan
 
-VkResult vkGetPhysicalDeviceImageFormatProperties2(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceImageFormatInfo2* pImageFormatInfo, VkImageFormatProperties2* pImageFormatProperties) #extern "vulkan"
+VkResult vkGetPhysicalDeviceImageFormatProperties2(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceImageFormatInfo2* pImageFormatInfo, VkImageFormatProperties2* pImageFormatProperties) #extern vulkan
 
-vkGetPhysicalDeviceQueueFamilyProperties2(VkPhysicalDevice* physicalDevice, u32* pQueueFamilyPropertyCount, VkQueueFamilyProperties2* pQueueFamilyProperties) #extern "vulkan"
+vkGetPhysicalDeviceQueueFamilyProperties2(VkPhysicalDevice* physicalDevice, u32* pQueueFamilyPropertyCount, VkQueueFamilyProperties2* pQueueFamilyProperties) #extern vulkan
 
-vkGetPhysicalDeviceMemoryProperties2(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceMemoryProperties2* pMemoryProperties) #extern "vulkan"
+vkGetPhysicalDeviceMemoryProperties2(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceMemoryProperties2* pMemoryProperties) #extern vulkan
 
-vkGetPhysicalDeviceSparseImageFormatProperties2(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceSparseImageFormatInfo2* pFormatInfo, u32* pPropertyCount, VkSparseImageFormatProperties2* pProperties) #extern "vulkan"
+vkGetPhysicalDeviceSparseImageFormatProperties2(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceSparseImageFormatInfo2* pFormatInfo, u32* pPropertyCount, VkSparseImageFormatProperties2* pProperties) #extern vulkan
 
-vkTrimCommandPool(VkDevice* device, VkCommandPool* commandPool, u32 flags) #extern "vulkan"
+vkTrimCommandPool(VkDevice* device, VkCommandPool* commandPool, u32 flags) #extern vulkan
 
-vkGetDeviceQueue2(VkDevice* device, VkDeviceQueueInfo2* pQueueInfo, VkQueue** pQueue) #extern "vulkan"
+vkGetDeviceQueue2(VkDevice* device, VkDeviceQueueInfo2* pQueueInfo, VkQueue** pQueue) #extern vulkan
 
-VkResult vkCreateSamplerYcbcrConversion(VkDevice* device, VkSamplerYcbcrConversionCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSamplerYcbcrConversion** pYcbcrConversion) #extern "vulkan"
+VkResult vkCreateSamplerYcbcrConversion(VkDevice* device, VkSamplerYcbcrConversionCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSamplerYcbcrConversion** pYcbcrConversion) #extern vulkan
 
-vkDestroySamplerYcbcrConversion(VkDevice* device, VkSamplerYcbcrConversion* ycbcrConversion, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroySamplerYcbcrConversion(VkDevice* device, VkSamplerYcbcrConversion* ycbcrConversion, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkCreateDescriptorUpdateTemplate(VkDevice* device, VkDescriptorUpdateTemplateCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkDescriptorUpdateTemplate** pDescriptorUpdateTemplate) #extern "vulkan"
+VkResult vkCreateDescriptorUpdateTemplate(VkDevice* device, VkDescriptorUpdateTemplateCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkDescriptorUpdateTemplate** pDescriptorUpdateTemplate) #extern vulkan
 
-vkDestroyDescriptorUpdateTemplate(VkDevice* device, VkDescriptorUpdateTemplate* descriptorUpdateTemplate, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyDescriptorUpdateTemplate(VkDevice* device, VkDescriptorUpdateTemplate* descriptorUpdateTemplate, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-vkUpdateDescriptorSetWithTemplate(VkDevice* device, VkDescriptorSet* descriptorSet, VkDescriptorUpdateTemplate* descriptorUpdateTemplate, void* pData) #extern "vulkan"
+vkUpdateDescriptorSetWithTemplate(VkDevice* device, VkDescriptorSet* descriptorSet, VkDescriptorUpdateTemplate* descriptorUpdateTemplate, void* pData) #extern vulkan
 
-vkGetPhysicalDeviceExternalBufferProperties(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceExternalBufferInfo* pExternalBufferInfo, VkExternalBufferProperties* pExternalBufferProperties) #extern "vulkan"
+vkGetPhysicalDeviceExternalBufferProperties(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceExternalBufferInfo* pExternalBufferInfo, VkExternalBufferProperties* pExternalBufferProperties) #extern vulkan
 
-vkGetPhysicalDeviceExternalFenceProperties(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceExternalFenceInfo* pExternalFenceInfo, VkExternalFenceProperties* pExternalFenceProperties) #extern "vulkan"
+vkGetPhysicalDeviceExternalFenceProperties(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceExternalFenceInfo* pExternalFenceInfo, VkExternalFenceProperties* pExternalFenceProperties) #extern vulkan
 
-vkGetPhysicalDeviceExternalSemaphoreProperties(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceExternalSemaphoreInfo* pExternalSemaphoreInfo, VkExternalSemaphoreProperties* pExternalSemaphoreProperties) #extern "vulkan"
+vkGetPhysicalDeviceExternalSemaphoreProperties(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceExternalSemaphoreInfo* pExternalSemaphoreInfo, VkExternalSemaphoreProperties* pExternalSemaphoreProperties) #extern vulkan
 
-vkGetDescriptorSetLayoutSupport(VkDevice* device, VkDescriptorSetLayoutCreateInfo* pCreateInfo, VkDescriptorSetLayoutSupport* pSupport) #extern "vulkan"
+vkGetDescriptorSetLayoutSupport(VkDevice* device, VkDescriptorSetLayoutCreateInfo* pCreateInfo, VkDescriptorSetLayoutSupport* pSupport) #extern vulkan
 
 enum VkDriverId {
     VK_DRIVER_ID_AMD_PROPRIETARY = 1;
@@ -5148,31 +5151,31 @@ interface u64 PFN_vkGetBufferOpaqueCaptureAddress(VkDevice* device, VkBufferDevi
 
 interface u64 PFN_vkGetDeviceMemoryOpaqueCaptureAddress(VkDevice* device, VkDeviceMemoryOpaqueCaptureAddressInfo* pInfo)
 
-vkCmdDrawIndirectCount(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride) #extern "vulkan"
+vkCmdDrawIndirectCount(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride) #extern vulkan
 
-vkCmdDrawIndexedIndirectCount(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride) #extern "vulkan"
+vkCmdDrawIndexedIndirectCount(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride) #extern vulkan
 
-VkResult vkCreateRenderPass2(VkDevice* device, VkRenderPassCreateInfo2* pCreateInfo, VkAllocationCallbacks* pAllocator, VkRenderPass** pRenderPass) #extern "vulkan"
+VkResult vkCreateRenderPass2(VkDevice* device, VkRenderPassCreateInfo2* pCreateInfo, VkAllocationCallbacks* pAllocator, VkRenderPass** pRenderPass) #extern vulkan
 
-vkCmdBeginRenderPass2(VkCommandBuffer* commandBuffer, VkRenderPassBeginInfo* pRenderPassBegin, VkSubpassBeginInfo* pSubpassBeginInfo) #extern "vulkan"
+vkCmdBeginRenderPass2(VkCommandBuffer* commandBuffer, VkRenderPassBeginInfo* pRenderPassBegin, VkSubpassBeginInfo* pSubpassBeginInfo) #extern vulkan
 
-vkCmdNextSubpass2(VkCommandBuffer* commandBuffer, VkSubpassBeginInfo* pSubpassBeginInfo, VkSubpassEndInfo* pSubpassEndInfo) #extern "vulkan"
+vkCmdNextSubpass2(VkCommandBuffer* commandBuffer, VkSubpassBeginInfo* pSubpassBeginInfo, VkSubpassEndInfo* pSubpassEndInfo) #extern vulkan
 
-vkCmdEndRenderPass2(VkCommandBuffer* commandBuffer, VkSubpassEndInfo* pSubpassEndInfo) #extern "vulkan"
+vkCmdEndRenderPass2(VkCommandBuffer* commandBuffer, VkSubpassEndInfo* pSubpassEndInfo) #extern vulkan
 
-vkResetQueryPool(VkDevice* device, VkQueryPool* queryPool, u32 firstQuery, u32 queryCount) #extern "vulkan"
+vkResetQueryPool(VkDevice* device, VkQueryPool* queryPool, u32 firstQuery, u32 queryCount) #extern vulkan
 
-VkResult vkGetSemaphoreCounterValue(VkDevice* device, VkSemaphore* semaphore, u64* pValue) #extern "vulkan"
+VkResult vkGetSemaphoreCounterValue(VkDevice* device, VkSemaphore* semaphore, u64* pValue) #extern vulkan
 
-VkResult vkWaitSemaphores(VkDevice* device, VkSemaphoreWaitInfo* pWaitInfo, u64 timeout) #extern "vulkan"
+VkResult vkWaitSemaphores(VkDevice* device, VkSemaphoreWaitInfo* pWaitInfo, u64 timeout) #extern vulkan
 
-VkResult vkSignalSemaphore(VkDevice* device, VkSemaphoreSignalInfo* pSignalInfo) #extern "vulkan"
+VkResult vkSignalSemaphore(VkDevice* device, VkSemaphoreSignalInfo* pSignalInfo) #extern vulkan
 
-u64 vkGetBufferDeviceAddress(VkDevice* device, VkBufferDeviceAddressInfo* pInfo) #extern "vulkan"
+u64 vkGetBufferDeviceAddress(VkDevice* device, VkBufferDeviceAddressInfo* pInfo) #extern vulkan
 
-u64 vkGetBufferOpaqueCaptureAddress(VkDevice* device, VkBufferDeviceAddressInfo* pInfo) #extern "vulkan"
+u64 vkGetBufferOpaqueCaptureAddress(VkDevice* device, VkBufferDeviceAddressInfo* pInfo) #extern vulkan
 
-u64 vkGetDeviceMemoryOpaqueCaptureAddress(VkDevice* device, VkDeviceMemoryOpaqueCaptureAddressInfo* pInfo) #extern "vulkan"
+u64 vkGetDeviceMemoryOpaqueCaptureAddress(VkDevice* device, VkDeviceMemoryOpaqueCaptureAddressInfo* pInfo) #extern vulkan
 
 struct VkSurfaceKHR {}
 
@@ -5259,15 +5262,15 @@ interface VkResult PFN_vkGetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice* ph
 
 interface VkResult PFN_vkGetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice* physicalDevice, VkSurfaceKHR* surface, u32* pPresentModeCount, VkPresentModeKHR* pPresentModes)
 
-vkDestroySurfaceKHR(VkInstance* instance, VkSurfaceKHR* surface, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroySurfaceKHR(VkInstance* instance, VkSurfaceKHR* surface, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkGetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice* physicalDevice, u32 queueFamilyIndex, VkSurfaceKHR* surface, u32* pSupported) #extern "vulkan"
+VkResult vkGetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice* physicalDevice, u32 queueFamilyIndex, VkSurfaceKHR* surface, u32* pSupported) #extern vulkan
 
-VkResult vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice* physicalDevice, VkSurfaceKHR* surface, VkSurfaceCapabilitiesKHR* pSurfaceCapabilities) #extern "vulkan"
+VkResult vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice* physicalDevice, VkSurfaceKHR* surface, VkSurfaceCapabilitiesKHR* pSurfaceCapabilities) #extern vulkan
 
-VkResult vkGetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice* physicalDevice, VkSurfaceKHR* surface, u32* pSurfaceFormatCount, VkSurfaceFormatKHR* pSurfaceFormats) #extern "vulkan"
+VkResult vkGetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice* physicalDevice, VkSurfaceKHR* surface, u32* pSurfaceFormatCount, VkSurfaceFormatKHR* pSurfaceFormats) #extern vulkan
 
-VkResult vkGetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice* physicalDevice, VkSurfaceKHR* surface, u32* pPresentModeCount, VkPresentModeKHR* pPresentModes) #extern "vulkan"
+VkResult vkGetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice* physicalDevice, VkSurfaceKHR* surface, u32* pPresentModeCount, VkPresentModeKHR* pPresentModes) #extern vulkan
 
 struct VkSwapchainKHR {}
 
@@ -5382,23 +5385,23 @@ interface VkResult PFN_vkGetPhysicalDevicePresentRectanglesKHR(VkPhysicalDevice*
 
 interface VkResult PFN_vkAcquireNextImage2KHR(VkDevice* device, VkAcquireNextImageInfoKHR* pAcquireInfo, u32* pImageIndex)
 
-VkResult vkCreateSwapchainKHR(VkDevice* device, VkSwapchainCreateInfoKHR* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSwapchainKHR** pSwapchain) #extern "vulkan"
+VkResult vkCreateSwapchainKHR(VkDevice* device, VkSwapchainCreateInfoKHR* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSwapchainKHR** pSwapchain) #extern vulkan
 
-vkDestroySwapchainKHR(VkDevice* device, VkSwapchainKHR* swapchain, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroySwapchainKHR(VkDevice* device, VkSwapchainKHR* swapchain, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkGetSwapchainImagesKHR(VkDevice* device, VkSwapchainKHR* swapchain, u32* pSwapchainImageCount, VkImage** pSwapchainImages) #extern "vulkan"
+VkResult vkGetSwapchainImagesKHR(VkDevice* device, VkSwapchainKHR* swapchain, u32* pSwapchainImageCount, VkImage** pSwapchainImages) #extern vulkan
 
-VkResult vkAcquireNextImageKHR(VkDevice* device, VkSwapchainKHR* swapchain, u64 timeout, VkSemaphore* semaphore, VkFence* fence, u32* pImageIndex) #extern "vulkan"
+VkResult vkAcquireNextImageKHR(VkDevice* device, VkSwapchainKHR* swapchain, u64 timeout, VkSemaphore* semaphore, VkFence* fence, u32* pImageIndex) #extern vulkan
 
-VkResult vkQueuePresentKHR(VkQueue* queue, VkPresentInfoKHR* pPresentInfo) #extern "vulkan"
+VkResult vkQueuePresentKHR(VkQueue* queue, VkPresentInfoKHR* pPresentInfo) #extern vulkan
 
-VkResult vkGetDeviceGroupPresentCapabilitiesKHR(VkDevice* device, VkDeviceGroupPresentCapabilitiesKHR* pDeviceGroupPresentCapabilities) #extern "vulkan"
+VkResult vkGetDeviceGroupPresentCapabilitiesKHR(VkDevice* device, VkDeviceGroupPresentCapabilitiesKHR* pDeviceGroupPresentCapabilities) #extern vulkan
 
-VkResult vkGetDeviceGroupSurfacePresentModesKHR(VkDevice* device, VkSurfaceKHR* surface, u32* pModes) #extern "vulkan"
+VkResult vkGetDeviceGroupSurfacePresentModesKHR(VkDevice* device, VkSurfaceKHR* surface, u32* pModes) #extern vulkan
 
-VkResult vkGetPhysicalDevicePresentRectanglesKHR(VkPhysicalDevice* physicalDevice, VkSurfaceKHR* surface, u32* pRectCount, VkRect2D* pRects) #extern "vulkan"
+VkResult vkGetPhysicalDevicePresentRectanglesKHR(VkPhysicalDevice* physicalDevice, VkSurfaceKHR* surface, u32* pRectCount, VkRect2D* pRects) #extern vulkan
 
-VkResult vkAcquireNextImage2KHR(VkDevice* device, VkAcquireNextImageInfoKHR* pAcquireInfo, u32* pImageIndex) #extern "vulkan"
+VkResult vkAcquireNextImage2KHR(VkDevice* device, VkAcquireNextImageInfoKHR* pAcquireInfo, u32* pImageIndex) #extern vulkan
 
 struct VkDisplayKHR {}
 struct VkDisplayModeKHR {}
@@ -5481,19 +5484,19 @@ interface VkResult PFN_vkGetDisplayPlaneCapabilitiesKHR(VkPhysicalDevice* physic
 
 interface VkResult PFN_vkCreateDisplayPlaneSurfaceKHR(VkInstance* instance, VkDisplaySurfaceCreateInfoKHR* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSurfaceKHR** pSurface)
 
-VkResult vkGetPhysicalDeviceDisplayPropertiesKHR(VkPhysicalDevice* physicalDevice, u32* pPropertyCount, VkDisplayPropertiesKHR* pProperties) #extern "vulkan"
+VkResult vkGetPhysicalDeviceDisplayPropertiesKHR(VkPhysicalDevice* physicalDevice, u32* pPropertyCount, VkDisplayPropertiesKHR* pProperties) #extern vulkan
 
-VkResult vkGetPhysicalDeviceDisplayPlanePropertiesKHR(VkPhysicalDevice* physicalDevice, u32* pPropertyCount, VkDisplayPlanePropertiesKHR* pProperties) #extern "vulkan"
+VkResult vkGetPhysicalDeviceDisplayPlanePropertiesKHR(VkPhysicalDevice* physicalDevice, u32* pPropertyCount, VkDisplayPlanePropertiesKHR* pProperties) #extern vulkan
 
-VkResult vkGetDisplayPlaneSupportedDisplaysKHR(VkPhysicalDevice* physicalDevice, u32 planeIndex, u32* pDisplayCount, VkDisplayKHR** pDisplays) #extern "vulkan"
+VkResult vkGetDisplayPlaneSupportedDisplaysKHR(VkPhysicalDevice* physicalDevice, u32 planeIndex, u32* pDisplayCount, VkDisplayKHR** pDisplays) #extern vulkan
 
-VkResult vkGetDisplayModePropertiesKHR(VkPhysicalDevice* physicalDevice, VkDisplayKHR* display, u32* pPropertyCount, VkDisplayModePropertiesKHR* pProperties) #extern "vulkan"
+VkResult vkGetDisplayModePropertiesKHR(VkPhysicalDevice* physicalDevice, VkDisplayKHR* display, u32* pPropertyCount, VkDisplayModePropertiesKHR* pProperties) #extern vulkan
 
-VkResult vkCreateDisplayModeKHR(VkPhysicalDevice* physicalDevice, VkDisplayKHR* display, VkDisplayModeCreateInfoKHR* pCreateInfo, VkAllocationCallbacks* pAllocator, VkDisplayModeKHR** pMode) #extern "vulkan"
+VkResult vkCreateDisplayModeKHR(VkPhysicalDevice* physicalDevice, VkDisplayKHR* display, VkDisplayModeCreateInfoKHR* pCreateInfo, VkAllocationCallbacks* pAllocator, VkDisplayModeKHR** pMode) #extern vulkan
 
-VkResult vkGetDisplayPlaneCapabilitiesKHR(VkPhysicalDevice* physicalDevice, VkDisplayModeKHR* mode, u32 planeIndex, VkDisplayPlaneCapabilitiesKHR* pCapabilities) #extern "vulkan"
+VkResult vkGetDisplayPlaneCapabilitiesKHR(VkPhysicalDevice* physicalDevice, VkDisplayModeKHR* mode, u32 planeIndex, VkDisplayPlaneCapabilitiesKHR* pCapabilities) #extern vulkan
 
-VkResult vkCreateDisplayPlaneSurfaceKHR(VkInstance* instance, VkDisplaySurfaceCreateInfoKHR* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSurfaceKHR** pSurface) #extern "vulkan"
+VkResult vkCreateDisplayPlaneSurfaceKHR(VkInstance* instance, VkDisplaySurfaceCreateInfoKHR* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSurfaceKHR** pSurface) #extern vulkan
 
 struct VkDisplayPresentInfoKHR {
     sType := VkStructureType.VK_STRUCTURE_TYPE_DISPLAY_PRESENT_INFO_KHR;
@@ -5505,7 +5508,7 @@ struct VkDisplayPresentInfoKHR {
 
 interface VkResult PFN_vkCreateSharedSwapchainsKHR(VkDevice* device, u32 swapchainCount, VkSwapchainCreateInfoKHR* pCreateInfos, VkAllocationCallbacks* pAllocator, VkSwapchainKHR** pSwapchains)
 
-VkResult vkCreateSharedSwapchainsKHR(VkDevice* device, u32 swapchainCount, VkSwapchainCreateInfoKHR* pCreateInfos, VkAllocationCallbacks* pAllocator, VkSwapchainKHR** pSwapchains) #extern "vulkan"
+VkResult vkCreateSharedSwapchainsKHR(VkDevice* device, u32 swapchainCount, VkSwapchainCreateInfoKHR* pCreateInfos, VkAllocationCallbacks* pAllocator, VkSwapchainKHR** pSwapchains) #extern vulkan
 
 interface PFN_vkGetPhysicalDeviceFeatures2KHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceFeatures2* pFeatures)
 
@@ -5521,19 +5524,19 @@ interface PFN_vkGetPhysicalDeviceMemoryProperties2KHR(VkPhysicalDevice* physical
 
 interface PFN_vkGetPhysicalDeviceSparseImageFormatProperties2KHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceSparseImageFormatInfo2* pFormatInfo, u32* pPropertyCount, VkSparseImageFormatProperties2* pProperties)
 
-vkGetPhysicalDeviceFeatures2KHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceFeatures2* pFeatures) #extern "vulkan"
+vkGetPhysicalDeviceFeatures2KHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceFeatures2* pFeatures) #extern vulkan
 
-vkGetPhysicalDeviceProperties2KHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceProperties2* pProperties) #extern "vulkan"
+vkGetPhysicalDeviceProperties2KHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceProperties2* pProperties) #extern vulkan
 
-vkGetPhysicalDeviceFormatProperties2KHR(VkPhysicalDevice* physicalDevice, VkFormat format, VkFormatProperties2* pFormatProperties) #extern "vulkan"
+vkGetPhysicalDeviceFormatProperties2KHR(VkPhysicalDevice* physicalDevice, VkFormat format, VkFormatProperties2* pFormatProperties) #extern vulkan
 
-VkResult vkGetPhysicalDeviceImageFormatProperties2KHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceImageFormatInfo2* pImageFormatInfo, VkImageFormatProperties2* pImageFormatProperties) #extern "vulkan"
+VkResult vkGetPhysicalDeviceImageFormatProperties2KHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceImageFormatInfo2* pImageFormatInfo, VkImageFormatProperties2* pImageFormatProperties) #extern vulkan
 
-vkGetPhysicalDeviceQueueFamilyProperties2KHR(VkPhysicalDevice* physicalDevice, u32* pQueueFamilyPropertyCount, VkQueueFamilyProperties2* pQueueFamilyProperties) #extern "vulkan"
+vkGetPhysicalDeviceQueueFamilyProperties2KHR(VkPhysicalDevice* physicalDevice, u32* pQueueFamilyPropertyCount, VkQueueFamilyProperties2* pQueueFamilyProperties) #extern vulkan
 
-vkGetPhysicalDeviceMemoryProperties2KHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceMemoryProperties2* pMemoryProperties) #extern "vulkan"
+vkGetPhysicalDeviceMemoryProperties2KHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceMemoryProperties2* pMemoryProperties) #extern vulkan
 
-vkGetPhysicalDeviceSparseImageFormatProperties2KHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceSparseImageFormatInfo2* pFormatInfo, u32* pPropertyCount, VkSparseImageFormatProperties2* pProperties) #extern "vulkan"
+vkGetPhysicalDeviceSparseImageFormatProperties2KHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceSparseImageFormatInfo2* pFormatInfo, u32* pPropertyCount, VkSparseImageFormatProperties2* pProperties) #extern vulkan
 
 interface PFN_vkGetDeviceGroupPeerMemoryFeaturesKHR(VkDevice* device, u32 heapIndex, u32 localDeviceIndex, u32 remoteDeviceIndex, u32* pPeerMemoryFeatures)
 
@@ -5541,23 +5544,23 @@ interface PFN_vkCmdSetDeviceMaskKHR(VkCommandBuffer* commandBuffer, u32 deviceMa
 
 interface PFN_vkCmdDispatchBaseKHR(VkCommandBuffer* commandBuffer, u32 baseGroupX, u32 baseGroupY, u32 baseGroupZ, u32 groupCountX, u32 groupCountY, u32 groupCountZ)
 
-vkGetDeviceGroupPeerMemoryFeaturesKHR(VkDevice* device, u32 heapIndex, u32 localDeviceIndex, u32 remoteDeviceIndex, u32* pPeerMemoryFeatures) #extern "vulkan"
+vkGetDeviceGroupPeerMemoryFeaturesKHR(VkDevice* device, u32 heapIndex, u32 localDeviceIndex, u32 remoteDeviceIndex, u32* pPeerMemoryFeatures) #extern vulkan
 
-vkCmdSetDeviceMaskKHR(VkCommandBuffer* commandBuffer, u32 deviceMask) #extern "vulkan"
+vkCmdSetDeviceMaskKHR(VkCommandBuffer* commandBuffer, u32 deviceMask) #extern vulkan
 
-vkCmdDispatchBaseKHR(VkCommandBuffer* commandBuffer, u32 baseGroupX, u32 baseGroupY, u32 baseGroupZ, u32 groupCountX, u32 groupCountY, u32 groupCountZ) #extern "vulkan"
+vkCmdDispatchBaseKHR(VkCommandBuffer* commandBuffer, u32 baseGroupX, u32 baseGroupY, u32 baseGroupZ, u32 groupCountX, u32 groupCountY, u32 groupCountZ) #extern vulkan
 
 interface PFN_vkTrimCommandPoolKHR(VkDevice* device, VkCommandPool* commandPool, u32 flags)
 
-vkTrimCommandPoolKHR(VkDevice* device, VkCommandPool* commandPool, u32 flags) #extern "vulkan"
+vkTrimCommandPoolKHR(VkDevice* device, VkCommandPool* commandPool, u32 flags) #extern vulkan
 
 interface VkResult PFN_vkEnumeratePhysicalDeviceGroupsKHR(VkInstance* instance, u32* pPhysicalDeviceGroupCount, VkPhysicalDeviceGroupProperties* pPhysicalDeviceGroupProperties)
 
-VkResult vkEnumeratePhysicalDeviceGroupsKHR(VkInstance* instance, u32* pPhysicalDeviceGroupCount, VkPhysicalDeviceGroupProperties* pPhysicalDeviceGroupProperties) #extern "vulkan"
+VkResult vkEnumeratePhysicalDeviceGroupsKHR(VkInstance* instance, u32* pPhysicalDeviceGroupCount, VkPhysicalDeviceGroupProperties* pPhysicalDeviceGroupProperties) #extern vulkan
 
 interface PFN_vkGetPhysicalDeviceExternalBufferPropertiesKHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceExternalBufferInfo* pExternalBufferInfo, VkExternalBufferProperties* pExternalBufferProperties)
 
-vkGetPhysicalDeviceExternalBufferPropertiesKHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceExternalBufferInfo* pExternalBufferInfo, VkExternalBufferProperties* pExternalBufferProperties) #extern "vulkan"
+vkGetPhysicalDeviceExternalBufferPropertiesKHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceExternalBufferInfo* pExternalBufferInfo, VkExternalBufferProperties* pExternalBufferProperties) #extern vulkan
 
 struct VkImportMemoryFdInfoKHR {
     sType := VkStructureType.VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR;
@@ -5583,13 +5586,13 @@ interface VkResult PFN_vkGetMemoryFdKHR(VkDevice* device, VkMemoryGetFdInfoKHR* 
 
 interface VkResult PFN_vkGetMemoryFdPropertiesKHR(VkDevice* device, VkExternalMemoryHandleTypeFlagBits handleType, s32 fd, VkMemoryFdPropertiesKHR* pMemoryFdProperties)
 
-VkResult vkGetMemoryFdKHR(VkDevice* device, VkMemoryGetFdInfoKHR* pGetFdInfo, s32* pFd) #extern "vulkan"
+VkResult vkGetMemoryFdKHR(VkDevice* device, VkMemoryGetFdInfoKHR* pGetFdInfo, s32* pFd) #extern vulkan
 
-VkResult vkGetMemoryFdPropertiesKHR(VkDevice* device, VkExternalMemoryHandleTypeFlagBits handleType, s32 fd, VkMemoryFdPropertiesKHR* pMemoryFdProperties) #extern "vulkan"
+VkResult vkGetMemoryFdPropertiesKHR(VkDevice* device, VkExternalMemoryHandleTypeFlagBits handleType, s32 fd, VkMemoryFdPropertiesKHR* pMemoryFdProperties) #extern vulkan
 
 interface PFN_vkGetPhysicalDeviceExternalSemaphorePropertiesKHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceExternalSemaphoreInfo* pExternalSemaphoreInfo, VkExternalSemaphoreProperties* pExternalSemaphoreProperties)
 
-vkGetPhysicalDeviceExternalSemaphorePropertiesKHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceExternalSemaphoreInfo* pExternalSemaphoreInfo, VkExternalSemaphoreProperties* pExternalSemaphoreProperties) #extern "vulkan"
+vkGetPhysicalDeviceExternalSemaphorePropertiesKHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceExternalSemaphoreInfo* pExternalSemaphoreInfo, VkExternalSemaphoreProperties* pExternalSemaphoreProperties) #extern vulkan
 
 struct VkImportSemaphoreFdInfoKHR {
     sType := VkStructureType.VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_FD_INFO_KHR;
@@ -5611,9 +5614,9 @@ interface VkResult PFN_vkImportSemaphoreFdKHR(VkDevice* device, VkImportSemaphor
 
 interface VkResult PFN_vkGetSemaphoreFdKHR(VkDevice* device, VkSemaphoreGetFdInfoKHR* pGetFdInfo, s32* pFd)
 
-VkResult vkImportSemaphoreFdKHR(VkDevice* device, VkImportSemaphoreFdInfoKHR* pImportSemaphoreFdInfo) #extern "vulkan"
+VkResult vkImportSemaphoreFdKHR(VkDevice* device, VkImportSemaphoreFdInfoKHR* pImportSemaphoreFdInfo) #extern vulkan
 
-VkResult vkGetSemaphoreFdKHR(VkDevice* device, VkSemaphoreGetFdInfoKHR* pGetFdInfo, s32* pFd) #extern "vulkan"
+VkResult vkGetSemaphoreFdKHR(VkDevice* device, VkSemaphoreGetFdInfoKHR* pGetFdInfo, s32* pFd) #extern vulkan
 
 struct VkPhysicalDevicePushDescriptorPropertiesKHR {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PUSH_DESCRIPTOR_PROPERTIES_KHR;
@@ -5625,9 +5628,9 @@ interface PFN_vkCmdPushDescriptorSetKHR(VkCommandBuffer* commandBuffer, VkPipeli
 
 interface PFN_vkCmdPushDescriptorSetWithTemplateKHR(VkCommandBuffer* commandBuffer, VkDescriptorUpdateTemplate* descriptorUpdateTemplate, VkPipelineLayout* layout, u32 set, void* pData)
 
-vkCmdPushDescriptorSetKHR(VkCommandBuffer* commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout* layout, u32 set, u32 descriptorWriteCount, VkWriteDescriptorSet* pDescriptorWrites) #extern "vulkan"
+vkCmdPushDescriptorSetKHR(VkCommandBuffer* commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout* layout, u32 set, u32 descriptorWriteCount, VkWriteDescriptorSet* pDescriptorWrites) #extern vulkan
 
-vkCmdPushDescriptorSetWithTemplateKHR(VkCommandBuffer* commandBuffer, VkDescriptorUpdateTemplate* descriptorUpdateTemplate, VkPipelineLayout* layout, u32 set, void* pData) #extern "vulkan"
+vkCmdPushDescriptorSetWithTemplateKHR(VkCommandBuffer* commandBuffer, VkDescriptorUpdateTemplate* descriptorUpdateTemplate, VkPipelineLayout* layout, u32 set, void* pData) #extern vulkan
 
 struct VkRectLayerKHR {
     offset: VkOffset2D;
@@ -5653,11 +5656,11 @@ interface PFN_vkDestroyDescriptorUpdateTemplateKHR(VkDevice* device, VkDescripto
 
 interface PFN_vkUpdateDescriptorSetWithTemplateKHR(VkDevice* device, VkDescriptorSet* descriptorSet, VkDescriptorUpdateTemplate* descriptorUpdateTemplate, void* pData)
 
-VkResult vkCreateDescriptorUpdateTemplateKHR(VkDevice* device, VkDescriptorUpdateTemplateCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkDescriptorUpdateTemplate** pDescriptorUpdateTemplate) #extern "vulkan"
+VkResult vkCreateDescriptorUpdateTemplateKHR(VkDevice* device, VkDescriptorUpdateTemplateCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkDescriptorUpdateTemplate** pDescriptorUpdateTemplate) #extern vulkan
 
-vkDestroyDescriptorUpdateTemplateKHR(VkDevice* device, VkDescriptorUpdateTemplate* descriptorUpdateTemplate, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyDescriptorUpdateTemplateKHR(VkDevice* device, VkDescriptorUpdateTemplate* descriptorUpdateTemplate, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-vkUpdateDescriptorSetWithTemplateKHR(VkDevice* device, VkDescriptorSet* descriptorSet, VkDescriptorUpdateTemplate* descriptorUpdateTemplate, void* pData) #extern "vulkan"
+vkUpdateDescriptorSetWithTemplateKHR(VkDevice* device, VkDescriptorSet* descriptorSet, VkDescriptorUpdateTemplate* descriptorUpdateTemplate, void* pData) #extern vulkan
 
 interface VkResult PFN_vkCreateRenderPass2KHR(VkDevice* device, VkRenderPassCreateInfo2* pCreateInfo, VkAllocationCallbacks* pAllocator, VkRenderPass** pRenderPass)
 
@@ -5667,13 +5670,13 @@ interface PFN_vkCmdNextSubpass2KHR(VkCommandBuffer* commandBuffer, VkSubpassBegi
 
 interface PFN_vkCmdEndRenderPass2KHR(VkCommandBuffer* commandBuffer, VkSubpassEndInfo* pSubpassEndInfo)
 
-VkResult vkCreateRenderPass2KHR(VkDevice* device, VkRenderPassCreateInfo2* pCreateInfo, VkAllocationCallbacks* pAllocator, VkRenderPass** pRenderPass) #extern "vulkan"
+VkResult vkCreateRenderPass2KHR(VkDevice* device, VkRenderPassCreateInfo2* pCreateInfo, VkAllocationCallbacks* pAllocator, VkRenderPass** pRenderPass) #extern vulkan
 
-vkCmdBeginRenderPass2KHR(VkCommandBuffer* commandBuffer, VkRenderPassBeginInfo* pRenderPassBegin, VkSubpassBeginInfo* pSubpassBeginInfo) #extern "vulkan"
+vkCmdBeginRenderPass2KHR(VkCommandBuffer* commandBuffer, VkRenderPassBeginInfo* pRenderPassBegin, VkSubpassBeginInfo* pSubpassBeginInfo) #extern vulkan
 
-vkCmdNextSubpass2KHR(VkCommandBuffer* commandBuffer, VkSubpassBeginInfo* pSubpassBeginInfo, VkSubpassEndInfo* pSubpassEndInfo) #extern "vulkan"
+vkCmdNextSubpass2KHR(VkCommandBuffer* commandBuffer, VkSubpassBeginInfo* pSubpassBeginInfo, VkSubpassEndInfo* pSubpassEndInfo) #extern vulkan
 
-vkCmdEndRenderPass2KHR(VkCommandBuffer* commandBuffer, VkSubpassEndInfo* pSubpassEndInfo) #extern "vulkan"
+vkCmdEndRenderPass2KHR(VkCommandBuffer* commandBuffer, VkSubpassEndInfo* pSubpassEndInfo) #extern vulkan
 
 struct VkSharedPresentSurfaceCapabilitiesKHR {
     sType := VkStructureType.VK_STRUCTURE_TYPE_SHARED_PRESENT_SURFACE_CAPABILITIES_KHR;
@@ -5683,11 +5686,11 @@ struct VkSharedPresentSurfaceCapabilitiesKHR {
 
 interface VkResult PFN_vkGetSwapchainStatusKHR(VkDevice* device, VkSwapchainKHR* swapchain)
 
-VkResult vkGetSwapchainStatusKHR(VkDevice* device, VkSwapchainKHR* swapchain) #extern "vulkan"
+VkResult vkGetSwapchainStatusKHR(VkDevice* device, VkSwapchainKHR* swapchain) #extern vulkan
 
 interface PFN_vkGetPhysicalDeviceExternalFencePropertiesKHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceExternalFenceInfo* pExternalFenceInfo, VkExternalFenceProperties* pExternalFenceProperties)
 
-vkGetPhysicalDeviceExternalFencePropertiesKHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceExternalFenceInfo* pExternalFenceInfo, VkExternalFenceProperties* pExternalFenceProperties) #extern "vulkan"
+vkGetPhysicalDeviceExternalFencePropertiesKHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceExternalFenceInfo* pExternalFenceInfo, VkExternalFenceProperties* pExternalFenceProperties) #extern vulkan
 
 struct VkImportFenceFdInfoKHR {
     sType := VkStructureType.VK_STRUCTURE_TYPE_IMPORT_FENCE_FD_INFO_KHR;
@@ -5709,9 +5712,9 @@ interface VkResult PFN_vkImportFenceFdKHR(VkDevice* device, VkImportFenceFdInfoK
 
 interface VkResult PFN_vkGetFenceFdKHR(VkDevice* device, VkFenceGetFdInfoKHR* pGetFdInfo, s32* pFd)
 
-VkResult vkImportFenceFdKHR(VkDevice* device, VkImportFenceFdInfoKHR* pImportFenceFdInfo) #extern "vulkan"
+VkResult vkImportFenceFdKHR(VkDevice* device, VkImportFenceFdInfoKHR* pImportFenceFdInfo) #extern vulkan
 
-VkResult vkGetFenceFdKHR(VkDevice* device, VkFenceGetFdInfoKHR* pGetFdInfo, s32* pFd) #extern "vulkan"
+VkResult vkGetFenceFdKHR(VkDevice* device, VkFenceGetFdInfoKHR* pGetFdInfo, s32* pFd) #extern vulkan
 
 enum VkPerformanceCounterUnitKHR {
     VK_PERFORMANCE_COUNTER_UNIT_GENERIC_KHR = 0;
@@ -5829,13 +5832,13 @@ interface VkResult PFN_vkAcquireProfilingLockKHR(VkDevice* device, VkAcquireProf
 
 interface PFN_vkReleaseProfilingLockKHR(VkDevice* device)
 
-VkResult vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR(VkPhysicalDevice* physicalDevice, u32 queueFamilyIndex, u32* pCounterCount, VkPerformanceCounterKHR* pCounters, VkPerformanceCounterDescriptionKHR* pCounterDescriptions) #extern "vulkan"
+VkResult vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR(VkPhysicalDevice* physicalDevice, u32 queueFamilyIndex, u32* pCounterCount, VkPerformanceCounterKHR* pCounters, VkPerformanceCounterDescriptionKHR* pCounterDescriptions) #extern vulkan
 
-vkGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR(VkPhysicalDevice* physicalDevice, VkQueryPoolPerformanceCreateInfoKHR* pPerformanceQueryCreateInfo, u32* pNumPasses) #extern "vulkan"
+vkGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR(VkPhysicalDevice* physicalDevice, VkQueryPoolPerformanceCreateInfoKHR* pPerformanceQueryCreateInfo, u32* pNumPasses) #extern vulkan
 
-VkResult vkAcquireProfilingLockKHR(VkDevice* device, VkAcquireProfilingLockInfoKHR* pInfo) #extern "vulkan"
+VkResult vkAcquireProfilingLockKHR(VkDevice* device, VkAcquireProfilingLockInfoKHR* pInfo) #extern vulkan
 
-vkReleaseProfilingLockKHR(VkDevice* device) #extern "vulkan"
+vkReleaseProfilingLockKHR(VkDevice* device) #extern vulkan
 
 struct VkPhysicalDeviceSurfaceInfo2KHR {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR;
@@ -5859,9 +5862,9 @@ interface VkResult PFN_vkGetPhysicalDeviceSurfaceCapabilities2KHR(VkPhysicalDevi
 
 interface VkResult PFN_vkGetPhysicalDeviceSurfaceFormats2KHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceSurfaceInfo2KHR* pSurfaceInfo, u32* pSurfaceFormatCount, VkSurfaceFormat2KHR* pSurfaceFormats)
 
-VkResult vkGetPhysicalDeviceSurfaceCapabilities2KHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceSurfaceInfo2KHR* pSurfaceInfo, VkSurfaceCapabilities2KHR* pSurfaceCapabilities) #extern "vulkan"
+VkResult vkGetPhysicalDeviceSurfaceCapabilities2KHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceSurfaceInfo2KHR* pSurfaceInfo, VkSurfaceCapabilities2KHR* pSurfaceCapabilities) #extern vulkan
 
-VkResult vkGetPhysicalDeviceSurfaceFormats2KHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceSurfaceInfo2KHR* pSurfaceInfo, u32* pSurfaceFormatCount, VkSurfaceFormat2KHR* pSurfaceFormats) #extern "vulkan"
+VkResult vkGetPhysicalDeviceSurfaceFormats2KHR(VkPhysicalDevice* physicalDevice, VkPhysicalDeviceSurfaceInfo2KHR* pSurfaceInfo, u32* pSurfaceFormatCount, VkSurfaceFormat2KHR* pSurfaceFormats) #extern vulkan
 
 struct VkDisplayProperties2KHR {
     sType := VkStructureType.VK_STRUCTURE_TYPE_DISPLAY_PROPERTIES_2_KHR;
@@ -5902,13 +5905,13 @@ interface VkResult PFN_vkGetDisplayModeProperties2KHR(VkPhysicalDevice* physical
 
 interface VkResult PFN_vkGetDisplayPlaneCapabilities2KHR(VkPhysicalDevice* physicalDevice, VkDisplayPlaneInfo2KHR* pDisplayPlaneInfo, VkDisplayPlaneCapabilities2KHR* pCapabilities)
 
-VkResult vkGetPhysicalDeviceDisplayProperties2KHR(VkPhysicalDevice* physicalDevice, u32* pPropertyCount, VkDisplayProperties2KHR* pProperties) #extern "vulkan"
+VkResult vkGetPhysicalDeviceDisplayProperties2KHR(VkPhysicalDevice* physicalDevice, u32* pPropertyCount, VkDisplayProperties2KHR* pProperties) #extern vulkan
 
-VkResult vkGetPhysicalDeviceDisplayPlaneProperties2KHR(VkPhysicalDevice* physicalDevice, u32* pPropertyCount, VkDisplayPlaneProperties2KHR* pProperties) #extern "vulkan"
+VkResult vkGetPhysicalDeviceDisplayPlaneProperties2KHR(VkPhysicalDevice* physicalDevice, u32* pPropertyCount, VkDisplayPlaneProperties2KHR* pProperties) #extern vulkan
 
-VkResult vkGetDisplayModeProperties2KHR(VkPhysicalDevice* physicalDevice, VkDisplayKHR* display, u32* pPropertyCount, VkDisplayModeProperties2KHR* pProperties) #extern "vulkan"
+VkResult vkGetDisplayModeProperties2KHR(VkPhysicalDevice* physicalDevice, VkDisplayKHR* display, u32* pPropertyCount, VkDisplayModeProperties2KHR* pProperties) #extern vulkan
 
-VkResult vkGetDisplayPlaneCapabilities2KHR(VkPhysicalDevice* physicalDevice, VkDisplayPlaneInfo2KHR* pDisplayPlaneInfo, VkDisplayPlaneCapabilities2KHR* pCapabilities) #extern "vulkan"
+VkResult vkGetDisplayPlaneCapabilities2KHR(VkPhysicalDevice* physicalDevice, VkDisplayPlaneInfo2KHR* pDisplayPlaneInfo, VkDisplayPlaneCapabilities2KHR* pCapabilities) #extern vulkan
 
 interface PFN_vkGetImageMemoryRequirements2KHR(VkDevice* device, VkImageMemoryRequirementsInfo2* pInfo, VkMemoryRequirements2* pMemoryRequirements)
 
@@ -5916,39 +5919,39 @@ interface PFN_vkGetBufferMemoryRequirements2KHR(VkDevice* device, VkBufferMemory
 
 interface PFN_vkGetImageSparseMemoryRequirements2KHR(VkDevice* device, VkImageSparseMemoryRequirementsInfo2* pInfo, u32* pSparseMemoryRequirementCount, VkSparseImageMemoryRequirements2* pSparseMemoryRequirements)
 
-vkGetImageMemoryRequirements2KHR(VkDevice* device, VkImageMemoryRequirementsInfo2* pInfo, VkMemoryRequirements2* pMemoryRequirements) #extern "vulkan"
+vkGetImageMemoryRequirements2KHR(VkDevice* device, VkImageMemoryRequirementsInfo2* pInfo, VkMemoryRequirements2* pMemoryRequirements) #extern vulkan
 
-vkGetBufferMemoryRequirements2KHR(VkDevice* device, VkBufferMemoryRequirementsInfo2* pInfo, VkMemoryRequirements2* pMemoryRequirements) #extern "vulkan"
+vkGetBufferMemoryRequirements2KHR(VkDevice* device, VkBufferMemoryRequirementsInfo2* pInfo, VkMemoryRequirements2* pMemoryRequirements) #extern vulkan
 
-vkGetImageSparseMemoryRequirements2KHR(VkDevice* device, VkImageSparseMemoryRequirementsInfo2* pInfo, u32* pSparseMemoryRequirementCount, VkSparseImageMemoryRequirements2* pSparseMemoryRequirements) #extern "vulkan"
+vkGetImageSparseMemoryRequirements2KHR(VkDevice* device, VkImageSparseMemoryRequirementsInfo2* pInfo, u32* pSparseMemoryRequirementCount, VkSparseImageMemoryRequirements2* pSparseMemoryRequirements) #extern vulkan
 
 interface VkResult PFN_vkCreateSamplerYcbcrConversionKHR(VkDevice* device, VkSamplerYcbcrConversionCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSamplerYcbcrConversion** pYcbcrConversion)
 
 interface PFN_vkDestroySamplerYcbcrConversionKHR(VkDevice* device, VkSamplerYcbcrConversion* ycbcrConversion, VkAllocationCallbacks* pAllocator)
 
-VkResult vkCreateSamplerYcbcrConversionKHR(VkDevice* device, VkSamplerYcbcrConversionCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSamplerYcbcrConversion** pYcbcrConversion) #extern "vulkan"
+VkResult vkCreateSamplerYcbcrConversionKHR(VkDevice* device, VkSamplerYcbcrConversionCreateInfo* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSamplerYcbcrConversion** pYcbcrConversion) #extern vulkan
 
-vkDestroySamplerYcbcrConversionKHR(VkDevice* device, VkSamplerYcbcrConversion* ycbcrConversion, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroySamplerYcbcrConversionKHR(VkDevice* device, VkSamplerYcbcrConversion* ycbcrConversion, VkAllocationCallbacks* pAllocator) #extern vulkan
 
 interface VkResult PFN_vkBindBufferMemory2KHR(VkDevice* device, u32 bindInfoCount, VkBindBufferMemoryInfo* pBindInfos)
 
 interface VkResult PFN_vkBindImageMemory2KHR(VkDevice* device, u32 bindInfoCount, VkBindImageMemoryInfo* pBindInfos)
 
-VkResult vkBindBufferMemory2KHR(VkDevice* device, u32 bindInfoCount, VkBindBufferMemoryInfo* pBindInfos) #extern "vulkan"
+VkResult vkBindBufferMemory2KHR(VkDevice* device, u32 bindInfoCount, VkBindBufferMemoryInfo* pBindInfos) #extern vulkan
 
-VkResult vkBindImageMemory2KHR(VkDevice* device, u32 bindInfoCount, VkBindImageMemoryInfo* pBindInfos) #extern "vulkan"
+VkResult vkBindImageMemory2KHR(VkDevice* device, u32 bindInfoCount, VkBindImageMemoryInfo* pBindInfos) #extern vulkan
 
 interface PFN_vkGetDescriptorSetLayoutSupportKHR(VkDevice* device, VkDescriptorSetLayoutCreateInfo* pCreateInfo, VkDescriptorSetLayoutSupport* pSupport)
 
-vkGetDescriptorSetLayoutSupportKHR(VkDevice* device, VkDescriptorSetLayoutCreateInfo* pCreateInfo, VkDescriptorSetLayoutSupport* pSupport) #extern "vulkan"
+vkGetDescriptorSetLayoutSupportKHR(VkDevice* device, VkDescriptorSetLayoutCreateInfo* pCreateInfo, VkDescriptorSetLayoutSupport* pSupport) #extern vulkan
 
 interface PFN_vkCmdDrawIndirectCountKHR(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride)
 
 interface PFN_vkCmdDrawIndexedIndirectCountKHR(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride)
 
-vkCmdDrawIndirectCountKHR(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride) #extern "vulkan"
+vkCmdDrawIndirectCountKHR(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride) #extern vulkan
 
-vkCmdDrawIndexedIndirectCountKHR(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride) #extern "vulkan"
+vkCmdDrawIndexedIndirectCountKHR(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride) #extern vulkan
 
 struct VkPhysicalDeviceShaderClockFeaturesKHR {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR;
@@ -5963,11 +5966,11 @@ interface VkResult PFN_vkWaitSemaphoresKHR(VkDevice* device, VkSemaphoreWaitInfo
 
 interface VkResult PFN_vkSignalSemaphoreKHR(VkDevice* device, VkSemaphoreSignalInfo* pSignalInfo)
 
-VkResult vkGetSemaphoreCounterValueKHR(VkDevice* device, VkSemaphore* semaphore, u64* pValue) #extern "vulkan"
+VkResult vkGetSemaphoreCounterValueKHR(VkDevice* device, VkSemaphore* semaphore, u64* pValue) #extern vulkan
 
-VkResult vkWaitSemaphoresKHR(VkDevice* device, VkSemaphoreWaitInfo* pWaitInfo, u64 timeout) #extern "vulkan"
+VkResult vkWaitSemaphoresKHR(VkDevice* device, VkSemaphoreWaitInfo* pWaitInfo, u64 timeout) #extern vulkan
 
-VkResult vkSignalSemaphoreKHR(VkDevice* device, VkSemaphoreSignalInfo* pSignalInfo) #extern "vulkan"
+VkResult vkSignalSemaphoreKHR(VkDevice* device, VkSemaphoreSignalInfo* pSignalInfo) #extern vulkan
 
 struct VkPhysicalDeviceShaderTerminateInvocationFeaturesKHR {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_TERMINATE_INVOCATION_FEATURES_KHR;
@@ -6039,9 +6042,9 @@ interface VkResult PFN_vkGetPhysicalDeviceFragmentShadingRatesKHR(VkPhysicalDevi
 
 interface PFN_vkCmdSetFragmentShadingRateKHR(VkCommandBuffer* commandBuffer, VkExtent2D* pFragmentSize, CArray<VkFragmentShadingRateCombinerOpKHR>[2] combinerOps)
 
-VkResult vkGetPhysicalDeviceFragmentShadingRatesKHR(VkPhysicalDevice* physicalDevice, u32* pFragmentShadingRateCount, VkPhysicalDeviceFragmentShadingRateKHR* pFragmentShadingRates) #extern "vulkan"
+VkResult vkGetPhysicalDeviceFragmentShadingRatesKHR(VkPhysicalDevice* physicalDevice, u32* pFragmentShadingRateCount, VkPhysicalDeviceFragmentShadingRateKHR* pFragmentShadingRates) #extern vulkan
 
-vkCmdSetFragmentShadingRateKHR(VkCommandBuffer* commandBuffer, VkExtent2D* pFragmentSize, CArray<VkFragmentShadingRateCombinerOpKHR>[2] combinerOps) #extern "vulkan"
+vkCmdSetFragmentShadingRateKHR(VkCommandBuffer* commandBuffer, VkExtent2D* pFragmentSize, CArray<VkFragmentShadingRateCombinerOpKHR>[2] combinerOps) #extern vulkan
 
 struct VkSurfaceProtectedCapabilitiesKHR {
     sType := VkStructureType.VK_STRUCTURE_TYPE_SURFACE_PROTECTED_CAPABILITIES_KHR;
@@ -6057,7 +6060,7 @@ struct VkPhysicalDevicePresentWaitFeaturesKHR {
 
 interface VkResult PFN_vkWaitForPresentKHR(VkDevice* device, VkSwapchainKHR* swapchain, u64 presentId, u64 timeout)
 
-VkResult vkWaitForPresentKHR(VkDevice* device, VkSwapchainKHR* swapchain, u64 presentId, u64 timeout) #extern "vulkan"
+VkResult vkWaitForPresentKHR(VkDevice* device, VkSwapchainKHR* swapchain, u64 presentId, u64 timeout) #extern vulkan
 
 interface u64 PFN_vkGetBufferDeviceAddressKHR(VkDevice* device, VkBufferDeviceAddressInfo* pInfo)
 
@@ -6065,11 +6068,11 @@ interface u64 PFN_vkGetBufferOpaqueCaptureAddressKHR(VkDevice* device, VkBufferD
 
 interface u64 PFN_vkGetDeviceMemoryOpaqueCaptureAddressKHR(VkDevice* device, VkDeviceMemoryOpaqueCaptureAddressInfo* pInfo)
 
-u64 vkGetBufferDeviceAddressKHR(VkDevice* device, VkBufferDeviceAddressInfo* pInfo) #extern "vulkan"
+u64 vkGetBufferDeviceAddressKHR(VkDevice* device, VkBufferDeviceAddressInfo* pInfo) #extern vulkan
 
-u64 vkGetBufferOpaqueCaptureAddressKHR(VkDevice* device, VkBufferDeviceAddressInfo* pInfo) #extern "vulkan"
+u64 vkGetBufferOpaqueCaptureAddressKHR(VkDevice* device, VkBufferDeviceAddressInfo* pInfo) #extern vulkan
 
-u64 vkGetDeviceMemoryOpaqueCaptureAddressKHR(VkDevice* device, VkDeviceMemoryOpaqueCaptureAddressInfo* pInfo) #extern "vulkan"
+u64 vkGetDeviceMemoryOpaqueCaptureAddressKHR(VkDevice* device, VkDeviceMemoryOpaqueCaptureAddressInfo* pInfo) #extern vulkan
 
 struct VkDeferredOperationKHR {}
 interface VkResult PFN_vkCreateDeferredOperationKHR(VkDevice* device, VkAllocationCallbacks* pAllocator, VkDeferredOperationKHR** pDeferredOperation)
@@ -6082,15 +6085,15 @@ interface VkResult PFN_vkGetDeferredOperationResultKHR(VkDevice* device, VkDefer
 
 interface VkResult PFN_vkDeferredOperationJoinKHR(VkDevice* device, VkDeferredOperationKHR* operation)
 
-VkResult vkCreateDeferredOperationKHR(VkDevice* device, VkAllocationCallbacks* pAllocator, VkDeferredOperationKHR** pDeferredOperation) #extern "vulkan"
+VkResult vkCreateDeferredOperationKHR(VkDevice* device, VkAllocationCallbacks* pAllocator, VkDeferredOperationKHR** pDeferredOperation) #extern vulkan
 
-vkDestroyDeferredOperationKHR(VkDevice* device, VkDeferredOperationKHR* operation, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyDeferredOperationKHR(VkDevice* device, VkDeferredOperationKHR* operation, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-u32 vkGetDeferredOperationMaxConcurrencyKHR(VkDevice* device, VkDeferredOperationKHR* operation) #extern "vulkan"
+u32 vkGetDeferredOperationMaxConcurrencyKHR(VkDevice* device, VkDeferredOperationKHR* operation) #extern vulkan
 
-VkResult vkGetDeferredOperationResultKHR(VkDevice* device, VkDeferredOperationKHR* operation) #extern "vulkan"
+VkResult vkGetDeferredOperationResultKHR(VkDevice* device, VkDeferredOperationKHR* operation) #extern vulkan
 
-VkResult vkDeferredOperationJoinKHR(VkDevice* device, VkDeferredOperationKHR* operation) #extern "vulkan"
+VkResult vkDeferredOperationJoinKHR(VkDevice* device, VkDeferredOperationKHR* operation) #extern vulkan
 
 enum VkPipelineExecutableStatisticFormatKHR {
     VK_PIPELINE_EXECUTABLE_STATISTIC_FORMAT_BOOL32_KHR = 0;
@@ -6160,11 +6163,11 @@ interface VkResult PFN_vkGetPipelineExecutableStatisticsKHR(VkDevice* device, Vk
 
 interface VkResult PFN_vkGetPipelineExecutableInternalRepresentationsKHR(VkDevice* device, VkPipelineExecutableInfoKHR* pExecutableInfo, u32* pInternalRepresentationCount, VkPipelineExecutableInternalRepresentationKHR* pInternalRepresentations)
 
-VkResult vkGetPipelineExecutablePropertiesKHR(VkDevice* device, VkPipelineInfoKHR* pPipelineInfo, u32* pExecutableCount, VkPipelineExecutablePropertiesKHR* pProperties) #extern "vulkan"
+VkResult vkGetPipelineExecutablePropertiesKHR(VkDevice* device, VkPipelineInfoKHR* pPipelineInfo, u32* pExecutableCount, VkPipelineExecutablePropertiesKHR* pProperties) #extern vulkan
 
-VkResult vkGetPipelineExecutableStatisticsKHR(VkDevice* device, VkPipelineExecutableInfoKHR* pExecutableInfo, u32* pStatisticCount, VkPipelineExecutableStatisticKHR* pStatistics) #extern "vulkan"
+VkResult vkGetPipelineExecutableStatisticsKHR(VkDevice* device, VkPipelineExecutableInfoKHR* pExecutableInfo, u32* pStatisticCount, VkPipelineExecutableStatisticKHR* pStatistics) #extern vulkan
 
-VkResult vkGetPipelineExecutableInternalRepresentationsKHR(VkDevice* device, VkPipelineExecutableInfoKHR* pExecutableInfo, u32* pInternalRepresentationCount, VkPipelineExecutableInternalRepresentationKHR* pInternalRepresentations) #extern "vulkan"
+VkResult vkGetPipelineExecutableInternalRepresentationsKHR(VkDevice* device, VkPipelineExecutableInfoKHR* pExecutableInfo, u32* pInternalRepresentationCount, VkPipelineExecutableInternalRepresentationKHR* pInternalRepresentations) #extern vulkan
 
 struct VkPhysicalDeviceShaderIntegerDotProductFeaturesKHR {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_FEATURES_KHR;
@@ -6422,21 +6425,21 @@ interface PFN_vkCmdWriteBufferMarker2AMD(VkCommandBuffer* commandBuffer, u64 sta
 
 interface PFN_vkGetQueueCheckpointData2NV(VkQueue* queue, u32* pCheckpointDataCount, VkCheckpointData2NV* pCheckpointData)
 
-vkCmdSetEvent2KHR(VkCommandBuffer* commandBuffer, VkEvent* event, VkDependencyInfoKHR* pDependencyInfo) #extern "vulkan"
+vkCmdSetEvent2KHR(VkCommandBuffer* commandBuffer, VkEvent* event, VkDependencyInfoKHR* pDependencyInfo) #extern vulkan
 
-vkCmdResetEvent2KHR(VkCommandBuffer* commandBuffer, VkEvent* event, u64 stageMask) #extern "vulkan"
+vkCmdResetEvent2KHR(VkCommandBuffer* commandBuffer, VkEvent* event, u64 stageMask) #extern vulkan
 
-vkCmdWaitEvents2KHR(VkCommandBuffer* commandBuffer, u32 eventCount, VkEvent** pEvents, VkDependencyInfoKHR* pDependencyInfos) #extern "vulkan"
+vkCmdWaitEvents2KHR(VkCommandBuffer* commandBuffer, u32 eventCount, VkEvent** pEvents, VkDependencyInfoKHR* pDependencyInfos) #extern vulkan
 
-vkCmdPipelineBarrier2KHR(VkCommandBuffer* commandBuffer, VkDependencyInfoKHR* pDependencyInfo) #extern "vulkan"
+vkCmdPipelineBarrier2KHR(VkCommandBuffer* commandBuffer, VkDependencyInfoKHR* pDependencyInfo) #extern vulkan
 
-vkCmdWriteTimestamp2KHR(VkCommandBuffer* commandBuffer, u64 stage, VkQueryPool* queryPool, u32 query) #extern "vulkan"
+vkCmdWriteTimestamp2KHR(VkCommandBuffer* commandBuffer, u64 stage, VkQueryPool* queryPool, u32 query) #extern vulkan
 
-VkResult vkQueueSubmit2KHR(VkQueue* queue, u32 submitCount, VkSubmitInfo2KHR* pSubmits, VkFence* fence) #extern "vulkan"
+VkResult vkQueueSubmit2KHR(VkQueue* queue, u32 submitCount, VkSubmitInfo2KHR* pSubmits, VkFence* fence) #extern vulkan
 
-vkCmdWriteBufferMarker2AMD(VkCommandBuffer* commandBuffer, u64 stage, VkBuffer* dstBuffer, u64 dstOffset, u32 marker) #extern "vulkan"
+vkCmdWriteBufferMarker2AMD(VkCommandBuffer* commandBuffer, u64 stage, VkBuffer* dstBuffer, u64 dstOffset, u32 marker) #extern vulkan
 
-vkGetQueueCheckpointData2NV(VkQueue* queue, u32* pCheckpointDataCount, VkCheckpointData2NV* pCheckpointData) #extern "vulkan"
+vkGetQueueCheckpointData2NV(VkQueue* queue, u32* pCheckpointDataCount, VkCheckpointData2NV* pCheckpointData) #extern vulkan
 
 struct VkPhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_FEATURES_KHR;
@@ -6582,17 +6585,17 @@ interface PFN_vkCmdBlitImage2KHR(VkCommandBuffer* commandBuffer, VkBlitImageInfo
 
 interface PFN_vkCmdResolveImage2KHR(VkCommandBuffer* commandBuffer, VkResolveImageInfo2KHR* pResolveImageInfo)
 
-vkCmdCopyBuffer2KHR(VkCommandBuffer* commandBuffer, VkCopyBufferInfo2KHR* pCopyBufferInfo) #extern "vulkan"
+vkCmdCopyBuffer2KHR(VkCommandBuffer* commandBuffer, VkCopyBufferInfo2KHR* pCopyBufferInfo) #extern vulkan
 
-vkCmdCopyImage2KHR(VkCommandBuffer* commandBuffer, VkCopyImageInfo2KHR* pCopyImageInfo) #extern "vulkan"
+vkCmdCopyImage2KHR(VkCommandBuffer* commandBuffer, VkCopyImageInfo2KHR* pCopyImageInfo) #extern vulkan
 
-vkCmdCopyBufferToImage2KHR(VkCommandBuffer* commandBuffer, VkCopyBufferToImageInfo2KHR* pCopyBufferToImageInfo) #extern "vulkan"
+vkCmdCopyBufferToImage2KHR(VkCommandBuffer* commandBuffer, VkCopyBufferToImageInfo2KHR* pCopyBufferToImageInfo) #extern vulkan
 
-vkCmdCopyImageToBuffer2KHR(VkCommandBuffer* commandBuffer, VkCopyImageToBufferInfo2KHR* pCopyImageToBufferInfo) #extern "vulkan"
+vkCmdCopyImageToBuffer2KHR(VkCommandBuffer* commandBuffer, VkCopyImageToBufferInfo2KHR* pCopyImageToBufferInfo) #extern vulkan
 
-vkCmdBlitImage2KHR(VkCommandBuffer* commandBuffer, VkBlitImageInfo2KHR* pBlitImageInfo) #extern "vulkan"
+vkCmdBlitImage2KHR(VkCommandBuffer* commandBuffer, VkBlitImageInfo2KHR* pBlitImageInfo) #extern vulkan
 
-vkCmdResolveImage2KHR(VkCommandBuffer* commandBuffer, VkResolveImageInfo2KHR* pResolveImageInfo) #extern "vulkan"
+vkCmdResolveImage2KHR(VkCommandBuffer* commandBuffer, VkResolveImageInfo2KHR* pResolveImageInfo) #extern vulkan
 
 struct VkDebugReportCallbackEXT {}
 enum VkDebugReportObjectTypeEXT {
@@ -6667,11 +6670,11 @@ interface PFN_vkDestroyDebugReportCallbackEXT(VkInstance* instance, VkDebugRepor
 
 interface PFN_vkDebugReportMessageEXT(VkInstance* instance, u32 flags, VkDebugReportObjectTypeEXT objectType, u64 object, u64 location, s32 messageCode, u8* pLayerPrefix, u8* pMessage)
 
-VkResult vkCreateDebugReportCallbackEXT(VkInstance* instance, VkDebugReportCallbackCreateInfoEXT* pCreateInfo, VkAllocationCallbacks* pAllocator, VkDebugReportCallbackEXT** pCallback) #extern "vulkan"
+VkResult vkCreateDebugReportCallbackEXT(VkInstance* instance, VkDebugReportCallbackCreateInfoEXT* pCreateInfo, VkAllocationCallbacks* pAllocator, VkDebugReportCallbackEXT** pCallback) #extern vulkan
 
-vkDestroyDebugReportCallbackEXT(VkInstance* instance, VkDebugReportCallbackEXT* callback, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyDebugReportCallbackEXT(VkInstance* instance, VkDebugReportCallbackEXT* callback, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-vkDebugReportMessageEXT(VkInstance* instance, u32 flags, VkDebugReportObjectTypeEXT objectType, u64 object, u64 location, s32 messageCode, u8* pLayerPrefix, u8* pMessage) #extern "vulkan"
+vkDebugReportMessageEXT(VkInstance* instance, u32 flags, VkDebugReportObjectTypeEXT objectType, u64 object, u64 location, s32 messageCode, u8* pLayerPrefix, u8* pMessage) #extern vulkan
 
 enum VkRasterizationOrderAMD {
     VK_RASTERIZATION_ORDER_STRICT_AMD = 0;
@@ -6720,15 +6723,15 @@ interface PFN_vkCmdDebugMarkerEndEXT(VkCommandBuffer* commandBuffer)
 
 interface PFN_vkCmdDebugMarkerInsertEXT(VkCommandBuffer* commandBuffer, VkDebugMarkerMarkerInfoEXT* pMarkerInfo)
 
-VkResult vkDebugMarkerSetObjectTagEXT(VkDevice* device, VkDebugMarkerObjectTagInfoEXT* pTagInfo) #extern "vulkan"
+VkResult vkDebugMarkerSetObjectTagEXT(VkDevice* device, VkDebugMarkerObjectTagInfoEXT* pTagInfo) #extern vulkan
 
-VkResult vkDebugMarkerSetObjectNameEXT(VkDevice* device, VkDebugMarkerObjectNameInfoEXT* pNameInfo) #extern "vulkan"
+VkResult vkDebugMarkerSetObjectNameEXT(VkDevice* device, VkDebugMarkerObjectNameInfoEXT* pNameInfo) #extern vulkan
 
-vkCmdDebugMarkerBeginEXT(VkCommandBuffer* commandBuffer, VkDebugMarkerMarkerInfoEXT* pMarkerInfo) #extern "vulkan"
+vkCmdDebugMarkerBeginEXT(VkCommandBuffer* commandBuffer, VkDebugMarkerMarkerInfoEXT* pMarkerInfo) #extern vulkan
 
-vkCmdDebugMarkerEndEXT(VkCommandBuffer* commandBuffer) #extern "vulkan"
+vkCmdDebugMarkerEndEXT(VkCommandBuffer* commandBuffer) #extern vulkan
 
-vkCmdDebugMarkerInsertEXT(VkCommandBuffer* commandBuffer, VkDebugMarkerMarkerInfoEXT* pMarkerInfo) #extern "vulkan"
+vkCmdDebugMarkerInsertEXT(VkCommandBuffer* commandBuffer, VkDebugMarkerMarkerInfoEXT* pMarkerInfo) #extern vulkan
 
 struct VkDedicatedAllocationImageCreateInfoNV {
     sType := VkStructureType.VK_STRUCTURE_TYPE_DEDICATED_ALLOCATION_IMAGE_CREATE_INFO_NV;
@@ -6790,17 +6793,17 @@ interface PFN_vkCmdEndQueryIndexedEXT(VkCommandBuffer* commandBuffer, VkQueryPoo
 
 interface PFN_vkCmdDrawIndirectByteCountEXT(VkCommandBuffer* commandBuffer, u32 instanceCount, u32 firstInstance, VkBuffer* counterBuffer, u64 counterBufferOffset, u32 counterOffset, u32 vertexStride)
 
-vkCmdBindTransformFeedbackBuffersEXT(VkCommandBuffer* commandBuffer, u32 firstBinding, u32 bindingCount, VkBuffer** pBuffers, u64* pOffsets, u64* pSizes) #extern "vulkan"
+vkCmdBindTransformFeedbackBuffersEXT(VkCommandBuffer* commandBuffer, u32 firstBinding, u32 bindingCount, VkBuffer** pBuffers, u64* pOffsets, u64* pSizes) #extern vulkan
 
-vkCmdBeginTransformFeedbackEXT(VkCommandBuffer* commandBuffer, u32 firstCounterBuffer, u32 counterBufferCount, VkBuffer** pCounterBuffers, u64* pCounterBufferOffsets) #extern "vulkan"
+vkCmdBeginTransformFeedbackEXT(VkCommandBuffer* commandBuffer, u32 firstCounterBuffer, u32 counterBufferCount, VkBuffer** pCounterBuffers, u64* pCounterBufferOffsets) #extern vulkan
 
-vkCmdEndTransformFeedbackEXT(VkCommandBuffer* commandBuffer, u32 firstCounterBuffer, u32 counterBufferCount, VkBuffer** pCounterBuffers, u64* pCounterBufferOffsets) #extern "vulkan"
+vkCmdEndTransformFeedbackEXT(VkCommandBuffer* commandBuffer, u32 firstCounterBuffer, u32 counterBufferCount, VkBuffer** pCounterBuffers, u64* pCounterBufferOffsets) #extern vulkan
 
-vkCmdBeginQueryIndexedEXT(VkCommandBuffer* commandBuffer, VkQueryPool* queryPool, u32 query, u32 flags, u32 index) #extern "vulkan"
+vkCmdBeginQueryIndexedEXT(VkCommandBuffer* commandBuffer, VkQueryPool* queryPool, u32 query, u32 flags, u32 index) #extern vulkan
 
-vkCmdEndQueryIndexedEXT(VkCommandBuffer* commandBuffer, VkQueryPool* queryPool, u32 query, u32 index) #extern "vulkan"
+vkCmdEndQueryIndexedEXT(VkCommandBuffer* commandBuffer, VkQueryPool* queryPool, u32 query, u32 index) #extern vulkan
 
-vkCmdDrawIndirectByteCountEXT(VkCommandBuffer* commandBuffer, u32 instanceCount, u32 firstInstance, VkBuffer* counterBuffer, u64 counterBufferOffset, u32 counterOffset, u32 vertexStride) #extern "vulkan"
+vkCmdDrawIndirectByteCountEXT(VkCommandBuffer* commandBuffer, u32 instanceCount, u32 firstInstance, VkBuffer* counterBuffer, u64 counterBufferOffset, u32 counterOffset, u32 vertexStride) #extern vulkan
 
 struct VkCuModuleNVX {}
 struct VkCuFunctionNVX {}
@@ -6846,15 +6849,15 @@ interface PFN_vkDestroyCuFunctionNVX(VkDevice* device, VkCuFunctionNVX* function
 
 interface PFN_vkCmdCuLaunchKernelNVX(VkCommandBuffer* commandBuffer, VkCuLaunchInfoNVX* pLaunchInfo)
 
-VkResult vkCreateCuModuleNVX(VkDevice* device, VkCuModuleCreateInfoNVX* pCreateInfo, VkAllocationCallbacks* pAllocator, VkCuModuleNVX** pModule) #extern "vulkan"
+VkResult vkCreateCuModuleNVX(VkDevice* device, VkCuModuleCreateInfoNVX* pCreateInfo, VkAllocationCallbacks* pAllocator, VkCuModuleNVX** pModule) #extern vulkan
 
-VkResult vkCreateCuFunctionNVX(VkDevice* device, VkCuFunctionCreateInfoNVX* pCreateInfo, VkAllocationCallbacks* pAllocator, VkCuFunctionNVX** pFunction) #extern "vulkan"
+VkResult vkCreateCuFunctionNVX(VkDevice* device, VkCuFunctionCreateInfoNVX* pCreateInfo, VkAllocationCallbacks* pAllocator, VkCuFunctionNVX** pFunction) #extern vulkan
 
-vkDestroyCuModuleNVX(VkDevice* device, VkCuModuleNVX* module, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyCuModuleNVX(VkDevice* device, VkCuModuleNVX* module, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-vkDestroyCuFunctionNVX(VkDevice* device, VkCuFunctionNVX* function, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyCuFunctionNVX(VkDevice* device, VkCuFunctionNVX* function, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-vkCmdCuLaunchKernelNVX(VkCommandBuffer* commandBuffer, VkCuLaunchInfoNVX* pLaunchInfo) #extern "vulkan"
+vkCmdCuLaunchKernelNVX(VkCommandBuffer* commandBuffer, VkCuLaunchInfoNVX* pLaunchInfo) #extern vulkan
 
 struct VkImageViewHandleInfoNVX {
     sType := VkStructureType.VK_STRUCTURE_TYPE_IMAGE_VIEW_HANDLE_INFO_NVX;
@@ -6875,17 +6878,17 @@ interface u32 PFN_vkGetImageViewHandleNVX(VkDevice* device, VkImageViewHandleInf
 
 interface VkResult PFN_vkGetImageViewAddressNVX(VkDevice* device, VkImageView* imageView, VkImageViewAddressPropertiesNVX* pProperties)
 
-u32 vkGetImageViewHandleNVX(VkDevice* device, VkImageViewHandleInfoNVX* pInfo) #extern "vulkan"
+u32 vkGetImageViewHandleNVX(VkDevice* device, VkImageViewHandleInfoNVX* pInfo) #extern vulkan
 
-VkResult vkGetImageViewAddressNVX(VkDevice* device, VkImageView* imageView, VkImageViewAddressPropertiesNVX* pProperties) #extern "vulkan"
+VkResult vkGetImageViewAddressNVX(VkDevice* device, VkImageView* imageView, VkImageViewAddressPropertiesNVX* pProperties) #extern vulkan
 
 interface PFN_vkCmdDrawIndirectCountAMD(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride)
 
 interface PFN_vkCmdDrawIndexedIndirectCountAMD(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride)
 
-vkCmdDrawIndirectCountAMD(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride) #extern "vulkan"
+vkCmdDrawIndirectCountAMD(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride) #extern vulkan
 
-vkCmdDrawIndexedIndirectCountAMD(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride) #extern "vulkan"
+vkCmdDrawIndexedIndirectCountAMD(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride) #extern vulkan
 
 struct VkTextureLODGatherFormatPropertiesAMD {
     sType := VkStructureType.VK_STRUCTURE_TYPE_TEXTURE_LOD_GATHER_FORMAT_PROPERTIES_AMD;
@@ -6920,7 +6923,7 @@ struct VkShaderStatisticsInfoAMD {
 
 interface VkResult PFN_vkGetShaderInfoAMD(VkDevice* device, VkPipeline* pipeline, VkShaderStageFlagBits shaderStage, VkShaderInfoTypeAMD infoType, u64* pInfoSize, void* pInfo)
 
-VkResult vkGetShaderInfoAMD(VkDevice* device, VkPipeline* pipeline, VkShaderStageFlagBits shaderStage, VkShaderInfoTypeAMD infoType, u64* pInfoSize, void* pInfo) #extern "vulkan"
+VkResult vkGetShaderInfoAMD(VkDevice* device, VkPipeline* pipeline, VkShaderStageFlagBits shaderStage, VkShaderInfoTypeAMD infoType, u64* pInfoSize, void* pInfo) #extern vulkan
 
 struct VkPhysicalDeviceCornerSampledImageFeaturesNV {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CORNER_SAMPLED_IMAGE_FEATURES_NV;
@@ -6952,7 +6955,7 @@ struct VkExternalImageFormatPropertiesNV {
 
 interface VkResult PFN_vkGetPhysicalDeviceExternalImageFormatPropertiesNV(VkPhysicalDevice* physicalDevice, VkFormat format, VkImageType type, VkImageTiling tiling, u32 usage, u32 flags, u32 externalHandleType, VkExternalImageFormatPropertiesNV* pExternalImageFormatProperties)
 
-VkResult vkGetPhysicalDeviceExternalImageFormatPropertiesNV(VkPhysicalDevice* physicalDevice, VkFormat format, VkImageType type, VkImageTiling tiling, u32 usage, u32 flags, u32 externalHandleType, VkExternalImageFormatPropertiesNV* pExternalImageFormatProperties) #extern "vulkan"
+VkResult vkGetPhysicalDeviceExternalImageFormatPropertiesNV(VkPhysicalDevice* physicalDevice, VkFormat format, VkImageType type, VkImageTiling tiling, u32 usage, u32 flags, u32 externalHandleType, VkExternalImageFormatPropertiesNV* pExternalImageFormatProperties) #extern vulkan
 
 struct VkExternalMemoryImageCreateInfoNV {
     sType := VkStructureType.VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO_NV;
@@ -7027,9 +7030,9 @@ interface PFN_vkCmdBeginConditionalRenderingEXT(VkCommandBuffer* commandBuffer, 
 
 interface PFN_vkCmdEndConditionalRenderingEXT(VkCommandBuffer* commandBuffer)
 
-vkCmdBeginConditionalRenderingEXT(VkCommandBuffer* commandBuffer, VkConditionalRenderingBeginInfoEXT* pConditionalRenderingBegin) #extern "vulkan"
+vkCmdBeginConditionalRenderingEXT(VkCommandBuffer* commandBuffer, VkConditionalRenderingBeginInfoEXT* pConditionalRenderingBegin) #extern vulkan
 
-vkCmdEndConditionalRenderingEXT(VkCommandBuffer* commandBuffer) #extern "vulkan"
+vkCmdEndConditionalRenderingEXT(VkCommandBuffer* commandBuffer) #extern vulkan
 
 struct VkViewportWScalingNV {
     xcoeff: float;
@@ -7046,11 +7049,11 @@ struct VkPipelineViewportWScalingStateCreateInfoNV {
 
 interface PFN_vkCmdSetViewportWScalingNV(VkCommandBuffer* commandBuffer, u32 firstViewport, u32 viewportCount, VkViewportWScalingNV* pViewportWScalings)
 
-vkCmdSetViewportWScalingNV(VkCommandBuffer* commandBuffer, u32 firstViewport, u32 viewportCount, VkViewportWScalingNV* pViewportWScalings) #extern "vulkan"
+vkCmdSetViewportWScalingNV(VkCommandBuffer* commandBuffer, u32 firstViewport, u32 viewportCount, VkViewportWScalingNV* pViewportWScalings) #extern vulkan
 
 interface VkResult PFN_vkReleaseDisplayEXT(VkPhysicalDevice* physicalDevice, VkDisplayKHR* display)
 
-VkResult vkReleaseDisplayEXT(VkPhysicalDevice* physicalDevice, VkDisplayKHR* display) #extern "vulkan"
+VkResult vkReleaseDisplayEXT(VkPhysicalDevice* physicalDevice, VkDisplayKHR* display) #extern vulkan
 
 enum VkSurfaceCounterFlagBitsEXT {
     VK_SURFACE_COUNTER_VBLANK_BIT_EXT = 0x00000001;
@@ -7076,7 +7079,7 @@ struct VkSurfaceCapabilities2EXT {
 
 interface VkResult PFN_vkGetPhysicalDeviceSurfaceCapabilities2EXT(VkPhysicalDevice* physicalDevice, VkSurfaceKHR* surface, VkSurfaceCapabilities2EXT* pSurfaceCapabilities)
 
-VkResult vkGetPhysicalDeviceSurfaceCapabilities2EXT(VkPhysicalDevice* physicalDevice, VkSurfaceKHR* surface, VkSurfaceCapabilities2EXT* pSurfaceCapabilities) #extern "vulkan"
+VkResult vkGetPhysicalDeviceSurfaceCapabilities2EXT(VkPhysicalDevice* physicalDevice, VkSurfaceKHR* surface, VkSurfaceCapabilities2EXT* pSurfaceCapabilities) #extern vulkan
 
 enum VkDisplayPowerStateEXT {
     VK_DISPLAY_POWER_STATE_OFF_EXT = 0;
@@ -7127,13 +7130,13 @@ interface VkResult PFN_vkRegisterDisplayEventEXT(VkDevice* device, VkDisplayKHR*
 
 interface VkResult PFN_vkGetSwapchainCounterEXT(VkDevice* device, VkSwapchainKHR* swapchain, VkSurfaceCounterFlagBitsEXT counter, u64* pCounterValue)
 
-VkResult vkDisplayPowerControlEXT(VkDevice* device, VkDisplayKHR* display, VkDisplayPowerInfoEXT* pDisplayPowerInfo) #extern "vulkan"
+VkResult vkDisplayPowerControlEXT(VkDevice* device, VkDisplayKHR* display, VkDisplayPowerInfoEXT* pDisplayPowerInfo) #extern vulkan
 
-VkResult vkRegisterDeviceEventEXT(VkDevice* device, VkDeviceEventInfoEXT* pDeviceEventInfo, VkAllocationCallbacks* pAllocator, VkFence** pFence) #extern "vulkan"
+VkResult vkRegisterDeviceEventEXT(VkDevice* device, VkDeviceEventInfoEXT* pDeviceEventInfo, VkAllocationCallbacks* pAllocator, VkFence** pFence) #extern vulkan
 
-VkResult vkRegisterDisplayEventEXT(VkDevice* device, VkDisplayKHR* display, VkDisplayEventInfoEXT* pDisplayEventInfo, VkAllocationCallbacks* pAllocator, VkFence** pFence) #extern "vulkan"
+VkResult vkRegisterDisplayEventEXT(VkDevice* device, VkDisplayKHR* display, VkDisplayEventInfoEXT* pDisplayEventInfo, VkAllocationCallbacks* pAllocator, VkFence** pFence) #extern vulkan
 
-VkResult vkGetSwapchainCounterEXT(VkDevice* device, VkSwapchainKHR* swapchain, VkSurfaceCounterFlagBitsEXT counter, u64* pCounterValue) #extern "vulkan"
+VkResult vkGetSwapchainCounterEXT(VkDevice* device, VkSwapchainKHR* swapchain, VkSurfaceCounterFlagBitsEXT counter, u64* pCounterValue) #extern vulkan
 
 struct VkRefreshCycleDurationGOOGLE {
     refreshDuration: u64;
@@ -7163,9 +7166,9 @@ interface VkResult PFN_vkGetRefreshCycleDurationGOOGLE(VkDevice* device, VkSwapc
 
 interface VkResult PFN_vkGetPastPresentationTimingGOOGLE(VkDevice* device, VkSwapchainKHR* swapchain, u32* pPresentationTimingCount, VkPastPresentationTimingGOOGLE* pPresentationTimings)
 
-VkResult vkGetRefreshCycleDurationGOOGLE(VkDevice* device, VkSwapchainKHR* swapchain, VkRefreshCycleDurationGOOGLE* pDisplayTimingProperties) #extern "vulkan"
+VkResult vkGetRefreshCycleDurationGOOGLE(VkDevice* device, VkSwapchainKHR* swapchain, VkRefreshCycleDurationGOOGLE* pDisplayTimingProperties) #extern vulkan
 
-VkResult vkGetPastPresentationTimingGOOGLE(VkDevice* device, VkSwapchainKHR* swapchain, u32* pPresentationTimingCount, VkPastPresentationTimingGOOGLE* pPresentationTimings) #extern "vulkan"
+VkResult vkGetPastPresentationTimingGOOGLE(VkDevice* device, VkSwapchainKHR* swapchain, u32* pPresentationTimingCount, VkPastPresentationTimingGOOGLE* pPresentationTimings) #extern vulkan
 
 struct VkPhysicalDeviceMultiviewPerViewAttributesPropertiesNVX {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_PER_VIEW_ATTRIBUTES_PROPERTIES_NVX;
@@ -7223,7 +7226,7 @@ struct VkPipelineDiscardRectangleStateCreateInfoEXT {
 
 interface PFN_vkCmdSetDiscardRectangleEXT(VkCommandBuffer* commandBuffer, u32 firstDiscardRectangle, u32 discardRectangleCount, VkRect2D* pDiscardRectangles)
 
-vkCmdSetDiscardRectangleEXT(VkCommandBuffer* commandBuffer, u32 firstDiscardRectangle, u32 discardRectangleCount, VkRect2D* pDiscardRectangles) #extern "vulkan"
+vkCmdSetDiscardRectangleEXT(VkCommandBuffer* commandBuffer, u32 firstDiscardRectangle, u32 discardRectangleCount, VkRect2D* pDiscardRectangles) #extern vulkan
 
 enum VkConservativeRasterizationModeEXT {
     VK_CONSERVATIVE_RASTERIZATION_MODE_DISABLED_EXT = 0;
@@ -7287,7 +7290,7 @@ struct VkHdrMetadataEXT {
 
 interface PFN_vkSetHdrMetadataEXT(VkDevice* device, u32 swapchainCount, VkSwapchainKHR** pSwapchains, VkHdrMetadataEXT* pMetadata)
 
-vkSetHdrMetadataEXT(VkDevice* device, u32 swapchainCount, VkSwapchainKHR** pSwapchains, VkHdrMetadataEXT* pMetadata) #extern "vulkan"
+vkSetHdrMetadataEXT(VkDevice* device, u32 swapchainCount, VkSwapchainKHR** pSwapchains, VkHdrMetadataEXT* pMetadata) #extern vulkan
 
 struct VkDebugUtilsMessengerEXT {}
 
@@ -7384,27 +7387,27 @@ interface PFN_vkDestroyDebugUtilsMessengerEXT(VkInstance* instance, VkDebugUtils
 
 interface PFN_vkSubmitDebugUtilsMessageEXT(VkInstance* instance, VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, u32 messageTypes, VkDebugUtilsMessengerCallbackDataEXT* pCallbackData)
 
-VkResult vkSetDebugUtilsObjectNameEXT(VkDevice* device, VkDebugUtilsObjectNameInfoEXT* pNameInfo) #extern "vulkan"
+VkResult vkSetDebugUtilsObjectNameEXT(VkDevice* device, VkDebugUtilsObjectNameInfoEXT* pNameInfo) #extern vulkan
 
-VkResult vkSetDebugUtilsObjectTagEXT(VkDevice* device, VkDebugUtilsObjectTagInfoEXT* pTagInfo) #extern "vulkan"
+VkResult vkSetDebugUtilsObjectTagEXT(VkDevice* device, VkDebugUtilsObjectTagInfoEXT* pTagInfo) #extern vulkan
 
-vkQueueBeginDebugUtilsLabelEXT(VkQueue* queue, VkDebugUtilsLabelEXT* pLabelInfo) #extern "vulkan"
+vkQueueBeginDebugUtilsLabelEXT(VkQueue* queue, VkDebugUtilsLabelEXT* pLabelInfo) #extern vulkan
 
-vkQueueEndDebugUtilsLabelEXT(VkQueue* queue) #extern "vulkan"
+vkQueueEndDebugUtilsLabelEXT(VkQueue* queue) #extern vulkan
 
-vkQueueInsertDebugUtilsLabelEXT(VkQueue* queue, VkDebugUtilsLabelEXT* pLabelInfo) #extern "vulkan"
+vkQueueInsertDebugUtilsLabelEXT(VkQueue* queue, VkDebugUtilsLabelEXT* pLabelInfo) #extern vulkan
 
-vkCmdBeginDebugUtilsLabelEXT(VkCommandBuffer* commandBuffer, VkDebugUtilsLabelEXT* pLabelInfo) #extern "vulkan"
+vkCmdBeginDebugUtilsLabelEXT(VkCommandBuffer* commandBuffer, VkDebugUtilsLabelEXT* pLabelInfo) #extern vulkan
 
-vkCmdEndDebugUtilsLabelEXT(VkCommandBuffer* commandBuffer) #extern "vulkan"
+vkCmdEndDebugUtilsLabelEXT(VkCommandBuffer* commandBuffer) #extern vulkan
 
-vkCmdInsertDebugUtilsLabelEXT(VkCommandBuffer* commandBuffer, VkDebugUtilsLabelEXT* pLabelInfo) #extern "vulkan"
+vkCmdInsertDebugUtilsLabelEXT(VkCommandBuffer* commandBuffer, VkDebugUtilsLabelEXT* pLabelInfo) #extern vulkan
 
-VkResult vkCreateDebugUtilsMessengerEXT(VkInstance* instance, VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT** pMessenger) #extern "vulkan"
+VkResult vkCreateDebugUtilsMessengerEXT(VkInstance* instance, VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT** pMessenger) #extern vulkan
 
-vkDestroyDebugUtilsMessengerEXT(VkInstance* instance, VkDebugUtilsMessengerEXT* messenger, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyDebugUtilsMessengerEXT(VkInstance* instance, VkDebugUtilsMessengerEXT* messenger, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-vkSubmitDebugUtilsMessageEXT(VkInstance* instance, VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, u32 messageTypes, VkDebugUtilsMessengerCallbackDataEXT* pCallbackData) #extern "vulkan"
+vkSubmitDebugUtilsMessageEXT(VkInstance* instance, VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, u32 messageTypes, VkDebugUtilsMessengerCallbackDataEXT* pCallbackData) #extern vulkan
 
 struct VkPhysicalDeviceInlineUniformBlockFeaturesEXT {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_FEATURES_EXT;
@@ -7496,9 +7499,9 @@ interface PFN_vkCmdSetSampleLocationsEXT(VkCommandBuffer* commandBuffer, VkSampl
 
 interface PFN_vkGetPhysicalDeviceMultisamplePropertiesEXT(VkPhysicalDevice* physicalDevice, VkSampleCountFlagBits samples, VkMultisamplePropertiesEXT* pMultisampleProperties)
 
-vkCmdSetSampleLocationsEXT(VkCommandBuffer* commandBuffer, VkSampleLocationsInfoEXT* pSampleLocationsInfo) #extern "vulkan"
+vkCmdSetSampleLocationsEXT(VkCommandBuffer* commandBuffer, VkSampleLocationsInfoEXT* pSampleLocationsInfo) #extern vulkan
 
-vkGetPhysicalDeviceMultisamplePropertiesEXT(VkPhysicalDevice* physicalDevice, VkSampleCountFlagBits samples, VkMultisamplePropertiesEXT* pMultisampleProperties) #extern "vulkan"
+vkGetPhysicalDeviceMultisamplePropertiesEXT(VkPhysicalDevice* physicalDevice, VkSampleCountFlagBits samples, VkMultisamplePropertiesEXT* pMultisampleProperties) #extern vulkan
 
 enum VkBlendOverlapEXT {
     VK_BLEND_OVERLAP_UNCORRELATED_EXT = 0;
@@ -7616,7 +7619,7 @@ struct VkImageDrmFormatModifierPropertiesEXT {
 
 interface VkResult PFN_vkGetImageDrmFormatModifierPropertiesEXT(VkDevice* device, VkImage* image, VkImageDrmFormatModifierPropertiesEXT* pProperties)
 
-VkResult vkGetImageDrmFormatModifierPropertiesEXT(VkDevice* device, VkImage* image, VkImageDrmFormatModifierPropertiesEXT* pProperties) #extern "vulkan"
+VkResult vkGetImageDrmFormatModifierPropertiesEXT(VkDevice* device, VkImage* image, VkImageDrmFormatModifierPropertiesEXT* pProperties) #extern vulkan
 
 struct VkValidationCacheEXT {}
 enum VkValidationCacheHeaderVersionEXT {
@@ -7646,13 +7649,13 @@ interface VkResult PFN_vkMergeValidationCachesEXT(VkDevice* device, VkValidation
 
 interface VkResult PFN_vkGetValidationCacheDataEXT(VkDevice* device, VkValidationCacheEXT* validationCache, u64* pDataSize, void* pData)
 
-VkResult vkCreateValidationCacheEXT(VkDevice* device, VkValidationCacheCreateInfoEXT* pCreateInfo, VkAllocationCallbacks* pAllocator, VkValidationCacheEXT** pValidationCache) #extern "vulkan"
+VkResult vkCreateValidationCacheEXT(VkDevice* device, VkValidationCacheCreateInfoEXT* pCreateInfo, VkAllocationCallbacks* pAllocator, VkValidationCacheEXT** pValidationCache) #extern vulkan
 
-vkDestroyValidationCacheEXT(VkDevice* device, VkValidationCacheEXT* validationCache, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyValidationCacheEXT(VkDevice* device, VkValidationCacheEXT* validationCache, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkMergeValidationCachesEXT(VkDevice* device, VkValidationCacheEXT* dstCache, u32 srcCacheCount, VkValidationCacheEXT** pSrcCaches) #extern "vulkan"
+VkResult vkMergeValidationCachesEXT(VkDevice* device, VkValidationCacheEXT* dstCache, u32 srcCacheCount, VkValidationCacheEXT** pSrcCaches) #extern vulkan
 
-VkResult vkGetValidationCacheDataEXT(VkDevice* device, VkValidationCacheEXT* validationCache, u64* pDataSize, void* pData) #extern "vulkan"
+VkResult vkGetValidationCacheDataEXT(VkDevice* device, VkValidationCacheEXT* validationCache, u64* pDataSize, void* pData) #extern vulkan
 
 enum VkShadingRatePaletteEntryNV {
     VK_SHADING_RATE_PALETTE_ENTRY_NO_INVOCATIONS_NV = 0;
@@ -7733,11 +7736,11 @@ interface PFN_vkCmdSetViewportShadingRatePaletteNV(VkCommandBuffer* commandBuffe
 
 interface PFN_vkCmdSetCoarseSampleOrderNV(VkCommandBuffer* commandBuffer, VkCoarseSampleOrderTypeNV sampleOrderType, u32 customSampleOrderCount, VkCoarseSampleOrderCustomNV* pCustomSampleOrders)
 
-vkCmdBindShadingRateImageNV(VkCommandBuffer* commandBuffer, VkImageView* imageView, VkImageLayout imageLayout) #extern "vulkan"
+vkCmdBindShadingRateImageNV(VkCommandBuffer* commandBuffer, VkImageView* imageView, VkImageLayout imageLayout) #extern vulkan
 
-vkCmdSetViewportShadingRatePaletteNV(VkCommandBuffer* commandBuffer, u32 firstViewport, u32 viewportCount, VkShadingRatePaletteNV* pShadingRatePalettes) #extern "vulkan"
+vkCmdSetViewportShadingRatePaletteNV(VkCommandBuffer* commandBuffer, u32 firstViewport, u32 viewportCount, VkShadingRatePaletteNV* pShadingRatePalettes) #extern vulkan
 
-vkCmdSetCoarseSampleOrderNV(VkCommandBuffer* commandBuffer, VkCoarseSampleOrderTypeNV sampleOrderType, u32 customSampleOrderCount, VkCoarseSampleOrderCustomNV* pCustomSampleOrders) #extern "vulkan"
+vkCmdSetCoarseSampleOrderNV(VkCommandBuffer* commandBuffer, VkCoarseSampleOrderTypeNV sampleOrderType, u32 customSampleOrderCount, VkCoarseSampleOrderCustomNV* pCustomSampleOrders) #extern vulkan
 
 struct VkAccelerationStructureNV {}
 enum VkRayTracingShaderGroupTypeKHR {
@@ -7986,31 +7989,31 @@ interface PFN_vkCmdWriteAccelerationStructuresPropertiesNV(VkCommandBuffer* comm
 
 interface VkResult PFN_vkCompileDeferredNV(VkDevice* device, VkPipeline* pipeline, u32 shader)
 
-VkResult vkCreateAccelerationStructureNV(VkDevice* device, VkAccelerationStructureCreateInfoNV* pCreateInfo, VkAllocationCallbacks* pAllocator, VkAccelerationStructureNV** pAccelerationStructure) #extern "vulkan"
+VkResult vkCreateAccelerationStructureNV(VkDevice* device, VkAccelerationStructureCreateInfoNV* pCreateInfo, VkAllocationCallbacks* pAllocator, VkAccelerationStructureNV** pAccelerationStructure) #extern vulkan
 
-vkDestroyAccelerationStructureNV(VkDevice* device, VkAccelerationStructureNV* accelerationStructure, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyAccelerationStructureNV(VkDevice* device, VkAccelerationStructureNV* accelerationStructure, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-vkGetAccelerationStructureMemoryRequirementsNV(VkDevice* device, VkAccelerationStructureMemoryRequirementsInfoNV* pInfo, VkMemoryRequirements2* pMemoryRequirements) #extern "vulkan"
+vkGetAccelerationStructureMemoryRequirementsNV(VkDevice* device, VkAccelerationStructureMemoryRequirementsInfoNV* pInfo, VkMemoryRequirements2* pMemoryRequirements) #extern vulkan
 
-VkResult vkBindAccelerationStructureMemoryNV(VkDevice* device, u32 bindInfoCount, VkBindAccelerationStructureMemoryInfoNV* pBindInfos) #extern "vulkan"
+VkResult vkBindAccelerationStructureMemoryNV(VkDevice* device, u32 bindInfoCount, VkBindAccelerationStructureMemoryInfoNV* pBindInfos) #extern vulkan
 
-vkCmdBuildAccelerationStructureNV(VkCommandBuffer* commandBuffer, VkAccelerationStructureInfoNV* pInfo, VkBuffer* instanceData, u64 instanceOffset, u32 update, VkAccelerationStructureNV* dst, VkAccelerationStructureNV* src, VkBuffer* scratch, u64 scratchOffset) #extern "vulkan"
+vkCmdBuildAccelerationStructureNV(VkCommandBuffer* commandBuffer, VkAccelerationStructureInfoNV* pInfo, VkBuffer* instanceData, u64 instanceOffset, u32 update, VkAccelerationStructureNV* dst, VkAccelerationStructureNV* src, VkBuffer* scratch, u64 scratchOffset) #extern vulkan
 
-vkCmdCopyAccelerationStructureNV(VkCommandBuffer* commandBuffer, VkAccelerationStructureNV* dst, VkAccelerationStructureNV* src, VkCopyAccelerationStructureModeKHR mode) #extern "vulkan"
+vkCmdCopyAccelerationStructureNV(VkCommandBuffer* commandBuffer, VkAccelerationStructureNV* dst, VkAccelerationStructureNV* src, VkCopyAccelerationStructureModeKHR mode) #extern vulkan
 
-vkCmdTraceRaysNV(VkCommandBuffer* commandBuffer, VkBuffer* raygenShaderBindingTableBuffer, u64 raygenShaderBindingOffset, VkBuffer* missShaderBindingTableBuffer, u64 missShaderBindingOffset, u64 missShaderBindingStride, VkBuffer* hitShaderBindingTableBuffer, u64 hitShaderBindingOffset, u64 hitShaderBindingStride, VkBuffer* callableShaderBindingTableBuffer, u64 callableShaderBindingOffset, u64 callableShaderBindingStride, u32 width, u32 height, u32 depth) #extern "vulkan"
+vkCmdTraceRaysNV(VkCommandBuffer* commandBuffer, VkBuffer* raygenShaderBindingTableBuffer, u64 raygenShaderBindingOffset, VkBuffer* missShaderBindingTableBuffer, u64 missShaderBindingOffset, u64 missShaderBindingStride, VkBuffer* hitShaderBindingTableBuffer, u64 hitShaderBindingOffset, u64 hitShaderBindingStride, VkBuffer* callableShaderBindingTableBuffer, u64 callableShaderBindingOffset, u64 callableShaderBindingStride, u32 width, u32 height, u32 depth) #extern vulkan
 
-VkResult vkCreateRayTracingPipelinesNV(VkDevice* device, VkPipelineCache* pipelineCache, u32 createInfoCount, VkRayTracingPipelineCreateInfoNV* pCreateInfos, VkAllocationCallbacks* pAllocator, VkPipeline** pPipelines) #extern "vulkan"
+VkResult vkCreateRayTracingPipelinesNV(VkDevice* device, VkPipelineCache* pipelineCache, u32 createInfoCount, VkRayTracingPipelineCreateInfoNV* pCreateInfos, VkAllocationCallbacks* pAllocator, VkPipeline** pPipelines) #extern vulkan
 
-VkResult vkGetRayTracingShaderGroupHandlesKHR(VkDevice* device, VkPipeline* pipeline, u32 firstGroup, u32 groupCount, u64 dataSize, void* pData) #extern "vulkan"
+VkResult vkGetRayTracingShaderGroupHandlesKHR(VkDevice* device, VkPipeline* pipeline, u32 firstGroup, u32 groupCount, u64 dataSize, void* pData) #extern vulkan
 
-VkResult vkGetRayTracingShaderGroupHandlesNV(VkDevice* device, VkPipeline* pipeline, u32 firstGroup, u32 groupCount, u64 dataSize, void* pData) #extern "vulkan"
+VkResult vkGetRayTracingShaderGroupHandlesNV(VkDevice* device, VkPipeline* pipeline, u32 firstGroup, u32 groupCount, u64 dataSize, void* pData) #extern vulkan
 
-VkResult vkGetAccelerationStructureHandleNV(VkDevice* device, VkAccelerationStructureNV* accelerationStructure, u64 dataSize, void* pData) #extern "vulkan"
+VkResult vkGetAccelerationStructureHandleNV(VkDevice* device, VkAccelerationStructureNV* accelerationStructure, u64 dataSize, void* pData) #extern vulkan
 
-vkCmdWriteAccelerationStructuresPropertiesNV(VkCommandBuffer* commandBuffer, u32 accelerationStructureCount, VkAccelerationStructureNV** pAccelerationStructures, VkQueryType queryType, VkQueryPool* queryPool, u32 firstQuery) #extern "vulkan"
+vkCmdWriteAccelerationStructuresPropertiesNV(VkCommandBuffer* commandBuffer, u32 accelerationStructureCount, VkAccelerationStructureNV** pAccelerationStructures, VkQueryType queryType, VkQueryPool* queryPool, u32 firstQuery) #extern vulkan
 
-VkResult vkCompileDeferredNV(VkDevice* device, VkPipeline* pipeline, u32 shader) #extern "vulkan"
+VkResult vkCompileDeferredNV(VkDevice* device, VkPipeline* pipeline, u32 shader) #extern vulkan
 
 struct VkPhysicalDeviceRepresentativeFragmentTestFeaturesNV {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_REPRESENTATIVE_FRAGMENT_TEST_FEATURES_NV;
@@ -8072,11 +8075,11 @@ struct VkPhysicalDeviceExternalMemoryHostPropertiesEXT {
 
 interface VkResult PFN_vkGetMemoryHostPointerPropertiesEXT(VkDevice* device, VkExternalMemoryHandleTypeFlagBits handleType, void* pHostPointer, VkMemoryHostPointerPropertiesEXT* pMemoryHostPointerProperties)
 
-VkResult vkGetMemoryHostPointerPropertiesEXT(VkDevice* device, VkExternalMemoryHandleTypeFlagBits handleType, void* pHostPointer, VkMemoryHostPointerPropertiesEXT* pMemoryHostPointerProperties) #extern "vulkan"
+VkResult vkGetMemoryHostPointerPropertiesEXT(VkDevice* device, VkExternalMemoryHandleTypeFlagBits handleType, void* pHostPointer, VkMemoryHostPointerPropertiesEXT* pMemoryHostPointerProperties) #extern vulkan
 
 interface PFN_vkCmdWriteBufferMarkerAMD(VkCommandBuffer* commandBuffer, VkPipelineStageFlagBits pipelineStage, VkBuffer* dstBuffer, u64 dstOffset, u32 marker)
 
-vkCmdWriteBufferMarkerAMD(VkCommandBuffer* commandBuffer, VkPipelineStageFlagBits pipelineStage, VkBuffer* dstBuffer, u64 dstOffset, u32 marker) #extern "vulkan"
+vkCmdWriteBufferMarkerAMD(VkCommandBuffer* commandBuffer, VkPipelineStageFlagBits pipelineStage, VkBuffer* dstBuffer, u64 dstOffset, u32 marker) #extern vulkan
 
 enum VkPipelineCompilerControlFlagBitsAMD {
     VK_PIPELINE_COMPILER_CONTROL_FLAG_BITS_MAX_ENUM_AMD = 0x7FFFFFFF;
@@ -8106,9 +8109,9 @@ interface VkResult PFN_vkGetPhysicalDeviceCalibrateableTimeDomainsEXT(VkPhysical
 
 interface VkResult PFN_vkGetCalibratedTimestampsEXT(VkDevice* device, u32 timestampCount, VkCalibratedTimestampInfoEXT* pTimestampInfos, u64* pTimestamps, u64* pMaxDeviation)
 
-VkResult vkGetPhysicalDeviceCalibrateableTimeDomainsEXT(VkPhysicalDevice* physicalDevice, u32* pTimeDomainCount, VkTimeDomainEXT* pTimeDomains) #extern "vulkan"
+VkResult vkGetPhysicalDeviceCalibrateableTimeDomainsEXT(VkPhysicalDevice* physicalDevice, u32* pTimeDomainCount, VkTimeDomainEXT* pTimeDomains) #extern vulkan
 
-VkResult vkGetCalibratedTimestampsEXT(VkDevice* device, u32 timestampCount, VkCalibratedTimestampInfoEXT* pTimestampInfos, u64* pTimestamps, u64* pMaxDeviation) #extern "vulkan"
+VkResult vkGetCalibratedTimestampsEXT(VkDevice* device, u32 timestampCount, VkCalibratedTimestampInfoEXT* pTimestampInfos, u64* pTimestamps, u64* pMaxDeviation) #extern vulkan
 
 struct VkPhysicalDeviceShaderCorePropertiesAMD {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CORE_PROPERTIES_AMD;
@@ -8230,11 +8233,11 @@ interface PFN_vkCmdDrawMeshTasksIndirectNV(VkCommandBuffer* commandBuffer, VkBuf
 
 interface PFN_vkCmdDrawMeshTasksIndirectCountNV(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride)
 
-vkCmdDrawMeshTasksNV(VkCommandBuffer* commandBuffer, u32 taskCount, u32 firstTask) #extern "vulkan"
+vkCmdDrawMeshTasksNV(VkCommandBuffer* commandBuffer, u32 taskCount, u32 firstTask) #extern vulkan
 
-vkCmdDrawMeshTasksIndirectNV(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, u32 drawCount, u32 stride) #extern "vulkan"
+vkCmdDrawMeshTasksIndirectNV(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, u32 drawCount, u32 stride) #extern vulkan
 
-vkCmdDrawMeshTasksIndirectCountNV(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride) #extern "vulkan"
+vkCmdDrawMeshTasksIndirectCountNV(VkCommandBuffer* commandBuffer, VkBuffer* buffer, u64 offset, VkBuffer* countBuffer, u64 countBufferOffset, u32 maxDrawCount, u32 stride) #extern vulkan
 
 struct VkPhysicalDeviceFragmentShaderBarycentricFeaturesNV {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_BARYCENTRIC_FEATURES_NV;
@@ -8263,7 +8266,7 @@ struct VkPhysicalDeviceExclusiveScissorFeaturesNV {
 
 interface PFN_vkCmdSetExclusiveScissorNV(VkCommandBuffer* commandBuffer, u32 firstExclusiveScissor, u32 exclusiveScissorCount, VkRect2D* pExclusiveScissors)
 
-vkCmdSetExclusiveScissorNV(VkCommandBuffer* commandBuffer, u32 firstExclusiveScissor, u32 exclusiveScissorCount, VkRect2D* pExclusiveScissors) #extern "vulkan"
+vkCmdSetExclusiveScissorNV(VkCommandBuffer* commandBuffer, u32 firstExclusiveScissor, u32 exclusiveScissorCount, VkRect2D* pExclusiveScissors) #extern vulkan
 
 struct VkQueueFamilyCheckpointPropertiesNV {
     sType := VkStructureType.VK_STRUCTURE_TYPE_QUEUE_FAMILY_CHECKPOINT_PROPERTIES_NV;
@@ -8282,9 +8285,9 @@ interface PFN_vkCmdSetCheckpointNV(VkCommandBuffer* commandBuffer, void* pCheckp
 
 interface PFN_vkGetQueueCheckpointDataNV(VkQueue* queue, u32* pCheckpointDataCount, VkCheckpointDataNV* pCheckpointData)
 
-vkCmdSetCheckpointNV(VkCommandBuffer* commandBuffer, void* pCheckpointMarker) #extern "vulkan"
+vkCmdSetCheckpointNV(VkCommandBuffer* commandBuffer, void* pCheckpointMarker) #extern vulkan
 
-vkGetQueueCheckpointDataNV(VkQueue* queue, u32* pCheckpointDataCount, VkCheckpointDataNV* pCheckpointData) #extern "vulkan"
+vkGetQueueCheckpointDataNV(VkQueue* queue, u32* pCheckpointDataCount, VkCheckpointDataNV* pCheckpointData) #extern vulkan
 
 struct VkPhysicalDeviceShaderIntegerFunctions2FeaturesINTEL {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_FUNCTIONS_2_FEATURES_INTEL;
@@ -8393,23 +8396,23 @@ interface VkResult PFN_vkQueueSetPerformanceConfigurationINTEL(VkQueue* queue, V
 
 interface VkResult PFN_vkGetPerformanceParameterINTEL(VkDevice* device, VkPerformanceParameterTypeINTEL parameter, VkPerformanceValueINTEL* pValue)
 
-VkResult vkInitializePerformanceApiINTEL(VkDevice* device, VkInitializePerformanceApiInfoINTEL* pInitializeInfo) #extern "vulkan"
+VkResult vkInitializePerformanceApiINTEL(VkDevice* device, VkInitializePerformanceApiInfoINTEL* pInitializeInfo) #extern vulkan
 
-vkUninitializePerformanceApiINTEL(VkDevice* device) #extern "vulkan"
+vkUninitializePerformanceApiINTEL(VkDevice* device) #extern vulkan
 
-VkResult vkCmdSetPerformanceMarkerINTEL(VkCommandBuffer* commandBuffer, VkPerformanceMarkerInfoINTEL* pMarkerInfo) #extern "vulkan"
+VkResult vkCmdSetPerformanceMarkerINTEL(VkCommandBuffer* commandBuffer, VkPerformanceMarkerInfoINTEL* pMarkerInfo) #extern vulkan
 
-VkResult vkCmdSetPerformanceStreamMarkerINTEL(VkCommandBuffer* commandBuffer, VkPerformanceStreamMarkerInfoINTEL* pMarkerInfo) #extern "vulkan"
+VkResult vkCmdSetPerformanceStreamMarkerINTEL(VkCommandBuffer* commandBuffer, VkPerformanceStreamMarkerInfoINTEL* pMarkerInfo) #extern vulkan
 
-VkResult vkCmdSetPerformanceOverrideINTEL(VkCommandBuffer* commandBuffer, VkPerformanceOverrideInfoINTEL* pOverrideInfo) #extern "vulkan"
+VkResult vkCmdSetPerformanceOverrideINTEL(VkCommandBuffer* commandBuffer, VkPerformanceOverrideInfoINTEL* pOverrideInfo) #extern vulkan
 
-VkResult vkAcquirePerformanceConfigurationINTEL(VkDevice* device, VkPerformanceConfigurationAcquireInfoINTEL* pAcquireInfo, VkPerformanceConfigurationINTEL** pConfiguration) #extern "vulkan"
+VkResult vkAcquirePerformanceConfigurationINTEL(VkDevice* device, VkPerformanceConfigurationAcquireInfoINTEL* pAcquireInfo, VkPerformanceConfigurationINTEL** pConfiguration) #extern vulkan
 
-VkResult vkReleasePerformanceConfigurationINTEL(VkDevice* device, VkPerformanceConfigurationINTEL* configuration) #extern "vulkan"
+VkResult vkReleasePerformanceConfigurationINTEL(VkDevice* device, VkPerformanceConfigurationINTEL* configuration) #extern vulkan
 
-VkResult vkQueueSetPerformanceConfigurationINTEL(VkQueue* queue, VkPerformanceConfigurationINTEL* configuration) #extern "vulkan"
+VkResult vkQueueSetPerformanceConfigurationINTEL(VkQueue* queue, VkPerformanceConfigurationINTEL* configuration) #extern vulkan
 
-VkResult vkGetPerformanceParameterINTEL(VkDevice* device, VkPerformanceParameterTypeINTEL parameter, VkPerformanceValueINTEL* pValue) #extern "vulkan"
+VkResult vkGetPerformanceParameterINTEL(VkDevice* device, VkPerformanceParameterTypeINTEL parameter, VkPerformanceValueINTEL* pValue) #extern vulkan
 
 struct VkPhysicalDevicePCIBusInfoPropertiesEXT {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PCI_BUS_INFO_PROPERTIES_EXT;
@@ -8434,7 +8437,7 @@ struct VkSwapchainDisplayNativeHdrCreateInfoAMD {
 
 interface PFN_vkSetLocalDimmingAMD(VkDevice* device, VkSwapchainKHR* swapChain, u32 localDimmingEnable)
 
-vkSetLocalDimmingAMD(VkDevice* device, VkSwapchainKHR* swapChain, u32 localDimmingEnable) #extern "vulkan"
+vkSetLocalDimmingAMD(VkDevice* device, VkSwapchainKHR* swapChain, u32 localDimmingEnable) #extern vulkan
 
 struct VkPhysicalDeviceFragmentDensityMapFeaturesEXT {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_DENSITY_MAP_FEATURES_EXT;
@@ -8545,7 +8548,7 @@ struct VkBufferDeviceAddressCreateInfoEXT {
 
 interface u64 PFN_vkGetBufferDeviceAddressEXT(VkDevice* device, VkBufferDeviceAddressInfo* pInfo)
 
-u64 vkGetBufferDeviceAddressEXT(VkDevice* device, VkBufferDeviceAddressInfo* pInfo) #extern "vulkan"
+u64 vkGetBufferDeviceAddressEXT(VkDevice* device, VkBufferDeviceAddressInfo* pInfo) #extern vulkan
 
 enum VkToolPurposeFlagBitsEXT {
     VK_TOOL_PURPOSE_VALIDATION_BIT_EXT = 0x00000001;
@@ -8570,7 +8573,7 @@ struct VkPhysicalDeviceToolPropertiesEXT {
 
 interface VkResult PFN_vkGetPhysicalDeviceToolPropertiesEXT(VkPhysicalDevice* physicalDevice, u32* pToolCount, VkPhysicalDeviceToolPropertiesEXT* pToolProperties)
 
-VkResult vkGetPhysicalDeviceToolPropertiesEXT(VkPhysicalDevice* physicalDevice, u32* pToolCount, VkPhysicalDeviceToolPropertiesEXT* pToolProperties) #extern "vulkan"
+VkResult vkGetPhysicalDeviceToolPropertiesEXT(VkPhysicalDevice* physicalDevice, u32* pToolCount, VkPhysicalDeviceToolPropertiesEXT* pToolProperties) #extern vulkan
 
 enum VkValidationFeatureEnableEXT {
     VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT = 0;
@@ -8653,7 +8656,7 @@ struct VkPhysicalDeviceCooperativeMatrixPropertiesNV {
 
 interface VkResult PFN_vkGetPhysicalDeviceCooperativeMatrixPropertiesNV(VkPhysicalDevice* physicalDevice, u32* pPropertyCount, VkCooperativeMatrixPropertiesNV* pProperties)
 
-VkResult vkGetPhysicalDeviceCooperativeMatrixPropertiesNV(VkPhysicalDevice* physicalDevice, u32* pPropertyCount, VkCooperativeMatrixPropertiesNV* pProperties) #extern "vulkan"
+VkResult vkGetPhysicalDeviceCooperativeMatrixPropertiesNV(VkPhysicalDevice* physicalDevice, u32* pPropertyCount, VkCooperativeMatrixPropertiesNV* pProperties) #extern vulkan
 
 enum VkCoverageReductionModeNV {
     VK_COVERAGE_REDUCTION_MODE_MERGE_NV = 0;
@@ -8685,7 +8688,7 @@ struct VkFramebufferMixedSamplesCombinationNV {
 
 interface VkResult PFN_vkGetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV(VkPhysicalDevice* physicalDevice, u32* pCombinationCount, VkFramebufferMixedSamplesCombinationNV* pCombinations)
 
-VkResult vkGetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV(VkPhysicalDevice* physicalDevice, u32* pCombinationCount, VkFramebufferMixedSamplesCombinationNV* pCombinations) #extern "vulkan"
+VkResult vkGetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV(VkPhysicalDevice* physicalDevice, u32* pCombinationCount, VkFramebufferMixedSamplesCombinationNV* pCombinations) #extern vulkan
 
 struct VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT;
@@ -8735,7 +8738,7 @@ struct VkHeadlessSurfaceCreateInfoEXT {
 
 interface VkResult PFN_vkCreateHeadlessSurfaceEXT(VkInstance* instance, VkHeadlessSurfaceCreateInfoEXT* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSurfaceKHR** pSurface)
 
-VkResult vkCreateHeadlessSurfaceEXT(VkInstance* instance, VkHeadlessSurfaceCreateInfoEXT* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSurfaceKHR** pSurface) #extern "vulkan"
+VkResult vkCreateHeadlessSurfaceEXT(VkInstance* instance, VkHeadlessSurfaceCreateInfoEXT* pCreateInfo, VkAllocationCallbacks* pAllocator, VkSurfaceKHR** pSurface) #extern vulkan
 
 enum VkLineRasterizationModeEXT {
     VK_LINE_RASTERIZATION_MODE_DEFAULT_EXT = 0;
@@ -8773,7 +8776,7 @@ struct VkPipelineRasterizationLineStateCreateInfoEXT {
 
 interface PFN_vkCmdSetLineStippleEXT(VkCommandBuffer* commandBuffer, u32 lineStippleFactor, u16 lineStipplePattern)
 
-vkCmdSetLineStippleEXT(VkCommandBuffer* commandBuffer, u32 lineStippleFactor, u16 lineStipplePattern) #extern "vulkan"
+vkCmdSetLineStippleEXT(VkCommandBuffer* commandBuffer, u32 lineStippleFactor, u16 lineStipplePattern) #extern vulkan
 
 struct VkPhysicalDeviceShaderAtomicFloatFeaturesEXT {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_FEATURES_EXT;
@@ -8794,7 +8797,7 @@ struct VkPhysicalDeviceShaderAtomicFloatFeaturesEXT {
 
 interface PFN_vkResetQueryPoolEXT(VkDevice* device, VkQueryPool* queryPool, u32 firstQuery, u32 queryCount)
 
-vkResetQueryPoolEXT(VkDevice* device, VkQueryPool* queryPool, u32 firstQuery, u32 queryCount) #extern "vulkan"
+vkResetQueryPoolEXT(VkDevice* device, VkQueryPool* queryPool, u32 firstQuery, u32 queryCount) #extern vulkan
 
 struct VkPhysicalDeviceIndexTypeUint8FeaturesEXT {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INDEX_TYPE_UINT8_FEATURES_EXT;
@@ -8832,29 +8835,29 @@ interface PFN_vkCmdSetStencilTestEnableEXT(VkCommandBuffer* commandBuffer, u32 s
 
 interface PFN_vkCmdSetStencilOpEXT(VkCommandBuffer* commandBuffer, u32 faceMask, VkStencilOp failOp, VkStencilOp passOp, VkStencilOp depthFailOp, VkCompareOp compareOp)
 
-vkCmdSetCullModeEXT(VkCommandBuffer* commandBuffer, u32 cullMode) #extern "vulkan"
+vkCmdSetCullModeEXT(VkCommandBuffer* commandBuffer, u32 cullMode) #extern vulkan
 
-vkCmdSetFrontFaceEXT(VkCommandBuffer* commandBuffer, VkFrontFace frontFace) #extern "vulkan"
+vkCmdSetFrontFaceEXT(VkCommandBuffer* commandBuffer, VkFrontFace frontFace) #extern vulkan
 
-vkCmdSetPrimitiveTopologyEXT(VkCommandBuffer* commandBuffer, VkPrimitiveTopology primitiveTopology) #extern "vulkan"
+vkCmdSetPrimitiveTopologyEXT(VkCommandBuffer* commandBuffer, VkPrimitiveTopology primitiveTopology) #extern vulkan
 
-vkCmdSetViewportWithCountEXT(VkCommandBuffer* commandBuffer, u32 viewportCount, VkViewport* pViewports) #extern "vulkan"
+vkCmdSetViewportWithCountEXT(VkCommandBuffer* commandBuffer, u32 viewportCount, VkViewport* pViewports) #extern vulkan
 
-vkCmdSetScissorWithCountEXT(VkCommandBuffer* commandBuffer, u32 scissorCount, VkRect2D* pScissors) #extern "vulkan"
+vkCmdSetScissorWithCountEXT(VkCommandBuffer* commandBuffer, u32 scissorCount, VkRect2D* pScissors) #extern vulkan
 
-vkCmdBindVertexBuffers2EXT(VkCommandBuffer* commandBuffer, u32 firstBinding, u32 bindingCount, VkBuffer** pBuffers, u64* pOffsets, u64* pSizes, u64* pStrides) #extern "vulkan"
+vkCmdBindVertexBuffers2EXT(VkCommandBuffer* commandBuffer, u32 firstBinding, u32 bindingCount, VkBuffer** pBuffers, u64* pOffsets, u64* pSizes, u64* pStrides) #extern vulkan
 
-vkCmdSetDepthTestEnableEXT(VkCommandBuffer* commandBuffer, u32 depthTestEnable) #extern "vulkan"
+vkCmdSetDepthTestEnableEXT(VkCommandBuffer* commandBuffer, u32 depthTestEnable) #extern vulkan
 
-vkCmdSetDepthWriteEnableEXT(VkCommandBuffer* commandBuffer, u32 depthWriteEnable) #extern "vulkan"
+vkCmdSetDepthWriteEnableEXT(VkCommandBuffer* commandBuffer, u32 depthWriteEnable) #extern vulkan
 
-vkCmdSetDepthCompareOpEXT(VkCommandBuffer* commandBuffer, VkCompareOp depthCompareOp) #extern "vulkan"
+vkCmdSetDepthCompareOpEXT(VkCommandBuffer* commandBuffer, VkCompareOp depthCompareOp) #extern vulkan
 
-vkCmdSetDepthBoundsTestEnableEXT(VkCommandBuffer* commandBuffer, u32 depthBoundsTestEnable) #extern "vulkan"
+vkCmdSetDepthBoundsTestEnableEXT(VkCommandBuffer* commandBuffer, u32 depthBoundsTestEnable) #extern vulkan
 
-vkCmdSetStencilTestEnableEXT(VkCommandBuffer* commandBuffer, u32 stencilTestEnable) #extern "vulkan"
+vkCmdSetStencilTestEnableEXT(VkCommandBuffer* commandBuffer, u32 stencilTestEnable) #extern vulkan
 
-vkCmdSetStencilOpEXT(VkCommandBuffer* commandBuffer, u32 faceMask, VkStencilOp failOp, VkStencilOp passOp, VkStencilOp depthFailOp, VkCompareOp compareOp) #extern "vulkan"
+vkCmdSetStencilOpEXT(VkCommandBuffer* commandBuffer, u32 faceMask, VkStencilOp failOp, VkStencilOp passOp, VkStencilOp depthFailOp, VkCompareOp compareOp) #extern vulkan
 
 struct VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_2_FEATURES_EXT;
@@ -9035,17 +9038,17 @@ interface VkResult PFN_vkCreateIndirectCommandsLayoutNV(VkDevice* device, VkIndi
 
 interface PFN_vkDestroyIndirectCommandsLayoutNV(VkDevice* device, VkIndirectCommandsLayoutNV* indirectCommandsLayout, VkAllocationCallbacks* pAllocator)
 
-vkGetGeneratedCommandsMemoryRequirementsNV(VkDevice* device, VkGeneratedCommandsMemoryRequirementsInfoNV* pInfo, VkMemoryRequirements2* pMemoryRequirements) #extern "vulkan"
+vkGetGeneratedCommandsMemoryRequirementsNV(VkDevice* device, VkGeneratedCommandsMemoryRequirementsInfoNV* pInfo, VkMemoryRequirements2* pMemoryRequirements) #extern vulkan
 
-vkCmdPreprocessGeneratedCommandsNV(VkCommandBuffer* commandBuffer, VkGeneratedCommandsInfoNV* pGeneratedCommandsInfo) #extern "vulkan"
+vkCmdPreprocessGeneratedCommandsNV(VkCommandBuffer* commandBuffer, VkGeneratedCommandsInfoNV* pGeneratedCommandsInfo) #extern vulkan
 
-vkCmdExecuteGeneratedCommandsNV(VkCommandBuffer* commandBuffer, u32 isPreprocessed, VkGeneratedCommandsInfoNV* pGeneratedCommandsInfo) #extern "vulkan"
+vkCmdExecuteGeneratedCommandsNV(VkCommandBuffer* commandBuffer, u32 isPreprocessed, VkGeneratedCommandsInfoNV* pGeneratedCommandsInfo) #extern vulkan
 
-vkCmdBindPipelineShaderGroupNV(VkCommandBuffer* commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipeline* pipeline, u32 groupIndex) #extern "vulkan"
+vkCmdBindPipelineShaderGroupNV(VkCommandBuffer* commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipeline* pipeline, u32 groupIndex) #extern vulkan
 
-VkResult vkCreateIndirectCommandsLayoutNV(VkDevice* device, VkIndirectCommandsLayoutCreateInfoNV* pCreateInfo, VkAllocationCallbacks* pAllocator, VkIndirectCommandsLayoutNV** pIndirectCommandsLayout) #extern "vulkan"
+VkResult vkCreateIndirectCommandsLayoutNV(VkDevice* device, VkIndirectCommandsLayoutCreateInfoNV* pCreateInfo, VkAllocationCallbacks* pAllocator, VkIndirectCommandsLayoutNV** pIndirectCommandsLayout) #extern vulkan
 
-vkDestroyIndirectCommandsLayoutNV(VkDevice* device, VkIndirectCommandsLayoutNV* indirectCommandsLayout, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyIndirectCommandsLayoutNV(VkDevice* device, VkIndirectCommandsLayoutNV* indirectCommandsLayout, VkAllocationCallbacks* pAllocator) #extern vulkan
 
 struct VkPhysicalDeviceInheritedViewportScissorFeaturesNV {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INHERITED_VIEWPORT_SCISSOR_FEATURES_NV;
@@ -9130,9 +9133,9 @@ interface VkResult PFN_vkAcquireDrmDisplayEXT(VkPhysicalDevice* physicalDevice, 
 
 interface VkResult PFN_vkGetDrmDisplayEXT(VkPhysicalDevice* physicalDevice, s32 drmFd, u32 connectorId, VkDisplayKHR** display)
 
-VkResult vkAcquireDrmDisplayEXT(VkPhysicalDevice* physicalDevice, s32 drmFd, VkDisplayKHR* display) #extern "vulkan"
+VkResult vkAcquireDrmDisplayEXT(VkPhysicalDevice* physicalDevice, s32 drmFd, VkDisplayKHR* display) #extern vulkan
 
-VkResult vkGetDrmDisplayEXT(VkPhysicalDevice* physicalDevice, s32 drmFd, u32 connectorId, VkDisplayKHR** display) #extern "vulkan"
+VkResult vkGetDrmDisplayEXT(VkPhysicalDevice* physicalDevice, s32 drmFd, u32 connectorId, VkDisplayKHR** display) #extern vulkan
 
 struct VkPhysicalDeviceRobustness2FeaturesEXT {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
@@ -9201,13 +9204,13 @@ interface VkResult PFN_vkSetPrivateDataEXT(VkDevice* device, VkObjectType object
 
 interface PFN_vkGetPrivateDataEXT(VkDevice* device, VkObjectType objectType, u64 objectHandle, VkPrivateDataSlotEXT* privateDataSlot, u64* pData)
 
-VkResult vkCreatePrivateDataSlotEXT(VkDevice* device, VkPrivateDataSlotCreateInfoEXT* pCreateInfo, VkAllocationCallbacks* pAllocator, VkPrivateDataSlotEXT** pPrivateDataSlot) #extern "vulkan"
+VkResult vkCreatePrivateDataSlotEXT(VkDevice* device, VkPrivateDataSlotCreateInfoEXT* pCreateInfo, VkAllocationCallbacks* pAllocator, VkPrivateDataSlotEXT** pPrivateDataSlot) #extern vulkan
 
-vkDestroyPrivateDataSlotEXT(VkDevice* device, VkPrivateDataSlotEXT* privateDataSlot, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyPrivateDataSlotEXT(VkDevice* device, VkPrivateDataSlotEXT* privateDataSlot, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-VkResult vkSetPrivateDataEXT(VkDevice* device, VkObjectType objectType, u64 objectHandle, VkPrivateDataSlotEXT* privateDataSlot, u64 data) #extern "vulkan"
+VkResult vkSetPrivateDataEXT(VkDevice* device, VkObjectType objectType, u64 objectHandle, VkPrivateDataSlotEXT* privateDataSlot, u64 data) #extern vulkan
 
-vkGetPrivateDataEXT(VkDevice* device, VkObjectType objectType, u64 objectHandle, VkPrivateDataSlotEXT* privateDataSlot, u64* pData) #extern "vulkan"
+vkGetPrivateDataEXT(VkDevice* device, VkObjectType objectType, u64 objectHandle, VkPrivateDataSlotEXT* privateDataSlot, u64* pData) #extern vulkan
 
 struct VkPhysicalDevicePipelineCreationCacheControlFeaturesEXT {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_CREATION_CACHE_CONTROL_FEATURES_EXT;
@@ -9280,7 +9283,7 @@ struct VkPipelineFragmentShadingRateEnumStateCreateInfoNV {
 
 interface PFN_vkCmdSetFragmentShadingRateEnumNV(VkCommandBuffer* commandBuffer, VkFragmentShadingRateNV shadingRate, CArray<VkFragmentShadingRateCombinerOpKHR>[2] combinerOps)
 
-vkCmdSetFragmentShadingRateEnumNV(VkCommandBuffer* commandBuffer, VkFragmentShadingRateNV shadingRate, CArray<VkFragmentShadingRateCombinerOpKHR>[2] combinerOps) #extern "vulkan"
+vkCmdSetFragmentShadingRateEnumNV(VkCommandBuffer* commandBuffer, VkFragmentShadingRateNV shadingRate, CArray<VkFragmentShadingRateCombinerOpKHR>[2] combinerOps) #extern vulkan
 
 enum VkAccelerationStructureMotionInstanceTypeNV {
     VK_ACCELERATION_STRUCTURE_MOTION_INSTANCE_TYPE_STATIC_NV = 0;
@@ -9411,9 +9414,9 @@ interface VkResult PFN_vkAcquireWinrtDisplayNV(VkPhysicalDevice* physicalDevice,
 
 interface VkResult PFN_vkGetWinrtDisplayNV(VkPhysicalDevice* physicalDevice, u32 deviceRelativeId, VkDisplayKHR** pDisplay)
 
-VkResult vkAcquireWinrtDisplayNV(VkPhysicalDevice* physicalDevice, VkDisplayKHR* display) #extern "vulkan"
+VkResult vkAcquireWinrtDisplayNV(VkPhysicalDevice* physicalDevice, VkDisplayKHR* display) #extern vulkan
 
-VkResult vkGetWinrtDisplayNV(VkPhysicalDevice* physicalDevice, u32 deviceRelativeId, VkDisplayKHR** pDisplay) #extern "vulkan"
+VkResult vkGetWinrtDisplayNV(VkPhysicalDevice* physicalDevice, u32 deviceRelativeId, VkDisplayKHR** pDisplay) #extern vulkan
 
 struct VkPhysicalDeviceMutableDescriptorTypeFeaturesVALVE {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MUTABLE_DESCRIPTOR_TYPE_FEATURES_VALVE;
@@ -9459,7 +9462,7 @@ struct VkVertexInputAttributeDescription2EXT {
 
 interface PFN_vkCmdSetVertexInputEXT(VkCommandBuffer* commandBuffer, u32 vertexBindingDescriptionCount, VkVertexInputBindingDescription2EXT* pVertexBindingDescriptions, u32 vertexAttributeDescriptionCount, VkVertexInputAttributeDescription2EXT* pVertexAttributeDescriptions)
 
-vkCmdSetVertexInputEXT(VkCommandBuffer* commandBuffer, u32 vertexBindingDescriptionCount, VkVertexInputBindingDescription2EXT* pVertexBindingDescriptions, u32 vertexAttributeDescriptionCount, VkVertexInputAttributeDescription2EXT* pVertexAttributeDescriptions) #extern "vulkan"
+vkCmdSetVertexInputEXT(VkCommandBuffer* commandBuffer, u32 vertexBindingDescriptionCount, VkVertexInputBindingDescription2EXT* pVertexBindingDescriptions, u32 vertexAttributeDescriptionCount, VkVertexInputAttributeDescription2EXT* pVertexAttributeDescriptions) #extern vulkan
 
 struct VkPhysicalDeviceDrmPropertiesEXT {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRM_PROPERTIES_EXT;
@@ -9502,9 +9505,9 @@ interface VkResult PFN_vkGetDeviceSubpassShadingMaxWorkgroupSizeHUAWEI(VkDevice*
 
 interface PFN_vkCmdSubpassShadingHUAWEI(VkCommandBuffer* commandBuffer)
 
-VkResult vkGetDeviceSubpassShadingMaxWorkgroupSizeHUAWEI(VkDevice* device, VkRenderPass* renderpass, VkExtent2D* pMaxWorkgroupSize) #extern "vulkan"
+VkResult vkGetDeviceSubpassShadingMaxWorkgroupSizeHUAWEI(VkDevice* device, VkRenderPass* renderpass, VkExtent2D* pMaxWorkgroupSize) #extern vulkan
 
-vkCmdSubpassShadingHUAWEI(VkCommandBuffer* commandBuffer) #extern "vulkan"
+vkCmdSubpassShadingHUAWEI(VkCommandBuffer* commandBuffer) #extern vulkan
 
 struct VkPhysicalDeviceInvocationMaskFeaturesHUAWEI {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INVOCATION_MASK_FEATURES_HUAWEI;
@@ -9514,7 +9517,7 @@ struct VkPhysicalDeviceInvocationMaskFeaturesHUAWEI {
 
 interface PFN_vkCmdBindInvocationMaskHUAWEI(VkCommandBuffer* commandBuffer, VkImageView* imageView, VkImageLayout imageLayout)
 
-vkCmdBindInvocationMaskHUAWEI(VkCommandBuffer* commandBuffer, VkImageView* imageView, VkImageLayout imageLayout) #extern "vulkan"
+vkCmdBindInvocationMaskHUAWEI(VkCommandBuffer* commandBuffer, VkImageView* imageView, VkImageLayout imageLayout) #extern vulkan
 
 struct VkMemoryGetRemoteAddressInfoNV {
     sType := VkStructureType.VK_STRUCTURE_TYPE_MEMORY_GET_REMOTE_ADDRESS_INFO_NV;
@@ -9531,7 +9534,7 @@ struct VkPhysicalDeviceExternalMemoryRDMAFeaturesNV {
 
 interface VkResult PFN_vkGetMemoryRemoteAddressNV(VkDevice* device, VkMemoryGetRemoteAddressInfoNV* pMemoryGetRemoteAddressInfo, void** pAddress)
 
-VkResult vkGetMemoryRemoteAddressNV(VkDevice* device, VkMemoryGetRemoteAddressInfoNV* pMemoryGetRemoteAddressInfo, void** pAddress) #extern "vulkan"
+VkResult vkGetMemoryRemoteAddressNV(VkDevice* device, VkMemoryGetRemoteAddressInfoNV* pMemoryGetRemoteAddressInfo, void** pAddress) #extern vulkan
 
 struct VkPhysicalDeviceExtendedDynamicState2FeaturesEXT {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT;
@@ -9551,15 +9554,15 @@ interface PFN_vkCmdSetLogicOpEXT(VkCommandBuffer* commandBuffer, VkLogicOp logic
 
 interface PFN_vkCmdSetPrimitiveRestartEnableEXT(VkCommandBuffer* commandBuffer, u32 primitiveRestartEnable)
 
-vkCmdSetPatchControlPointsEXT(VkCommandBuffer* commandBuffer, u32 patchControlPoints) #extern "vulkan"
+vkCmdSetPatchControlPointsEXT(VkCommandBuffer* commandBuffer, u32 patchControlPoints) #extern vulkan
 
-vkCmdSetRasterizerDiscardEnableEXT(VkCommandBuffer* commandBuffer, u32 rasterizerDiscardEnable) #extern "vulkan"
+vkCmdSetRasterizerDiscardEnableEXT(VkCommandBuffer* commandBuffer, u32 rasterizerDiscardEnable) #extern vulkan
 
-vkCmdSetDepthBiasEnableEXT(VkCommandBuffer* commandBuffer, u32 depthBiasEnable) #extern "vulkan"
+vkCmdSetDepthBiasEnableEXT(VkCommandBuffer* commandBuffer, u32 depthBiasEnable) #extern vulkan
 
-vkCmdSetLogicOpEXT(VkCommandBuffer* commandBuffer, VkLogicOp logicOp) #extern "vulkan"
+vkCmdSetLogicOpEXT(VkCommandBuffer* commandBuffer, VkLogicOp logicOp) #extern vulkan
 
-vkCmdSetPrimitiveRestartEnableEXT(VkCommandBuffer* commandBuffer, u32 primitiveRestartEnable) #extern "vulkan"
+vkCmdSetPrimitiveRestartEnableEXT(VkCommandBuffer* commandBuffer, u32 primitiveRestartEnable) #extern vulkan
 
 struct VkPhysicalDeviceColorWriteEnableFeaturesEXT {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COLOR_WRITE_ENABLE_FEATURES_EXT;
@@ -9576,7 +9579,7 @@ struct VkPipelineColorWriteCreateInfoEXT {
 
 interface PFN_vkCmdSetColorWriteEnableEXT(VkCommandBuffer* commandBuffer, u32 attachmentCount, u32* pColorWriteEnables)
 
-vkCmdSetColorWriteEnableEXT(VkCommandBuffer* commandBuffer, u32 attachmentCount, u32* pColorWriteEnables) #extern "vulkan"
+vkCmdSetColorWriteEnableEXT(VkCommandBuffer* commandBuffer, u32 attachmentCount, u32* pColorWriteEnables) #extern vulkan
 
 struct VkPhysicalDeviceGlobalPriorityQueryFeaturesEXT {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GLOBAL_PRIORITY_QUERY_FEATURES_EXT;
@@ -9618,9 +9621,9 @@ interface PFN_vkCmdDrawMultiEXT(VkCommandBuffer* commandBuffer, u32 drawCount, V
 
 interface PFN_vkCmdDrawMultiIndexedEXT(VkCommandBuffer* commandBuffer, u32 drawCount, VkMultiDrawIndexedInfoEXT* pIndexInfo, u32 instanceCount, u32 firstInstance, u32 stride, s32* pVertexOffset)
 
-vkCmdDrawMultiEXT(VkCommandBuffer* commandBuffer, u32 drawCount, VkMultiDrawInfoEXT* pVertexInfo, u32 instanceCount, u32 firstInstance, u32 stride) #extern "vulkan"
+vkCmdDrawMultiEXT(VkCommandBuffer* commandBuffer, u32 drawCount, VkMultiDrawInfoEXT* pVertexInfo, u32 instanceCount, u32 firstInstance, u32 stride) #extern vulkan
 
-vkCmdDrawMultiIndexedEXT(VkCommandBuffer* commandBuffer, u32 drawCount, VkMultiDrawIndexedInfoEXT* pIndexInfo, u32 instanceCount, u32 firstInstance, u32 stride, s32* pVertexOffset) #extern "vulkan"
+vkCmdDrawMultiIndexedEXT(VkCommandBuffer* commandBuffer, u32 drawCount, VkMultiDrawIndexedInfoEXT* pIndexInfo, u32 instanceCount, u32 firstInstance, u32 stride, s32* pVertexOffset) #extern vulkan
 
 struct VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PAGEABLE_DEVICE_LOCAL_MEMORY_FEATURES_EXT;
@@ -9630,7 +9633,7 @@ struct VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT {
 
 interface PFN_vkSetDeviceMemoryPriorityEXT(VkDevice* device, VkDeviceMemory* memory, float priority)
 
-vkSetDeviceMemoryPriorityEXT(VkDevice* device, VkDeviceMemory* memory, float priority) #extern "vulkan"
+vkSetDeviceMemoryPriorityEXT(VkDevice* device, VkDeviceMemory* memory, float priority) #extern vulkan
 
 struct VkAccelerationStructureKHR {}
 
@@ -9842,37 +9845,37 @@ interface PFN_vkGetDeviceAccelerationStructureCompatibilityKHR(VkDevice* device,
 
 interface PFN_vkGetAccelerationStructureBuildSizesKHR(VkDevice* device, VkAccelerationStructureBuildTypeKHR buildType, VkAccelerationStructureBuildGeometryInfoKHR* pBuildInfo, u32* pMaxPrimitiveCounts, VkAccelerationStructureBuildSizesInfoKHR* pSizeInfo)
 
-VkResult vkCreateAccelerationStructureKHR(VkDevice* device, VkAccelerationStructureCreateInfoKHR* pCreateInfo, VkAllocationCallbacks* pAllocator, VkAccelerationStructureKHR** pAccelerationStructure) #extern "vulkan"
+VkResult vkCreateAccelerationStructureKHR(VkDevice* device, VkAccelerationStructureCreateInfoKHR* pCreateInfo, VkAllocationCallbacks* pAllocator, VkAccelerationStructureKHR** pAccelerationStructure) #extern vulkan
 
-vkDestroyAccelerationStructureKHR(VkDevice* device, VkAccelerationStructureKHR* accelerationStructure, VkAllocationCallbacks* pAllocator) #extern "vulkan"
+vkDestroyAccelerationStructureKHR(VkDevice* device, VkAccelerationStructureKHR* accelerationStructure, VkAllocationCallbacks* pAllocator) #extern vulkan
 
-vkCmdBuildAccelerationStructuresKHR(VkCommandBuffer* commandBuffer, u32 infoCount, VkAccelerationStructureBuildGeometryInfoKHR* pInfos, VkAccelerationStructureBuildRangeInfoKHR* ppBuildRangeInfos) #extern "vulkan"
+vkCmdBuildAccelerationStructuresKHR(VkCommandBuffer* commandBuffer, u32 infoCount, VkAccelerationStructureBuildGeometryInfoKHR* pInfos, VkAccelerationStructureBuildRangeInfoKHR* ppBuildRangeInfos) #extern vulkan
 
-vkCmdBuildAccelerationStructuresIndirectKHR(VkCommandBuffer* commandBuffer, u32 infoCount, VkAccelerationStructureBuildGeometryInfoKHR* pInfos, u64* pIndirectDeviceAddresses, u32* pIndirectStrides, u32* ppMaxPrimitiveCounts) #extern "vulkan"
+vkCmdBuildAccelerationStructuresIndirectKHR(VkCommandBuffer* commandBuffer, u32 infoCount, VkAccelerationStructureBuildGeometryInfoKHR* pInfos, u64* pIndirectDeviceAddresses, u32* pIndirectStrides, u32* ppMaxPrimitiveCounts) #extern vulkan
 
-VkResult vkBuildAccelerationStructuresKHR(VkDevice* device, VkDeferredOperationKHR* deferredOperation, u32 infoCount, VkAccelerationStructureBuildGeometryInfoKHR* pInfos, VkAccelerationStructureBuildRangeInfoKHR* ppBuildRangeInfos) #extern "vulkan"
+VkResult vkBuildAccelerationStructuresKHR(VkDevice* device, VkDeferredOperationKHR* deferredOperation, u32 infoCount, VkAccelerationStructureBuildGeometryInfoKHR* pInfos, VkAccelerationStructureBuildRangeInfoKHR* ppBuildRangeInfos) #extern vulkan
 
-VkResult vkCopyAccelerationStructureKHR(VkDevice* device, VkDeferredOperationKHR* deferredOperation, VkCopyAccelerationStructureInfoKHR* pInfo) #extern "vulkan"
+VkResult vkCopyAccelerationStructureKHR(VkDevice* device, VkDeferredOperationKHR* deferredOperation, VkCopyAccelerationStructureInfoKHR* pInfo) #extern vulkan
 
-VkResult vkCopyAccelerationStructureToMemoryKHR(VkDevice* device, VkDeferredOperationKHR* deferredOperation, VkCopyAccelerationStructureToMemoryInfoKHR* pInfo) #extern "vulkan"
+VkResult vkCopyAccelerationStructureToMemoryKHR(VkDevice* device, VkDeferredOperationKHR* deferredOperation, VkCopyAccelerationStructureToMemoryInfoKHR* pInfo) #extern vulkan
 
-VkResult vkCopyMemoryToAccelerationStructureKHR(VkDevice* device, VkDeferredOperationKHR* deferredOperation, VkCopyMemoryToAccelerationStructureInfoKHR* pInfo) #extern "vulkan"
+VkResult vkCopyMemoryToAccelerationStructureKHR(VkDevice* device, VkDeferredOperationKHR* deferredOperation, VkCopyMemoryToAccelerationStructureInfoKHR* pInfo) #extern vulkan
 
-VkResult vkWriteAccelerationStructuresPropertiesKHR(VkDevice* device, u32 accelerationStructureCount, VkAccelerationStructureKHR** pAccelerationStructures, VkQueryType queryType, u64 dataSize, void* pData, u64 stride) #extern "vulkan"
+VkResult vkWriteAccelerationStructuresPropertiesKHR(VkDevice* device, u32 accelerationStructureCount, VkAccelerationStructureKHR** pAccelerationStructures, VkQueryType queryType, u64 dataSize, void* pData, u64 stride) #extern vulkan
 
-vkCmdCopyAccelerationStructureKHR(VkCommandBuffer* commandBuffer, VkCopyAccelerationStructureInfoKHR* pInfo) #extern "vulkan"
+vkCmdCopyAccelerationStructureKHR(VkCommandBuffer* commandBuffer, VkCopyAccelerationStructureInfoKHR* pInfo) #extern vulkan
 
-vkCmdCopyAccelerationStructureToMemoryKHR(VkCommandBuffer* commandBuffer, VkCopyAccelerationStructureToMemoryInfoKHR* pInfo) #extern "vulkan"
+vkCmdCopyAccelerationStructureToMemoryKHR(VkCommandBuffer* commandBuffer, VkCopyAccelerationStructureToMemoryInfoKHR* pInfo) #extern vulkan
 
-vkCmdCopyMemoryToAccelerationStructureKHR(VkCommandBuffer* commandBuffer, VkCopyMemoryToAccelerationStructureInfoKHR* pInfo) #extern "vulkan"
+vkCmdCopyMemoryToAccelerationStructureKHR(VkCommandBuffer* commandBuffer, VkCopyMemoryToAccelerationStructureInfoKHR* pInfo) #extern vulkan
 
-u64 vkGetAccelerationStructureDeviceAddressKHR(VkDevice* device, VkAccelerationStructureDeviceAddressInfoKHR* pInfo) #extern "vulkan"
+u64 vkGetAccelerationStructureDeviceAddressKHR(VkDevice* device, VkAccelerationStructureDeviceAddressInfoKHR* pInfo) #extern vulkan
 
-vkCmdWriteAccelerationStructuresPropertiesKHR(VkCommandBuffer* commandBuffer, u32 accelerationStructureCount, VkAccelerationStructureKHR** pAccelerationStructures, VkQueryType queryType, VkQueryPool* queryPool, u32 firstQuery) #extern "vulkan"
+vkCmdWriteAccelerationStructuresPropertiesKHR(VkCommandBuffer* commandBuffer, u32 accelerationStructureCount, VkAccelerationStructureKHR** pAccelerationStructures, VkQueryType queryType, VkQueryPool* queryPool, u32 firstQuery) #extern vulkan
 
-vkGetDeviceAccelerationStructureCompatibilityKHR(VkDevice* device, VkAccelerationStructureVersionInfoKHR* pVersionInfo, VkAccelerationStructureCompatibilityKHR* pCompatibility) #extern "vulkan"
+vkGetDeviceAccelerationStructureCompatibilityKHR(VkDevice* device, VkAccelerationStructureVersionInfoKHR* pVersionInfo, VkAccelerationStructureCompatibilityKHR* pCompatibility) #extern vulkan
 
-vkGetAccelerationStructureBuildSizesKHR(VkDevice* device, VkAccelerationStructureBuildTypeKHR buildType, VkAccelerationStructureBuildGeometryInfoKHR* pBuildInfo, u32* pMaxPrimitiveCounts, VkAccelerationStructureBuildSizesInfoKHR* pSizeInfo) #extern "vulkan"
+vkGetAccelerationStructureBuildSizesKHR(VkDevice* device, VkAccelerationStructureBuildTypeKHR buildType, VkAccelerationStructureBuildGeometryInfoKHR* pBuildInfo, u32* pMaxPrimitiveCounts, VkAccelerationStructureBuildSizesInfoKHR* pSizeInfo) #extern vulkan
 
 enum VkShaderGroupShaderKHR {
     VK_SHADER_GROUP_SHADER_GENERAL_KHR = 0;
@@ -9964,17 +9967,17 @@ interface u64 PFN_vkGetRayTracingShaderGroupStackSizeKHR(VkDevice* device, VkPip
 
 interface PFN_vkCmdSetRayTracingPipelineStackSizeKHR(VkCommandBuffer* commandBuffer, u32 pipelineStackSize)
 
-vkCmdTraceRaysKHR(VkCommandBuffer* commandBuffer, VkStridedDeviceAddressRegionKHR* pRaygenShaderBindingTable, VkStridedDeviceAddressRegionKHR* pMissShaderBindingTable, VkStridedDeviceAddressRegionKHR* pHitShaderBindingTable, VkStridedDeviceAddressRegionKHR* pCallableShaderBindingTable, u32 width, u32 height, u32 depth) #extern "vulkan"
+vkCmdTraceRaysKHR(VkCommandBuffer* commandBuffer, VkStridedDeviceAddressRegionKHR* pRaygenShaderBindingTable, VkStridedDeviceAddressRegionKHR* pMissShaderBindingTable, VkStridedDeviceAddressRegionKHR* pHitShaderBindingTable, VkStridedDeviceAddressRegionKHR* pCallableShaderBindingTable, u32 width, u32 height, u32 depth) #extern vulkan
 
-VkResult vkCreateRayTracingPipelinesKHR(VkDevice* device, VkDeferredOperationKHR* deferredOperation, VkPipelineCache* pipelineCache, u32 createInfoCount, VkRayTracingPipelineCreateInfoKHR* pCreateInfos, VkAllocationCallbacks* pAllocator, VkPipeline** pPipelines) #extern "vulkan"
+VkResult vkCreateRayTracingPipelinesKHR(VkDevice* device, VkDeferredOperationKHR* deferredOperation, VkPipelineCache* pipelineCache, u32 createInfoCount, VkRayTracingPipelineCreateInfoKHR* pCreateInfos, VkAllocationCallbacks* pAllocator, VkPipeline** pPipelines) #extern vulkan
 
-VkResult vkGetRayTracingCaptureReplayShaderGroupHandlesKHR(VkDevice* device, VkPipeline* pipeline, u32 firstGroup, u32 groupCount, u64 dataSize, void* pData) #extern "vulkan"
+VkResult vkGetRayTracingCaptureReplayShaderGroupHandlesKHR(VkDevice* device, VkPipeline* pipeline, u32 firstGroup, u32 groupCount, u64 dataSize, void* pData) #extern vulkan
 
-vkCmdTraceRaysIndirectKHR(VkCommandBuffer* commandBuffer, VkStridedDeviceAddressRegionKHR* pRaygenShaderBindingTable, VkStridedDeviceAddressRegionKHR* pMissShaderBindingTable, VkStridedDeviceAddressRegionKHR* pHitShaderBindingTable, VkStridedDeviceAddressRegionKHR* pCallableShaderBindingTable, u64 indirectDeviceAddress) #extern "vulkan"
+vkCmdTraceRaysIndirectKHR(VkCommandBuffer* commandBuffer, VkStridedDeviceAddressRegionKHR* pRaygenShaderBindingTable, VkStridedDeviceAddressRegionKHR* pMissShaderBindingTable, VkStridedDeviceAddressRegionKHR* pHitShaderBindingTable, VkStridedDeviceAddressRegionKHR* pCallableShaderBindingTable, u64 indirectDeviceAddress) #extern vulkan
 
-u64 vkGetRayTracingShaderGroupStackSizeKHR(VkDevice* device, VkPipeline* pipeline, u32 group, VkShaderGroupShaderKHR groupShader) #extern "vulkan"
+u64 vkGetRayTracingShaderGroupStackSizeKHR(VkDevice* device, VkPipeline* pipeline, u32 group, VkShaderGroupShaderKHR groupShader) #extern vulkan
 
-vkCmdSetRayTracingPipelineStackSizeKHR(VkCommandBuffer* commandBuffer, u32 pipelineStackSize) #extern "vulkan"
+vkCmdSetRayTracingPipelineStackSizeKHR(VkCommandBuffer* commandBuffer, u32 pipelineStackSize) #extern vulkan
 
 struct VkPhysicalDeviceRayQueryFeaturesKHR {
     sType := VkStructureType.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
