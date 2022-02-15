@@ -35,13 +35,12 @@ main() {
 
 bool run_test(string test_dir, string test) {
     #if os == OS.Windows {
-        executable := "ol/bin/Debug/net6.0/ol"; #const
         skip_file_name := "no_windows"; #const
     }
     else {
-        executable := "./ol/bin/Debug/net6.0/ol"; #const
         skip_file_name := "no_linux"; #const
     }
+    executable := "./ol/bin/Debug/net6.0/ol"; #const
 
     skip_file := format_string("%/%", test_dir, skip_file_name);
     skip := file_exists(skip_file);
