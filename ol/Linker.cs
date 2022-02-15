@@ -45,19 +45,20 @@ public static class Linker
         // 4. Run the linker
         #if _LINUX
         var linker = DetermineLinker(BuildSettings.Linker, libDirectory);
-        var libraries = string.Join(' ', BuildSettings.Libraries.Select(lib => $"-l{lib}"));
+        var libraries = string.Join(' ', BuildSettings.LibraryNames.Select(lib => $"-l{lib}"));
+        var libraryDirectories = string.Join(' ', BuildSettings.LibraryDirectories.Select(d => $"/libpath:\"{d}\""));
         var dependencies = BuildSettings.Linker == LinkerType.Static ?
-            string.Join(' ', BuildSettings.Dependencies.Select(lib => $"{lib}.a")) :
-            string.Join(' ', BuildSettings.Dependencies.Select(lib => $"{lib}.so"));
+            string.Join(' ', BuildSettings.Libraries.Select(lib => GetLibraryName(lib, "a"))) :
+            string.Join(' ', BuildSettings.Libraries.Select(lib => GetLibraryName(lib, "so")));
 
-        var linkerArguments = $"{linker} -o {executableFile} {objectFile} {defaultObjects} --start-group {libraries} {dependencies} --end-group";
+        var linkerArguments = $"{linker} -o {executableFile} {objectFile} {defaultObjects} {libraryDirectories} --start-group {libraries} {dependencies} --end-group";
 
         Console.WriteLine($"Linking: ld {linkerArguments}\n");
         #elif _WINDOWS
         var debug = BuildSettings.Release ? string.Empty : "-debug ";
+        var libraryNames = string.Join(' ', BuildSettings.LibraryNames.Select(lib => $"{lib}.lib"));
         var libraryDirectories = string.Join(' ', BuildSettings.LibraryDirectories.Select(d => $"/libpath:\"{d}\""));
-        var libraries = string.Join(' ', BuildSettings.Libraries.Select(lib => $"{lib}.lib"));
-        var dependencies = string.Join(' ', BuildSettings.Dependencies.Select(lib => $"{lib}.lib"));
+        var dependencies = string.Join(' ', BuildSettings.Libraries.Select(lib => GetLibraryName(lib, "lib"));
 
         var linkerArguments = $"/entry:_start {debug}/out:{executableFile}.exe {objectFile} {defaultObjects} /libpath:\"{libDirectory.FullName}\" {libraryDirectories} {libraries} {dependencies}";
 
@@ -174,4 +175,26 @@ public static class Linker
         return $"-dynamic-linker {linker.FullName}";
     }
     #endif
+
+    private static string GetLibraryName(Library library, string extension)
+    {
+        if (library.FileName == null)
+        {
+            return $"{library.AbsolutePath}.{extension}";
+        }
+
+        #if _LINUX
+        if (library.LibPath == null)
+        {
+            return $"-l{library.FileName}";
+        }
+        return $"-L{library.LibPath} -l{library.FileName}";
+        #elif _WINDOWS
+        if (library.LibPath == null)
+        {
+            return $"{library.FileName}.{extension}";
+        }
+        return $"/libpath:\"{library.LibPath}\" {library.FileName}.lib";
+        #endif
+    }
 }
