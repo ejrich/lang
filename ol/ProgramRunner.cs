@@ -358,6 +358,30 @@ public static unsafe class ProgramRunner
         }
     }
 
+    private static void CopyToOutputDirectory(String file)
+    {
+        var filePath = Marshal.PtrToStringAnsi(file.Data, (int)file.Length);
+        FileInfo fileInfo;
+        if (Path.IsPathRooted(filePath))
+        {
+            fileInfo = new(filePath);
+        }
+        else
+        {
+            var fullPath = Path.Combine(BuildSettings.Path, filePath);
+            fileInfo = new(fullPath);
+        }
+
+        if (!fileInfo.Exists)
+        {
+            ErrorReporter.Report($"File '{filePath}' not found, unable to copy to output directory");
+        }
+        else
+        {
+            BuildSettings.FilesToCopy.Add(fileInfo);
+        }
+    }
+
     private static Register ExecuteFunction(FunctionIR function, Register[] arguments)
     {
         var instructionPointer = 0;
@@ -1607,6 +1631,13 @@ public static unsafe class ProgramRunner
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
                     var directory = Marshal.PtrToStructure<String>(value.Pointer);
                     AddLibraryDirectory(directory);
+                    break;
+                }
+                case "copy_to_output_directory":
+                {
+                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    var file = Marshal.PtrToStructure<String>(value.Pointer);
+                    CopyToOutputDirectory(file);
                     break;
                 }
                 default:
