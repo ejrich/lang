@@ -56,9 +56,9 @@ public static class Linker
         Console.WriteLine($"Linking: ld {linkerArguments}\n");
         #elif _WINDOWS
         var debug = BuildSettings.Release ? string.Empty : "-debug ";
-        var libraryNames = string.Join(' ', BuildSettings.LibraryNames.Select(lib => $"{lib}.lib"));
+        var libraries = string.Join(' ', BuildSettings.LibraryNames.Select(lib => $"{lib}.lib"));
         var libraryDirectories = string.Join(' ', BuildSettings.LibraryDirectories.Select(d => $"/libpath:\"{d}\""));
-        var dependencies = string.Join(' ', BuildSettings.Libraries.Select(lib => GetLibraryName(lib, "lib"));
+        var dependencies = string.Join(' ', BuildSettings.Libraries.Select(lib => GetLibraryName(lib, "lib")));
 
         var linkerArguments = $"/entry:_start {debug}/out:{executableFile}.exe {objectFile} {defaultObjects} /libpath:\"{libDirectory.FullName}\" {libraryDirectories} {libraries} {dependencies}";
 
