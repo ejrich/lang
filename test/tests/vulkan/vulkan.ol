@@ -578,7 +578,7 @@ bool handle_inputs() {
         if !running return false;
     }
 
-    // return true;
+    return true;
     return false;
 }
 
