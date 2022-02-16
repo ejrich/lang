@@ -279,6 +279,22 @@ struct XModifierKeymap {
     modifiermap: u8*;
 }
 
+[flags]
+enum ModState {
+    ShiftMask   = 0x1;
+    LockMask    = 0x2;
+    ControlMask = 0x4;
+    Mod1Mask    = 0x8;
+    Mod2Mask    = 0x10;
+    Mod3Mask    = 0x20;
+    Mod4Mask    = 0x40;
+    Mod5Mask    = 0x80;
+    Button1Mask = 0x100;
+    Button2Mask = 0x200;
+    Button3Mask = 0x400;
+    Button4Mask = 0x800;
+    Button5Mask = 0x1000;
+}
 
 struct XKeyEvent {
     type: XEventType;
@@ -293,7 +309,7 @@ struct XKeyEvent {
     y: s32;
     x_root: s32;
     y_root: s32;
-    state: u32;
+    state: ModState;
     keycode: u32;
     same_screen: s32;
 }
@@ -311,7 +327,7 @@ struct XButtonEvent {
     y: s32;
     x_root: s32;
     y_root: s32;
-    state: u32;
+    state: ModState;
     button: u32;
     same_screen: s32;
 }
