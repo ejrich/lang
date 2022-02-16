@@ -24,9 +24,9 @@ public static class ErrorReporter
 {
     public static List<Error> Errors { get; } = new();
 
-    public static void Report(string message, Token token)
+    public static void Report(string message, int fileIndex, Token token)
     {
-        Report(message, token.FileIndex, token.Line, token.Column);
+        Report(message, fileIndex, token.Line, token.Column);
     }
 
     public static void Report(string message, IAst ast)

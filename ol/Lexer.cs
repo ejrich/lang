@@ -121,7 +121,6 @@ public static class Lexer
                         {
                             Type = TokenType.ForwardSlash,
                             Value = "/",
-                            FileIndex = fileIndex,
                             Line = line,
                             Column = column
                         };
@@ -138,7 +137,6 @@ public static class Lexer
                     {
                         Type = TokenType.Literal,
                         Value = "",
-                        FileIndex = fileIndex,
                         Line = line,
                         Column = column
                     };
@@ -181,7 +179,7 @@ public static class Lexer
                             {
                                 if (error)
                                 {
-                                    ErrorReporter.Report($"Unexpected token '{token.Value}'", token);
+                                    ErrorReporter.Report($"Unexpected token '{token.Value}'", fileIndex, token);
                                 }
 
                                 tokens.Add(token);
@@ -208,7 +206,6 @@ public static class Lexer
                             {
                                 Type = TokenType.Character,
                                 Value = escapedCharacter.ToString(),
-                                FileIndex = fileIndex,
                                 Line = line,
                                 Column = column
                             };
@@ -227,7 +224,6 @@ public static class Lexer
                         {
                             Type = TokenType.Character,
                             Value = character.ToString(),
-                            FileIndex = fileIndex,
                             Line = line,
                             Column = column
                         };
@@ -249,7 +245,7 @@ public static class Lexer
                 // Handle ranges and varargs
                 case '.':
                 {
-                    token = new Token {FileIndex = fileIndex, Line = line, Column = column};
+                    token = new Token {Line = line, Column = column};
 
                     if (fileText[i+1] == '.')
                     {
@@ -279,7 +275,7 @@ public static class Lexer
                 }
                 case '!':
                 {
-                    token = new Token {FileIndex = fileIndex, Line = line, Column = column};
+                    token = new Token {Line = line, Column = column};
 
                     if (fileText[i+1] == '=')
                     {
@@ -299,7 +295,7 @@ public static class Lexer
                 }
                 case '&':
                 {
-                    token = new Token {FileIndex = fileIndex, Line = line, Column = column};
+                    token = new Token {Line = line, Column = column};
 
                     if (fileText[i+1] == '&')
                     {
@@ -319,7 +315,7 @@ public static class Lexer
                 }
                 case '|':
                 {
-                    token = new Token {FileIndex = fileIndex, Line = line, Column = column};
+                    token = new Token {Line = line, Column = column};
 
                     if (fileText[i+1] == '|')
                     {
@@ -339,7 +335,7 @@ public static class Lexer
                 }
                 case '+':
                 {
-                    token = new Token {FileIndex = fileIndex, Line = line, Column = column};
+                    token = new Token {Line = line, Column = column};
 
                     if (fileText[i+1] == '+')
                     {
@@ -359,7 +355,7 @@ public static class Lexer
                 }
                 case '-':
                 {
-                    token = new Token {FileIndex = fileIndex, Line = line, Column = column};
+                    token = new Token {Line = line, Column = column};
 
                     character = fileText[i+1];
                     if (character == '-')
@@ -428,7 +424,7 @@ public static class Lexer
                 }
                 case '=':
                 {
-                    token = new Token {FileIndex = fileIndex, Line = line, Column = column};
+                    token = new Token {Line = line, Column = column};
 
                     if (fileText[i+1] == '=')
                     {
@@ -448,7 +444,7 @@ public static class Lexer
                 }
                 case '<':
                 {
-                    token = new Token {FileIndex = fileIndex, Line = line, Column = column};
+                    token = new Token {Line = line, Column = column};
 
                     character = fileText[i+1];
                     if (character == '=')
@@ -486,7 +482,7 @@ public static class Lexer
                 }
                 case '>':
                 {
-                    token = new Token {FileIndex = fileIndex, Line = line, Column = column};
+                    token = new Token {Line = line, Column = column};
 
                     character = fileText[i+1];
                     if (character == '=')
@@ -540,7 +536,6 @@ public static class Lexer
                     {
                         Type = (TokenType)character,
                         Value = character.ToString(),
-                        FileIndex = fileIndex,
                         Line = line,
                         Column = column
                     };
@@ -555,7 +550,6 @@ public static class Lexer
                     token = new Token
                     {
                         Type = TokenType.Number,
-                        FileIndex = fileIndex,
                         Line = line,
                         Column = column
                     };
@@ -622,7 +616,7 @@ public static class Lexer
                 {
                     var startIndex = i;
                     var offset = 1;
-                    token = new Token {FileIndex = fileIndex, Line = line, Column = column};
+                    token = new Token {Line = line, Column = column};
 
                     while (true)
                     {
@@ -711,7 +705,6 @@ public struct Token
     public TokenType Type;
     public string Value;
     public TokenFlags Flags;
-    public int FileIndex;
     public uint Line;
     public uint Column;
 }
