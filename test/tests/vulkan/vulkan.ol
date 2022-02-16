@@ -81,6 +81,7 @@ init_vulkan() {
     create_sync_objects();
 
     start = get_performance_counter();
+    frequency = get_performance_frequency();
 }
 
 
@@ -1646,10 +1647,11 @@ create_uniform_buffers() {
 }
 
 start: u64;
+frequency: u64;
 
 update_uniform_buffer(u32 current_image) {
     now := get_performance_counter();
-    time_diff := cast(float, now - start) / 100000000;
+    time_diff := cast(float, now - start) / frequency * 10;
 
     ubo: UniformBufferObject = {
         model = mat4_rotate_z(radians(time_diff));
