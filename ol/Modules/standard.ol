@@ -249,6 +249,20 @@ yield() {
     }
 }
 
+u64 get_performance_frequency() {
+    freq: u64;
+
+    #if os == OS.Linux {
+        // Always return to handle nanoseconds
+        return 1000000000;
+    }
+    #if os == OS.Windows {
+        QueryPerformanceFrequency(&freq);
+    }
+
+    return freq;
+}
+
 u64 get_performance_counter() {
     counter: u64;
 
@@ -260,7 +274,6 @@ u64 get_performance_counter() {
     }
     #if os == OS.Windows {
         QueryPerformanceCounter(&counter);
-        counter *= 100; // Convert to ns
     }
 
     return counter;
