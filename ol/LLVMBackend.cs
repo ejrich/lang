@@ -1748,6 +1748,11 @@ public static unsafe class LLVMBackend
                         values[instruction.ValueIndex] = _builder.BuildIntToPtr(value, targetType);
                         break;
                     }
+                    case InstructionType.IntegerToEnumCast:
+                    {
+                        values[instruction.ValueIndex] = GetValue(instruction.Value1, values, allocations, functionPointer);
+                        break;
+                    }
                     case InstructionType.AllocateArray:
                     {
                         var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
