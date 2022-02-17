@@ -296,6 +296,29 @@ enum ModState {
     Button5Mask = 0x1000;
 }
 
+XK_F1  := 0xffbe; #const
+XK_F2  := 0xffbf; #const
+XK_F3  := 0xffc0; #const
+XK_F4  := 0xffc1; #const
+XK_F5  := 0xffc2; #const
+XK_F6  := 0xffc3; #const
+XK_F7  := 0xffc4; #const
+XK_F8  := 0xffc5; #const
+XK_F9  := 0xffc6; #const
+XK_F10 := 0xffc7; #const
+XK_F11 := 0xffc8; #const
+XK_F12 := 0xffc9; #const
+XK_Escape := 0xff1b; #const
+XK_Left  := 0xff51; #const
+XK_Up    := 0xff52; #const
+XK_Right := 0xff53; #const
+XK_Down  := 0xff54; #const
+XK_Shift_L    := 0xffe1; #const
+XK_Shift_R    := 0xffe2; #const
+XK_Control_L  := 0xffe3; #const
+XK_Control_R  := 0xffe4; #const
+XK_Caps_Lock  := 0xffe5; #const
+
 struct XKeyEvent {
     type: XEventType;
     serial: u64;
