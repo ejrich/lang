@@ -3611,6 +3611,12 @@ public static class TypeChecker
                             ErrorReporter.Report($"Unable to cast type '{valueType.Name}' to '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast.Value);
                         }
                         break;
+                    case TypeKind.Enum:
+                        if (valueType != null && valueType.TypeKind != TypeKind.Integer)
+                        {
+                            ErrorReporter.Report($"Unable to cast type '{valueType.Name}' to '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast.Value);
+                        }
+                        break;
                     case null:
                         ErrorReporter.Report($"Unable to cast to invalid type '{PrintTypeDefinition(cast.TargetTypeDefinition)}'", cast);
                         break;

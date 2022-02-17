@@ -2462,6 +2462,23 @@ public static class ProgramIRBuilder
             case TypeKind.Interface:
                 castInstruction.Type = value.Type == TypeTable.U64Type ? InstructionType.IntegerToPointerCast : InstructionType.PointerCast;
                 break;
+            case TypeKind.Enum:
+                var targetEnumType = (EnumAst)targetType;
+                switch (value.Type.TypeKind)
+                {
+                    case TypeKind.Integer:
+                        var sourceIntegerType = (PrimitiveAst)value.Type;
+                        if (sourceIntegerType == targetEnumType.BaseType)
+                        {
+                            castInstruction.Type = InstructionType.IntegerToEnumCast;
+                        }
+                        else
+                        {
+                            castInstruction.Type = GetIntegerCastType(sourceIntegerType, targetEnumType.BaseType);
+                        }
+                        break;
+                }
+                break;
         }
 
         return AddInstruction(function, castInstruction, targetType);

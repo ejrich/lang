@@ -137,6 +137,7 @@ public enum InstructionType
     PointerCast,
     PointerToIntegerCast,
     IntegerToPointerCast,
+    IntegerToEnumCast,
     AllocateArray,
     IsNull,
     IsNotNull,
