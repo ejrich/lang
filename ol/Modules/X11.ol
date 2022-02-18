@@ -296,30 +296,30 @@ enum ModState {
     Button5Mask = 0x1000;
 }
 
-XK_Escape := 0xFF1B; #const
-XK_Left   := 0xFF51; #const
-XK_Up     := 0xFF52; #const
-XK_Right  := 0xFF53; #const
-XK_Down   := 0xFF54; #const
-XK_F1  := 0xFFBE; #const
-XK_F2  := 0xFFBF; #const
-XK_F3  := 0xFFC0; #const
-XK_F4  := 0xFFC1; #const
-XK_F5  := 0xFFC2; #const
-XK_F6  := 0xFFC3; #const
-XK_F7  := 0xFFC4; #const
-XK_F8  := 0xFFC5; #const
-XK_F9  := 0xFFC6; #const
-XK_F10 := 0xFFC7; #const
-XK_F11 := 0xFFC8; #const
-XK_F12 := 0xFFC9; #const
-XK_Shift_L    := 0xFFE1; #const
-XK_Shift_R    := 0xFFE2; #const
-XK_Control_L  := 0xFFE3; #const
-XK_Control_R  := 0xFFE4; #const
-XK_Caps_Lock  := 0xFFE5; #const
-XK_Alt_L      := 0xFFE9; #const
-XK_Alt_R      := 0xFFEA; #const
+XK_Escape    := 0xFF1B; #const
+XK_Left      := 0xFF51; #const
+XK_Up        := 0xFF52; #const
+XK_Right     := 0xFF53; #const
+XK_Down      := 0xFF54; #const
+XK_F1        := 0xFFBE; #const
+XK_F2        := 0xFFBF; #const
+XK_F3        := 0xFFC0; #const
+XK_F4        := 0xFFC1; #const
+XK_F5        := 0xFFC2; #const
+XK_F6        := 0xFFC3; #const
+XK_F7        := 0xFFC4; #const
+XK_F8        := 0xFFC5; #const
+XK_F9        := 0xFFC6; #const
+XK_F10       := 0xFFC7; #const
+XK_F11       := 0xFFC8; #const
+XK_F12       := 0xFFC9; #const
+XK_Shift_L   := 0xFFE1; #const
+XK_Shift_R   := 0xFFE2; #const
+XK_Control_L := 0xFFE3; #const
+XK_Control_R := 0xFFE4; #const
+XK_Caps_Lock := 0xFFE5; #const
+XK_Alt_L     := 0xFFE9; #const
+XK_Alt_R     := 0xFFEA; #const
 
 struct XKeyEvent {
     type: XEventType;
@@ -1123,6 +1123,7 @@ enum XInputMasks : s64 {
     PropertyChangeMask       = 0x400000;
     ColormapChangeMask       = 0x800000;
     OwnerGrabButtonMask      = 0x1000000;
+    AllEventMask             = 0x1FFFFFF;
 }
 
 XFontStruct* XQueryFont(Display* a, u64 b) #extern "X11"

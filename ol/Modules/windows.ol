@@ -46,6 +46,7 @@ bool PeekMessageA(MSG* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax
 bool TranslateMessage(MSG* lpMsg)  #extern "user32"
 s64 DispatchMessageA(MSG* lpMsg)  #extern "user32"
 bool GetWindowRect(Handle* hWnd, RECT* lpRect) #extern "user32"
+s16 GetKeyState(int nVirtKey) #extern "user32"
 
 NtStatus BCryptOpenAlgorithmProvider(Handle** phAlgorithm, u16* pszAlgId, u16* pszImplementation, u64 dwFlags) #extern "bcrypt"
 NtStatus BCryptCloseAlgorithmProvider(Handle* phAlgorithm, u64 dwFlags) #extern "bcrypt"
@@ -1360,6 +1361,17 @@ enum NtStatus {
     STATUS_INVALID_PARAMETER = 0xC000000D;
     STATUS_NO_MEMORY         = 0xC0000017;
     STATUS_NOT_FOUND         = 0xC0000225;
+}
+
+[flags]
+enum MouseButtonMod {
+    MK_LBUTTON  = 0x1;
+    MK_RBUTTON  = 0x2;
+    MK_SHIFT    = 0x4;
+    MK_CONTROL  = 0x8;
+    MK_MBUTTON  = 0x10;
+    MK_XBUTTON1 = 0x20;
+    MK_XBUTTON2 = 0x40;
 }
 
 
