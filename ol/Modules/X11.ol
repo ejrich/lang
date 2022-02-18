@@ -1126,6 +1126,10 @@ enum XInputMasks : s64 {
     AllEventMask             = 0x1FFFFFF;
 }
 
+QueuedAlready      := 0; #const
+QueuedAfterReading := 1; #const
+QueuedAfterFlush   := 2; #const
+
 XFontStruct* XQueryFont(Display* a, u64 b) #extern "X11"
 
 XTimeCoord* XGetMotionEvents(Display* a, u64 b, u64 c, u64 d, s32* e) #extern "X11"
