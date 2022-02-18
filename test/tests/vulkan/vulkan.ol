@@ -494,8 +494,7 @@ create_window() {
         XClearWindow(display, x_win);
         XMapRaised(display, x_win);
 
-        window.handle = display;
-        window.window = x_win; window.graphics_context = gc;
+        window = { handle = display; window = x_win; graphics_context = gc; }
     }
     #if os == OS.Windows {
         class_name := "VulkanWindowClass";
@@ -545,13 +544,10 @@ bool handle_inputs() {
             XNextEvent(window.handle, &event);
 
             if event.type == XEventType.KeyPress {
-                text: CArray<u8>[255];
-                key: u64;
-
-                if XLookupString(&event.xkey, &text, 255, &key, null) == 1 {
-                    if text[0] == 'q' {
-                        return false;
-                    }
+                char := XLookupKeysym(&event.xkey, 0);
+                if char == 'q' {
+                    print("Quitting\n");
+                    return false;
                 }
             }
             else if event.type == XEventType.ConfigureNotify {
