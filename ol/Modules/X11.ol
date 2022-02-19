@@ -1123,7 +1123,7 @@ enum XInputMasks : s64 {
     PropertyChangeMask       = 0x400000;
     ColormapChangeMask       = 0x800000;
     OwnerGrabButtonMask      = 0x1000000;
-    AllEventMask             = 0x1FFFF7F;
+    AllEventMask             = 0x1FBFF7F;
 }
 
 QueuedAlready      := 0; #const
