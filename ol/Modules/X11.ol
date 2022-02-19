@@ -370,7 +370,7 @@ struct XMotionEvent {
     y: s32;
     x_root: s32;
     y_root: s32;
-    state: u32;
+    state: ModState;
     is_hint: u8;
     same_screen: s32;
 }
@@ -1123,7 +1123,7 @@ enum XInputMasks : s64 {
     PropertyChangeMask       = 0x400000;
     ColormapChangeMask       = 0x800000;
     OwnerGrabButtonMask      = 0x1000000;
-    AllEventMask             = 0x1FFFFFF;
+    AllEventMask             = 0x1FFFF7F;
 }
 
 QueuedAlready      := 0; #const
