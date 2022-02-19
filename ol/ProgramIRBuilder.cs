@@ -153,6 +153,9 @@ public static class ProgramIRBuilder
             case AssemblyAst assembly:
                 EmitInlineAssembly(function, assembly, TypeChecker.GlobalScope);
                 break;
+            case SwitchAst switchAst:
+                EmitSwitch(function, switchAst, TypeChecker.GlobalScope, null, null, null);
+                break;
             default:
                 EmitIR(function, ast, TypeChecker.GlobalScope);
                 break;
@@ -553,6 +556,9 @@ public static class ProgramIRBuilder
                     break;
                 case AssemblyAst assembly:
                     EmitInlineAssembly(function, assembly, scope);
+                    break;
+                case SwitchAst switchAst:
+                    EmitSwitch(function, switchAst, scope, returnType, breakBlock, continueBlock);
                     break;
                 case BreakAst:
                     var breakJump = new Instruction {Type = InstructionType.Jump, Scope = scope, Value1 = BasicBlockValue(breakBlock)};
@@ -1463,6 +1469,12 @@ public static class ProgramIRBuilder
 
         var asmInstruction = new Instruction {Type = InstructionType.InlineAssembly, Scope = scope, Source = assembly};
         function.Instructions.Add(asmInstruction);
+    }
+
+    private static BasicBlock EmitSwitch(FunctionIR function, SwitchAst switchAst, IScope scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock)
+    {
+        // TODO Implement me
+        return null;
     }
 
     private static InstructionValue BasicBlockValue(BasicBlock jumpBlock)
