@@ -1746,6 +1746,9 @@ public static class TypeChecker
                 case AssemblyAst assembly:
                     VerifyInlineAssembly(assembly, scope);
                     break;
+                case SwitchAst switchAst:
+                    VerifySwitch(switchAst, function, scope, canBreak);
+                    break;
                 case BreakAst:
                     scope.Returns = true;
                     if (!canBreak)
@@ -3308,6 +3311,45 @@ public static class TypeChecker
         }
 
         return value.Dereference == arg.Memory && value.RegisterDefinition.Type == arg.Type;
+    }
+
+    private static void VerifySwitch(SwitchAst switchAst, IFunction currentFunction, IScope scope, bool canBreak)
+    {
+        // TODO Implement me
+        var valueType = VerifyExpression(switchAst.Value, currentFunction, scope);
+
+        foreach (var (cases, body) in switchAst.Cases)
+        {
+            foreach (var switchCase in cases)
+            {
+                var caseType = VerifyExpression(switchCase, currentFunction, scope, out var constant);
+
+                if (caseType != null && valueType != null)
+                {
+                    if (!TypeEquals(valueType, caseType))
+                    {
+                        ErrorReporter.Report($"Expeceted case value to be type '{valueType.Name}', but got '{caseType.Name}'", switchCase);
+                    }
+                    else if (!constant)
+                    {
+                        ErrorReporter.Report("Expected switch case to be a constant", switchCase);
+                    }
+                    else
+                    {
+                        VerifyConstantIfNecessary(switchCase, valueType);
+                    }
+                }
+            }
+
+            body.Parent = scope;
+            VerifyScope(body, currentFunction, canBreak);
+        }
+
+        if (switchAst.DefaultCase != null)
+        {
+            switchAst.DefaultCase.Parent = scope;
+            VerifyScope(switchAst.DefaultCase, currentFunction, canBreak);
+        }
     }
 
     private static void VerifyFunctionIfNecessary(FunctionAst function, IFunction currentFunction)
