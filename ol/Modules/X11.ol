@@ -296,6 +296,9 @@ enum ModState {
     Button5Mask = 0x1000;
 }
 
+XK_BackSpace := 0xFF08; #const
+XK_Tab       := 0xFF09; #const
+XK_Return    := 0xFF0D; #const
 XK_Escape    := 0xFF1B; #const
 XK_Left      := 0xFF51; #const
 XK_Up        := 0xFF52; #const

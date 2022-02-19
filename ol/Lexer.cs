@@ -27,7 +27,6 @@ public static class Lexer
         {"false", TokenType.Boolean},
         {"if", TokenType.If},
         {"else", TokenType.Else},
-        {"then", TokenType.Then},
         {"while", TokenType.While},
         {"each", TokenType.Each},
         {"in", TokenType.In},
@@ -41,7 +40,10 @@ public static class Lexer
         {"operator", TokenType.Operator},
         {"break", TokenType.Break},
         {"continue", TokenType.Continue},
-        {"asm", TokenType.Asm}
+        {"asm", TokenType.Asm},
+        {"switch", TokenType.Switch},
+        {"case", TokenType.Case},
+        {"default", TokenType.Default},
     };
 
     public static List<Token> LoadFileTokens(string filePath, int fileIndex)
@@ -722,7 +724,6 @@ public enum TokenType
     Return,
     If,
     Else,
-    Then,
     While,
     Each,
     And,
@@ -770,7 +771,10 @@ public enum TokenType
     VarArgs = 256,
     Interface,
     Out,
-    Asm
+    Asm,
+    Switch,
+    Case,
+    Default
 }
 
 [Flags]

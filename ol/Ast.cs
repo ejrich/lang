@@ -651,6 +651,16 @@ public class AssemblyValueAst : IAst
     public ConstantAst Constant { get; set; }
 }
 
+public class SwitchAst : IAst
+{
+    public int FileIndex { get; set; }
+    public uint Line { get; init; }
+    public uint Column { get; init; }
+    public IAst Value { get; set; }
+    public List<(List<IAst>, ScopeAst)> Cases { get; } = new();
+    public ScopeAst DefaultCase { get; set; }
+}
+
 public class TypeDefinition : IAst
 {
     public int FileIndex { get; set; }

@@ -48,6 +48,8 @@ main() {
     multiple_return_values();
 
     imports();
+
+    switch_statement();
 }
 
 basic() {
@@ -494,6 +496,17 @@ imports() {
     foobar();
     foobar_2();
     // foobaz(); // This is a private function that should not compile
+}
+
+switch_statement() {
+    result := foo();
+    switch result {
+        case 1;
+        case 2;
+            return;
+        default;
+            print("Foo value = %\n", result);
+    }
 }
 
 #run main();

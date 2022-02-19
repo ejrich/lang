@@ -98,6 +98,8 @@ main() { //#print_ir {
     foobar();
     foobar_2();
     // foobaz(); // This is a private function that should not compile
+
+    switch_statement();
 }
 
 global_c := global_b;
@@ -462,4 +464,17 @@ int, bool number_is_correct(int a) {
 
 int, int, bool hello_world() {
     return 1, 2, true;
+}
+
+switch_statement() {
+    result := foo();
+    switch result {
+        case 1;
+        case 2;
+            return;
+        case 3;
+            print("Value is 3\n");
+        default;
+            print("Foo value = %\n", result);
+    }
 }
