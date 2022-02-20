@@ -3122,6 +3122,7 @@ public static class Parser
                 if (currentCases != null)
                 {
                     ErrorReporter.Report("Switch statement contains case(s) without bodies starting", currentCases[0]);
+                    return null;
                 }
                 break;
             }
@@ -3195,6 +3196,11 @@ public static class Parser
         if (!closed)
         {
             ErrorReporter.Report("Expected switch statement to be closed by '}'", enumerator.FileIndex, enumerator.Current);
+            return null;
+        }
+        else if (switchAst.Cases.Count == 0)
+        {
+            ErrorReporter.Report("Expected switch to have 1 or more non-default cases", switchAst);
             return null;
         }
 
