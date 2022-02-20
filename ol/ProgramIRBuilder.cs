@@ -154,7 +154,7 @@ public static class ProgramIRBuilder
                 EmitInlineAssembly(function, assembly, TypeChecker.GlobalScope);
                 break;
             case SwitchAst switchAst:
-                EmitSwitch(function, switchAst, TypeChecker.GlobalScope, null, null, null);
+                EmitSwitch(function, entryBlock, switchAst, TypeChecker.GlobalScope, null, null, null);
                 break;
             default:
                 EmitIR(function, ast, TypeChecker.GlobalScope);
@@ -558,15 +558,13 @@ public static class ProgramIRBuilder
                     EmitInlineAssembly(function, assembly, scope);
                     break;
                 case SwitchAst switchAst:
-                    EmitSwitch(function, switchAst, scope, returnType, breakBlock, continueBlock);
+                    block = EmitSwitch(function, block, switchAst, scope, returnType, breakBlock, continueBlock);
                     break;
                 case BreakAst:
-                    var breakJump = new Instruction {Type = InstructionType.Jump, Scope = scope, Value1 = BasicBlockValue(breakBlock)};
-                    function.Instructions.Add(breakJump);
+                    EmitJump(function, scope, breakBlock);
                     return block;
                 case ContinueAst:
-                    var continueJump = new Instruction {Type = InstructionType.Jump, Scope = scope, Value1 = BasicBlockValue(continueBlock)};
-                    function.Instructions.Add(continueJump);
+                    EmitJump(function, scope, continueBlock);
                     return block;
                 default:
                     EmitIR(function, ast, scope);
@@ -1271,8 +1269,7 @@ public static class ProgramIRBuilder
 
         AddBasicBlock(function, whileBodyBlock);
         EmitScope(function, whileBodyBlock, whileAst.Body, returnType, afterBlock, conditionBlock);
-        var jumpToCondition = new Instruction {Type = InstructionType.Jump, Scope = scope, Value1 = BasicBlockValue(conditionBlock)};
-        function.Instructions.Add(jumpToCondition);
+        EmitJump(function, scope, conditionBlock);
 
         AddBasicBlock(function, afterBlock);
 
@@ -1318,7 +1315,7 @@ public static class ProgramIRBuilder
             value = EmitIR(function, ast, scope);
         }
 
-        var condition =  value.Type.TypeKind switch
+        var condition = value.Type.TypeKind switch
         {
             TypeKind.Integer or TypeKind.Enum => EmitInstruction(InstructionType.IntegerEquals, function, TypeTable.BoolType, scope, value, GetDefaultConstant(value.Type)),
             TypeKind.Float => EmitInstruction(InstructionType.FloatEquals, function, TypeTable.BoolType, scope, value, GetDefaultConstant(value.Type)),
@@ -1443,8 +1440,7 @@ public static class ProgramIRBuilder
         var incrementValue = new InstructionValue {ValueType = InstructionValueType.Constant, Type = indexType, ConstantValue = new Constant {Integer = 1}};
         var nextValue = EmitInstruction(InstructionType.IntegerAdd, function, TypeTable.S32Type, eachBody, indexValue, incrementValue);
         EmitStore(function, indexVariable, nextValue, eachBody);
-        var jumpToCondition = new Instruction {Type = InstructionType.Jump, Scope = eachBody, Value1 = BasicBlockValue(conditionBlock)};
-        function.Instructions.Add(jumpToCondition);
+        EmitJump(function, eachBody, conditionBlock);
 
         AddBasicBlock(function, afterBlock);
         conditionJump.Value2 = BasicBlockValue(afterBlock);
@@ -1471,10 +1467,91 @@ public static class ProgramIRBuilder
         function.Instructions.Add(asmInstruction);
     }
 
-    private static BasicBlock EmitSwitch(FunctionIR function, SwitchAst switchAst, IScope scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock)
+    private static BasicBlock EmitSwitch(FunctionIR function, BasicBlock block, SwitchAst switchAst, IScope scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock)
     {
-        // TODO Implement me
-        return null;
+        var value = EmitIR(function, switchAst.Value, scope);
+        var afterBlock = new BasicBlock();
+
+        if (switchAst.DefaultCase != null)
+        {
+            var (cases, body) = switchAst.Cases[0];
+            var nextCaseBlock = new BasicBlock();
+            EmitSwitchCase(function, value, cases, body, scope, nextCaseBlock, afterBlock, returnType, breakBlock, continueBlock);
+
+            for (var i = 1; i < switchAst.Cases.Count; i++)
+            {
+                block = nextCaseBlock;
+                AddBasicBlock(function, nextCaseBlock);
+
+                (cases, body) = switchAst.Cases[i];
+                nextCaseBlock = new BasicBlock();
+
+                EmitSwitchCase(function, value, cases, body, scope, nextCaseBlock, afterBlock, returnType, breakBlock, continueBlock);
+            }
+
+            AddBasicBlock(function, nextCaseBlock);
+            EmitScope(function, nextCaseBlock, switchAst.DefaultCase, returnType, breakBlock, continueBlock);
+        }
+        else
+        {
+            if (switchAst.Cases.Count > 1)
+            {
+                var (cases, body) = switchAst.Cases[0];
+                var nextCaseBlock = new BasicBlock();
+                EmitSwitchCase(function, value, cases, body, scope, nextCaseBlock, afterBlock, returnType, breakBlock, continueBlock);
+
+                for (var i = 1; i < switchAst.Cases.Count - 1; i++)
+                {
+                    block = nextCaseBlock;
+                    AddBasicBlock(function, nextCaseBlock);
+
+                    (cases, body) = switchAst.Cases[i];
+                    nextCaseBlock = new BasicBlock();
+
+                    EmitSwitchCase(function, value, cases, body, scope, nextCaseBlock, afterBlock, returnType, breakBlock, continueBlock);
+                }
+
+                AddBasicBlock(function, nextCaseBlock);
+            }
+
+            {
+                var (cases, body) = switchAst.Cases[^1];
+                EmitSwitchCase(function, value, cases, body, scope, afterBlock, null, returnType, breakBlock, continueBlock, false);
+            }
+        }
+
+        AddBasicBlock(function, afterBlock);
+
+        return afterBlock;
+    }
+
+    private static void EmitSwitchCase(FunctionIR function, InstructionValue value, List<IAst> cases, ScopeAst body, IScope scope, BasicBlock nextCaseBlock, BasicBlock afterBlock, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock, bool emitJump = true)
+    {
+        var bodyBlock = new BasicBlock();
+        if (cases.Count > 1)
+        {
+            for (var i = 0; i < cases.Count - 1; i++)
+            {
+                var switchCase = EmitAndCast(function, cases[i], scope, value.Type);
+                var compare = EmitExpression(function, value, switchCase, Operator.Equality, TypeTable.BoolType, scope);
+                EmitConditionalJump(function, scope, compare, bodyBlock);
+                AddBasicBlock(function);
+            }
+        }
+
+        {
+            // Last case jumps to the next case if no match
+            var switchCase = EmitAndCast(function, cases[^1], scope, value.Type);
+            var compare = EmitExpression(function, value, switchCase, Operator.NotEqual, TypeTable.BoolType, scope);
+            EmitConditionalJump(function, scope, compare, nextCaseBlock);
+        }
+
+        AddBasicBlock(function, bodyBlock);
+        EmitScope(function, bodyBlock, body, returnType, breakBlock, continueBlock);
+        if (!body.Returns && emitJump)
+        {
+            EmitJump(function, body, afterBlock);
+        }
     }
 
     private static InstructionValue BasicBlockValue(BasicBlock jumpBlock)
@@ -2625,6 +2702,16 @@ public static class ProgramIRBuilder
             Value1 = dataPointer, Value2 = count
         };
         function.Instructions.Add(instruction);
+    }
+
+    private static void EmitJump(FunctionIR function, IScope scope, BasicBlock block)
+    {
+        var jump = new Instruction
+        {
+            Type = InstructionType.Jump, Scope = scope,
+            Value1 = new InstructionValue {ValueType = InstructionValueType.BasicBlock, JumpBlock = block}
+        };
+        function.Instructions.Add(jump);
     }
 
     private static void EmitConditionalJump(FunctionIR function, IScope scope, InstructionValue condition, BasicBlock block)

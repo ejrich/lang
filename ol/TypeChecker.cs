@@ -3315,8 +3315,22 @@ public static class TypeChecker
 
     private static void VerifySwitch(SwitchAst switchAst, IFunction currentFunction, IScope scope, bool canBreak)
     {
-        // TODO Implement me
         var valueType = VerifyExpression(switchAst.Value, currentFunction, scope);
+        if (valueType != null)
+        {
+            switch (valueType.TypeKind)
+            {
+                case TypeKind.Boolean:
+                case TypeKind.Integer:
+                case TypeKind.Float:
+                case TypeKind.Enum:
+                    // Valid types
+                    break;
+                default:
+                    ErrorReporter.Report($"Expected switch value to be bool, int, float, or enum but got '{valueType.Name}'", switchAst.Value);
+                    break;
+            }
+        }
 
         foreach (var (cases, body) in switchAst.Cases)
         {
