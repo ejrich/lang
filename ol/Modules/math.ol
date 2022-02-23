@@ -72,3 +72,30 @@ T floor<T>(T value) {
     result := cast(s64, value);
     return cast(T, result);
 }
+
+
+// Data structures
+struct Vector2 {
+    x: float;
+    y: float;
+}
+
+struct Vector3 {
+    x: float;
+    y: float;
+    z: float;
+}
+
+struct Vector4 {
+    x: float;
+    y: float;
+    z: float;
+    w: float;
+}
+
+struct Matrix4 {
+    a: Vector4;
+    b: Vector4;
+    c: Vector4;
+    d: Vector4;
+}

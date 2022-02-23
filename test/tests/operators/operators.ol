@@ -72,12 +72,6 @@ operator_overloading() {
     print("Greater than or equal: %, Less than or equal: %, Greater than: %, Less than: %\n", gte, lte, gt, lt);
 }
 
-struct Vector3 {
-    x: float;
-    y: float;
-    z: float;
-}
-
 struct Vector3I {
     x: int;
     y: int;
