@@ -1366,12 +1366,6 @@ cleanup_swap_chain() {
 
 
 // Part 17: https://vulkan-tutorial.com/en/Vertex_buffers/Vertex_input_description
-struct Vector3 {
-    x: float;
-    y: float;
-    z: float;
-}
-
 struct Vertex {
     position: Vector3;
     color: Vector3;
@@ -1576,20 +1570,6 @@ create_index_buffer(Array<u32> indices, VkBuffer** index_buffer, VkDeviceMemory*
 
 
 // Part 21: https://vulkan-tutorial.com/en/Uniform_buffers/Descriptor_layout_and_buffer
-struct Vector4 {
-    x: float;
-    y: float;
-    z: float;
-    w: float;
-}
-
-struct Matrix4 {
-    a: Vector4;
-    b: Vector4;
-    c: Vector4;
-    d: Vector4;
-}
-
 struct UniformBufferObject {
     model: Matrix4;
     view: Matrix4;
@@ -2124,10 +2104,6 @@ create_texture_sampler() {
 
 
 // Part 25: https://vulkan-tutorial.com/en/Texture_mapping/Combined_image_sampler
-struct Vector2 {
-    x: float;
-    y: float;
-}
 
 
 // Part 26: https://vulkan-tutorial.com/en/Depth_buffering
