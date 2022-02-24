@@ -185,7 +185,9 @@ void __start(int argc, u8** argv) {
 }
 
 exit_program(int exit_code) {
-    run_exit_callbacks();
+    each callback in exit_callbacks {
+        callback();
+    }
 
     #if os == OS.Linux {
         exit_group(exit_code);
@@ -196,14 +198,7 @@ exit_program(int exit_code) {
 }
 
 interface ExitCallback()
-
 exit_callbacks: Array<ExitCallback>;
-
-run_exit_callbacks() {
-    each callback in exit_callbacks {
-        callback();
-    }
-}
 
 command_line_arguments: Array<string>;
 exit_code := 0;
