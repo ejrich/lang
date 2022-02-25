@@ -162,7 +162,7 @@ Array<u8*> get_required_extensions() {
     }
 
     if enable_validation_layers {
-        array_insert(&extension_names, VK_EXT_DEBUG_UTILS_EXTENSION_NAME .data);
+        array_insert(&extension_names, VK_EXT_DEBUG_UTILS_EXTENSION_NAME.data);
     }
 
     return extension_names;
@@ -303,7 +303,6 @@ pick_physical_device() {
         if score > highest_score {
             physical_device = device_candidate;
             highest_score = score;
-            break;
         }
     }
 

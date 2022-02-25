@@ -1812,10 +1812,12 @@ public static class TypeChecker
     private static void VerifyGlobalVariable(DeclarationAst declaration)
     {
         declaration.Verified = true;
+        IScope scope = PrivateScopes[declaration.FileIndex];
+        if (scope == null) scope = GlobalScope;
 
         if (declaration.TypeDefinition != null)
         {
-            declaration.Type = VerifyType(declaration.TypeDefinition, GlobalScope, out _, out var isVarargs, out var isParams, initialArrayLength: declaration.ArrayValues?.Count);
+            declaration.Type = VerifyType(declaration.TypeDefinition, scope, out _, out var isVarargs, out var isParams, initialArrayLength: declaration.ArrayValues?.Count);
             if (isVarargs || isParams)
             {
                 ErrorReporter.Report($"Variable '{declaration.Name}' cannot be varargs or Params", declaration.TypeDefinition);
@@ -1881,7 +1883,7 @@ public static class TypeChecker
                     var structDef = declaration.Type as StructAst;
                     foreach (var (name, assignment) in declaration.Assignments)
                     {
-                        VerifyFieldAssignment(structDef, name, assignment, null, GlobalScope, true);
+                        VerifyFieldAssignment(structDef, name, assignment, null, scope, true);
                     }
                 }
             }
@@ -1905,7 +1907,7 @@ public static class TypeChecker
                     var elementType = declaration.ArrayElementType;
                     foreach (var value in declaration.ArrayValues)
                     {
-                        var valueType = VerifyExpression(value, null, GlobalScope, out var isConstant);
+                        var valueType = VerifyExpression(value, null, scope, out var isConstant);
                         if (valueType != null)
                         {
                             if (!TypeEquals(elementType, valueType))
@@ -1944,7 +1946,7 @@ public static class TypeChecker
         // 7. Verify the type definition count if necessary
         if (declaration.Type?.TypeKind == TypeKind.Array && declaration.TypeDefinition.Count != null)
         {
-            var countType = VerifyExpression(declaration.TypeDefinition.Count, null, GlobalScope, out var isConstant, out uint arrayLength);
+            var countType = VerifyExpression(declaration.TypeDefinition.Count, null, scope, out var isConstant, out uint arrayLength);
 
             if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
             {
@@ -1967,7 +1969,7 @@ public static class TypeChecker
 
         if (!ErrorReporter.Errors.Any())
         {
-            ProgramIRBuilder.EmitGlobalVariable(declaration, GlobalScope);
+            ProgramIRBuilder.EmitGlobalVariable(declaration, scope);
         }
     }
 
