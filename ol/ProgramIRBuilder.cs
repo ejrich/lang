@@ -2611,7 +2611,7 @@ public static class ProgramIRBuilder
         do {
             if (scope.Identifiers.TryGetValue(name, out var ast))
             {
-                global = scope.Parent == null;
+                global = scope.Parent == null || scope is PrivateScope;
                 return ast;
             }
             scope = scope.Parent;
