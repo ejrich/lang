@@ -35,8 +35,8 @@ bool FindNextFileA(Handle* hFindHandle, WIN32_FIND_DATAA* lpFindFileData) #exter
 bool FindClose(Handle* hFindFile) #extern "kernel32"
 
 int GetModuleFileNameA(Handle* hModule, u8* lpFileName, int nSize) #extern "kernel32"
-bool GetCurrentDirectory(int nBufferLength, u8* lpBuffer) #extern "kernel32"
-bool SetCurrentDirectory(string lpPathName) #extern "kernel32"
+bool GetCurrentDirectoryA(int nBufferLength, u8* lpBuffer) #extern "kernel32"
+bool SetCurrentDirectoryA(string lpPathName) #extern "kernel32"
 
 Handle* GetModuleHandleA(string lpModuleName) #extern "kernel32"
 bool RegisterClassExA(WNDCLASSEXA* wndClass) #extern "user32"
@@ -1441,7 +1441,7 @@ VK_NUMPAD8: u8 = 0x68; #const
 VK_NUMPAD9: u8 = 0x69; #const
 VK_MULTIPLY: u8 = 0x6A; #const
 VK_ADD: u8 = 0x6B; #const
-VK_SEPARATOR: u8 = 0x6C #const;
+VK_SEPARATOR: u8 = 0x6C; #const
 VK_SUBTRACT: u8 = 0x6D; #const
 VK_DECIMAL: u8 = 0x6E; #const
 VK_DIVIDE: u8 = 0x6F; #const
@@ -1492,7 +1492,7 @@ VK_MEDIA_PREV_TRACK: u8 = 0xB1; #const
 VK_MEDIA_STOP: u8 = 0xB2; #const
 VK_MEDIA_PLAY_PAUSE: u8 = 0xB3; #const
 VK_LAUNCH_MAIL: u8 = 0xB4; #const
-VK_LAUNCH_MEDIA_SELECT: u8 = 0xB5 #const;
+VK_LAUNCH_MEDIA_SELECT: u8 = 0xB5; #const
 VK_LAUNCH_APP1: u8 = 0xB6; #const
 VK_LAUNCH_APP2: u8 = 0xB7; #const
 VK_OEM_1: u8 = 0xBA; #const // ';:' key
