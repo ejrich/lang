@@ -34,6 +34,10 @@ Handle* FindFirstFileA(string lpFileName, WIN32_FIND_DATAA* lpFindFileData) #ext
 bool FindNextFileA(Handle* hFindHandle, WIN32_FIND_DATAA* lpFindFileData) #extern "kernel32"
 bool FindClose(Handle* hFindFile) #extern "kernel32"
 
+int GetModuleFileNameA(Handle* hModule, u8* lpFileName, int nSize) #extern "kernel32"
+bool GetCurrentDirectory(int nBufferLength, u8* lpBuffer) #extern "kernel32"
+bool SetCurrentDirectory(string lpPathName) #extern "kernel32"
+
 Handle* GetModuleHandleA(string lpModuleName) #extern "kernel32"
 bool RegisterClassExA(WNDCLASSEXA* wndClass) #extern "user32"
 s64 DefWindowProcA(Handle* hWnd, MessageType uMsg, u64 wParam, s64 lParam) #extern "user32"
