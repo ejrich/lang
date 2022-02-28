@@ -1186,6 +1186,17 @@ public static class TypeChecker
                 {
                     ErrorReporter.Report($"Argument '{argument.Name}' in function '{function.Name}' cannot have default value if the argument has a generic type", argument.Value);
                 }
+                else if (argument.Value is NullAst nullAst && argument.Type != null)
+                {
+                    if (argument.Type.TypeKind == TypeKind.Pointer || argument.Type.TypeKind == TypeKind.Interface)
+                    {
+                        nullAst.TargetType = argument.Type;
+                    }
+                    else
+                    {
+                        ErrorReporter.Report($"Type of argument '{argument.Name}' in function '{function.Name}' is '{PrintTypeDefinition(argument.TypeDefinition)}', but default value is 'null'", argument.Value);
+                    }
+                }
                 else if (defaultType != null)
                 {
                     if (!isConstant)
@@ -1200,17 +1211,6 @@ public static class TypeChecker
                     else
                     {
                         VerifyConstantIfNecessary(argument.Value, argument.Type);
-                    }
-                }
-                else if (argument.Value is NullAst nullAst && argument.Type != null)
-                {
-                    if (argument.Type.TypeKind != TypeKind.Pointer || argument.Type.TypeKind == TypeKind.Interface)
-                    {
-                        nullAst.TargetType = argument.Type;
-                    }
-                    else
-                    {
-                        ErrorReporter.Report($"Type of argument '{argument.Name}' in function '{function.Name}' is '{PrintTypeDefinition(argument.TypeDefinition)}', but default value is 'null'", argument.Value);
                     }
                 }
             }
