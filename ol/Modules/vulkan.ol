@@ -3035,7 +3035,7 @@ struct VkRenderPassCreateInfo {
 struct VkCommandPoolCreateInfo {
     sType := VkStructureType.VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     pNext: void*;
-    flags: u32;
+    flags: VkCommandPoolCreateFlagBits;
     queueFamilyIndex: u32;
 }
 
