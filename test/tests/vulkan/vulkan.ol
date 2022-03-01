@@ -1114,7 +1114,7 @@ create_framebuffers() {
 
 // Part 14: https://vulkan-tutorial.com/en/Drawing_a_triangle/Drawing/Command_buffers
 command_pool: VkCommandPool*;
-command_buffers: Array<VkCommandBuffer*>;
+command_buffers: Array<VkCommandBuffer*>[MAX_FRAMES_IN_FLIGHT];
 
 create_command_pool() {
     graphics_family, _: u32;
@@ -1122,6 +1122,7 @@ create_command_pool() {
 
     pool_info: VkCommandPoolCreateInfo = {
         queueFamilyIndex = graphics_family;
+        flags = VkCommandPoolCreateFlagBits.VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     }
 
     result := vkCreateCommandPool(device, &pool_info, null, &command_pool);
@@ -1132,8 +1133,6 @@ create_command_pool() {
 }
 
 create_command_buffers() {
-    array_reserve(&command_buffers, swap_chain_framebuffers.length);
-
     alloc_info: VkCommandBufferAllocateInfo = {
         commandPool = command_pool;
         level = VkCommandBufferLevel.VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -1145,58 +1144,52 @@ create_command_buffers() {
         print("Unable to create command pool %\n", result);
         exit_program(1);
     }
+}
 
-    begin_info: VkCommandBufferBeginInfo = {
-        pInheritanceInfo = null;
-    }
+record_command_buffer(VkCommandBuffer* command_buffer, u32 image_index) {
+    begin_info: VkCommandBufferBeginInfo;
 
     clear_values: Array<VkClearValue>[2];
-    clear_values[0].color.float32[0] = 0.0;
-    clear_values[0].color.float32[1] = 0.0;
-    clear_values[0].color.float32[2] = 0.0;
-    clear_values[0].color.float32[3] = 1.0;
-    clear_values[1].depthStencil.depth = 1.0;
-    clear_values[1].depthStencil.stencil = 0;
+    clear_values[0].color.float32 = [0.0, 0.0, 0.0, 0.0]
+    clear_values[1].depthStencil = { depth = 1.0; stencil = 0; }
 
     render_pass_info: VkRenderPassBeginInfo = {
         renderPass = render_pass;
+        framebuffer = swap_chain_framebuffers[image_index];
         clearValueCount = clear_values.length;
         pClearValues = clear_values.data;
+        renderArea = { extent = swap_chain_extent; }
     }
-    render_pass_info.renderArea.extent = swap_chain_extent;
 
-    each command_buffer, i in command_buffers {
-        result = vkBeginCommandBuffer(command_buffer, &begin_info);
-        if result != VkResult.VK_SUCCESS {
-            print("Unable to begin recording command buffer %\n", result);
-            exit_program(1);
-        }
+    result := vkBeginCommandBuffer(command_buffer, &begin_info);
+    if result != VkResult.VK_SUCCESS {
+        print("Unable to begin recording command buffer %\n", result);
+        exit_program(1);
+    }
 
-        render_pass_info.framebuffer = swap_chain_framebuffers[i];
-        vkCmdBeginRenderPass(command_buffer, &render_pass_info, VkSubpassContents.VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRenderPass(command_buffer, &render_pass_info, VkSubpassContents.VK_SUBPASS_CONTENTS_INLINE);
 
-        vkCmdBindPipeline(command_buffer, VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline);
+    vkCmdBindPipeline(command_buffer, VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline);
 
-        vkCmdBindDescriptorSets(command_buffer, VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_sets[i], 0, null);
+    vkCmdBindDescriptorSets(command_buffer, VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_sets[current_frame], 0, null);
 
-        offset: u64;
-        vkCmdBindVertexBuffers(command_buffer, 0, 1, &vertex_buffer, &offset);
-        vkCmdBindIndexBuffer(command_buffer, index_buffer, 0, VkIndexType.VK_INDEX_TYPE_UINT32);
-        vkCmdDrawIndexed(command_buffer, indices.length, 1, 0, 0, 0);
+    offset: u64;
+    vkCmdBindVertexBuffers(command_buffer, 0, 1, &vertex_buffer, &offset);
+    vkCmdBindIndexBuffer(command_buffer, index_buffer, 0, VkIndexType.VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(command_buffer, indices.length, 1, 0, 0, 0);
 
-        vkCmdBindDescriptorSets(command_buffer, VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &model_descriptor_sets[i], 0, null);
+    vkCmdBindDescriptorSets(command_buffer, VkPipelineBindPoint.VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &model_descriptor_sets[current_frame], 0, null);
 
-        vkCmdBindVertexBuffers(command_buffer, 0, 1, &model_vertex_buffer, &offset);
-        vkCmdBindIndexBuffer(command_buffer, model_index_buffer, 0, VkIndexType.VK_INDEX_TYPE_UINT32);
-        vkCmdDrawIndexed(command_buffer, model_indices.length, 1, 0, 0, 0);
+    vkCmdBindVertexBuffers(command_buffer, 0, 1, &model_vertex_buffer, &offset);
+    vkCmdBindIndexBuffer(command_buffer, model_index_buffer, 0, VkIndexType.VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(command_buffer, model_indices.length, 1, 0, 0, 0);
 
-        vkCmdEndRenderPass(command_buffer);
+    vkCmdEndRenderPass(command_buffer);
 
-        result = vkEndCommandBuffer(command_buffer);
-        if result != VkResult.VK_SUCCESS {
-            print("Unable to record command buffer %\n", result);
-            exit_program(1);
-        }
+    result = vkEndCommandBuffer(command_buffer);
+    if result != VkResult.VK_SUCCESS {
+        print("Unable to record command buffer %\n", result);
+        exit_program(1);
     }
 }
 
@@ -1265,19 +1258,22 @@ draw_frame() {
 
     images_in_flight[image_index] = in_flight_fences[current_frame];
 
-    update_uniform_buffer(image_index);
+    update_uniform_buffer(current_frame);
+
+    vkResetFences(device, 1, &in_flight_fences[current_frame]);
+
+    vkResetCommandBuffer(command_buffers[current_frame], 0);
+    record_command_buffer(command_buffers[current_frame], image_index);
 
     submit_info: VkSubmitInfo = {
         waitSemaphoreCount = 1;
         pWaitSemaphores = &image_available_semaphores[current_frame];
         pWaitDstStageMask = wait_stages.data;
         commandBufferCount = 1;
-        pCommandBuffers = &command_buffers[image_index];
+        pCommandBuffers = &command_buffers[current_frame];
         signalSemaphoreCount = 1;
         pSignalSemaphores = &render_finished_semaphores[current_frame];
     }
-
-    vkResetFences(device, 1, &in_flight_fences[current_frame]);
 
     result = vkQueueSubmit(graphics_queue, 1, &submit_info, in_flight_fences[current_frame]);
     if result != VkResult.VK_SUCCESS {
@@ -1304,8 +1300,6 @@ draw_frame() {
     }
 
     current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
-
-    vkQueueWaitIdle(present_queue);
 }
 
 
@@ -1607,14 +1601,11 @@ create_descriptor_set_layout() {
     }
 }
 
-uniform_buffers: Array<VkBuffer*>;
-uniform_buffers_memory: Array<VkDeviceMemory*>;
+uniform_buffers: Array<VkBuffer*>[MAX_FRAMES_IN_FLIGHT];
+uniform_buffers_memory: Array<VkDeviceMemory*>[MAX_FRAMES_IN_FLIGHT];
 
 create_uniform_buffers() {
     size := size_of(UniformBufferObject);
-
-    array_reserve(&uniform_buffers, swap_chain_images.length);
-    array_reserve(&uniform_buffers_memory, swap_chain_images.length);
 
     each uniform_buffer, i in uniform_buffers {
         create_buffer(size, VkBufferUsageFlagBits.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &uniform_buffer, &uniform_buffers_memory[i]);
@@ -1760,21 +1751,20 @@ Vector3 vec3(float x = 0.0, float y = 0.0, float z = 0.0) {
 
 // Part 22: https://vulkan-tutorial.com/en/Uniform_buffers/Descriptor_pool_and_sets
 descriptor_pool: VkDescriptorPool*;
-descriptor_sets: Array<VkDescriptorSet*>;
+descriptor_sets: Array<VkDescriptorSet*>[MAX_FRAMES_IN_FLIGHT];
 
 create_descriptor_pool() {
-    pool_sizes: Array<VkDescriptorPoolSize>[2];
-    descriptor_length := swap_chain_images.length * 2;
+    pool_sizes: Array<VkDescriptorPoolSize>[MAX_FRAMES_IN_FLIGHT];
 
     pool_sizes[0].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    pool_sizes[0].descriptorCount = descriptor_length;
+    pool_sizes[0].descriptorCount = MAX_FRAMES_IN_FLIGHT * 2;
     pool_sizes[1].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    pool_sizes[1].descriptorCount = descriptor_length;
+    pool_sizes[1].descriptorCount = MAX_FRAMES_IN_FLIGHT * 2;
 
     pool_info: VkDescriptorPoolCreateInfo = {
         poolSizeCount = pool_sizes.length;
         pPoolSizes = pool_sizes.data;
-        maxSets = descriptor_length;
+        maxSets = MAX_FRAMES_IN_FLIGHT * 2;
     }
 
     result := vkCreateDescriptorPool(device, &pool_info, null, &descriptor_pool);
@@ -1785,18 +1775,16 @@ create_descriptor_pool() {
 }
 
 create_descriptor_sets(Array<VkDescriptorSet*>* descriptor_sets, VkImageView* texture_image_view) {
-    layouts: Array<VkDescriptorSetLayout*>[swap_chain_images.length];
+    layouts: Array<VkDescriptorSetLayout*>[MAX_FRAMES_IN_FLIGHT];
     each layout in layouts {
         layout = descriptor_set_layout;
     }
 
     alloc_info: VkDescriptorSetAllocateInfo = {
         descriptorPool = descriptor_pool;
-        descriptorSetCount = swap_chain_images.length;
+        descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
         pSetLayouts = layouts.data;
     }
-
-    array_reserve(descriptor_sets, swap_chain_images.length);
 
     result := vkAllocateDescriptorSets(device, &alloc_info, descriptor_sets.data);
     if result != VkResult.VK_SUCCESS {
@@ -2172,7 +2160,7 @@ model_index_buffer_memory: VkDeviceMemory*;
 model_texture_image: VkImage*;
 model_texture_image_memory: VkDeviceMemory*;
 model_texture_image_view: VkImageView*;
-model_descriptor_sets: Array<VkDescriptorSet*>;
+model_descriptor_sets: Array<VkDescriptorSet*>[MAX_FRAMES_IN_FLIGHT];
 
 model_vertices: Array<Vertex>;
 model_indices: Array<u32>;
