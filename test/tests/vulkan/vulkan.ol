@@ -818,20 +818,9 @@ create_graphics_pipeline() {
 
     attribute_descriptions: Array<VkVertexInputAttributeDescription>[3];
 
-    attribute_descriptions[0].binding = 0;
-    attribute_descriptions[0].location = 0;
-    attribute_descriptions[0].format = VkFormat.VK_FORMAT_R32G32B32_SFLOAT;
-    attribute_descriptions[0].offset = 0;
-
-    attribute_descriptions[1].binding = 0;
-    attribute_descriptions[1].location = 1;
-    attribute_descriptions[1].format = VkFormat.VK_FORMAT_R32G32B32_SFLOAT;
-    attribute_descriptions[1].offset = size_of(Vector3);
-
-    attribute_descriptions[2].binding = 0;
-    attribute_descriptions[2].location = 2;
-    attribute_descriptions[2].format = VkFormat.VK_FORMAT_R32G32_SFLOAT;
-    attribute_descriptions[2].offset = size_of(Vector3) * 2;
+    attribute_descriptions[0] = { binding = 0; location = 0; format = VkFormat.VK_FORMAT_R32G32B32_SFLOAT; offset = 0; }
+    attribute_descriptions[1] = { binding = 0; location = 1; format = VkFormat.VK_FORMAT_R32G32B32_SFLOAT; offset = size_of(Vector3); }
+    attribute_descriptions[2] = { binding = 0; location = 1; format = VkFormat.VK_FORMAT_R32G32_SFLOAT; offset = size_of(Vector3) * 2; }
 
 
     // Part 10: https://vulkan-tutorial.com/Drawing_a_triangle/Graphics_pipeline_basics/Fixed_functions
