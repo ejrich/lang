@@ -2857,7 +2857,7 @@ struct VkGraphicsPipelineCreateInfo {
 }
 
 struct VkPushConstantRange {
-    stageFlags: u32;
+    stageFlags: VkShaderStageFlagBits;
     offset: u32;
     size: u32;
 }
@@ -3412,7 +3412,7 @@ interface PFN_vkCmdWriteTimestamp(VkCommandBuffer* commandBuffer, VkPipelineStag
 
 interface PFN_vkCmdCopyQueryPoolResults(VkCommandBuffer* commandBuffer, VkQueryPool* queryPool, u32 firstQuery, u32 queryCount, VkBuffer* dstBuffer, u64 dstOffset, u64 stride, u32 flags)
 
-interface PFN_vkCmdPushConstants(VkCommandBuffer* commandBuffer, VkPipelineLayout* layout, u32 stageFlags, u32 offset, u32 size, void* pValues)
+interface PFN_vkCmdPushConstants(VkCommandBuffer* commandBuffer, VkPipelineLayout* layout, VkShaderStageFlagBits stageFlags, u32 offset, u32 size, void* pValues)
 
 interface PFN_vkCmdBeginRenderPass(VkCommandBuffer* commandBuffer, VkRenderPassBeginInfo* pRenderPassBegin, VkSubpassContents contents)
 
@@ -3686,7 +3686,7 @@ vkCmdWriteTimestamp(VkCommandBuffer* commandBuffer, VkPipelineStageFlagBits pipe
 
 vkCmdCopyQueryPoolResults(VkCommandBuffer* commandBuffer, VkQueryPool* queryPool, u32 firstQuery, u32 queryCount, VkBuffer* dstBuffer, u64 dstOffset, u64 stride, u32 flags) #extern vulkan
 
-vkCmdPushConstants(VkCommandBuffer* commandBuffer, VkPipelineLayout* layout, u32 stageFlags, u32 offset, u32 size, void* pValues) #extern vulkan
+vkCmdPushConstants(VkCommandBuffer* commandBuffer, VkPipelineLayout* layout, VkShaderStageFlagBits stageFlags, u32 offset, u32 size, void* pValues) #extern vulkan
 
 vkCmdBeginRenderPass(VkCommandBuffer* commandBuffer, VkRenderPassBeginInfo* pRenderPassBegin, VkSubpassContents contents) #extern vulkan
 
