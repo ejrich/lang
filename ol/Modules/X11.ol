@@ -669,6 +669,13 @@ struct XClientMessageEvent {
     window: u64;
     message_type: u64;
     format: s32;
+    data: XClientMessageData;
+}
+
+union XClientMessageData {
+    b: CArray<u8>[20];
+    s: CArray<s16>[10];
+    l: CArray<s64>[5];
 }
 
 struct XMappingEvent {
