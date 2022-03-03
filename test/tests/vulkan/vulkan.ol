@@ -72,9 +72,9 @@ init_vulkan() {
 
     create_descriptor_pool();
 
-    create_descriptor_sets(&descriptor_sets, texture_image_view);
+    create_descriptor_sets(descriptor_sets, texture_image_view);
 
-    create_descriptor_sets(&model_descriptor_sets, model_texture_image_view);
+    create_descriptor_sets(model_descriptor_sets, model_texture_image_view);
 
     create_command_buffers();
 
@@ -820,7 +820,7 @@ create_graphics_pipeline() {
 
     attribute_descriptions[0] = { binding = 0; location = 0; format = VkFormat.VK_FORMAT_R32G32B32_SFLOAT; offset = 0; }
     attribute_descriptions[1] = { binding = 0; location = 1; format = VkFormat.VK_FORMAT_R32G32B32_SFLOAT; offset = size_of(Vector3); }
-    attribute_descriptions[2] = { binding = 0; location = 1; format = VkFormat.VK_FORMAT_R32G32_SFLOAT; offset = size_of(Vector3) * 2; }
+    attribute_descriptions[2] = { binding = 0; location = 2; format = VkFormat.VK_FORMAT_R32G32_SFLOAT; offset = size_of(Vector3) * 2; }
 
 
     // Part 10: https://vulkan-tutorial.com/Drawing_a_triangle/Graphics_pipeline_basics/Fixed_functions
@@ -1309,8 +1309,8 @@ recreate_swap_chain() {
     create_framebuffers();
     create_uniform_buffers();
     create_descriptor_pool();
-    create_descriptor_sets(&descriptor_sets, texture_image_view);
-    create_descriptor_sets(&model_descriptor_sets, model_texture_image_view);
+    create_descriptor_sets(descriptor_sets, texture_image_view);
+    create_descriptor_sets(model_descriptor_sets, model_texture_image_view);
     create_command_buffers();
 }
 
@@ -1763,7 +1763,7 @@ create_descriptor_pool() {
     }
 }
 
-create_descriptor_sets(Array<VkDescriptorSet*>* descriptor_sets, VkImageView* texture_image_view) {
+create_descriptor_sets(Array<VkDescriptorSet*> descriptor_sets, VkImageView* texture_image_view) {
     layouts: Array<VkDescriptorSetLayout*>[MAX_FRAMES_IN_FLIGHT];
     each layout in layouts {
         layout = descriptor_set_layout;
@@ -1803,12 +1803,13 @@ create_descriptor_sets(Array<VkDescriptorSet*>* descriptor_sets, VkImageView* te
     each uniform_buffer, i in uniform_buffers {
         buffer_info.buffer = uniform_buffer;
 
-        descriptor_writes[0].dstSet = descriptor_sets.data[i];
-        descriptor_writes[0].pBufferInfo = &buffer_info;
-        descriptor_writes[1].dstSet = descriptor_sets.data[i];
-        descriptor_writes[1].dstBinding = 1;
-        descriptor_writes[1].descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptor_writes[1].pImageInfo = &image_info;
+        descriptor_writes[0] = { dstSet = descriptor_sets[i]; pBufferInfo = &buffer_info; }
+        descriptor_writes[1] = {
+            dstSet = descriptor_sets[i];
+            dstBinding = 1;
+            descriptorType = VkDescriptorType.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            pImageInfo = &image_info;
+        }
 
         vkUpdateDescriptorSets(device, descriptor_writes.length, descriptor_writes.data, 0, null);
     }
