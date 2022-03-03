@@ -1638,11 +1638,6 @@ Matrix4 mat4_ident() {
     return matrix;
 }
 
-Vector4 vec4(float x = 0.0, float y = 0.0, float z = 0.0, float w = 0.0) {
-    vector: Vector4 = { x = x; y = y; z = z; w = w; }
-    return vector;
-}
-
 // rotate, look_at, and perspective borrowed from https://github.com/g-truc/glm
 Matrix4 mat4_rotate_z(float angle) {
     sin := sine(angle);
