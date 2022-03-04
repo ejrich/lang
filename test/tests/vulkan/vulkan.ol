@@ -1738,7 +1738,7 @@ descriptor_pool: VkDescriptorPool*;
 descriptor_sets: Array<VkDescriptorSet*>[MAX_FRAMES_IN_FLIGHT];
 
 create_descriptor_pool() {
-    pool_sizes: Array<VkDescriptorPoolSize>[MAX_FRAMES_IN_FLIGHT];
+    pool_sizes: Array<VkDescriptorPoolSize>[2];
 
     pool_sizes[0].type = VkDescriptorType.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     pool_sizes[0].descriptorCount = MAX_FRAMES_IN_FLIGHT * 2;
