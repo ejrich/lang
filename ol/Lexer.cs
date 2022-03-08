@@ -84,7 +84,7 @@ public static class Lexer
                     {
                         i += 2;
                         column += 2;
-                        while (true)
+                        while (i < fileText.Length)
                         {
                             character = fileText[i++];
                             if (character == '*')
