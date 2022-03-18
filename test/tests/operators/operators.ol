@@ -1,5 +1,4 @@
 #import standard
-#import math
 
 main() {
     operator_overloading();
@@ -25,11 +24,11 @@ operator_overloading() {
     div := a / b;
     print("Divide: x = %, y = %, z = %\n", div.x, div.y, div.z);
 
-    mod := a % b;
-    print("Modulus: x = %, y = %, z = %\n", mod.x, mod.y, mod.z);
-
     a_int: Vector3I = { x = 1; y = 1; z = 1; }
     b_int: Vector3I = { x = 2; y = 2; z = 2; }
+
+    mod := a_int % b_int;
+    print("Modulus: x = %, y = %, z = %\n", mod.x, mod.y, mod.z);
 
     bitwise_or := a_int | b_int;
     print("Bitwise bitwise_or: x = %, y = %, z = %\n", bitwise_or.x, bitwise_or.y, bitwise_or.z);
@@ -72,6 +71,12 @@ operator_overloading() {
     print("Greater than or equal: %, Less than or equal: %, Greater than: %, Less than: %\n", gte, lte, gt, lt);
 }
 
+struct Vector3 {
+    x: float;
+    y: float;
+    z: float;
+}
+
 struct Vector3I {
     x: int;
     y: int;
@@ -99,8 +104,8 @@ operator / (Vector3 a, Vector3 b) {
     return c;
 }
 
-operator % (Vector3 a, Vector3 b) {
-    c: Vector3 = { x = float_mod(a.x, b.x); y = float_mod(a.y, b.y); z = float_mod(a.z, b.z); }
+operator % (Vector3I a, Vector3I b) {
+    c: Vector3I = { x = a.x % b.x; y = a.y % b.y; z = a.z % b.z; }
     return c;
 }
 
