@@ -1,5 +1,10 @@
 // General math module
 
+float abs(float value) {
+    if value < 0 return -value;
+    return value;
+}
+
 float64 square_root(float64 value) {
     asm {
         in xmm0, value;
@@ -98,4 +103,74 @@ struct Matrix4 {
     b: Vector4;
     c: Vector4;
     d: Vector4;
+}
+
+
+operator + (Vector3 a, Vector3 b) {
+    c: Vector3 = { x = a.x + b.x; y = a.y + b.y; z = a.z + b.z; }
+    return c;
+}
+
+operator - (Vector3 a, Vector3 b) {
+    c: Vector3 = { x = a.x - b.x; y = a.y - b.y; z = a.z - b.z; }
+    return c;
+}
+
+operator == (Vector3 a, Vector3 b) {
+    return !(a != b);
+}
+
+operator != (Vector3 a, Vector3 b) {
+    if a.x != b.x || a.y != b.y || a.z != b.z return true;
+
+    return false;
+}
+
+Vector3 multiply(Vector3 vec, float value) {
+    vec.x *= value;
+    vec.y *= value;
+    vec.z *= value;
+    return vec;
+}
+
+float length_squared(Vector3 a) {
+    return a.x * a.x + a.y * a.y + a.z * a.z;
+}
+
+float dot(Vector3 a, Vector3 b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+Vector3 cross(Vector3 a, Vector3 b) {
+    c: Vector3 = {
+        x = a.y * b.z - a.z * b.y;
+        y = a.z * b.x - a.x * b.z;
+        z = a.x * b.y - a.y * b.x;
+    }
+    return c;
+}
+
+Vector3 cross_one(Vector3 a) {
+    c: Vector3 = {
+        x = a.y - a.z;
+        y = a.z - a.x;
+        z = a.x - a.y;
+    }
+    return c;
+}
+
+Vector3 inverse(Vector3 a) {
+    a.x *= -1;
+    a.y *= -1;
+    a.z *= -1;
+    return a;
+}
+
+Vector3 normalize(Vector3 a) {
+    length := square_root(a.x * a.x + a.y * a.y + a.z * a.z);
+
+    a.x /= length;
+    a.y /= length;
+    a.z /= length;
+    return a;
 }
