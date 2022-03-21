@@ -1694,30 +1694,6 @@ Matrix4 perspective(float fovy, float aspect, float z_near, float z_far) {
     return result;
 }
 
-Vector3 normalize(Vector3 vec) {
-    magnitude := square_root(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
-
-    result: Vector3 = {
-        x = vec.x / magnitude;
-        y = vec.y / magnitude;
-        z = vec.z / magnitude;
-    }
-    return result;
-}
-
-Vector3 cross(Vector3 a, Vector3 b) {
-    result: Vector3 = {
-        x = a.y * b.z - a.z * b.y;
-        y = a.z * b.x - a.x * b.z;
-        z = a.x * b.y - a.y * b.x;
-    }
-    return result;
-}
-
-float dot(Vector3 a, Vector3 b) {
-    return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-
 Vector3 sub(Vector3 a, Vector3 b) {
     result: Vector3 = {
         x = a.x - b.x;
