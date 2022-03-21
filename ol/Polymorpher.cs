@@ -36,10 +36,9 @@ public static class Polymorpher
         return polyStruct;
     }
 
-    public static FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, bool privateGenericTypes, IType[] genericTypes)
+    public static FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, bool privateGenericTypes, IType[] genericTypes)
     {
         var function = CopyAst(baseFunction);
-        function.Name = name;
         function.Flags = baseFunction.Flags;
         function.Private = baseFunction.Private || privateGenericTypes;
 
@@ -64,8 +63,6 @@ public static class Polymorpher
             }
         }
 
-        function.Body = CopyScope(baseFunction.Body, genericTypes, baseFunction.Generics);
-
         return function;
     }
 
@@ -89,7 +86,7 @@ public static class Polymorpher
         return overload;
     }
 
-    private static TypeDefinition CopyType(TypeDefinition type, IType[] genericTypes)
+    public static TypeDefinition CopyType(TypeDefinition type, IType[] genericTypes)
     {
         var copyType = CopyAst(type);
 
@@ -187,7 +184,7 @@ public static class Polymorpher
         return copy;
     }
 
-    private static ScopeAst CopyScope(ScopeAst scope, IType[] genericTypes, List<string> generics)
+    public static ScopeAst CopyScope(ScopeAst scope, IType[] genericTypes, List<string> generics)
     {
         var copy = CopyAst(scope);
         CopyAsts(copy.Children, scope.Children, genericTypes, generics);

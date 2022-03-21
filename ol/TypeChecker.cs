@@ -3914,9 +3914,6 @@ public static class TypeChecker
 
         if (function == null)
         {
-            if (call.Name == "format_string")
-            {
-            }
             function = DetermineCallingFunction(call, argumentTypes, specifiedArguments, scope);
 
             if (function == null)
@@ -4244,7 +4241,7 @@ public static class TypeChecker
                 foreach (var (name, argument) in call.SpecifiedArguments)
                 {
                     var found = false;
-                    for (var argIndex = 0; argIndex < function.Arguments.Count; argIndex++)
+                    for (var argIndex = 0; argIndex < functionArgCount; argIndex++)
                     {
                         var functionArg = function.Arguments[argIndex];
                         if (functionArg.Name == name)
@@ -4362,22 +4359,16 @@ public static class TypeChecker
 
             if (match && (function.Flags.HasFlag(FunctionFlags.Varargs) || callArgIndex == call.Arguments.Count))
             {
-                var name = $"{function.Name}<{string.Join(", ", genericTypes.Select(t => t.Name))}>";
+                var nameBuilder = new StringBuilder(function.Name, function.Name.Length + 4 * (function.Arguments.Count + 1));
 
-                if (GetExistingFunction(name, call.FileIndex, out polymorphedFunction, out var functionCount))
-                {
-                    if (functionCount > 1)
-                    {
-                        ErrorReporter.Report($"Internal compiler error, multiple implementations of polymorphic function '{name}'", call);
-                    }
-                    return true;
-                }
-
-                polymorphedFunction = Polymorpher.CreatePolymorphedFunction(function, name, privateGenericTypes, genericTypes);
+                // TODO This isn't the best way to do this, but works for now
+                polymorphedFunction = Polymorpher.CreatePolymorphedFunction(function, privateGenericTypes, genericTypes);
                 if (polymorphedFunction.ReturnType == null)
                 {
                     polymorphedFunction.ReturnType = VerifyType(polymorphedFunction.ReturnTypeDefinition, scope);
                 }
+                nameBuilder.AppendFormat(".{0}", polymorphedFunction.ReturnType.TypeIndex);
+
                 foreach (var argument in polymorphedFunction.Arguments)
                 {
                     if (argument.Type == null)
@@ -4389,6 +4380,15 @@ public static class TypeChecker
                             polymorphedFunction.ParamsElementType = paramsArrayType.GenericTypes[0];
                         }
                     }
+                    nameBuilder.AppendFormat(".{0}", argument.Type.TypeIndex);
+                }
+
+                var name = nameBuilder.ToString();
+
+                if (GetExistingFunction(name, call.FileIndex, out var existingFunction, out var functionCount))
+                {
+                    polymorphedFunction = existingFunction;
+                    return true;
                 }
 
                 var fileIndex = function.FileIndex;
@@ -4397,6 +4397,8 @@ public static class TypeChecker
                     fileIndex = call.FileIndex;
                 }
 
+                polymorphedFunction.Name = name;
+                polymorphedFunction.Body = Polymorpher.CopyScope(function.Body, genericTypes, function.Generics);
                 AddFunction(name, fileIndex, polymorphedFunction);
                 polymorphedFunction.Flags |= FunctionFlags.Queued;
                 _astCompleteQueue.Enqueue(polymorphedFunction);
@@ -4671,16 +4673,10 @@ public static class TypeChecker
         {
             // Return false if the generic types have been determined,
             // the type cannot be inferred from a null argument if the generics haven't been determined yet
-            if (argumentType.Name != "*" && genericTypes.Any(generic => generic == null))
-            {
-                return false;
-            }
+            return argumentType.Name == "*" || genericTypes.All(generic => generic != null);
         }
-        else if (!VerifyPolymorphicArgument(callType, argumentType, genericTypes))
-        {
-            return false;
-        }
-        return true;
+
+        return VerifyPolymorphicArgument(callType, argumentType, genericTypes);
     }
 
     private static bool VerifyPolymorphicArgument(IType callType, TypeDefinition argumentType, IType[] genericTypes)
@@ -4725,9 +4721,6 @@ public static class TypeChecker
                             }
                         }
                         break;
-                    // case TypeKind.CArray:
-                    // case TypeKind.Function:
-                    //    break;
                     default:
                         return false;
                 }

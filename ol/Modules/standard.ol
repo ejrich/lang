@@ -22,6 +22,45 @@ array_insert<T>(Array<T>* array, T value, Allocate allocator = default_allocator
     array.length++;
 }
 
+array_insert<T>(Array<T>* array, int index, T value, Allocate allocator = default_allocator, Reallocate reallocator = default_reallocator) {
+    length := array.length;
+    if length > index {
+        reserve_length := length + ARRAY_BLOCK_SIZE - length % ARRAY_BLOCK_SIZE;
+        element_size := size_of(T);
+
+        if length {
+            array.data = reallocator(array.data, element_size * reserve_length);
+        }
+        else {
+            array.data = allocator(element_size * reserve_length);
+        }
+
+        array.length = index;
+        array.data[index] = value;
+        return;
+    }
+
+    if length % ARRAY_BLOCK_SIZE == 0 {
+        new_blocks := length / ARRAY_BLOCK_SIZE + 1;
+        element_size := size_of(T);
+
+        if length {
+            array.data = reallocator(array.data, element_size * new_blocks * ARRAY_BLOCK_SIZE);
+        }
+        else {
+            array.data = allocator(element_size * new_blocks * ARRAY_BLOCK_SIZE);
+        }
+    }
+
+    while length > index {
+        array.data[length] = array.data[length - 1];
+        length--;
+    }
+
+    array.data[index] = value;
+    array.length++;
+}
+
 bool array_remove<T>(Array<T>* array, int index) {
     length := array.length;
     if index < 0 || index >= length {
