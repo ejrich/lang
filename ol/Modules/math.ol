@@ -133,6 +133,15 @@ Vector3 multiply(Vector3 vec, float value) {
     return vec;
 }
 
+Vector3 multiply(Vector3 vec, Matrix4 mat) {
+    vec = {
+        x = vec.x * mat.a.x + vec.y * mat.b.y + vec.z * mat.c.z + mat.d.x;
+        y = vec.x * mat.a.y + vec.y * mat.b.y + vec.z * mat.c.y + mat.d.y;
+        z = vec.x * mat.a.z + vec.y * mat.b.z + vec.z * mat.c.z + mat.d.z;
+    }
+    return vec;
+}
+
 float length_squared(Vector3 a) {
     return a.x * a.x + a.y * a.y + a.z * a.z;
 }
