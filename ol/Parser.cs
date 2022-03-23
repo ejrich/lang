@@ -755,6 +755,9 @@ public static class Parser
                 case "print_ir":
                     function.Flags |= FunctionFlags.PrintIR;
                     break;
+                case "call_location":
+                    function.Flags |= FunctionFlags.PassCallLocation;
+                    break;
                 default:
                     ErrorReporter.Report($"Unexpected compiler directive '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
                     break;

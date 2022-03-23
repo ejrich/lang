@@ -58,7 +58,8 @@ public enum FunctionFlags
     ReturnTypeHasGenerics = 0x400,
     PrintIR = 0x800,
     ExternInitted = 0x1000,
-    Queued = 0x2000
+    Queued = 0x2000,
+    PassCallLocation = 0x2000
 }
 
 public interface IValues : IAst
