@@ -413,18 +413,21 @@ write_value_to_buffer(StringBuffer* buffer, TypeInfo* type, void* data) {
     }
     else if type_kind == TypeKind.Integer {
         type_info := cast(IntegerTypeInfo*, type);
-        size := type_info.size;
         if type_info.signed {
-            if size == 1 write_integer<s8>(buffer, data);
-            else if size == 2 write_integer<s16>(buffer, data);
-            else if size == 4 write_integer<s32>(buffer, data);
-            else write_integer<s64>(buffer, data);
+            switch type_info.size {
+                case 1;  write_integer<s8>(buffer, data);
+                case 2;  write_integer<s16>(buffer, data);
+                case 4;  write_integer<s32>(buffer, data);
+                default; write_integer<s64>(buffer, data);
+            }
         }
         else {
-            if size == 1 write_integer<u8>(buffer, data);
-            else if size == 2 write_integer<u16>(buffer, data);
-            else if size == 4 write_integer<u32>(buffer, data);
-            else write_integer<u64>(buffer, data);
+            switch type_info.size {
+                case 1;  write_integer<u8>(buffer, data);
+                case 2;  write_integer<u16>(buffer, data);
+                case 4;  write_integer<u32>(buffer, data);
+                default; write_integer<u64>(buffer, data);
+            }
         }
     }
     else if type_kind == TypeKind.Float {

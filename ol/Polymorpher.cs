@@ -36,10 +36,11 @@ public static class Polymorpher
         return polyStruct;
     }
 
-    public static FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, bool privateGenericTypes, IType[] genericTypes)
+    public static FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, bool privateGenericTypes, IType[] genericTypes)
     {
         var function = CopyAst(baseFunction);
         function.Flags = baseFunction.Flags;
+        function.Name = name;
         function.Private = baseFunction.Private || privateGenericTypes;
 
         if (baseFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics))
@@ -62,6 +63,8 @@ public static class Polymorpher
                 function.Arguments.Add(argument);
             }
         }
+
+        function.Body = Polymorpher.CopyScope(baseFunction.Body, genericTypes, baseFunction.Generics);
 
         return function;
     }
