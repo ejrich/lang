@@ -4359,15 +4359,18 @@ public static class TypeChecker
 
             if (match && (function.Flags.HasFlag(FunctionFlags.Varargs) || callArgIndex == call.Arguments.Count))
             {
-                var nameBuilder = new StringBuilder(function.Name, function.Name.Length + 4 * (function.Arguments.Count + 1));
+                var name = $"{function.Name}.{i}.{string.Join('.', genericTypes.Select(type => type.TypeIndex))}";
 
-                // TODO This isn't the best way to do this, but works for now
-                polymorphedFunction = Polymorpher.CreatePolymorphedFunction(function, privateGenericTypes, genericTypes);
+                if (GetExistingFunction(name, call.FileIndex, out polymorphedFunction, out var functionCount))
+                {
+                    return true;
+                }
+
+                polymorphedFunction = Polymorpher.CreatePolymorphedFunction(function, name, privateGenericTypes, genericTypes);
                 if (polymorphedFunction.ReturnType == null)
                 {
                     polymorphedFunction.ReturnType = VerifyType(polymorphedFunction.ReturnTypeDefinition, scope);
                 }
-                nameBuilder.AppendFormat(".{0}", polymorphedFunction.ReturnType.TypeIndex);
 
                 foreach (var argument in polymorphedFunction.Arguments)
                 {
@@ -4380,15 +4383,6 @@ public static class TypeChecker
                             polymorphedFunction.ParamsElementType = paramsArrayType.GenericTypes[0];
                         }
                     }
-                    nameBuilder.AppendFormat(".{0}", argument.Type.TypeIndex);
-                }
-
-                var name = nameBuilder.ToString();
-
-                if (GetExistingFunction(name, call.FileIndex, out var existingFunction, out var functionCount))
-                {
-                    polymorphedFunction = existingFunction;
-                    return true;
                 }
 
                 var fileIndex = function.FileIndex;
@@ -4397,8 +4391,6 @@ public static class TypeChecker
                     fileIndex = call.FileIndex;
                 }
 
-                polymorphedFunction.Name = name;
-                polymorphedFunction.Body = Polymorpher.CopyScope(function.Body, genericTypes, function.Generics);
                 AddFunction(name, fileIndex, polymorphedFunction);
                 polymorphedFunction.Flags |= FunctionFlags.Queued;
                 _astCompleteQueue.Enqueue(polymorphedFunction);
