@@ -310,6 +310,8 @@ public static class ProgramIRBuilder
                 return $"@{callingFunction.Source.Name}";
             case InstructionValueType.CallArguments:
                 return string.Join(", ", value.Values.Select(PrintInstructionValue));
+            case InstructionValueType.FileName:
+                return BuildSettings.Files[value.ValueIndex].Replace(BuildSettings.Path, string.Empty);
         }
 
         return string.Empty;
@@ -2113,6 +2115,37 @@ public static class ProgramIRBuilder
                 }
                 arguments[i] = argument;
             }
+        }
+        else if (call.Function.Flags.HasFlag(FunctionFlags.PassCallLocation))
+        {
+            var i = 0;
+            for (; i < call.Function.ArgumentCount; i++)
+            {
+                var functionArg = call.Function.Arguments[i];
+                var argument = EmitIR(function, call.Arguments[i], scope, out var hasCall);
+                if (functionArg.Type.TypeKind == TypeKind.Any)
+                {
+                    arguments[i] = GetAnyValue(function, argument, scope);
+                }
+                else
+                {
+                    var value = EmitCastValue(function, argument, functionArg.Type, scope);
+                    if (hasCall && value.Type is StructAst)
+                    {
+                        var allocation = AddAllocation(function, value.Type);
+                        EmitStore(function, allocation, value, scope);
+                        arguments[i] = EmitLoad(function, value.Type, allocation, scope);
+                    }
+                    else
+                    {
+                        arguments[i] = value;
+                    }
+                }
+            }
+
+            arguments[i] = new InstructionValue {ValueType = InstructionValueType.FileName, Type = TypeTable.StringType, ValueIndex = call.FileIndex};
+            arguments[i+1] = GetConstantInteger(call.Line);
+            arguments[i+2] = GetConstantInteger(call.Column);
         }
         else
         {

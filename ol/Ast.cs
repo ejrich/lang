@@ -31,6 +31,7 @@ public interface IInterface : IAst
     IType ReturnType { get; set; }
     TypeDefinition ReturnTypeDefinition { get; set; }
     List<DeclarationAst> Arguments { get; }
+    int ArgumentCount { get; set; }
 }
 
 public interface IFunction : IInterface
@@ -59,7 +60,7 @@ public enum FunctionFlags
     PrintIR = 0x800,
     ExternInitted = 0x1000,
     Queued = 0x2000,
-    PassCallLocation = 0x2000
+    PassCallLocation = 0x4000
 }
 
 public interface IValues : IAst
@@ -129,6 +130,7 @@ public class FunctionAst : IFunction, IType
     public uint Alignment { get; set; } // Will always be 0
     public bool Used { get; set; }
     public bool Private { get; set; }
+    public int ArgumentCount { get; set; }
     public string ExternLib { get; set; }
     public string LibraryName { get; set; }
     public Library Library { get; set; }
@@ -583,6 +585,7 @@ public class OperatorOverloadAst : IFunction
     public TypeDefinition ReturnTypeDefinition { get; set; }
     public List<string> Generics { get; } = new();
     public List<DeclarationAst> Arguments { get; } = new();
+    public int ArgumentCount { get; set; } = 2;
     public ScopeAst Body { get; set; }
 }
 
@@ -604,6 +607,7 @@ public class InterfaceAst : IInterface, IType
     public IType ReturnType { get; set; }
     public TypeDefinition ReturnTypeDefinition { get; set; }
     public List<DeclarationAst> Arguments { get; } = new();
+    public int ArgumentCount { get; set; }
 }
 
 public class AssemblyAst : IAst
