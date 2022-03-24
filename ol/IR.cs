@@ -202,5 +202,6 @@ public enum InstructionValueType
     BasicBlock,
     CallArguments,
     ConstantStruct,
-    ConstantArray
+    ConstantArray,
+    FileName
 }

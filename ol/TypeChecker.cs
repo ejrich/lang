@@ -1216,6 +1216,22 @@ public static class TypeChecker
             }
         }
 
+        if (function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params))
+        {
+            function.ArgumentCount = function.Arguments.Count - 1;
+        }
+        else
+        {
+            function.ArgumentCount = function.Arguments.Count;
+        }
+
+        if (function.Flags.HasFlag(FunctionFlags.PassCallLocation))
+        {
+            function.Arguments.Add(new DeclarationAst { Name = "file", Type = TypeTable.StringType });
+            function.Arguments.Add(new DeclarationAst { Name = "line", Type = TypeTable.S32Type });
+            function.Arguments.Add(new DeclarationAst { Name = "column", Type = TypeTable.S32Type });
+        }
+
         // 3. Verify main function return type and arguments
         if (function.Name == "main")
         {
@@ -1498,6 +1514,7 @@ public static class TypeChecker
                 ErrorReporter.Report($"Type '{PrintTypeDefinition(argument.TypeDefinition)}' of argument '{argument.Name}' in interface '{interfaceAst.Name}' is not defined", argument.TypeDefinition);
             }
         }
+        interfaceAst.ArgumentCount = interfaceAst.Arguments.Count;
 
         // 3. Load the interface into the type table
         TypeTable.CreateTypeInfo(interfaceAst);
@@ -4213,7 +4230,7 @@ public static class TypeChecker
 
             var match = true;
             var callArgIndex = 0;
-            var functionArgCount = function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params) ? function.Arguments.Count - 1 : function.Arguments.Count;
+            var functionArgCount = function.ArgumentCount;
             var genericTypes = new IType[function.Generics.Count];
 
             if (call.Generics != null)
@@ -4406,7 +4423,7 @@ public static class TypeChecker
     {
         var match = true;
         var callArgIndex = 0;
-        var functionArgCount = varargs || Params ? function.Arguments.Count - 1 : function.Arguments.Count;
+        var functionArgCount = function.ArgumentCount;
 
         if (call.SpecifiedArguments != null)
         {

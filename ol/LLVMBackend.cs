@@ -23,6 +23,7 @@ public static unsafe class LLVMBackend
     private static LLVMValueRef[] _typeInfos;
     private static LLVMValueRef[] _globals;
     private static LLVMValueRef[] _functions;
+    private static LLVMValueRef[] _fileNames;
     private static Queue<(LLVMValueRef, FunctionIR)> _functionsToWrite;
 
     private static LLVMTypeRef _structTypeInfoType;
@@ -185,6 +186,7 @@ public static unsafe class LLVMBackend
         // 5. Write the program beginning at the entrypoint
         _functionTypes = new LLVMTypeRef[TypeTable.FunctionCount];
         _functions = new LLVMValueRef[TypeTable.FunctionCount];
+        _fileNames = new LLVMValueRef[BuildSettings.Files.Count];
         _functionsToWrite = new();
         WriteFunctionDefinition("__start", Program.EntryPoint);
         while (_functionsToWrite.Any())
@@ -2164,6 +2166,13 @@ public static unsafe class LLVMBackend
                 return _builder.BuildBitCast(typeInfo, _typeInfoPointerType);
             case InstructionValueType.Function:
                 return GetOrCreateFunctionDefinition(value.ValueIndex);
+            case InstructionValueType.FileName:
+                var fileName = _fileNames[value.ValueIndex];
+                if (fileName.Handle == IntPtr.Zero)
+                {
+                    _fileNames[value.ValueIndex] = fileName = GetString(BuildSettings.Files[value.ValueIndex].Replace(BuildSettings.Path, string.Empty));
+                }
+                return fileName;
         }
         return null;
     }
