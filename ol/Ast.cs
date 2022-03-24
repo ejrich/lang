@@ -60,7 +60,8 @@ public enum FunctionFlags
     PrintIR = 0x800,
     ExternInitted = 0x1000,
     Queued = 0x2000,
-    PassCallLocation = 0x4000
+    PassCallLocation = 0x4000,
+    Inline = 0x8000
 }
 
 public interface IValues : IAst
@@ -414,6 +415,7 @@ public class CallAst : IAst
     public Dictionary<string, IAst> SpecifiedArguments { get; set; }
     public List<IAst> Arguments { get; } = new();
     public IType TypeInfo { get; set; }
+    public bool Inline { get; set; }
 }
 
 public class DeclarationAst : IDeclaration

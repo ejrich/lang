@@ -693,7 +693,7 @@ public static class Parser
             return null;
         }
         // 6. Handle compiler directives
-        if (enumerator.Current.Type == TokenType.Pound)
+        while (enumerator.Current.Type == TokenType.Pound)
         {
             if (!enumerator.MoveNext())
             {
@@ -757,6 +757,9 @@ public static class Parser
                     break;
                 case "call_location":
                     function.Flags |= FunctionFlags.PassCallLocation;
+                    break;
+                case "inline":
+                    function.Flags |= FunctionFlags.Inline;
                     break;
                 default:
                     ErrorReporter.Report($"Unexpected compiler directive '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
