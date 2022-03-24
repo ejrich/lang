@@ -95,7 +95,7 @@ array_reserve<T>(Array<T>* array, int length, Allocate allocator = default_alloc
 
 
 // Assertions
-assert(bool assertion, int exit_code = 1) #call_location {
+assert(bool assertion, int exit_code = 1) #call_location #inline {
     if assertion return;
 
     print("Assertion failed at % %:%\n", file, line, column);
@@ -103,7 +103,7 @@ assert(bool assertion, int exit_code = 1) #call_location {
     exit_program(exit_code);
 }
 
-assert(bool assertion, string message, int exit_code = 1) #call_location {
+assert(bool assertion, string message, int exit_code = 1) #call_location #inline {
     if assertion return;
 
     if message.length == 0 print("Assertion failed\n");
