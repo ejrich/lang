@@ -34,16 +34,23 @@ function_returns() {
 
     assert(a.foo == b.foo);
     assert(a.bar == b.bar);
+
+    default_free(a);
+    default_free(b);
 }
 
 BaseStruct* returns_base(bool use_struct_a) {
     if use_struct_a {
         a: StructA;
-        return &a;
+        a_pointer := default_allocator(size_of(a));
+        memory_copy(a_pointer, &a, size_of(a));
+        return a_pointer;
     }
     else {
         base: BaseStruct;
-        return &base;
+        base_pointer := default_allocator(size_of(base));
+        memory_copy(base_pointer, &base, size_of(base));
+        return base_pointer;
     }
 }
 
