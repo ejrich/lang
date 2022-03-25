@@ -4003,9 +4003,7 @@ public static class TypeChecker
                 call.Inline = true;
             }
 
-            // TODO Why is function.ArgumentCount not working here?
-            var argumentCount = functionAst.Flags.HasFlag(FunctionFlags.Varargs) || functionAst.Flags.HasFlag(FunctionFlags.Params) ? function.Arguments.Count - 1 : function.Arguments.Count;
-            OrderCallArguments(call, function, argumentCount, argumentTypes);
+            OrderCallArguments(call, function, argumentTypes);
 
             // Verify varargs call arguments
             if (functionAst.Flags.HasFlag(FunctionFlags.Params))
@@ -4014,7 +4012,7 @@ public static class TypeChecker
 
                 if (paramsType != null)
                 {
-                    for (var i = argumentCount; i < argumentTypes.Length; i++)
+                    for (var i = function.ArgumentCount; i < argumentTypes.Length; i++)
                     {
                         var argumentAst = call.Arguments[i];
                         if (argumentAst is NullAst nullAst)
@@ -4098,7 +4096,7 @@ public static class TypeChecker
         else
         {
             call.Interface = function;
-            OrderCallArguments(call, function, function.Arguments.Count, argumentTypes);
+            OrderCallArguments(call, function, argumentTypes);
         }
 
         return function.ReturnType;
@@ -4616,10 +4614,10 @@ public static class TypeChecker
         return null;
     }
 
-    private static void OrderCallArguments(CallAst call, IInterface function, int argumentCount, IType[] argumentTypes)
+    private static void OrderCallArguments(CallAst call, IInterface function, IType[] argumentTypes)
     {
         // Verify call arguments match the types of the function arguments
-        for (var i = 0; i < argumentCount; i++)
+        for (var i = 0; i < function.ArgumentCount; i++)
         {
             var functionArg = function.Arguments[i];
             if (call.SpecifiedArguments != null && call.SpecifiedArguments.TryGetValue(functionArg.Name, out var specifiedArgument))
