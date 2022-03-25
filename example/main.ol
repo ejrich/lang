@@ -118,7 +118,8 @@ bool test(int a) {
     else return false;
 }
 
-int foo() {
+int foo() #print_ir {
+    #inline assert(true);
     a := 0;
     a++;
     ++a;

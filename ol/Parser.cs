@@ -2742,6 +2742,18 @@ public static class Parser
                 directive.Value = ParseExpression(enumerator, currentFunction);
                 currentFunction.Flags |= FunctionFlags.HasDirectives;
                 break;
+            case "inline":
+                if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Identifier)
+                {
+                    ErrorReporter.Report($"Expected funciton call following #inline directive", enumerator.FileIndex, token);
+                    return null;
+                }
+                var call = ParseCall(enumerator, currentFunction, true);
+                if (call != null)
+                {
+                    call.Inline = true;
+                }
+                return call;
             default:
                 ErrorReporter.Report($"Unsupported function level compiler directive '{token.Value}'", enumerator.FileIndex, token);
                 return null;

@@ -1612,7 +1612,7 @@ public static class TypeChecker
             }
         }
 
-        if (!ErrorReporter.Errors.Any())
+        if (!ErrorReporter.Errors.Any() /*&& !function.Flags.HasFlag(FunctionFlags.Inline)*/)
         {
             ThreadPool.QueueWork(WriteFunctionJob, function);
         }
@@ -3998,8 +3998,19 @@ public static class TypeChecker
             }
 
             call.Function = functionAst;
-            if (!call.Inline && functionAst.Flags.HasFlag(FunctionFlags.Inline))
+            if (call.Inline)
             {
+                if (!functionAst.Flags.HasFlag(FunctionFlags.Verified) && function != currentFunction)
+                {
+                    VerifyFunction(functionAst);
+                }
+            }
+            else if (functionAst.Flags.HasFlag(FunctionFlags.Inline))
+            {
+                if (!functionAst.Flags.HasFlag(FunctionFlags.Verified) && function != currentFunction)
+                {
+                    VerifyFunction(functionAst);
+                }
                 call.Inline = true;
             }
 

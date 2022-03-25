@@ -13,10 +13,7 @@ public static class ProgramIRBuilder
 
     public static void AddFunction(FunctionAst function)
     {
-        var functionIR = new FunctionIR
-        {
-            Source = function, Allocations = new(), Instructions = new(), BasicBlocks = new(), Constants = new InstructionValue[function.ConstantCount]
-        };
+        var functionIR = new FunctionIR {Source = function, Allocations = new(), Instructions = new(), BasicBlocks = new()};
 
         if (function.Name == "__start")
         {
@@ -56,7 +53,8 @@ public static class ProgramIRBuilder
             functionIR.CompoundReturnAllocation = AddAllocation(functionIR, function.ReturnType);
         }
 
-        EmitScope(functionIR, entryBlock, function.Body, function.ReturnType, null, null);
+        var constants = new InstructionValue[function.ConstantCount];
+        EmitScope(functionIR, constants, entryBlock, function.Body, function.ReturnType, null, null);
 
         if (function.Flags.HasFlag(FunctionFlags.ReturnVoidAtEnd))
         {
@@ -78,10 +76,7 @@ public static class ProgramIRBuilder
 
     public static void AddOperatorOverload(OperatorOverloadAst overload)
     {
-        var functionIR = new FunctionIR
-        {
-            Source = overload, Allocations = new(), Instructions = new(), BasicBlocks = new(), Constants = new InstructionValue[overload.ConstantCount]
-        };
+        var functionIR = new FunctionIR {Source = overload, Allocations = new(), Instructions = new(), BasicBlocks = new()};
         var entryBlock = AddBasicBlock(functionIR);
 
         if (BuildSettings.Release)
@@ -108,7 +103,8 @@ public static class ProgramIRBuilder
 
         Program.Functions[overload.FunctionIndex] = functionIR;
 
-        EmitScope(functionIR, entryBlock, overload.Body, overload.ReturnType, null, null);
+        var constants = new InstructionValue[overload.ConstantCount];
+        EmitScope(functionIR, constants, entryBlock, overload.Body, overload.ReturnType, null, null);
 
         if (overload.Flags.HasFlag(FunctionFlags.PrintIR))
         {
@@ -125,39 +121,39 @@ public static class ProgramIRBuilder
         switch (ast)
         {
             case ReturnAst returnAst:
-                EmitReturn(function, returnAst, null, TypeChecker.GlobalScope);
+                EmitReturn(function, null, returnAst, null, TypeChecker.GlobalScope);
                 returns = true;
                 break;
             case DeclarationAst declaration:
-                EmitDeclaration(function, declaration, TypeChecker.GlobalScope);
+                EmitDeclaration(function, null, declaration, TypeChecker.GlobalScope);
                 break;
             case CompoundDeclarationAst compoundDeclaration:
-                EmitCompoundDeclaration(function, compoundDeclaration, TypeChecker.GlobalScope);
+                EmitCompoundDeclaration(function, null, compoundDeclaration, TypeChecker.GlobalScope);
                 break;
             case AssignmentAst assignment:
-                EmitAssignment(function, assignment, TypeChecker.GlobalScope);
+                EmitAssignment(function, null, assignment, TypeChecker.GlobalScope);
                 break;
             case ScopeAst childScope:
-                EmitScope(function, entryBlock, childScope, null, null, null);
+                EmitScope(function, null, entryBlock, childScope, null, null, null);
                 returns = childScope.Returns;
                 break;
             case ConditionalAst conditional:
-                EmitConditional(function, conditional, TypeChecker.GlobalScope, null, null, null, out returns);
+                EmitConditional(function, null, conditional, TypeChecker.GlobalScope, null, null, null, out returns);
                 break;
             case WhileAst whileAst:
-                EmitWhile(function, entryBlock, whileAst, TypeChecker.GlobalScope, null);
+                EmitWhile(function, null, entryBlock, whileAst, TypeChecker.GlobalScope, null);
                 break;
             case EachAst each:
-                EmitEach(function, each, TypeChecker.GlobalScope, null);
+                EmitEach(function, null, each, TypeChecker.GlobalScope, null);
                 break;
             case AssemblyAst assembly:
-                EmitInlineAssembly(function, assembly, TypeChecker.GlobalScope);
+                EmitInlineAssembly(function, null, assembly, TypeChecker.GlobalScope);
                 break;
             case SwitchAst switchAst:
-                EmitSwitch(function, entryBlock, switchAst, TypeChecker.GlobalScope, null, null, null);
+                EmitSwitch(function, null, entryBlock, switchAst, TypeChecker.GlobalScope, null, null, null);
                 break;
             default:
-                EmitIR(function, ast, TypeChecker.GlobalScope);
+                EmitIR(function, null, ast, TypeChecker.GlobalScope);
                 break;
         }
 
@@ -174,7 +170,7 @@ public static class ProgramIRBuilder
         var function = new FunctionIR {Allocations = new(), Instructions = new(), BasicBlocks = new()};
         var entryBlock = AddBasicBlock(function);
 
-        var value = EmitIR(function, ast, TypeChecker.GlobalScope);
+        var value = EmitIR(function, null, ast, TypeChecker.GlobalScope);
 
         // This logic is the opposite of EmitConditionExpression because for runnable conditions the returned value
         // should be true if the result of the expression is truthy.
@@ -516,7 +512,7 @@ public static class ProgramIRBuilder
         return constArray;
     }
 
-    private static BasicBlock EmitScope(FunctionIR function, BasicBlock block, ScopeAst scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock)
+    private static BasicBlock EmitScope(FunctionIR function, InstructionValue[] constants, BasicBlock block, ScopeAst scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock)
     {
         foreach (var ast in scope.Children)
         {
@@ -525,42 +521,42 @@ public static class ProgramIRBuilder
             switch (ast)
             {
                 case ReturnAst returnAst:
-                    EmitReturn(function, returnAst, returnType, scope);
+                    EmitReturn(function, constants, returnAst, returnType, scope);
                     return block;
                 case DeclarationAst declaration:
-                    EmitDeclaration(function, declaration, scope);
+                    EmitDeclaration(function, constants, declaration, scope);
                     break;
                 case CompoundDeclarationAst compoundDeclaration:
-                    EmitCompoundDeclaration(function, compoundDeclaration, scope);
+                    EmitCompoundDeclaration(function, constants, compoundDeclaration, scope);
                     break;
                 case AssignmentAst assignment:
-                    EmitAssignment(function, assignment, scope);
+                    EmitAssignment(function, constants, assignment, scope);
                     break;
                 case ScopeAst childScope:
-                    block = EmitScope(function, block, childScope, returnType, breakBlock, continueBlock);
+                    block = EmitScope(function, constants, block, childScope, returnType, breakBlock, continueBlock);
                     if (childScope.Returns)
                     {
                         return block;
                     }
                     break;
                 case ConditionalAst conditional:
-                    block = EmitConditional(function, conditional, scope, returnType, breakBlock, continueBlock, out var returns);
+                    block = EmitConditional(function, constants, conditional, scope, returnType, breakBlock, continueBlock, out var returns);
                     if (returns)
                     {
                         return block;
                     }
                     break;
                 case WhileAst whileAst:
-                    block = EmitWhile(function, block, whileAst, scope, returnType);
+                    block = EmitWhile(function, constants, block, whileAst, scope, returnType);
                     break;
                 case EachAst each:
-                    block = EmitEach(function, each, scope, returnType);
+                    block = EmitEach(function, constants, each, scope, returnType);
                     break;
                 case AssemblyAst assembly:
-                    EmitInlineAssembly(function, assembly, scope);
+                    EmitInlineAssembly(function, constants, assembly, scope);
                     break;
                 case SwitchAst switchAst:
-                    block = EmitSwitch(function, block, switchAst, scope, returnType, breakBlock, continueBlock);
+                    block = EmitSwitch(function, constants, block, switchAst, scope, returnType, breakBlock, continueBlock);
                     break;
                 case BreakAst:
                     EmitJump(function, scope, breakBlock);
@@ -569,18 +565,18 @@ public static class ProgramIRBuilder
                     EmitJump(function, scope, continueBlock);
                     return block;
                 default:
-                    EmitIR(function, ast, scope);
+                    EmitIR(function, constants, ast, scope);
                     break;
             }
         }
         return block;
     }
 
-    private static void EmitDeclaration(FunctionIR function, DeclarationAst declaration, IScope scope)
+    private static void EmitDeclaration(FunctionIR function, InstructionValue[] constants, DeclarationAst declaration, IScope scope)
     {
         if (declaration.Constant)
         {
-            function.Constants[declaration.ConstantIndex] = EmitConstantIR(declaration.Value, scope, function);
+            constants[declaration.ConstantIndex] = EmitConstantIR(declaration.Value, scope, constants);
         }
         else
         {
@@ -593,7 +589,7 @@ public static class ProgramIRBuilder
 
             if (declaration.Value != null)
             {
-                var value = EmitAndCast(function, declaration.Value, scope, declaration.Type);
+                var value = EmitAndCast(function, constants, declaration.Value, scope, declaration.Type);
                 EmitStore(function, allocation, value, scope);
                 return;
             }
@@ -609,13 +605,13 @@ public static class ProgramIRBuilder
 
                         if (declaration.ArrayValues != null)
                         {
-                            InitializeArrayValues(function, arrayPointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
+                            InitializeArrayValues(function, constants, arrayPointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
                         }
                     }
                     else if (declaration.TypeDefinition.Count != null)
                     {
                         function.SaveStack = true;
-                        EmitAllocateArray(function, arrayStruct, scope, allocation, declaration.TypeDefinition.Count, declaration.ArrayElementType);
+                        EmitAllocateArray(function, constants, arrayStruct, scope, allocation, declaration.TypeDefinition.Count, declaration.ArrayElementType);
                     }
                     else
                     {
@@ -627,13 +623,13 @@ public static class ProgramIRBuilder
                 case TypeKind.CArray:
                     if (declaration.ArrayValues != null)
                     {
-                        InitializeArrayValues(function, allocation, declaration.ArrayElementType, declaration.ArrayValues, scope);
+                        InitializeArrayValues(function, constants, allocation, declaration.ArrayElementType, declaration.ArrayValues, scope);
                     }
                     break;
                 // Initialize struct field default values
                 case TypeKind.Struct:
                 case TypeKind.String:
-                    InitializeStruct(function, (StructAst)declaration.Type, allocation, scope, declaration.Assignments);
+                    InitializeStruct(function, constants, (StructAst)declaration.Type, allocation, scope, declaration.Assignments);
                     break;
                 // Initialize pointers to null
                 case TypeKind.Pointer:
@@ -652,7 +648,7 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static void EmitCompoundDeclaration(FunctionIR function, CompoundDeclarationAst declaration, IScope scope)
+    private static void EmitCompoundDeclaration(FunctionIR function, InstructionValue[] constants, CompoundDeclarationAst declaration, IScope scope)
     {
         var variableCount = declaration.Variables.Length;
 
@@ -669,7 +665,7 @@ public static class ProgramIRBuilder
                         var allocation = variable.Pointer = AddAllocation(function, variable.Type);
                         DeclareVariable(function, variable, scope);
 
-                        var value = EmitIR(function, compoundExpression.Children[i], scope);
+                        var value = EmitIR(function, constants, compoundExpression.Children[i], scope);
                         EmitStore(function, allocation, value, scope);
                     }
                 }
@@ -680,7 +676,7 @@ public static class ProgramIRBuilder
                         var variable = declaration.Variables[i];
                         var allocation = variable.Pointer = AddAllocation(function, variable.Type);
 
-                        var value = EmitIR(function, compoundExpression.Children[i], scope);
+                        var value = EmitIR(function, constants, compoundExpression.Children[i], scope);
                         EmitStore(function, allocation, value, scope);
                     }
                 }
@@ -688,7 +684,7 @@ public static class ProgramIRBuilder
             else
             {
                 var allocation = AddAllocation(function, compoundType);
-                var value = EmitIR(function, declaration.Value, scope);
+                var value = EmitIR(function, constants, declaration.Value, scope);
                 EmitStore(function, allocation, value, scope);
 
                 uint offset = 0;
@@ -739,7 +735,7 @@ public static class ProgramIRBuilder
 
             if (declaration.Value != null)
             {
-                var value = EmitAndCast(function, declaration.Value, scope, declaration.Type);
+                var value = EmitAndCast(function, constants, declaration.Value, scope, declaration.Type);
 
                 foreach (var variable in declaration.Variables)
                 {
@@ -768,7 +764,7 @@ public static class ProgramIRBuilder
                             foreach (var variable in declaration.Variables)
                             {
                                 var arrayPointer = InitializeConstArray(function, variable.Pointer, arrayStruct, length, declaration.ArrayElementType, scope);
-                                InitializeArrayValues(function, arrayPointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
+                                InitializeArrayValues(function, constants, arrayPointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
                             }
                         }
                     }
@@ -777,7 +773,7 @@ public static class ProgramIRBuilder
                         function.SaveStack = true;
                         foreach (var variable in declaration.Variables)
                         {
-                            EmitAllocateArray(function, arrayStruct, scope, variable.Pointer, declaration.TypeDefinition.Count, declaration.ArrayElementType);
+                            EmitAllocateArray(function, constants, arrayStruct, scope, variable.Pointer, declaration.TypeDefinition.Count, declaration.ArrayElementType);
                         }
                     }
                     else
@@ -795,7 +791,7 @@ public static class ProgramIRBuilder
                     {
                         foreach (var variable in declaration.Variables)
                         {
-                            InitializeArrayValues(function, variable.Pointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
+                            InitializeArrayValues(function, constants, variable.Pointer, declaration.ArrayElementType, declaration.ArrayValues, scope);
                         }
                     }
                     break;
@@ -804,7 +800,7 @@ public static class ProgramIRBuilder
                 case TypeKind.String:
                     foreach (var variable in declaration.Variables)
                     {
-                        InitializeStruct(function, (StructAst)declaration.Type, variable.Pointer, scope, declaration.Assignments);
+                        InitializeStruct(function, constants, (StructAst)declaration.Type, variable.Pointer, scope, declaration.Assignments);
                     }
                     break;
                 // Initialize pointers to null
@@ -895,19 +891,19 @@ public static class ProgramIRBuilder
         return arrayData;
     }
 
-    private static void InitializeArrayValues(FunctionIR function, InstructionValue arrayPointer, IType elementType, List<IAst> arrayValues, IScope scope)
+    private static void InitializeArrayValues(FunctionIR function, InstructionValue[] constants, InstructionValue arrayPointer, IType elementType, List<IAst> arrayValues, IScope scope)
     {
         for (var i = 0; i < arrayValues.Count; i++)
         {
             var index = GetConstantInteger(i);
             var pointer = EmitGetPointer(function, arrayPointer, index, elementType, scope, true);
 
-            var value = EmitAndCast(function, arrayValues[i], scope, elementType);
+            var value = EmitAndCast(function, constants, arrayValues[i], scope, elementType);
             EmitStore(function, pointer, value, scope);
         }
     }
 
-    private static void InitializeStruct(FunctionIR function, StructAst structDef, InstructionValue pointer, IScope scope, Dictionary<string, AssignmentAst> assignments)
+    private static void InitializeStruct(FunctionIR function, InstructionValue[] constants, StructAst structDef, InstructionValue pointer, IScope scope, Dictionary<string, AssignmentAst> assignments)
     {
         if (assignments == null)
         {
@@ -917,7 +913,7 @@ public static class ProgramIRBuilder
 
                 var fieldPointer = EmitGetStructPointer(function, pointer, scope, structDef, i, field);
 
-                InitializeField(function, field, fieldPointer, scope);
+                InitializeField(function, constants, field, fieldPointer, scope);
             }
         }
         else
@@ -932,17 +928,17 @@ public static class ProgramIRBuilder
                 {
                     if (assignment.Value != null)
                     {
-                        var value = EmitAndCast(function, assignment.Value, scope, field.Type);
+                        var value = EmitAndCast(function, constants, assignment.Value, scope, field.Type);
 
                         EmitStore(function, fieldPointer, value, scope);
                     }
                     else if (assignment.Assignments != null)
                     {
-                        InitializeStruct(function, (StructAst)field.Type, fieldPointer, scope, assignment.Assignments);
+                        InitializeStruct(function, constants, (StructAst)field.Type, fieldPointer, scope, assignment.Assignments);
                     }
                     else if (assignment.ArrayValues != null)
                     {
-                        EmitArrayAssignments(function, assignment.ArrayValues, field.Type, fieldPointer, scope);
+                        EmitArrayAssignments(function, constants, assignment.ArrayValues, field.Type, fieldPointer, scope);
                     }
                     else
                     {
@@ -951,13 +947,13 @@ public static class ProgramIRBuilder
                 }
                 else
                 {
-                    InitializeField(function, field, fieldPointer, scope);
+                    InitializeField(function, constants, field, fieldPointer, scope);
                 }
             }
         }
     }
 
-    private static void InitializeField(FunctionIR function, StructFieldAst field, InstructionValue pointer, IScope scope)
+    private static void InitializeField(FunctionIR function, InstructionValue[] constants, StructFieldAst field, InstructionValue pointer, IScope scope)
     {
         switch (field.Type.TypeKind)
         {
@@ -970,7 +966,7 @@ public static class ProgramIRBuilder
 
                     if (field.ArrayValues != null)
                     {
-                        InitializeArrayValues(function, arrayPointer, field.ArrayElementType, field.ArrayValues, scope);
+                        InitializeArrayValues(function, constants, arrayPointer, field.ArrayElementType, field.ArrayValues, scope);
                     }
                 }
                 else
@@ -983,13 +979,13 @@ public static class ProgramIRBuilder
             case TypeKind.CArray:
                 if (field.ArrayValues != null)
                 {
-                    InitializeArrayValues(function, pointer, field.ArrayElementType, field.ArrayValues, scope);
+                    InitializeArrayValues(function, constants, pointer, field.ArrayElementType, field.ArrayValues, scope);
                 }
                 break;
             // Initialize struct field default values
             case TypeKind.Struct:
             case TypeKind.String:
-                InitializeStruct(function, (StructAst)field.Type, pointer, scope, field.Assignments);
+                InitializeStruct(function, constants, (StructAst)field.Type, pointer, scope, field.Assignments);
                 break;
             // Initialize pointers to null
             case TypeKind.Pointer:
@@ -1001,7 +997,7 @@ public static class ProgramIRBuilder
                 break;
             // Or initialize to default
             default:
-                var defaultValue = field.Value == null ? GetDefaultConstant(field.Type) : EmitIR(function, field.Value, scope);
+                var defaultValue = field.Value == null ? GetDefaultConstant(field.Type) : EmitIR(function, constants, field.Value, scope);
                 EmitStore(function, pointer, defaultValue, scope);
                 break;
         }
@@ -1026,7 +1022,7 @@ public static class ProgramIRBuilder
         return value;
     }
 
-    private static void EmitAssignment(FunctionIR function, AssignmentAst assignment, IScope scope)
+    private static void EmitAssignment(FunctionIR function, InstructionValue[] constants, AssignmentAst assignment, IScope scope)
     {
         if (assignment.Reference is CompoundExpressionAst compoundReference)
         {
@@ -1035,7 +1031,7 @@ public static class ProgramIRBuilder
 
             for (var i = 0; i < pointers.Length; i++)
             {
-                var (pointer, type) = EmitGetReference(function, compoundReference.Children[i], scope, out var loaded);
+                var (pointer, type) = EmitGetReference(function, constants, compoundReference.Children[i], scope, out var loaded);
                 if (loaded && type.TypeKind == TypeKind.Pointer)
                 {
                     var pointerType = (PointerType)type;
@@ -1057,13 +1053,13 @@ public static class ProgramIRBuilder
             {
                 for (var i = 0; i < pointers.Length; i++)
                 {
-                    var value = EmitAndCast(function, compoundExpression.Children[i], scope, types[i]);
+                    var value = EmitAndCast(function, constants, compoundExpression.Children[i], scope, types[i]);
                     EmitStore(function, pointers[i], value, scope);
                 }
             }
             else
             {
-                var value = EmitIR(function, assignment.Value, scope);
+                var value = EmitIR(function, constants, assignment.Value, scope);
                 if (value.Type.TypeKind == TypeKind.Compound)
                 {
                     var compoundType = (CompoundType)value.Type;
@@ -1094,22 +1090,22 @@ public static class ProgramIRBuilder
         }
         else
         {
-            var (pointer, type) = EmitGetReference(function, assignment.Reference, scope, out var loaded);
+            var (pointer, type) = EmitGetReference(function, constants, assignment.Reference, scope, out var loaded);
             if (loaded && type.TypeKind == TypeKind.Pointer)
             {
                 var pointerType = (PointerType)type;
                 type = pointerType.PointedType;
             }
 
-            EmitAssignments(function, assignment, scope, pointer, type);
+            EmitAssignments(function, constants, assignment, scope, pointer, type);
         }
     }
 
-    private static void EmitAssignments(FunctionIR function, AssignmentAst assignment, IScope scope, InstructionValue pointer, IType type)
+    private static void EmitAssignments(FunctionIR function, InstructionValue[] constants, AssignmentAst assignment, IScope scope, InstructionValue pointer, IType type)
     {
         if (assignment.Value != null)
         {
-            var value = EmitAndCast(function, assignment.Value, scope, type);
+            var value = EmitAndCast(function, constants, assignment.Value, scope, type);
             if (assignment.Operator != Operator.None)
             {
                 var previousValue = EmitLoad(function, type, pointer, scope);
@@ -1128,13 +1124,13 @@ public static class ProgramIRBuilder
                 {
                     var fieldPointer = EmitGetStructPointer(function, pointer, scope, structDef, i, field);
 
-                    EmitAssignments(function, assignmentValue, scope, fieldPointer, field.Type);
+                    EmitAssignments(function, constants, assignmentValue, scope, fieldPointer, field.Type);
                 }
             }
         }
         else if (assignment.ArrayValues != null)
         {
-            EmitArrayAssignments(function, assignment.ArrayValues, type, pointer, scope);
+            EmitArrayAssignments(function, constants, assignment.ArrayValues, type, pointer, scope);
         }
         else
         {
@@ -1142,7 +1138,7 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static void EmitArrayAssignments(FunctionIR function, List<IAst> arrayValues, IType type, InstructionValue pointer, IScope scope)
+    private static void EmitArrayAssignments(FunctionIR function, InstructionValue[] constants, List<IAst> arrayValues, IType type, InstructionValue pointer, IScope scope)
     {
         if (type is StructAst arrayStruct)
         {
@@ -1155,17 +1151,17 @@ public static class ProgramIRBuilder
                 var index = GetConstantInteger(i);
                 var elementPointer = EmitGetPointer(function, arrayPointer, index, elementType, scope);
 
-                var value = EmitAndCast(function, arrayValues[i], scope, elementType);
+                var value = EmitAndCast(function, constants, arrayValues[i], scope, elementType);
                 EmitStore(function, elementPointer, value, scope);
             }
         }
         else if (type is ArrayType arrayType)
         {
-            InitializeArrayValues(function, pointer, arrayType.ElementType, arrayValues, scope);
+            InitializeArrayValues(function, constants, pointer, arrayType.ElementType, arrayValues, scope);
         }
     }
 
-    private static void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, IScope scope)
+    private static void EmitReturn(FunctionIR function, InstructionValue[] constants, ReturnAst returnAst, IType returnType, IScope scope)
     {
         if (returnAst.Value == null)
         {
@@ -1183,7 +1179,7 @@ public static class ProgramIRBuilder
                     var expression = compoundExpression.Children[i];
                     var pointer = EmitGetStructPointer(function, function.CompoundReturnAllocation, scope, i, offset, type);
 
-                    var value = EmitAndCast(function, expression, scope, type, returnValue: true);
+                    var value = EmitAndCast(function, constants, expression, scope, type, returnValue: true);
                     EmitStore(function, pointer, value, scope);
                     offset += type.Size;
                 }
@@ -1193,22 +1189,22 @@ public static class ProgramIRBuilder
             }
             else
             {
-                var returnValue = EmitAndCast(function, returnAst.Value, scope, returnType, returnValue: true);
+                var returnValue = EmitAndCast(function, constants, returnAst.Value, scope, returnType, returnValue: true);
                 EmitInstruction(InstructionType.Return, function, null, scope, returnValue);
             }
         }
     }
 
-    private static BasicBlock EmitConditional(FunctionIR function, ConditionalAst conditional, IScope scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock, out bool returns)
+    private static BasicBlock EmitConditional(FunctionIR function, InstructionValue[] constants, ConditionalAst conditional, IScope scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock, out bool returns)
     {
         // Run the condition expression in the current basic block and then jump to the following
         var bodyBlock = new BasicBlock();
         var elseBlock = new BasicBlock();
         var instructionCount = function.Instructions.Count;
-        EmitConditionExpression(function, conditional.Condition, scope, bodyBlock, elseBlock);
+        EmitConditionExpression(function, constants, conditional.Condition, scope, bodyBlock, elseBlock);
 
         AddBasicBlock(function, bodyBlock);
-        bodyBlock = EmitScope(function, bodyBlock, conditional.IfBlock, returnType, breakBlock, continueBlock);
+        bodyBlock = EmitScope(function, constants, bodyBlock, conditional.IfBlock, returnType, breakBlock, continueBlock);
         Instruction jumpToAfter = null;
 
         // For when the the if block does not return and there is an else block, a jump to the after block is required
@@ -1243,7 +1239,7 @@ public static class ProgramIRBuilder
             return elseBlock;
         }
 
-        elseBlock = EmitScope(function, elseBlock, conditional.ElseBlock, returnType, breakBlock, continueBlock);
+        elseBlock = EmitScope(function, constants, elseBlock, conditional.ElseBlock, returnType, breakBlock, continueBlock);
 
         if (conditional.IfBlock.Returns && conditional.ElseBlock.Returns)
         {
@@ -1261,16 +1257,16 @@ public static class ProgramIRBuilder
         return afterBlock;
     }
 
-    private static BasicBlock EmitWhile(FunctionIR function, BasicBlock block, WhileAst whileAst, IScope scope, IType returnType)
+    private static BasicBlock EmitWhile(FunctionIR function, InstructionValue[] constants, BasicBlock block, WhileAst whileAst, IScope scope, IType returnType)
     {
         // Create a block for the condition expression and then jump to the following
         var conditionBlock = block.Location < function.Instructions.Count ? AddBasicBlock(function) : block;
         var whileBodyBlock = new BasicBlock();
         var afterBlock = new BasicBlock();
-        EmitConditionExpression(function, whileAst.Condition, scope, whileBodyBlock, afterBlock);
+        EmitConditionExpression(function, constants, whileAst.Condition, scope, whileBodyBlock, afterBlock);
 
         AddBasicBlock(function, whileBodyBlock);
-        EmitScope(function, whileBodyBlock, whileAst.Body, returnType, afterBlock, conditionBlock);
+        EmitScope(function, constants, whileBodyBlock, whileAst.Body, returnType, afterBlock, conditionBlock);
         EmitJump(function, scope, conditionBlock);
 
         AddBasicBlock(function, afterBlock);
@@ -1278,17 +1274,17 @@ public static class ProgramIRBuilder
         return afterBlock;
     }
 
-    private static void EmitConditionExpression(FunctionIR function, IAst ast, IScope scope, BasicBlock bodyBlock, BasicBlock elseBlock)
+    private static void EmitConditionExpression(FunctionIR function, InstructionValue[] constants, IAst ast, IScope scope, BasicBlock bodyBlock, BasicBlock elseBlock)
     {
         InstructionValue value;
         if (ast is ExpressionAst expression)
         {
-            value = EmitIR(function, expression.Children[0], scope);
+            value = EmitIR(function, constants, expression.Children[0], scope);
             for (var i = 1; i < expression.Children.Count; i++)
             {
                 if (expression.OperatorOverloads.TryGetValue(i, out var overload))
                 {
-                    var rhs = EmitIR(function, expression.Children[i], scope);
+                    var rhs = EmitIR(function, constants, expression.Children[i], scope);
                     value = EmitCall(function, overload, new []{value, rhs}, scope);
                 }
                 else
@@ -1307,14 +1303,14 @@ public static class ProgramIRBuilder
                             break;
                     }
 
-                    var rhs = EmitIR(function, expression.Children[i], scope);
+                    var rhs = EmitIR(function, constants, expression.Children[i], scope);
                     value = EmitExpression(function, value, rhs, op, expression.ResultingTypes[i - 1], scope);
                 }
             }
         }
         else
         {
-            value = EmitIR(function, ast, scope);
+            value = EmitIR(function, constants, ast, scope);
         }
 
         var condition = value.Type.TypeKind switch
@@ -1329,7 +1325,7 @@ public static class ProgramIRBuilder
         EmitConditionalJump(function, scope, condition, elseBlock);
     }
 
-    private static BasicBlock EmitEach(FunctionIR function, EachAst each, IScope scope, IType returnType)
+    private static BasicBlock EmitEach(FunctionIR function, InstructionValue[] constants, EachAst each, IScope scope, IType returnType)
     {
         InstructionValue indexVariable;
         InstructionValue compareTarget;
@@ -1347,7 +1343,7 @@ public static class ProgramIRBuilder
             }
             EmitStore(function, indexVariable, GetConstantS64(0), each.Body);
 
-            var iteration = EmitIR(function, each.Iteration, each.Body);
+            var iteration = EmitIR(function, constants, each.Iteration, each.Body);
 
             // Load the array data and set the compareTarget to the array count
             InstructionValue arrayData = null;
@@ -1385,13 +1381,13 @@ public static class ProgramIRBuilder
                 DeclareVariable(function, each.IterationVariable, each.Body);
             }
 
-            return EmitEachBody(function, each.Body, TypeTable.S64Type, returnType, indexValue, indexVariable, condition, conditionBlock);
+            return EmitEachBody(function, constants, each.Body, TypeTable.S64Type, returnType, indexValue, indexVariable, condition, conditionBlock);
         }
         else
         {
             indexVariable = AddAllocation(function, TypeTable.S32Type);
             // Begin the loop at the beginning of the range
-            var value = EmitAndCast(function, each.RangeBegin, each.Body, TypeTable.S32Type);
+            var value = EmitAndCast(function, constants, each.RangeBegin, each.Body, TypeTable.S32Type);
 
             EmitStore(function, indexVariable, value, each.Body);
             each.IterationVariable.Pointer = indexVariable;
@@ -1401,17 +1397,17 @@ public static class ProgramIRBuilder
             }
 
             // Get the end of the range
-            compareTarget = EmitAndCast(function, each.RangeEnd, each.Body, TypeTable.S32Type);
+            compareTarget = EmitAndCast(function, constants, each.RangeEnd, each.Body, TypeTable.S32Type);
 
             var conditionBlock = AddBasicBlock(function);
             var indexValue = EmitLoad(function, TypeTable.S32Type, indexVariable, each.Body);
             var condition = EmitInstruction(InstructionType.IntegerGreaterThan, function, TypeTable.BoolType, each.Body, indexValue, compareTarget);
 
-            return EmitEachBody(function, each.Body, TypeTable.S32Type, returnType, indexValue, indexVariable, condition, conditionBlock);
+            return EmitEachBody(function, constants, each.Body, TypeTable.S32Type, returnType, indexValue, indexVariable, condition, conditionBlock);
         }
     }
 
-    private static BasicBlock EmitEachBody(FunctionIR function, ScopeAst eachBody, IType indexType, IType returnType, InstructionValue indexValue, InstructionValue indexVariable, InstructionValue condition, BasicBlock conditionBlock)
+    private static BasicBlock EmitEachBody(FunctionIR function, InstructionValue[] constants, ScopeAst eachBody, IType indexType, IType returnType, InstructionValue indexValue, InstructionValue indexVariable, InstructionValue condition, BasicBlock conditionBlock)
     {
         var conditionJump = new Instruction {Type = InstructionType.ConditionalJump, Scope = eachBody, Value1 = condition};
         function.Instructions.Add(conditionJump);
@@ -1420,7 +1416,7 @@ public static class ProgramIRBuilder
         var eachBodyBlock = AddBasicBlock(function);
         var eachIncrementBlock = new BasicBlock();
         var afterBlock = new BasicBlock();
-        eachBodyBlock = EmitScope(function, eachBodyBlock, eachBody, returnType, afterBlock, eachIncrementBlock);
+        eachBodyBlock = EmitScope(function, constants, eachBodyBlock, eachBody, returnType, afterBlock, eachIncrementBlock);
 
         if (eachBodyBlock.Location < function.Instructions.Count)
         {
@@ -1450,35 +1446,35 @@ public static class ProgramIRBuilder
         return afterBlock;
     }
 
-    private static void EmitInlineAssembly(FunctionIR function, AssemblyAst assembly, IScope scope)
+    private static void EmitInlineAssembly(FunctionIR function, InstructionValue[] constants, AssemblyAst assembly, IScope scope)
     {
         // Get the values to place in the input registers
         foreach (var (_, input) in assembly.InRegisters)
         {
-            input.Value = input.GetPointer ? EmitGetReference(function, input.Ast, scope, out _).value :
-                EmitIR(function, input.Ast, scope);
+            input.Value = input.GetPointer ? EmitGetReference(function, constants, input.Ast, scope, out _).value :
+                EmitIR(function, constants, input.Ast, scope);
         }
 
         // Get the output values from the registers
         foreach (var output in assembly.OutValues)
         {
-            output.Value = EmitGetReference(function, output.Ast, scope, out _).value;
+            output.Value = EmitGetReference(function, constants, output.Ast, scope, out _).value;
         }
 
         var asmInstruction = new Instruction {Type = InstructionType.InlineAssembly, Scope = scope, Source = assembly};
         function.Instructions.Add(asmInstruction);
     }
 
-    private static BasicBlock EmitSwitch(FunctionIR function, BasicBlock block, SwitchAst switchAst, IScope scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock)
+    private static BasicBlock EmitSwitch(FunctionIR function, InstructionValue[] constants, BasicBlock block, SwitchAst switchAst, IScope scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock)
     {
-        var value = EmitIR(function, switchAst.Value, scope);
+        var value = EmitIR(function, constants, switchAst.Value, scope);
         var afterBlock = new BasicBlock();
 
         if (switchAst.DefaultCase != null)
         {
             var (cases, body) = switchAst.Cases[0];
             var nextCaseBlock = new BasicBlock();
-            EmitSwitchCase(function, value, cases, body, scope, nextCaseBlock, afterBlock, returnType, breakBlock, continueBlock);
+            EmitSwitchCase(function, constants, value, cases, body, scope, nextCaseBlock, afterBlock, returnType, breakBlock, continueBlock);
 
             for (var i = 1; i < switchAst.Cases.Count; i++)
             {
@@ -1488,11 +1484,11 @@ public static class ProgramIRBuilder
                 (cases, body) = switchAst.Cases[i];
                 nextCaseBlock = new BasicBlock();
 
-                EmitSwitchCase(function, value, cases, body, scope, nextCaseBlock, afterBlock, returnType, breakBlock, continueBlock);
+                EmitSwitchCase(function, constants, value, cases, body, scope, nextCaseBlock, afterBlock, returnType, breakBlock, continueBlock);
             }
 
             AddBasicBlock(function, nextCaseBlock);
-            EmitScope(function, nextCaseBlock, switchAst.DefaultCase, returnType, breakBlock, continueBlock);
+            EmitScope(function, constants, nextCaseBlock, switchAst.DefaultCase, returnType, breakBlock, continueBlock);
         }
         else
         {
@@ -1500,7 +1496,7 @@ public static class ProgramIRBuilder
             {
                 var (cases, body) = switchAst.Cases[0];
                 var nextCaseBlock = new BasicBlock();
-                EmitSwitchCase(function, value, cases, body, scope, nextCaseBlock, afterBlock, returnType, breakBlock, continueBlock);
+                EmitSwitchCase(function, constants, value, cases, body, scope, nextCaseBlock, afterBlock, returnType, breakBlock, continueBlock);
 
                 for (var i = 1; i < switchAst.Cases.Count - 1; i++)
                 {
@@ -1510,7 +1506,7 @@ public static class ProgramIRBuilder
                     (cases, body) = switchAst.Cases[i];
                     nextCaseBlock = new BasicBlock();
 
-                    EmitSwitchCase(function, value, cases, body, scope, nextCaseBlock, afterBlock, returnType, breakBlock, continueBlock);
+                    EmitSwitchCase(function, constants, value, cases, body, scope, nextCaseBlock, afterBlock, returnType, breakBlock, continueBlock);
                 }
 
                 AddBasicBlock(function, nextCaseBlock);
@@ -1518,7 +1514,7 @@ public static class ProgramIRBuilder
 
             {
                 var (cases, body) = switchAst.Cases[^1];
-                EmitSwitchCase(function, value, cases, body, scope, afterBlock, null, returnType, breakBlock, continueBlock, false);
+                EmitSwitchCase(function, constants, value, cases, body, scope, afterBlock, null, returnType, breakBlock, continueBlock, false);
             }
         }
 
@@ -1527,14 +1523,14 @@ public static class ProgramIRBuilder
         return afterBlock;
     }
 
-    private static void EmitSwitchCase(FunctionIR function, InstructionValue value, List<IAst> cases, ScopeAst body, IScope scope, BasicBlock nextCaseBlock, BasicBlock afterBlock, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock, bool emitJump = true)
+    private static void EmitSwitchCase(FunctionIR function, InstructionValue[] constants, InstructionValue value, List<IAst> cases, ScopeAst body, IScope scope, BasicBlock nextCaseBlock, BasicBlock afterBlock, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock, bool emitJump = true)
     {
         var bodyBlock = new BasicBlock();
         if (cases.Count > 1)
         {
             for (var i = 0; i < cases.Count - 1; i++)
             {
-                var switchCase = EmitAndCast(function, cases[i], scope, value.Type);
+                var switchCase = EmitAndCast(function, constants, cases[i], scope, value.Type);
                 var compare = EmitExpression(function, value, switchCase, Operator.Equality, TypeTable.BoolType, scope);
                 EmitConditionalJump(function, scope, compare, bodyBlock);
                 AddBasicBlock(function);
@@ -1543,13 +1539,13 @@ public static class ProgramIRBuilder
 
         {
             // Last case jumps to the next case if no match
-            var switchCase = EmitAndCast(function, cases[^1], scope, value.Type);
+            var switchCase = EmitAndCast(function, constants, cases[^1], scope, value.Type);
             var compare = EmitExpression(function, value, switchCase, Operator.NotEqual, TypeTable.BoolType, scope);
             EmitConditionalJump(function, scope, compare, nextCaseBlock);
         }
 
         AddBasicBlock(function, bodyBlock);
-        EmitScope(function, bodyBlock, body, returnType, breakBlock, continueBlock);
+        EmitScope(function, constants, bodyBlock, body, returnType, breakBlock, continueBlock);
         if (!body.Returns && emitJump)
         {
             EmitJump(function, body, afterBlock);
@@ -1575,18 +1571,18 @@ public static class ProgramIRBuilder
         function.BasicBlocks.Add(block);
     }
 
-    private static InstructionValue EmitAndCast(FunctionIR function, IAst ast, IScope scope, IType type, bool useRawString = false, bool returnValue = false)
+    private static InstructionValue EmitAndCast(FunctionIR function, InstructionValue[] constants, IAst ast, IScope scope, IType type, bool useRawString = false, bool returnValue = false)
     {
-        var value = EmitIR(function, ast, scope, useRawString, returnValue);
+        var value = EmitIR(function, constants, ast, scope, useRawString, returnValue);
         return EmitCastValue(function, value, type, scope);
     }
 
-    private static InstructionValue EmitIR(FunctionIR function, IAst ast, IScope scope, bool useRawString = false, bool returnValue = false)
+    private static InstructionValue EmitIR(FunctionIR function, InstructionValue[] constants, IAst ast, IScope scope, bool useRawString = false, bool returnValue = false)
     {
-        return EmitIR(function, ast, scope, out _, useRawString, returnValue);
+        return EmitIR(function, constants, ast, scope, out _, useRawString, returnValue);
     }
 
-    private static InstructionValue EmitIR(FunctionIR function, IAst ast, IScope scope, out bool hasCall, bool useRawString = false, bool returnValue = false)
+    private static InstructionValue EmitIR(FunctionIR function, InstructionValue[] constants, IAst ast, IScope scope, out bool hasCall, bool useRawString = false, bool returnValue = false)
     {
         hasCall = false;
         switch (ast)
@@ -1609,7 +1605,7 @@ public static class ProgramIRBuilder
                     };
                 }
 
-                return EmitIdentifier(function, identifierAst.Name, scope, useRawString, returnValue);
+                return EmitIdentifier(function, constants, identifierAst.Name, scope, useRawString, returnValue);
             case StructFieldRefAst structField:
                 if (structField.IsEnum)
                 {
@@ -1627,13 +1623,13 @@ public static class ProgramIRBuilder
                 }
                 else if (structField.ConstantStringLength)
                 {
-                    var constantValue = structField.GlobalConstant ? Program.Constants[structField.ConstantIndex] : function.Constants[structField.ConstantIndex];
+                    var constantValue = structField.GlobalConstant ? Program.Constants[structField.ConstantIndex] : constants[structField.ConstantIndex];
 
                     return GetConstantS64(constantValue.ConstantString.Length);
                 }
                 else if (structField.RawConstantString)
                 {
-                    var constantValue = structField.GlobalConstant ? Program.Constants[structField.ConstantIndex] : function.Constants[structField.ConstantIndex];
+                    var constantValue = structField.GlobalConstant ? Program.Constants[structField.ConstantIndex] : constants[structField.ConstantIndex];
 
                     return new InstructionValue
                     {
@@ -1641,7 +1637,7 @@ public static class ProgramIRBuilder
                         ConstantString = constantValue.ConstantString, UseRawString = true
                     };
                 }
-                var structFieldPointer = EmitGetStructRefPointer(function, structField, scope, out var loaded, out hasCall);
+                var structFieldPointer = EmitGetStructRefPointer(function, constants, structField, scope, out var loaded, out hasCall);
                 if (!loaded)
                 {
                     if (useRawString && structFieldPointer.Type.TypeKind == TypeKind.String)
@@ -1656,9 +1652,9 @@ public static class ProgramIRBuilder
                 return structFieldPointer;
             case CallAst call:
                 hasCall = true;
-                return EmitCall(function, call, scope);
+                return EmitCall(function, constants, call, scope);
             case ChangeByOneAst changeByOne:
-                var (pointer, pointerType) = EmitGetReference(function, changeByOne.Value, scope, out loaded);
+                var (pointer, pointerType) = EmitGetReference(function, constants, changeByOne.Value, scope, out loaded);
                 if (loaded && pointerType.TypeKind == TypeKind.Pointer)
                 {
                     var pointerTypeDef = (PointerType)pointerType;
@@ -1687,17 +1683,17 @@ public static class ProgramIRBuilder
                 switch (unary.Operator)
                 {
                     case UnaryOperator.Not:
-                        value = EmitIR(function, unary.Value, scope);
+                        value = EmitIR(function, constants, unary.Value, scope);
                         return EmitInstruction(InstructionType.Not, function, value.Type, scope, value);
                     case UnaryOperator.Negate:
-                        value = EmitIR(function, unary.Value, scope);
+                        value = EmitIR(function, constants, unary.Value, scope);
                         var negate = value.Type.TypeKind == TypeKind.Integer ? InstructionType.IntegerNegate : InstructionType.FloatNegate;
                         return EmitInstruction(negate, function, value.Type, scope, value);
                     case UnaryOperator.Dereference:
-                        value = EmitIR(function, unary.Value, scope, out hasCall);
+                        value = EmitIR(function, constants, unary.Value, scope, out hasCall);
                         return EmitLoad(function, unary.Type, value, scope);
                     case UnaryOperator.Reference:
-                        (value, _) = EmitGetReference(function, unary.Value, scope, out _);
+                        (value, _) = EmitGetReference(function, constants, unary.Value, scope, out _);
                         if (value.Type.TypeKind == TypeKind.CArray)
                         {
                             return EmitInstruction(InstructionType.PointerCast, function, unary.Type, scope, value, new InstructionValue {ValueType = InstructionValueType.Type, Type = unary.Type});
@@ -1706,7 +1702,7 @@ public static class ProgramIRBuilder
                 }
                 break;
             case IndexAst index:
-                var indexPointer = EmitGetIndexPointer(function, index, scope);
+                var indexPointer = EmitGetIndexPointer(function, constants, index, scope);
 
                 if (useRawString && indexPointer.Type.TypeKind == TypeKind.String)
                 {
@@ -1717,10 +1713,10 @@ public static class ProgramIRBuilder
                 }
                 return index.CallsOverload ? indexPointer : EmitLoad(function, indexPointer.Type, indexPointer, scope);
             case ExpressionAst expression:
-                var expressionValue = EmitIR(function, expression.Children[0], scope);
+                var expressionValue = EmitIR(function, constants, expression.Children[0], scope);
                 for (var i = 1; i < expression.Children.Count; i++)
                 {
-                    var rhs = EmitIR(function, expression.Children[i], scope);
+                    var rhs = EmitIR(function, constants, expression.Children[i], scope);
                     if (expression.OperatorOverloads.TryGetValue(i, out var overload))
                     {
                         expressionValue = EmitCall(function, overload, new []{expressionValue, rhs}, scope);
@@ -1734,14 +1730,14 @@ public static class ProgramIRBuilder
             case TypeDefinition typeDef:
                 return GetConstantInteger(typeDef.TypeIndex);
             case CastAst cast:
-                return EmitAndCast(function, cast.Value, scope, cast.TargetType);
+                return EmitAndCast(function, constants, cast.Value, scope, cast.TargetType);
         }
 
         Debug.Assert(false, "Expected to emit an expression");
         return null;
     }
 
-    private static InstructionValue EmitConstantIR(IAst ast, IScope scope, FunctionIR function = null)
+    private static InstructionValue EmitConstantIR(IAst ast, IScope scope, InstructionValue[] constants = null)
     {
         switch (ast)
         {
@@ -1764,7 +1760,7 @@ public static class ProgramIRBuilder
                 {
                     if (declaration.Constant)
                     {
-                        return global ? Program.Constants[declaration.ConstantIndex] : function?.Constants[declaration.ConstantIndex];
+                        return global ? Program.Constants[declaration.ConstantIndex] : constants[declaration.ConstantIndex];
                     }
 
                     return null;
@@ -1802,14 +1798,14 @@ public static class ProgramIRBuilder
         return value;
     }
 
-    private static InstructionValue EmitIdentifier(FunctionIR function, string name, IScope scope, bool useRawString = false, bool returnValue = false)
+    private static InstructionValue EmitIdentifier(FunctionIR function, InstructionValue[] constants, string name, IScope scope, bool useRawString = false, bool returnValue = false)
     {
         var identifier = GetScopeIdentifier(scope, name, out var global);
         if (identifier is DeclarationAst declaration)
         {
             if (declaration.Constant)
             {
-                var constantValue = global ? Program.Constants[declaration.ConstantIndex] : function.Constants[declaration.ConstantIndex];
+                var constantValue = global ? Program.Constants[declaration.ConstantIndex] : constants[declaration.ConstantIndex];
                 if (useRawString && constantValue.Type?.TypeKind == TypeKind.String)
                 {
                     return new InstructionValue
@@ -1846,7 +1842,7 @@ public static class ProgramIRBuilder
         return null;
     }
 
-    private static (InstructionValue value, IType type) EmitGetReference(FunctionIR function, IAst ast, IScope scope, out bool loaded)
+    private static (InstructionValue value, IType type) EmitGetReference(FunctionIR function, InstructionValue[] constants, IAst ast, IScope scope, out bool loaded)
     {
         loaded = false;
         switch (ast)
@@ -1854,14 +1850,14 @@ public static class ProgramIRBuilder
             case IdentifierAst identifier:
                 return EmitGetVariableReference(identifier.Name, scope);
             case StructFieldRefAst structField:
-                var structFieldPointer = EmitGetStructRefPointer(function, structField, scope, out loaded, out _);
+                var structFieldPointer = EmitGetStructRefPointer(function, constants, structField, scope, out loaded, out _);
                 return (structFieldPointer, structFieldPointer.Type);
             case IndexAst index:
                 loaded = index.CallsOverload;
-                var indexPointer = EmitGetIndexPointer(function, index, scope);
+                var indexPointer = EmitGetIndexPointer(function, constants, index, scope);
                 return (indexPointer, indexPointer.Type);
             case UnaryAst unary:
-                var pointer = EmitIR(function, unary.Value, scope);
+                var pointer = EmitIR(function, constants, unary.Value, scope);
                 return (pointer, unary.Type);
         }
         return (null, null);
@@ -1883,7 +1879,7 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static InstructionValue EmitGetStructRefPointer(FunctionIR function, StructFieldRefAst structField, IScope scope, out bool loaded, out bool hasCall)
+    private static InstructionValue EmitGetStructRefPointer(FunctionIR function, InstructionValue[] constants, StructFieldRefAst structField, IScope scope, out bool loaded, out bool hasCall)
     {
         loaded = false;
         hasCall = false;
@@ -1905,7 +1901,7 @@ public static class ProgramIRBuilder
                 }
                 break;
             case IndexAst index:
-                value = EmitGetIndexPointer(function, index, scope);
+                value = EmitGetIndexPointer(function, constants, index, scope);
                 if (index.CallsOverload && !structField.Pointers[0])
                 {
                     var type = structField.Types[0];
@@ -1916,7 +1912,7 @@ public static class ProgramIRBuilder
                 break;
             case CallAst call:
                 hasCall = true;
-                value = EmitCall(function, call, scope);
+                value = EmitCall(function, constants, call, scope);
                 skipPointer = true;
                 if (!structField.Pointers[0])
                 {
@@ -1950,7 +1946,7 @@ public static class ProgramIRBuilder
             {
                 if (structField.Children[i] is IndexAst indexAst)
                 {
-                    var indexValue = EmitIR(function, indexAst.Index, scope);
+                    var indexValue = EmitIR(function, constants, indexAst.Index, scope);
                     var arrayType = (ArrayType) type;
                     var elementType = arrayType.ElementType;
                     value = EmitGetPointer(function, value, indexValue, elementType, scope, true);
@@ -1974,7 +1970,7 @@ public static class ProgramIRBuilder
 
             if (structField.Children[i] is IndexAst index)
             {
-                value = EmitGetIndexPointer(function, index, scope, value.Type, value);
+                value = EmitGetIndexPointer(function, constants, index, scope, value.Type, value);
 
                 if (index.CallsOverload)
                 {
@@ -1995,7 +1991,7 @@ public static class ProgramIRBuilder
             else if (structField.Children[i] is CallAst call)
             {
                 var functionPointer = EmitLoad(function, value.Type, value, scope);
-                value = EmitCallFunctionPointer(function, call, scope, functionPointer);
+                value = EmitCallFunctionPointer(function, constants, call, scope, functionPointer);
 
                 skipPointer = true;
                 if (i < structField.Pointers.Length && !structField.Pointers[i])
@@ -2014,7 +2010,7 @@ public static class ProgramIRBuilder
         return value;
     }
 
-    private static InstructionValue EmitCall(FunctionIR function, CallAst call, IScope scope)
+    private static InstructionValue EmitCall(FunctionIR function, InstructionValue[] constants, CallAst call, IScope scope)
     {
         if (call.TypeInfo != null)
         {
@@ -2030,18 +2026,19 @@ public static class ProgramIRBuilder
 
         if (call.Function == null)
         {
-            return EmitCallFunctionPointer(function, call, scope);
+            return EmitCallFunctionPointer(function, constants, call, scope);
         }
 
+        var callFunction = call.Function;
         var argumentCount = call.Function.Flags.HasFlag(FunctionFlags.Varargs) ? call.Arguments.Count : call.Function.Arguments.Count;
         var arguments = new InstructionValue[argumentCount];
 
-        if (call.Function.Flags.HasFlag(FunctionFlags.Params))
+        if (callFunction.Flags.HasFlag(FunctionFlags.Params))
         {
             for (var i = 0; i < argumentCount - 1; i++)
             {
-                var functionArg = call.Function.Arguments[i];
-                var argument = EmitIR(function, call.Arguments[i], scope, out var hasCall);
+                var functionArg = callFunction.Arguments[i];
+                var argument = EmitIR(function, constants, call.Arguments[i], scope, out var hasCall);
                 if (functionArg.Type.TypeKind == TypeKind.Any)
                 {
                     arguments[i] = GetAnyValue(function, argument, scope);
@@ -2063,32 +2060,32 @@ public static class ProgramIRBuilder
             }
 
             // Rollup the rest of the arguments into an array
-            var paramsType = call.Function.Arguments[^1].Type;
-            var paramsElementType = call.Function.ParamsElementType;
+            var paramsType = callFunction.Arguments[^1].Type;
+            var paramsElementType = callFunction.ParamsElementType;
             var paramsAllocationIndex = AddAllocation(function, paramsType);
-            var dataPointer = InitializeConstArray(function, paramsAllocationIndex, (StructAst)paramsType, (uint)(call.Arguments.Count - call.Function.Arguments.Count + 1), paramsElementType, scope);
+            var dataPointer = InitializeConstArray(function, paramsAllocationIndex, (StructAst)paramsType, (uint)(call.Arguments.Count - callFunction.Arguments.Count + 1), paramsElementType, scope);
 
             uint paramsIndex = 0;
             if (paramsElementType.TypeKind == TypeKind.Any)
             {
-                for (var i = call.Function.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
+                for (var i = callFunction.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
                 {
                     var index = GetConstantInteger(paramsIndex);
                     var pointer = EmitGetPointer(function, dataPointer, index, paramsElementType, scope, true);
 
-                    var argument = EmitIR(function, call.Arguments[i], scope);
+                    var argument = EmitIR(function, constants, call.Arguments[i], scope);
                     var anyValue = GetAnyValue(function, argument, scope);
                     EmitStore(function, pointer, anyValue, scope);
                 }
             }
             else
             {
-                for (var i = call.Function.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
+                for (var i = callFunction.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
                 {
                     var index = GetConstantInteger(paramsIndex);
                     var pointer = EmitGetPointer(function, dataPointer, index, paramsElementType, scope, true);
 
-                    var value = EmitAndCast(function, call.Arguments[i], scope, paramsElementType);
+                    var value = EmitAndCast(function, constants, call.Arguments[i], scope, paramsElementType);
                     EmitStore(function, pointer, value, scope);
                 }
             }
@@ -2096,19 +2093,19 @@ public static class ProgramIRBuilder
             var paramsValue = EmitLoad(function, paramsType, paramsAllocationIndex, scope);
             arguments[argumentCount - 1] = paramsValue;
         }
-        else if (call.Function.Flags.HasFlag(FunctionFlags.Varargs))
+        else if (callFunction.Flags.HasFlag(FunctionFlags.Varargs))
         {
             var i = 0;
-            for (; i < call.Function.Arguments.Count - 1; i++)
+            for (; i < callFunction.Arguments.Count - 1; i++)
             {
-                arguments[i] = EmitAndCast(function, call.Arguments[i], scope, call.Function.Arguments[i].Type, true);
+                arguments[i] = EmitAndCast(function, constants, call.Arguments[i], scope, callFunction.Arguments[i].Type, true);
             }
 
             // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
             // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
             for (; i < argumentCount; i++)
             {
-                var argument = EmitIR(function, call.Arguments[i], scope, true);
+                var argument = EmitIR(function, constants, call.Arguments[i], scope, true);
                 if (argument.Type?.TypeKind == TypeKind.Float && argument.Type.Size == 4)
                 {
                     argument = EmitCastValue(function, argument, TypeTable.Float64Type, scope);
@@ -2116,13 +2113,13 @@ public static class ProgramIRBuilder
                 arguments[i] = argument;
             }
         }
-        else if (call.Function.Flags.HasFlag(FunctionFlags.PassCallLocation))
+        else if (callFunction.Flags.HasFlag(FunctionFlags.PassCallLocation))
         {
             var i = 0;
-            for (; i < call.Function.ArgumentCount; i++)
+            for (; i < callFunction.ArgumentCount; i++)
             {
-                var functionArg = call.Function.Arguments[i];
-                var argument = EmitIR(function, call.Arguments[i], scope, out var hasCall);
+                var functionArg = callFunction.Arguments[i];
+                var argument = EmitIR(function, constants, call.Arguments[i], scope, out var hasCall);
                 if (functionArg.Type.TypeKind == TypeKind.Any)
                 {
                     arguments[i] = GetAnyValue(function, argument, scope);
@@ -2149,11 +2146,11 @@ public static class ProgramIRBuilder
         }
         else
         {
-            var externCall = call.Function.Flags.HasFlag(FunctionFlags.Extern);
+            var externCall = callFunction.Flags.HasFlag(FunctionFlags.Extern);
             for (var i = 0; i < argumentCount; i++)
             {
-                var functionArg = call.Function.Arguments[i];
-                var argument = EmitIR(function, call.Arguments[i], scope, out var hasCall, externCall);
+                var functionArg = callFunction.Arguments[i];
+                var argument = EmitIR(function, constants, call.Arguments[i], scope, out var hasCall, externCall);
                 if (functionArg.Type.TypeKind == TypeKind.Any)
                 {
                     arguments[i] = GetAnyValue(function, argument, scope);
@@ -2174,13 +2171,45 @@ public static class ProgramIRBuilder
                 }
             }
 
-            if (call.Function.Flags.HasFlag(FunctionFlags.Syscall))
+            if (callFunction.Flags.HasFlag(FunctionFlags.Syscall))
             {
-                return EmitSyscall(function, call.Function, arguments, scope);
+                return EmitSyscall(function, callFunction, arguments, scope);
             }
         }
 
-        return EmitCall(function, call.Function, arguments, scope, call.ExternIndex);
+        if (call.Inline)
+        {
+            // Copy the arguments onto the stack
+            /*
+            if (BuildSettings.Release)
+            {
+                for (var i = 0; i < arguments.Length; i++)
+                {
+                    var argument = arguments[i];
+                    var allocation = AddAllocation(function, argument.Type);
+
+                    EmitStore(function, allocation, argument, callFunction.Body);
+                }
+            }
+            else
+            {
+                for (var i = 0; i < arguments.Length; i++)
+                {
+                    var argument = arguments[i];
+                    var allocation = AddAllocation(function, argument.Type);
+
+                    EmitStore(function, allocation, argument, callFunction.Body);
+                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareParameter, Scope = callFunction.Body, Index = i});
+                }
+            }
+
+            // Emit the function body and for returns, jump to the following basic block
+            var inlineConstants = new InstructionValue[callFunction.ConstantCount];
+            EmitScopeInline(function, constants, currentBlock, callFunction.ReturnType, null, null);
+            */
+        }
+
+        return EmitCall(function, callFunction, arguments, scope, call.ExternIndex);
     }
 
     private static InstructionValue GetAnyValue(FunctionIR function, InstructionValue argument, IScope scope)
@@ -2227,7 +2256,7 @@ public static class ProgramIRBuilder
         return new InstructionValue {ValueType = InstructionValueType.TypeInfo, ValueIndex = type.TypeIndex, Type = TypeTable.TypeInfoPointerType};
     }
 
-    private static InstructionValue EmitCallFunctionPointer(FunctionIR function, CallAst call, IScope scope, InstructionValue functionPointer = null)
+    private static InstructionValue EmitCallFunctionPointer(FunctionIR function, InstructionValue[] constants, CallAst call, IScope scope, InstructionValue functionPointer = null)
     {
         if (functionPointer == null)
         {
@@ -2246,7 +2275,7 @@ public static class ProgramIRBuilder
         for (var i = 0; i < arguments.Length; i++)
         {
             var functionArg = call.Interface.Arguments[i];
-            var argument = EmitIR(function, call.Arguments[i], scope);
+            var argument = EmitIR(function, constants, call.Arguments[i], scope);
             if (functionArg.Type.TypeKind == TypeKind.Any)
             {
                 arguments[i] = GetAnyValue(function, argument, scope);
@@ -2265,7 +2294,7 @@ public static class ProgramIRBuilder
         return AddInstruction(function, callInstruction, call.Interface.ReturnType);
     }
 
-    private static InstructionValue EmitGetIndexPointer(FunctionIR function, IndexAst index, IScope scope, IType type = null, InstructionValue variable = null)
+    private static InstructionValue EmitGetIndexPointer(FunctionIR function, InstructionValue[] constants, IndexAst index, IScope scope, IType type = null, InstructionValue variable = null)
     {
         if (type == null)
         {
@@ -2282,7 +2311,7 @@ public static class ProgramIRBuilder
             }
         }
 
-        var indexValue = EmitIR(function, index.Index, scope);
+        var indexValue = EmitIR(function, constants, index.Index, scope);
 
         if (index.CallsOverload)
         {
@@ -2722,9 +2751,9 @@ public static class ProgramIRBuilder
         function.Instructions.Add(store);
     }
 
-    private static void EmitAllocateArray(FunctionIR function, StructAst arrayStruct, IScope scope, InstructionValue pointer, IAst arrayLength, IType elementType)
+    private static void EmitAllocateArray(FunctionIR function, InstructionValue[] constants, StructAst arrayStruct, IScope scope, InstructionValue pointer, IAst arrayLength, IType elementType)
     {
-        var count = EmitAndCast(function, arrayLength, scope, TypeTable.S64Type);
+        var count = EmitAndCast(function, constants, arrayLength, scope, TypeTable.S64Type);
         var countPointer = EmitGetStructPointer(function, pointer, scope, arrayStruct, 0);
         EmitStore(function, countPointer, count, scope);
 
