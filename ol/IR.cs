@@ -24,7 +24,6 @@ public class FunctionIR
     public List<Allocation> Allocations { get; set; }
     public List<Instruction> Instructions { get; set; }
     public List<BasicBlock> BasicBlocks { get; set; }
-    public InstructionValue[] Constants { get; set; }
     public IntPtr FunctionPointer { get; set; }
 }
 
