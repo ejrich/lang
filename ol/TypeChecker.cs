@@ -1232,6 +1232,22 @@ public static class TypeChecker
             function.Arguments.Add(new DeclarationAst { Name = "column", Type = TypeTable.S32Type });
         }
 
+        if (function.Flags.HasFlag(FunctionFlags.Inline))
+        {
+            if (function.Flags.HasFlag(FunctionFlags.Extern))
+            {
+                ErrorReporter.Report("Extern functions cannot be inlined, remove #inline directive from function definition", function);
+            }
+            else if (function.Flags.HasFlag(FunctionFlags.Compiler))
+            {
+                ErrorReporter.Report("Functions that call the compiler cannot be inlined, remove #inline directive from function definition", function);
+            }
+            else if (function.Flags.HasFlag(FunctionFlags.Syscall))
+            {
+                ErrorReporter.Report("System calls are already inlined, remove #inline directive", function);
+            }
+        }
+
         // 3. Verify main function return type and arguments
         if (function.Name == "main")
         {
@@ -3982,8 +3998,13 @@ public static class TypeChecker
             }
 
             call.Function = functionAst;
-            var argumentCount = functionAst.Flags.HasFlag(FunctionFlags.Varargs) || functionAst.Flags.HasFlag(FunctionFlags.Params) ? function.Arguments.Count - 1 : function.Arguments.Count;
+            if (!call.Inline && functionAst.Flags.HasFlag(FunctionFlags.Inline))
+            {
+                call.Inline = true;
+            }
 
+            // TODO Why is function.ArgumentCount not working here?
+            var argumentCount = functionAst.Flags.HasFlag(FunctionFlags.Varargs) || functionAst.Flags.HasFlag(FunctionFlags.Params) ? function.Arguments.Count - 1 : function.Arguments.Count;
             OrderCallArguments(call, function, argumentCount, argumentTypes);
 
             // Verify varargs call arguments
