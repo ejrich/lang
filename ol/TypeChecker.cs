@@ -1632,6 +1632,7 @@ public static class TypeChecker
 
         // Set the overload as verified to prevent multiple verifications
         overload.Flags |= FunctionFlags.Verified;
+        Debug.Assert(overload.Body != null, "Should not verify overload without body");
 
         // 1. Initialize local variables
         foreach (var argument in overload.Arguments)
@@ -1644,10 +1645,7 @@ public static class TypeChecker
                     ErrorReporter.Report($"Argument '{argument.Name}' already exists as a type", argument);
                 }
             }
-            if (overload.Body != null)
-            {
-                overload.Body.Identifiers[argument.Name] = argument;
-            }
+            overload.Body.Identifiers[argument.Name] = argument;
         }
 
         // 2. Loop through body and verify all ASTs
