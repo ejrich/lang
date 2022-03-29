@@ -433,7 +433,7 @@ public class DeclarationAst : IDeclaration
     public bool HasGenerics { get; set; }
     public bool Constant { get; set; }
     public int ConstantIndex { get; set; }
-    public InstructionValue Allocation { get; set; }
+    public int PointerIndex { get; set; }
     public IAst Value { get; set; }
     public Dictionary<string, AssignmentAst> Assignments { get; set; }
     public List<IAst> ArrayValues { get; set; }
@@ -505,7 +505,7 @@ public class VariableAst : IAst
     public uint Column { get; init; }
     public string Name { get; set; }
     public IType Type { get; set; }
-    public InstructionValue Pointer { get; set; }
+    public int PointerIndex { get; set; }
 }
 
 public class IndexAst : IAst
