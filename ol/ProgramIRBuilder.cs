@@ -664,9 +664,7 @@ public static class ProgramIRBuilder
                     {
                         var variable = declaration.Variables[i];
                         var allocation = AddAllocation(function, variable.Type);
-                        // TODO Pointer offset
-                        variable.PointerIndex = function.Pointers.Count;
-                        function.Pointers.Add(allocation);
+                        variable.PointerIndex = AddPointer(function, allocation);
                         DeclareVariable(function, variable, scope, allocation);
 
                         var value = EmitIR(function, constants, compoundExpression.Children[i], scope);
@@ -679,8 +677,7 @@ public static class ProgramIRBuilder
                     {
                         var variable = declaration.Variables[i];
                         var allocation = AddAllocation(function, variable.Type);
-                        variable.PointerIndex = function.Pointers.Count;
-                        function.Pointers.Add(allocation);
+                        variable.PointerIndex = AddPointer(function, allocation);
 
                         var value = EmitIR(function, constants, compoundExpression.Children[i], scope);
                         EmitStore(function, allocation, value, scope);
@@ -701,8 +698,7 @@ public static class ProgramIRBuilder
                         var variable = declaration.Variables[i];
                         var type = compoundType.Types[i];
                         var pointer = EmitGetStructPointer(function, allocation, scope, i, offset, type);
-                        variable.PointerIndex = function.Pointers.Count;
-                        function.Pointers.Add(pointer);
+                        variable.PointerIndex = AddPointer(function, pointer);
                         offset += type.Size;
 
                         DeclareVariable(function, variable, scope, pointer);
@@ -715,8 +711,7 @@ public static class ProgramIRBuilder
                         var variable = declaration.Variables[i];
                         var type = compoundType.Types[i];
                         var pointer = EmitGetStructPointer(function, allocation, scope, i, offset, type);
-                        variable.PointerIndex = function.Pointers.Count;
-                        function.Pointers.Add(pointer);
+                        variable.PointerIndex = AddPointer(function, pointer);
                         offset += type.Size;
                     }
                 }
@@ -731,8 +726,7 @@ public static class ProgramIRBuilder
                 {
                     var variable = declaration.Variables[i];
                     var allocation = allocations[i] = AddAllocation(function, declaration.Type);
-                    variable.PointerIndex = function.Pointers.Count;
-                    function.Pointers.Add(allocation);
+                    variable.PointerIndex = AddPointer(function, allocation);
 
                     DeclareVariable(function, variable, scope, allocation);
                 }
@@ -743,8 +737,7 @@ public static class ProgramIRBuilder
                 {
                     var variable = declaration.Variables[i];
                     var allocation = allocations[i] = AddAllocation(function, declaration.Type);
-                    variable.PointerIndex = function.Pointers.Count;
-                    function.Pointers.Add(allocation);
+                    variable.PointerIndex = AddPointer(function, allocation);
                 }
             }
 
@@ -841,7 +834,6 @@ public static class ProgramIRBuilder
 
     private static InstructionValue AddAllocation(FunctionIR function, DeclarationAst declaration)
     {
-        declaration.PointerIndex = function.Pointers.Count;
         InstructionValue allocation;
         if (declaration.Type is ArrayType arrayType)
         {
@@ -852,7 +844,7 @@ public static class ProgramIRBuilder
             allocation = AddAllocation(function, declaration.Type);
         }
 
-        function.Pointers.Add(allocation);
+        declaration.PointerIndex = AddPointer(function, allocation);
         return allocation;
     }
 
@@ -879,6 +871,13 @@ public static class ProgramIRBuilder
         function.StackSize += arrayLength * elementType.Size;
         function.Allocations.Add(allocation);
         return AllocationValue(index, type);
+    }
+
+    private static int AddPointer(FunctionIR function, InstructionValue pointer)
+    {
+        var pointerCount = function.Pointers.Count - function.PointerOffset;
+        function.Pointers.Add(pointer);
+        return pointerCount;
     }
 
     private static InstructionValue AllocationValue(int index, IType type, bool global = false)
@@ -1357,8 +1356,7 @@ public static class ProgramIRBuilder
             indexVariable = AddAllocation(function, TypeTable.S64Type);
             if (each.IndexVariable != null)
             {
-                each.IndexVariable.PointerIndex = function.Pointers.Count;
-                function.Pointers.Add(indexVariable);
+                each.IndexVariable.PointerIndex = AddPointer(function, indexVariable);
                 if (!BuildSettings.Release)
                 {
                     DeclareVariable(function, each.IndexVariable, each.Body, indexVariable);
@@ -1397,8 +1395,7 @@ public static class ProgramIRBuilder
             var condition = EmitInstruction(InstructionType.IntegerGreaterThanOrEqual, function, TypeTable.BoolType, each.Body, indexValue, compareTarget);
 
             var iterationPointer = EmitGetPointer(function, arrayData, indexValue, each.IterationVariable.Type, each.Body, cArrayIteration);
-            each.IterationVariable.PointerIndex = function.Pointers.Count;
-            function.Pointers.Add(iterationPointer);
+            each.IterationVariable.PointerIndex = AddPointer(function, iterationPointer);
 
             if (!BuildSettings.Release)
             {
@@ -1414,8 +1411,8 @@ public static class ProgramIRBuilder
             var value = EmitAndCast(function, constants, each.RangeBegin, each.Body, TypeTable.S32Type);
 
             EmitStore(function, indexVariable, value, each.Body);
-            each.IterationVariable.PointerIndex = function.Pointers.Count;
-            function.Pointers.Add(indexVariable);
+            each.IterationVariable.PointerIndex = AddPointer(function, indexVariable);
+
             if (!BuildSettings.Release)
             {
                 DeclareVariable(function, each.IterationVariable, each.Body, indexVariable);
@@ -1842,7 +1839,7 @@ public static class ProgramIRBuilder
                 return constantValue;
             }
 
-            var pointer = global ? Program.GlobalVariables[declaration.PointerIndex].Pointer : function.Pointers[declaration.PointerIndex];
+            var pointer = global ? Program.GlobalVariables[declaration.PointerIndex].Pointer : function.Pointers[declaration.PointerIndex + function.PointerOffset];
             if (useRawString && declaration.Type.TypeKind == TypeKind.String)
             {
                 var dataField = TypeTable.StringType.Fields[1];
@@ -1858,10 +1855,10 @@ public static class ProgramIRBuilder
             {
                 var dataField = TypeTable.StringType.Fields[1];
 
-                var dataPointer = EmitGetStructPointer(function, function.Pointers[variable.PointerIndex], scope, TypeTable.StringType, 1, dataField);
+                var dataPointer = EmitGetStructPointer(function, function.Pointers[variable.PointerIndex + function.PointerOffset], scope, TypeTable.StringType, 1, dataField);
                 return EmitLoadPointer(function, dataField.Type, dataPointer, scope);
             }
-            return EmitLoad(function, variable.Type, function.Pointers[variable.PointerIndex], scope, returnValue);
+            return EmitLoad(function, variable.Type, function.Pointers[variable.PointerIndex + function.PointerOffset], scope, returnValue);
         }
 
         Debug.Assert(false, "Expected to emit an expression");
@@ -1879,11 +1876,11 @@ public static class ProgramIRBuilder
                 {
                     case DeclarationAst declaration:
                     {
-                        var pointer = global ? Program.GlobalVariables[declaration.PointerIndex].Pointer : function.Pointers[declaration.PointerIndex];
+                        var pointer = global ? Program.GlobalVariables[declaration.PointerIndex].Pointer : function.Pointers[declaration.PointerIndex + function.PointerOffset];
                         return (pointer, declaration.Type);
                     }
                     case VariableAst variable:
-                        return (function.Pointers[variable.PointerIndex], variable.Type);
+                        return (function.Pointers[variable.PointerIndex + function.PointerOffset], variable.Type);
                     default:
                         return (null, null);
                 }
@@ -1917,10 +1914,10 @@ public static class ProgramIRBuilder
                 switch (ident)
                 {
                     case DeclarationAst declaration:
-                        value = global ? Program.GlobalVariables[declaration.PointerIndex].Pointer : function.Pointers[declaration.PointerIndex];
+                        value = global ? Program.GlobalVariables[declaration.PointerIndex].Pointer : function.Pointers[declaration.PointerIndex + function.PointerOffset];
                         break;
                     case VariableAst variable:
-                        value = function.Pointers[variable.PointerIndex];
+                        value = function.Pointers[variable.PointerIndex + function.PointerOffset];
                         break;
                 }
                 break;
@@ -2204,14 +2201,14 @@ public static class ProgramIRBuilder
         if (call.Inline)
         {
             // Copy the arguments onto the stack
-            /*
+            var pointerCount = function.Pointers.Count;
+            function.PointerOffset = pointerCount;
             if (BuildSettings.Release)
             {
                 for (var i = 0; i < arguments.Length; i++)
                 {
                     var argument = arguments[i];
-                    var allocation = AddAllocation(function, argument.Type);
-
+                    var allocation = AddAllocation(function, callFunction.Arguments[i]);
                     EmitStore(function, allocation, argument, callFunction.Body);
                 }
             }
@@ -2220,17 +2217,17 @@ public static class ProgramIRBuilder
                 for (var i = 0; i < arguments.Length; i++)
                 {
                     var argument = arguments[i];
-                    var allocation = AddAllocation(function, argument.Type);
-
+                    var allocation = AddAllocation(function, callFunction.Arguments[i]);
                     EmitStore(function, allocation, argument, callFunction.Body);
-                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareParameter, Scope = callFunction.Body, Index = i});
+
+                    DeclareVariable(function, callFunction.Arguments[i], callFunction.Body, allocation);
                 }
             }
 
             // Emit the function body and for returns, jump to the following basic block
             var inlineConstants = new InstructionValue[callFunction.ConstantCount];
-            EmitScopeInline(function, constants, currentBlock, callFunction.ReturnType, null, null);
-            */
+            EmitScopeInline(function, inlineConstants, null, callFunction.Body, callFunction.ReturnType, null, null);
+            function.PointerOffset = pointerCount;
         }
 
         return EmitCall(function, callFunction, arguments, scope, call.ExternIndex);
@@ -2287,11 +2284,11 @@ public static class ProgramIRBuilder
             var identifier = GetScopeIdentifier(scope, call.Name, out var _);
             if (identifier is DeclarationAst declaration)
             {
-                functionPointer = EmitLoad(function, declaration.Type, function.Pointers[declaration.PointerIndex], scope);
+                functionPointer = EmitLoad(function, declaration.Type, function.Pointers[declaration.PointerIndex + function.PointerOffset], scope);
             }
             else if (identifier is VariableAst variable)
             {
-                functionPointer = EmitLoad(function, variable.Type, function.Pointers[variable.PointerIndex], scope);
+                functionPointer = EmitLoad(function, variable.Type, function.Pointers[variable.PointerIndex + function.PointerOffset], scope);
             }
         }
 
@@ -2318,6 +2315,67 @@ public static class ProgramIRBuilder
         return AddInstruction(function, callInstruction, call.Interface.ReturnType);
     }
 
+    private static BasicBlock EmitScopeInline(FunctionIR function, InstructionValue[] constants, BasicBlock block, ScopeAst scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock)
+    {
+        foreach (var ast in scope.Children)
+        {
+            function.Instructions.Add(new Instruction {Type = InstructionType.DebugSetLocation, Source = ast, Scope = scope});
+
+            switch (ast)
+            {
+                case ReturnAst returnAst:
+                    // TODO Change return to set the returning register or jump to the following basic block
+                    EmitReturn(function, constants, returnAst, returnType, scope);
+                    return block;
+                case DeclarationAst declaration:
+                    EmitDeclaration(function, constants, declaration, scope);
+                    break;
+                case CompoundDeclarationAst compoundDeclaration:
+                    EmitCompoundDeclaration(function, constants, compoundDeclaration, scope);
+                    break;
+                case AssignmentAst assignment:
+                    EmitAssignment(function, constants, assignment, scope);
+                    break;
+                case ScopeAst childScope:
+                    block = EmitScope(function, constants, block, childScope, returnType, breakBlock, continueBlock);
+                    if (childScope.Returns)
+                    {
+                        return block;
+                    }
+                    break;
+                case ConditionalAst conditional:
+                    block = EmitConditional(function, constants, conditional, scope, returnType, breakBlock, continueBlock, out var returns);
+                    if (returns)
+                    {
+                        return block;
+                    }
+                    break;
+                case WhileAst whileAst:
+                    block = EmitWhile(function, constants, block, whileAst, scope, returnType);
+                    break;
+                case EachAst each:
+                    block = EmitEach(function, constants, each, scope, returnType);
+                    break;
+                case AssemblyAst assembly:
+                    EmitInlineAssembly(function, constants, assembly, scope);
+                    break;
+                case SwitchAst switchAst:
+                    block = EmitSwitch(function, constants, block, switchAst, scope, returnType, breakBlock, continueBlock);
+                    break;
+                case BreakAst:
+                    EmitJump(function, scope, breakBlock);
+                    return block;
+                case ContinueAst:
+                    EmitJump(function, scope, continueBlock);
+                    return block;
+                default:
+                    EmitIR(function, constants, ast, scope);
+                    break;
+            }
+        }
+        return block;
+    }
+
     private static InstructionValue EmitGetIndexPointer(FunctionIR function, InstructionValue[] constants, IndexAst index, IScope scope, IType type = null, InstructionValue variable = null)
     {
         if (type == null)
@@ -2326,12 +2384,12 @@ public static class ProgramIRBuilder
             if (identifier is DeclarationAst declaration)
             {
                 type = declaration.Type;
-                variable = global ? Program.GlobalVariables[declaration.PointerIndex].Pointer : function.Pointers[declaration.PointerIndex];
+                variable = global ? Program.GlobalVariables[declaration.PointerIndex].Pointer : function.Pointers[declaration.PointerIndex + function.PointerOffset];
             }
             else if (identifier is VariableAst variableAst)
             {
                 type = variableAst.Type;
-                variable = function.Pointers[variableAst.PointerIndex];
+                variable = function.Pointers[variableAst.PointerIndex + function.PointerOffset];
             }
         }
 
