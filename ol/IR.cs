@@ -18,10 +18,12 @@ public class FunctionIR
 {
     public uint StackSize { get; set; }
     public int ValueCount { get; set; }
+    public int PointerOffset { get; set; }
     public bool SaveStack { get; set; }
     public InstructionValue CompoundReturnAllocation { get; set; }
     public IFunction Source { get; set; }
     public List<Allocation> Allocations { get; set; }
+    public List<InstructionValue> Pointers { get; set; }
     public List<Instruction> Instructions { get; set; }
     public List<BasicBlock> BasicBlocks { get; set; }
     public IntPtr FunctionPointer { get; set; }
@@ -37,6 +39,7 @@ public class GlobalVariable
     public uint ArrayLength { get; set; }
     public IType Type { get; set; }
     public InstructionValue InitialValue { get; set; }
+    public InstructionValue Pointer { get; set; }
 }
 
 public class Allocation
