@@ -13,6 +13,10 @@ public static class ProgramIRBuilder
 
     public static void AddFunction(FunctionAst function)
     {
+        if (function.Name == "default_reallocator")
+        {
+        }
+
         var functionIR = new FunctionIR {Source = function, Constants = new InstructionValue[function.ConstantCount], Allocations = new(), Pointers = new(), Instructions = new(), BasicBlocks = new()};
 
         if (function.Name == "__start")
@@ -1269,6 +1273,66 @@ public static class ProgramIRBuilder
         return false;
     }
 
+    private static bool EmitInlineConditional(FunctionIR function, ConditionalAst conditional, IScope scope, IType returnType, InstructionValue returnAllocation, BasicBlock returnBlock, BasicBlock breakBlock, BasicBlock continueBlock)
+    {
+        // Run the condition expression in the current basic block and then jump to the following
+        var bodyBlock = new BasicBlock();
+        var elseBlock = new BasicBlock();
+        var instructionCount = function.Instructions.Count;
+        EmitConditionExpression(function, conditional.Condition, scope, bodyBlock, elseBlock);
+
+        AddBasicBlock(function, bodyBlock);
+        EmitScopeInline(function, conditional.IfBlock, returnType, returnAllocation, returnBlock, breakBlock, continueBlock);
+        Instruction jumpToAfter = null;
+
+        // For when the the if block does not return and there is an else block, a jump to the after block is required
+        if (!conditional.IfBlock.Returns && conditional.ElseBlock != null)
+        {
+            jumpToAfter = new Instruction {Type = InstructionType.Jump, Scope = scope};
+            function.Instructions.Add(jumpToAfter);
+            AddBasicBlock(function, elseBlock);
+        }
+        else if (bodyBlock.Location < function.Instructions.Count)
+        {
+            AddBasicBlock(function, elseBlock);
+        }
+        else
+        {
+            // Patch the conditional jumps to the else basic block to be the last body block that is currently empty
+            for (; instructionCount < function.Instructions.Count; instructionCount++)
+            {
+                var instruction = function.Instructions[instructionCount];
+                if (instruction.Type == InstructionType.ConditionalJump && instruction.Value2.JumpBlock == elseBlock)
+                {
+                    instruction.Value2.JumpBlock = bodyBlock;
+                }
+            }
+            elseBlock = bodyBlock;
+        }
+
+        // Jump to the else block, otherwise fall through to the then block
+        if (conditional.ElseBlock == null)
+        {
+            return false;
+        }
+
+        EmitScopeInline(function, conditional.ElseBlock, returnType, returnAllocation, returnBlock, breakBlock, continueBlock);
+
+        if (conditional.IfBlock.Returns && conditional.ElseBlock.Returns)
+        {
+            return true;
+        }
+
+        var afterBlock = elseBlock.Location < function.Instructions.Count ? AddBasicBlock(function) : elseBlock;
+
+        if (!conditional.IfBlock.Returns)
+        {
+            jumpToAfter.Value1 = BasicBlockValue(afterBlock);
+        }
+
+        return false;
+    }
+
     private static BasicBlock EmitWhile(FunctionIR function, WhileAst whileAst, IScope scope, IType returnType)
     {
         // Create a block for the condition expression and then jump to the following
@@ -1283,6 +1347,27 @@ public static class ProgramIRBuilder
 
         AddBasicBlock(function, whileBodyBlock);
         EmitScope(function, whileAst.Body, returnType, afterBlock, conditionBlock);
+        EmitJump(function, scope, conditionBlock);
+
+        AddBasicBlock(function, afterBlock);
+
+        return afterBlock;
+    }
+
+    private static BasicBlock EmitInlineWhile(FunctionIR function, WhileAst whileAst, IScope scope, IType returnType, InstructionValue returnAllocation, BasicBlock returnBlock)
+    {
+        // Create a block for the condition expression and then jump to the following
+        var conditionBlock = function.BasicBlocks[^1];
+        if (conditionBlock.Location < function.Instructions.Count)
+        {
+            conditionBlock = AddBasicBlock(function);
+        }
+        var whileBodyBlock = new BasicBlock();
+        var afterBlock = new BasicBlock();
+        EmitConditionExpression(function, whileAst.Condition, scope, whileBodyBlock, afterBlock);
+
+        AddBasicBlock(function, whileBodyBlock);
+        EmitScopeInline(function, whileAst.Body, returnType, returnAllocation, returnBlock, afterBlock, conditionBlock);
         EmitJump(function, scope, conditionBlock);
 
         AddBasicBlock(function, afterBlock);
@@ -1463,6 +1548,129 @@ public static class ProgramIRBuilder
         return afterBlock;
     }
 
+    // TODO Cleanup
+    private static BasicBlock EmitInlineEach(FunctionIR function, EachAst each, IScope scope, IType returnType, InstructionValue returnAllocation, BasicBlock returnBlock)
+    {
+        InstructionValue indexVariable;
+        InstructionValue compareTarget;
+
+        if (each.Iteration != null)
+        {
+            indexVariable = AddAllocation(function, TypeTable.S64Type);
+            if (each.IndexVariable != null)
+            {
+                each.IndexVariable.PointerIndex = AddPointer(function, indexVariable);
+                if (!BuildSettings.Release)
+                {
+                    DeclareVariable(function, each.IndexVariable, each.Body, indexVariable);
+                }
+            }
+            EmitStore(function, indexVariable, GetConstantS64(0), each.Body);
+
+            var iteration = EmitIR(function, each.Iteration, each.Body);
+
+            // Load the array data and set the compareTarget to the array count
+            InstructionValue arrayData = null;
+            var cArrayIteration = false;
+            if (iteration.Type.TypeKind == TypeKind.CArray)
+            {
+                arrayData = iteration;
+                cArrayIteration = true;
+                var arrayType = (ArrayType)iteration.Type;
+                compareTarget = GetConstantS64(arrayType.Length);
+            }
+            else
+            {
+                var arrayDef = (StructAst)iteration.Type;
+                var iterationVariable = AddAllocation(function, arrayDef);
+                EmitStore(function, iterationVariable, iteration, each.Body);
+
+                var lengthPointer = EmitGetStructPointer(function, iterationVariable, each.Body, arrayDef, 0);
+                compareTarget = EmitLoad(function, TypeTable.S32Type, lengthPointer, each.Body);
+
+                var dataField = arrayDef.Fields[1];
+                var dataPointer = EmitGetStructPointer(function, iterationVariable, each.Body, arrayDef, 1, dataField);
+                arrayData = EmitLoad(function, dataField.Type, dataPointer, each.Body);
+            }
+
+            var conditionBlock = AddBasicBlock(function);
+            var indexValue = EmitLoad(function, TypeTable.S64Type, indexVariable, each.Body);
+            var condition = EmitInstruction(InstructionType.IntegerGreaterThanOrEqual, function, TypeTable.BoolType, each.Body, indexValue, compareTarget);
+
+            var iterationPointer = EmitGetPointer(function, arrayData, indexValue, each.IterationVariable.Type, each.Body, cArrayIteration);
+            each.IterationVariable.PointerIndex = AddPointer(function, iterationPointer);
+
+            if (!BuildSettings.Release)
+            {
+                DeclareVariable(function, each.IterationVariable, each.Body, iterationPointer);
+            }
+
+            return EmitInlineEachBody(function, each.Body, TypeTable.S64Type, returnType, returnAllocation, returnBlock, indexValue, indexVariable, condition, conditionBlock);
+        }
+        else
+        {
+            indexVariable = AddAllocation(function, TypeTable.S32Type);
+            // Begin the loop at the beginning of the range
+            var value = EmitAndCast(function, each.RangeBegin, each.Body, TypeTable.S32Type);
+
+            EmitStore(function, indexVariable, value, each.Body);
+            each.IterationVariable.PointerIndex = AddPointer(function, indexVariable);
+
+            if (!BuildSettings.Release)
+            {
+                DeclareVariable(function, each.IterationVariable, each.Body, indexVariable);
+            }
+
+            // Get the end of the range
+            compareTarget = EmitAndCast(function, each.RangeEnd, each.Body, TypeTable.S32Type);
+
+            var conditionBlock = AddBasicBlock(function);
+            var indexValue = EmitLoad(function, TypeTable.S32Type, indexVariable, each.Body);
+            var condition = EmitInstruction(InstructionType.IntegerGreaterThan, function, TypeTable.BoolType, each.Body, indexValue, compareTarget);
+
+            return EmitInlineEachBody(function, each.Body, TypeTable.S32Type, returnType, returnAllocation, returnBlock, indexValue, indexVariable, condition, conditionBlock);
+        }
+    }
+
+    private static BasicBlock EmitInlineEachBody(FunctionIR function, ScopeAst eachBody, IType indexType, IType returnType, InstructionValue returnAllocation, BasicBlock returnBlock, InstructionValue indexValue, InstructionValue indexVariable, InstructionValue condition, BasicBlock conditionBlock)
+    {
+        var conditionJump = new Instruction {Type = InstructionType.ConditionalJump, Scope = eachBody, Value1 = condition};
+        function.Instructions.Add(conditionJump);
+        var instructionCount = function.Instructions.Count;
+
+        var eachBodyBlock = AddBasicBlock(function);
+        var eachIncrementBlock = new BasicBlock();
+        var afterBlock = new BasicBlock();
+        EmitScope(function, eachBody, returnType, afterBlock, eachIncrementBlock);
+
+        if (eachBodyBlock.Location < function.Instructions.Count)
+        {
+            AddBasicBlock(function, eachIncrementBlock);
+        }
+        else
+        {
+            // Patch the jumps to the increment basic block to be the last body block that is currently empty
+            for (; instructionCount < function.Instructions.Count; instructionCount++)
+            {
+                var instruction = function.Instructions[instructionCount];
+                if (instruction.Type == InstructionType.Jump && instruction.Value1.JumpBlock == eachIncrementBlock)
+                {
+                    instruction.Value1.JumpBlock = eachBodyBlock;
+                }
+            }
+        }
+
+        var incrementValue = new InstructionValue {ValueType = InstructionValueType.Constant, Type = indexType, ConstantValue = new Constant {Integer = 1}};
+        var nextValue = EmitInstruction(InstructionType.IntegerAdd, function, TypeTable.S32Type, eachBody, indexValue, incrementValue);
+        EmitStore(function, indexVariable, nextValue, eachBody);
+        EmitJump(function, eachBody, conditionBlock);
+
+        AddBasicBlock(function, afterBlock);
+        conditionJump.Value2 = BasicBlockValue(afterBlock);
+
+        return afterBlock;
+    }
+
     private static void EmitInlineAssembly(FunctionIR function, AssemblyAst assembly, IScope scope)
     {
         // Get the values to place in the input registers
@@ -1561,6 +1769,91 @@ public static class ProgramIRBuilder
 
         AddBasicBlock(function, bodyBlock);
         EmitScope(function, body, returnType, breakBlock, continueBlock);
+        if (!body.Returns && emitJump)
+        {
+            EmitJump(function, body, afterBlock);
+        }
+    }
+
+    private static BasicBlock EmitInlineSwitch(FunctionIR function, SwitchAst switchAst, IScope scope, IType returnType, InstructionValue returnAllocation, BasicBlock returnBlock, BasicBlock breakBlock, BasicBlock continueBlock)
+    {
+        var value = EmitIR(function, switchAst.Value, scope);
+        var afterBlock = new BasicBlock();
+
+        if (switchAst.DefaultCase != null)
+        {
+            var (cases, body) = switchAst.Cases[0];
+            var nextCaseBlock = new BasicBlock();
+            EmitInlineSwitchCase(function, value, cases, body, scope, nextCaseBlock, afterBlock, returnType, returnAllocation, returnBlock, breakBlock, continueBlock);
+
+            for (var i = 1; i < switchAst.Cases.Count; i++)
+            {
+                AddBasicBlock(function, nextCaseBlock);
+
+                (cases, body) = switchAst.Cases[i];
+                nextCaseBlock = new BasicBlock();
+
+                EmitInlineSwitchCase(function, value, cases, body, scope, nextCaseBlock, afterBlock, returnType, returnAllocation, returnBlock, breakBlock, continueBlock);
+            }
+
+            AddBasicBlock(function, nextCaseBlock);
+            EmitScope(function, switchAst.DefaultCase, returnType, breakBlock, continueBlock);
+        }
+        else
+        {
+            if (switchAst.Cases.Count > 1)
+            {
+                var (cases, body) = switchAst.Cases[0];
+                var nextCaseBlock = new BasicBlock();
+                EmitInlineSwitchCase(function, value, cases, body, scope, nextCaseBlock, afterBlock, returnType, returnAllocation, returnBlock, breakBlock, continueBlock);
+
+                for (var i = 1; i < switchAst.Cases.Count - 1; i++)
+                {
+                    AddBasicBlock(function, nextCaseBlock);
+
+                    (cases, body) = switchAst.Cases[i];
+                    nextCaseBlock = new BasicBlock();
+
+                    EmitInlineSwitchCase(function, value, cases, body, scope, nextCaseBlock, afterBlock, returnType, returnAllocation, returnBlock, breakBlock, continueBlock);
+                }
+
+                AddBasicBlock(function, nextCaseBlock);
+            }
+
+            {
+                var (cases, body) = switchAst.Cases[^1];
+                EmitInlineSwitchCase(function, value, cases, body, scope, afterBlock, null, returnType, returnAllocation, returnBlock, breakBlock, continueBlock, false);
+            }
+        }
+
+        AddBasicBlock(function, afterBlock);
+
+        return afterBlock;
+    }
+
+    private static void EmitInlineSwitchCase(FunctionIR function, InstructionValue value, List<IAst> cases, ScopeAst body, IScope scope, BasicBlock nextCaseBlock, BasicBlock afterBlock, IType returnType, InstructionValue returnAllocation, BasicBlock returnBlock, BasicBlock breakBlock, BasicBlock continueBlock, bool emitJump = true)
+    {
+        var bodyBlock = new BasicBlock();
+        if (cases.Count > 1)
+        {
+            for (var i = 0; i < cases.Count - 1; i++)
+            {
+                var switchCase = EmitAndCast(function, cases[i], scope, value.Type);
+                var compare = EmitExpression(function, value, switchCase, Operator.Equality, TypeTable.BoolType, scope);
+                EmitConditionalJump(function, scope, compare, bodyBlock);
+                AddBasicBlock(function);
+            }
+        }
+
+        {
+            // Last case jumps to the next case if no match
+            var switchCase = EmitAndCast(function, cases[^1], scope, value.Type);
+            var compare = EmitExpression(function, value, switchCase, Operator.NotEqual, TypeTable.BoolType, scope);
+            EmitConditionalJump(function, scope, compare, nextCaseBlock);
+        }
+
+        AddBasicBlock(function, bodyBlock);
+        EmitScopeInline(function, body, returnType, returnAllocation, returnBlock, breakBlock, continueBlock);
         if (!body.Returns && emitJump)
         {
             EmitJump(function, body, afterBlock);
@@ -2194,9 +2487,8 @@ public static class ProgramIRBuilder
         if (call.Inline)
         {
             // Copy the arguments onto the stack
-            /*
-            var pointerCount = function.Pointers.Count;
-            function.PointerOffset = pointerCount;
+            var pointerOffset = function.PointerOffset;
+            function.PointerOffset = function.Pointers.Count;
             if (BuildSettings.Release)
             {
                 for (var i = 0; i < arguments.Length; i++)
@@ -2228,7 +2520,7 @@ public static class ProgramIRBuilder
                 EmitScopeInline(function, callFunction.Body, callFunction.ReturnType, null, returnBlock, null, null);
                 AddBasicBlock(function, returnBlock);
 
-                function.PointerOffset = pointerCount;
+                function.PointerOffset = pointerOffset;
                 function.Constants = constants;
                 return null;
             }
@@ -2238,11 +2530,10 @@ public static class ProgramIRBuilder
                 EmitScopeInline(function, callFunction.Body, callFunction.ReturnType, returnAllocation, returnBlock, null, null);
                 AddBasicBlock(function, returnBlock);
 
-                function.PointerOffset = pointerCount;
+                function.PointerOffset = pointerOffset;
                 function.Constants = constants;
                 return EmitLoad(function, callFunction.ReturnType, returnAllocation, callFunction.Body);
             }
-            */
         }
 
         return EmitCall(function, callFunction, arguments, scope, call.ExternIndex);
@@ -2374,7 +2665,6 @@ public static class ProgramIRBuilder
                     EmitAssignment(function, assignment, scope);
                     break;
                 case ScopeAst childScope:
-                    // TODO Determine how to properly break and jump following returns
                     EmitScopeInline(function, childScope, returnType, returnAllocation, returnBlock, breakBlock, continueBlock);
                     if (childScope.Returns)
                     {
@@ -2382,26 +2672,22 @@ public static class ProgramIRBuilder
                     }
                     break;
                 case ConditionalAst conditional:
-                    // TODO Determine how to properly break and jump following returns
-                    if (EmitConditional(function, conditional, scope, returnType, breakBlock, continueBlock))
+                    if (EmitInlineConditional(function, conditional, scope, returnType, returnAllocation, returnBlock, breakBlock, continueBlock))
                     {
                         return;
                     }
                     break;
                 case WhileAst whileAst:
-                    // TODO Determine how to properly break and jump following returns
-                    EmitWhile(function, whileAst, scope, returnType);
+                    EmitInlineWhile(function, whileAst, scope, returnType, returnAllocation, returnBlock);
                     break;
                 case EachAst each:
-                    // TODO Determine how to properly break and jump following returns
-                    EmitEach(function, each, scope, returnType);
+                    EmitInlineEach(function, each, scope, returnType, returnAllocation, returnBlock);
                     break;
                 case AssemblyAst assembly:
                     EmitInlineAssembly(function, assembly, scope);
                     break;
                 case SwitchAst switchAst:
-                    // TODO Determine how to properly break and jump following returns
-                    EmitSwitch(function, switchAst, scope, returnType, breakBlock, continueBlock);
+                    EmitInlineSwitch(function, switchAst, scope, returnType, returnAllocation, returnBlock, breakBlock, continueBlock);
                     break;
                 case BreakAst:
                     EmitJump(function, scope, breakBlock);
