@@ -150,7 +150,7 @@ public static class ProgramIRBuilder
                 EmitInlineAssembly(function, null, assembly, TypeChecker.GlobalScope);
                 break;
             case SwitchAst switchAst:
-                EmitSwitch(function, null, entryBlock, switchAst, TypeChecker.GlobalScope, null, null, null);
+                EmitSwitch(function, null, switchAst, TypeChecker.GlobalScope, null, null, null);
                 break;
             default:
                 EmitIR(function, null, ast, TypeChecker.GlobalScope);
@@ -557,7 +557,7 @@ public static class ProgramIRBuilder
                     EmitInlineAssembly(function, constants, assembly, scope);
                     break;
                 case SwitchAst switchAst:
-                    block = EmitSwitch(function, constants, block, switchAst, scope, returnType, breakBlock, continueBlock);
+                    block = EmitSwitch(function, constants, switchAst, scope, returnType, breakBlock, continueBlock);
                     break;
                 case BreakAst:
                     EmitJump(function, scope, breakBlock);
@@ -1189,30 +1189,27 @@ public static class ProgramIRBuilder
             var instruction = new Instruction {Type = InstructionType.ReturnVoid, Scope = scope};
             function.Instructions.Add(instruction);
         }
+        else if (returnType is CompoundType compoundReturnType && returnAst.Value is CompoundExpressionAst compoundExpression)
+        {
+            uint offset = 0;
+            for (var i = 0; i < compoundReturnType.Types.Length; i++)
+            {
+                var type = compoundReturnType.Types[i];
+                var expression = compoundExpression.Children[i];
+                var pointer = EmitGetStructPointer(function, function.CompoundReturnAllocation, scope, i, offset, type);
+
+                var value = EmitAndCast(function, constants, expression, scope, type, returnValue: true);
+                EmitStore(function, pointer, value, scope);
+                offset += type.Size;
+            }
+
+            var returnValue = EmitLoad(function, compoundReturnType, function.CompoundReturnAllocation, scope);
+            EmitInstruction(InstructionType.Return, function, null, scope, returnValue);
+        }
         else
         {
-            if (returnType is CompoundType compoundReturnType && returnAst.Value is CompoundExpressionAst compoundExpression)
-            {
-                uint offset = 0;
-                for (var i = 0; i < compoundReturnType.Types.Length; i++)
-                {
-                    var type = compoundReturnType.Types[i];
-                    var expression = compoundExpression.Children[i];
-                    var pointer = EmitGetStructPointer(function, function.CompoundReturnAllocation, scope, i, offset, type);
-
-                    var value = EmitAndCast(function, constants, expression, scope, type, returnValue: true);
-                    EmitStore(function, pointer, value, scope);
-                    offset += type.Size;
-                }
-
-                var returnValue = EmitLoad(function, compoundReturnType, function.CompoundReturnAllocation, scope);
-                EmitInstruction(InstructionType.Return, function, null, scope, returnValue);
-            }
-            else
-            {
-                var returnValue = EmitAndCast(function, constants, returnAst.Value, scope, returnType, returnValue: true);
-                EmitInstruction(InstructionType.Return, function, null, scope, returnValue);
-            }
+            var returnValue = EmitAndCast(function, constants, returnAst.Value, scope, returnType, returnValue: true);
+            EmitInstruction(InstructionType.Return, function, null, scope, returnValue);
         }
     }
 
@@ -1487,7 +1484,7 @@ public static class ProgramIRBuilder
         function.Instructions.Add(asmInstruction);
     }
 
-    private static BasicBlock EmitSwitch(FunctionIR function, InstructionValue[] constants, BasicBlock block, SwitchAst switchAst, IScope scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock)
+    private static BasicBlock EmitSwitch(FunctionIR function, InstructionValue[] constants, SwitchAst switchAst, IScope scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock)
     {
         var value = EmitIR(function, constants, switchAst.Value, scope);
         var afterBlock = new BasicBlock();
@@ -1500,7 +1497,6 @@ public static class ProgramIRBuilder
 
             for (var i = 1; i < switchAst.Cases.Count; i++)
             {
-                block = nextCaseBlock;
                 AddBasicBlock(function, nextCaseBlock);
 
                 (cases, body) = switchAst.Cases[i];
@@ -1522,7 +1518,6 @@ public static class ProgramIRBuilder
 
                 for (var i = 1; i < switchAst.Cases.Count - 1; i++)
                 {
-                    block = nextCaseBlock;
                     AddBasicBlock(function, nextCaseBlock);
 
                     (cases, body) = switchAst.Cases[i];
@@ -2201,6 +2196,7 @@ public static class ProgramIRBuilder
         if (call.Inline)
         {
             // Copy the arguments onto the stack
+            /*
             var pointerCount = function.Pointers.Count;
             function.PointerOffset = pointerCount;
             if (BuildSettings.Release)
@@ -2228,12 +2224,14 @@ public static class ProgramIRBuilder
             var inlineConstants = new InstructionValue[callFunction.ConstantCount];
             EmitScopeInline(function, inlineConstants, null, callFunction.Body, callFunction.ReturnType, null, null);
             function.PointerOffset = pointerCount;
+            */
         }
 
         return EmitCall(function, callFunction, arguments, scope, call.ExternIndex);
     }
 
     private static InstructionValue GetAnyValue(FunctionIR function, InstructionValue argument, IScope scope)
+
     {
         if (argument.Type.TypeKind == TypeKind.Any)
         {
@@ -2325,7 +2323,12 @@ public static class ProgramIRBuilder
             {
                 case ReturnAst returnAst:
                     // TODO Change return to set the returning register or jump to the following basic block
-                    EmitReturn(function, constants, returnAst, returnType, scope);
+                    if (returnAst.Value == null)
+                    {
+                    }
+                    else
+                    {
+                    }
                     return block;
                 case DeclarationAst declaration:
                     EmitDeclaration(function, constants, declaration, scope);
@@ -2337,13 +2340,15 @@ public static class ProgramIRBuilder
                     EmitAssignment(function, constants, assignment, scope);
                     break;
                 case ScopeAst childScope:
-                    block = EmitScope(function, constants, block, childScope, returnType, breakBlock, continueBlock);
+                    // TODO Determine how to properly break and jump following returns
+                    block = EmitScopeInline(function, constants, block, childScope, returnType, breakBlock, continueBlock);
                     if (childScope.Returns)
                     {
                         return block;
                     }
                     break;
                 case ConditionalAst conditional:
+                    // TODO Determine how to properly break and jump following returns
                     block = EmitConditional(function, constants, conditional, scope, returnType, breakBlock, continueBlock, out var returns);
                     if (returns)
                     {
@@ -2351,16 +2356,19 @@ public static class ProgramIRBuilder
                     }
                     break;
                 case WhileAst whileAst:
+                    // TODO Determine how to properly break and jump following returns
                     block = EmitWhile(function, constants, block, whileAst, scope, returnType);
                     break;
                 case EachAst each:
+                    // TODO Determine how to properly break and jump following returns
                     block = EmitEach(function, constants, each, scope, returnType);
                     break;
                 case AssemblyAst assembly:
                     EmitInlineAssembly(function, constants, assembly, scope);
                     break;
                 case SwitchAst switchAst:
-                    block = EmitSwitch(function, constants, block, switchAst, scope, returnType, breakBlock, continueBlock);
+                    // TODO Determine how to properly break and jump following returns
+                    block = EmitSwitch(function, constants, switchAst, scope, returnType, breakBlock, continueBlock);
                     break;
                 case BreakAst:
                     EmitJump(function, scope, breakBlock);
