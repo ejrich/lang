@@ -5,7 +5,7 @@ float abs(float value) {
     return value;
 }
 
-float64 square_root(float64 value) {
+float64 square_root(float64 value) #inline {
     asm {
         in xmm0, value;
         sqrtsd xmm0, xmm0;
@@ -15,7 +15,7 @@ float64 square_root(float64 value) {
     return value;
 }
 
-float64 sine(float64 value) {
+float64 sine(float64 value) #inline {
     asm {
         in rax, &value;
         fld [rax];
@@ -26,7 +26,7 @@ float64 sine(float64 value) {
     return value;
 }
 
-float64 cosine(float64 value) {
+float64 cosine(float64 value) #inline {
     asm {
         in rax, &value;
         fld [rax];
@@ -37,7 +37,7 @@ float64 cosine(float64 value) {
     return value;
 }
 
-float64 tangent(float64 value) {
+float64 tangent(float64 value) #inline {
     asm {
         in rax, &value;
         fld [rax];
@@ -49,7 +49,7 @@ float64 tangent(float64 value) {
     return value;
 }
 
-float64 log_2(float64 value) {
+float64 log_2(float64 value) #inline {
     asm {
         in rax, &value;
         fld1;
@@ -142,11 +142,11 @@ Vector3 multiply(Vector3 vec, Matrix4 mat) {
     return vec;
 }
 
-float length_squared(Vector3 a) {
+float length_squared(Vector3 a) #inline {
     return a.x * a.x + a.y * a.y + a.z * a.z;
 }
 
-float dot(Vector3 a, Vector3 b) {
+float dot(Vector3 a, Vector3 b) #inline {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 

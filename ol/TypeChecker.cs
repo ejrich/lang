@@ -1612,7 +1612,7 @@ public static class TypeChecker
             }
         }
 
-        if (!ErrorReporter.Errors.Any() /*&& !function.Flags.HasFlag(FunctionFlags.Inline)*/)
+        if (!ErrorReporter.Errors.Any() && !function.Flags.HasFlag(FunctionFlags.Inline))
         {
             ThreadPool.QueueWork(WriteFunctionJob, function);
         }
