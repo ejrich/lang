@@ -22,6 +22,7 @@ public class FunctionIR
     public bool SaveStack { get; set; }
     public InstructionValue CompoundReturnAllocation { get; set; }
     public IFunction Source { get; set; }
+    public InstructionValue[] Constants { get; set; }
     public List<Allocation> Allocations { get; set; }
     public List<InstructionValue> Pointers { get; set; }
     public List<Instruction> Instructions { get; set; }
