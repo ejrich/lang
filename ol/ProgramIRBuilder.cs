@@ -13,10 +13,6 @@ public static class ProgramIRBuilder
 
     public static void AddFunction(FunctionAst function)
     {
-        if (function.Name == "default_reallocator")
-        {
-        }
-
         var functionIR = new FunctionIR {Source = function, Constants = new InstructionValue[function.ConstantCount], Allocations = new(), Pointers = new(), Instructions = new(), BasicBlocks = new()};
 
         if (function.Name == "__start")
@@ -199,7 +195,7 @@ public static class ProgramIRBuilder
 
         var blockIndex = 0;
         var instructionIndex = 0;
-        var file = Path.GetFileName(BuildSettings.Files[function.Source.FileIndex]);
+        var functionFile = Path.GetFileName(BuildSettings.Files[function.Source.FileIndex]);
         var line = function.Source.Line;
         var column = function.Source.Column;
         while (blockIndex < function.BasicBlocks.Count)
@@ -209,8 +205,9 @@ public static class ProgramIRBuilder
             while (instructionIndex < instructionToStopAt)
             {
                 var instruction = function.Instructions[instructionIndex++];
-
+                var file = instruction.Scope is ScopeAst scope ? Path.GetFileName(BuildSettings.Files[scope.FileIndex]) : functionFile;
                 var text = $"{file} {line}:{column}\t\t{instruction.Type} ";
+
                 switch (instruction.Type)
                 {
                     case InstructionType.Jump:
