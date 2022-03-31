@@ -1418,7 +1418,7 @@ public static unsafe class LLVMBackend
                     if (!lexicalBlocks.TryGetValue(instruction.Scope, out var newDebugBlock))
                     {
                         var newScope = (ScopeAst)instruction.Scope;
-                        newDebugBlock = LLVM.DIBuilderCreateLexicalBlock(_debugBuilder, debugBlock, file, newScope.Line, newScope.Column);
+                        newDebugBlock = LLVM.DIBuilderCreateLexicalBlock(_debugBuilder, debugBlock, _debugFiles[newScope.FileIndex], newScope.Line, newScope.Column);
                     }
                     currentScope = instruction.Scope;
                     debugBlock = newDebugBlock;
@@ -2118,7 +2118,8 @@ public static unsafe class LLVMBackend
                     {
                         using var name = new MarshaledString(instruction.String);
 
-                        var debugVariable = LLVM.DIBuilderCreateAutoVariable(_debugBuilder, debugBlock, name.Value, (UIntPtr)name.Length, file, instruction.Source.Line, _debugTypes[instruction.Value1.Type.TypeIndex], 0, LLVMDIFlags.LLVMDIFlagZero, 0);
+                        var scope = (ScopeAst)instruction.Scope;
+                        var debugVariable = LLVM.DIBuilderCreateAutoVariable(_debugBuilder, debugBlock, name.Value, (UIntPtr)name.Length, _debugFiles[scope.FileIndex], instruction.Source.Line, _debugTypes[instruction.Value1.Type.TypeIndex], 0, LLVMDIFlags.LLVMDIFlagZero, 0);
                         var location = LLVM.GetCurrentDebugLocation2(_builder);
                         var variable = GetValue(instruction.Value1, values, allocations, functionPointer);
 
