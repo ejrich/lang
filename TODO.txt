@@ -1,7 +1,2 @@
+- Test debugging for inline functions
 - Only write the IR for functions starting from entrypoint or run directives
-
-Writing IR for inline functions:
-- Copy from existing IR - not simple enough
-- Make new values each time
-    - declaration.Allocation needs to be changed to better support inlines
-    - Track the allocation index in the type checker to avoid concurrency issues
