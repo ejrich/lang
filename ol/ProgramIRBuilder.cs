@@ -2371,9 +2371,11 @@ public static class ProgramIRBuilder
                 {
                     var argument = arguments[i];
                     var allocation = AddAllocation(function, callFunction.Arguments[i]);
-                    EmitStore(function, allocation, argument, callFunction.Body);
-
+                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugSetLocation, Source = callFunction.Body, Scope = callFunction.Body});
                     DeclareVariable(function, callFunction.Arguments[i], callFunction.Body, allocation);
+
+                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugSetLocation, Source = call, Scope = scope});
+                    EmitStore(function, allocation, argument, scope);
                 }
             }
 
