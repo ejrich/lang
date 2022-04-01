@@ -1418,7 +1418,7 @@ public static unsafe class LLVMBackend
                     if (!lexicalBlocks.TryGetValue(instruction.Scope, out var newDebugBlock))
                     {
                         var newScope = (ScopeAst)instruction.Scope;
-                        newDebugBlock = LLVM.DIBuilderCreateLexicalBlock(_debugBuilder, debugBlock, _debugFiles[newScope.FileIndex], newScope.Line, newScope.Column);
+                        newDebugBlock = lexicalBlocks[newScope] = LLVM.DIBuilderCreateLexicalBlock(_debugBuilder, debugBlock, _debugFiles[newScope.FileIndex], newScope.Line, newScope.Column);
                     }
                     currentScope = instruction.Scope;
                     debugBlock = newDebugBlock;
