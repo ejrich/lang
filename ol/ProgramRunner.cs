@@ -921,22 +921,22 @@ public static unsafe class ProgramRunner
                     {
                         register.Float = instruction.Value1.Type.Size switch
                         {
-                            1 => (float)value.SByte,
-                            2 => (float)value.Short,
-                            4 => (float)value.Integer,
-                            8 => (float)value.Long,
-                            _ => (float)value.Integer,
+                            1 => value.SByte,
+                            2 => value.Short,
+                            4 => value.Integer,
+                            8 => value.Long,
+                            _ => value.Integer,
                         };
                     }
                     else
                     {
                         register.Double = instruction.Value1.Type.Size switch
                         {
-                            1 => (double)value.SByte,
-                            2 => (double)value.Short,
-                            4 => (double)value.Integer,
-                            8 => (double)value.Long,
-                            _ => (double)value.Integer,
+                            1 => value.SByte,
+                            2 => value.Short,
+                            4 => value.Integer,
+                            8 => value.Long,
+                            _ => value.Integer,
                         };
                     }
                     registers[instruction.ValueIndex] = register;
@@ -1560,7 +1560,7 @@ public static unsafe class ProgramRunner
         return new Register();
     }
 
-    private static Register GetConstant(InstructionValue value, bool constant = false)
+    private static Register GetConstant(InstructionValue value)
     {
         var register = new Register();
         switch (value.Type.TypeKind)
@@ -1668,8 +1668,6 @@ public static unsafe class ProgramRunner
 
     private static void WriteAssemblyInstruction(InstructionDefinition definition, RegisterDefinition register1, RegisterDefinition register2, List<byte> code, ulong? value1 = null, ulong? value2 = null)
     {
-        var codeIndex = code.Count;
-
         // Handle instructions with prefixes
         if (definition.Prefix != 0)
         {
