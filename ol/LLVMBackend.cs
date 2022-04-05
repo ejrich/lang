@@ -2369,14 +2369,8 @@ public static unsafe class LLVMBackend
                 return LLVM.BuildCall2(_builder, assemblyFunctionType, asm, (LLVMOpaqueValue**)pArgs, (uint)arguments.Length, name);
             }
         }
-        else
-        {
-            return LLVM.BuildCall2(_builder, assemblyFunctionType, asm, null, 0, name);
-        }
-    }
 
-    private static string Compile(string baseFileName, bool outputIntermediate)
-    {
+        return LLVM.BuildCall2(_builder, assemblyFunctionType, asm, null, 0, name);
     }
 
     private static void CreateTemporaryDebugStructType(StructAst structAst)
