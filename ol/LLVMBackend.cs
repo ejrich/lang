@@ -1357,7 +1357,7 @@ public static unsafe class LLVMBackend
         _builder.CurrentDebugLocation = null;
 
         // Allocate the function stack
-        var allocations = new LLVMValueRef[function.Allocations.Count];
+        Span<LLVMValueRef> allocations = stackalloc LLVMValueRef[function.Allocations.Count];
         foreach (var allocation in function.Allocations)
         {
             if (allocation.Array)
@@ -1403,7 +1403,7 @@ public static unsafe class LLVMBackend
         // Write the instructions
         var blockIndex = 0;
         var instructionIndex = 0;
-        var values = new LLVMValueRef[function.ValueCount];
+        Span<LLVMValueRef> values = stackalloc LLVMValueRef[function.ValueCount];
         while (blockIndex < function.BasicBlocks.Count)
         {
             LLVM.PositionBuilderAtEnd(_builder, basicBlocks[blockIndex]); // Redundant for the first pass, not a big deal
@@ -2140,7 +2140,7 @@ public static unsafe class LLVMBackend
         LLVM.RunFunctionPassManager(_passManager, functionPointer);
     }
 
-    private static LLVMValueRef GetValue(InstructionValue value, LLVMValueRef[] values, LLVMValueRef[] allocations, LLVMValueRef functionPointer)
+    private static LLVMValueRef GetValue(InstructionValue value, ReadOnlySpan<LLVMValueRef> values, ReadOnlySpan<LLVMValueRef> allocations, LLVMValueRef functionPointer)
     {
         switch (value.ValueType)
         {
