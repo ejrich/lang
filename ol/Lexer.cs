@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 
 namespace ol;
 
@@ -138,10 +139,10 @@ public static class Lexer
                 {
                     var literalEscapeToken = false;
                     var error = false;
+                    var stringBuilder = new StringBuilder();
                     token = new Token
                     {
                         Type = TokenType.Literal,
-                        Value = "",
                         Line = line,
                         Column = column
                     };
@@ -169,12 +170,12 @@ public static class Lexer
                         {
                             if (_escapableCharacters.TryGetValue(character, out var escapedCharacter))
                             {
-                                token.Value += escapedCharacter;
+                                stringBuilder.Append(escapedCharacter);
                             }
                             else
                             {
                                 error = true;
-                                token.Value += character;
+                                stringBuilder.Append(character);
                             }
                             literalEscapeToken = false;
                         }
@@ -182,6 +183,7 @@ public static class Lexer
                         {
                             if (character == '"')
                             {
+                                token.Value = stringBuilder.ToString();
                                 if (error)
                                 {
                                     ErrorReporter.Report($"Unexpected token '{token.Value}'", fileIndex, token);
@@ -190,7 +192,7 @@ public static class Lexer
                                 tokens.Add(token);
                                 break;
                             }
-                            token.Value += character;
+                            stringBuilder.Append(character);
                         }
                     }
                     break;
