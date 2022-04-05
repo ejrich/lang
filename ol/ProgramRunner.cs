@@ -335,14 +335,7 @@ public static unsafe class ProgramRunner
     private static void SetOutputDirectory(String directory)
     {
         var directoryPath = Marshal.PtrToStringAnsi(directory.Data, (int)directory.Length);
-        if (Path.IsPathRooted(directoryPath))
-        {
-            BuildSettings.OutputDirectory = directoryPath;
-        }
-        else
-        {
-            BuildSettings.OutputDirectory = Path.Combine(BuildSettings.Path, directoryPath);
-        }
+        BuildSettings.OutputDirectory = Path.IsPathRooted(directoryPath) ? directoryPath : Path.Combine(BuildSettings.Path, directoryPath);
 
         if (!Directory.Exists(BuildSettings.OutputDirectory))
         {
@@ -393,10 +386,10 @@ public static unsafe class ProgramRunner
         }
     }
 
-    private static Register ExecuteFunction(FunctionIR function, Register[] arguments)
+    private static Register ExecuteFunction(FunctionIR function, ReadOnlySpan<Register> arguments)
     {
         var instructionPointer = 0;
-        var registers = new Register[function.ValueCount];
+        Span<Register> registers = stackalloc Register[function.ValueCount];
 
         var (stackPointer, stackCursor, stackBlock) = Allocator.StackAllocate((int)function.StackSize);
         var additionalBlocks = new List<(MemoryBlock block, int cursor)>();
@@ -1533,7 +1526,7 @@ public static unsafe class ProgramRunner
         }
     }
 
-    private static Register GetValue(InstructionValue value, Register[] registers, IntPtr stackPointer, FunctionIR function, Register[] arguments)
+    private static Register GetValue(InstructionValue value, ReadOnlySpan<Register> registers, IntPtr stackPointer, FunctionIR function, ReadOnlySpan<Register> arguments)
     {
         switch (value.ValueType)
         {
@@ -1599,7 +1592,7 @@ public static unsafe class ProgramRunner
         return register;
     }
 
-    private static Register MakeCall(FunctionIR callingFunction, InstructionValue[] arguments, Register[] registers, IntPtr stackPointer, FunctionIR function, Register[] functionArgs, int externIndex = 0)
+    private static Register MakeCall(FunctionIR callingFunction, InstructionValue[] arguments, ReadOnlySpan<Register> registers, IntPtr stackPointer, FunctionIR function, ReadOnlySpan<Register> functionArgs, int externIndex = 0)
     {
         if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Extern))
         {
@@ -1609,7 +1602,8 @@ public static unsafe class ProgramRunner
             var returnValue = functionDecl.Invoke(null, args);
             return ConvertToRegister(returnValue);
         }
-        else if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Compiler))
+
+        if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Compiler))
         {
             var returnValue = new Register();
             switch (callingFunction.Source.Name)
@@ -1660,9 +1654,9 @@ public static unsafe class ProgramRunner
             }
             return returnValue;
         }
-        else
+
         {
-            var args = new Register[arguments.Length];
+            Span<Register> args = stackalloc Register[arguments.Length];
             for (var i = 0; i < arguments.Length; i++)
             {
                 args[i] = GetValue(arguments[i], registers, stackPointer, function, functionArgs);
@@ -1822,7 +1816,7 @@ public static unsafe class ProgramRunner
         return register;
     }
 
-    private static object[] GetExternArguments(InstructionValue[] arguments, Register[] registers, IntPtr stackPointer, FunctionIR function, Register[] functionArgs)
+    private static object[] GetExternArguments(InstructionValue[] arguments, ReadOnlySpan<Register> registers, IntPtr stackPointer, FunctionIR function, ReadOnlySpan<Register> functionArgs)
     {
         var args = new object[arguments.Length];
         for (var i = 0; i < args.Length; i++)
