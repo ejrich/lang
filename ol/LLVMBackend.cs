@@ -51,7 +51,6 @@ public static unsafe class LLVMBackend
 
     private static LLVMValueRef _defaultAttributes;
     private static LLVMValueRef _defaultFields;
-    private static LLVMValueRef _defaultArguments;
 
     private static bool _emitDebug;
     private static LLVMDIBuilderRef _debugBuilder;
@@ -61,7 +60,7 @@ public static unsafe class LLVMBackend
     private static LLVMMetadataRef[] _debugFunctions;
 
     private static readonly LLVMTypeRef _u8PointerType = LLVM.PointerType(LLVM.Int8Type(), 0);
-    private static readonly LLVMValueRef _zeroInt = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), 0, false);
+    private static readonly LLVMValueRef _zeroInt = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), 0);
     private static readonly LLVMValueRef _interfaceTypeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Interface, 0);
     private static readonly LLVMValueRef _functionTypeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Function, 0);
 
@@ -73,7 +72,43 @@ public static unsafe class LLVMBackend
             Directory.CreateDirectory(objectPath);
 
         // 2. Initialize the LLVM module and builder
-        InitLLVM(objectPath);
+        _module = LLVMModuleRef.CreateWithName(BuildSettings.Name);
+        _context = _module.Context;
+        _builder = LLVMBuilderRef.Create(_context);
+        _passManager = _module.CreateFunctionPassManager();
+        if (BuildSettings.Release)
+        {
+            LLVM.AddBasicAliasAnalysisPass(_passManager);
+            LLVM.AddPromoteMemoryToRegisterPass(_passManager);
+            LLVM.AddInstructionCombiningPass(_passManager);
+            LLVM.AddReassociatePass(_passManager);
+            LLVM.AddGVNPass(_passManager);
+            LLVM.AddCFGSimplificationPass(_passManager);
+            LLVM.AddLoopVectorizePass(_passManager);
+            LLVM.AddSLPVectorizePass(_passManager);
+
+            LLVM.InitializeFunctionPassManager(_passManager);
+            _codeGenLevel = LLVMCodeGenOptLevel.LLVMCodeGenLevelAggressive;
+        }
+        else
+        {
+            _emitDebug = true;
+            _debugBuilder = _module.CreateDIBuilder();
+            _debugFiles = BuildSettings.Files.Select(file => _debugBuilder.CreateFile(Path.GetFileName(file), Path.GetDirectoryName(file))).ToList();
+            _debugCompilationUnit = _debugBuilder.CreateCompileUnit(LLVMDWARFSourceLanguage.LLVMDWARFSourceLanguageC, _debugFiles[0], "ol", 0, string.Empty, 0, string.Empty, LLVMDWARFEmissionKind.LLVMDWARFEmissionFull, 0, 0, 0, string.Empty, string.Empty);
+
+            #if _LINUX
+            AddModuleFlag("Dwarf Version", 4);
+            #elif _WINDOWS
+            AddModuleFlag("CodeView", 1);
+            AddModuleFlag("uwtable", 1);
+            #endif
+            AddModuleFlag("Debug Info Version", LLVM.DebugMetadataVersion());
+            AddModuleFlag("PIE Level", 2);
+
+            _debugTypes = new LLVMMetadataRef[TypeTable.Count];
+            _debugFunctions = new LLVMMetadataRef[TypeTable.FunctionCount];
+        }
 
         // 3. Declare types
         _types = new LLVMTypeRef[TypeTable.Count];
@@ -104,7 +139,6 @@ public static unsafe class LLVMBackend
         _typeInfoPointerType = LLVM.PointerType(_typeInfoType, 0);
         _defaultAttributes = LLVMValueRef.CreateConstNamedStruct(_stringArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(_stringType, 0))});
         _defaultFields = LLVMValueRef.CreateConstNamedStruct(_typeFieldArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(_typeFieldType, 0))});
-        _defaultArguments = LLVMValueRef.CreateConstNamedStruct(_argumentArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(_argumentType, 0))});
 
         switch (BuildSettings.OutputTypeTable)
         {
@@ -201,48 +235,61 @@ public static unsafe class LLVMBackend
 
         // 7. Compile to object file
         var baseFileName = Path.Combine(objectPath, BuildSettings.Name);
-        return Compile(baseFileName, BuildSettings.OutputAssembly);
-    }
-
-    private static void InitLLVM(string objectPath)
-    {
-        _module = LLVMModuleRef.CreateWithName(BuildSettings.Name);
-        _context = _module.Context;
-        _builder = LLVMBuilderRef.Create(_context);
-        _passManager = _module.CreateFunctionPassManager();
-        if (BuildSettings.Release)
+        if (_emitDebug)
         {
-            LLVM.AddBasicAliasAnalysisPass(_passManager);
-            LLVM.AddPromoteMemoryToRegisterPass(_passManager);
-            LLVM.AddInstructionCombiningPass(_passManager);
-            LLVM.AddReassociatePass(_passManager);
-            LLVM.AddGVNPass(_passManager);
-            LLVM.AddCFGSimplificationPass(_passManager);
-            LLVM.AddLoopVectorizePass(_passManager);
-            LLVM.AddSLPVectorizePass(_passManager);
-
-            LLVM.InitializeFunctionPassManager(_passManager);
-            _codeGenLevel = LLVMCodeGenOptLevel.LLVMCodeGenLevelAggressive;
+            LLVM.DIBuilderFinalize(_debugBuilder);
         }
-        else
+
+        #if DEBUG
+        LLVM.VerifyModule(_module, LLVMVerifierFailureAction.LLVMPrintMessageAction, null);
+        #endif
+
+        LLVM.InitializeX86TargetInfo();
+        LLVM.InitializeX86Target();
+        LLVM.InitializeX86TargetMC();
+        LLVM.InitializeX86AsmParser();
+        LLVM.InitializeX86AsmPrinter();
+
+        var target = LLVMTargetRef.Targets.FirstOrDefault(t => t.Name == "x86-64");
+        var defaultTriple = LLVMTargetRef.DefaultTriple;
+        _module.Target = defaultTriple;
+
+        if (BuildSettings.OutputAssembly)
         {
-            _emitDebug = true;
-            _debugBuilder = _module.CreateDIBuilder();
-            _debugFiles = BuildSettings.Files.Select(file => _debugBuilder.CreateFile(Path.GetFileName(file), Path.GetDirectoryName(file))).ToList();
-            _debugCompilationUnit = _debugBuilder.CreateCompileUnit(LLVMDWARFSourceLanguage.LLVMDWARFSourceLanguageC, _debugFiles[0], "ol", 0, string.Empty, 0, string.Empty, LLVMDWARFEmissionKind.LLVMDWARFEmissionFull, 0, 0, 0, string.Empty, string.Empty);
+            using var test = new MarshaledString("test");
+            using var intelString = new MarshaledString("--x86-asm-syntax=intel");
+            var args = new sbyte*[] {test.Value, intelString.Value};
 
-            #if _LINUX
-            AddModuleFlag("Dwarf Version", 4);
-            #elif _WINDOWS
-            AddModuleFlag("CodeView", 1);
-            AddModuleFlag("uwtable", 1);
-            #endif
-            AddModuleFlag("Debug Info Version", LLVM.DebugMetadataVersion());
-            AddModuleFlag("PIE Level", 2);
-
-            _debugTypes = new LLVMMetadataRef[TypeTable.Count];
-            _debugFunctions = new LLVMMetadataRef[TypeTable.FunctionCount];
+            fixed (sbyte** pointer = &args[0])
+            {
+                LLVM.ParseCommandLineOptions(2, pointer, null);
+            }
         }
+
+        var targetMachine = target.CreateTargetMachine(defaultTriple, "generic", string.Empty, _codeGenLevel, LLVMRelocMode.LLVMRelocDefault, LLVMCodeModel.LLVMCodeModelDefault);
+
+        if (BuildSettings.OutputAssembly)
+        {
+            var llvmIrFile = $"{baseFileName}.ll";
+            _module.PrintToFile(llvmIrFile);
+
+            var assemblyFile = $"{baseFileName}.s";
+            targetMachine.TryEmitToFile(_module, assemblyFile, LLVMCodeGenFileType.LLVMAssemblyFile, out _);
+        }
+
+        #if _LINUX
+        var objectFile = $"{baseFileName}.o";
+        #elif _WINDOWS
+        var objectFile = $"{baseFileName}.obj";
+        #endif
+
+        if (!targetMachine.TryEmitToFile(_module, objectFile, LLVMCodeGenFileType.LLVMObjectFile, out var errorMessage))
+        {
+            Console.WriteLine($"LLVM Build error: {errorMessage}");
+            Environment.Exit(ErrorCodes.BuildError);
+        }
+
+        return objectFile;
     }
 
     private static void AddModuleFlag(string flagName, uint flagValue)
@@ -2330,61 +2377,6 @@ public static unsafe class LLVMBackend
 
     private static string Compile(string baseFileName, bool outputIntermediate)
     {
-        if (_emitDebug)
-        {
-            LLVM.DIBuilderFinalize(_debugBuilder);
-        }
-
-        #if DEBUG
-        LLVM.VerifyModule(_module, LLVMVerifierFailureAction.LLVMPrintMessageAction, null);
-        #endif
-
-        LLVM.InitializeX86TargetInfo();
-        LLVM.InitializeX86Target();
-        LLVM.InitializeX86TargetMC();
-        LLVM.InitializeX86AsmParser();
-        LLVM.InitializeX86AsmPrinter();
-
-        var target = LLVMTargetRef.Targets.FirstOrDefault(t => t.Name == "x86-64");
-        var defaultTriple = LLVMTargetRef.DefaultTriple;
-        _module.Target = defaultTriple;
-
-        if (outputIntermediate)
-        {
-            using var test = new MarshaledString("test");
-            using var intelString = new MarshaledString("--x86-asm-syntax=intel");
-            var args = new sbyte*[] {test.Value, intelString.Value};
-
-            fixed (sbyte** pointer = &args[0])
-            {
-                LLVM.ParseCommandLineOptions(2, pointer, null);
-            }
-        }
-
-        var targetMachine = target.CreateTargetMachine(defaultTriple, "generic", string.Empty, _codeGenLevel, LLVMRelocMode.LLVMRelocDefault, LLVMCodeModel.LLVMCodeModelDefault);
-
-        if (outputIntermediate)
-        {
-            var llvmIrFile = $"{baseFileName}.ll";
-            _module.PrintToFile(llvmIrFile);
-
-            var assemblyFile = $"{baseFileName}.s";
-            targetMachine.TryEmitToFile(_module, assemblyFile, LLVMCodeGenFileType.LLVMAssemblyFile, out _);
-        }
-
-        #if _LINUX
-        var objectFile = $"{baseFileName}.o";
-        #elif _WINDOWS
-        var objectFile = $"{baseFileName}.obj";
-        #endif
-
-        if (!targetMachine.TryEmitToFile(_module, objectFile, LLVMCodeGenFileType.LLVMObjectFile, out var errorMessage))
-        {
-            Console.WriteLine($"LLVM Build error: {errorMessage}");
-            Environment.Exit(ErrorCodes.BuildError);
-        }
-
-        return objectFile;
     }
 
     private static void CreateTemporaryDebugStructType(StructAst structAst)
