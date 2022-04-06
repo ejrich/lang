@@ -1690,7 +1690,7 @@ public static class Parser
                 }
                 if (token.Type == TokenType.Number && token.Value[0] == '-')
                 {
-                    token.Value = token.Value[1..];
+                    token.Value = token.Value.Substring(1);
                     expression.Operators.Add(Operator.Subtract);
                     var constant = ParseConstant(token, enumerator.FileIndex);
                     expression.Children.Add(constant);
@@ -2022,7 +2022,7 @@ public static class Parser
                 }
                 if (token.Type == TokenType.Number && token.Value[0] == '-')
                 {
-                    token.Value = token.Value[1..];
+                    token.Value = token.Value.Substring(1);
                     expression.Operators.Add(Operator.Subtract);
                     var constant = ParseConstant(token, enumerator.FileIndex);
                     expression.Children.Add(constant);

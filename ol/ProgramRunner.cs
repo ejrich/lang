@@ -322,7 +322,7 @@ public static unsafe class ProgramRunner
         BuildSettings.Linker = (LinkerType)linker;
     }
 
-    private static void SetExecutableName(String name)
+    private static void SetExecutableName(LanguageString name)
     {
         BuildSettings.Name = Marshal.PtrToStringAnsi(name.Data, (int)name.Length);
     }
@@ -332,7 +332,7 @@ public static unsafe class ProgramRunner
         BuildSettings.OutputTypeTable = (OutputTypeTableConfiguration)config;
     }
 
-    private static void SetOutputDirectory(String directory)
+    private static void SetOutputDirectory(LanguageString directory)
     {
         var directoryPath = Marshal.PtrToStringAnsi(directory.Data, (int)directory.Length);
         BuildSettings.OutputDirectory = Path.IsPathRooted(directoryPath) ? directoryPath : Path.Combine(BuildSettings.Path, directoryPath);
@@ -343,7 +343,7 @@ public static unsafe class ProgramRunner
         }
     }
 
-    private static void AddLibraryDirectory(String directory)
+    private static void AddLibraryDirectory(LanguageString directory)
     {
         var directoryPath = Marshal.PtrToStringAnsi(directory.Data, (int)directory.Length);
         if (Path.IsPathRooted(directoryPath))
@@ -362,7 +362,7 @@ public static unsafe class ProgramRunner
         }
     }
 
-    private static void CopyToOutputDirectory(String file)
+    private static void CopyToOutputDirectory(LanguageString file)
     {
         var filePath = Marshal.PtrToStringAnsi(file.Data, (int)file.Length);
         FileInfo fileInfo;
@@ -1617,7 +1617,7 @@ public static unsafe class ProgramRunner
                 case "set_executable_name":
                 {
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
-                    var name = Marshal.PtrToStructure<String>(value.Pointer);
+                    var name = Marshal.PtrToStructure<LanguageString>(value.Pointer);
                     SetExecutableName(name);
                     break;
                 }
@@ -1630,21 +1630,21 @@ public static unsafe class ProgramRunner
                 case "set_output_directory":
                 {
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
-                    var directory = Marshal.PtrToStructure<String>(value.Pointer);
+                    var directory = Marshal.PtrToStructure<LanguageString>(value.Pointer);
                     SetOutputDirectory(directory);
                     break;
                 }
                 case "add_library_directory":
                 {
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
-                    var directory = Marshal.PtrToStructure<String>(value.Pointer);
+                    var directory = Marshal.PtrToStructure<LanguageString>(value.Pointer);
                     AddLibraryDirectory(directory);
                     break;
                 }
                 case "copy_to_output_directory":
                 {
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
-                    var file = Marshal.PtrToStructure<String>(value.Pointer);
+                    var file = Marshal.PtrToStructure<LanguageString>(value.Pointer);
                     CopyToOutputDirectory(file);
                     break;
                 }

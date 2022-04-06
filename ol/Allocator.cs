@@ -112,21 +112,21 @@ public static class Allocator
         }
 
         var stringPointer = Allocate(StringLength);
-        var stringStruct = new String {Length = value.Length, Data = s};
+        var stringStruct = new LanguageString {Length = value.Length, Data = s};
         Marshal.StructureToPtr(stringStruct, stringPointer, false);
 
         return stringPointer;
     }
 
-    public static String MakeString(string value)
+    public static LanguageString MakeString(string value)
     {
         var s = AllocateString(value);
 
-        var stringStruct = new String {Length = value.Length, Data = s};
+        var stringStruct = new LanguageString {Length = value.Length, Data = s};
         return stringStruct;
     }
 
-    public unsafe static IntPtr AllocateString(string value)
+    public static unsafe IntPtr AllocateString(string value)
     {
         var pointer = Allocate(value.Length + 1);
         var bytePointer = (byte*)pointer;
@@ -146,7 +146,7 @@ public static class Allocator
 }
 
 [StructLayout(LayoutKind.Explicit, Size=Allocator.StringLength)]
-public struct String
+public struct LanguageString
 {
     [FieldOffset(0)] public long Length;
     [FieldOffset(8)] public IntPtr Data;
