@@ -2106,7 +2106,7 @@ public static unsafe class LLVMBackend
         {
             pointer[i] = (sbyte)name[i];
         }
-        return LLVM.DIBuilderCreateAutoVariable(_debugBuilder, debugBlock, pointer, (UIntPtr)name.Length, file, line, debugType, 0, LLVMDIFlags.LLVMDIFlagZero, 0);
+        return LLVM.DIBuilderCreateAutoVariable(_debugBuilder, debugBlock, pointer, name, file, line, debugType, 0, LLVMDIFlags.LLVMDIFlagZero, 0);
     }
 
     private static LLVMValueRef GetValue(InstructionValue value, ReadOnlySpan<LLVMValueRef> values, ReadOnlySpan<LLVMValueRef> allocations, LLVMValueRef functionPointer)
