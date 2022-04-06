@@ -32,7 +32,7 @@ public class FunctionIR
 
 public class GlobalVariable
 {
-    public string Name { get; set; }
+    public String Name { get; set; }
     public int? FileIndex { get; set; }
     public uint Line { get; set; }
     public uint Size { get; set; }
@@ -70,7 +70,7 @@ public class Instruction
     public int Index { get; set; }
     public int Index2 { get; set; }
     public bool Flag { get; set; }
-    public string String { get; set; }
+    public String String { get; set; }
     public IType LoadType { get; set; }
 
     public InstructionValue Value1 { get; set; }
@@ -87,7 +87,7 @@ public class InstructionValue
 
     // For constant values
     public Constant ConstantValue { get; set; }
-    public string ConstantString { get; set; }
+    public String ConstantString { get; set; }
     public bool UseRawString { get; set; }
 
     // For calls and constant structs/arrays

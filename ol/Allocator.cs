@@ -102,7 +102,7 @@ public static class Allocator
 
     public const int StringLength = 16;
 
-    public static IntPtr MakeString(string value, bool useRawString)
+    public static IntPtr MakeString(ReadOnlySpan<char> value, bool useRawString)
     {
         var s = AllocateString(value);
 
@@ -118,22 +118,14 @@ public static class Allocator
         return stringPointer;
     }
 
-    public static LanguageString MakeString(string value)
-    {
-        var s = AllocateString(value);
-
-        var stringStruct = new LanguageString {Length = value.Length, Data = s};
-        return stringStruct;
-    }
-
-    public static unsafe IntPtr AllocateString(string value)
+    public static unsafe IntPtr AllocateString(ReadOnlySpan<char> value)
     {
         var pointer = Allocate(value.Length + 1);
         var bytePointer = (byte*)pointer;
 
         if (value != "")
         {
-            var stringBytes = Encoding.ASCII.GetBytes(value);
+            var stringBytes = Encoding.ASCII.GetBytes(value.ToArray());
             fixed (byte* p = &stringBytes[0])
             {
                 Buffer.MemoryCopy(p, bytePointer, value.Length, value.Length);

@@ -205,7 +205,7 @@ public unsafe static class TypeTable
         if (ErrorReporter.Errors.Count > 0) return;
 
         var typeInfoPointer = IntPtr.Zero;
-        var name = Allocator.MakeString(type.Name);
+        var name = (LanguageString)type.Name;
 
         switch (type.TypeKind)
         {
@@ -245,7 +245,7 @@ public unsafe static class TypeTable
 
                 foreach (var (valueName, value) in enumType.Values)
                 {
-                    var enumValue = new EnumValue {Name = Allocator.MakeString(valueName), Value = value.Value};
+                    var enumValue = new EnumValue {Name = valueName, Value = value.Value};
                     enumValues[value.Index] = enumValue;
                 }
 
@@ -264,7 +264,7 @@ public unsafe static class TypeTable
 
                     for (var i = 0; i < attributes.Length; i++)
                     {
-                        attributes[i] = Allocator.MakeString(enumType.Attributes[i]);
+                        attributes[i] = enumType.Attributes[i];
                     }
 
                     var attributesArraySize = attributes.Length * Allocator.StringLength;
@@ -294,7 +294,7 @@ public unsafe static class TypeTable
                     for (var i = 0; i < structType.Fields.Count; i++)
                     {
                         var field = structType.Fields[i];
-                        var typeField = new TypeField {Name = Allocator.MakeString(field.Name), Offset = field.Offset, TypeInfo = TypeInfos[field.Type.TypeIndex]};
+                        var typeField = new TypeField {Name = field.Name, Offset = field.Offset, TypeInfo = TypeInfos[field.Type.TypeIndex]};
 
                         if (field.Attributes != null)
                         {
@@ -303,7 +303,7 @@ public unsafe static class TypeTable
 
                             for (var attributeIndex = 0; attributeIndex < attributes.Length; attributeIndex++)
                             {
-                                attributes[attributeIndex] = Allocator.MakeString(field.Attributes[attributeIndex]);
+                                attributes[attributeIndex] = field.Attributes[attributeIndex];
                             }
 
                             var attributesArraySize = attributes.Length * Allocator.StringLength;
@@ -334,7 +334,7 @@ public unsafe static class TypeTable
 
                     for (var i = 0; i < attributes.Length; i++)
                     {
-                        attributes[i] = Allocator.MakeString(structType.Attributes[i]);
+                        attributes[i] = structType.Attributes[i];
                     }
 
                     var attributesArraySize = attributes.Length * Allocator.StringLength;
@@ -383,7 +383,7 @@ public unsafe static class TypeTable
                 for (var i = 0; i < unionFields.Length; i++)
                 {
                     var field = union.Fields[i];
-                    unionFields[i] = new UnionField {Name = Allocator.MakeString(field.Name), TypeInfo = TypeInfos[field.Type.TypeIndex]};
+                    unionFields[i] = new UnionField {Name = field.Name, TypeInfo = TypeInfos[field.Type.TypeIndex]};
                 }
 
                 var unionFieldsArraySize = unionFields.Length * UnionFieldSize;
@@ -409,7 +409,7 @@ public unsafe static class TypeTable
                     for (var i = 0; i < arguments.Length; i++)
                     {
                         var argument = interfaceAst.Arguments[i];
-                        var argumentType = new ArgumentType {Name = Allocator.MakeString(argument.Name), TypeInfo = TypeInfos[argument.Type.TypeIndex]};
+                        var argumentType = new ArgumentType {Name = argument.Name, TypeInfo = TypeInfos[argument.Type.TypeIndex]};
                         arguments[i] = argumentType;
                     }
 
@@ -439,7 +439,7 @@ public unsafe static class TypeTable
                     for (var i = 0; i < argumentCount; i++)
                     {
                         var argument = function.Arguments[i];
-                        var argumentType = new ArgumentType {Name = Allocator.MakeString(argument.Name), TypeInfo = TypeInfos[argument.Type.TypeIndex]};
+                        var argumentType = new ArgumentType {Name = argument.Name, TypeInfo = TypeInfos[argument.Type.TypeIndex]};
                         arguments[i] = argumentType;
                     }
 
@@ -459,7 +459,7 @@ public unsafe static class TypeTable
 
                     for (var i = 0; i < attributes.Length; i++)
                     {
-                        attributes[i] = Allocator.MakeString(function.Attributes[i]);
+                        attributes[i] = function.Attributes[i];
                     }
 
                     var attributesArraySize = attributes.Length * Allocator.StringLength;

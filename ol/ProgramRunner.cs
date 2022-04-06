@@ -32,9 +32,9 @@ public static unsafe class ProgramRunner
     private static TypeBuilder _functionTypeBuilder;
     private static int _version;
     private static ConstructorInfo _dllImportConstructor;
-    private static readonly Dictionary<string, CustomAttributeBuilder> _libraries = new();
-    private static readonly Dictionary<string, List<MethodInfo>> _externFunctions = new();
-    private static readonly Dictionary<string, Type> _functionPointerDelegateTypes = new();
+    private static readonly Dictionary<String, CustomAttributeBuilder> _libraries = new();
+    private static readonly Dictionary<String, List<MethodInfo>> _externFunctions = new();
+    private static readonly Dictionary<String, Type> _functionPointerDelegateTypes = new();
 
     private static int _typeCount;
     private static IntPtr _typeTablePointer;
@@ -114,7 +114,7 @@ public static unsafe class ProgramRunner
 
         var method = _functionTypeBuilder.DefineMethod(function.Name, MethodAttributes.Public | MethodAttributes.Static, returnType, argumentTypes);
 
-        var library = function.Library == null ? function.ExternLib : function.Library.FileName == null ?
+        var library = function.Library == null ? function.ExternLib.ToString() : function.Library.FileName.Pointer == null ?
         #if _LINUX
             $"{function.Library.AbsolutePath}.so" :
         #elif _WINDOWS
@@ -125,7 +125,7 @@ public static unsafe class ProgramRunner
         if (!_libraries.TryGetValue(library, out var libraryDllImport))
         {
             _dllImportConstructor ??= typeof(DllImportAttribute).GetConstructor(new []{typeof(string)});
-            libraryDllImport = _libraries[library] = new CustomAttributeBuilder(_dllImportConstructor, new []{library});
+            libraryDllImport = _libraries[library] = new CustomAttributeBuilder(_dllImportConstructor, new string[]{library});
         }
 
         method.SetCustomAttribute(libraryDllImport);
@@ -1606,52 +1606,46 @@ public static unsafe class ProgramRunner
         if (callingFunction.Source.Flags.Has(FunctionFlags.Compiler))
         {
             var returnValue = new Register();
-            switch (callingFunction.Source.Name)
+            var functionName = callingFunction.Source.Name;
+            if (functionName.Compare("set_linker"))
             {
-                case "set_linker":
-                {
-                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
-                    SetLinker(value.Byte);
-                    break;
-                }
-                case "set_executable_name":
-                {
-                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
-                    var name = Marshal.PtrToStructure<LanguageString>(value.Pointer);
-                    SetExecutableName(name);
-                    break;
-                }
-                case "set_output_type_table":
-                {
-                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
-                    SetOutputTypeTable(value.Byte);
-                    break;
-                }
-                case "set_output_directory":
-                {
-                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
-                    var directory = Marshal.PtrToStructure<LanguageString>(value.Pointer);
-                    SetOutputDirectory(directory);
-                    break;
-                }
-                case "add_library_directory":
-                {
-                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
-                    var directory = Marshal.PtrToStructure<LanguageString>(value.Pointer);
-                    AddLibraryDirectory(directory);
-                    break;
-                }
-                case "copy_to_output_directory":
-                {
-                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
-                    var file = Marshal.PtrToStructure<LanguageString>(value.Pointer);
-                    CopyToOutputDirectory(file);
-                    break;
-                }
-                default:
-                    ErrorReporter.Report($"Undefined compiler function '{callingFunction.Source.Name}'", callingFunction.Source);
-                    break;
+                var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                SetLinker(value.Byte);
             }
+            else if (functionName.Compare("set_executable_name"))
+            {
+                var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                var name = Marshal.PtrToStructure<LanguageString>(value.Pointer);
+                SetExecutableName(name);
+            }
+            else if (functionName.Compare("set_output_type_table"))
+            {
+                var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                SetOutputTypeTable(value.Byte);
+            }
+            else if (functionName.Compare("set_output_directory"))
+            {
+                var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                var directory = Marshal.PtrToStructure<LanguageString>(value.Pointer);
+                SetOutputDirectory(directory);
+            }
+            else if (functionName.Compare("add_library_directory"))
+            {
+                var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                var directory = Marshal.PtrToStructure<LanguageString>(value.Pointer);
+                AddLibraryDirectory(directory);
+            }
+            else if (functionName.Compare("copy_to_output_directory"))
+            {
+                var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                var file = Marshal.PtrToStructure<LanguageString>(value.Pointer);
+                CopyToOutputDirectory(file);
+            }
+            else
+            {
+                ErrorReporter.Report($"Undefined compiler function '{callingFunction.Source.Name}'", callingFunction.Source);
+            }
+
             return returnValue;
         }
 

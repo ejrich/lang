@@ -382,7 +382,7 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static InstructionValue GetConstantStruct(StructAst structDef, IScope scope, Dictionary<string, AssignmentAst> assignments)
+    private static InstructionValue GetConstantStruct(StructAst structDef, IScope scope, Dictionary<String, AssignmentAst> assignments)
     {
         var constantStruct = new InstructionValue {ValueType = InstructionValueType.ConstantStruct, Type = structDef, Values = new InstructionValue[structDef.Fields.Count]};
 
@@ -921,7 +921,7 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static void InitializeStruct(FunctionIR function, StructAst structDef, InstructionValue pointer, IScope scope, Dictionary<string, AssignmentAst> assignments)
+    private static void InitializeStruct(FunctionIR function, StructAst structDef, InstructionValue pointer, IScope scope, Dictionary<String, AssignmentAst> assignments)
     {
         if (assignments == null)
         {
@@ -1973,7 +1973,7 @@ public static class ProgramIRBuilder
         return value;
     }
 
-    private static InstructionValue EmitIdentifier(FunctionIR function, string name, IScope scope, bool useRawString = false, bool returnValue = false)
+    private static InstructionValue EmitIdentifier(FunctionIR function, String name, IScope scope, bool useRawString = false, bool returnValue = false)
     {
         var identifier = GetScopeIdentifier(scope, name, out var global);
         if (identifier is DeclarationAst declaration)
@@ -2002,7 +2002,8 @@ public static class ProgramIRBuilder
             }
             return EmitLoad(function, declaration.Type, pointer, scope, returnValue);
         }
-        else if (identifier is VariableAst variable)
+
+        if (identifier is VariableAst variable)
         {
             if (useRawString && variable.Type.TypeKind == TypeKind.String)
             {
@@ -2457,7 +2458,7 @@ public static class ProgramIRBuilder
     {
         if (functionPointer == null)
         {
-            var identifier = GetScopeIdentifier(scope, call.Name, out var _);
+            var identifier = GetScopeIdentifier(scope, call.Name, out _);
             if (identifier is DeclarationAst declaration)
             {
                 functionPointer = EmitLoad(function, declaration.Type, function.Pointers[declaration.PointerIndex + function.PointerOffset], scope);
@@ -2948,7 +2949,7 @@ public static class ProgramIRBuilder
         return new InstructionValue {ValueType = InstructionValueType.Constant, Type = TypeTable.S32Type, ConstantValue = new Constant {Integer = value}};
     }
 
-    private static IAst GetScopeIdentifier(IScope scope, string name, out bool global)
+    private static IAst GetScopeIdentifier(IScope scope, String name, out bool global)
     {
         do {
             if (scope.Identifiers.TryGetValue(name, out var ast))

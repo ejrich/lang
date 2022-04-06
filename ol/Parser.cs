@@ -6,12 +6,12 @@ using System.Linq;
 
 namespace ol;
 
-public static class Parser
+public static unsafe class Parser
 {
     private static string _libraryDirectory;
 
-    public static SafeLinkedList<IAst> Asts = new();
-    public static SafeLinkedList<CompilerDirectiveAst> Directives = new();
+    public static readonly SafeLinkedList<IAst> Asts = new();
+    public static readonly SafeLinkedList<CompilerDirectiveAst> Directives = new();
 
     private class TokenEnumerator
     {
@@ -39,15 +39,13 @@ public static class Parser
             return Remaining = false;
         }
 
-        public bool Move(int steps)
+        public void Move(int steps)
         {
             _index += steps;
             if (_tokens.Count > _index)
             {
                 Current = _tokens[_index];
-                return true;
             }
-            return false;
         }
 
         public bool Peek(out Token token, int steps = 0)
@@ -359,14 +357,14 @@ public static class Parser
         }
     }
 
-    private static List<string> ParseAttributes(TokenEnumerator enumerator)
+    private static List<String> ParseAttributes(TokenEnumerator enumerator)
     {
         if (enumerator.Current.Type != TokenType.OpenBracket)
         {
             return null;
         }
 
-        var attributes = new List<string>();
+        var attributes = new List<String>();
         var commaRequired = false;
         while (enumerator.MoveNext())
         {
@@ -412,7 +410,7 @@ public static class Parser
         return attributes;
     }
 
-    private static FunctionAst ParseFunction(TokenEnumerator enumerator, List<string> attributes)
+    private static FunctionAst ParseFunction(TokenEnumerator enumerator, List<String> attributes)
     {
         // 1. Determine return type and name of the function
         var function = CreateAst<FunctionAst>(enumerator);
@@ -500,7 +498,7 @@ public static class Parser
         if (enumerator.Current.Type == TokenType.LessThan)
         {
             var commaRequiredBeforeNextType = false;
-            var generics = new HashSet<string>();
+            var generics = new HashSet<String>();
             while (enumerator.MoveNext())
             {
                 token = enumerator.Current;
@@ -701,69 +699,78 @@ public static class Parser
                 return null;
             }
 
-            switch (enumerator.Current.Value)
+            var directive = enumerator.Current.Value;
+            if (directive.Compare("extern"))
             {
-                case "extern":
-                    function.Flags |= FunctionFlags.Extern;
-                    const string externError = "Extern function definition should be followed by the library in use";
-                    if (!enumerator.Peek(out token))
+                function.Flags |= FunctionFlags.Extern;
+                const string externError = "Extern function definition should be followed by the library in use";
+                if (!enumerator.Peek(out token))
+                {
+                    ErrorReporter.Report(externError, enumerator.FileIndex, token);
+                }
+                else if (token.Type == TokenType.Literal)
+                {
+                    enumerator.MoveNext();
+                    function.ExternLib = token.Value;
+                }
+                else if (token.Type == TokenType.Identifier)
+                {
+                    enumerator.MoveNext();
+                    function.LibraryName = token.Value;
+                }
+                else
+                {
+                    ErrorReporter.Report(externError, enumerator.FileIndex, token);
+                }
+
+                return function;
+            }
+            if (directive.Compare("compiler"))
+            {
+                function.Flags |= FunctionFlags.Compiler;
+                return function;
+            }
+            if (directive.Compare("syscall"))
+            {
+                function.Flags |= FunctionFlags.Syscall;
+                const string syscallError = "Syscall function definition should be followed by the number for the system call";
+                if (!enumerator.Peek(out token))
+                {
+                    ErrorReporter.Report(syscallError, enumerator.FileIndex, token);
+                }
+                else if (token.Type == TokenType.Number)
+                {
+                    enumerator.MoveNext();
+                    if (token.Flags == TokenFlags.None && int.TryParse(token.Value, out var value))
                     {
-                        ErrorReporter.Report(externError, enumerator.FileIndex, token);
-                    }
-                    else if (token.Type == TokenType.Literal)
-                    {
-                        enumerator.MoveNext();
-                        function.ExternLib = token.Value;
-                    }
-                    else if (token.Type == TokenType.Identifier)
-                    {
-                        enumerator.MoveNext();
-                        function.LibraryName = token.Value;
+                        function.Syscall = value;
                     }
                     else
                     {
-                        ErrorReporter.Report(externError, enumerator.FileIndex, token);
-                    }
-                    return function;
-                case "compiler":
-                    function.Flags |= FunctionFlags.Compiler;
-                    return function;
-                case "syscall":
-                    function.Flags |= FunctionFlags.Syscall;
-                    const string syscallError = "Syscall function definition should be followed by the number for the system call";
-                    if (!enumerator.Peek(out token))
-                    {
                         ErrorReporter.Report(syscallError, enumerator.FileIndex, token);
                     }
-                    else if (token.Type == TokenType.Number)
-                    {
-                        enumerator.MoveNext();
-                        if (token.Flags == TokenFlags.None && int.TryParse(token.Value, out var value))
-                        {
-                            function.Syscall = value;
-                        }
-                        else
-                        {
-                            ErrorReporter.Report(syscallError, enumerator.FileIndex, token);
-                        }
-                    }
-                    else
-                    {
-                        ErrorReporter.Report(syscallError, enumerator.FileIndex, token);
-                    }
-                    return function;
-                case "print_ir":
-                    function.Flags |= FunctionFlags.PrintIR;
-                    break;
-                case "call_location":
-                    function.Flags |= FunctionFlags.PassCallLocation;
-                    break;
-                case "inline":
-                    function.Flags |= FunctionFlags.Inline;
-                    break;
-                default:
-                    ErrorReporter.Report($"Unexpected compiler directive '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
-                    break;
+                }
+                else
+                {
+                    ErrorReporter.Report(syscallError, enumerator.FileIndex, token);
+                }
+                return function;
+            }
+            if (directive.Compare("print_ir"))
+            {
+                function.Flags |= FunctionFlags.PrintIR;
+            }
+            else if (directive.Compare("call_location"))
+            {
+                function.Flags |= FunctionFlags.PassCallLocation;
+            }
+            else if (directive.Compare("inline"))
+            {
+                function.Flags |= FunctionFlags.Inline;
+            }
+            else
+            {
+                ErrorReporter.Report($"Unexpected compiler directive '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
             }
             enumerator.MoveNext();
         }
@@ -788,7 +795,7 @@ public static class Parser
         return function;
     }
 
-    private static StructAst ParseStruct(TokenEnumerator enumerator, List<string> attributes)
+    private static StructAst ParseStruct(TokenEnumerator enumerator, List<String> attributes)
     {
         var structAst = CreateAst<StructAst>(enumerator);
         structAst.Attributes = attributes;
@@ -822,7 +829,7 @@ public static class Parser
             // Clear the '<' before entering loop
             enumerator.MoveNext();
             var commaRequiredBeforeNextType = false;
-            var generics = new HashSet<string>();
+            var generics = new HashSet<String>();
             while (enumerator.MoveNext())
             {
                 token = enumerator.Current;
@@ -1001,7 +1008,7 @@ public static class Parser
         return structField;
     }
 
-    private static EnumAst ParseEnum(TokenEnumerator enumerator, List<string> attributes)
+    private static EnumAst ParseEnum(TokenEnumerator enumerator, List<String> attributes)
     {
         var enumAst = CreateAst<EnumAst>(enumerator);
         enumAst.Attributes = attributes;
@@ -1356,7 +1363,7 @@ public static class Parser
         return field;
     }
 
-    private static bool SearchForGeneric(string generic, int index, TypeDefinition type)
+    private static bool SearchForGeneric(String generic, int index, TypeDefinition type)
     {
         if (type.Name == generic)
         {
@@ -1828,7 +1835,7 @@ public static class Parser
         switch (enumerator.Current.Type)
         {
             case TokenType.OpenBrace:
-                values.Assignments = new Dictionary<string, AssignmentAst>();
+                values.Assignments = new();
                 while (enumerator.MoveNext())
                 {
                     var token = enumerator.Current;
@@ -2527,7 +2534,7 @@ public static class Parser
                     enumerator.MoveNext();
                     enumerator.MoveNext();
 
-                    callAst.SpecifiedArguments ??= new Dictionary<string, IAst>();
+                    callAst.SpecifiedArguments ??= new Dictionary<String, IAst>();
                     var argument = ParseExpression(enumerator, currentFunction, null, TokenType.Comma, TokenType.CloseParen);
                     if (!callAst.SpecifiedArguments.TryAdd(argumentName, argument))
                     {
@@ -2598,121 +2605,128 @@ public static class Parser
         }
 
         var token = enumerator.Current;
-        switch (token.Value)
+        var type = token.Value;
+        if (type.Compare("run"))
         {
-            case "run":
-                directive.Type = DirectiveType.Run;
-                enumerator.MoveNext();
-                var ast = ParseLine(enumerator, null);
-                if (ast != null)
-                    directive.Value = ast;
-                break;
-            case "if":
-                directive.Type = DirectiveType.If;
-                directive.Value = ParseConditional(enumerator, null, true, directory);
-                break;
-            case "assert":
-                directive.Type = DirectiveType.Assert;
-                enumerator.MoveNext();
-                directive.Value = ParseExpression(enumerator, null);
-                break;
-            case "import":
-                if (!enumerator.MoveNext())
-                {
-                    ErrorReporter.Report($"Expected module name or source file", enumerator.FileIndex, enumerator.Last);
-                    return null;
-                }
-                token = enumerator.Current;
-                switch (token.Type)
-                {
-                    case TokenType.Identifier:
-                        directive.Type = DirectiveType.ImportModule;
-                        var module = token.Value;
-                        if (global)
-                        {
-                            AddModule(module, enumerator.FileIndex, token);
-                        }
-                        else
-                        {
-                            directive.Import = new Import {Name = module, Path = Path.Combine(_libraryDirectory, $"{token.Value}.ol")};
-                        }
-                        break;
-                    case TokenType.Literal:
-                        directive.Type = DirectiveType.ImportFile;
-                        var file = token.Value;
-                        if (global)
-                        {
-                            AddFile(file, directory, enumerator.FileIndex, token);
-                        }
-                        else
-                        {
-                            directive.Import = new Import {Name = file, Path = Path.Combine(directory, token.Value)};
-                        }
-                        break;
-                    default:
-                        ErrorReporter.Report($"Expected module name or source file, but got '{token.Value}'", enumerator.FileIndex, token);
-                        break;
-                }
-                break;
-            case "library":
-                directive.Type = DirectiveType.Library;
-                if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Identifier)
-                {
-                    ErrorReporter.Report($"Expected library name, but got '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
-                    return null;
-                }
-                var name = enumerator.Current.Value;
-                if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Literal)
-                {
-                    ErrorReporter.Report($"Expected library path, but got '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
-                    return null;
-                }
-                var path = enumerator.Current.Value;
-                directive.Library = new Library {Name = name, Path = path};
-                if (path[0] == '/')
-                {
-                    directive.Library.AbsolutePath = path;
-                }
-                else
-                {
-                    directive.Library.AbsolutePath = Path.Combine(directory, path);
-                }
-                break;
-            case "system_library":
-                directive.Type = DirectiveType.SystemLibrary;
-                if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Identifier)
-                {
-                    ErrorReporter.Report($"Expected library name, but got '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
-                    return null;
-                }
-                name = enumerator.Current.Value;
-                if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Literal)
-                {
-                    ErrorReporter.Report($"Expected library file name, but got '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
-                    return null;
-                }
-                var fileName = enumerator.Current.Value;
-                directive.Library = new Library {Name = name, FileName = fileName};
-                if (enumerator.Peek(out token) && token.Type == TokenType.Literal)
-                {
-                    directive.Library.LibPath = token.Value;
-                    enumerator.MoveNext();
-                }
-                break;
-            case "private":
-                if (enumerator.Private)
-                {
-                    ErrorReporter.Report("Tried to set #private when already in private scope", enumerator.FileIndex, token);
-                }
-                else
-                {
-                    TypeChecker.PrivateScopes[enumerator.FileIndex] = new PrivateScope{Parent = TypeChecker.GlobalScope};
-                }
-                enumerator.Private = true;
-                break;
-            default:
-                ErrorReporter.Report($"Unsupported top-level compiler directive '{token.Value}'", enumerator.FileIndex, token);
+            directive.Type = DirectiveType.Run;
+            enumerator.MoveNext();
+            var ast = ParseLine(enumerator, null);
+            if (ast != null)
+                directive.Value = ast;
+        }
+        else if (type.Compare("if"))
+        {
+            directive.Type = DirectiveType.If;
+            directive.Value = ParseConditional(enumerator, null, true, directory);
+        }
+        else if (type.Compare("assert"))
+        {
+            directive.Type = DirectiveType.Assert;
+            enumerator.MoveNext();
+            directive.Value = ParseExpression(enumerator, null);
+        }
+        else if (type.Compare("import"))
+        {
+            if (!enumerator.MoveNext())
+            {
+                ErrorReporter.Report($"Expected module name or source file", enumerator.FileIndex, enumerator.Last);
                 return null;
+            }
+
+            token = enumerator.Current;
+            switch (token.Type)
+            {
+                case TokenType.Identifier:
+                    directive.Type = DirectiveType.ImportModule;
+                    var module = token.Value;
+                    if (global)
+                    {
+                        AddModule(module, enumerator.FileIndex, token);
+                    }
+                    else
+                    {
+                        directive.Import = new Import {Name = module, Path = Path.Combine(_libraryDirectory, $"{token.Value}.ol")};
+                    }
+                    break;
+                case TokenType.Literal:
+                    directive.Type = DirectiveType.ImportFile;
+                    var file = token.Value;
+                    if (global)
+                    {
+                        AddFile(file, directory, enumerator.FileIndex, token);
+                    }
+                    else
+                    {
+                        directive.Import = new Import {Name = file, Path = Path.Combine(directory, token.Value)};
+                    }
+                    break;
+                default:
+                    ErrorReporter.Report($"Expected module name or source file, but got '{token.Value}'", enumerator.FileIndex, token);
+                    break;
+            }
+        }
+        else if (type.Compare("library"))
+        {
+            directive.Type = DirectiveType.Library;
+            if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Identifier)
+            {
+                ErrorReporter.Report($"Expected library name, but got '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
+                return null;
+            }
+            var name = enumerator.Current.Value;
+            if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Literal)
+            {
+                ErrorReporter.Report($"Expected library path, but got '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
+                return null;
+            }
+            var path = enumerator.Current.Value;
+            directive.Library = new Library {Name = name, Path = path};
+            if (path[0] == '/')
+            {
+                directive.Library.AbsolutePath = path;
+            }
+            else
+            {
+                directive.Library.AbsolutePath = Path.Combine(directory, path);
+            }
+        }
+        else if (type.Compare("system_library"))
+        {
+            directive.Type = DirectiveType.SystemLibrary;
+            if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Identifier)
+            {
+                ErrorReporter.Report($"Expected library name, but got '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
+                return null;
+            }
+            var name = enumerator.Current.Value;
+            if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Literal)
+            {
+                ErrorReporter.Report($"Expected library file name, but got '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
+                return null;
+            }
+            var fileName = enumerator.Current.Value;
+            directive.Library = new Library {Name = name, FileName = fileName};
+            if (enumerator.Peek(out token) && token.Type == TokenType.Literal)
+            {
+                directive.Library.LibPath = token.Value;
+                enumerator.MoveNext();
+            }
+        }
+        else if (type.Compare("private"))
+        {
+            if (enumerator.Private)
+            {
+                ErrorReporter.Report("Tried to set #private when already in private scope", enumerator.FileIndex, token);
+            }
+            else
+            {
+                TypeChecker.PrivateScopes[enumerator.FileIndex] = new PrivateScope{Parent = TypeChecker.GlobalScope};
+            }
+            enumerator.Private = true;
+        }
+        else
+        {
+            ErrorReporter.Report($"Unsupported top-level compiler directive '{token.Value}'", enumerator.FileIndex, token);
         }
 
         return directive;
@@ -2729,34 +2743,37 @@ public static class Parser
         }
 
         var token = enumerator.Current;
-        switch (token.Value)
+        var type = token.Value;
+        if (type.Compare("inline"))
         {
-            case "if":
-                directive.Type = DirectiveType.If;
-                directive.Value = ParseConditional(enumerator, currentFunction);
-                currentFunction.Flags |= FunctionFlags.HasDirectives;
-                break;
-            case "assert":
-                directive.Type = DirectiveType.Assert;
-                enumerator.MoveNext();
-                directive.Value = ParseExpression(enumerator, currentFunction);
-                currentFunction.Flags |= FunctionFlags.HasDirectives;
-                break;
-            case "inline":
-                if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Identifier)
-                {
-                    ErrorReporter.Report($"Expected funciton call following #inline directive", enumerator.FileIndex, token);
-                    return null;
-                }
-                var call = ParseCall(enumerator, currentFunction, true);
-                if (call != null)
-                {
-                    call.Inline = true;
-                }
-                return call;
-            default:
-                ErrorReporter.Report($"Unsupported function level compiler directive '{token.Value}'", enumerator.FileIndex, token);
+            if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Identifier)
+            {
+                ErrorReporter.Report($"Expected function call following #inline directive", enumerator.FileIndex, token);
                 return null;
+            }
+            var call = ParseCall(enumerator, currentFunction, true);
+            if (call != null)
+            {
+                call.Inline = true;
+            }
+            return call;
+        }
+        if (type.Compare("if"))
+        {
+            directive.Type = DirectiveType.If;
+            directive.Value = ParseConditional(enumerator, currentFunction);
+            currentFunction.Flags |= FunctionFlags.HasDirectives;
+        }
+        else if (type.Compare("assert"))
+        {
+            directive.Type = DirectiveType.Assert;
+            enumerator.MoveNext();
+            directive.Value = ParseExpression(enumerator, currentFunction);
+            currentFunction.Flags |= FunctionFlags.HasDirectives;
+        }
+        else
+        {
+            ErrorReporter.Report($"Unsupported function level compiler directive '{token.Value}'", enumerator.FileIndex, token);
         }
 
         return directive;
@@ -3258,7 +3275,7 @@ public static class Parser
         if (enumerator.Current.Type == TokenType.LessThan)
         {
             var commaRequiredBeforeNextType = false;
-            var generics = new HashSet<string>();
+            var generics = new HashSet<String>();
             while (enumerator.MoveNext())
             {
                 token = enumerator.Current;
@@ -3459,14 +3476,14 @@ public static class Parser
                 ErrorReporter.Report("Expected compiler directive value", enumerator.FileIndex, enumerator.Last);
                 return null;
             }
-            switch (enumerator.Current.Value)
+
+            if (enumerator.Current.Value.Compare("print_ir"))
             {
-                case "print_ir":
-                    overload.Flags |= FunctionFlags.PrintIR;
-                    break;
-                default:
-                    ErrorReporter.Report($"Unexpected compiler directive '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
-                    break;
+                overload.Flags |= FunctionFlags.PrintIR;
+            }
+            else
+            {
+                ErrorReporter.Report($"Unexpected compiler directive '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
             }
             enumerator.MoveNext();
         }
@@ -3818,7 +3835,7 @@ public static class Parser
                     endsWithShift = true;
                     break;
                 }
-                else if (token.Type == TokenType.RotateRight)
+                if (token.Type == TokenType.RotateRight)
                 {
                     if ((depth % 3 != 2 && !endsWithRotate) || (!commaRequiredBeforeNextType && typeDefinition.Generics.Any()))
                     {
