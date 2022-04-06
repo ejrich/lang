@@ -1594,7 +1594,7 @@ public static unsafe class ProgramRunner
 
     private static Register MakeCall(FunctionIR callingFunction, InstructionValue[] arguments, ReadOnlySpan<Register> registers, IntPtr stackPointer, FunctionIR function, ReadOnlySpan<Register> functionArgs, int externIndex = 0)
     {
-        if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Extern))
+        if (callingFunction.Source.Flags.Has(FunctionFlags.Extern))
         {
             var args = GetExternArguments(arguments, registers, stackPointer, function, functionArgs);
 
@@ -1603,7 +1603,7 @@ public static unsafe class ProgramRunner
             return ConvertToRegister(returnValue);
         }
 
-        if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Compiler))
+        if (callingFunction.Source.Flags.Has(FunctionFlags.Compiler))
         {
             var returnValue = new Register();
             switch (callingFunction.Source.Name)
@@ -1915,7 +1915,7 @@ public static unsafe class ProgramRunner
             var argumentTypes = new Type[function.Source.Arguments.Count];
             Delegate functionDelegate;
 
-            if (function.Source.Flags.HasFlag(FunctionFlags.Extern))
+            if (function.Source.Flags.Has(FunctionFlags.Extern))
             {
                 var methodInfo = _externFunctions[function.Source.Name][0];
 

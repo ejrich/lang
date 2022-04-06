@@ -1165,11 +1165,11 @@ public static class Parser
                                 ErrorReporter.Report($"Expected enum value to be an integer, but got '{token.Value}'", enumerator.FileIndex, token);
                             }
                         }
-                        else if (token.Flags.HasFlag(TokenFlags.Float))
+                        else if (token.Flags.Has(TokenFlags.Float))
                         {
                             ErrorReporter.Report($"Expected enum value to be an integer, but got '{token.Value}'", enumerator.FileIndex, token);
                         }
-                        else if (token.Flags.HasFlag(TokenFlags.HexNumber))
+                        else if (token.Flags.Has(TokenFlags.HexNumber))
                         {
                             if (token.Value.Length == 2)
                             {
@@ -3922,7 +3922,7 @@ public static class Parser
                     return null;
                 }
 
-                if (token.Flags.HasFlag(TokenFlags.Float))
+                if (token.Flags.Has(TokenFlags.Float))
                 {
                     if (float.TryParse(token.Value, out var f32))
                     {
@@ -3942,7 +3942,7 @@ public static class Parser
                     return null;
                 }
 
-                if (token.Flags.HasFlag(TokenFlags.HexNumber))
+                if (token.Flags.Has(TokenFlags.HexNumber))
                 {
                     if (token.Value.Length == 2)
                     {

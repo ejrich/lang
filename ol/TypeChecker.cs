@@ -281,13 +281,13 @@ public static class TypeChecker
                 }
                 break;
             case FunctionAst function:
-                if (!function.Flags.HasFlag(FunctionFlags.Verified))
+                if (!function.Flags.Has(FunctionFlags.Verified))
                 {
                     VerifyFunction(function);
                 }
                 break;
             case OperatorOverloadAst overload:
-                if (!overload.Flags.HasFlag(FunctionFlags.Verified))
+                if (!overload.Flags.Has(FunctionFlags.Verified))
                 {
                     VerifyOperatorOverload(overload);
                 }
@@ -519,7 +519,7 @@ public static class TypeChecker
     {
         if (function.Generics.Any())
         {
-            // if (!function.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) && function.Arguments.All(arg => !arg.HasGenerics))
+            // if (!function.Flags.Has(FunctionFlags.ReturnTypeHasGenerics) && function.Arguments.All(arg => !arg.HasGenerics))
             // {
             //     ErrorReporter.Report($"Function '{function.Name}' has generic(s), but the generic(s) are not used in the argument(s) or the return type", function);
             // }
@@ -547,7 +547,7 @@ public static class TypeChecker
         }
         else
         {
-            if (function.Flags.HasFlag(FunctionFlags.Extern))
+            if (function.Flags.Has(FunctionFlags.Extern))
             {
                 if (function.Private)
                 {
@@ -1133,7 +1133,7 @@ public static class TypeChecker
 
             if (isVarargs)
             {
-                if (function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params))
+                if (function.Flags.Has(FunctionFlags.Varargs) || function.Flags.Has(FunctionFlags.Params))
                 {
                     ErrorReporter.Report($"Function '{function.Name}' cannot have multiple varargs", argument.TypeDefinition);
                 }
@@ -1142,7 +1142,7 @@ public static class TypeChecker
             }
             else if (isParams)
             {
-                if (function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params))
+                if (function.Flags.Has(FunctionFlags.Varargs) || function.Flags.Has(FunctionFlags.Params))
                 {
                     ErrorReporter.Report($"Function '{function.Name}' cannot have multiple varargs", argument.TypeDefinition);
                 }
@@ -1163,15 +1163,15 @@ public static class TypeChecker
             }
             else
             {
-                if (function.Flags.HasFlag(FunctionFlags.Varargs))
+                if (function.Flags.Has(FunctionFlags.Varargs))
                 {
                     ErrorReporter.Report($"Cannot declare argument '{argument.Name}' following varargs", argument);
                 }
-                else if (function.Flags.HasFlag(FunctionFlags.Params))
+                else if (function.Flags.Has(FunctionFlags.Params))
                 {
                     ErrorReporter.Report($"Cannot declare argument '{argument.Name}' following params", argument);
                 }
-                else if (function.Flags.HasFlag(FunctionFlags.Extern) && argument.Type?.TypeKind == TypeKind.String)
+                else if (function.Flags.Has(FunctionFlags.Extern) && argument.Type?.TypeKind == TypeKind.String)
                 {
                     argument.Type = TypeTable.RawStringType;
                 }
@@ -1216,7 +1216,7 @@ public static class TypeChecker
             }
         }
 
-        if (function.Flags.HasFlag(FunctionFlags.Varargs) || function.Flags.HasFlag(FunctionFlags.Params))
+        if (function.Flags.Has(FunctionFlags.Varargs) || function.Flags.Has(FunctionFlags.Params))
         {
             function.ArgumentCount = function.Arguments.Count - 1;
         }
@@ -1225,24 +1225,24 @@ public static class TypeChecker
             function.ArgumentCount = function.Arguments.Count;
         }
 
-        if (function.Flags.HasFlag(FunctionFlags.PassCallLocation))
+        if (function.Flags.Has(FunctionFlags.PassCallLocation))
         {
             function.Arguments.Add(new DeclarationAst { Name = "file", Type = TypeTable.StringType });
             function.Arguments.Add(new DeclarationAst { Name = "line", Type = TypeTable.S32Type });
             function.Arguments.Add(new DeclarationAst { Name = "column", Type = TypeTable.S32Type });
         }
 
-        if (function.Flags.HasFlag(FunctionFlags.Inline))
+        if (function.Flags.Has(FunctionFlags.Inline))
         {
-            if (function.Flags.HasFlag(FunctionFlags.Extern))
+            if (function.Flags.Has(FunctionFlags.Extern))
             {
                 ErrorReporter.Report("Extern functions cannot be inlined, remove #inline directive from function definition", function);
             }
-            else if (function.Flags.HasFlag(FunctionFlags.Compiler))
+            else if (function.Flags.Has(FunctionFlags.Compiler))
             {
                 ErrorReporter.Report("Functions that call the compiler cannot be inlined, remove #inline directive from function definition", function);
             }
-            else if (function.Flags.HasFlag(FunctionFlags.Syscall))
+            else if (function.Flags.Has(FunctionFlags.Syscall))
             {
                 ErrorReporter.Report("System calls are already inlined, remove #inline directive", function);
             }
@@ -1266,7 +1266,7 @@ public static class TypeChecker
                 ErrorReporter.Report("The main function cannot have generics", function);
             }
 
-            if (function.Flags.HasFlag(FunctionFlags.Extern))
+            if (function.Flags.Has(FunctionFlags.Extern))
             {
                 ErrorReporter.Report("The main function cannot be extern", function);
             }
@@ -1278,7 +1278,7 @@ public static class TypeChecker
             TypeTable.Add(function);
             TypeTable.CreateTypeInfo(function);
 
-            if (function.Flags.HasFlag(FunctionFlags.Extern))
+            if (function.Flags.Has(FunctionFlags.Extern))
             {
                 if (function.LibraryName != null)
                 {
@@ -1295,12 +1295,12 @@ public static class TypeChecker
                 function.Flags |= FunctionFlags.Verified;
                 ProgramIRBuilder.AddFunctionDefinition(function);
             }
-            else if (function.Flags.HasFlag(FunctionFlags.Compiler))
+            else if (function.Flags.Has(FunctionFlags.Compiler))
             {
                 function.Flags |= FunctionFlags.Verified;
                 ProgramIRBuilder.AddFunctionDefinition(function);
             }
-            else if (function.Flags.HasFlag(FunctionFlags.Syscall))
+            else if (function.Flags.Has(FunctionFlags.Syscall))
             {
                 function.Flags |= FunctionFlags.Verified;
             }
@@ -1558,7 +1558,7 @@ public static class TypeChecker
 
     private static void VerifyFunction(FunctionAst function)
     {
-        if (!function.Flags.HasFlag(FunctionFlags.DefinitionVerified))
+        if (!function.Flags.Has(FunctionFlags.DefinitionVerified))
         {
             if (!VerifyFunctionDefinition(function))
             {
@@ -1594,7 +1594,7 @@ public static class TypeChecker
         VerifyScope(function.Body, function);
 
         // 3. Verify the main function doesn't call the compiler
-        if (function.Name == "main" && function.Flags.HasFlag(FunctionFlags.CallsCompiler))
+        if (function.Name == "main" && function.Flags.Has(FunctionFlags.CallsCompiler))
         {
             ErrorReporter.Report("The main function cannot call the compiler", function);
         }
@@ -1612,7 +1612,7 @@ public static class TypeChecker
             }
         }
 
-        if (!ErrorReporter.Errors.Any() && !function.Flags.HasFlag(FunctionFlags.Inline))
+        if (!ErrorReporter.Errors.Any() && !function.Flags.Has(FunctionFlags.Inline))
         {
             ThreadPool.QueueWork(WriteFunctionJob, function);
         }
@@ -3401,22 +3401,22 @@ public static class TypeChecker
 
     private static void VerifyFunctionIfNecessary(FunctionAst function, IFunction currentFunction)
     {
-        if (function.Flags.HasFlag(FunctionFlags.Extern))
+        if (function.Flags.Has(FunctionFlags.Extern))
         {
-            if (!function.Flags.HasFlag(FunctionFlags.Verified))
+            if (!function.Flags.Has(FunctionFlags.Verified))
             {
                 VerifyFunctionDefinition(function);
             }
 
-            if (!function.Flags.HasFlag(FunctionFlags.Varargs) && !function.Flags.HasFlag(FunctionFlags.ExternInitted) && (function.ExternLib != null || function.Library != null))
+            if (!function.Flags.Has(FunctionFlags.Varargs) && !function.Flags.Has(FunctionFlags.ExternInitted) && (function.ExternLib != null || function.Library != null))
             {
                 function.Flags |= FunctionFlags.ExternInitted;
                 ProgramRunner.InitExternFunction(function);
             }
         }
-        else if (!function.Flags.HasFlag(FunctionFlags.Verified) && function != currentFunction && !function.Flags.HasFlag(FunctionFlags.Queued))
+        else if (!function.Flags.Has(FunctionFlags.Verified) && function != currentFunction && !function.Flags.Has(FunctionFlags.Queued))
         {
-            if (!function.Flags.HasFlag(FunctionFlags.DefinitionVerified))
+            if (!function.Flags.Has(FunctionFlags.DefinitionVerified))
             {
                 VerifyFunctionDefinition(function);
             }
@@ -3934,7 +3934,7 @@ public static class TypeChecker
                 }
                 else if (GetExistingPolymorphicFunction(call.Name, call.FileIndex, out existingFunction))
                 {
-                    return existingFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? null : existingFunction.ReturnType;
+                    return existingFunction.Flags.Has(FunctionFlags.ReturnTypeHasGenerics) ? null : existingFunction.ReturnType;
                 }
 
                 ErrorReporter.Report($"Call to undefined function '{call.Name}'", call);
@@ -3990,7 +3990,7 @@ public static class TypeChecker
                 }
             }
 
-            if (currentFunction != null && !currentFunction.Flags.HasFlag(FunctionFlags.CallsCompiler) && (functionAst.Flags.HasFlag(FunctionFlags.Compiler) || functionAst.Flags.HasFlag(FunctionFlags.CallsCompiler)))
+            if (currentFunction != null && !currentFunction.Flags.Has(FunctionFlags.CallsCompiler) && (functionAst.Flags.Has(FunctionFlags.Compiler) || functionAst.Flags.Has(FunctionFlags.CallsCompiler)))
             {
                 currentFunction.Flags |= FunctionFlags.CallsCompiler;
             }
@@ -3998,14 +3998,14 @@ public static class TypeChecker
             call.Function = functionAst;
             if (call.Inline)
             {
-                if (!functionAst.Flags.HasFlag(FunctionFlags.Verified) && function != currentFunction)
+                if (!functionAst.Flags.Has(FunctionFlags.Verified) && function != currentFunction)
                 {
                     VerifyFunction(functionAst);
                 }
             }
-            else if (functionAst.Flags.HasFlag(FunctionFlags.Inline))
+            else if (functionAst.Flags.Has(FunctionFlags.Inline))
             {
-                if (!functionAst.Flags.HasFlag(FunctionFlags.Verified) && function != currentFunction)
+                if (!functionAst.Flags.Has(FunctionFlags.Verified) && function != currentFunction)
                 {
                     VerifyFunction(functionAst);
                 }
@@ -4015,7 +4015,7 @@ public static class TypeChecker
             OrderCallArguments(call, function, argumentTypes);
 
             // Verify varargs call arguments
-            if (functionAst.Flags.HasFlag(FunctionFlags.Params))
+            if (functionAst.Flags.Has(FunctionFlags.Params))
             {
                 var paramsType = functionAst.ParamsElementType;
 
@@ -4052,7 +4052,7 @@ public static class TypeChecker
                     }
                 }
             }
-            else if (functionAst.Flags.HasFlag(FunctionFlags.Varargs))
+            else if (functionAst.Flags.Has(FunctionFlags.Varargs))
             {
                 var types = new Type[argumentTypes.Length];
                 for (var i = 0; i < argumentTypes.Length; i++)
@@ -4226,12 +4226,12 @@ public static class TypeChecker
     {
         foreach (var function in functions)
         {
-            if (!function.Flags.HasFlag(FunctionFlags.DefinitionVerified))
+            if (!function.Flags.Has(FunctionFlags.DefinitionVerified))
             {
                 VerifyFunctionDefinition(function);
             }
 
-            if (VerifyArguments(call, arguments, specifiedArguments, function, function.Flags.HasFlag(FunctionFlags.Varargs), function.Flags.HasFlag(FunctionFlags.Params), function.ParamsElementType, function.Flags.HasFlag(FunctionFlags.Extern)))
+            if (VerifyArguments(call, arguments, specifiedArguments, function, function.Flags.Has(FunctionFlags.Varargs), function.Flags.Has(FunctionFlags.Params), function.ParamsElementType, function.Flags.Has(FunctionFlags.Extern)))
             {
                 matchedFunction = function;
                 return true;
@@ -4246,7 +4246,7 @@ public static class TypeChecker
         for (var i = 0; i < polymorphicFunctions.Count; i++)
         {
             var function = polymorphicFunctions[i];
-            if (!function.Flags.HasFlag(FunctionFlags.DefinitionVerified))
+            if (!function.Flags.Has(FunctionFlags.DefinitionVerified))
             {
                 VerifyFunctionDefinition(function);
             }
@@ -4353,7 +4353,7 @@ public static class TypeChecker
                 }
             }
 
-            if (match && function.Flags.HasFlag(FunctionFlags.Params))
+            if (match && function.Flags.Has(FunctionFlags.Params))
             {
                 var paramsArgument = function.Arguments[^1];
                 var paramsType = paramsArgument.TypeDefinition.Generics.FirstOrDefault();
@@ -4402,7 +4402,7 @@ public static class TypeChecker
                 }
             }
 
-            if (match && (function.Flags.HasFlag(FunctionFlags.Varargs) || callArgIndex == call.Arguments.Count))
+            if (match && (function.Flags.Has(FunctionFlags.Varargs) || callArgIndex == call.Arguments.Count))
             {
                 var name = $"{function.Name}.{i}.{string.Join('.', genericTypes.Select(type => type.TypeIndex))}";
 
@@ -5064,7 +5064,7 @@ public static class TypeChecker
     {
         if (_operatorOverloads.TryGetValue(type.BackendName, out var overloads) && overloads.TryGetValue(op, out var overload))
         {
-            if (!overload.Flags.HasFlag(FunctionFlags.Verified) && overload != currentFunction && !overload.Flags.HasFlag(FunctionFlags.DefinitionVerified))
+            if (!overload.Flags.Has(FunctionFlags.Verified) && overload != currentFunction && !overload.Flags.Has(FunctionFlags.DefinitionVerified))
             {
                 VerifyOperatorOverloadDefinition(overload);
                 _astCompleteQueue.Enqueue(overload);

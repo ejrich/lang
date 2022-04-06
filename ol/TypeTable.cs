@@ -430,7 +430,7 @@ public unsafe static class TypeTable
                 var functionTypeInfo = new FunctionTypeInfo {Name = name, Type = TypeKind.Function};
                 functionTypeInfo.ReturnType = TypeInfos[function.ReturnType.TypeIndex];
 
-                var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
+                var argumentCount = function.Flags.Has(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
                 if (argumentCount > 0)
                 {
                     functionTypeInfo.Arguments.Length = argumentCount;

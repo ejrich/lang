@@ -64,6 +64,19 @@ public enum FunctionFlags
     Inline = 0x8000
 }
 
+public static class EnumExtensions
+{
+    public static bool Has(this FunctionFlags flag, FunctionFlags compare)
+    {
+        return ((int)flag & (int)compare) != 0;
+    }
+
+    public static bool Has(this TokenFlags flag, TokenFlags compare)
+    {
+        return ((int)flag & (int)compare) != 0;
+    }
+}
+
 public interface IValues : IAst
 {
     IAst Value { get; set; }

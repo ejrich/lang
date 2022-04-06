@@ -55,12 +55,12 @@ public static class ProgramIRBuilder
 
         EmitScope(functionIR, function.Body, function.ReturnType, null, null);
 
-        if (function.Flags.HasFlag(FunctionFlags.ReturnVoidAtEnd))
+        if (function.Flags.Has(FunctionFlags.ReturnVoidAtEnd))
         {
             functionIR.Instructions.Add(new Instruction {Type = InstructionType.ReturnVoid, Scope = function.Body});
         }
 
-        if (function.Flags.HasFlag(FunctionFlags.PrintIR))
+        if (function.Flags.Has(FunctionFlags.PrintIR))
         {
             PrintFunction(function.Name, functionIR);
         }
@@ -104,7 +104,7 @@ public static class ProgramIRBuilder
 
         EmitScope(functionIR, overload.Body, overload.ReturnType, null, null);
 
-        if (overload.Flags.HasFlag(FunctionFlags.PrintIR))
+        if (overload.Flags.Has(FunctionFlags.PrintIR))
         {
             PrintFunction(overload.Name, functionIR);
         }
@@ -2204,10 +2204,10 @@ public static class ProgramIRBuilder
         }
 
         var callFunction = call.Function;
-        var argumentCount = call.Function.Flags.HasFlag(FunctionFlags.Varargs) ? call.Arguments.Count : call.Function.Arguments.Count;
+        var argumentCount = call.Function.Flags.Has(FunctionFlags.Varargs) ? call.Arguments.Count : call.Function.Arguments.Count;
         var arguments = new InstructionValue[argumentCount];
 
-        if (callFunction.Flags.HasFlag(FunctionFlags.Params))
+        if (callFunction.Flags.Has(FunctionFlags.Params))
         {
             for (var i = 0; i < argumentCount - 1; i++)
             {
@@ -2267,7 +2267,7 @@ public static class ProgramIRBuilder
             var paramsValue = EmitLoad(function, paramsType, paramsAllocationIndex, scope);
             arguments[argumentCount - 1] = paramsValue;
         }
-        else if (callFunction.Flags.HasFlag(FunctionFlags.Varargs))
+        else if (callFunction.Flags.Has(FunctionFlags.Varargs))
         {
             var i = 0;
             for (; i < callFunction.Arguments.Count - 1; i++)
@@ -2287,7 +2287,7 @@ public static class ProgramIRBuilder
                 arguments[i] = argument;
             }
         }
-        else if (callFunction.Flags.HasFlag(FunctionFlags.PassCallLocation))
+        else if (callFunction.Flags.Has(FunctionFlags.PassCallLocation))
         {
             var i = 0;
             for (; i < callFunction.ArgumentCount; i++)
@@ -2320,7 +2320,7 @@ public static class ProgramIRBuilder
         }
         else
         {
-            var externCall = callFunction.Flags.HasFlag(FunctionFlags.Extern);
+            var externCall = callFunction.Flags.Has(FunctionFlags.Extern);
             for (var i = 0; i < argumentCount; i++)
             {
                 var functionArg = callFunction.Arguments[i];
@@ -2345,7 +2345,7 @@ public static class ProgramIRBuilder
                 }
             }
 
-            if (callFunction.Flags.HasFlag(FunctionFlags.Syscall))
+            if (callFunction.Flags.Has(FunctionFlags.Syscall))
             {
                 return EmitSyscall(function, callFunction, arguments, scope);
             }

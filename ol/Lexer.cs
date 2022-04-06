@@ -54,7 +54,7 @@ public static class Lexer
     {
         var fileText = File.ReadAllText(filePath);
 
-        var tokens = new List<Token>();
+        var tokens = new List<Token>(fileText.Length / 4);
         uint line = 1, column = 0;
 
         for (var i = 0; i < fileText.Length; i++)
@@ -388,7 +388,7 @@ public static class Lexer
                             {
                                 if (character == '.')
                                 {
-                                    if (token.Flags.HasFlag(TokenFlags.Float) || fileText[i+2] == '.')
+                                    if (token.Flags.Has(TokenFlags.Float) || fileText[i+2] == '.')
                                     {
                                         break;
                                     }
@@ -700,7 +700,7 @@ public static class Lexer
                         {
                             if (nextCharacter == '.')
                             {
-                                if (token.Flags.HasFlag(TokenFlags.Float) || fileText[i+2] == '.')
+                                if (token.Flags.Has(TokenFlags.Float) || fileText[i+2] == '.')
                                 {
                                     break;
                                 }
@@ -735,7 +735,7 @@ public static class Lexer
                                 offset = 0;
                                 break;
                             }
-                            else if (!token.Flags.HasFlag(TokenFlags.HexNumber) || !IsHexLetter(nextCharacter))
+                            else if (!token.Flags.Has(TokenFlags.HexNumber) || !IsHexLetter(nextCharacter))
                             {
                                 break;
                             }

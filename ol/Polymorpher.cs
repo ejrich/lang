@@ -44,7 +44,7 @@ public static class Polymorpher
         function.Private = baseFunction.Private || privateGenericTypes;
         function.ArgumentCount = baseFunction.ArgumentCount;
 
-        if (baseFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics))
+        if (baseFunction.Flags.Has(FunctionFlags.ReturnTypeHasGenerics))
         {
             function.ReturnTypeDefinition = CopyType(baseFunction.ReturnTypeDefinition, genericTypes);
         }
@@ -78,7 +78,7 @@ public static class Polymorpher
         overload.Name = $"operator.{overload.Operator}.{overload.Type.GenericName}";
         overload.FunctionIndex = TypeTable.GetFunctionIndex();
         overload.Flags = baseOverload.Flags;
-        overload.ReturnTypeDefinition = baseOverload.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? CopyType(baseOverload.ReturnTypeDefinition, genericTypes) : baseOverload.ReturnTypeDefinition;
+        overload.ReturnTypeDefinition = baseOverload.Flags.Has(FunctionFlags.ReturnTypeHasGenerics) ? CopyType(baseOverload.ReturnTypeDefinition, genericTypes) : baseOverload.ReturnTypeDefinition;
 
         foreach (var argument in baseOverload.Arguments)
         {
