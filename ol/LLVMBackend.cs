@@ -173,7 +173,7 @@ public static unsafe class LLVMBackend
             if (globalVariable.Array)
             {
                 var elementType = _types[globalVariable.Type.TypeIndex];
-                global = _module.AddGlobal(LLVM.ArrayType(elementType, globalVariable.ArrayLength), globalVariable.Name);
+                global = AddGlobal(LLVM.ArrayType(elementType, globalVariable.ArrayLength), globalVariable.Name);
 
                 if (globalVariable.InitialValue == null)
                 {
@@ -189,7 +189,7 @@ public static unsafe class LLVMBackend
             }
             else
             {
-                global = _module.AddGlobal(_types[globalVariable.Type.TypeIndex], globalVariable.Name);
+                global = AddGlobal(_types[globalVariable.Type.TypeIndex], globalVariable.Name);
             }
 
             if (globalVariable.InitialValue != null)
@@ -200,17 +200,13 @@ public static unsafe class LLVMBackend
 
             if (_emitDebug && globalVariable.FileIndex.HasValue)
             {
-                using var name = new MarshaledString(globalVariable.Name);
-                var file = _debugFiles[globalVariable.FileIndex.Value];
-                var debugType = _debugTypes[globalVariable.Type.TypeIndex];
-                var globalDebug = LLVM.DIBuilderCreateGlobalVariableExpression(_debugBuilder, _debugCompilationUnit, name.Value, (UIntPtr)name.Length, null, UIntPtr.Zero, file, globalVariable.Line, debugType, 0, null, null, 0);
-                LLVM.GlobalSetMetadata(global, 0, globalDebug);
+                DeclareDebugGlobal(globalVariable, global);
             }
 
             LLVM.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
             _globals[i] = global;
 
-            if (globalVariable.Name == "__type_table")
+            if (globalVariable.Name.Compare("__type_table"))
             {
                 typeTable = global;
                 SetPrivateConstant(typeTable);
@@ -288,6 +284,30 @@ public static unsafe class LLVMBackend
         return objectFile;
     }
 
+    private static LLVMValueRef AddGlobal(LLVMTypeRef type, String name)
+    {
+        var pointer = stackalloc sbyte[name.Length + 1];
+        for (var i = 0; i < name.Length; i++)
+        {
+            pointer[i] = (sbyte)name[i];
+        }
+        pointer[name.Length] = 0;
+        return LLVM.AddGlobal(_module, type, pointer);
+    }
+
+    private static void DeclareDebugGlobal(GlobalVariable globalVariable, LLVMValueRef global)
+    {
+        var file = _debugFiles[globalVariable.FileIndex.Value];
+        var debugType = _debugTypes[globalVariable.Type.TypeIndex];
+        var pointer = stackalloc sbyte[globalVariable.Name.Length];
+        for (var i = 0; i < globalVariable.Name.Length; i++)
+        {
+            pointer[i] = (sbyte)globalVariable.Name[i];
+        }
+        var globalDebug = LLVM.DIBuilderCreateGlobalVariableExpression(_debugBuilder, _debugCompilationUnit, pointer, globalVariable.Name, null, UIntPtr.Zero, file, globalVariable.Line, debugType, 0, null, null, 0);
+        LLVM.GlobalSetMetadata(global, 0, globalDebug);
+    }
+
     private static void AddModuleFlag(string flagName, uint flagValue)
     {
         using var name = new MarshaledString(flagName);
@@ -298,13 +318,24 @@ public static unsafe class LLVMBackend
     private static LLVMTypeRef CreateStruct(string typeName)
     {
         var typeInfo = TypeChecker.GlobalScope.Types[typeName];
-        var typeStruct = _types[typeInfo.TypeIndex] = _context.CreateNamedStruct(typeInfo.Name);
+        var typeStruct = _types[typeInfo.TypeIndex] = CreateNamedStruct(typeInfo.Name);
 
         if (_emitDebug)
         {
             CreateTemporaryDebugStructType((StructAst)typeInfo);
         }
         return typeStruct;
+    }
+
+    private static LLVMTypeRef CreateNamedStruct(ReadOnlySpan<char> name)
+    {
+        var pointer = stackalloc sbyte[name.Length + 1];
+        for (var i = 0; i < name.Length; i++)
+        {
+            pointer[i] = (sbyte)name[i];
+        }
+        pointer[name.Length] = 0;
+        return LLVM.StructCreateNamed(_context, pointer);
     }
 
     private static void DeclareAllTypesAndTypeInfos()
@@ -387,7 +418,7 @@ public static unsafe class LLVMBackend
                     case StructAst structAst:
                         if (_types[structAst.TypeIndex].Handle == IntPtr.Zero)
                         {
-                            _types[structAst.TypeIndex] = _context.CreateNamedStruct(structAst.Name);
+                            _types[structAst.TypeIndex] = CreateNamedStruct(structAst.Name);
                         }
                         CreateTypeInfo(_structTypeInfoType, structAst.TypeIndex);
                         structQueue.Add(structAst);
@@ -496,7 +527,7 @@ public static unsafe class LLVMBackend
                     case StructAst structAst:
                         if (_types[structAst.TypeIndex].Handle == IntPtr.Zero)
                         {
-                            _types[structAst.TypeIndex] = _context.CreateNamedStruct(structAst.Name);
+                            _types[structAst.TypeIndex] = CreateNamedStruct(structAst.Name);
                         }
 
                         if (structAst.Fields.Any())
@@ -554,7 +585,7 @@ public static unsafe class LLVMBackend
                     case StructAst structAst:
                         if (_types[structAst.TypeIndex].Handle == IntPtr.Zero)
                         {
-                            _types[structAst.TypeIndex] = _context.CreateNamedStruct(structAst.Name);
+                            _types[structAst.TypeIndex] = CreateNamedStruct(structAst.Name);
                         }
 
                         if (structAst.Fields.Any())
@@ -646,7 +677,7 @@ public static unsafe class LLVMBackend
                     case StructAst structAst:
                         if (_types[structAst.TypeIndex].Handle == IntPtr.Zero)
                         {
-                            _types[structAst.TypeIndex] = _context.CreateNamedStruct(structAst.Name);
+                            _types[structAst.TypeIndex] = CreateNamedStruct(structAst.Name);
                         }
 
                         if (structAst.Fields.Any())
@@ -700,7 +731,7 @@ public static unsafe class LLVMBackend
                     case StructAst structAst:
                         if (_types[structAst.TypeIndex].Handle == IntPtr.Zero)
                         {
-                            _types[structAst.TypeIndex] = _context.CreateNamedStruct(structAst.Name);
+                            _types[structAst.TypeIndex] = CreateNamedStruct(structAst.Name);
                         }
 
                         if (structAst.Fields.Any())
@@ -868,7 +899,7 @@ public static unsafe class LLVMBackend
 
     private static LLVMValueRef CreateTypeInfo(LLVMTypeRef typeInfoType, int typeIndex)
     {
-        var typeInfo = _module.AddGlobal(typeInfoType, "____type_info");
+        var typeInfo = AddGlobal(typeInfoType, "____type_info");
         SetPrivateConstant(typeInfo);
         return _typeInfos[typeIndex] = typeInfo;
     }
@@ -876,7 +907,7 @@ public static unsafe class LLVMBackend
     private static LLVMValueRef CreateConstantArray(LLVMTypeRef elementType, LLVMTypeRef arrayType, ReadOnlySpan<LLVMValueRef> data, string name)
     {
         var array = LLVMValueRef.CreateConstArray(elementType, data);
-        var arrayGlobal = _module.AddGlobal(LLVM.TypeOf(array), name);
+        var arrayGlobal = AddGlobal(LLVM.TypeOf(array), name);
         SetPrivateConstant(arrayGlobal);
         LLVM.SetInitializer(arrayGlobal, array);
 
@@ -1006,7 +1037,7 @@ public static unsafe class LLVMBackend
 
     private static void DeclareUnion(UnionAst union)
     {
-        var type = _types[union.TypeIndex] = _context.CreateNamedStruct(union.Name);
+        var type = _types[union.TypeIndex] = CreateNamedStruct(union.Name);
 
         type.StructSetBody(stackalloc []{LLVMTypeRef.CreateArray(LLVM.Int8Type(), union.Size)}, false);
     }
@@ -1301,9 +1332,15 @@ public static unsafe class LLVMBackend
         LLVM.SetUnnamedAddr(variable, 1);
     }
 
-    private static LLVMValueRef WriteFunctionDefinition(string name, FunctionIR function)
+    private static LLVMValueRef WriteFunctionDefinition(String name, FunctionIR function)
     {
         LLVMValueRef functionPointer;
+        var linkageNamePointer = stackalloc sbyte[name.Length + 1];
+        for (var i = 0; i < name.Length; i++)
+        {
+            linkageNamePointer[i] = (sbyte)name[i];
+        }
+        linkageNamePointer[name.Length] = 0;
 
         if (_emitDebug && function.Instructions != null)
         {
@@ -1323,18 +1360,25 @@ public static unsafe class LLVMBackend
                 debugArgumentTypes[i + 1] = _debugTypes[argumentType];
             }
 
+            var sourceName = function.Source.Name;
+            var namePointer = stackalloc sbyte[sourceName.Length];
+            for (var i = 0; i < sourceName.Length; i++)
+            {
+                namePointer[i] = (sbyte)sourceName[i];
+            }
+
             var file = _debugFiles[function.Source.FileIndex];
             var functionType = _debugBuilder.CreateSubroutineType(file, debugArgumentTypes, LLVMDIFlags.LLVMDIFlagZero);
-            var debugFunction = _debugFunctions[function.Source.FunctionIndex] = _debugBuilder.CreateFunction(file, function.Source.Name, name, file, function.Source.Line, functionType, 0, 1, function.Source.Line, LLVMDIFlags.LLVMDIFlagPrototyped, 0);
+            var debugFunction = _debugFunctions[function.Source.FunctionIndex] = LLVM.DIBuilderCreateFunction(_debugBuilder, file, namePointer, sourceName, linkageNamePointer, name, file, function.Source.Line, functionType, 0, 1, function.Source.Line, LLVMDIFlags.LLVMDIFlagPrototyped, 0);
 
             // Declare the function
-            functionPointer = _module.AddFunction(name, LLVMTypeRef.CreateFunction(_types[function.Source.ReturnType.TypeIndex], argumentTypes, varargs));
+            functionPointer = LLVM.AddFunction(_module, linkageNamePointer, LLVMTypeRef.CreateFunction(_types[function.Source.ReturnType.TypeIndex], argumentTypes, varargs));
             LLVM.SetSubprogram(functionPointer, debugFunction);
         }
         else
         {
             var functionType = GetFunctionType(function.Source);
-            functionPointer = _module.AddFunction(name, functionType);
+            functionPointer = LLVM.AddFunction(_module, linkageNamePointer, functionType);
         }
 
         if (function.Instructions == null)
@@ -1394,9 +1438,23 @@ public static unsafe class LLVMBackend
     {
         // Declare the basic blocks
         Span<LLVMBasicBlockRef> basicBlocks = stackalloc LLVMBasicBlockRef[function.BasicBlocks.Count];
+        var blockNameLength = (int)Math.Log10(function.BasicBlocks.Count) + 1;
+        var basicBlockName = stackalloc sbyte[blockNameLength];
+        for (var i = 0; i < blockNameLength; i++)
+        {
+            basicBlockName[i] = 0;
+        }
+
         foreach (var block in function.BasicBlocks)
         {
-            basicBlocks[block.Index] = functionPointer.AppendBasicBlock(block.Index.ToString());
+            var index = block.Index;
+            var digits = index == 0 ? 1 : (int)Math.Log10(index);
+            while (digits > 0)
+            {
+                basicBlockName[--digits] = (sbyte)(index % 10 + 48); // 48 = '0'
+                index /= 10;
+            }
+            basicBlocks[block.Index] = LLVM.AppendBasicBlock(functionPointer, basicBlockName);
         }
         LLVM.PositionBuilderAtEnd(_builder, basicBlocks[0]);
         _builder.CurrentDebugLocation = null;
@@ -1997,10 +2055,7 @@ public static unsafe class LLVMBackend
                     {
                         var functionArg = function.Source.Arguments[instruction.Index];
 
-                        using var argName = new MarshaledString(functionArg.Name);
-
-                        var debugType = _debugTypes[functionArg.Type.TypeIndex];
-                        var debugVariable = LLVM.DIBuilderCreateParameterVariable(_debugBuilder, debugBlock, argName.Value, (UIntPtr)argName.Length, (uint)instruction.Index+1, file, functionArg.Line, debugType, 0, LLVMDIFlags.LLVMDIFlagZero);
+                        var debugVariable = DeclareDebugParameter(functionArg.Name, instruction.Index, functionArg.Line, functionArg.Type, file, debugBlock);
                         var location = LLVM.DIBuilderCreateDebugLocation(_context, functionArg.Line, functionArg.Column, debugBlock, null);
 
                         LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, allocations[instruction.Index], debugVariable, expression, location, basicBlocks[blockIndex]);
@@ -2011,7 +2066,7 @@ public static unsafe class LLVMBackend
                         using var name = new MarshaledString(instruction.String);
 
                         var scope = (ScopeAst)instruction.Scope;
-                        var debugVariable = LLVM.DIBuilderCreateAutoVariable(_debugBuilder, debugBlock, name.Value, (UIntPtr)name.Length, _debugFiles[scope.FileIndex], instruction.Source.Line, _debugTypes[instruction.Value1.Type.TypeIndex], 0, LLVMDIFlags.LLVMDIFlagZero, 0);
+                        var debugVariable = DeclareDebugVariable(instruction.String, instruction.Source.Line, instruction.Value1.Type, _debugFiles[scope.FileIndex], debugBlock);
                         var location = LLVM.GetCurrentDebugLocation2(_builder);
                         var variable = GetValue(instruction.Value1, values, allocations, functionPointer);
 
@@ -2030,6 +2085,28 @@ public static unsafe class LLVMBackend
 
         // Optimize the function if release build
         LLVM.RunFunctionPassManager(_passManager, functionPointer);
+    }
+
+    private static LLVMMetadataRef DeclareDebugParameter(String name, int arg, uint line, IType type, LLVMMetadataRef file, LLVMMetadataRef debugBlock)
+    {
+        var debugType = _debugTypes[type.TypeIndex];
+        var pointer = stackalloc sbyte[name.Length];
+        for (var i = 0; i < name.Length; i++)
+        {
+            pointer[i] = (sbyte)name[i];
+        }
+        return LLVM.DIBuilderCreateParameterVariable(_debugBuilder, debugBlock, pointer, name, (uint)arg+1, file, line, debugType, 0, LLVMDIFlags.LLVMDIFlagZero);
+    }
+
+    private static LLVMMetadataRef DeclareDebugVariable(String name, uint line, IType type, LLVMMetadataRef file, LLVMMetadataRef debugBlock)
+    {
+        var debugType = _debugTypes[type.TypeIndex];
+        var pointer = stackalloc sbyte[name.Length];
+        for (var i = 0; i < name.Length; i++)
+        {
+            pointer[i] = (sbyte)name[i];
+        }
+        return LLVM.DIBuilderCreateAutoVariable(_debugBuilder, debugBlock, pointer, (UIntPtr)name.Length, file, line, debugType, 0, LLVMDIFlags.LLVMDIFlagZero, 0);
     }
 
     private static LLVMValueRef GetValue(InstructionValue value, ReadOnlySpan<LLVMValueRef> values, ReadOnlySpan<LLVMValueRef> allocations, LLVMValueRef functionPointer)
@@ -2166,10 +2243,16 @@ public static unsafe class LLVMBackend
         return null;
     }
 
-    private static LLVMValueRef GetString(string value, bool useRawString = false, bool constant = true)
+    private static LLVMValueRef GetString(String value, bool useRawString = false, bool constant = true)
     {
-        var stringValue = _context.GetConstString(value, false);
-        var stringGlobal = _module.AddGlobal(LLVM.TypeOf(stringValue), "str");
+        var pointer = stackalloc sbyte[value.Length];
+        for (var i = 0; i < value.Length; i++)
+        {
+            pointer[i] = (sbyte)value[i];
+        }
+
+        var stringValue = LLVM.ConstStringInContext(_context, pointer, (uint)value.Length, 0);
+        var stringGlobal = AddGlobal(LLVM.TypeOf(stringValue), "str");
         if (constant)
         {
             SetPrivateConstant(stringGlobal);
@@ -2182,7 +2265,7 @@ public static unsafe class LLVMBackend
             return stringPointer;
         }
 
-        var length = LLVMValueRef.CreateConstInt(LLVM.Int64Type(), (ulong)value.Length, false);
+        var length = LLVMValueRef.CreateConstInt(LLVM.Int64Type(), (ulong)value.Length);
         return LLVMValueRef.CreateConstNamedStruct(_stringType, stackalloc [] {length, stringPointer});
     }
 
@@ -2290,7 +2373,7 @@ public static unsafe class LLVMBackend
 
         foreach (var instr in assembly.Instructions)
         {
-            assemblyString.Append(instr.Instruction);
+            assemblyString.Append((ReadOnlySpan<char>)instr.Instruction);
             if (instr.Value1 != null)
             {
                 if (instr.Value1.Dereference)
@@ -2394,16 +2477,17 @@ public static unsafe class LLVMBackend
 
     private static void CreateTemporaryDebugStructType(StructAst structAst)
     {
-        using var structName = new MarshaledString(structAst.Name);
-
         var file = _debugFiles[structAst.FileIndex];
-        _debugTypes[structAst.TypeIndex] = LLVM.DIBuilderCreateReplaceableCompositeType(_debugBuilder, (uint)DwarfTag.Structure_type, structName.Value, (UIntPtr)structName.Length, null, file, structAst.Line, 0, structAst.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, UIntPtr.Zero);
+        var pointer = stackalloc sbyte[structAst.Name.Length];
+        for (var i = 0; i < structAst.Name.Length; i++)
+        {
+            pointer[i] = (sbyte)structAst.Name[i];
+        }
+        _debugTypes[structAst.TypeIndex] = LLVM.DIBuilderCreateReplaceableCompositeType(_debugBuilder, (uint)DwarfTag.Structure_type, pointer, structAst.Name, null, file, structAst.Line, 0, structAst.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, UIntPtr.Zero);
     }
 
     private static void CreateDebugStructType(StructAst structAst)
     {
-        using var structName = new MarshaledString(structAst.Name);
-
         var file = _debugFiles[structAst.FileIndex];
         Span<LLVMMetadataRef> fields = stackalloc LLVMMetadataRef[structAst.Fields.Count];
 
@@ -2413,15 +2497,18 @@ public static unsafe class LLVMBackend
             for (var i = 0; i < fields.Length; i++)
             {
                 var structField = structAst.Fields[i];
-                using var fieldName = new MarshaledString(structField.Name);
-
-                fields[i] = LLVM.DIBuilderCreateMemberType(_debugBuilder, structDecl, fieldName.Value, (UIntPtr)fieldName.Length, file, structField.Line, structField.Type.Size * 8, 0, structField.Offset * 8, LLVMDIFlags.LLVMDIFlagZero, _debugTypes[structField.Type.TypeIndex]);
+                fields[i] = DeclareDebugField(structField.Name, structField.Line, structField.Offset * 8, structField.Type, structDecl, file);
             }
         }
 
         fixed (LLVMMetadataRef* fieldsPointer = fields)
         {
-            var debugStruct = LLVM.DIBuilderCreateStructType(_debugBuilder, null, structName.Value, (UIntPtr)structName.Length, file, structAst.Line, structAst.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, (LLVMOpaqueMetadata**)fieldsPointer, (uint)fields.Length, 0, null, null, UIntPtr.Zero);
+            var pointer = stackalloc sbyte[structAst.Name.Length];
+            for (var i = 0; i < structAst.Name.Length; i++)
+            {
+                pointer[i] = (sbyte)structAst.Name[i];
+            }
+            var debugStruct = LLVM.DIBuilderCreateStructType(_debugBuilder, null, pointer, structAst.Name, file, structAst.Line, structAst.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, (LLVMOpaqueMetadata**)fieldsPointer, (uint)fields.Length, 0, null, null, UIntPtr.Zero);
             if (fields.Length > 0)
             {
                 LLVM.MetadataReplaceAllUsesWith(_debugTypes[structAst.TypeIndex], debugStruct);
@@ -2430,45 +2517,70 @@ public static unsafe class LLVMBackend
         }
     }
 
+    private static LLVMMetadataRef DeclareDebugField(String name, uint line, uint offset, IType type, LLVMMetadataRef structDecl, LLVMMetadataRef file)
+    {
+        var pointer = stackalloc sbyte[name.Length];
+        for (var i = 0; i < name.Length; i++)
+        {
+            pointer[i] = (sbyte)name[i];
+        }
+        return LLVM.DIBuilderCreateMemberType(_debugBuilder, structDecl, pointer, name, file, line, type.Size * 8, 0, offset, LLVMDIFlags.LLVMDIFlagZero, _debugTypes[type.TypeIndex]);
+    }
+
     private static void CreateDebugEnumType(EnumAst enumAst)
     {
-        using var enumName = new MarshaledString(enumAst.Name);
-
         var file = _debugFiles[enumAst.FileIndex];
         Span<LLVMMetadataRef> enumValues = stackalloc LLVMMetadataRef[enumAst.Values.Count];
         var isUnsigned = enumAst.BaseType.Signed ? 0 : 1;
 
         foreach (var (name, value) in enumAst.Values)
         {
-            using var valueName = new MarshaledString(name);
-
-            enumValues[value.Index] = LLVM.DIBuilderCreateEnumerator(_debugBuilder, valueName.Value, (UIntPtr)valueName.Length, value.Value, isUnsigned);
+            enumValues[value.Index] = DeclareDebugEnumValue(name, value.Value, isUnsigned);
         }
 
         fixed (LLVMMetadataRef* enumValuesPointer = enumValues)
         {
-            _debugTypes[enumAst.TypeIndex] = LLVM.DIBuilderCreateEnumerationType(_debugBuilder, null, enumName.Value, (UIntPtr)enumName.Length, file, enumAst.Line, (uint)enumAst.Size * 8, 0, (LLVMOpaqueMetadata**)enumValuesPointer, (uint)enumValues.Length, _debugTypes[enumAst.BaseType.TypeIndex]);
+            var pointer = stackalloc sbyte[enumAst.Name.Length];
+            for (var i = 0; i < enumAst.Name.Length; i++)
+            {
+                pointer[i] = (sbyte)enumAst.Name[i];
+            }
+            _debugTypes[enumAst.TypeIndex] = LLVM.DIBuilderCreateEnumerationType(_debugBuilder, null, pointer, enumAst.Name, file, enumAst.Line, enumAst.Size * 8, 0, (LLVMOpaqueMetadata**)enumValuesPointer, (uint)enumValues.Length, _debugTypes[enumAst.BaseType.TypeIndex]);
         }
+    }
+
+    private static LLVMMetadataRef DeclareDebugEnumValue(String name, int value, int isUnsigned)
+    {
+        var pointer = stackalloc sbyte[name.Length];
+        for (var i = 0; i < name.Length; i++)
+        {
+            pointer[i] = (sbyte)name[i];
+        }
+        return LLVM.DIBuilderCreateEnumerator(_debugBuilder, pointer, name, value, isUnsigned);
     }
 
     private static void CreateDebugBasicType(PrimitiveAst type)
     {
-        using var name = new MarshaledString(type.Name);
+        var pointer = stackalloc sbyte[type.Name.Length];
+        for (var i = 0; i < type.Name.Length; i++)
+        {
+            pointer[i] = (sbyte)type.Name[i];
+        }
         switch (type.TypeKind)
         {
             case TypeKind.Void:
                 _debugTypes[type.TypeIndex] = null;
                 break;
             case TypeKind.Boolean:
-                _debugTypes[type.TypeIndex] = LLVM.DIBuilderCreateBasicType(_debugBuilder, name.Value, (UIntPtr)name.Length, 8, (uint)DwarfTypeEncoding.Boolean, LLVMDIFlags.LLVMDIFlagZero);
+                _debugTypes[type.TypeIndex] = LLVM.DIBuilderCreateBasicType(_debugBuilder, pointer, type.Name, 8, (uint)DwarfTypeEncoding.Boolean, LLVMDIFlags.LLVMDIFlagZero);
                 break;
             case TypeKind.Integer:
             case TypeKind.Type:
                 var encoding = type.Signed ? DwarfTypeEncoding.Signed : DwarfTypeEncoding.Unsigned;
-                _debugTypes[type.TypeIndex] = LLVM.DIBuilderCreateBasicType(_debugBuilder, name.Value, (UIntPtr)name.Length, type.Size * 8, (uint)encoding, LLVMDIFlags.LLVMDIFlagZero);
+                _debugTypes[type.TypeIndex] = LLVM.DIBuilderCreateBasicType(_debugBuilder, pointer, type.Name, type.Size * 8, (uint)encoding, LLVMDIFlags.LLVMDIFlagZero);
                 break;
             case TypeKind.Float:
-                _debugTypes[type.TypeIndex] = LLVM.DIBuilderCreateBasicType(_debugBuilder, name.Value, (UIntPtr)name.Length, type.Size * 8, (uint)DwarfTypeEncoding.Float, LLVMDIFlags.LLVMDIFlagZero);
+                _debugTypes[type.TypeIndex] = LLVM.DIBuilderCreateBasicType(_debugBuilder, pointer, type.Name, type.Size * 8, (uint)DwarfTypeEncoding.Float, LLVMDIFlags.LLVMDIFlagZero);
                 break;
             case TypeKind.Pointer:
                 break;
@@ -2477,9 +2589,13 @@ public static unsafe class LLVMBackend
 
     private static void CreatePointerDebugType(PointerType pointerType)
     {
-        using var name = new MarshaledString(pointerType.Name);
         var pointedType = _debugTypes[pointerType.PointedType.TypeIndex];
-        _debugTypes[pointerType.TypeIndex] = LLVM.DIBuilderCreatePointerType(_debugBuilder, pointedType, 64, 0, 0, name.Value, (UIntPtr)name.Length);
+        var pointer = stackalloc sbyte[pointerType.Name.Length];
+        for (var i = 0; i < pointerType.Name.Length; i++)
+        {
+            pointer[i] = (sbyte)pointerType.Name[i];
+        }
+        _debugTypes[pointerType.TypeIndex] = LLVM.DIBuilderCreatePointerType(_debugBuilder, pointedType, 64, 0, 0, pointer, pointerType.Name);
     }
 
     private static void CreateArrayDebugType(ArrayType arrayType)
@@ -2490,16 +2606,17 @@ public static unsafe class LLVMBackend
 
     private static void CreateTemporaryDebugUnionType(UnionAst union)
     {
-        using var unionName = new MarshaledString(union.Name);
-
         var file = _debugFiles[union.FileIndex];
-        _debugTypes[union.TypeIndex] = LLVM.DIBuilderCreateReplaceableCompositeType(_debugBuilder, (uint)DwarfTag.Union_type, unionName.Value, (UIntPtr)unionName.Length, null, file, union.Line, 0, union.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, UIntPtr.Zero);
+        var pointer = stackalloc sbyte[union.Name.Length];
+        for (var i = 0; i < union.Name.Length; i++)
+        {
+            pointer[i] = (sbyte)union.Name[i];
+        }
+        _debugTypes[union.TypeIndex] = LLVM.DIBuilderCreateReplaceableCompositeType(_debugBuilder, (uint)DwarfTag.Union_type, pointer, union.Name, null, file, union.Line, 0, union.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, UIntPtr.Zero);
     }
 
     private static void DeclareCompoundDebugType(CompoundType compoundType)
     {
-        using var typeName = new MarshaledString(compoundType.Name);
-
         var file = _debugFiles[0];
         Span<LLVMMetadataRef> types = stackalloc LLVMMetadataRef[compoundType.Types.Length];
 
@@ -2508,15 +2625,18 @@ public static unsafe class LLVMBackend
         {
             var subType = compoundType.Types[i];
             var size = subType.Size * 8;
-            using var subTypeName = new MarshaledString(subType.Name);
-
-            types[i] = LLVM.DIBuilderCreateMemberType(_debugBuilder, file, subTypeName.Value, (UIntPtr)subTypeName.Length, file, 0, size, 0, offset, LLVMDIFlags.LLVMDIFlagZero, _debugTypes[subType.TypeIndex]);
+            types[i] = DeclareDebugField(subType.Name, 0, offset, subType, file, file);
             offset += size;
         }
 
         fixed (LLVMMetadataRef* typesPointer = types)
         {
-            _debugTypes[compoundType.TypeIndex] = LLVM.DIBuilderCreateStructType(_debugBuilder, null, typeName.Value, (UIntPtr)typeName.Length, file, 0, compoundType.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, (LLVMOpaqueMetadata**)typesPointer, (uint)types.Length, 0, null, null, UIntPtr.Zero);
+            var pointer = stackalloc sbyte[compoundType.Name.Length];
+            for (var i = 0; i < compoundType.Name.Length; i++)
+            {
+                pointer[i] = (sbyte)compoundType.Name[i];
+            }
+            _debugTypes[compoundType.TypeIndex] = LLVM.DIBuilderCreateStructType(_debugBuilder, null, pointer, compoundType.Name, file, 0, compoundType.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, (LLVMOpaqueMetadata**)typesPointer, (uint)types.Length, 0, null, null, UIntPtr.Zero);
         }
     }
 
@@ -2532,14 +2652,16 @@ public static unsafe class LLVMBackend
         }
 
         var functionType = _debugBuilder.CreateSubroutineType(_debugFiles[interfaceAst.FileIndex], debugArgumentTypes, LLVMDIFlags.LLVMDIFlagZero);
-        using var interfaceName = new MarshaledString(interfaceAst.Name);
-        _debugTypes[interfaceAst.TypeIndex] = LLVM.DIBuilderCreatePointerType(_debugBuilder, functionType, 64, 0, 0, interfaceName.Value, (UIntPtr)interfaceName.Length);
+        var pointer = stackalloc sbyte[interfaceAst.Name.Length];
+        for (var i = 0; i < interfaceAst.Name.Length; i++)
+        {
+            pointer[i] = (sbyte)interfaceAst.Name[i];
+        }
+        _debugTypes[interfaceAst.TypeIndex] = LLVM.DIBuilderCreatePointerType(_debugBuilder, functionType, 64, 0, 0, pointer, interfaceAst.Name);
     }
 
     private static void DeclareUnionDebugType(UnionAst union)
     {
-        using var unionName = new MarshaledString(union.Name);
-
         var file = _debugFiles[union.FileIndex];
         Span<LLVMMetadataRef> debugFields = stackalloc LLVMMetadataRef[union.Fields.Count];
 
@@ -2547,15 +2669,18 @@ public static unsafe class LLVMBackend
         for (var i = 0; i < debugFields.Length; i++)
         {
             var field = union.Fields[i];
-            using var fieldName = new MarshaledString(field.Name);
-
-            debugFields[i] = LLVM.DIBuilderCreateMemberType(_debugBuilder, structDecl, fieldName.Value, (UIntPtr)fieldName.Length, file, field.Line, field.Type.Size * 8, 0, 0, LLVMDIFlags.LLVMDIFlagZero, _debugTypes[field.Type.TypeIndex]);
+            debugFields[i] = DeclareDebugField(field.Name, field.Line, 0, field.Type, structDecl, file);
         }
 
         fixed (LLVMMetadataRef* fieldsPointer = debugFields)
         {
-             var debugUnion = LLVM.DIBuilderCreateStructType(_debugBuilder, null, unionName.Value, (UIntPtr)unionName.Length, file, union.Line, union.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, (LLVMOpaqueMetadata**)fieldsPointer, (uint)debugFields.Length, 0, null, null, UIntPtr.Zero);
-             LLVM.MetadataReplaceAllUsesWith(_debugTypes[union.TypeIndex], debugUnion);
+            var pointer = stackalloc sbyte[union.Name.Length];
+            for (var i = 0; i < union.Name.Length; i++)
+            {
+                pointer[i] = (sbyte)union.Name[i];
+            }
+            var debugUnion = LLVM.DIBuilderCreateStructType(_debugBuilder, null, pointer, union.Name, file, union.Line, union.Size * 8, 0, LLVMDIFlags.LLVMDIFlagZero, null, (LLVMOpaqueMetadata**)fieldsPointer, (uint)debugFields.Length, 0, null, null, UIntPtr.Zero);
+            LLVM.MetadataReplaceAllUsesWith(_debugTypes[union.TypeIndex], debugUnion);
             _debugTypes[union.TypeIndex] = debugUnion;
         }
     }

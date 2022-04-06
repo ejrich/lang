@@ -24,7 +24,7 @@ public static class Lexer
 
     private static readonly ConcurrentDictionary<char, String> _characterCache = new();
 
-    private static readonly Dictionary<string, TokenType> _reservedTokens = new()
+    private static readonly Dictionary<String, TokenType> _reservedTokens = new()
     {
         {"return", TokenType.Return},
         {"true", TokenType.Boolean},

@@ -4,7 +4,7 @@ namespace ol;
 
 public static class Assembly
 {
-    public static readonly Dictionary<string, RegisterDefinition> Registers = new()
+    public static readonly Dictionary<String, RegisterDefinition> Registers = new()
     {
         {"rax",   new()},
         {"rcx",   new(offset: 1)},
@@ -56,7 +56,7 @@ public static class Assembly
         {"ymm15", new(RegisterType.AVX, 7, 0x44)}
     };
 
-    public static readonly Dictionary<string, InstructionDefinition[]> Instructions = new()
+    public static readonly Dictionary<String, InstructionDefinition[]> Instructions = new()
     {
         {"fcos",   new InstructionDefinition[]{ new() {Opcode = 0xD9, Opcode2 = 0xFF} }},
         {"fld",    new InstructionDefinition[]{ new() {Opcode = 0xDD, HasExtension = true, Value1 = new(true)} }},

@@ -8,15 +8,15 @@ using System.Text;
 
 namespace ol;
 
-public static class TypeChecker
+public static unsafe class TypeChecker
 {
     public static GlobalScope GlobalScope;
     public static List<PrivateScope> PrivateScopes;
     public static StructAst BaseArrayType;
 
-    private static ConcurrentDictionary<string, Dictionary<Operator, OperatorOverloadAst>> _operatorOverloads;
-    private static ConcurrentDictionary<string, Dictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads;
-    private static ConcurrentDictionary<string, Library> _libraries;
+    private static ConcurrentDictionary<String, Dictionary<Operator, OperatorOverloadAst>> _operatorOverloads;
+    private static ConcurrentDictionary<String, Dictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads;
+    private static ConcurrentDictionary<String, Library> _libraries;
 
     private static Queue<IAst> _astCompleteQueue = new();
 
@@ -45,7 +45,7 @@ public static class TypeChecker
         TypeTable.TypeType = AddPrimitive("Type", TypeKind.Type, 4, true);
     }
 
-    private static PrimitiveAst AddPrimitive(string name, TypeKind typeKind, uint size = 0, bool signed = false)
+    private static PrimitiveAst AddPrimitive(String name, TypeKind typeKind, uint size = 0, bool signed = false)
     {
         var primitiveAst = new PrimitiveAst {Name = name, BackendName = name, TypeKind = typeKind, Size = size, Alignment = size, Signed = signed};
         GlobalScope.Identifiers[name] = primitiveAst;
@@ -387,7 +387,7 @@ public static class TypeChecker
         return true;
     }
 
-    public static bool AddTypeAndIdentifier(string name, IType type, IAst ast)
+    public static bool AddTypeAndIdentifier(String name, IType type, IAst ast)
     {
         if (type.Private)
         {
@@ -421,7 +421,7 @@ public static class TypeChecker
         return true;
     }
 
-    private static bool GetType(string name, int fileIndex, out IType type)
+    private static bool GetType(String name, int fileIndex, out IType type)
     {
         var privateScope = PrivateScopes[fileIndex];
 
@@ -433,7 +433,7 @@ public static class TypeChecker
         return privateScope.Types.TryGetValue(name, out type) || GlobalScope.Types.TryGetValue(name, out type);
     }
 
-    private static bool GetPolymorphicStruct(string name, int fileIndex, out StructAst type)
+    private static bool GetPolymorphicStruct(String name, int fileIndex, out StructAst type)
     {
         var privateScope = PrivateScopes[fileIndex];
 
@@ -445,7 +445,7 @@ public static class TypeChecker
         return privateScope.PolymorphicStructs.TryGetValue(name, out type) || GlobalScope.PolymorphicStructs.TryGetValue(name, out type);
     }
 
-    private static bool GetExistingFunction(string name, int fileIndex, out FunctionAst function, out int functionCount)
+    private static bool GetExistingFunction(String name, int fileIndex, out FunctionAst function, out int functionCount)
     {
         var privateScope = PrivateScopes[fileIndex];
 
@@ -485,7 +485,7 @@ public static class TypeChecker
         return false;
     }
 
-    private static bool GetExistingPolymorphicFunction(string name, int fileIndex, out FunctionAst function)
+    private static bool GetExistingPolymorphicFunction(String name, int fileIndex, out FunctionAst function)
     {
         function = null;
         var privateScope = PrivateScopes[fileIndex];
@@ -567,9 +567,9 @@ public static class TypeChecker
         }
     }
 
-    private static void AddFunction(string name, int fileIndex, FunctionAst function)
+    private static void AddFunction(String name, int fileIndex, FunctionAst function)
     {
-        if (name == null) return;
+        if (name.Pointer == null) return;
 
         function.FunctionIndex = TypeTable.GetFunctionIndex();
 
@@ -664,10 +664,7 @@ public static class TypeChecker
                 ErrorReporter.Report($"Identifier '{variable.Name}' already defined", variable);
                 return false;
             }
-            else
-            {
-                privateScope.Identifiers[variable.Name] = variable;
-            }
+            privateScope.Identifiers[variable.Name] = variable;
         }
         else
         {
@@ -721,7 +718,7 @@ public static class TypeChecker
         var library = directive.Library;
         if (library.LibPath != null && !Directory.Exists(library.LibPath))
         {
-            ErrorReporter.Report($"Libary path '{library.LibPath}' of library '{library.Name}' does not exist", directive);
+            ErrorReporter.Report($"Library path '{library.LibPath}' of library '{library.Name}' does not exist", directive);
         }
 
         if (!_libraries.TryAdd(library.Name, library))
@@ -741,7 +738,7 @@ public static class TypeChecker
     private static void VerifyStruct(StructAst structAst)
     {
         // Verify struct fields have valid types
-        var fieldNames = new HashSet<string>();
+        var fieldNames = new HashSet<String>();
         structAst.Verifying = true;
         var i = 0;
 
@@ -997,7 +994,7 @@ public static class TypeChecker
 
     private static void VerifyUnion(UnionAst union)
     {
-        var fieldNames = new HashSet<string>();
+        var fieldNames = new HashSet<String>();
         union.Verifying = true;
 
         if (union.Fields.Count == 0)
@@ -1119,7 +1116,7 @@ public static class TypeChecker
         }
 
         // 2. Verify the argument types
-        var argumentNames = new HashSet<string>();
+        var argumentNames = new HashSet<String>();
         foreach (var argument in function.Arguments)
         {
             // 3a. Check if the argument has been previously defined
@@ -1315,7 +1312,7 @@ public static class TypeChecker
 
     private static bool OverloadExistsForFunction(FunctionAst currentFunction)
     {
-        if (currentFunction.Name == null) return false;
+        if (currentFunction.Name.Pointer == null) return false;
 
         var privateScope = PrivateScopes[currentFunction.FileIndex];
 
@@ -1447,7 +1444,7 @@ public static class TypeChecker
         {
             ErrorReporter.Report($"Overload of operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}' should contain exactly 2 arguments to represent the l-value and r-value of the expression", overload);
         }
-        var argumentNames = new HashSet<string>();
+        var argumentNames = new HashSet<String>();
         for (var i = 0; i < overload.Arguments.Count; i++)
         {
             var argument = overload.Arguments[i];
@@ -1505,7 +1502,7 @@ public static class TypeChecker
         }
 
         // 2. Verify the argument types
-        var argumentNames = new HashSet<string>();
+        var argumentNames = new HashSet<String>();
         foreach (var argument in interfaceAst.Arguments)
         {
             // 3a. Check if the argument has been previously defined
@@ -1537,12 +1534,12 @@ public static class TypeChecker
         interfaceAst.Verified = true;
     }
 
-    private static bool GetScopeIdentifier(IScope scope, string name, out IAst ast)
+    private static bool GetScopeIdentifier(IScope scope, String name, out IAst ast)
     {
         return GetScopeIdentifier(scope, name, out ast, out _);
     }
 
-    private static bool GetScopeIdentifier(IScope scope, string name, out IAst ast, out bool global)
+    private static bool GetScopeIdentifier(IScope scope, String name, out IAst ast, out bool global)
     {
         do {
             if (scope.Identifiers.TryGetValue(name, out ast))
@@ -1961,16 +1958,15 @@ public static class TypeChecker
         // 6. Verify compiler constants
         else
         {
-            switch (declaration.Name)
+            if (declaration.Name.Compare("os"))
             {
-                case "os":
-                    declaration.Value = GetOSVersion();
-                    VerifyGlobalVariableValue(declaration);
-                    break;
-                case "build_env":
-                    declaration.Value = GetBuildEnv();
-                    VerifyGlobalVariableValue(declaration);
-                    break;
+                declaration.Value = GetOSVersion();
+                VerifyGlobalVariableValue(declaration);
+            }
+            else if (declaration.Name.Compare("build_env"))
+            {
+                declaration.Value = GetBuildEnv();
+                VerifyGlobalVariableValue(declaration);
             }
         }
 
@@ -2692,7 +2688,7 @@ public static class TypeChecker
         }
     }
 
-    private static void VerifyFieldAssignment(StructAst structDef, string name, AssignmentAst assignment, IFunction currentFunction, IScope scope, bool global = false, bool structField = false)
+    private static void VerifyFieldAssignment(StructAst structDef, String name, AssignmentAst assignment, IFunction currentFunction, IScope scope, bool global = false, bool structField = false)
     {
         foreach (var field in structDef.Fields)
         {
@@ -2895,7 +2891,7 @@ public static class TypeChecker
         }
     }
 
-    private static IType GetVariable(string name, IAst ast, IScope scope, out bool constant, bool allowEnums = false)
+    private static IType GetVariable(String name, IAst ast, IScope scope, out bool constant, bool allowEnums = false)
     {
         constant = false;
         if (!GetScopeIdentifier(scope, name, out var identifier))
@@ -3029,7 +3025,7 @@ public static class TypeChecker
         return null;
     }
 
-    private static IType VerifyStructField(string fieldName, IType structType, StructFieldRefAst structField, int fieldIndex, IAst ast, bool call = false)
+    private static IType VerifyStructField(String fieldName, IType structType, StructFieldRefAst structField, int fieldIndex, IAst ast, bool call = false)
     {
         if (structType.TypeKind == TypeKind.Pointer)
         {
@@ -3897,7 +3893,7 @@ public static class TypeChecker
             argumentTypes[i] = argumentType;
         }
 
-        var specifiedArguments = new Dictionary<string, IType>();
+        var specifiedArguments = new Dictionary<String, IType>();
         if (call.SpecifiedArguments != null)
         {
             foreach (var (name, argument) in call.SpecifiedArguments)
@@ -3932,7 +3928,7 @@ public static class TypeChecker
                 {
                     return existingFunction.ReturnType;
                 }
-                else if (GetExistingPolymorphicFunction(call.Name, call.FileIndex, out existingFunction))
+                if (GetExistingPolymorphicFunction(call.Name, call.FileIndex, out existingFunction))
                 {
                     return existingFunction.Flags.Has(FunctionFlags.ReturnTypeHasGenerics) ? null : existingFunction.ReturnType;
                 }
@@ -4111,7 +4107,7 @@ public static class TypeChecker
         return function.ReturnType;
     }
 
-    private static IInterface DetermineCallingFunction(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments, IScope scope)
+    private static IInterface DetermineCallingFunction(CallAst call, IType[] arguments, Dictionary<String, IType> specifiedArguments, IScope scope)
     {
         var privateScope = PrivateScopes[call.FileIndex];
         var functionCount = 0;
@@ -4120,7 +4116,7 @@ public static class TypeChecker
         {
             if (GlobalScope.Functions.TryGetValue(call.Name, out var functions))
             {
-                if (FindFunctionThatMatchesCall(call, arguments, specifiedArguments, scope, functions, out var function))
+                if (FindFunctionThatMatchesCall(call, arguments, specifiedArguments, functions, out var function))
                 {
                     return function;
                 }
@@ -4149,7 +4145,7 @@ public static class TypeChecker
         {
             if (privateScope.Functions.TryGetValue(call.Name, out var functions))
             {
-                if (FindFunctionThatMatchesCall(call, arguments, specifiedArguments, scope, functions, out var function))
+                if (FindFunctionThatMatchesCall(call, arguments, specifiedArguments, functions, out var function))
                 {
                     return function;
                 }
@@ -4158,7 +4154,7 @@ public static class TypeChecker
 
             if (GlobalScope.Functions.TryGetValue(call.Name, out functions))
             {
-                if (FindFunctionThatMatchesCall(call, arguments, specifiedArguments, scope, functions, out var function))
+                if (FindFunctionThatMatchesCall(call, arguments, specifiedArguments, functions, out var function))
                 {
                     return function;
                 }
@@ -4204,11 +4200,11 @@ public static class TypeChecker
         return null;
     }
 
-    private static void ReportNoFunctionForCall(string callName, CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments)
+    private static void ReportNoFunctionForCall(String callName, CallAst call, IType[] arguments, Dictionary<String, IType> specifiedArguments)
     {
         if (arguments.Length > 0 || specifiedArguments.Any())
         {
-            var argumentTypes = string.Join(", ", arguments.Select(type => type == null ? "null" : type.Name));
+            var argumentTypes = string.Join(", ", arguments.Select(type => type == null ? "null" : type.Name.ToString()));
             if (arguments.Length > 0 && specifiedArguments.Any())
             {
                 argumentTypes += ", ";
@@ -4222,7 +4218,7 @@ public static class TypeChecker
         }
     }
 
-    private static bool FindFunctionThatMatchesCall(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments, IScope scope, List<FunctionAst> functions, out FunctionAst matchedFunction)
+    private static bool FindFunctionThatMatchesCall(CallAst call, IType[] arguments, Dictionary<String, IType> specifiedArguments, List<FunctionAst> functions, out FunctionAst matchedFunction)
     {
         foreach (var function in functions)
         {
@@ -4241,7 +4237,7 @@ public static class TypeChecker
         return false;
     }
 
-    private static bool FindPolymorphicFunctionThatMatchesCall(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments, IScope scope, List<FunctionAst> polymorphicFunctions, out FunctionAst polymorphedFunction)
+    private static bool FindPolymorphicFunctionThatMatchesCall(CallAst call, IType[] arguments, Dictionary<String, IType> specifiedArguments, IScope scope, List<FunctionAst> polymorphicFunctions, out FunctionAst polymorphedFunction)
     {
         for (var i = 0; i < polymorphicFunctions.Count; i++)
         {
@@ -4447,7 +4443,7 @@ public static class TypeChecker
         return false;
     }
 
-    private static bool VerifyArguments(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments, IInterface function, bool varargs = false, bool Params = false, IType paramsElementType = null, bool Extern = false)
+    private static bool VerifyArguments(CallAst call, IType[] arguments, Dictionary<String, IType> specifiedArguments, IInterface function, bool varargs = false, bool Params = false, IType paramsElementType = null, bool Extern = false)
     {
         var match = true;
         var callArgIndex = 0;
@@ -4531,7 +4527,7 @@ public static class TypeChecker
         return match && (varargs || callArgIndex == call.Arguments.Count);
     }
 
-    private static InterfaceAst VerifyInterfaceCall(CallAst call, IAst ast, IType[] arguments, Dictionary<string, IType> specifiedArguments)
+    private static InterfaceAst VerifyInterfaceCall(CallAst call, IAst ast, IType[] arguments, Dictionary<String, IType> specifiedArguments)
     {
         InterfaceAst interfaceAst = null;
         if (ast is DeclarationAst declaration)
@@ -5266,231 +5262,239 @@ public static class TypeChecker
 
         var hasGenerics = type.Generics.Any();
 
-        switch (type.Name)
+        if (type.Name.Compare("bool"))
         {
-            case "bool":
-                if (hasGenerics)
-                {
-                    ErrorReporter.Report("Type 'bool' cannot have generics", type);
-                }
-                return TypeTable.BoolType;
-            case "string":
-                if (hasGenerics)
-                {
-                    ErrorReporter.Report("Type 'string' cannot have generics", type);
-                }
-                return TypeTable.StringType;
-            case "Array":
-                if (type.Generics.Count != 1)
-                {
-                    ErrorReporter.Report($"Type 'Array' should have 1 generic type, but got {type.Generics.Count}", type);
-                }
-                return VerifyArray(type, scope, depth, out isGeneric);
-            case "CArray":
-                if (type.Generics.Count != 1)
-                {
-                    ErrorReporter.Report($"Type 'CArray' should have 1 generic type, but got {type.Generics.Count}", type);
-                    return null;
-                }
-                else
-                {
-                    var elementType = VerifyType(type.Generics[0], scope, out isGeneric, out _, out _, depth + 1, allowParams);
-                    if (elementType == null || isGeneric)
-                    {
-                        return null;
-                    }
-                    else
-                    {
-                        uint arrayLength;
-                        if (initialArrayLength.HasValue)
-                        {
-                            arrayLength = (uint)initialArrayLength.Value;
-                        }
-                        else
-                        {
-                            var countType = VerifyExpression(type.Count, null, scope, out var isConstant, out arrayLength);
-                            if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
-                            {
-                                ErrorReporter.Report($"Expected size of C array to be a constant, positive integer", type);
-                            }
-                        }
-
-                        var name = $"{PrintTypeDefinition(type)}[{arrayLength}]";
-                        var backendName = $"{type.GenericName}.{arrayLength}";
-                        if (!GetType(backendName, type.FileIndex, out var arrayType))
-                        {
-                            arrayType = new ArrayType
-                            {
-                                FileIndex = elementType.FileIndex, Name = name, BackendName = backendName,
-                                Size = elementType.Size * arrayLength, Alignment = elementType.Alignment,
-                                Private = elementType.Private, Length = arrayLength, ElementType = elementType
-                            };
-                            AddType(backendName, arrayType);
-                            TypeTable.CreateTypeInfo(arrayType);
-                        }
-                        return arrayType;
-                    }
-                }
-            case "void":
-                if (hasGenerics)
-                {
-                    ErrorReporter.Report("Type 'void' cannot have generics", type);
-                }
-                return TypeTable.VoidType;
-            case "*":
-                if (type.Generics.Count != 1)
-                {
-                    ErrorReporter.Report($"pointer type should have reference to 1 type, but got {type.Generics.Count}", type);
-                    return null;
-                }
-                else if (GetType(type.GenericName, type.FileIndex, out var pointerType))
-                {
-                    return pointerType;
-                }
-                else
-                {
-                    var typeDef = type.Generics[0];
-                    var pointedToType = VerifyType(typeDef, scope, out isGeneric, out _, out _, depth + 1, allowParams);
-                    if (pointedToType == null || isGeneric)
-                    {
-                        return null;
-                    }
-                    else
-                    {
-                        // There are some cases where the pointed to type is a struct that contains a field for the pointer type
-                        // To account for this, the type table needs to be checked for again for the type
-                        if (!GetType(type.GenericName, type.FileIndex, out pointerType))
-                        {
-                            pointerType = CreatePointerType(PrintTypeDefinition(type), type.GenericName, pointedToType);
-                        }
-                        return pointerType;
-                    }
-                }
-            case "...":
-                if (hasGenerics)
-                {
-                    ErrorReporter.Report("Type 'varargs' cannot have generics", type);
-                }
-                isVarargs = true;
-                return null;
-            case "Params":
-                if (!allowParams)
-                {
-                    return null;
-                }
-                if (depth != 0)
-                {
-                    ErrorReporter.Report($"Params can only be declared as a top level type, such as 'Params<int>'", type);
-                    return null;
-                }
-                if (type.Generics.Count == 0)
-                {
-                    isParams = true;
-                    const string backendName = "Array.Any";
-                    if (GlobalScope.Types.TryGetValue(backendName, out var arrayType))
-                    {
-                        return arrayType;
-                    }
-
-                    return CreateArrayStruct("Array<Any>", backendName, TypeTable.AnyType);
-                }
-                if (type.Generics.Count != 1)
-                {
-                    ErrorReporter.Report($"Type 'Params' should have 1 generic type, but got {type.Generics.Count}", type);
-                    return null;
-                }
-                isParams = true;
-                return VerifyArray(type, scope, depth, out isGeneric);
-            case "Type":
-                if (hasGenerics)
-                {
-                    ErrorReporter.Report("Type 'Type' cannot have generics", type);
-                }
-                return TypeTable.TypeType;
-            case "Any":
-                if (hasGenerics)
-                {
-                    ErrorReporter.Report("Type 'Any' cannot have generics", type);
-                }
-                return TypeTable.AnyType;
-            default:
-                if (hasGenerics)
-                {
-                    var genericName = type.GenericName;
-                    if (GetType(genericName, type.FileIndex, out var structType))
-                    {
-                        return structType;
-                    }
-                    else
-                    {
-                        var generics = type.Generics.ToArray();
-                        var genericTypes = new IType[generics.Length];
-                        var error = false;
-                        var privateGenericTypes = false;
-                        for (var i = 0; i < generics.Length; i++)
-                        {
-                            var genericType = genericTypes[i] = VerifyType(generics[i], scope, out var hasGeneric, out _, out _, depth + 1, allowParams);
-                            if (genericType == null && !hasGeneric)
-                            {
-                                error = true;
-                            }
-                            else if (hasGeneric)
-                            {
-                                isGeneric = true;
-                            }
-                            else if (genericType.Private)
-                            {
-                                privateGenericTypes = true;
-                            }
-                        }
-                        if (!GetPolymorphicStruct(type.Name, type.FileIndex, out var structDef))
-                        {
-                            ErrorReporter.Report($"No polymorphic structs of type '{type.Name}'", type);
-                            return null;
-                        }
-                        else if (structDef.Generics.Count != type.Generics.Count)
-                        {
-                            ErrorReporter.Report($"Expected type '{type.Name}' to have {structDef.Generics.Count} generic(s), but got {type.Generics.Count}", type);
-                            return null;
-                        }
-                        else if (error || isGeneric)
-                        {
-                            return null;
-                        }
-                        else
-                        {
-                            var name = PrintTypeDefinition(type);
-                            var fileIndex = structDef.FileIndex;
-                            if (privateGenericTypes && !structDef.Private)
-                            {
-                                fileIndex = type.FileIndex;
-                            }
-
-                            var polyStruct = Polymorpher.CreatePolymorphedStruct(structDef, name, genericName, TypeKind.Struct, privateGenericTypes, genericTypes);
-                            AddType(genericName, polyStruct, fileIndex);
-                            VerifyStruct(polyStruct);
-                            return polyStruct;
-                        }
-                    }
-                }
-                else if (GetType(type.Name, type.FileIndex, out var typeValue))
-                {
-                    if (typeValue is StructAst structAst && !structAst.Verifying)
-                    {
-                        VerifyStruct(structAst);
-                    }
-                    else if (typeValue is UnionAst union && !union.Verifying)
-                    {
-                        VerifyUnion(union);
-                    }
-                    else if (typeValue is InterfaceAst interfaceAst && !interfaceAst.Verifying)
-                    {
-                        VerifyInterface(interfaceAst);
-                    }
-                    return typeValue;
-                }
-                return null;
+            if (hasGenerics)
+            {
+                ErrorReporter.Report("Type 'bool' cannot have generics", type);
+            }
+            return TypeTable.BoolType;
         }
+        if (type.Name.Compare("string"))
+        {
+            if (hasGenerics)
+            {
+                ErrorReporter.Report("Type 'string' cannot have generics", type);
+            }
+            return TypeTable.StringType;
+        }
+        if (type.Name.Compare("Array"))
+        {
+            if (type.Generics.Count != 1)
+            {
+                ErrorReporter.Report($"Type 'Array' should have 1 generic type, but got {type.Generics.Count}", type);
+            }
+            return VerifyArray(type, scope, depth, out isGeneric);
+        }
+        if (type.Name.Compare("CArray"))
+        {
+            if (type.Generics.Count != 1)
+            {
+                ErrorReporter.Report($"Type 'CArray' should have 1 generic type, but got {type.Generics.Count}", type);
+                return null;
+            }
+
+            var elementType = VerifyType(type.Generics[0], scope, out isGeneric, out _, out _, depth + 1, allowParams);
+            if (elementType == null || isGeneric)
+            {
+                return null;
+            }
+
+            uint arrayLength;
+            if (initialArrayLength.HasValue)
+            {
+                arrayLength = (uint)initialArrayLength.Value;
+            }
+            else
+            {
+                var countType = VerifyExpression(type.Count, null, scope, out var isConstant, out arrayLength);
+                if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
+                {
+                    ErrorReporter.Report($"Expected size of C array to be a constant, positive integer", type);
+                }
+            }
+
+            var name = $"{PrintTypeDefinition(type)}[{arrayLength}]";
+            var backendName = $"{type.GenericName}.{arrayLength}";
+            if (!GetType(backendName, type.FileIndex, out var arrayType))
+            {
+                arrayType = new ArrayType
+                {
+                    FileIndex = elementType.FileIndex, Name = name, BackendName = backendName,
+                    Size = elementType.Size * arrayLength, Alignment = elementType.Alignment,
+                    Private = elementType.Private, Length = arrayLength, ElementType = elementType
+                };
+                AddType(backendName, arrayType);
+                TypeTable.CreateTypeInfo(arrayType);
+            }
+            return arrayType;
+        }
+        if (type.Name.Compare("void"))
+        {
+            if (hasGenerics)
+            {
+                ErrorReporter.Report("Type 'void' cannot have generics", type);
+            }
+            return TypeTable.VoidType;
+        }
+        if (type.Name.Compare("*"))
+        {
+            if (type.Generics.Count != 1)
+            {
+                ErrorReporter.Report($"pointer type should have reference to 1 type, but got {type.Generics.Count}", type);
+                return null;
+            }
+            if (GetType(type.GenericName, type.FileIndex, out var pointerType))
+            {
+                return pointerType;
+            }
+
+            var typeDef = type.Generics[0];
+            var pointedToType = VerifyType(typeDef, scope, out isGeneric, out _, out _, depth + 1, allowParams);
+            if (pointedToType == null || isGeneric)
+            {
+                return null;
+            }
+            else
+            {
+                // There are some cases where the pointed to type is a struct that contains a field for the pointer type
+                // To account for this, the type table needs to be checked for again for the type
+                if (!GetType(type.GenericName, type.FileIndex, out pointerType))
+                {
+                    pointerType = CreatePointerType(PrintTypeDefinition(type), type.GenericName, pointedToType);
+                }
+                return pointerType;
+            }
+        }
+        if (type.Name.Compare("..."))
+        {
+            if (hasGenerics)
+            {
+                ErrorReporter.Report("Type 'varargs' cannot have generics", type);
+            }
+            isVarargs = true;
+            return null;
+        }
+        if (type.Name.Compare("Params"))
+        {
+            if (!allowParams)
+            {
+                return null;
+            }
+            if (depth != 0)
+            {
+                ErrorReporter.Report($"Params can only be declared as a top level type, such as 'Params<int>'", type);
+                return null;
+            }
+            if (type.Generics.Count == 0)
+            {
+                isParams = true;
+                const string backendName = "Array.Any";
+                if (GlobalScope.Types.TryGetValue(backendName, out var arrayType))
+                {
+                    return arrayType;
+                }
+
+                return CreateArrayStruct("Array<Any>", backendName, TypeTable.AnyType);
+            }
+            if (type.Generics.Count != 1)
+            {
+                ErrorReporter.Report($"Type 'Params' should have 1 generic type, but got {type.Generics.Count}", type);
+                return null;
+            }
+            isParams = true;
+            return VerifyArray(type, scope, depth, out isGeneric);
+        }
+        if (type.Name.Compare("Type"))
+        {
+            if (hasGenerics)
+            {
+                ErrorReporter.Report("Type 'Type' cannot have generics", type);
+            }
+            return TypeTable.TypeType;
+        }
+        if (type.Name.Compare("Any"))
+        {
+            if (hasGenerics)
+            {
+                ErrorReporter.Report("Type 'Any' cannot have generics", type);
+            }
+            return TypeTable.AnyType;
+        }
+
+        if (hasGenerics)
+        {
+            var genericName = type.GenericName;
+            if (GetType(genericName, type.FileIndex, out var structType))
+            {
+                return structType;
+            }
+
+            var generics = type.Generics.ToArray();
+            var genericTypes = new IType[generics.Length];
+            var error = false;
+            var privateGenericTypes = false;
+            for (var i = 0; i < generics.Length; i++)
+            {
+                var genericType = genericTypes[i] = VerifyType(generics[i], scope, out var hasGeneric, out _, out _, depth + 1, allowParams);
+                if (genericType == null && !hasGeneric)
+                {
+                    error = true;
+                }
+                else if (hasGeneric)
+                {
+                    isGeneric = true;
+                }
+                else if (genericType.Private)
+                {
+                    privateGenericTypes = true;
+                }
+            }
+            if (!GetPolymorphicStruct(type.Name, type.FileIndex, out var structDef))
+            {
+                ErrorReporter.Report($"No polymorphic structs of type '{type.Name}'", type);
+                return null;
+            }
+            if (structDef.Generics.Count != type.Generics.Count)
+            {
+                ErrorReporter.Report($"Expected type '{type.Name}' to have {structDef.Generics.Count} generic(s), but got {type.Generics.Count}", type);
+                return null;
+            }
+            if (error || isGeneric)
+            {
+                return null;
+            }
+
+            var name = PrintTypeDefinition(type);
+            var fileIndex = structDef.FileIndex;
+            if (privateGenericTypes && !structDef.Private)
+            {
+                fileIndex = type.FileIndex;
+            }
+
+            var polyStruct = Polymorpher.CreatePolymorphedStruct(structDef, name, genericName, TypeKind.Struct, privateGenericTypes, genericTypes);
+            AddType(genericName, polyStruct, fileIndex);
+            VerifyStruct(polyStruct);
+            return polyStruct;
+        }
+
+        if (GetType(type.Name, type.FileIndex, out var typeValue))
+        {
+            if (typeValue is StructAst structAst && !structAst.Verifying)
+            {
+                VerifyStruct(structAst);
+            }
+            else if (typeValue is UnionAst union && !union.Verifying)
+            {
+                VerifyUnion(union);
+            }
+            else if (typeValue is InterfaceAst interfaceAst && !interfaceAst.Verifying)
+            {
+                VerifyInterface(interfaceAst);
+            }
+            return typeValue;
+        }
+        return null;
     }
 
     private static IType VerifyArray(TypeDefinition typeDef, IScope scope, int depth, out bool isGeneric)
@@ -5558,7 +5562,7 @@ public static class TypeChecker
             return sb.ToString();
         }
 
-        sb.Append(type.Name);
+        sb.Append((ReadOnlySpan<char>)type.Name);
         if (type.Generics.Any())
         {
             sb.Append($"<{string.Join(", ", type.Generics.Select(PrintTypeDefinition))}>");
