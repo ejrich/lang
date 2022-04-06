@@ -843,7 +843,7 @@ public static unsafe class LLVMBackend
             }
             case FunctionAst function:
             {
-                var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
+                var argumentCount = function.Flags.Has(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
                 Span<LLVMValueRef> argumentValues = stackalloc LLVMValueRef[argumentCount];
                 for (var arg = 0; arg < argumentCount; arg++)
                 {
@@ -1226,7 +1226,7 @@ public static unsafe class LLVMBackend
 
     private static void CreateFunctionTypeInfo(FunctionAst function)
     {
-        var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
+        var argumentCount = function.Flags.Has(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
         Span<LLVMValueRef> argumentValues = stackalloc LLVMValueRef[argumentCount];
         for (var arg = 0; arg < argumentCount; arg++)
         {
@@ -1307,7 +1307,7 @@ public static unsafe class LLVMBackend
 
         if (_emitDebug && function.Instructions != null)
         {
-            var varargs = function.Source.Flags.HasFlag(FunctionFlags.Varargs);
+            var varargs = function.Source.Flags.Has(FunctionFlags.Varargs);
             var sourceArguments = function.Source.Arguments;
             var argumentCount = varargs ? sourceArguments.Count - 1 : sourceArguments.Count;
 
@@ -1366,7 +1366,7 @@ public static unsafe class LLVMBackend
             return type;
         }
 
-        var varargs = function.Flags.HasFlag(FunctionFlags.Varargs);
+        var varargs = function.Flags.Has(FunctionFlags.Varargs);
         var sourceArguments = function.Arguments;
         var argumentCount = varargs ? sourceArguments.Count - 1 : sourceArguments.Count;
 
