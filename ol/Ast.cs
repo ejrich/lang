@@ -73,7 +73,7 @@ public static class EnumExtensions
 
     public static bool Has(this TokenFlags flag, TokenFlags compare)
     {
-        return ((int)flag & (int)compare) != 0;
+        return ((byte)flag & (byte)compare) != 0;
     }
 }
 

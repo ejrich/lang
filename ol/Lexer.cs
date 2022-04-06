@@ -22,7 +22,7 @@ public static class Lexer
         {'0', "\0"}
     };
 
-    private static readonly ConcurrentDictionary<char, string> _characterCache = new();
+    private static readonly ConcurrentDictionary<char, String> _characterCache = new();
 
     private static readonly Dictionary<string, TokenType> _reservedTokens = new()
     {
@@ -52,7 +52,7 @@ public static class Lexer
 
     public static List<Token> LoadFileTokens(string filePath, int fileIndex)
     {
-        var fileText = File.ReadAllText(filePath);
+        var fileText = File.ReadAllText(filePath).AsSpan();
 
         var tokens = new List<Token>(fileText.Length / 4);
         uint line = 1, column = 0;
@@ -417,7 +417,7 @@ public static class Lexer
                             column++;
                         }
 
-                        token.Value = fileText.Substring(startIndex, i - startIndex + offset);
+                        token.Value = fileText.Slice(startIndex, i - startIndex + offset);
                     }
                     else
                     {
@@ -745,7 +745,7 @@ public static class Lexer
                         column++;
                     }
 
-                    token.Value = fileText.Substring(startIndex, i - startIndex + offset);
+                    token.Value = fileText.Slice(startIndex, i - startIndex + offset);
                     tokens.Add(token);
                     break;
                 }
@@ -783,7 +783,7 @@ public static class Lexer
                         column++;
                     }
 
-                    token.Value = fileText.Substring(startIndex, i - startIndex + offset);
+                    token.Value = fileText.Slice(startIndex, i - startIndex + offset);
 
                     if (_reservedTokens.TryGetValue(token.Value, out var type))
                     {
@@ -841,7 +841,7 @@ public static class Lexer
 public struct Token
 {
     public TokenType Type;
-    public string Value;
+    public String Value;
     public TokenFlags Flags;
     public uint Line;
     public uint Column;
