@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Runtime.InteropServices;
-:w
-
 
 namespace ol;
 
