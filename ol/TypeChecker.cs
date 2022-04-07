@@ -606,11 +606,14 @@ public static unsafe class TypeChecker
         }
         else
         {
-            overload.Name = $"operator.{overload.Operator}.{overload.Type.GenericName}";
             overload.FunctionIndex = TypeTable.GetFunctionIndex();
-            if (!_operatorOverloads.TryGetValue(overload.Type.GenericName, out var overloads))
+
+            Span<char> typeName = stackalloc char[overload.Type.GenericNameLength];
+            overload.Type.WriteGenericName(typeName);
+            overload.Name = $"operator.{overload.Operator}.{typeName}";
+            if (!_operatorOverloads.TryGetValue(typeName, out var overloads))
             {
-                _operatorOverloads[overload.Type.GenericName] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
+                _operatorOverloads[typeName.ToString()] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
             }
             if (overloads.ContainsKey(overload.Operator))
             {

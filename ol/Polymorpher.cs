@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -75,10 +76,13 @@ public static class Polymorpher
         var overload = CopyAst(baseOverload);
         overload.Operator = baseOverload.Operator;
         overload.Type = CopyType(baseOverload.Type, genericTypes);
-        overload.Name = $"operator.{overload.Operator}.{overload.Type.GenericName}";
         overload.FunctionIndex = TypeTable.GetFunctionIndex();
         overload.Flags = baseOverload.Flags;
         overload.ReturnTypeDefinition = baseOverload.Flags.Has(FunctionFlags.ReturnTypeHasGenerics) ? CopyType(baseOverload.ReturnTypeDefinition, genericTypes) : baseOverload.ReturnTypeDefinition;
+
+        Span<char> typeName = stackalloc char[overload.Type.GenericNameLength];
+        overload.Type.WriteGenericName(typeName);
+        overload.Name = $"operator.{overload.Operator}.{typeName}";
 
         foreach (var argument in baseOverload.Arguments)
         {
