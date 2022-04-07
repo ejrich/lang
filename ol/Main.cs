@@ -15,6 +15,7 @@ public static class BuildSettings
     public static string Path { get; set; }
     public static string OutputDirectory { get; set; }
     public static List<string> Files { get; } = new();
+    public static List<string> FileContents { get; } = new();
     public static List<FileInfo> FilesToCopy { get; } = new();
     // These are the libraries that are linked in with -l{name}
     public static HashSet<String> LibraryNames { get; } = new();

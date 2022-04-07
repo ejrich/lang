@@ -14,8 +14,8 @@ public static unsafe class TypeChecker
     public static List<PrivateScope> PrivateScopes;
     public static StructAst BaseArrayType;
 
-    private static ConcurrentDictionary<String, Dictionary<Operator, OperatorOverloadAst>> _operatorOverloads;
-    private static ConcurrentDictionary<String, Dictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads;
+    private static ConcurrentDictionary<String, ConcurrentDictionary<Operator, OperatorOverloadAst>> _operatorOverloads;
+    private static ConcurrentDictionary<String, ConcurrentDictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads;
     private static ConcurrentDictionary<String, Library> _libraries;
 
     private static Queue<IAst> _astCompleteQueue = new();
@@ -594,10 +594,7 @@ public static unsafe class TypeChecker
     {
         if (overload.Generics.Any())
         {
-            if (!_polymorphicOperatorOverloads.TryGetValue(overload.Type.Name, out var overloads))
-            {
-                _polymorphicOperatorOverloads[overload.Type.Name] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
-            }
+            var overloads = _polymorphicOperatorOverloads.GetOrAdd(overload.Type.Name, _ => new());
             if (overloads.ContainsKey(overload.Operator))
             {
                 ErrorReporter.Report($"Multiple definitions of overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}'", overload);
@@ -607,19 +604,14 @@ public static unsafe class TypeChecker
         else
         {
             overload.FunctionIndex = TypeTable.GetFunctionIndex();
-
-            Span<char> typeName = stackalloc char[overload.Type.GenericNameLength];
-            overload.Type.WriteGenericName(typeName);
-            overload.Name = $"operator.{overload.Operator}.{typeName}";
-            if (!_operatorOverloads.TryGetValue(typeName, out var overloads))
-            {
-                _operatorOverloads[typeName.ToString()] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
-            }
+            overload.Name = $"operator.{overload.Operator}.{overload.Type.Name}";
+            var overloads = _operatorOverloads.GetOrAdd(overload.Type.Name, _ => new());
             if (overloads.ContainsKey(overload.Operator))
             {
                 ErrorReporter.Report($"Multiple definitions of overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}'", overload);
             }
             overloads[overload.Operator] = overload;
+
         }
     }
 
@@ -699,14 +691,14 @@ public static unsafe class TypeChecker
         library.HasDll = File.Exists($"{library.AbsolutePath}.so");
         if (!library.HasLib && !library.HasDll)
         {
-            ErrorReporter.Report($"Unable to find .a/.so '{library.Path}' of library '{library.Name}'", directive);
+            ErrorReporter.Report($"Unable to find .a/.so '{library.Path.ToSpan()}' of library '{library.Name.ToSpan()}'", directive);
         }
         #elif _WINDOWS
         library.HasLib = File.Exists($"{library.AbsolutePath}.lib");
         library.HasDll = File.Exists($"{library.AbsolutePath}.dll");
         if (!library.HasLib && !library.HasDll)
         {
-            ErrorReporter.Report($"Unable to find .lib/.dll '{library.Path}' of library '{library.Name}'", directive);
+            ErrorReporter.Report($"Unable to find .lib/.dll '{library.Path.ToSpan()}' of library '{library.Name.ToSpan()}'", directive);
         }
         #endif
 
@@ -5074,12 +5066,12 @@ public static unsafe class TypeChecker
             }
             return overload;
         }
-        else if (type.BaseStructName != null && _polymorphicOperatorOverloads.TryGetValue(type.BaseStructName, out var polymorphicOverloads) && polymorphicOverloads.TryGetValue(op, out var polymorphicOverload))
+        if (type.BaseStructName != null && _polymorphicOperatorOverloads.TryGetValue(type.BaseStructName, out var polymorphicOverloads) && polymorphicOverloads.TryGetValue(op, out var polymorphicOverload))
         {
             var polymorphedOverload = Polymorpher.CreatePolymorphedOperatorOverload(polymorphicOverload, type.GenericTypes.ToArray());
             if (overloads == null)
             {
-                _operatorOverloads[type.BackendName] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
+                overloads = _operatorOverloads.GetOrAdd(type.BackendName, _ => new());
             }
             overloads[op] = polymorphedOverload;
             foreach (var argument in polymorphedOverload.Arguments)
@@ -5095,11 +5087,9 @@ public static unsafe class TypeChecker
 
             return polymorphedOverload;
         }
-        else
-        {
-            ErrorReporter.Report($"Type '{type.Name}' does not contain an overload for operator '{PrintOperator(op)}'", ast);
-            return null;
-        }
+
+        ErrorReporter.Report($"Type '{type.Name}' does not contain an overload for operator '{PrintOperator(op)}'", ast);
+        return null;
     }
 
     private static bool TypeEquals(IType target, IType source, bool checkPrimitives = false)

@@ -114,7 +114,7 @@ public static unsafe class ProgramRunner
 
         var method = _functionTypeBuilder.DefineMethod(function.Name, MethodAttributes.Public | MethodAttributes.Static, returnType, argumentTypes);
 
-        var library = function.Library == null ? function.ExternLib.ToString() : function.Library.FileName.Pointer == null ?
+        String library = function.Library == null ? function.ExternLib : function.Library.FileName == null ?
         #if _LINUX
             $"{function.Library.AbsolutePath}.so" :
         #elif _WINDOWS
@@ -125,7 +125,7 @@ public static unsafe class ProgramRunner
         if (!_libraries.TryGetValue(library, out var libraryDllImport))
         {
             _dllImportConstructor ??= typeof(DllImportAttribute).GetConstructor(new []{typeof(string)});
-            libraryDllImport = _libraries[library] = new CustomAttributeBuilder(_dllImportConstructor, new string[]{library});
+            libraryDllImport = _libraries[library] = new(_dllImportConstructor, new []{library.ToString()});
         }
 
         method.SetCustomAttribute(libraryDllImport);
