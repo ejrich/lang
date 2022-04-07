@@ -5215,7 +5215,9 @@ public static unsafe class TypeChecker
 
         if (type.Compound)
         {
-            if (GetType(type.GenericName, type.FileIndex, out var compoundType))
+            Span<char> genericName = stackalloc char[type.GenericNameLength];
+            type.WriteGenericName(genericName);
+            if (GetType(genericName, type.FileIndex, out var compoundType))
             {
                 return compoundType;
             }
@@ -5251,7 +5253,7 @@ public static unsafe class TypeChecker
                 return null;
             }
 
-            return CreateCompoundType(types, type.GenericName, size, privateType, type.FileIndex);
+            return CreateCompoundType(types, genericName.ToString(), size, privateType, type.FileIndex);
         }
 
         if (type.Count != null && type.Name != "Array" && type.Name != "CArray")
@@ -5314,13 +5316,12 @@ public static unsafe class TypeChecker
                 }
             }
 
-            var name = $"{PrintTypeDefinition(type)}[{arrayLength}]";
             var backendName = $"{type.GenericName}.{arrayLength}";
             if (!GetType(backendName, type.FileIndex, out var arrayType))
             {
                 arrayType = new ArrayType
                 {
-                    FileIndex = elementType.FileIndex, Name = name, BackendName = backendName,
+                    FileIndex = elementType.FileIndex, Name = $"{PrintTypeDefinition(type)}[{arrayLength}]", BackendName = backendName,
                     Size = elementType.Size * arrayLength, Alignment = elementType.Alignment,
                     Private = elementType.Private, Length = arrayLength, ElementType = elementType
                 };
@@ -5344,7 +5345,9 @@ public static unsafe class TypeChecker
                 ErrorReporter.Report($"pointer type should have reference to 1 type, but got {type.Generics.Count}", type);
                 return null;
             }
-            if (GetType(type.GenericName, type.FileIndex, out var pointerType))
+            Span<char> genericName = stackalloc char[type.GenericNameLength];
+            type.WriteGenericName(genericName);
+            if (GetType(genericName, type.FileIndex, out var pointerType))
             {
                 return pointerType;
             }
@@ -5359,9 +5362,9 @@ public static unsafe class TypeChecker
             {
                 // There are some cases where the pointed to type is a struct that contains a field for the pointer type
                 // To account for this, the type table needs to be checked for again for the type
-                if (!GetType(type.GenericName, type.FileIndex, out pointerType))
+                if (!GetType(genericName, type.FileIndex, out pointerType))
                 {
-                    pointerType = CreatePointerType(PrintTypeDefinition(type), type.GenericName, pointedToType);
+                    pointerType = CreatePointerType(PrintTypeDefinition(type), genericName.ToString(), pointedToType);
                 }
                 return pointerType;
             }
@@ -5424,7 +5427,8 @@ public static unsafe class TypeChecker
 
         if (hasGenerics)
         {
-            var genericName = type.GenericName;
+            Span<char> genericName = stackalloc char[type.GenericNameLength];
+            type.WriteGenericName(genericName);
             if (GetType(genericName, type.FileIndex, out var structType))
             {
                 return structType;
@@ -5472,8 +5476,9 @@ public static unsafe class TypeChecker
                 fileIndex = type.FileIndex;
             }
 
-            var polyStruct = Polymorpher.CreatePolymorphedStruct(structDef, name, genericName, TypeKind.Struct, privateGenericTypes, genericTypes);
-            AddType(genericName, polyStruct, fileIndex);
+            var genericNameString = genericName.ToString();
+            var polyStruct = Polymorpher.CreatePolymorphedStruct(structDef, name, genericNameString, TypeKind.Struct, privateGenericTypes, genericTypes);
+            AddType(genericNameString, polyStruct, fileIndex);
             VerifyStruct(polyStruct);
             return polyStruct;
         }
@@ -5556,19 +5561,46 @@ public static unsafe class TypeChecker
         }
 
         var sb = new StringBuilder();
-        if (type.Name == "*")
-        {
-            sb.Append($"{PrintTypeDefinition(type.Generics[0])}*");
-            return sb.ToString();
-        }
-
-        sb.Append((ReadOnlySpan<char>)type.Name);
-        if (type.Generics.Any())
-        {
-            sb.Append($"<{string.Join(", ", type.Generics.Select(PrintTypeDefinition))}>");
-        }
+        PrintTypeDefinition(sb, type);
 
         return sb.ToString();
+    }
+
+    private static void PrintTypeDefinition(StringBuilder sb, TypeDefinition type)
+    {
+        if (type == null) return;
+
+        if (type.BakedType != null)
+        {
+            sb.Append(type.BakedType.Name.ToSpan());
+        }
+
+        if (type.Name == "*")
+        {
+            PrintTypeDefinition(sb, type.Generics[0]);
+            sb.Append('*');
+            return;
+        }
+
+        sb.Append(type.Name.ToSpan());
+        if (type.Generics.Any())
+        {
+            sb.Append('<');
+            if (type.Generics.Count > 1)
+            {
+                for (var i = 0; i < type.Generics.Count - 1; i++)
+                {
+                    PrintTypeDefinition(sb, type.Generics[i]);
+                    sb.Append(", ");
+                }
+                PrintTypeDefinition(sb, type.Generics[^1]);
+            }
+            else
+            {
+                PrintTypeDefinition(sb, type.Generics[0]);
+            }
+            sb.Append('>');
+        }
     }
 
     private static string PrintOperator(Operator op)

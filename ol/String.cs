@@ -54,7 +54,9 @@ public unsafe struct String
     public static implicit operator string(String str) => new(str.Pointer, 0, str.Length);
     public static implicit operator LanguageString(String str) => new() {Length = str.Length, Data = Allocator.AllocateString(str)};
     public static implicit operator ReadOnlySpan<char>(String str) => new(str.Pointer, str.Length);
+
     public static implicit operator String(string str) => str.AsSpan();
+    public static implicit operator String(Span<char> str) => (ReadOnlySpan<char>)str;
     public static implicit operator String(ReadOnlySpan<char> span)
     {
         fixed (char* ptr = &MemoryMarshal.GetReference(span))

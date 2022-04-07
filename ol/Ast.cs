@@ -696,6 +696,9 @@ public class TypeDefinition : IAst
     public uint? ConstCount { get; set; }
     public IType BakedType { get; set; }
 
+    public int GenericNameLength => Compound ? Generics.Sum(g => g.GenericNameLength) + Generics.Count - 1 :
+        Name.Length + (Generics.Any() ? Generics.Sum(g => g.GenericNameLength) + Generics.Count : 0);
+
     private string _genericName;
     public string GenericName
     {
@@ -707,13 +710,38 @@ public class TypeDefinition : IAst
                 {
                     return _genericName = string.Join("-", Generics.Select(g => g.GenericName));
                 }
-                else
-                {
-                    return _genericName = Generics.Aggregate(Name, (current, generic) => current + $".{generic.GenericName}");
-                }
+                return _genericName = Generics.Aggregate(Name, (current, generic) => current + $".{generic.GenericName}");
             }
             return _genericName;
         }
+    }
+
+    public int WriteGenericName(Span<char> str, int offset = 0)
+    {
+        if (Compound)
+        {
+            for (var i = 0; i < Generics.Count - 1; i++)
+            {
+                offset = Generics[i].WriteGenericName(str, offset);
+                str[offset++] = '-';
+            }
+            offset = Generics[^1].WriteGenericName(str, offset);
+        }
+        else
+        {
+            for (var i = 0; i < Name.Length; i++)
+            {
+                str[offset++] = Name[i];
+            }
+
+            foreach (var type in Generics)
+            {
+                str[offset++] = '.';
+                offset = type.WriteGenericName(str, offset);
+            }
+        }
+
+        return offset;
     }
 }
 
