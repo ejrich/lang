@@ -8,7 +8,7 @@ namespace ol;
 
 public static class Lexer
 {
-    private static readonly Dictionary<char, string> _escapableCharacters = new()
+    private static readonly Dictionary<char, String> _escapableCharacters = new()
     {
         {'"', "\""},
         {'\\', "\\"},
@@ -138,6 +138,7 @@ public static class Lexer
                 case '"':
                 {
                     var literalEscapeToken = false;
+                    var completed = false;
                     var error = false;
                     var stringBuilder = new StringBuilder();
                     token = new Token
@@ -147,7 +148,7 @@ public static class Lexer
                         Column = column
                     };
 
-                    while (true)
+                    while (i < fileText.Length - 1)
                     {
                         character = fileText[++i];
                         column++;
@@ -184,6 +185,7 @@ public static class Lexer
                             if (character == '"')
                             {
                                 token.Value = stringBuilder.ToString();
+                                completed = true;
                                 if (error)
                                 {
                                     ErrorReporter.Report($"Unexpected token '{token.Value}'", fileIndex, token);
@@ -194,6 +196,10 @@ public static class Lexer
                             }
                             stringBuilder.Append(character);
                         }
+                    }
+                    if (!completed)
+                    {
+                        ErrorReporter.Report("Expected to close string literal with \"", fileIndex, token);
                     }
                     break;
                 }

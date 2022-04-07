@@ -30,7 +30,7 @@ public unsafe struct String
 
     public bool Equals(String other) => this == other;
     public override bool Equals(object obj) => obj is String other && Equals(other);
-    public override int GetHashCode()// => ((string)this).GetHashCode();
+    public override int GetHashCode()
     {
         var sum = 0;
         for (var i = 0; i < Length; i++)
@@ -55,7 +55,7 @@ public unsafe struct String
     public static bool operator !=(String a, String b) => !(a == b);
 
     public static implicit operator string(String str) => new(str.Pointer, 0, str.Length);
-    public static implicit operator LanguageString(String str) => new() {Length = str.Length, Data = (IntPtr)str.Pointer};
+    public static implicit operator LanguageString(String str) => new() {Length = str.Length, Data = Allocator.AllocateString(str)};
     public static implicit operator ReadOnlySpan<char>(String str) => new(str.Pointer, str.Length);
     public static implicit operator String(string str) => str.AsSpan();
     public static implicit operator String(ReadOnlySpan<char> span)
