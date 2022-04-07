@@ -699,23 +699,6 @@ public class TypeDefinition : IAst
     public int GenericNameLength => Compound ? Generics.Sum(g => g.GenericNameLength) + Generics.Count - 1 :
         Name.Length + (Generics.Any() ? Generics.Sum(g => g.GenericNameLength) + Generics.Count : 0);
 
-    private string _genericName;
-    public string GenericName
-    {
-        get
-        {
-            if (_genericName == null)
-            {
-                if (Compound)
-                {
-                    return _genericName = string.Join("-", Generics.Select(g => g.GenericName));
-                }
-                return _genericName = Generics.Aggregate(Name, (current, generic) => current + $".{generic.GenericName}");
-            }
-            return _genericName;
-        }
-    }
-
     public int WriteGenericName(Span<char> str, int offset = 0)
     {
         if (Compound)
