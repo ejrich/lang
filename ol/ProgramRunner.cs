@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -33,7 +34,7 @@ public static unsafe class ProgramRunner
     private static int _version;
     private static ConstructorInfo _dllImportConstructor;
     private static readonly Dictionary<String, CustomAttributeBuilder> _libraries = new();
-    private static readonly Dictionary<String, List<MethodInfo>> _externFunctions = new();
+    private static readonly ConcurrentDictionary<String, List<MethodInfo>> _externFunctions = new();
     private static readonly Dictionary<String, Type> _functionPointerDelegateTypes = new();
 
     private static int _typeCount;
@@ -140,14 +141,8 @@ public static unsafe class ProgramRunner
 
             foreach (var function in library.GetMethods(BindingFlags.Public | BindingFlags.Static))
             {
-                if (!_externFunctions.TryGetValue(function.Name, out var functions))
-                {
-                    _externFunctions[function.Name] = new List<MethodInfo> {function};
-                }
-                else
-                {
-                    functions.Add(function);
-                }
+                var functions = _externFunctions.GetOrAdd(function.Name, _ => new());
+                functions.Add(function);
             }
             _version++;
         }
