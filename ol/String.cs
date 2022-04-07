@@ -9,10 +9,7 @@ public unsafe struct String
     public int Length;
     public char* Pointer;
 
-    public String Substring(int start)
-    {
-        return new String {Length = Length - start, Pointer = Pointer + start};
-    }
+    public String Substring(int start) => new() {Length = Length - start, Pointer = Pointer + start};
 
     public bool Compare(string str)
     {
@@ -68,8 +65,6 @@ public unsafe struct String
 
     public static implicit operator UIntPtr(String str) => (UIntPtr)str.Length;
 
-    public override string ToString()
-    {
-        return this;
-    }
+    public ReadOnlySpan<char> ToSpan() => this;
+    public override string ToString() => this;
 }

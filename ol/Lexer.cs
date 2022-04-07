@@ -8,7 +8,7 @@ namespace ol;
 
 public static class Lexer
 {
-    private static readonly Dictionary<char, String> _escapableCharacters = new()
+    private static readonly Dictionary<char, string> _escapableCharacters = new()
     {
         {'"', "\""},
         {'\\', "\\"},
@@ -171,7 +171,7 @@ public static class Lexer
                         {
                             if (_escapableCharacters.TryGetValue(character, out var escapedCharacter))
                             {
-                                stringBuilder.Append(escapedCharacter);
+                                stringBuilder.Append(escapedCharacter.AsSpan());
                             }
                             else
                             {
@@ -239,7 +239,7 @@ public static class Lexer
 
                         if (!_characterCache.TryGetValue(character, out token.Value))
                         {
-                            token.Value = _characterCache[character] = character.ToString();
+                            token.Value = _characterCache[character] = fileText.Slice(i, 1);
                         }
 
                         tokens.Add(token);
