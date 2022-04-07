@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace ol;
@@ -141,7 +142,9 @@ public static class Lexer
                     var literalEscapeToken = false;
                     var completed = false;
                     var error = false;
-                    var stringBuilder = new StringBuilder();
+                    var hasEscapeTokens = false;
+                    var startIndex = i + 1;
+                    StringBuilder stringBuilder = null;
                     token = new Token
                     {
                         Type = TokenType.Literal,
@@ -156,6 +159,7 @@ public static class Lexer
 
                         if (character == '\\' && !literalEscapeToken)
                         {
+                            hasEscapeTokens = true;
                             literalEscapeToken = true;
                         }
                         else if (character == '\n')
@@ -170,6 +174,8 @@ public static class Lexer
                         }
                         else if (literalEscapeToken)
                         {
+                            stringBuilder ??= new();
+                            stringBuilder.Append(fileText.Slice(startIndex, i - startIndex - 1));
                             if (_escapableCharacters.TryGetValue(character, out var escapedCharacter))
                             {
                                 stringBuilder.Append(escapedCharacter.AsSpan());
@@ -177,25 +183,31 @@ public static class Lexer
                             else
                             {
                                 error = true;
-                                stringBuilder.Append(character);
                             }
+                            startIndex = i + 1;
                             literalEscapeToken = false;
                         }
-                        else
+                        else if (character == '"')
                         {
-                            if (character == '"')
+                            if (hasEscapeTokens)
                             {
-                                token.Value = stringBuilder.ToString();
-                                completed = true;
-                                if (error)
-                                {
-                                    ErrorReporter.Report($"Unexpected token '{token.Value}'", fileIndex, token);
-                                }
-
-                                tokens.Add(token);
-                                break;
+                                stringBuilder.Append(fileText.Slice(startIndex, i - startIndex));
+                                var literal = stringBuilder.ToString();
+                                GCHandle.Alloc(literal);
+                                token.Value = literal;
                             }
-                            stringBuilder.Append(character);
+                            else
+                            {
+                                token.Value = fileText.Slice(startIndex, i - startIndex);
+                            }
+                            completed = true;
+                            if (error)
+                            {
+                                ErrorReporter.Report($"Unexpected token '{token.Value}'", fileIndex, token);
+                            }
+
+                            tokens.Add(token);
+                            break;
                         }
                     }
                     if (!completed)
