@@ -1438,7 +1438,7 @@ public static unsafe class LLVMBackend
     {
         // Declare the basic blocks
         Span<LLVMBasicBlockRef> basicBlocks = stackalloc LLVMBasicBlockRef[function.BasicBlocks.Count];
-        var blockNameLength = (int)Math.Log10(function.BasicBlocks.Count) + 1;
+        var blockNameLength = (int)Math.Log10(function.BasicBlocks.Count) + 2;
         var basicBlockName = stackalloc sbyte[blockNameLength];
         for (var i = 0; i < blockNameLength; i++)
         {

@@ -3584,21 +3584,27 @@ public static unsafe class TypeChecker
                     if (referenceType.TypeKind == TypeKind.CArray)
                     {
                         var arrayType = (ArrayType)referenceType;
-                        var backendName = $"*.{arrayType.ElementType.BackendName}";
+                        Span<char> backendName = stackalloc char[arrayType.ElementType.BackendName.Length + 2];
+                        backendName[0] = '*';
+                        backendName[1] = '.';
+                        arrayType.ElementType.BackendName.ToSpan().CopyTo(backendName[2..]);
                         if (!GetType(backendName, unary.FileIndex, out var pointerType))
                         {
                             var name = $"{arrayType.ElementType.Name}*";
-                            pointerType = CreatePointerType(name, backendName, arrayType.ElementType);
+                            pointerType = CreatePointerType(name, backendName.ToString(), arrayType.ElementType);
                         }
                         unary.Type = pointerType;
                     }
                     else
                     {
-                        var backendName = $"*.{referenceType.BackendName}";
+                        Span<char> backendName = stackalloc char[referenceType.BackendName.Length + 2];
+                        backendName[0] = '*';
+                        backendName[1] = '.';
+                        referenceType.BackendName.ToSpan().CopyTo(backendName[2..]);
                         if (!GetType(backendName, unary.FileIndex, out var pointerType))
                         {
                             var name = $"{referenceType.Name}*";
-                            pointerType = CreatePointerType(name, backendName, referenceType);
+                            pointerType = CreatePointerType(name, backendName.ToString(), referenceType);
                         }
                         unary.Type = pointerType;
                     }
@@ -4999,16 +5005,14 @@ public static unsafe class TypeChecker
                 _ => TypeTable.S32Type
             };
         }
-        else
+
+        return size switch
         {
-            return size switch
-            {
-                1 => TypeTable.U8Type,
-                2 => TypeTable.U16Type,
-                8 => TypeTable.U64Type,
-                _ => TypeTable.U32Type
-            };
-        }
+            1 => TypeTable.U8Type,
+            2 => TypeTable.U16Type,
+            8 => TypeTable.U64Type,
+            _ => TypeTable.U32Type
+        };
     }
 
     private static IType VerifyIndex(IndexAst index, IType type, IFunction currentFunction, IScope scope, out bool overloaded)
@@ -5316,16 +5320,21 @@ public static unsafe class TypeChecker
                 }
             }
 
-            var backendName = $"{type.GenericName}.{arrayLength}";
+            var length = type.GenericNameLength;
+            Span<char> backendName = stackalloc char[length + (int)Math.Log10(arrayLength) + 2];
+            type.WriteGenericName(backendName);
+            backendName[length] = '.';
+            arrayLength.TryFormat(backendName.Slice(length + 1), out _);
             if (!GetType(backendName, type.FileIndex, out var arrayType))
             {
+                var backendNameString = backendName.ToString();
                 arrayType = new ArrayType
                 {
-                    FileIndex = elementType.FileIndex, Name = $"{PrintTypeDefinition(type)}[{arrayLength}]", BackendName = backendName,
+                    FileIndex = elementType.FileIndex, Name = $"{PrintTypeDefinition(type)}[{arrayLength}]", BackendName = backendNameString,
                     Size = elementType.Size * arrayLength, Alignment = elementType.Alignment,
                     Private = elementType.Private, Length = arrayLength, ElementType = elementType
                 };
-                AddType(backendName, arrayType);
+                AddType(backendNameString, arrayType);
                 TypeTable.CreateTypeInfo(arrayType);
             }
             return arrayType;
