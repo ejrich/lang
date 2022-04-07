@@ -741,7 +741,7 @@ public static unsafe class Parser
                 else if (token.Type == TokenType.Number)
                 {
                     enumerator.MoveNext();
-                    if (token.Flags == TokenFlags.None && int.TryParse(token.Value, out var value))
+                    if (token.Flags == TokenFlags.None && int.TryParse(token.Value.ToSpan(), out var value))
                     {
                         function.Syscall = value;
                     }
@@ -1162,7 +1162,7 @@ public static unsafe class Parser
                     {
                         if (token.Flags == TokenFlags.None)
                         {
-                            if (int.TryParse(token.Value, out var value))
+                            if (int.TryParse(token.Value.ToSpan(), out var value))
                             {
                                 currentValue.Value = value;
                                 currentValue.Defined = true;
@@ -1186,7 +1186,7 @@ public static unsafe class Parser
                             var value = token.Value.Substring(2);
                             if (value.Length <= 8)
                             {
-                                if (uint.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u32))
+                                if (uint.TryParse(value.ToSpan(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u32))
                                 {
                                     currentValue.Value = (int)u32;
                                     currentValue.Defined = true;
@@ -1194,7 +1194,7 @@ public static unsafe class Parser
                             }
                             else if (value.Length <= 16)
                             {
-                                if (ulong.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u64))
+                                if (ulong.TryParse(value.ToSpan(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u64))
                                 {
                                     currentValue.Value = (int)u64;
                                     currentValue.Defined = true;
@@ -3914,21 +3914,21 @@ public static unsafe class Parser
             case TokenType.Number:
                 if (token.Flags == TokenFlags.None)
                 {
-                    if (int.TryParse(token.Value, out var s32))
+                    if (int.TryParse(token.Value.ToSpan(), out var s32))
                     {
                         constant.TypeName = "s32";
                         constant.Value = new Constant {Integer = s32};
                         return constant;
                     }
 
-                    if (long.TryParse(token.Value, out var s64))
+                    if (long.TryParse(token.Value.ToSpan(), out var s64))
                     {
                         constant.TypeName = "s64";
                         constant.Value = new Constant {Integer = s64};
                         return constant;
                     }
 
-                    if (ulong.TryParse(token.Value, out var u64))
+                    if (ulong.TryParse(token.Value.ToSpan(), out var u64))
                     {
                         constant.TypeName = "u64";
                         constant.Value = new Constant {UnsignedInteger = u64};
@@ -3941,14 +3941,14 @@ public static unsafe class Parser
 
                 if (token.Flags.Has(TokenFlags.Float))
                 {
-                    if (float.TryParse(token.Value, out var f32))
+                    if (float.TryParse(token.Value.ToSpan(), out var f32))
                     {
                         constant.TypeName = "float";
                         constant.Value = new Constant {Double = (double)f32};
                         return constant;
                     }
 
-                    if (double.TryParse(token.Value, out var f64))
+                    if (double.TryParse(token.Value.ToSpan(), out var f64))
                     {
                         constant.TypeName = "float64";
                         constant.Value = new Constant {Double = f64};
@@ -3970,7 +3970,7 @@ public static unsafe class Parser
                     var value = token.Value.Substring(2);
                     if (value.Length <= 8)
                     {
-                        if (uint.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u32))
+                        if (uint.TryParse(value.ToSpan(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u32))
                         {
                             constant.TypeName = "u32";
                             constant.Value = new Constant {UnsignedInteger = u32};
@@ -3979,7 +3979,7 @@ public static unsafe class Parser
                     }
                     else if (value.Length <= 16)
                     {
-                        if (ulong.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u64))
+                        if (ulong.TryParse(value.ToSpan(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u64))
                         {
                             constant.TypeName = "u64";
                             constant.Value = new Constant {UnsignedInteger = u64};
@@ -3993,7 +3993,7 @@ public static unsafe class Parser
                 return null;
             case TokenType.Boolean:
                 constant.TypeName = "bool";
-                constant.Value = new Constant {Boolean = token.Value == "true"};
+                constant.Value = new Constant {Boolean = token.Value.Compare("true")};
                 return constant;
             default:
                 ErrorReporter.Report($"Unable to determine type of token '{token.Value}'", fileIndex, token);
