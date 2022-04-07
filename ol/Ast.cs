@@ -553,9 +553,9 @@ public class Library
 {
     public String Name { get; set; }
     public String Path { get; set; }
-    public String AbsolutePath { get; set; }
-    public String FileName { get; set; }
-    public String LibPath { get; set; }
+    public string AbsolutePath { get; set; }
+    public string FileName { get; set; }
+    public string LibPath { get; set; }
     public bool HasLib { get; set; }
     public bool HasDll { get; set; }
 }

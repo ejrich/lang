@@ -29,12 +29,13 @@ public unsafe struct String
     public override bool Equals(object obj) => obj is String other && Equals(other);
     public override int GetHashCode()
     {
-        var sum = 0;
-        for (var i = 0; i < Length; i++)
-        {
-            sum += Pointer[i];
-        }
-        return sum;
+        return ToString().GetHashCode();
+        // var sum = 0;
+        // for (var i = 0; i < Length; i++)
+        // {
+        //     sum += Pointer[i];
+        // }
+        // return sum;
     }
 
     public static bool operator ==(String a, String b)
