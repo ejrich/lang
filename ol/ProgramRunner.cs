@@ -113,6 +113,7 @@ public static unsafe class ProgramRunner
     {
         _functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
 
+        _externFunctions.GetOrAdd(function.Name, _ => new());
         var method = _functionTypeBuilder.DefineMethod(function.Name, MethodAttributes.Public | MethodAttributes.Static, returnType, argumentTypes);
 
         String library = function.Library == null ? function.ExternLib : function.Library.FileName == null ?
@@ -141,7 +142,7 @@ public static unsafe class ProgramRunner
 
             foreach (var function in library.GetMethods(BindingFlags.Public | BindingFlags.Static))
             {
-                var functions = _externFunctions.GetOrAdd(function.Name, _ => new());
+                var functions = _externFunctions[function.Name];
                 functions.Add(function);
             }
             _version++;
@@ -612,7 +613,7 @@ public static unsafe class ProgramRunner
 
                     var estimatedBytes = assembly.InRegisters.Count * 10 + assembly.Instructions.Count * 3 + assembly.OutValues.Count * 10;
                     var assemblyCode = new List<byte>(estimatedBytes);
-                    var mov = Assembly.Instructions["mov"][0];
+                    var mov = Assembly.Mov[0];
 
                     // Declare the inputs and write the assembly instructions
                     RegisterDefinition stagingRegister = null;
@@ -643,7 +644,7 @@ public static unsafe class ProgramRunner
                         else
                         {
                             WriteAssemblyInstruction(mov, stagingRegister, null, assemblyCode, null, value.ULong);
-                            WriteAssemblyInstruction(Assembly.Instructions["movq"][0], input.RegisterDefinition, stagingRegister, assemblyCode);
+                            WriteAssemblyInstruction(Assembly.Movq[0], input.RegisterDefinition, stagingRegister, assemblyCode);
                         }
                     }
 
@@ -685,7 +686,7 @@ public static unsafe class ProgramRunner
                         }
                         Debug.Assert(stagingRegister != null, "Unable to set staging register for capturing outputs");
 
-                        var movPointer = Assembly.Instructions["mov"][1];
+                        var movPointer = Assembly.Mov[1];
                         foreach (var output in assembly.OutValues)
                         {
                             var value = GetValue(output.Value, registers, stackPointer, function, arguments);
@@ -695,11 +696,11 @@ public static unsafe class ProgramRunner
                             {
                                 if (output.Value.Type.Size == 4)
                                 {
-                                    WriteAssemblyInstruction(Assembly.Instructions["movss"][0], stagingRegister, output.RegisterDefinition, assemblyCode);
+                                    WriteAssemblyInstruction(Assembly.Movss[0], stagingRegister, output.RegisterDefinition, assemblyCode);
                                 }
                                 else
                                 {
-                                    WriteAssemblyInstruction(Assembly.Instructions["movsd"][0], stagingRegister, output.RegisterDefinition, assemblyCode);
+                                    WriteAssemblyInstruction(Assembly.Movsd[0], stagingRegister, output.RegisterDefinition, assemblyCode);
                                 }
                             }
                             else
@@ -1638,7 +1639,7 @@ public static unsafe class ProgramRunner
             }
             else
             {
-                ErrorReporter.Report($"Undefined compiler function '{callingFunction.Source.Name}'", callingFunction.Source);
+                ErrorReporter.Report($"Undefined compiler function '{functionName}'", callingFunction.Source);
             }
 
             return returnValue;

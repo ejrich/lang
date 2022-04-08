@@ -6,11 +6,11 @@ namespace ol;
 
 public static class Polymorpher
 {
-    public static StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, string backendName, TypeKind typeKind, bool privateGenericTypes, params IType[] genericTypes)
+    public static StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, String backendName, TypeKind typeKind, bool privateGenericTypes, params IType[] genericTypes)
     {
         var polyStruct = new StructAst
         {
-            FileIndex = baseStruct.FileIndex, Line = baseStruct.Line, Column = baseStruct.Column, Name = name,
+            FileIndex = baseStruct.FileIndex, Line = baseStruct.Line, Column = baseStruct.Column, Name = Allocator.ReserveString(name),
             BackendName = backendName, TypeKind = typeKind, Private = baseStruct.Private || privateGenericTypes,
             BaseStructName = baseStruct.Name, BaseTypeDefinition = baseStruct.BaseTypeDefinition,
             BaseStruct = baseStruct.BaseStruct, GenericTypes = genericTypes
@@ -41,7 +41,7 @@ public static class Polymorpher
     {
         var function = CopyAst(baseFunction);
         function.Flags = baseFunction.Flags;
-        function.Name = name;
+        function.Name = Allocator.ReserveString(name);
         function.Private = baseFunction.Private || privateGenericTypes;
         function.ArgumentCount = baseFunction.ArgumentCount;
 

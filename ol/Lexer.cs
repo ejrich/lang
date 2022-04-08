@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Text;
 
 namespace ol;
@@ -192,9 +191,7 @@ public static class Lexer
                             if (hasEscapeTokens)
                             {
                                 stringBuilder.Append(fileText.Slice(startIndex, i - startIndex));
-                                var literal = stringBuilder.ToString();
-                                GCHandle.Alloc(literal);
-                                token.Value = literal;
+                                token.Value = Allocator.ReserveString(stringBuilder);
                             }
                             else
                             {
