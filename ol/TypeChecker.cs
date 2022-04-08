@@ -5585,6 +5585,7 @@ public static unsafe class TypeChecker
         if (type.BakedType != null)
         {
             sb.Append(type.BakedType.Name.ToSpan());
+            return;
         }
 
         if (type.Name == "*")

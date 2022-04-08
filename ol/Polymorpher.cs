@@ -66,7 +66,7 @@ public static class Polymorpher
             }
         }
 
-        function.Body = Polymorpher.CopyScope(baseFunction.Body, genericTypes, baseFunction.Generics);
+        function.Body = CopyScope(baseFunction.Body, genericTypes, baseFunction.Generics);
 
         return function;
     }
