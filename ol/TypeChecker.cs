@@ -40,7 +40,7 @@ public static unsafe class TypeChecker
         TypeTable.U32Type = AddPrimitive("u32", TypeKind.Integer, 4);
         TypeTable.S64Type = AddPrimitive("s64", TypeKind.Integer, 8, true);
         TypeTable.U64Type = AddPrimitive("u64", TypeKind.Integer, 8);
-        AddPrimitive("float", TypeKind.Float, 4, true);
+        TypeTable.FloatType = AddPrimitive("float", TypeKind.Float, 4, true);
         TypeTable.Float64Type = AddPrimitive("float64", TypeKind.Float, 8, true);
         TypeTable.TypeType = AddPrimitive("Type", TypeKind.Type, 4, true);
     }
@@ -857,7 +857,7 @@ public static unsafe class TypeChecker
                     {
                         ErrorReporter.Report($"Cannot use array initializer to declare non-array type '{PrintTypeDefinition(structField.TypeDefinition)}'", structField.TypeDefinition);
                     }
-                    else
+                    else if (structField.ArrayElementType != null)
                     {
                         structField.TypeDefinition.ConstCount = (uint)structField.ArrayValues.Count;
                         var elementType = structField.ArrayElementType;
@@ -954,15 +954,19 @@ public static unsafe class TypeChecker
                     }
                 }
 
-                if (structField.Type.Alignment > structAst.Alignment)
+                var alignment = structField.Type.Alignment;
+                if (alignment > 0)
                 {
-                    structAst.Alignment = structField.Type.Alignment;
-                }
+                    if (structField.Type.Alignment > structAst.Alignment)
+                    {
+                        structAst.Alignment = structField.Type.Alignment;
+                    }
 
-                var alignmentOffset = structAst.Size % structField.Type.Alignment;
-                if (alignmentOffset > 0)
-                {
-                    structAst.Size += structField.Type.Alignment - alignmentOffset;
+                    var alignmentOffset = structAst.Size % structField.Type.Alignment;
+                    if (alignmentOffset > 0)
+                    {
+                        structAst.Size += structField.Type.Alignment - alignmentOffset;
+                    }
                 }
 
                 structField.Offset = structAst.Size;
@@ -1192,13 +1196,16 @@ public static unsafe class TypeChecker
                         ErrorReporter.Report($"Expected default value of argument '{argument.Name}' in function '{function.Name}' to be a constant value", argument.Value);
 
                     }
-                    else if (argument.Type != null && !TypeEquals(argument.Type, defaultType))
+                    else if (argument.Type != null)
                     {
-                        ErrorReporter.Report($"Type of argument '{argument.Name}' in function '{function.Name}' is '{argument.Type.Name}', but default value is type '{defaultType.Name}'", argument.Value);
-                    }
-                    else
-                    {
-                        VerifyConstantIfNecessary(argument.Value, argument.Type);
+                        if (!TypeEquals(argument.Type, defaultType))
+                        {
+                            ErrorReporter.Report($"Type of argument '{argument.Name}' in function '{function.Name}' is '{argument.Type.Name}', but default value is type '{defaultType.Name}'", argument.Value);
+                        }
+                        else
+                        {
+                            VerifyConstantIfNecessary(argument.Value, argument.Type);
+                        }
                     }
                 }
             }
@@ -1560,7 +1567,7 @@ public static unsafe class TypeChecker
 
         // Set the function as verified to prevent multiple verifications
         function.Flags |= FunctionFlags.Verified;
-        Debug.Assert(function.Body != null, "Should not verify function without body");
+        Debug.Assert(function.Body != null, $"Should not verify function without body {function.Name} {function.Flags}");
 
         // 1. Initialize local variables
         foreach (var argument in function.Arguments)
@@ -3225,10 +3232,6 @@ public static unsafe class TypeChecker
                         ErrorReporter.Report($"Unknown register '{instruction.Value1.Register}'", instruction.Value1);
                     }
                 }
-                else
-                {
-                    instruction.Value1.Constant.Type = GlobalScope.Types[instruction.Value1.Constant.TypeName];
-                }
             }
 
             if (instruction.Value2 != null)
@@ -3244,10 +3247,6 @@ public static unsafe class TypeChecker
                         valid = false;
                         ErrorReporter.Report($"Unknown register '{instruction.Value2.Register}'", instruction.Value2);
                     }
-                }
-                else if (instruction.Value2.Constant != null)
-                {
-                    instruction.Value2.Constant.Type = GlobalScope.Types[instruction.Value2.Constant.TypeName];
                 }
             }
 
@@ -3442,7 +3441,10 @@ public static unsafe class TypeChecker
         {
             case ConstantAst constant:
                 isConstant = true;
-                constant.Type = GlobalScope.Types[constant.TypeName];
+                if (constant.String.Pointer != null)
+                {
+                    constant.Type = TypeTable.StringType;
+                }
                 if (getArrayLength && constant.Type.TypeKind == TypeKind.Integer)
                 {
                     arrayLength = (uint)constant.Value.UnsignedInteger;
@@ -3855,7 +3857,6 @@ public static unsafe class TypeChecker
             }
 
             constant.Type = targetType;
-            constant.TypeName = targetType.Name;
         }
     }
 
