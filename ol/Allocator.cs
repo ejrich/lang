@@ -20,6 +20,7 @@ public static class Allocator
     private static readonly List<MemoryBlock> _memoryBlocks = new();
     private static readonly List<MemoryBlock> _stackBlocks = new();
     private static readonly List<IntPtr> _openPointers = new();
+    private static readonly List<string> _allocatedStrings = new();
 
     public static IntPtr Allocate(uint size)
     {
@@ -134,6 +135,14 @@ public static class Allocator
         bytePointer[value.Length] = 0;
 
         return pointer;
+    }
+
+    public static String ReserveString(ReadOnlySpan<char> span) => ReserveString(span.ToString());
+    public static String ReserveString(StringBuilder sb) => ReserveString(sb.ToString());
+    public static String ReserveString(string str)
+    {
+        _allocatedStrings.Add(str);
+        return str;
     }
 }
 

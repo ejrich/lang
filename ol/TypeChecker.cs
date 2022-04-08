@@ -355,12 +355,12 @@ public static unsafe class TypeChecker
         Parser.Asts.Add(ast);
     }
 
-    public static bool AddType(string name, IType type)
+    public static bool AddType(String name, IType type)
     {
         return AddType(name, type, type.FileIndex);
     }
 
-    public static bool AddType(string name, IType type, int fileIndex)
+    public static bool AddType(String name, IType type, int fileIndex)
     {
         if (type.Private)
         {
@@ -398,11 +398,9 @@ public static unsafe class TypeChecker
                 ErrorReporter.Report($"Multiple definitions of type '{type.Name}'", ast);
                 return false;
             }
-            else
-            {
-                privateScope.Types[name] = type;
-                privateScope.Identifiers[name] = ast;
-            }
+
+            privateScope.Types[name] = type;
+            privateScope.Identifiers[name] = ast;
         }
         else
         {
@@ -411,10 +409,8 @@ public static unsafe class TypeChecker
                 ErrorReporter.Report($"Multiple definitions of type '{type.Name}'", ast);
                 return false;
             }
-            else
-            {
-                GlobalScope.Identifiers[name] = ast;
-            }
+
+            GlobalScope.Identifiers[name] = ast;
         }
 
         TypeTable.Add(type);
@@ -3585,8 +3581,8 @@ public static unsafe class TypeChecker
                         arrayType.ElementType.BackendName.ToSpan().CopyTo(backendName[2..]);
                         if (!GetType(backendName, unary.FileIndex, out var pointerType))
                         {
-                            var name = $"{arrayType.ElementType.Name}*";
-                            pointerType = CreatePointerType(name, backendName.ToString(), arrayType.ElementType);
+                            var name = Allocator.ReserveString($"{arrayType.ElementType.Name}*");
+                            pointerType = CreatePointerType(name, Allocator.ReserveString(backendName), arrayType.ElementType);
                         }
                         unary.Type = pointerType;
                     }
@@ -3598,8 +3594,8 @@ public static unsafe class TypeChecker
                         referenceType.BackendName.ToSpan().CopyTo(backendName[2..]);
                         if (!GetType(backendName, unary.FileIndex, out var pointerType))
                         {
-                            var name = $"{referenceType.Name}*";
-                            pointerType = CreatePointerType(name, backendName.ToString(), referenceType);
+                            var name = Allocator.ReserveString($"{referenceType.Name}*");
+                            pointerType = CreatePointerType(name, Allocator.ReserveString(backendName), referenceType);
                         }
                         unary.Type = pointerType;
                     }
@@ -3721,6 +3717,7 @@ public static unsafe class TypeChecker
                 var error = false;
                 var privateType = false;
                 uint size = 0;
+                int compoundTypeNameSize = 0;
                 for (var i = 0; i < types.Length; i++)
                 {
                     var type = VerifyExpression(compoundExpression.Children[i], currentFunction, scope);
@@ -3731,6 +3728,7 @@ public static unsafe class TypeChecker
                     else
                     {
                         size += type.Size;
+                        compoundTypeNameSize += type.BackendName.Length;
                         types[i] = type;
                         if (type.Private)
                         {
@@ -3743,13 +3741,23 @@ public static unsafe class TypeChecker
                     return null;
                 }
 
-                var compoundTypeName = string.Join("-", types.Select(t => t.BackendName));
+                Span<char> compoundTypeName = stackalloc char[compoundTypeNameSize + types.Length - 1];
+                var offset = 0;
+                for (var i = 0; i < types.Length - 1; i++)
+                {
+                    var name = types[i].BackendName;
+                    name.ToSpan().CopyTo(compoundTypeName[offset..]);
+                    offset += name.Length + 1;
+                    compoundTypeName[offset - 1] = '-';
+                }
+                types[^1].BackendName.ToSpan().CopyTo(compoundTypeName[offset..]);
+
                 if (GetType(compoundTypeName, compoundExpression.FileIndex, out var compoundType))
                 {
                     return compoundType;
                 }
 
-                return CreateCompoundType(types, compoundTypeName, size, privateType, compoundExpression.FileIndex);
+                return CreateCompoundType(types, Allocator.ReserveString(compoundTypeName), size, privateType, compoundExpression.FileIndex);
             case null:
                 return null;
             default:
@@ -5069,10 +5077,7 @@ public static unsafe class TypeChecker
         if (type.BaseStructName != null && _polymorphicOperatorOverloads.TryGetValue(type.BaseStructName, out var polymorphicOverloads) && polymorphicOverloads.TryGetValue(op, out var polymorphicOverload))
         {
             var polymorphedOverload = Polymorpher.CreatePolymorphedOperatorOverload(polymorphicOverload, type.GenericTypes.ToArray());
-            if (overloads == null)
-            {
-                overloads = _operatorOverloads.GetOrAdd(type.BackendName, _ => new());
-            }
+            overloads ??= _operatorOverloads.GetOrAdd(type.BackendName, _ => new());
             overloads[op] = polymorphedOverload;
             foreach (var argument in polymorphedOverload.Arguments)
             {
@@ -5250,7 +5255,7 @@ public static unsafe class TypeChecker
                 return null;
             }
 
-            return CreateCompoundType(types, genericName.ToString(), size, privateType, type.FileIndex);
+            return CreateCompoundType(types, Allocator.ReserveString(genericName), size, privateType, type.FileIndex);
         }
 
         if (type.Count != null && type.Name != "Array" && type.Name != "CArray")
@@ -5320,10 +5325,11 @@ public static unsafe class TypeChecker
             arrayLength.TryFormat(backendName.Slice(length + 1), out _);
             if (!GetType(backendName, type.FileIndex, out var arrayType))
             {
-                var backendNameString = backendName.ToString();
+                var name = Allocator.ReserveString($"{PrintTypeDefinition(type)}[{arrayLength}]");
+                var backendNameString = Allocator.ReserveString(backendName);
                 arrayType = new ArrayType
                 {
-                    FileIndex = elementType.FileIndex, Name = $"{PrintTypeDefinition(type)}[{arrayLength}]", BackendName = backendNameString,
+                    FileIndex = elementType.FileIndex, Name = name, BackendName = backendNameString,
                     Size = elementType.Size * arrayLength, Alignment = elementType.Alignment,
                     Private = elementType.Private, Length = arrayLength, ElementType = elementType
                 };
@@ -5366,7 +5372,8 @@ public static unsafe class TypeChecker
                 // To account for this, the type table needs to be checked for again for the type
                 if (!GetType(genericName, type.FileIndex, out pointerType))
                 {
-                    pointerType = CreatePointerType(PrintTypeDefinition(type), genericName.ToString(), pointedToType);
+                    var name = Allocator.ReserveString(PrintTypeDefinition(type));
+                    pointerType = CreatePointerType(name, Allocator.ReserveString(genericName), pointedToType);
                 }
                 return pointerType;
             }
@@ -5478,7 +5485,7 @@ public static unsafe class TypeChecker
                 fileIndex = type.FileIndex;
             }
 
-            var genericNameString = genericName.ToString();
+            var genericNameString = Allocator.ReserveString(genericName);
             var polyStruct = Polymorpher.CreatePolymorphedStruct(structDef, name, genericNameString, TypeKind.Struct, privateGenericTypes, genericTypes);
             AddType(genericNameString, polyStruct, fileIndex);
             VerifyStruct(polyStruct);
@@ -5514,16 +5521,18 @@ public static unsafe class TypeChecker
             return null;
         }
 
-        var backendName = $"Array.{elementType.BackendName}";
+        Span<char> backendName = stackalloc char[elementType.BackendName.Length + 6];
+        "Array.".CopyTo(backendName);
+        elementType.BackendName.ToSpan().CopyTo(backendName[6..]);
         if (GetType(backendName, typeDef.FileIndex, out var arrayType))
         {
             return arrayType;
         }
 
-        return CreateArrayStruct($"Array<{elementType.Name}>", backendName, elementType, elementTypeDef);
+        return CreateArrayStruct($"Array<{elementType.Name}>", Allocator.ReserveString(backendName), elementType, elementTypeDef);
     }
 
-    private static IType CreateArrayStruct(string name, string backendName, IType elementType, TypeDefinition elementTypeDef = null)
+    private static IType CreateArrayStruct(string name, String backendName, IType elementType, TypeDefinition elementTypeDef = null)
     {
         if (BaseArrayType == null)
         {
@@ -5536,7 +5545,7 @@ public static unsafe class TypeChecker
         return arrayStruct;
     }
 
-    private static IType CreatePointerType(string name, string backendName, IType pointedToType)
+    private static IType CreatePointerType(String name, String backendName, IType pointedToType)
     {
         var pointerType = new PointerType {FileIndex = pointedToType.FileIndex, Name = name, BackendName = backendName, Private = pointedToType.Private, PointedType = pointedToType};
         AddType(backendName, pointerType);
@@ -5545,9 +5554,10 @@ public static unsafe class TypeChecker
         return pointerType;
     }
 
-    private static IType CreateCompoundType(IType[] types, string backendName, uint size, bool privateType, int fileIndex)
+    private static IType CreateCompoundType(IType[] types, String backendName, uint size, bool privateType, int fileIndex)
     {
-        var compoundType = new CompoundType {FileIndex = fileIndex, Name = string.Join(", ", types.Select(t => t.Name)), BackendName = backendName, Size = size, Private = privateType, Types = types};
+        var name = Allocator.ReserveString(string.Join(", ", types.Select(t => t.Name)));
+        var compoundType = new CompoundType {FileIndex = fileIndex, Name = name, BackendName = backendName, Size = size, Private = privateType, Types = types};
         AddType(backendName, compoundType);
         TypeTable.CreateTypeInfo(compoundType);
         return compoundType;

@@ -315,7 +315,7 @@ public static unsafe class LLVMBackend
         LLVM.AddModuleFlag(_module, LLVMModuleFlagBehavior.LLVMModuleFlagBehaviorWarning, name.Value, (UIntPtr)name.Length, value);
     }
 
-    private static LLVMTypeRef CreateStruct(string typeName)
+    private static LLVMTypeRef CreateStruct(String typeName)
     {
         var typeInfo = TypeChecker.GlobalScope.Types[typeName];
         var typeStruct = _types[typeInfo.TypeIndex] = CreateNamedStruct(typeInfo.Name);
@@ -2366,23 +2366,28 @@ public static unsafe class LLVMBackend
             {
                 arguments[i] = GetValue(input.Value, values, allocations, functionPointer);
                 argumentTypes[i++] = _types[input.Value.Type.TypeIndex];
-                constraintString.AppendFormat("{{{0}}},", register);
+                constraintString.Append('{');
+                constraintString.Append(register.ToSpan());
+                constraintString.Append("},");
             }
             constraintString.Remove(constraintString.Length-1, 1);
         }
 
         foreach (var instr in assembly.Instructions)
         {
-            assemblyString.Append((ReadOnlySpan<char>)instr.Instruction);
+            assemblyString.Append(instr.Instruction.ToSpan());
             if (instr.Value1 != null)
             {
                 if (instr.Value1.Dereference)
                 {
-                    assemblyString.AppendFormat(" qword ptr [{0}]", instr.Value1.Register);
+                    assemblyString.Append(" qword ptr [");
+                    assemblyString.Append(instr.Value1.Register.ToSpan());
+                    assemblyString.Append(']');
                 }
                 else if (instr.Value1.Register != null)
                 {
-                    assemblyString.AppendFormat(" {0}", instr.Value1.Register);
+                    assemblyString.Append(' ');
+                    assemblyString.Append(instr.Value1.Register.ToSpan());
                 }
                 else
                 {
@@ -2393,11 +2398,14 @@ public static unsafe class LLVMBackend
             {
                 if (instr.Value2.Dereference)
                 {
-                    assemblyString.AppendFormat(", qword ptr [{0}]", instr.Value2.Register);
+                    assemblyString.Append(", qword ptr [");
+                    assemblyString.Append(instr.Value2.Register.ToSpan());
+                    assemblyString.Append(']');
                 }
                 else if (instr.Value2.Register != null)
                 {
-                    assemblyString.AppendFormat(", {0}", instr.Value2.Register);
+                    assemblyString.Append(", ");
+                    assemblyString.Append(instr.Value2.Register.ToSpan());
                 }
                 else
                 {
@@ -2447,7 +2455,9 @@ public static unsafe class LLVMBackend
                         assemblyString.Append("mov ");
                         break;
                 }
-                assemblyString.AppendFormat("%{0}, ${1}; ", output.Register, i);
+                assemblyString.Append('%');
+                assemblyString.Append(output.Register.ToSpan());
+                assemblyString.Append($", ${i}; ");
                 constraintString.Append("=*m,");
             }
             constraintString.Remove(constraintString.Length-1, 1);

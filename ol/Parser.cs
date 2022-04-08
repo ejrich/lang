@@ -222,13 +222,13 @@ public static unsafe class Parser
                         structAst.BackendName = structAst.Name;
                         if (TypeChecker.AddStruct(structAst))
                         {
-                            if (structAst.Name == "string")
+                            if (structAst.Name.Compare("string"))
                             {
                                 TypeTable.StringType = structAst;
                                 structAst.TypeKind = TypeKind.String;
                                 structAst.Used = true;
                             }
-                            else if (structAst.Name == "Any")
+                            else if (structAst.Name.Compare("Any"))
                             {
                                 TypeTable.AnyType = structAst;
                                 structAst.TypeKind = TypeKind.Any;
