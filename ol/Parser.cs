@@ -151,7 +151,6 @@ public static unsafe class Parser
 
         var fileIndex = BuildSettings.Files.Count;
         BuildSettings.Files.Add(file);
-        BuildSettings.FileContents.Add(null);
         TypeChecker.PrivateScopes.Add(null);
         ThreadPool.QueueWork(ParseFile, new ParseData {File = file, FileIndex = fileIndex});
     }

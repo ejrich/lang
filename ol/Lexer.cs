@@ -52,7 +52,8 @@ public static class Lexer
 
     public static List<Token> LoadFileTokens(string filePath, int fileIndex)
     {
-        var file = BuildSettings.FileContents[fileIndex] = File.ReadAllText(filePath);
+        var file = File.ReadAllText(filePath);
+        Allocator.ReserveString(file);
         var fileText = file.AsSpan();
 
         var tokens = new List<Token>(fileText.Length / 4);
