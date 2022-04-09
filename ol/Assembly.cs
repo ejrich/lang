@@ -4,7 +4,7 @@ namespace ol;
 
 public static class Assembly
 {
-    public static readonly Dictionary<String, RegisterDefinition> Registers = new()
+    public static readonly Dictionary<string, RegisterDefinition> Registers = new()
     {
         {"rax",   new()},
         {"rcx",   new(offset: 1)},
@@ -56,32 +56,7 @@ public static class Assembly
         {"ymm15", new(RegisterType.AVX, 7, 0x44)}
     };
 
-    public static readonly InstructionDefinition[] Mov = new InstructionDefinition[]
-    {
-        new() {Rex = 0x48, Opcode = 0xB8, AddRegisterToOpcode = true, Value1 = new(), Value2 = new(constant: true)},
-        new() {Rex = 0x48, Opcode = 0x89, Value1 = new(true), Value2 = new()}
-    };
-
-    public static readonly InstructionDefinition[] Movq = new InstructionDefinition[]
-    {
-        new() {Prefix = 0x66, Rex = 0x48, OF = true, Opcode = 0x6E, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new()}
-    };
-
-    public static readonly InstructionDefinition[] Movss = new InstructionDefinition[]
-    {
-        new() {Prefix = 0x0F3, OF = true, Opcode = 0x11, Value1 = new(true), Value2 = new(type: RegisterType.SSE)},
-        new() {Prefix = 0x0F3, OF = true, Opcode = 0x10, Value1 = new(type: RegisterType.SSE), Value2 = new(true)},
-        new() {Prefix = 0x0F3, OF = true, Opcode = 0x10, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new(type: RegisterType.SSE)}
-    };
-
-    public static readonly InstructionDefinition[] Movsd = new InstructionDefinition[]
-    {
-        new() {Prefix = 0x0F2, OF = true, Opcode = 0x11, Value1 = new(true), Value2 = new(type: RegisterType.SSE)},
-        new() {Prefix = 0x0F2, OF = true, Opcode = 0x10, Value1 = new(type: RegisterType.SSE), Value2 = new(true)},
-        new() {Prefix = 0x0F2, OF = true, Opcode = 0x10, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new(type: RegisterType.SSE)}
-    };
-
-    public static readonly Dictionary<String, InstructionDefinition[]> Instructions = new()
+    public static readonly Dictionary<string, InstructionDefinition[]> Instructions = new()
     {
         {"fcos",   new InstructionDefinition[]{ new() {Opcode = 0xD9, Opcode2 = 0xFF} }},
         {"fld",    new InstructionDefinition[]{ new() {Opcode = 0xDD, HasExtension = true, Value1 = new(true)} }},
@@ -91,10 +66,21 @@ public static class Assembly
         {"fst",    new InstructionDefinition[]{ new() {Opcode = 0xDD, HasExtension = true, Extension = 0x10, Value1 = new(true)} }},
         {"fstp",   new InstructionDefinition[]{ new() {Opcode = 0xDD, HasExtension = true, Extension = 0x18, Value1 = new(true)} }},
         {"fyl2x",  new InstructionDefinition[]{ new() {Opcode = 0xD9, Opcode2 = 0xF1} }},
-        {"mov",    Mov},
-        {"movsd",  Movsd},
-        {"movss",  Movss},
-        {"movq",   Movq},
+        {"mov",    new InstructionDefinition[]{
+            new() {Rex = 0x48, Opcode = 0xB8, AddRegisterToOpcode = true, Value1 = new(), Value2 = new(constant: true)},
+            new() {Rex = 0x48, Opcode = 0x89, Value1 = new(true), Value2 = new()}
+        }},
+        {"movsd",  new InstructionDefinition[]{
+            new() {Prefix = 0x0F2, OF = true, Opcode = 0x11, Value1 = new(true), Value2 = new(type: RegisterType.SSE)},
+            new() {Prefix = 0x0F2, OF = true, Opcode = 0x10, Value1 = new(type: RegisterType.SSE), Value2 = new(true)},
+            new() {Prefix = 0x0F2, OF = true, Opcode = 0x10, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new(type: RegisterType.SSE)}
+        }},
+        {"movss",  new InstructionDefinition[]{
+            new() {Prefix = 0x0F3, OF = true, Opcode = 0x11, Value1 = new(true), Value2 = new(type: RegisterType.SSE)},
+            new() {Prefix = 0x0F3, OF = true, Opcode = 0x10, Value1 = new(type: RegisterType.SSE), Value2 = new(true)},
+            new() {Prefix = 0x0F3, OF = true, Opcode = 0x10, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new(type: RegisterType.SSE)}
+        }},
+        {"movq",   new InstructionDefinition[]{ new() {Prefix = 0x66, Rex = 0x48, OF = true, Opcode = 0x6E, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new()} }},
         {"sqrtsd", new InstructionDefinition[]{ new() {Prefix = 0xF2, OF = true, Opcode = 0x51, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new(type: RegisterType.SSE)} }},
         // TODO Add more
     };

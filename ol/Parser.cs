@@ -6,12 +6,12 @@ using System.Linq;
 
 namespace ol;
 
-public static unsafe class Parser
+public static class Parser
 {
     private static string _libraryDirectory;
 
-    public static readonly SafeLinkedList<IAst> Asts = new();
-    public static readonly SafeLinkedList<CompilerDirectiveAst> Directives = new();
+    public static SafeLinkedList<IAst> Asts = new();
+    public static SafeLinkedList<CompilerDirectiveAst> Directives = new();
 
     private class TokenEnumerator
     {
@@ -39,13 +39,15 @@ public static unsafe class Parser
             return Remaining = false;
         }
 
-        public void Move(int steps)
+        public bool Move(int steps)
         {
             _index += steps;
             if (_tokens.Count > _index)
             {
                 Current = _tokens[_index];
+                return true;
             }
+            return false;
         }
 
         public bool Peek(out Token token, int steps = 0)
@@ -221,13 +223,13 @@ public static unsafe class Parser
                         structAst.BackendName = structAst.Name;
                         if (TypeChecker.AddStruct(structAst))
                         {
-                            if (structAst.Name.Compare("string"))
+                            if (structAst.Name == "string")
                             {
                                 TypeTable.StringType = structAst;
                                 structAst.TypeKind = TypeKind.String;
                                 structAst.Used = true;
                             }
-                            else if (structAst.Name.Compare("Any"))
+                            else if (structAst.Name == "Any")
                             {
                                 TypeTable.AnyType = structAst;
                                 structAst.TypeKind = TypeKind.Any;
@@ -357,14 +359,14 @@ public static unsafe class Parser
         }
     }
 
-    private static List<String> ParseAttributes(TokenEnumerator enumerator)
+    private static List<string> ParseAttributes(TokenEnumerator enumerator)
     {
         if (enumerator.Current.Type != TokenType.OpenBracket)
         {
             return null;
         }
 
-        var attributes = new List<String>();
+        var attributes = new List<string>();
         var commaRequired = false;
         while (enumerator.MoveNext())
         {
@@ -410,7 +412,7 @@ public static unsafe class Parser
         return attributes;
     }
 
-    private static FunctionAst ParseFunction(TokenEnumerator enumerator, List<String> attributes)
+    private static FunctionAst ParseFunction(TokenEnumerator enumerator, List<string> attributes)
     {
         // 1. Determine return type and name of the function
         var function = CreateAst<FunctionAst>(enumerator);
@@ -498,7 +500,7 @@ public static unsafe class Parser
         if (enumerator.Current.Type == TokenType.LessThan)
         {
             var commaRequiredBeforeNextType = false;
-            var generics = new HashSet<String>();
+            var generics = new HashSet<string>();
             while (enumerator.MoveNext())
             {
                 token = enumerator.Current;
@@ -699,78 +701,69 @@ public static unsafe class Parser
                 return null;
             }
 
-            var directive = enumerator.Current.Value;
-            if (directive.Compare("extern"))
+            switch (enumerator.Current.Value)
             {
-                function.Flags |= FunctionFlags.Extern;
-                const string externError = "Extern function definition should be followed by the library in use";
-                if (!enumerator.Peek(out token))
-                {
-                    ErrorReporter.Report(externError, enumerator.FileIndex, token);
-                }
-                else if (token.Type == TokenType.Literal)
-                {
-                    enumerator.MoveNext();
-                    function.ExternLib = token.Value;
-                }
-                else if (token.Type == TokenType.Identifier)
-                {
-                    enumerator.MoveNext();
-                    function.LibraryName = token.Value;
-                }
-                else
-                {
-                    ErrorReporter.Report(externError, enumerator.FileIndex, token);
-                }
-
-                return function;
-            }
-            if (directive.Compare("compiler"))
-            {
-                function.Flags |= FunctionFlags.Compiler;
-                return function;
-            }
-            if (directive.Compare("syscall"))
-            {
-                function.Flags |= FunctionFlags.Syscall;
-                const string syscallError = "Syscall function definition should be followed by the number for the system call";
-                if (!enumerator.Peek(out token))
-                {
-                    ErrorReporter.Report(syscallError, enumerator.FileIndex, token);
-                }
-                else if (token.Type == TokenType.Number)
-                {
-                    enumerator.MoveNext();
-                    if (token.Flags == TokenFlags.None && int.TryParse(token.Value.ToSpan(), out var value))
+                case "extern":
+                    function.Flags |= FunctionFlags.Extern;
+                    const string externError = "Extern function definition should be followed by the library in use";
+                    if (!enumerator.Peek(out token))
                     {
-                        function.Syscall = value;
+                        ErrorReporter.Report(externError, enumerator.FileIndex, token);
+                    }
+                    else if (token.Type == TokenType.Literal)
+                    {
+                        enumerator.MoveNext();
+                        function.ExternLib = token.Value;
+                    }
+                    else if (token.Type == TokenType.Identifier)
+                    {
+                        enumerator.MoveNext();
+                        function.LibraryName = token.Value;
+                    }
+                    else
+                    {
+                        ErrorReporter.Report(externError, enumerator.FileIndex, token);
+                    }
+                    return function;
+                case "compiler":
+                    function.Flags |= FunctionFlags.Compiler;
+                    return function;
+                case "syscall":
+                    function.Flags |= FunctionFlags.Syscall;
+                    const string syscallError = "Syscall function definition should be followed by the number for the system call";
+                    if (!enumerator.Peek(out token))
+                    {
+                        ErrorReporter.Report(syscallError, enumerator.FileIndex, token);
+                    }
+                    else if (token.Type == TokenType.Number)
+                    {
+                        enumerator.MoveNext();
+                        if (token.Flags == TokenFlags.None && int.TryParse(token.Value, out var value))
+                        {
+                            function.Syscall = value;
+                        }
+                        else
+                        {
+                            ErrorReporter.Report(syscallError, enumerator.FileIndex, token);
+                        }
                     }
                     else
                     {
                         ErrorReporter.Report(syscallError, enumerator.FileIndex, token);
                     }
-                }
-                else
-                {
-                    ErrorReporter.Report(syscallError, enumerator.FileIndex, token);
-                }
-                return function;
-            }
-            if (directive.Compare("print_ir"))
-            {
-                function.Flags |= FunctionFlags.PrintIR;
-            }
-            else if (directive.Compare("call_location"))
-            {
-                function.Flags |= FunctionFlags.PassCallLocation;
-            }
-            else if (directive.Compare("inline"))
-            {
-                function.Flags |= FunctionFlags.Inline;
-            }
-            else
-            {
-                ErrorReporter.Report($"Unexpected compiler directive '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
+                    return function;
+                case "print_ir":
+                    function.Flags |= FunctionFlags.PrintIR;
+                    break;
+                case "call_location":
+                    function.Flags |= FunctionFlags.PassCallLocation;
+                    break;
+                case "inline":
+                    function.Flags |= FunctionFlags.Inline;
+                    break;
+                default:
+                    ErrorReporter.Report($"Unexpected compiler directive '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
+                    break;
             }
             enumerator.MoveNext();
         }
@@ -795,7 +788,7 @@ public static unsafe class Parser
         return function;
     }
 
-    private static StructAst ParseStruct(TokenEnumerator enumerator, List<String> attributes)
+    private static StructAst ParseStruct(TokenEnumerator enumerator, List<string> attributes)
     {
         var structAst = CreateAst<StructAst>(enumerator);
         structAst.Attributes = attributes;
@@ -829,7 +822,7 @@ public static unsafe class Parser
             // Clear the '<' before entering loop
             enumerator.MoveNext();
             var commaRequiredBeforeNextType = false;
-            var generics = new HashSet<String>();
+            var generics = new HashSet<string>();
             while (enumerator.MoveNext())
             {
                 token = enumerator.Current;
@@ -1008,7 +1001,7 @@ public static unsafe class Parser
         return structField;
     }
 
-    private static EnumAst ParseEnum(TokenEnumerator enumerator, List<String> attributes)
+    private static EnumAst ParseEnum(TokenEnumerator enumerator, List<string> attributes)
     {
         var enumAst = CreateAst<EnumAst>(enumerator);
         enumAst.Attributes = attributes;
@@ -1162,7 +1155,7 @@ public static unsafe class Parser
                     {
                         if (token.Flags == TokenFlags.None)
                         {
-                            if (int.TryParse(token.Value.ToSpan(), out var value))
+                            if (int.TryParse(token.Value, out var value))
                             {
                                 currentValue.Value = value;
                                 currentValue.Defined = true;
@@ -1172,11 +1165,11 @@ public static unsafe class Parser
                                 ErrorReporter.Report($"Expected enum value to be an integer, but got '{token.Value}'", enumerator.FileIndex, token);
                             }
                         }
-                        else if (token.Flags.Has(TokenFlags.Float))
+                        else if (token.Flags.HasFlag(TokenFlags.Float))
                         {
                             ErrorReporter.Report($"Expected enum value to be an integer, but got '{token.Value}'", enumerator.FileIndex, token);
                         }
-                        else if (token.Flags.Has(TokenFlags.HexNumber))
+                        else if (token.Flags.HasFlag(TokenFlags.HexNumber))
                         {
                             if (token.Value.Length == 2)
                             {
@@ -1186,7 +1179,7 @@ public static unsafe class Parser
                             var value = token.Value.Substring(2);
                             if (value.Length <= 8)
                             {
-                                if (uint.TryParse(value.ToSpan(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u32))
+                                if (uint.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u32))
                                 {
                                     currentValue.Value = (int)u32;
                                     currentValue.Defined = true;
@@ -1194,7 +1187,7 @@ public static unsafe class Parser
                             }
                             else if (value.Length <= 16)
                             {
-                                if (ulong.TryParse(value.ToSpan(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u64))
+                                if (ulong.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u64))
                                 {
                                     currentValue.Value = (int)u64;
                                     currentValue.Defined = true;
@@ -1363,7 +1356,7 @@ public static unsafe class Parser
         return field;
     }
 
-    private static bool SearchForGeneric(String generic, int index, TypeDefinition type)
+    private static bool SearchForGeneric(string generic, int index, TypeDefinition type)
     {
         if (type.Name == generic)
         {
@@ -1697,7 +1690,7 @@ public static unsafe class Parser
                 }
                 if (token.Type == TokenType.Number && token.Value[0] == '-')
                 {
-                    token.Value = token.Value.Substring(1);
+                    token.Value = token.Value[1..];
                     expression.Operators.Add(Operator.Subtract);
                     var constant = ParseConstant(token, enumerator.FileIndex);
                     expression.Children.Add(constant);
@@ -1835,7 +1828,7 @@ public static unsafe class Parser
         switch (enumerator.Current.Type)
         {
             case TokenType.OpenBrace:
-                values.Assignments = new();
+                values.Assignments = new Dictionary<string, AssignmentAst>();
                 while (enumerator.MoveNext())
                 {
                     var token = enumerator.Current;
@@ -2029,7 +2022,7 @@ public static unsafe class Parser
                 }
                 if (token.Type == TokenType.Number && token.Value[0] == '-')
                 {
-                    token.Value = token.Value.Substring(1);
+                    token.Value = token.Value[1..];
                     expression.Operators.Add(Operator.Subtract);
                     var constant = ParseConstant(token, enumerator.FileIndex);
                     expression.Children.Add(constant);
@@ -2534,7 +2527,7 @@ public static unsafe class Parser
                     enumerator.MoveNext();
                     enumerator.MoveNext();
 
-                    callAst.SpecifiedArguments ??= new Dictionary<String, IAst>();
+                    callAst.SpecifiedArguments ??= new Dictionary<string, IAst>();
                     var argument = ParseExpression(enumerator, currentFunction, null, TokenType.Comma, TokenType.CloseParen);
                     if (!callAst.SpecifiedArguments.TryAdd(argumentName, argument))
                     {
@@ -2605,127 +2598,121 @@ public static unsafe class Parser
         }
 
         var token = enumerator.Current;
-        var type = token.Value;
-        if (type.Compare("run"))
+        switch (token.Value)
         {
-            directive.Type = DirectiveType.Run;
-            enumerator.MoveNext();
-            var ast = ParseLine(enumerator, null);
-            if (ast != null)
-                directive.Value = ast;
-        }
-        else if (type.Compare("if"))
-        {
-            directive.Type = DirectiveType.If;
-            directive.Value = ParseConditional(enumerator, null, true, directory);
-        }
-        else if (type.Compare("assert"))
-        {
-            directive.Type = DirectiveType.Assert;
-            enumerator.MoveNext();
-            directive.Value = ParseExpression(enumerator, null);
-        }
-        else if (type.Compare("import"))
-        {
-            if (!enumerator.MoveNext())
-            {
-                ErrorReporter.Report($"Expected module name or source file", enumerator.FileIndex, enumerator.Last);
-                return null;
-            }
-
-            token = enumerator.Current;
-            switch (token.Type)
-            {
-                case TokenType.Identifier:
-                    directive.Type = DirectiveType.ImportModule;
-                    var module = token.Value;
-                    if (global)
-                    {
-                        AddModule(module, enumerator.FileIndex, token);
-                    }
-                    else
-                    {
-                        directive.Import = new Import {Name = module, Path = Path.Combine(_libraryDirectory, $"{token.Value}.ol")};
-                    }
-                    break;
-                case TokenType.Literal:
-                    directive.Type = DirectiveType.ImportFile;
-                    var file = token.Value;
-                    if (global)
-                    {
-                        AddFile(file, directory, enumerator.FileIndex, token);
-                    }
-                    else
-                    {
-                        directive.Import = new Import {Name = file, Path = Path.Combine(directory, token.Value)};
-                    }
-                    break;
-                default:
-                    ErrorReporter.Report($"Expected module name or source file, but got '{token.Value}'", enumerator.FileIndex, token);
-                    break;
-            }
-        }
-        else if (type.Compare("library"))
-        {
-            directive.Type = DirectiveType.Library;
-            if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Identifier)
-            {
-                ErrorReporter.Report($"Expected library name, but got '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
-                return null;
-            }
-            var name = enumerator.Current.Value;
-            if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Literal)
-            {
-                ErrorReporter.Report($"Expected library path, but got '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
-                return null;
-            }
-            var path = enumerator.Current.Value;
-            directive.Library = new Library {Name = name, Path = path};
-            if (path[0] == '/')
-            {
-                directive.Library.AbsolutePath = path;
-            }
-            else
-            {
-                directive.Library.AbsolutePath = Path.Combine(directory, path);
-            }
-        }
-        else if (type.Compare("system_library"))
-        {
-            directive.Type = DirectiveType.SystemLibrary;
-            if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Identifier)
-            {
-                ErrorReporter.Report($"Expected library name, but got '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
-                return null;
-            }
-            var name = enumerator.Current.Value;
-            if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Literal)
-            {
-                ErrorReporter.Report($"Expected library file name, but got '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
-                return null;
-            }
-            directive.Library = new Library {Name = name, FileName = enumerator.Current.Value};
-            if (enumerator.Peek(out token) && token.Type == TokenType.Literal)
-            {
-                directive.Library.LibPath = token.Value;
+            case "run":
+                directive.Type = DirectiveType.Run;
                 enumerator.MoveNext();
-            }
-        }
-        else if (type.Compare("private"))
-        {
-            if (enumerator.Private)
-            {
-                ErrorReporter.Report("Tried to set #private when already in private scope", enumerator.FileIndex, token);
-            }
-            else
-            {
-                TypeChecker.PrivateScopes[enumerator.FileIndex] = new PrivateScope{Parent = TypeChecker.GlobalScope};
-            }
-            enumerator.Private = true;
-        }
-        else
-        {
-            ErrorReporter.Report($"Unsupported top-level compiler directive '{token.Value}'", enumerator.FileIndex, token);
+                var ast = ParseLine(enumerator, null);
+                if (ast != null)
+                    directive.Value = ast;
+                break;
+            case "if":
+                directive.Type = DirectiveType.If;
+                directive.Value = ParseConditional(enumerator, null, true, directory);
+                break;
+            case "assert":
+                directive.Type = DirectiveType.Assert;
+                enumerator.MoveNext();
+                directive.Value = ParseExpression(enumerator, null);
+                break;
+            case "import":
+                if (!enumerator.MoveNext())
+                {
+                    ErrorReporter.Report($"Expected module name or source file", enumerator.FileIndex, enumerator.Last);
+                    return null;
+                }
+                token = enumerator.Current;
+                switch (token.Type)
+                {
+                    case TokenType.Identifier:
+                        directive.Type = DirectiveType.ImportModule;
+                        var module = token.Value;
+                        if (global)
+                        {
+                            AddModule(module, enumerator.FileIndex, token);
+                        }
+                        else
+                        {
+                            directive.Import = new Import {Name = module, Path = Path.Combine(_libraryDirectory, $"{token.Value}.ol")};
+                        }
+                        break;
+                    case TokenType.Literal:
+                        directive.Type = DirectiveType.ImportFile;
+                        var file = token.Value;
+                        if (global)
+                        {
+                            AddFile(file, directory, enumerator.FileIndex, token);
+                        }
+                        else
+                        {
+                            directive.Import = new Import {Name = file, Path = Path.Combine(directory, token.Value)};
+                        }
+                        break;
+                    default:
+                        ErrorReporter.Report($"Expected module name or source file, but got '{token.Value}'", enumerator.FileIndex, token);
+                        break;
+                }
+                break;
+            case "library":
+                directive.Type = DirectiveType.Library;
+                if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Identifier)
+                {
+                    ErrorReporter.Report($"Expected library name, but got '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
+                    return null;
+                }
+                var name = enumerator.Current.Value;
+                if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Literal)
+                {
+                    ErrorReporter.Report($"Expected library path, but got '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
+                    return null;
+                }
+                var path = enumerator.Current.Value;
+                directive.Library = new Library {Name = name, Path = path};
+                if (path[0] == '/')
+                {
+                    directive.Library.AbsolutePath = path;
+                }
+                else
+                {
+                    directive.Library.AbsolutePath = Path.Combine(directory, path);
+                }
+                break;
+            case "system_library":
+                directive.Type = DirectiveType.SystemLibrary;
+                if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Identifier)
+                {
+                    ErrorReporter.Report($"Expected library name, but got '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
+                    return null;
+                }
+                name = enumerator.Current.Value;
+                if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Literal)
+                {
+                    ErrorReporter.Report($"Expected library file name, but got '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
+                    return null;
+                }
+                var fileName = enumerator.Current.Value;
+                directive.Library = new Library {Name = name, FileName = fileName};
+                if (enumerator.Peek(out token) && token.Type == TokenType.Literal)
+                {
+                    directive.Library.LibPath = token.Value;
+                    enumerator.MoveNext();
+                }
+                break;
+            case "private":
+                if (enumerator.Private)
+                {
+                    ErrorReporter.Report("Tried to set #private when already in private scope", enumerator.FileIndex, token);
+                }
+                else
+                {
+                    TypeChecker.PrivateScopes[enumerator.FileIndex] = new PrivateScope{Parent = TypeChecker.GlobalScope};
+                }
+                enumerator.Private = true;
+                break;
+            default:
+                ErrorReporter.Report($"Unsupported top-level compiler directive '{token.Value}'", enumerator.FileIndex, token);
+                return null;
         }
 
         return directive;
@@ -2742,37 +2729,34 @@ public static unsafe class Parser
         }
 
         var token = enumerator.Current;
-        var type = token.Value;
-        if (type.Compare("inline"))
+        switch (token.Value)
         {
-            if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Identifier)
-            {
-                ErrorReporter.Report($"Expected function call following #inline directive", enumerator.FileIndex, token);
+            case "if":
+                directive.Type = DirectiveType.If;
+                directive.Value = ParseConditional(enumerator, currentFunction);
+                currentFunction.Flags |= FunctionFlags.HasDirectives;
+                break;
+            case "assert":
+                directive.Type = DirectiveType.Assert;
+                enumerator.MoveNext();
+                directive.Value = ParseExpression(enumerator, currentFunction);
+                currentFunction.Flags |= FunctionFlags.HasDirectives;
+                break;
+            case "inline":
+                if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Identifier)
+                {
+                    ErrorReporter.Report($"Expected funciton call following #inline directive", enumerator.FileIndex, token);
+                    return null;
+                }
+                var call = ParseCall(enumerator, currentFunction, true);
+                if (call != null)
+                {
+                    call.Inline = true;
+                }
+                return call;
+            default:
+                ErrorReporter.Report($"Unsupported function level compiler directive '{token.Value}'", enumerator.FileIndex, token);
                 return null;
-            }
-            var call = ParseCall(enumerator, currentFunction, true);
-            if (call != null)
-            {
-                call.Inline = true;
-            }
-            return call;
-        }
-        if (type.Compare("if"))
-        {
-            directive.Type = DirectiveType.If;
-            directive.Value = ParseConditional(enumerator, currentFunction);
-            currentFunction.Flags |= FunctionFlags.HasDirectives;
-        }
-        else if (type.Compare("assert"))
-        {
-            directive.Type = DirectiveType.Assert;
-            enumerator.MoveNext();
-            directive.Value = ParseExpression(enumerator, currentFunction);
-            currentFunction.Flags |= FunctionFlags.HasDirectives;
-        }
-        else
-        {
-            ErrorReporter.Report($"Unsupported function level compiler directive '{token.Value}'", enumerator.FileIndex, token);
         }
 
         return directive;
@@ -3274,7 +3258,7 @@ public static unsafe class Parser
         if (enumerator.Current.Type == TokenType.LessThan)
         {
             var commaRequiredBeforeNextType = false;
-            var generics = new HashSet<String>();
+            var generics = new HashSet<string>();
             while (enumerator.MoveNext())
             {
                 token = enumerator.Current;
@@ -3475,14 +3459,14 @@ public static unsafe class Parser
                 ErrorReporter.Report("Expected compiler directive value", enumerator.FileIndex, enumerator.Last);
                 return null;
             }
-
-            if (enumerator.Current.Value.Compare("print_ir"))
+            switch (enumerator.Current.Value)
             {
-                overload.Flags |= FunctionFlags.PrintIR;
-            }
-            else
-            {
-                ErrorReporter.Report($"Unexpected compiler directive '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
+                case "print_ir":
+                    overload.Flags |= FunctionFlags.PrintIR;
+                    break;
+                default:
+                    ErrorReporter.Report($"Unexpected compiler directive '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
+                    break;
             }
             enumerator.MoveNext();
         }
@@ -3834,7 +3818,7 @@ public static unsafe class Parser
                     endsWithShift = true;
                     break;
                 }
-                if (token.Type == TokenType.RotateRight)
+                else if (token.Type == TokenType.RotateRight)
                 {
                     if ((depth % 3 != 2 && !endsWithRotate) || (!commaRequiredBeforeNextType && typeDefinition.Generics.Any()))
                     {
@@ -3903,32 +3887,33 @@ public static unsafe class Parser
         switch (token.Type)
         {
             case TokenType.Literal:
+                constant.TypeName = "string";
                 constant.String = token.Value;
                 return constant;
             case TokenType.Character:
-                constant.Type = TypeTable.U8Type;
+                constant.TypeName = "u8";
                 constant.Value = new Constant {UnsignedInteger = (byte)token.Value[0]};
                 return constant;
             case TokenType.Number:
                 if (token.Flags == TokenFlags.None)
                 {
-                    if (int.TryParse(token.Value.ToSpan(), out var s32))
+                    if (int.TryParse(token.Value, out var s32))
                     {
-                        constant.Type = TypeTable.S32Type;
+                        constant.TypeName = "s32";
                         constant.Value = new Constant {Integer = s32};
                         return constant;
                     }
 
-                    if (long.TryParse(token.Value.ToSpan(), out var s64))
+                    if (long.TryParse(token.Value, out var s64))
                     {
-                        constant.Type = TypeTable.S64Type;
+                        constant.TypeName = "s64";
                         constant.Value = new Constant {Integer = s64};
                         return constant;
                     }
 
-                    if (ulong.TryParse(token.Value.ToSpan(), out var u64))
+                    if (ulong.TryParse(token.Value, out var u64))
                     {
-                        constant.Type = TypeTable.U64Type;
+                        constant.TypeName = "u64";
                         constant.Value = new Constant {UnsignedInteger = u64};
                         return constant;
                     }
@@ -3937,18 +3922,18 @@ public static unsafe class Parser
                     return null;
                 }
 
-                if (token.Flags.Has(TokenFlags.Float))
+                if (token.Flags.HasFlag(TokenFlags.Float))
                 {
-                    if (float.TryParse(token.Value.ToSpan(), out var f32))
+                    if (float.TryParse(token.Value, out var f32))
                     {
-                        constant.Type = TypeTable.FloatType;
+                        constant.TypeName = "float";
                         constant.Value = new Constant {Double = (double)f32};
                         return constant;
                     }
 
-                    if (double.TryParse(token.Value.ToSpan(), out var f64))
+                    if (double.TryParse(token.Value, out var f64))
                     {
-                        constant.Type = TypeTable.Float64Type;
+                        constant.TypeName = "float64";
                         constant.Value = new Constant {Double = f64};
                         return constant;
                     }
@@ -3957,7 +3942,7 @@ public static unsafe class Parser
                     return null;
                 }
 
-                if (token.Flags.Has(TokenFlags.HexNumber))
+                if (token.Flags.HasFlag(TokenFlags.HexNumber))
                 {
                     if (token.Value.Length == 2)
                     {
@@ -3968,18 +3953,18 @@ public static unsafe class Parser
                     var value = token.Value.Substring(2);
                     if (value.Length <= 8)
                     {
-                        if (uint.TryParse(value.ToSpan(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u32))
+                        if (uint.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u32))
                         {
-                            constant.Type = TypeTable.U32Type;
+                            constant.TypeName = "u32";
                             constant.Value = new Constant {UnsignedInteger = u32};
                             return constant;
                         }
                     }
                     else if (value.Length <= 16)
                     {
-                        if (ulong.TryParse(value.ToSpan(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u64))
+                        if (ulong.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u64))
                         {
-                            constant.Type = TypeTable.U64Type;
+                            constant.TypeName = "u64";
                             constant.Value = new Constant {UnsignedInteger = u64};
                             return constant;
                         }
@@ -3990,8 +3975,8 @@ public static unsafe class Parser
                 ErrorReporter.Report($"Unable to determine type of token '{token.Value}'", fileIndex, token);
                 return null;
             case TokenType.Boolean:
-                constant.Type = TypeTable.BoolType;
-                constant.Value = new Constant {Boolean = token.Value.Compare("true")};
+                constant.TypeName = "bool";
+                constant.Value = new Constant {Boolean = token.Value == "true"};
                 return constant;
             default:
                 ErrorReporter.Report($"Unable to determine type of token '{token.Value}'", fileIndex, token);

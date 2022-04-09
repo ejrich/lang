@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -33,9 +32,9 @@ public static unsafe class ProgramRunner
     private static TypeBuilder _functionTypeBuilder;
     private static int _version;
     private static ConstructorInfo _dllImportConstructor;
-    private static readonly Dictionary<String, CustomAttributeBuilder> _libraries = new();
-    private static readonly ConcurrentDictionary<String, List<MethodInfo>> _externFunctions = new();
-    private static readonly Dictionary<String, Type> _functionPointerDelegateTypes = new();
+    private static readonly Dictionary<string, CustomAttributeBuilder> _libraries = new();
+    private static readonly Dictionary<string, List<MethodInfo>> _externFunctions = new();
+    private static readonly Dictionary<string, Type> _functionPointerDelegateTypes = new();
 
     private static int _typeCount;
     private static IntPtr _typeTablePointer;
@@ -113,10 +112,9 @@ public static unsafe class ProgramRunner
     {
         _functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
 
-        _externFunctions.GetOrAdd(function.Name, _ => new());
         var method = _functionTypeBuilder.DefineMethod(function.Name, MethodAttributes.Public | MethodAttributes.Static, returnType, argumentTypes);
 
-        String library = function.Library == null ? function.ExternLib : function.Library.FileName == null ?
+        var library = function.Library == null ? function.ExternLib : function.Library.FileName == null ?
         #if _LINUX
             $"{function.Library.AbsolutePath}.so" :
         #elif _WINDOWS
@@ -127,7 +125,7 @@ public static unsafe class ProgramRunner
         if (!_libraries.TryGetValue(library, out var libraryDllImport))
         {
             _dllImportConstructor ??= typeof(DllImportAttribute).GetConstructor(new []{typeof(string)});
-            libraryDllImport = _libraries[library] = new(_dllImportConstructor, new []{library.ToString()});
+            libraryDllImport = _libraries[library] = new CustomAttributeBuilder(_dllImportConstructor, new []{library});
         }
 
         method.SetCustomAttribute(libraryDllImport);
@@ -142,8 +140,14 @@ public static unsafe class ProgramRunner
 
             foreach (var function in library.GetMethods(BindingFlags.Public | BindingFlags.Static))
             {
-                var functions = _externFunctions[function.Name];
-                functions.Add(function);
+                if (!_externFunctions.TryGetValue(function.Name, out var functions))
+                {
+                    _externFunctions[function.Name] = new List<MethodInfo> {function};
+                }
+                else
+                {
+                    functions.Add(function);
+                }
             }
             _version++;
         }
@@ -318,7 +322,7 @@ public static unsafe class ProgramRunner
         BuildSettings.Linker = (LinkerType)linker;
     }
 
-    private static void SetExecutableName(LanguageString name)
+    private static void SetExecutableName(String name)
     {
         BuildSettings.Name = Marshal.PtrToStringAnsi(name.Data, (int)name.Length);
     }
@@ -328,7 +332,7 @@ public static unsafe class ProgramRunner
         BuildSettings.OutputTypeTable = (OutputTypeTableConfiguration)config;
     }
 
-    private static void SetOutputDirectory(LanguageString directory)
+    private static void SetOutputDirectory(String directory)
     {
         var directoryPath = Marshal.PtrToStringAnsi(directory.Data, (int)directory.Length);
         BuildSettings.OutputDirectory = Path.IsPathRooted(directoryPath) ? directoryPath : Path.Combine(BuildSettings.Path, directoryPath);
@@ -339,7 +343,7 @@ public static unsafe class ProgramRunner
         }
     }
 
-    private static void AddLibraryDirectory(LanguageString directory)
+    private static void AddLibraryDirectory(String directory)
     {
         var directoryPath = Marshal.PtrToStringAnsi(directory.Data, (int)directory.Length);
         if (Path.IsPathRooted(directoryPath))
@@ -358,7 +362,7 @@ public static unsafe class ProgramRunner
         }
     }
 
-    private static void CopyToOutputDirectory(LanguageString file)
+    private static void CopyToOutputDirectory(String file)
     {
         var filePath = Marshal.PtrToStringAnsi(file.Data, (int)file.Length);
         FileInfo fileInfo;
@@ -613,7 +617,7 @@ public static unsafe class ProgramRunner
 
                     var estimatedBytes = assembly.InRegisters.Count * 10 + assembly.Instructions.Count * 3 + assembly.OutValues.Count * 10;
                     var assemblyCode = new List<byte>(estimatedBytes);
-                    var mov = Assembly.Mov[0];
+                    var mov = Assembly.Instructions["mov"][0];
 
                     // Declare the inputs and write the assembly instructions
                     RegisterDefinition stagingRegister = null;
@@ -644,7 +648,7 @@ public static unsafe class ProgramRunner
                         else
                         {
                             WriteAssemblyInstruction(mov, stagingRegister, null, assemblyCode, null, value.ULong);
-                            WriteAssemblyInstruction(Assembly.Movq[0], input.RegisterDefinition, stagingRegister, assemblyCode);
+                            WriteAssemblyInstruction(Assembly.Instructions["movq"][0], input.RegisterDefinition, stagingRegister, assemblyCode);
                         }
                     }
 
@@ -686,7 +690,7 @@ public static unsafe class ProgramRunner
                         }
                         Debug.Assert(stagingRegister != null, "Unable to set staging register for capturing outputs");
 
-                        var movPointer = Assembly.Mov[1];
+                        var movPointer = Assembly.Instructions["mov"][1];
                         foreach (var output in assembly.OutValues)
                         {
                             var value = GetValue(output.Value, registers, stackPointer, function, arguments);
@@ -696,11 +700,11 @@ public static unsafe class ProgramRunner
                             {
                                 if (output.Value.Type.Size == 4)
                                 {
-                                    WriteAssemblyInstruction(Assembly.Movss[0], stagingRegister, output.RegisterDefinition, assemblyCode);
+                                    WriteAssemblyInstruction(Assembly.Instructions["movss"][0], stagingRegister, output.RegisterDefinition, assemblyCode);
                                 }
                                 else
                                 {
-                                    WriteAssemblyInstruction(Assembly.Movsd[0], stagingRegister, output.RegisterDefinition, assemblyCode);
+                                    WriteAssemblyInstruction(Assembly.Instructions["movsd"][0], stagingRegister, output.RegisterDefinition, assemblyCode);
                                 }
                             }
                             else
@@ -917,22 +921,22 @@ public static unsafe class ProgramRunner
                     {
                         register.Float = instruction.Value1.Type.Size switch
                         {
-                            1 => value.SByte,
-                            2 => value.Short,
-                            4 => value.Integer,
-                            8 => value.Long,
-                            _ => value.Integer,
+                            1 => (float)value.SByte,
+                            2 => (float)value.Short,
+                            4 => (float)value.Integer,
+                            8 => (float)value.Long,
+                            _ => (float)value.Integer,
                         };
                     }
                     else
                     {
                         register.Double = instruction.Value1.Type.Size switch
                         {
-                            1 => value.SByte,
-                            2 => value.Short,
-                            4 => value.Integer,
-                            8 => value.Long,
-                            _ => value.Integer,
+                            1 => (double)value.SByte,
+                            2 => (double)value.Short,
+                            4 => (double)value.Integer,
+                            8 => (double)value.Long,
+                            _ => (double)value.Integer,
                         };
                     }
                     registers[instruction.ValueIndex] = register;
@@ -1556,7 +1560,7 @@ public static unsafe class ProgramRunner
         return new Register();
     }
 
-    private static Register GetConstant(InstructionValue value)
+    private static Register GetConstant(InstructionValue value, bool constant = false)
     {
         var register = new Register();
         switch (value.Type.TypeKind)
@@ -1590,7 +1594,7 @@ public static unsafe class ProgramRunner
 
     private static Register MakeCall(FunctionIR callingFunction, InstructionValue[] arguments, ReadOnlySpan<Register> registers, IntPtr stackPointer, FunctionIR function, ReadOnlySpan<Register> functionArgs, int externIndex = 0)
     {
-        if (callingFunction.Source.Flags.Has(FunctionFlags.Extern))
+        if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Extern))
         {
             var args = GetExternArguments(arguments, registers, stackPointer, function, functionArgs);
 
@@ -1599,49 +1603,55 @@ public static unsafe class ProgramRunner
             return ConvertToRegister(returnValue);
         }
 
-        if (callingFunction.Source.Flags.Has(FunctionFlags.Compiler))
+        if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Compiler))
         {
             var returnValue = new Register();
-            var functionName = callingFunction.Source.Name;
-            if (functionName.Compare("set_linker"))
+            switch (callingFunction.Source.Name)
             {
-                var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
-                SetLinker(value.Byte);
+                case "set_linker":
+                {
+                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    SetLinker(value.Byte);
+                    break;
+                }
+                case "set_executable_name":
+                {
+                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    var name = Marshal.PtrToStructure<String>(value.Pointer);
+                    SetExecutableName(name);
+                    break;
+                }
+                case "set_output_type_table":
+                {
+                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    SetOutputTypeTable(value.Byte);
+                    break;
+                }
+                case "set_output_directory":
+                {
+                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    var directory = Marshal.PtrToStructure<String>(value.Pointer);
+                    SetOutputDirectory(directory);
+                    break;
+                }
+                case "add_library_directory":
+                {
+                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    var directory = Marshal.PtrToStructure<String>(value.Pointer);
+                    AddLibraryDirectory(directory);
+                    break;
+                }
+                case "copy_to_output_directory":
+                {
+                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    var file = Marshal.PtrToStructure<String>(value.Pointer);
+                    CopyToOutputDirectory(file);
+                    break;
+                }
+                default:
+                    ErrorReporter.Report($"Undefined compiler function '{callingFunction.Source.Name}'", callingFunction.Source);
+                    break;
             }
-            else if (functionName.Compare("set_executable_name"))
-            {
-                var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
-                var name = Marshal.PtrToStructure<LanguageString>(value.Pointer);
-                SetExecutableName(name);
-            }
-            else if (functionName.Compare("set_output_type_table"))
-            {
-                var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
-                SetOutputTypeTable(value.Byte);
-            }
-            else if (functionName.Compare("set_output_directory"))
-            {
-                var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
-                var directory = Marshal.PtrToStructure<LanguageString>(value.Pointer);
-                SetOutputDirectory(directory);
-            }
-            else if (functionName.Compare("add_library_directory"))
-            {
-                var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
-                var directory = Marshal.PtrToStructure<LanguageString>(value.Pointer);
-                AddLibraryDirectory(directory);
-            }
-            else if (functionName.Compare("copy_to_output_directory"))
-            {
-                var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
-                var file = Marshal.PtrToStructure<LanguageString>(value.Pointer);
-                CopyToOutputDirectory(file);
-            }
-            else
-            {
-                ErrorReporter.Report($"Undefined compiler function '{functionName}'", callingFunction.Source);
-            }
-
             return returnValue;
         }
 
@@ -1658,6 +1668,8 @@ public static unsafe class ProgramRunner
 
     private static void WriteAssemblyInstruction(InstructionDefinition definition, RegisterDefinition register1, RegisterDefinition register2, List<byte> code, ulong? value1 = null, ulong? value2 = null)
     {
+        var codeIndex = code.Count;
+
         // Handle instructions with prefixes
         if (definition.Prefix != 0)
         {
@@ -1905,7 +1917,7 @@ public static unsafe class ProgramRunner
             var argumentTypes = new Type[function.Source.Arguments.Count];
             Delegate functionDelegate;
 
-            if (function.Source.Flags.Has(FunctionFlags.Extern))
+            if (function.Source.Flags.HasFlag(FunctionFlags.Extern))
             {
                 var methodInfo = _externFunctions[function.Source.Name][0];
 

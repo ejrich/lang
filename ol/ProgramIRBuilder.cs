@@ -55,12 +55,12 @@ public static class ProgramIRBuilder
 
         EmitScope(functionIR, function.Body, function.ReturnType, null, null);
 
-        if (function.Flags.Has(FunctionFlags.ReturnVoidAtEnd))
+        if (function.Flags.HasFlag(FunctionFlags.ReturnVoidAtEnd))
         {
             functionIR.Instructions.Add(new Instruction {Type = InstructionType.ReturnVoid, Scope = function.Body});
         }
 
-        if (function.Flags.Has(FunctionFlags.PrintIR))
+        if (function.Flags.HasFlag(FunctionFlags.PrintIR))
         {
             PrintFunction(function.Name, functionIR);
         }
@@ -104,7 +104,7 @@ public static class ProgramIRBuilder
 
         EmitScope(functionIR, overload.Body, overload.ReturnType, null, null);
 
-        if (overload.Flags.Has(FunctionFlags.PrintIR))
+        if (overload.Flags.HasFlag(FunctionFlags.PrintIR))
         {
             PrintFunction(overload.Name, functionIR);
         }
@@ -382,7 +382,7 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static InstructionValue GetConstantStruct(StructAst structDef, IScope scope, Dictionary<String, AssignmentAst> assignments)
+    private static InstructionValue GetConstantStruct(StructAst structDef, IScope scope, Dictionary<string, AssignmentAst> assignments)
     {
         var constantStruct = new InstructionValue {ValueType = InstructionValueType.ConstantStruct, Type = structDef, Values = new InstructionValue[structDef.Fields.Count]};
 
@@ -921,7 +921,7 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static void InitializeStruct(FunctionIR function, StructAst structDef, InstructionValue pointer, IScope scope, Dictionary<String, AssignmentAst> assignments)
+    private static void InitializeStruct(FunctionIR function, StructAst structDef, InstructionValue pointer, IScope scope, Dictionary<string, AssignmentAst> assignments)
     {
         if (assignments == null)
         {
@@ -1973,7 +1973,7 @@ public static class ProgramIRBuilder
         return value;
     }
 
-    private static InstructionValue EmitIdentifier(FunctionIR function, String name, IScope scope, bool useRawString = false, bool returnValue = false)
+    private static InstructionValue EmitIdentifier(FunctionIR function, string name, IScope scope, bool useRawString = false, bool returnValue = false)
     {
         var identifier = GetScopeIdentifier(scope, name, out var global);
         if (identifier is DeclarationAst declaration)
@@ -2002,8 +2002,7 @@ public static class ProgramIRBuilder
             }
             return EmitLoad(function, declaration.Type, pointer, scope, returnValue);
         }
-
-        if (identifier is VariableAst variable)
+        else if (identifier is VariableAst variable)
         {
             if (useRawString && variable.Type.TypeKind == TypeKind.String)
             {
@@ -2205,10 +2204,10 @@ public static class ProgramIRBuilder
         }
 
         var callFunction = call.Function;
-        var argumentCount = call.Function.Flags.Has(FunctionFlags.Varargs) ? call.Arguments.Count : call.Function.Arguments.Count;
+        var argumentCount = call.Function.Flags.HasFlag(FunctionFlags.Varargs) ? call.Arguments.Count : call.Function.Arguments.Count;
         var arguments = new InstructionValue[argumentCount];
 
-        if (callFunction.Flags.Has(FunctionFlags.Params))
+        if (callFunction.Flags.HasFlag(FunctionFlags.Params))
         {
             for (var i = 0; i < argumentCount - 1; i++)
             {
@@ -2268,7 +2267,7 @@ public static class ProgramIRBuilder
             var paramsValue = EmitLoad(function, paramsType, paramsAllocationIndex, scope);
             arguments[argumentCount - 1] = paramsValue;
         }
-        else if (callFunction.Flags.Has(FunctionFlags.Varargs))
+        else if (callFunction.Flags.HasFlag(FunctionFlags.Varargs))
         {
             var i = 0;
             for (; i < callFunction.Arguments.Count - 1; i++)
@@ -2288,7 +2287,7 @@ public static class ProgramIRBuilder
                 arguments[i] = argument;
             }
         }
-        else if (callFunction.Flags.Has(FunctionFlags.PassCallLocation))
+        else if (callFunction.Flags.HasFlag(FunctionFlags.PassCallLocation))
         {
             var i = 0;
             for (; i < callFunction.ArgumentCount; i++)
@@ -2321,7 +2320,7 @@ public static class ProgramIRBuilder
         }
         else
         {
-            var externCall = callFunction.Flags.Has(FunctionFlags.Extern);
+            var externCall = callFunction.Flags.HasFlag(FunctionFlags.Extern);
             for (var i = 0; i < argumentCount; i++)
             {
                 var functionArg = callFunction.Arguments[i];
@@ -2346,7 +2345,7 @@ public static class ProgramIRBuilder
                 }
             }
 
-            if (callFunction.Flags.Has(FunctionFlags.Syscall))
+            if (callFunction.Flags.HasFlag(FunctionFlags.Syscall))
             {
                 return EmitSyscall(function, callFunction, arguments, scope);
             }
@@ -2458,7 +2457,7 @@ public static class ProgramIRBuilder
     {
         if (functionPointer == null)
         {
-            var identifier = GetScopeIdentifier(scope, call.Name, out _);
+            var identifier = GetScopeIdentifier(scope, call.Name, out var _);
             if (identifier is DeclarationAst declaration)
             {
                 functionPointer = EmitLoad(function, declaration.Type, function.Pointers[declaration.PointerIndex + function.PointerOffset], scope);
@@ -2949,7 +2948,7 @@ public static class ProgramIRBuilder
         return new InstructionValue {ValueType = InstructionValueType.Constant, Type = TypeTable.S32Type, ConstantValue = new Constant {Integer = value}};
     }
 
-    private static IAst GetScopeIdentifier(IScope scope, String name, out bool global)
+    private static IAst GetScopeIdentifier(IScope scope, string name, out bool global)
     {
         do {
             if (scope.Identifiers.TryGetValue(name, out var ast))
