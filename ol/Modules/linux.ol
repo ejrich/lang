@@ -43,6 +43,7 @@ int readlink(u8* path, u8* buf, int bufsize) #syscall 89
 int getdents64(int fd, Dirent* dirp, u32 count) #syscall 217
 int clock_gettime(ClockId clk_id, Timespec* tp) #syscall 228
 exit_group(int status) #syscall 231
+int getcpu(u32* cpu, u32* node) #syscall 309
 s64 getrandom(void* buf, u64 buflen, RandomFlags flags) #syscall 318
 // TODO Add additional syscalls when necessary
 
@@ -221,3 +222,9 @@ enum RandomFlags {
     GRND_RANDOM   = 2;
     GRND_INSECURE = 4;
 }
+
+int get_nprocs() #extern "c"
+
+
+int pthread_create(u64* thread, pthread_attr_t* attr, ThreadProcedure start_routine, void* arg) #extern "c"
+struct pthread_attr_t {}

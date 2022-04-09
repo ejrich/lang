@@ -11,7 +11,7 @@ array_insert<T>(Array<T>* array, T value, Allocate allocator = default_allocator
         element_size := size_of(T);
 
         if length {
-            array.data = reallocator(array.data, element_size * new_blocks * ARRAY_BLOCK_SIZE);
+            array.data = reallocator(array.data, length * element_size, element_size * new_blocks * ARRAY_BLOCK_SIZE);
         }
         else {
             array.data = allocator(element_size * new_blocks * ARRAY_BLOCK_SIZE);
@@ -29,7 +29,7 @@ array_insert<T>(Array<T>* array, int index, T value, Allocate allocator = defaul
         element_size := size_of(T);
 
         if length {
-            array.data = reallocator(array.data, element_size * reserve_length);
+            array.data = reallocator(array.data, length * element_size, element_size * reserve_length);
         }
         else {
             array.data = allocator(element_size * reserve_length);
@@ -45,7 +45,7 @@ array_insert<T>(Array<T>* array, int index, T value, Allocate allocator = defaul
         element_size := size_of(T);
 
         if length {
-            array.data = reallocator(array.data, element_size * new_blocks * ARRAY_BLOCK_SIZE);
+            array.data = reallocator(array.data, length * element_size, element_size * new_blocks * ARRAY_BLOCK_SIZE);
         }
         else {
             array.data = allocator(element_size * new_blocks * ARRAY_BLOCK_SIZE);
@@ -84,7 +84,7 @@ array_reserve<T>(Array<T>* array, int length, Allocate allocator = default_alloc
     element_size := size_of(T);
 
     if array.length {
-        array.data = reallocator(array.data, element_size * reserve_length);
+        array.data = reallocator(array.data, array.length * element_size, element_size * reserve_length);
     }
     else {
         array.data = allocator(element_size * reserve_length);
@@ -213,7 +213,7 @@ void* default_allocator(int size) {
     return pointer;
 }
 
-void* default_reallocator(void* pointer, int size) {
+void* default_reallocator(void* pointer, int old_size, int size) {
     each allocation in default_allocations {
         if allocation.pointer == pointer {
             // Try to reallocate the memory from the os
@@ -951,4 +951,20 @@ write_buffer_to_file(File file, u8* buffer, s64 length) {
         written: int;
         WriteFile(handle, buffer, length, &written, null);
     }
+}
+
+
+// System information
+int get_processors() {
+    result: int;
+    #if os == OS.Linux {
+        result = get_nprocs();
+    }
+    #if os == OS.Windows {
+        info: SYSTEM_INFO;
+        GetSystemInfo(&info);
+        result = info.dwNumberOfProcessors;
+    }
+
+    return result;
 }
