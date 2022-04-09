@@ -47,14 +47,17 @@ bool UpdateWindow(Handle* hWnd) #extern "user32"
 bool CloseWindow(Handle* hWnd) #extern "user32"
 bool GetMessage(MSG* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax) #extern "user32"
 bool PeekMessageA(MSG* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax, RemoveMsg wRemoveMsg) #extern "user32"
-bool TranslateMessage(MSG* lpMsg)  #extern "user32"
-s64 DispatchMessageA(MSG* lpMsg)  #extern "user32"
+bool TranslateMessage(MSG* lpMsg) #extern "user32"
+s64 DispatchMessageA(MSG* lpMsg) #extern "user32"
 bool GetWindowRect(Handle* hWnd, RECT* lpRect) #extern "user32"
 s16 GetKeyState(int nVirtKey) #extern "user32"
 
 NtStatus BCryptOpenAlgorithmProvider(Handle** phAlgorithm, u16* pszAlgId, u16* pszImplementation, u64 dwFlags) #extern "bcrypt"
 NtStatus BCryptCloseAlgorithmProvider(Handle* phAlgorithm, u64 dwFlags) #extern "bcrypt"
 NtStatus BCryptGenRandom(Handle* hProv, void* pbBuffer, u64 cbBuffer, u64 dwFlags) #extern "bcrypt"
+
+GetSystemInfo(SYSTEM_INFO* lpSystemInfo) #extern "kernel32"
+CreateThread(SECURITY_ATTRIBUTES* lpThreadAttributes, u64 dwStackSize, ThreadProcedure lpStartAddress, void* lpParameter, int dwCreationFlags, int* lpThreadId) #extern "kernel32'
 
 STD_INPUT_HANDLE  := -10; #const
 STD_OUTPUT_HANDLE := -11; #const
@@ -1376,6 +1379,19 @@ enum MouseButtonMod {
     MK_MBUTTON  = 0x10;
     MK_XBUTTON1 = 0x20;
     MK_XBUTTON2 = 0x40;
+}
+
+struct SYSTEM_INFO {
+    DUMMYUNIONNAME: int;
+    dwPageSize: int;
+    lpMinimumApplicationAddress: void*;
+    lpMaximumApplicationAddress: void*;
+    dwActiveProcessorMask: int*;
+    dwNumberOfProcessors: int;
+    dwProcessorType: int;
+    dwAllocationGranularity: int;
+    wProcessorLevel: s16;
+    wProcessorRevision: s16;
 }
 
 
