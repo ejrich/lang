@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -6,11 +5,11 @@ namespace ol;
 
 public static class Polymorpher
 {
-    public static StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, String backendName, TypeKind typeKind, bool privateGenericTypes, params IType[] genericTypes)
+    public static StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, string backendName, TypeKind typeKind, bool privateGenericTypes, params IType[] genericTypes)
     {
         var polyStruct = new StructAst
         {
-            FileIndex = baseStruct.FileIndex, Line = baseStruct.Line, Column = baseStruct.Column, Name = Allocator.ReserveString(name),
+            FileIndex = baseStruct.FileIndex, Line = baseStruct.Line, Column = baseStruct.Column, Name = name,
             BackendName = backendName, TypeKind = typeKind, Private = baseStruct.Private || privateGenericTypes,
             BaseStructName = baseStruct.Name, BaseTypeDefinition = baseStruct.BaseTypeDefinition,
             BaseStruct = baseStruct.BaseStruct, GenericTypes = genericTypes
@@ -41,11 +40,11 @@ public static class Polymorpher
     {
         var function = CopyAst(baseFunction);
         function.Flags = baseFunction.Flags;
-        function.Name = Allocator.ReserveString(name);
+        function.Name = name;
         function.Private = baseFunction.Private || privateGenericTypes;
         function.ArgumentCount = baseFunction.ArgumentCount;
 
-        if (baseFunction.Flags.Has(FunctionFlags.ReturnTypeHasGenerics))
+        if (baseFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics))
         {
             function.ReturnTypeDefinition = CopyType(baseFunction.ReturnTypeDefinition, genericTypes);
         }
@@ -66,7 +65,7 @@ public static class Polymorpher
             }
         }
 
-        function.Body = CopyScope(baseFunction.Body, genericTypes, baseFunction.Generics);
+        function.Body = Polymorpher.CopyScope(baseFunction.Body, genericTypes, baseFunction.Generics);
 
         return function;
     }
@@ -76,13 +75,10 @@ public static class Polymorpher
         var overload = CopyAst(baseOverload);
         overload.Operator = baseOverload.Operator;
         overload.Type = CopyType(baseOverload.Type, genericTypes);
+        overload.Name = $"operator.{overload.Operator}.{overload.Type.GenericName}";
         overload.FunctionIndex = TypeTable.GetFunctionIndex();
         overload.Flags = baseOverload.Flags;
-        overload.ReturnTypeDefinition = baseOverload.Flags.Has(FunctionFlags.ReturnTypeHasGenerics) ? CopyType(baseOverload.ReturnTypeDefinition, genericTypes) : baseOverload.ReturnTypeDefinition;
-
-        Span<char> typeName = stackalloc char[overload.Type.GenericNameLength];
-        overload.Type.WriteGenericName(typeName);
-        overload.Name = $"operator.{overload.Operator}.{typeName}";
+        overload.ReturnTypeDefinition = baseOverload.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? CopyType(baseOverload.ReturnTypeDefinition, genericTypes) : baseOverload.ReturnTypeDefinition;
 
         foreach (var argument in baseOverload.Arguments)
         {
@@ -119,7 +115,7 @@ public static class Polymorpher
         return copyType;
     }
 
-    private static void CopyAsts(List<IAst> parent, List<IAst> baseAsts, IType[] genericTypes, List<String> generics)
+    private static void CopyAsts(List<IAst> parent, List<IAst> baseAsts, IType[] genericTypes, List<string> generics)
     {
         foreach (var ast in baseAsts)
         {
@@ -127,7 +123,7 @@ public static class Polymorpher
         }
     }
 
-    private static IAst CopyAst(IAst ast, IType[] genericTypes, List<String> generics)
+    private static IAst CopyAst(IAst ast, IType[] genericTypes, List<string> generics)
     {
         switch (ast)
         {
@@ -152,14 +148,14 @@ public static class Polymorpher
         }
     }
 
-    private static ReturnAst CopyReturn(ReturnAst returnAst, IType[] genericTypes, List<String> generics)
+    private static ReturnAst CopyReturn(ReturnAst returnAst, IType[] genericTypes, List<string> generics)
     {
         var copy = CopyAst(returnAst);
         copy.Value = CopyExpression(returnAst.Value, genericTypes, generics);
         return copy;
     }
 
-    private static DeclarationAst CopyDeclaration(DeclarationAst declaration, IType[] genericTypes, List<String> generics)
+    private static DeclarationAst CopyDeclaration(DeclarationAst declaration, IType[] genericTypes, List<string> generics)
     {
         var copy = CopyAst(declaration);
         copy.Name = declaration.Name;
@@ -183,7 +179,7 @@ public static class Polymorpher
         return copy;
     }
 
-    private static AssignmentAst CopyAssignment(AssignmentAst assignment, IType[] genericTypes, List<String> generics)
+    private static AssignmentAst CopyAssignment(AssignmentAst assignment, IType[] genericTypes, List<string> generics)
     {
         var copy = CopyAst(assignment);
         copy.Reference = CopyExpression(assignment.Reference, genericTypes, generics);
@@ -192,14 +188,14 @@ public static class Polymorpher
         return copy;
     }
 
-    public static ScopeAst CopyScope(ScopeAst scope, IType[] genericTypes, List<String> generics)
+    public static ScopeAst CopyScope(ScopeAst scope, IType[] genericTypes, List<string> generics)
     {
         var copy = CopyAst(scope);
         CopyAsts(copy.Children, scope.Children, genericTypes, generics);
         return copy;
     }
 
-    private static ConditionalAst CopyConditional(ConditionalAst conditional, IType[] genericTypes, List<String> generics)
+    private static ConditionalAst CopyConditional(ConditionalAst conditional, IType[] genericTypes, List<string> generics)
     {
         var copy = CopyAst(conditional);
         copy.Condition = CopyExpression(conditional.Condition, genericTypes, generics);
@@ -211,7 +207,7 @@ public static class Polymorpher
         return copy;
     }
 
-    private static WhileAst CopyWhile(WhileAst whileAst, IType[] genericTypes, List<String> generics)
+    private static WhileAst CopyWhile(WhileAst whileAst, IType[] genericTypes, List<string> generics)
     {
         var copy = CopyAst(whileAst);
         copy.Condition = CopyExpression(whileAst.Condition, genericTypes, generics);
@@ -219,7 +215,7 @@ public static class Polymorpher
         return copy;
     }
 
-    private static EachAst CopyEach(EachAst each, IType[] genericTypes, List<String> generics)
+    private static EachAst CopyEach(EachAst each, IType[] genericTypes, List<string> generics)
     {
         var copy = CopyAst(each);
         copy.IterationVariable = each.IterationVariable;
@@ -231,7 +227,7 @@ public static class Polymorpher
         return copy;
     }
 
-    private static CompilerDirectiveAst CopyCompilerDirective(CompilerDirectiveAst compilerDirective, IType[] genericTypes, List<String> generics)
+    private static CompilerDirectiveAst CopyCompilerDirective(CompilerDirectiveAst compilerDirective, IType[] genericTypes, List<string> generics)
     {
         var copy = CopyAst(compilerDirective);
         copy.Type = compilerDirective.Type;
@@ -239,7 +235,7 @@ public static class Polymorpher
         return copy;
     }
 
-    private static IAst CopyExpression(IAst ast, IType[] genericTypes, List<String> generics)
+    private static IAst CopyExpression(IAst ast, IType[] genericTypes, List<string> generics)
     {
         switch (ast)
         {
@@ -298,7 +294,7 @@ public static class Polymorpher
                 }
                 if (call.SpecifiedArguments != null)
                 {
-                    callCopy.SpecifiedArguments = new Dictionary<String, IAst>();
+                    callCopy.SpecifiedArguments = new Dictionary<string, IAst>();
                     foreach (var (name, argument) in call.SpecifiedArguments)
                     {
                         callCopy.SpecifiedArguments[name] = CopyExpression(argument, genericTypes, generics);

@@ -20,7 +20,6 @@ public static class Allocator
     private static readonly List<MemoryBlock> _memoryBlocks = new();
     private static readonly List<MemoryBlock> _stackBlocks = new();
     private static readonly List<IntPtr> _openPointers = new();
-    private static readonly List<string> _allocatedStrings = new();
 
     public static IntPtr Allocate(uint size)
     {
@@ -103,7 +102,7 @@ public static class Allocator
 
     public const int StringLength = 16;
 
-    public static IntPtr MakeString(ReadOnlySpan<char> value, bool useRawString)
+    public static IntPtr MakeString(string value, bool useRawString)
     {
         var s = AllocateString(value);
 
@@ -113,20 +112,28 @@ public static class Allocator
         }
 
         var stringPointer = Allocate(StringLength);
-        var stringStruct = new LanguageString {Length = value.Length, Data = s};
+        var stringStruct = new String {Length = value.Length, Data = s};
         Marshal.StructureToPtr(stringStruct, stringPointer, false);
 
         return stringPointer;
     }
 
-    public static unsafe IntPtr AllocateString(ReadOnlySpan<char> value)
+    public static String MakeString(string value)
+    {
+        var s = AllocateString(value);
+
+        var stringStruct = new String {Length = value.Length, Data = s};
+        return stringStruct;
+    }
+
+    public unsafe static IntPtr AllocateString(string value)
     {
         var pointer = Allocate(value.Length + 1);
         var bytePointer = (byte*)pointer;
 
-        if (value.Length > 0)
+        if (value != "")
         {
-            var stringBytes = Encoding.ASCII.GetBytes(value.ToArray());
+            var stringBytes = Encoding.ASCII.GetBytes(value);
             fixed (byte* p = &stringBytes[0])
             {
                 Buffer.MemoryCopy(p, bytePointer, value.Length, value.Length);
@@ -136,18 +143,10 @@ public static class Allocator
 
         return pointer;
     }
-
-    public static String ReserveString(ReadOnlySpan<char> span) => ReserveString(span.ToString());
-    public static String ReserveString(StringBuilder sb) => ReserveString(sb.ToString());
-    public static String ReserveString(string str)
-    {
-        _allocatedStrings.Add(str);
-        return str;
-    }
 }
 
 [StructLayout(LayoutKind.Explicit, Size=Allocator.StringLength)]
-public struct LanguageString
+public struct String
 {
     [FieldOffset(0)] public long Length;
     [FieldOffset(8)] public IntPtr Data;

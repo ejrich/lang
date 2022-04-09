@@ -23,7 +23,6 @@ public unsafe static class TypeTable
     public static IType U32Type;
     public static IType S64Type;
     public static IType U64Type;
-    public static IType FloatType;
     public static IType Float64Type;
     public static IType TypeType;
     public static StructAst StringType;
@@ -58,7 +57,7 @@ public unsafe static class TypeTable
     [StructLayout(LayoutKind.Explicit, Size=TypeInfoSize)]
     public struct TypeInfo
     {
-        [FieldOffset(0)] public LanguageString Name;
+        [FieldOffset(0)] public String Name;
         [FieldOffset(16)] public TypeKind Type;
         [FieldOffset(20)] public uint Size;
     }
@@ -67,7 +66,7 @@ public unsafe static class TypeTable
     [StructLayout(LayoutKind.Explicit, Size=IntegerTypeInfoSize)]
     public struct IntegerTypeInfo
     {
-        [FieldOffset(0)] public LanguageString Name;
+        [FieldOffset(0)] public String Name;
         [FieldOffset(16)] public TypeKind Type;
         [FieldOffset(20)] public uint Size;
         [FieldOffset(24)] public bool Signed;
@@ -77,7 +76,7 @@ public unsafe static class TypeTable
     [StructLayout(LayoutKind.Explicit, Size=TypeInfoSize)]
     public struct PointerTypeInfo
     {
-        [FieldOffset(0)] public LanguageString Name;
+        [FieldOffset(0)] public String Name;
         [FieldOffset(16)] public TypeKind Type;
         [FieldOffset(20)] public uint Size = 8;
         [FieldOffset(24)] public IntPtr PointerType;
@@ -87,7 +86,7 @@ public unsafe static class TypeTable
     [StructLayout(LayoutKind.Explicit, Size=CArrayTypeInfoSize)]
     public struct CArrayTypeInfo
     {
-        [FieldOffset(0)] public LanguageString Name;
+        [FieldOffset(0)] public String Name;
         [FieldOffset(16)] public TypeKind Type;
         [FieldOffset(20)] public uint Size;
         [FieldOffset(24)] public uint Length;
@@ -98,7 +97,7 @@ public unsafe static class TypeTable
     [StructLayout(LayoutKind.Explicit, Size=EnumTypeInfoSize)]
     public struct EnumTypeInfo
     {
-        [FieldOffset(0)] public LanguageString Name;
+        [FieldOffset(0)] public String Name;
         [FieldOffset(16)] public TypeKind Type;
         [FieldOffset(20)] public uint Size;
         [FieldOffset(24)] public IntPtr BaseType;
@@ -110,7 +109,7 @@ public unsafe static class TypeTable
     [StructLayout(LayoutKind.Explicit, Size=StructTypeInfoSize)]
     public struct StructTypeInfo
     {
-        [FieldOffset(0)] public LanguageString Name;
+        [FieldOffset(0)] public String Name;
         [FieldOffset(16)] public TypeKind Type;
         [FieldOffset(20)] public uint Size;
         [FieldOffset(24)] public Array Fields;
@@ -121,7 +120,7 @@ public unsafe static class TypeTable
     [StructLayout(LayoutKind.Explicit, Size=UnionTypeInfoSize)]
     public struct UnionTypeInfo
     {
-        [FieldOffset(0)] public LanguageString Name;
+        [FieldOffset(0)] public String Name;
         [FieldOffset(16)] public TypeKind Type;
         [FieldOffset(20)] public uint Size;
         [FieldOffset(24)] public Array Fields;
@@ -131,7 +130,7 @@ public unsafe static class TypeTable
     [StructLayout(LayoutKind.Explicit, Size=CompoundTypeInfoSize)]
     public struct CompoundTypeInfo
     {
-        [FieldOffset(0)] public LanguageString Name;
+        [FieldOffset(0)] public String Name;
         [FieldOffset(16)] public TypeKind Type;
         [FieldOffset(20)] public uint Size;
         [FieldOffset(24)] public Array Types;
@@ -141,7 +140,7 @@ public unsafe static class TypeTable
     [StructLayout(LayoutKind.Explicit, Size=InterfaceTypeInfoSize)]
     public struct InterfaceTypeInfo
     {
-        [FieldOffset(0)] public LanguageString Name;
+        [FieldOffset(0)] public String Name;
         [FieldOffset(16)] public TypeKind Type;
         [FieldOffset(20)] public uint Size = 8;
         [FieldOffset(24)] public IntPtr ReturnType;
@@ -152,7 +151,7 @@ public unsafe static class TypeTable
     [StructLayout(LayoutKind.Explicit, Size=FunctionTypeInfoSize)]
     public struct FunctionTypeInfo
     {
-        [FieldOffset(0)] public LanguageString Name;
+        [FieldOffset(0)] public String Name;
         [FieldOffset(16)] public TypeKind Type;
         [FieldOffset(20)] public uint Size;
         [FieldOffset(24)] public IntPtr ReturnType;
@@ -171,7 +170,7 @@ public unsafe static class TypeTable
     [StructLayout(LayoutKind.Explicit, Size=TypeFieldSize)]
     public struct TypeField
     {
-        [FieldOffset(0)] public LanguageString Name;
+        [FieldOffset(0)] public String Name;
         [FieldOffset(16)] public uint Offset;
         [FieldOffset(24)] public IntPtr TypeInfo;
         [FieldOffset(32)] public Array Attributes;
@@ -181,7 +180,7 @@ public unsafe static class TypeTable
     [StructLayout(LayoutKind.Explicit, Size=UnionFieldSize)]
     public struct UnionField
     {
-        [FieldOffset(0)] public LanguageString Name;
+        [FieldOffset(0)] public String Name;
         [FieldOffset(16)] public IntPtr TypeInfo;
     }
 
@@ -189,7 +188,7 @@ public unsafe static class TypeTable
     [StructLayout(LayoutKind.Explicit, Size=EnumValueSize)]
     public struct EnumValue
     {
-        [FieldOffset(0)] public LanguageString Name;
+        [FieldOffset(0)] public String Name;
         [FieldOffset(16)] public int Value;
     }
 
@@ -197,7 +196,7 @@ public unsafe static class TypeTable
     [StructLayout(LayoutKind.Explicit, Size=ArgumentTypeSize)]
     public struct ArgumentType
     {
-        [FieldOffset(0)] public LanguageString Name;
+        [FieldOffset(0)] public String Name;
         [FieldOffset(16)] public IntPtr TypeInfo;
     }
 
@@ -206,7 +205,7 @@ public unsafe static class TypeTable
         if (ErrorReporter.Errors.Count > 0) return;
 
         var typeInfoPointer = IntPtr.Zero;
-        var name = (LanguageString)type.Name;
+        var name = Allocator.MakeString(type.Name);
 
         switch (type.TypeKind)
         {
@@ -246,7 +245,7 @@ public unsafe static class TypeTable
 
                 foreach (var (valueName, value) in enumType.Values)
                 {
-                    var enumValue = new EnumValue {Name = valueName, Value = value.Value};
+                    var enumValue = new EnumValue {Name = Allocator.MakeString(valueName), Value = value.Value};
                     enumValues[value.Index] = enumValue;
                 }
 
@@ -261,16 +260,16 @@ public unsafe static class TypeTable
                 if (enumType.Attributes != null)
                 {
                     enumTypeInfo.Attributes.Length = enumType.Attributes.Count;
-                    var attributes = new LanguageString[enumTypeInfo.Attributes.Length];
+                    var attributes = new String[enumTypeInfo.Attributes.Length];
 
                     for (var i = 0; i < attributes.Length; i++)
                     {
-                        attributes[i] = enumType.Attributes[i];
+                        attributes[i] = Allocator.MakeString(enumType.Attributes[i]);
                     }
 
                     var attributesArraySize = attributes.Length * Allocator.StringLength;
                     var attributesPointer = Allocator.Allocate(attributesArraySize);
-                    fixed (LanguageString* pointer = &attributes[0])
+                    fixed (String* pointer = &attributes[0])
                     {
                         Buffer.MemoryCopy(pointer, attributesPointer.ToPointer(), attributesArraySize, attributesArraySize);
                     }
@@ -295,21 +294,21 @@ public unsafe static class TypeTable
                     for (var i = 0; i < structType.Fields.Count; i++)
                     {
                         var field = structType.Fields[i];
-                        var typeField = new TypeField {Name = field.Name, Offset = field.Offset, TypeInfo = TypeInfos[field.Type.TypeIndex]};
+                        var typeField = new TypeField {Name = Allocator.MakeString(field.Name), Offset = field.Offset, TypeInfo = TypeInfos[field.Type.TypeIndex]};
 
                         if (field.Attributes != null)
                         {
                             typeField.Attributes.Length = field.Attributes.Count;
-                            var attributes = new LanguageString[typeField.Attributes.Length];
+                            var attributes = new String[typeField.Attributes.Length];
 
                             for (var attributeIndex = 0; attributeIndex < attributes.Length; attributeIndex++)
                             {
-                                attributes[attributeIndex] = field.Attributes[attributeIndex];
+                                attributes[attributeIndex] = Allocator.MakeString(field.Attributes[attributeIndex]);
                             }
 
                             var attributesArraySize = attributes.Length * Allocator.StringLength;
                             var attributesPointer = Allocator.Allocate(attributesArraySize);
-                            fixed (LanguageString* pointer = &attributes[0])
+                            fixed (String* pointer = &attributes[0])
                             {
                                 Buffer.MemoryCopy(pointer, attributesPointer.ToPointer(), attributesArraySize, attributesArraySize);
                             }
@@ -331,16 +330,16 @@ public unsafe static class TypeTable
                 if (structType.Attributes != null)
                 {
                     structTypeInfo.Attributes.Length = structType.Attributes.Count;
-                    var attributes = new LanguageString[structTypeInfo.Attributes.Length];
+                    var attributes = new String[structTypeInfo.Attributes.Length];
 
                     for (var i = 0; i < attributes.Length; i++)
                     {
-                        attributes[i] = structType.Attributes[i];
+                        attributes[i] = Allocator.MakeString(structType.Attributes[i]);
                     }
 
                     var attributesArraySize = attributes.Length * Allocator.StringLength;
                     var attributesPointer = Allocator.Allocate(attributesArraySize);
-                    fixed (LanguageString* pointer = &attributes[0])
+                    fixed (String* pointer = &attributes[0])
                     {
                         Buffer.MemoryCopy(pointer, attributesPointer.ToPointer(), attributesArraySize, attributesArraySize);
                     }
@@ -384,7 +383,7 @@ public unsafe static class TypeTable
                 for (var i = 0; i < unionFields.Length; i++)
                 {
                     var field = union.Fields[i];
-                    unionFields[i] = new UnionField {Name = field.Name, TypeInfo = TypeInfos[field.Type.TypeIndex]};
+                    unionFields[i] = new UnionField {Name = Allocator.MakeString(field.Name), TypeInfo = TypeInfos[field.Type.TypeIndex]};
                 }
 
                 var unionFieldsArraySize = unionFields.Length * UnionFieldSize;
@@ -410,7 +409,7 @@ public unsafe static class TypeTable
                     for (var i = 0; i < arguments.Length; i++)
                     {
                         var argument = interfaceAst.Arguments[i];
-                        var argumentType = new ArgumentType {Name = argument.Name, TypeInfo = TypeInfos[argument.Type.TypeIndex]};
+                        var argumentType = new ArgumentType {Name = Allocator.MakeString(argument.Name), TypeInfo = TypeInfos[argument.Type.TypeIndex]};
                         arguments[i] = argumentType;
                     }
 
@@ -431,7 +430,7 @@ public unsafe static class TypeTable
                 var functionTypeInfo = new FunctionTypeInfo {Name = name, Type = TypeKind.Function};
                 functionTypeInfo.ReturnType = TypeInfos[function.ReturnType.TypeIndex];
 
-                var argumentCount = function.Flags.Has(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
+                var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
                 if (argumentCount > 0)
                 {
                     functionTypeInfo.Arguments.Length = argumentCount;
@@ -440,7 +439,7 @@ public unsafe static class TypeTable
                     for (var i = 0; i < argumentCount; i++)
                     {
                         var argument = function.Arguments[i];
-                        var argumentType = new ArgumentType {Name = argument.Name, TypeInfo = TypeInfos[argument.Type.TypeIndex]};
+                        var argumentType = new ArgumentType {Name = Allocator.MakeString(argument.Name), TypeInfo = TypeInfos[argument.Type.TypeIndex]};
                         arguments[i] = argumentType;
                     }
 
@@ -456,16 +455,16 @@ public unsafe static class TypeTable
                 if (function.Attributes != null)
                 {
                     functionTypeInfo.Attributes.Length = function.Attributes.Count;
-                    var attributes = new LanguageString[functionTypeInfo.Attributes.Length];
+                    var attributes = new String[functionTypeInfo.Attributes.Length];
 
                     for (var i = 0; i < attributes.Length; i++)
                     {
-                        attributes[i] = function.Attributes[i];
+                        attributes[i] = Allocator.MakeString(function.Attributes[i]);
                     }
 
                     var attributesArraySize = attributes.Length * Allocator.StringLength;
                     var attributesPointer = Allocator.Allocate(attributesArraySize);
-                    fixed (LanguageString* pointer = &attributes[0])
+                    fixed (String* pointer = &attributes[0])
                     {
                         Buffer.MemoryCopy(pointer, attributesPointer.ToPointer(), attributesArraySize, attributesArraySize);
                     }

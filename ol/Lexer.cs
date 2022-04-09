@@ -1,30 +1,26 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 
 namespace ol;
 
 public static class Lexer
 {
-    private static readonly Dictionary<char, string> _escapableCharacters = new()
+    private static readonly IDictionary<char, char> _escapableCharacters = new Dictionary<char, char>
     {
-        {'"', "\""},
-        {'\\', "\\"},
-        {'a', "\a"},
-        {'b', "\b"},
-        {'f', "\f"},
-        {'n', "\n"},
-        {'r', "\r"},
-        {'t', "\t"},
-        {'v', "\v"},
-        {'0', "\0"}
+        {'"', '"'},
+        {'\\', '\\'},
+        {'a', '\a'},
+        {'b', '\b'},
+        {'f', '\f'},
+        {'n', '\n'},
+        {'r', '\r'},
+        {'t', '\t'},
+        {'v', '\v'},
+        {'0', '\0'}
     };
 
-    private static readonly ConcurrentDictionary<char, String> _characterCache = new();
-
-    private static readonly Dictionary<String, TokenType> _reservedTokens = new()
+    private static readonly IDictionary<string, TokenType> _reservedTokens = new Dictionary<string, TokenType>
     {
         {"return", TokenType.Return},
         {"true", TokenType.Boolean},
@@ -52,11 +48,10 @@ public static class Lexer
 
     public static List<Token> LoadFileTokens(string filePath, int fileIndex)
     {
-        var file = File.ReadAllText(filePath);
-        Allocator.ReserveString(file);
-        var fileText = file.AsSpan();
+        var fileText = File.ReadAllText(filePath);
 
-        var tokens = new List<Token>(fileText.Length / 4);
+        var tokens = new List<Token>();
+        Token token;
         uint line = 1, column = 0;
 
         for (var i = 0; i < fileText.Length; i++)
@@ -64,7 +59,6 @@ public static class Lexer
             var character = fileText[i];
             column++;
 
-            Token token;
             switch (character)
             {
                 case '\n':
@@ -101,7 +95,7 @@ public static class Lexer
                                     column++;
                                     break;
                                 }
-                                if (character == '\n')
+                                else if (character == '\n')
                                 {
                                     line++;
                                     column = 1;
@@ -140,26 +134,22 @@ public static class Lexer
                 case '"':
                 {
                     var literalEscapeToken = false;
-                    var completed = false;
                     var error = false;
-                    var hasEscapeTokens = false;
-                    var startIndex = i + 1;
-                    StringBuilder stringBuilder = null;
                     token = new Token
                     {
                         Type = TokenType.Literal,
+                        Value = "",
                         Line = line,
                         Column = column
                     };
 
-                    while (i < fileText.Length - 1)
+                    while (true)
                     {
                         character = fileText[++i];
                         column++;
 
                         if (character == '\\' && !literalEscapeToken)
                         {
-                            hasEscapeTokens = true;
                             literalEscapeToken = true;
                         }
                         else if (character == '\n')
@@ -174,43 +164,34 @@ public static class Lexer
                         }
                         else if (literalEscapeToken)
                         {
-                            stringBuilder ??= new();
-                            stringBuilder.Append(fileText.Slice(startIndex, i - startIndex - 1));
                             if (_escapableCharacters.TryGetValue(character, out var escapedCharacter))
                             {
-                                stringBuilder.Append(escapedCharacter.AsSpan());
+                                token.Value += escapedCharacter;
                             }
                             else
                             {
                                 error = true;
+                                token.Value += character;
                             }
-                            startIndex = i + 1;
                             literalEscapeToken = false;
                         }
-                        else if (character == '"')
+                        else
                         {
-                            if (hasEscapeTokens)
+                            if (character == '"')
                             {
-                                stringBuilder.Append(fileText.Slice(startIndex, i - startIndex));
-                                token.Value = Allocator.ReserveString(stringBuilder);
+                                if (error)
+                                {
+                                    ErrorReporter.Report($"Unexpected token '{token.Value}'", fileIndex, token);
+                                }
+
+                                tokens.Add(token);
+                                break;
                             }
                             else
                             {
-                                token.Value = fileText.Slice(startIndex, i - startIndex);
+                                token.Value += character;
                             }
-                            completed = true;
-                            if (error)
-                            {
-                                ErrorReporter.Report($"Unexpected token '{token.Value}'", fileIndex, token);
-                            }
-
-                            tokens.Add(token);
-                            break;
                         }
-                    }
-                    if (!completed)
-                    {
-                        ErrorReporter.Report("Expected to close string literal with \"", fileIndex, token);
                     }
                     break;
                 }
@@ -226,7 +207,7 @@ public static class Lexer
                             token = new Token
                             {
                                 Type = TokenType.Character,
-                                Value = escapedCharacter,
+                                Value = escapedCharacter.ToString(),
                                 Line = line,
                                 Column = column
                             };
@@ -244,15 +225,10 @@ public static class Lexer
                         token = new Token
                         {
                             Type = TokenType.Character,
+                            Value = character.ToString(),
                             Line = line,
                             Column = column
                         };
-
-                        if (!_characterCache.TryGetValue(character, out token.Value))
-                        {
-                            token.Value = _characterCache[character] = fileText.Slice(i, 1);
-                        }
-
                         tokens.Add(token);
                     }
 
@@ -405,11 +381,14 @@ public static class Lexer
                             {
                                 if (character == '.')
                                 {
-                                    if (token.Flags.Has(TokenFlags.Float) || fileText[i+2] == '.')
+                                    if (token.Flags.HasFlag(TokenFlags.Float) || fileText[i+2] == '.')
                                     {
                                         break;
                                     }
-                                    token.Flags |= TokenFlags.Float;
+                                    else
+                                    {
+                                        token.Flags |= TokenFlags.Float;
+                                    }
                                 }
                                 else
                                 {
@@ -434,7 +413,7 @@ public static class Lexer
                             column++;
                         }
 
-                        token.Value = fileText.Slice(startIndex, i - startIndex + offset);
+                        token.Value = fileText.Substring(startIndex, i - startIndex + offset);
                     }
                     else
                     {
@@ -542,155 +521,23 @@ public static class Lexer
                     break;
                 }
                 case '(':
-                {
-                    token = new Token
-                    {
-                        Type = TokenType.OpenParen,
-                        Value = "(",
-                        Line = line,
-                        Column = column
-                    };
-                    tokens.Add(token);
-                    break;
-                }
                 case ')':
-                {
-                    token = new Token
-                    {
-                        Type = TokenType.CloseParen,
-                        Value = ")",
-                        Line = line,
-                        Column = column
-                    };
-                    tokens.Add(token);
-                    break;
-                }
                 case '[':
-                {
-                    token = new Token
-                    {
-                        Type = TokenType.OpenBracket,
-                        Value = "[",
-                        Line = line,
-                        Column = column
-                    };
-                    tokens.Add(token);
-                    break;
-                }
                 case ']':
-                {
-                    token = new Token
-                    {
-                        Type = TokenType.CloseBracket,
-                        Value = "]",
-                        Line = line,
-                        Column = column
-                    };
-                    tokens.Add(token);
-                    break;
-                }
                 case '{':
-                {
-                    token = new Token
-                    {
-                        Type = TokenType.OpenBrace,
-                        Value = "{",
-                        Line = line,
-                        Column = column
-                    };
-                    tokens.Add(token);
-                    break;
-                }
                 case '}':
-                {
-                    token = new Token
-                    {
-                        Type = TokenType.CloseBrace,
-                        Value = "}",
-                        Line = line,
-                        Column = column
-                    };
-                    tokens.Add(token);
-                    break;
-                }
                 case '^':
-                {
-                    token = new Token
-                    {
-                        Type = TokenType.Caret,
-                        Value = "^",
-                        Line = line,
-                        Column = column
-                    };
-                    tokens.Add(token);
-                    break;
-                }
                 case '*':
-                {
-                    token = new Token
-                    {
-                        Type = TokenType.Asterisk,
-                        Value = "*",
-                        Line = line,
-                        Column = column
-                    };
-                    tokens.Add(token);
-                    break;
-                }
                 case '%':
-                {
-                    token = new Token
-                    {
-                        Type = TokenType.Percent,
-                        Value = "%",
-                        Line = line,
-                        Column = column
-                    };
-                    tokens.Add(token);
-                    break;
-                }
                 case ':':
-                {
-                    token = new Token
-                    {
-                        Type = TokenType.Colon,
-                        Value = ":",
-                        Line = line,
-                        Column = column
-                    };
-                    tokens.Add(token);
-                    break;
-                }
                 case ';':
-                {
-                    token = new Token
-                    {
-                        Type = TokenType.SemiColon,
-                        Value = ";",
-                        Line = line,
-                        Column = column
-                    };
-                    tokens.Add(token);
-                    break;
-                }
                 case ',':
-                {
-                    token = new Token
-                    {
-                        Type = TokenType.Comma,
-                        Value = ",",
-                        Line = line,
-                        Column = column
-                    };
-                    tokens.Add(token);
-                    break;
-                }
                 case '#':
                 {
                     token = new Token
                     {
-                        Type = TokenType.Pound,
-                        Value = "#",
+                        Type = (TokenType)character,
+                        Value = character.ToString(),
                         Line = line,
                         Column = column
                     };
@@ -717,7 +564,7 @@ public static class Lexer
                         {
                             if (nextCharacter == '.')
                             {
-                                if (token.Flags.Has(TokenFlags.Float) || fileText[i+2] == '.')
+                                if (token.Flags.HasFlag(TokenFlags.Float) || fileText[i+2] == '.')
                                 {
                                     break;
                                 }
@@ -752,7 +599,7 @@ public static class Lexer
                                 offset = 0;
                                 break;
                             }
-                            else if (!token.Flags.Has(TokenFlags.HexNumber) || !IsHexLetter(nextCharacter))
+                            else if (!token.Flags.HasFlag(TokenFlags.HexNumber) || !IsHexLetter(nextCharacter))
                             {
                                 break;
                             }
@@ -762,7 +609,7 @@ public static class Lexer
                         column++;
                     }
 
-                    token.Value = fileText.Slice(startIndex, i - startIndex + offset);
+                    token.Value = fileText.Substring(startIndex, i - startIndex + offset);
                     tokens.Add(token);
                     break;
                 }
@@ -784,14 +631,14 @@ public static class Lexer
                             offset = 0;
                             break;
                         }
-                        if (character == ' ' || character == '\r' || character == '\t')
+                        else if (character == ' ' || character == '\r' || character == '\t')
                         {
                             i++;
                             column++;
                             offset = 0;
                             break;
                         }
-                        if (IsNotIdentifierCharacter(character))
+                        else if (IsNotIdentifierCharacter(character))
                         {
                             break;
                         }
@@ -800,7 +647,7 @@ public static class Lexer
                         column++;
                     }
 
-                    token.Value = fileText.Slice(startIndex, i - startIndex + offset);
+                    token.Value = fileText.Substring(startIndex, i - startIndex + offset);
 
                     if (_reservedTokens.TryGetValue(token.Value, out var type))
                     {
@@ -858,7 +705,7 @@ public static class Lexer
 public struct Token
 {
     public TokenType Type;
-    public String Value;
+    public string Value;
     public TokenFlags Flags;
     public uint Line;
     public uint Column;
