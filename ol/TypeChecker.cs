@@ -505,9 +505,9 @@ public static class TypeChecker
                 function = functions[0];
                 return true;
             }
-            else if (GlobalScope.PolymorphicFunctions.TryGetValue(name, out var globalFunctions))
+            if (GlobalScope.PolymorphicFunctions.TryGetValue(name, out var globalFunctions))
             {
-                function = functions[0];
+                function = globalFunctions[0];
                 return true;
             }
         }
@@ -3932,7 +3932,7 @@ public static class TypeChecker
                 {
                     return existingFunction.ReturnType;
                 }
-                else if (GetExistingPolymorphicFunction(call.Name, call.FileIndex, out existingFunction))
+                if (GetExistingPolymorphicFunction(call.Name, call.FileIndex, out existingFunction))
                 {
                     return existingFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ? null : existingFunction.ReturnType;
                 }
