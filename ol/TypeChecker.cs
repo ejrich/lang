@@ -748,6 +748,7 @@ public static class TypeChecker
         if (structAst.BaseTypeDefinition != null)
         {
             var baseType = VerifyType(structAst.BaseTypeDefinition, GlobalScope, out var isGeneric, out var isVarargs, out var isParams);
+            structAst.Alignment = baseType.Alignment;
 
             if (isVarargs || isParams || isGeneric)
             {
