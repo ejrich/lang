@@ -3,3 +3,6 @@ struct Ast {
     line: u32;
     column: u32;
 }
+
+struct CompilerDirectiveAst : Ast {
+}

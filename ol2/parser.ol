@@ -3,10 +3,38 @@
 
 library_directory: string;
 
+asts: LinkedList<Ast*>;
+directives: LinkedList<CompilerDirectiveAst*>;
+
 parse(string entrypoint) {
     init_lexer();
 
-    tokens := load_file_tokens(entrypoint, 0);
+    executable_path: CArray<u8>[4096];
+    #if os == OS.Linux {
+        self_path := "/proc/self/exe"; #const
+        bytes := readlink(self_path.data, &executable_path, 4095);
+        dir_char := '/'; #const
+    }
+    #if os == OS.Windows {
+        bytes := GetModuleFileNameA(null, &executable_path, 4096);
+        dir_char := '\\'; #const
+    }
+
+    length := 0;
+    each i in 1..bytes-1 {
+        if executable_path[i] == dir_char {
+            length = i;
+        }
+    }
+
+    modules_path := "/../../ol/Modules"; #const
+    memory_copy(&executable_path + length, modules_path.data, modules_path.length);
+    library_directory = { length = length + modules_path.length; data = &executable_path; }
+
+    add_module("runtime");
+    queue_file_if_not_exists(entrypoint);
+
+    complete_work();
 }
 
 add_module(string module) {
@@ -23,7 +51,7 @@ add_module(string module, int fileIndex, Token token) {
         report_error("Undefined module '%'", fileIndex, token, module);
 }
 
-// add_module(CompilerDirectiveAst module) {
+// add_module(CompilerDirectiveAst* module) {
 //     if file_exists(module.import.path)
 //         queue_file_if_not_exists(module.Import.Path);
 //     else
@@ -113,6 +141,8 @@ struct ParseData {
 
 parse_file(void* data) {
     parse_data: ParseData* = data;
+    file_index := parse_data.file_index;
 
-
+    print("Parsing file: %\n", parse_data.file);
+    tokens := load_file_tokens(parse_data.file, file_index);
 }
