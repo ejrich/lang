@@ -408,145 +408,147 @@ write_value_to_buffer(StringBuffer* buffer, TypeInfo* type, void* data) {
 
     type_kind := type.type;
 
-    if type_kind == TypeKind.Void {
-        add_to_string_buffer(buffer, "void");
-    }
-    else if type_kind == TypeKind.Boolean {
-        value := *cast(bool*, data);
-        if value add_to_string_buffer(buffer, "true");
-        else add_to_string_buffer(buffer, "false");
-    }
-    else if type_kind == TypeKind.Integer {
-        type_info := cast(IntegerTypeInfo*, type);
-        if type_info.signed {
-            switch type_info.size {
-                case 1;  write_integer<s8>(buffer, data);
-                case 2;  write_integer<s16>(buffer, data);
-                case 4;  write_integer<s32>(buffer, data);
-                default; write_integer<s64>(buffer, data);
-            }
+    switch type.type {
+        case TypeKind.Void; add_to_string_buffer(buffer, "void");
+        case TypeKind.Boolean; {
+            value := *cast(bool*, data);
+            if value add_to_string_buffer(buffer, "true");
+            else add_to_string_buffer(buffer, "false");
         }
-        else {
-            switch type_info.size {
-                case 1;  write_integer<u8>(buffer, data);
-                case 2;  write_integer<u16>(buffer, data);
-                case 4;  write_integer<u32>(buffer, data);
-                default; write_integer<u64>(buffer, data);
+        case TypeKind.Integer; {
+            type_info := cast(IntegerTypeInfo*, type);
+            if type_info.signed {
+                switch type_info.size {
+                    case 1;  write_integer<s8>(buffer, data);
+                    case 2;  write_integer<s16>(buffer, data);
+                    case 4;  write_integer<s32>(buffer, data);
+                    default; write_integer<s64>(buffer, data);
+                }
             }
-        }
-    }
-    else if type_kind == TypeKind.Float {
-        if type.size == 4 write_float<float>(buffer, data);
-        else write_float<float64>(buffer, data);
-    }
-    else if type_kind == TypeKind.String {
-        value := *cast(string*, data);
-        add_to_string_buffer(buffer, value);
-    }
-    else if type_kind == TypeKind.Pointer {
-        write_pointer_to_buffer(buffer, data);
-    }
-    else if type_kind == TypeKind.Array {
-        type_info := cast(StructTypeInfo*, type);
-        pointer_field := type_info.fields[1];
-        pointer_type_info := cast(PointerTypeInfo*, pointer_field.type_info);
-        element_type := pointer_type_info.pointer_type;
-
-        array := cast(Array<void*>*, data);
-        write_array_to_buffer(buffer, element_type, array.data, array.length);
-    }
-    else if type_kind == TypeKind.CArray {
-        type_info := cast(CArrayTypeInfo*, type);
-        element_type := type_info.element_type;
-
-        write_array_to_buffer(buffer, element_type, data, type_info.length);
-    }
-    else if type_kind == TypeKind.Enum {
-        type_info := cast(EnumTypeInfo*, type);
-        value: s32;
-        if type_info.size == 1 value = *cast(s8*, data);
-        else if type_info.size == 2 value = *cast(s16*, data);
-        else if type_info.size == 4 value = *cast(s32*, data);
-        else value = *cast(s64*, data);
-
-        flags := false;
-        each attribute in type_info.attributes {
-            if attribute == "flags" {
-                flags = true;
-                break;
-            }
-        }
-
-        found := false;
-        if flags {
-            each enum_value in type_info.values {
-                if enum_value.value & value {
-                    if found add_to_string_buffer(buffer, " | ");
-                    else found = true;
-
-                    add_to_string_buffer(buffer, enum_value.name);
+            else {
+                switch type_info.size {
+                    case 1;  write_integer<u8>(buffer, data);
+                    case 2;  write_integer<u16>(buffer, data);
+                    case 4;  write_integer<u32>(buffer, data);
+                    default; write_integer<u64>(buffer, data);
                 }
             }
         }
-        else {
-            each enum_value in type_info.values {
-                if enum_value.value == value {
-                    add_to_string_buffer(buffer, enum_value.name);
-                    found = true;
+        case TypeKind.Float; {
+            if type.size == 4 write_float<float>(buffer, data);
+            else write_float<float64>(buffer, data);
+        }
+        case TypeKind.String; {
+            value := *cast(string*, data);
+            add_to_string_buffer(buffer, value);
+        }
+        case TypeKind.Pointer; {
+            write_pointer_to_buffer(buffer, data);
+        }
+        case TypeKind.Array; {
+            type_info := cast(StructTypeInfo*, type);
+            pointer_field := type_info.fields[1];
+            pointer_type_info := cast(PointerTypeInfo*, pointer_field.type_info);
+            element_type := pointer_type_info.pointer_type;
+
+            array := cast(Array<void*>*, data);
+            write_array_to_buffer(buffer, element_type, array.data, array.length);
+        }
+        case TypeKind.CArray; {
+            type_info := cast(CArrayTypeInfo*, type);
+            element_type := type_info.element_type;
+
+            write_array_to_buffer(buffer, element_type, data, type_info.length);
+        }
+        case TypeKind.Enum; {
+            type_info := cast(EnumTypeInfo*, type);
+            value: s32;
+            switch type_info.size {
+                case 1;  value = *cast(s8*, data);
+                case 2;  value = *cast(s16*, data);
+                case 4;  value = *cast(s32*, data);
+                default; value = *cast(s64*, data);
+            }
+
+            flags := false;
+            each attribute in type_info.attributes {
+                if attribute == "flags" {
+                    flags = true;
                     break;
                 }
             }
-        }
 
-        if !found {
-            if value == 0 {
-                buffer.buffer[buffer.length++] = '0';
+            found := false;
+            if flags {
+                each enum_value in type_info.values {
+                    if enum_value.value & value {
+                        if found add_to_string_buffer(buffer, " | ");
+                        else found = true;
+
+                        add_to_string_buffer(buffer, enum_value.name);
+                    }
+                }
             }
             else {
-                if value < 0 {
-                    buffer.buffer[buffer.length++] = '-';
-                    value *= -1;
+                each enum_value in type_info.values {
+                    if enum_value.value == value {
+                        add_to_string_buffer(buffer, enum_value.name);
+                        found = true;
+                        break;
+                    }
                 }
-                write_integer_to_buffer(buffer, value);
+            }
+
+            if !found {
+                if value == 0 {
+                    buffer.buffer[buffer.length++] = '0';
+                }
+                else {
+                    if value < 0 {
+                        buffer.buffer[buffer.length++] = '-';
+                        value *= -1;
+                    }
+                    write_integer_to_buffer(buffer, value);
+                }
             }
         }
-    }
-    else if type_kind == TypeKind.Struct {
-        type_info := cast(StructTypeInfo*, type);
-        write_struct_to_buffer(buffer, type_info, data);
-    }
-    else if type_kind == TypeKind.Union {
-        type_info := cast(UnionTypeInfo*, type);
-        add_to_string_buffer(buffer, "{ ");
-
-        each field in type_info.fields {
-            add_to_string_buffer(buffer, field.name);
-            add_to_string_buffer(buffer, ": ");
-            write_value_to_buffer(buffer, field.type_info, data);
-            add_to_string_buffer(buffer, ", ");
+        case TypeKind.Struct; {
+            type_info := cast(StructTypeInfo*, type);
+            write_struct_to_buffer(buffer, type_info, data);
         }
+        case TypeKind.Union; {
+            type_info := cast(UnionTypeInfo*, type);
+            add_to_string_buffer(buffer, "{ ");
 
-        buffer.buffer[buffer.length-2] = ' ';
-        buffer.buffer[buffer.length-1] = '}';
-    }
-    else if type_kind == TypeKind.Interface {
-        write_pointer_to_buffer(buffer, data);
-    }
-    else if type_kind == TypeKind.Type {
-        value := *cast(s32*, data);
-        type_info := __type_table[value];
-        add_to_string_buffer(buffer, type_info.name);
-    }
-    else if type_kind == TypeKind.Any {
-        type_info := cast(StructTypeInfo*, type);
-        write_struct_to_buffer(buffer, type_info, data);
-    }
-    else if type_kind == TypeKind.Compound {
-        // @Cleanup This branch should not be hit
-    }
-    else if type_kind == TypeKind.Function {
-        type_info := cast(FunctionTypeInfo*, type);
-        add_to_string_buffer(buffer, type_info.name);
+            each field in type_info.fields {
+                add_to_string_buffer(buffer, field.name);
+                add_to_string_buffer(buffer, ": ");
+                write_value_to_buffer(buffer, field.type_info, data);
+                add_to_string_buffer(buffer, ", ");
+            }
+
+            buffer.buffer[buffer.length-2] = ' ';
+            buffer.buffer[buffer.length-1] = '}';
+        }
+        case TypeKind.Interface; {
+            write_pointer_to_buffer(buffer, data);
+        }
+        case TypeKind.Type; {
+            value := *cast(s32*, data);
+            type_info := __type_table[value];
+            add_to_string_buffer(buffer, type_info.name);
+        }
+        case TypeKind.Any; {
+            type_info := cast(StructTypeInfo*, type);
+            write_struct_to_buffer(buffer, type_info, data);
+        }
+        case TypeKind.Compound; {
+            // @Cleanup This branch should not be hit
+        }
+        case TypeKind.Function; {
+            type_info := cast(FunctionTypeInfo*, type);
+            add_to_string_buffer(buffer, type_info.name);
+        }
     }
 }
 

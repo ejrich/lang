@@ -416,6 +416,7 @@ public class CallAst : IAst
     public List<IAst> Arguments { get; } = new();
     public IType TypeInfo { get; set; }
     public bool Inline { get; set; }
+    public bool PassArrayToParams { get; set; }
 }
 
 public class DeclarationAst : IDeclaration
