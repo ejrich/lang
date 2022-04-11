@@ -2,7 +2,9 @@
 #import "lexer.ol"
 
 parse(string entrypoint) {
+    init_lexer();
 
+    tokens := load_file_tokens(entrypoint, 0);
 }
 
 #private

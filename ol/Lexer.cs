@@ -8,6 +8,7 @@ public static class Lexer
 {
     private static readonly IDictionary<char, char> _escapableCharacters = new Dictionary<char, char>
     {
+        {'\'', '\''},
         {'"', '"'},
         {'\\', '\\'},
         {'a', '\a'},
