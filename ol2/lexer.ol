@@ -52,7 +52,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
 
     token_list: TokenList;
     if !found {
-        report_error(format_string("File not found '%'", allocate, file_path));
+        report_error_message("File not found '%'", file_path);
         return token_list.tokens;
     }
 
@@ -566,8 +566,7 @@ enum TokenType {
 }
 
 [flags]
-enum TokenFlags
-{
+enum TokenFlags {
     None = 0;
     Float = 1;
     HexNumber = 2;
@@ -582,7 +581,7 @@ struct TokenList {
 
 add_token(TokenList* token_list, Token token) {
     if token_list.tokens.length > token_list.allocated_length {
-        report_error("Whoops, out of memory, FIX ME!!!!!!!!\n");
+        report_error_message("Whoops, out of memory, FIX ME!!!!!!!!\n");
         return;
     }
 

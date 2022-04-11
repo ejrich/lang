@@ -30,14 +30,14 @@ main() {
         else if arg == "-noThreads" noThreads = true;
         else {
             if arg[0] == '-' {
-                report_error(format_string("Unrecognized compiler flag '%'", allocate, arg));
+                report_error_message("Unrecognized compiler flag '%'", arg);
             }
             else if !string_is_empty(entrypoint) {
-                report_error(format_string("Multiple program entrypoints defined '%'", allocate, arg));
+                report_error_message("Multiple program entrypoints defined '%'", arg);
             }
             else {
                 if !file_exists(arg) || !ends_with(arg, ".ol") {
-                    report_error(format_string("Entrypoint file does not exist or is not an .ol file '%'", allocate, arg));
+                    report_error_message("Entrypoint file does not exist or is not an .ol file '%'", arg);
                 }
                 else {
                     // name = Path.GetFileNameWithoutExtension(arg);
@@ -48,7 +48,7 @@ main() {
         }
     }
 
-    if string_is_empty(entrypoint) report_error("Program entrypoint not defined");
+    if string_is_empty(entrypoint) report_error_message("Program entrypoint not defined");
     list_errors_and_exit(ArgumentsError);
 
     // Parse source files to asts
@@ -109,6 +109,7 @@ init_thread_pool() {
 void* thread_worker(void* arg) {
     while true {
         if execute_queued_item() {
+            // TODO wait_one();
         }
     }
     return null;
@@ -265,20 +266,22 @@ struct Error {
 
 errors: Array<Error>;
 
-report_error(string message_format) {
-    report_error(message_format, -1, 0, 0);
+report_error_message(string message, Params args) {
+    report_error(message, -1, 0, 0, args);
 }
 
-report_error(string message, int file_index, Token token) {
-    report_error(message, file_index, token.line, token.column);
+report_error(string message, int file_index, Token token, Params args) {
+    report_error(message, file_index, token.line, token.column, args);
 }
 
-report_error(string message, Ast* ast) {
-    if ast == null report_error(message, -1, 0, 0);
-    else report_error(message, ast.file_index, ast.line, ast.column);
+report_error(string message, Ast* ast, Params args) {
+    if ast == null report_error(message, -1, 0, 0, args);
+    else report_error(message, ast.file_index, ast.line, ast.column, args);
 }
 
-report_error(string message, int file_index, u32 line, u32 column) {
+report_error(string message, int file_index, u32 line, u32 column, Params args) {
+    if args.length message = format_string(message, allocate, args);
+
     error: Error = { message = message; file_index = file_index; line = line; column = column; }
     array_insert(&errors, error, allocate, reallocate);
 }

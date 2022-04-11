@@ -2234,38 +2234,55 @@ public static class ProgramIRBuilder
             }
 
             // Rollup the rest of the arguments into an array
-            var paramsType = callFunction.Arguments[^1].Type;
-            var paramsElementType = callFunction.ParamsElementType;
-            var paramsAllocationIndex = AddAllocation(function, paramsType);
-            var dataPointer = InitializeConstArray(function, paramsAllocationIndex, (StructAst)paramsType, (uint)(call.Arguments.Count - callFunction.Arguments.Count + 1), paramsElementType, scope);
-
-            uint paramsIndex = 0;
-            if (paramsElementType.TypeKind == TypeKind.Any)
+            if (call.PassArrayToParams)
             {
-                for (var i = callFunction.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
+                var value = EmitIR(function, call.Arguments[^1], scope, out var hasCall);
+                if (hasCall && value.Type is StructAst)
                 {
-                    var index = GetConstantInteger(paramsIndex);
-                    var pointer = EmitGetPointer(function, dataPointer, index, paramsElementType, scope, true);
-
-                    var argument = EmitIR(function, call.Arguments[i], scope);
-                    var anyValue = GetAnyValue(function, argument, scope);
-                    EmitStore(function, pointer, anyValue, scope);
+                    var allocation = AddAllocation(function, value.Type);
+                    EmitStore(function, allocation, value, scope);
+                    arguments[argumentCount - 1] = EmitLoad(function, value.Type, allocation, scope);
+                }
+                else
+                {
+                    arguments[argumentCount - 1] = value;
                 }
             }
             else
             {
-                for (var i = callFunction.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
+                var paramsType = callFunction.Arguments[^1].Type;
+                var paramsElementType = callFunction.ParamsElementType;
+                var paramsAllocationIndex = AddAllocation(function, paramsType);
+                var dataPointer = InitializeConstArray(function, paramsAllocationIndex, (StructAst)paramsType, (uint)(call.Arguments.Count - callFunction.Arguments.Count + 1), paramsElementType, scope);
+
+                uint paramsIndex = 0;
+                if (paramsElementType.TypeKind == TypeKind.Any)
                 {
-                    var index = GetConstantInteger(paramsIndex);
-                    var pointer = EmitGetPointer(function, dataPointer, index, paramsElementType, scope, true);
+                    for (var i = callFunction.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
+                    {
+                        var index = GetConstantInteger(paramsIndex);
+                        var pointer = EmitGetPointer(function, dataPointer, index, paramsElementType, scope, true);
 
-                    var value = EmitAndCast(function, call.Arguments[i], scope, paramsElementType);
-                    EmitStore(function, pointer, value, scope);
+                        var argument = EmitIR(function, call.Arguments[i], scope);
+                        var anyValue = GetAnyValue(function, argument, scope);
+                        EmitStore(function, pointer, anyValue, scope);
+                    }
                 }
-            }
+                else
+                {
+                    for (var i = callFunction.Arguments.Count - 1; i < call.Arguments.Count; i++, paramsIndex++)
+                    {
+                        var index = GetConstantInteger(paramsIndex);
+                        var pointer = EmitGetPointer(function, dataPointer, index, paramsElementType, scope, true);
 
-            var paramsValue = EmitLoad(function, paramsType, paramsAllocationIndex, scope);
-            arguments[argumentCount - 1] = paramsValue;
+                        var value = EmitAndCast(function, call.Arguments[i], scope, paramsElementType);
+                        EmitStore(function, pointer, value, scope);
+                    }
+                }
+
+                var paramsValue = EmitLoad(function, paramsType, paramsAllocationIndex, scope);
+                arguments[argumentCount - 1] = paramsValue;
+            }
         }
         else if (callFunction.Flags.HasFlag(FunctionFlags.Varargs))
         {

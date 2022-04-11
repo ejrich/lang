@@ -4353,6 +4353,7 @@ public static class TypeChecker
                 }
             }
 
+            var passArrayToParams = false;
             if (match && function.Flags.HasFlag(FunctionFlags.Params))
             {
                 var paramsArgument = function.Arguments[^1];
@@ -4369,6 +4370,26 @@ public static class TypeChecker
                                 match = false;
                                 break;
                             }
+                        }
+                    }
+                    else if (callArgIndex == arguments.Length - 1)
+                    {
+                        var argument = arguments[^1];
+                        if (argument?.TypeKind == TypeKind.Array)
+                        {
+                            var arrayStruct = (StructAst)argument;
+                            if (arrayStruct.GenericTypes[0] == function.ParamsElementType)
+                            {
+                                passArrayToParams = true;
+                            }
+                            else
+                            {
+                                match = VerifyArgument(call.Arguments[callArgIndex], argument, function.ParamsElementType);
+                            }
+                        }
+                        else
+                        {
+                            match = VerifyArgument(call.Arguments[callArgIndex], argument, function.ParamsElementType);
                         }
                     }
                     else
@@ -4404,6 +4425,7 @@ public static class TypeChecker
 
             if (match && (function.Flags.HasFlag(FunctionFlags.Varargs) || callArgIndex == call.Arguments.Count))
             {
+                call.PassArrayToParams = passArrayToParams;
                 var name = $"{function.Name}.{i}.{string.Join('.', genericTypes.Select(type => type.TypeIndex))}";
 
                 if (GetExistingFunction(name, call.FileIndex, out polymorphedFunction, out var functionCount))
@@ -4517,12 +4539,30 @@ public static class TypeChecker
         {
             if (paramsElementType != null)
             {
-                for (; callArgIndex < arguments.Length; callArgIndex++)
+                if (callArgIndex == arguments.Length - 1)
                 {
-                    if (!VerifyArgument(call.Arguments[callArgIndex], arguments[callArgIndex], paramsElementType))
+                    var argument = arguments[^1];
+                    if (argument?.TypeKind == TypeKind.Array)
                     {
-                        match = false;
-                        break;
+                        var arrayStruct = (StructAst)argument;
+                        if (arrayStruct.GenericTypes[0] == paramsElementType)
+                        {
+                            call.PassArrayToParams = true;
+                            return true;
+                        }
+                    }
+
+                    return VerifyArgument(call.Arguments[callArgIndex], argument, paramsElementType);
+                }
+                else
+                {
+                    for (; callArgIndex < arguments.Length; callArgIndex++)
+                    {
+                        if (!VerifyArgument(call.Arguments[callArgIndex], arguments[callArgIndex], paramsElementType))
+                        {
+                            match = false;
+                            break;
+                        }
                     }
                 }
             }
