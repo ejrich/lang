@@ -1589,7 +1589,10 @@ public static unsafe class LLVMBackend
                             {
                                 if (instr.Value1.Dereference)
                                 {
-                                    assemblyString.AppendFormat(" qword ptr [{0}]", instr.Value1.Register);
+                                    assemblyString.Append(' ');
+                                    assemblyString.Append(GetAddressSpace(instr.Definition.AddressSpace));
+                                    assemblyString.Append(instr.Value1.Register);
+                                    assemblyString.Append(']');
                                 }
                                 else if (instr.Value1.Register != null)
                                 {
@@ -1604,7 +1607,10 @@ public static unsafe class LLVMBackend
                             {
                                 if (instr.Value2.Dereference)
                                 {
-                                    assemblyString.AppendFormat(", qword ptr [{0}]", instr.Value2.Register);
+                                    assemblyString.Append(", ");
+                                    assemblyString.Append(GetAddressSpace(instr.Definition.AddressSpace));
+                                    assemblyString.Append(instr.Value2.Register);
+                                    assemblyString.Append(']');
                                 }
                                 else if (instr.Value2.Register != null)
                                 {
@@ -2306,6 +2312,16 @@ public static unsafe class LLVMBackend
 
         var stackPointerValue = _builder.BuildLoad(stackPointer);
         _builder.BuildCall(stackRestore, new []{stackPointerValue});
+    }
+
+    private static string GetAddressSpace(int addressSpace)
+    {
+        return addressSpace switch {
+            1 => "byte ptr [",
+            2 => "word ptr [",
+            4 => "dword ptr [",
+            _ => "qword ptr ["
+        };
     }
 
     private static LLVMValueRef BuildAssemblyCall(string assembly, string constraint, LLVMTypeRef assemblyFunctionType, LLVMValueRef[] arguments, LLVMInlineAsmDialect dialect = LLVMInlineAsmDialect.LLVMInlineAsmDialectIntel)
