@@ -228,3 +228,7 @@ int get_nprocs() #extern "c"
 
 int pthread_create(u64* thread, pthread_attr_t* attr, ThreadProcedure start_routine, void* arg) #extern "c"
 struct pthread_attr_t {}
+
+int sem_init(void* sem, int pshared, int value) #extern "c"
+int sem_wait(void* sem) #extern "c"
+int sem_post(void* sem) #extern "c"

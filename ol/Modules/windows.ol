@@ -58,6 +58,9 @@ NtStatus BCryptGenRandom(Handle* hProv, void* pbBuffer, u64 cbBuffer, u64 dwFlag
 
 GetSystemInfo(SYSTEM_INFO* lpSystemInfo) #extern "kernel32"
 CreateThread(SECURITY_ATTRIBUTES* lpThreadAttributes, u64 dwStackSize, ThreadProcedure lpStartAddress, void* lpParameter, int dwCreationFlags, int* lpThreadId) #extern "kernel32'
+Handle* CreateSemaphoreA(SECURITY_ATTRIBUTES* lpSemaphoreAttributes, u64 lInitialCount, u64 lMaximumCount, string lpName) #extern "kernel32'
+bool ReleaseSemaphore(Handle* hSemaphore, u64 lReleaseCount, u64* lpPreviousCount) #extern "kernel32'
+int WaitForSingleObject(Handle* hHandle, int dwMilliseconds) #extern "kernel32'
 
 STD_INPUT_HANDLE  := -10; #const
 STD_OUTPUT_HANDLE := -11; #const
@@ -1393,6 +1396,8 @@ struct SYSTEM_INFO {
     wProcessorLevel: s16;
     wProcessorRevision: s16;
 }
+
+INFINITE := -1; #const
 
 
 // Virtual key codes
