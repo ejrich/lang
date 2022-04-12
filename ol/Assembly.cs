@@ -6,6 +6,54 @@ public static class Assembly
 {
     public static readonly Dictionary<string, RegisterDefinition> Registers = new()
     {
+        {"al",    new(size: 1)},
+        {"cl",    new(offset: 1, size: 1)},
+        {"dl",    new(offset: 2, size: 1)},
+        {"bl",    new(offset: 3, size: 1)},
+        {"spl",   new(offset: 4, size: 1)},
+        {"bpl",   new(offset: 5, size: 1)},
+        {"sil",   new(offset: 6, size: 1)},
+        {"dil",   new(offset: 7, size: 1)},
+        {"r8b",   new(rex: 0x41, size: 1)},
+        {"r9b",   new(offset: 1, rex: 0x41, size: 1)},
+        {"r10b",  new(offset: 2, rex: 0x41, size: 1)},
+        {"r11b",  new(offset: 3, rex: 0x41, size: 1)},
+        {"r12b",  new(offset: 4, rex: 0x41, size: 1)},
+        {"r13b",  new(offset: 5, rex: 0x41, size: 1)},
+        {"r14b",  new(offset: 6, rex: 0x41, size: 1)},
+        {"r15b",  new(offset: 7, rex: 0x41, size: 1)},
+        {"ax",    new(size: 2)},
+        {"cx",    new(offset: 1, size: 2)},
+        {"dx",    new(offset: 2, size: 2)},
+        {"bx",    new(offset: 3, size: 2)},
+        {"sp",    new(offset: 4, size: 2)},
+        {"bp",    new(offset: 5, size: 2)},
+        {"si",    new(offset: 6, size: 2)},
+        {"di",    new(offset: 7, size: 2)},
+        {"r8w",   new(rex: 0x41, size: 2)},
+        {"r9w",   new(offset: 1, rex: 0x41, size: 2)},
+        {"r10w",  new(offset: 2, rex: 0x41, size: 2)},
+        {"r11w",  new(offset: 3, rex: 0x41, size: 2)},
+        {"r12w",  new(offset: 4, rex: 0x41, size: 2)},
+        {"r13w",  new(offset: 5, rex: 0x41, size: 2)},
+        {"r14w",  new(offset: 6, rex: 0x41, size: 2)},
+        {"r15w",  new(offset: 7, rex: 0x41, size: 2)},
+        {"eax",   new(size: 4)},
+        {"ecx",   new(offset: 1, size: 4)},
+        {"edx",   new(offset: 2, size: 4)},
+        {"ebx",   new(offset: 3, size: 4)},
+        {"esp",   new(offset: 4, size: 4)},
+        {"ebp",   new(offset: 5, size: 4)},
+        {"esi",   new(offset: 6, size: 4)},
+        {"edi",   new(offset: 7, size: 4)},
+        {"r8d",   new(rex: 0x41, size: 4)},
+        {"r9d",   new(offset: 1, rex: 0x41, size: 4)},
+        {"r10d",  new(offset: 2, rex: 0x41, size: 4)},
+        {"r11d",  new(offset: 3, rex: 0x41, size: 4)},
+        {"r12d",  new(offset: 4, rex: 0x41, size: 4)},
+        {"r13d",  new(offset: 5, rex: 0x41, size: 4)},
+        {"r14d",  new(offset: 6, rex: 0x41, size: 4)},
+        {"r15d",  new(offset: 7, rex: 0x41, size: 4)},
         {"rax",   new()},
         {"rcx",   new(offset: 1)},
         {"rdx",   new(offset: 2)},
@@ -67,6 +115,7 @@ public static class Assembly
         {"fstp",   new InstructionDefinition[]{ new() {Opcode = 0xDD, HasExtension = true, Extension = 0x18, Value1 = new(true)} }},
         {"fyl2x",  new InstructionDefinition[]{ new() {Opcode = 0xD9, Opcode2 = 0xF1} }},
         {"mov",    new InstructionDefinition[]{
+            // TODO Better implement REX translation
             new() {Rex = 0x48, Opcode = 0xB8, AddRegisterToOpcode = true, Value1 = new(), Value2 = new(constant: true)},
             new() {Rex = 0x48, Opcode = 0x89, Value1 = new(true), Value2 = new()}
         }},
@@ -82,6 +131,12 @@ public static class Assembly
         }},
         {"movq",   new InstructionDefinition[]{ new() {Prefix = 0x66, Rex = 0x48, OF = true, Opcode = 0x6E, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new()} }},
         {"sqrtsd", new InstructionDefinition[]{ new() {Prefix = 0xF2, OF = true, Opcode = 0x51, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new(type: RegisterType.SSE)} }},
+        {"xadd",   new InstructionDefinition[]{
+            new() {OF = true, Opcode = 0xC0, AddressSpace = 1, Value1 = new(true), Value2 = new(size: 1)},
+            new() {Prefix = 0x66, OF = true, Opcode = 0xC1, AddressSpace = 2, Value1 = new(true), Value2 = new(size: 2)},
+            new() {OF = true, Opcode = 0xC1, AddressSpace = 4, Value1 = new(true), Value2 = new(size: 4)},
+            new() {Rex = 0x48, OF = true, Opcode = 0xC1, Value1 = new(true), Value2 = new()}
+        }}
         // TODO Add more
     };
 }
@@ -95,16 +150,18 @@ public enum RegisterType : byte
 
 public class RegisterDefinition
 {
-    public RegisterDefinition(RegisterType type = RegisterType.General, byte offset = 0, byte rex = 0)
+    public RegisterDefinition(RegisterType type = RegisterType.General, byte offset = 0, byte rex = 0, byte size = 8)
     {
         Type = type;
         Offset = offset;
         Rex = rex;
+        Size = size;
     }
 
     public RegisterType Type;
     public byte Offset;
     public byte Rex;
+    public byte Size;
 }
 
 public class InstructionDefinition
@@ -118,20 +175,23 @@ public class InstructionDefinition
     public bool HasExtension;
     public byte Extension;
     public byte Mod;
+    public byte AddressSpace = 8;
     public InstructionArgument Value1;
     public InstructionArgument Value2;
 }
 
 public class InstructionArgument
 {
-    public InstructionArgument(bool memory = false, bool constant = false, RegisterType type = RegisterType.General)
+    public InstructionArgument(bool memory = false, bool constant = false, byte size = 8, RegisterType type = RegisterType.General)
     {
         Memory = memory;
         Constant = constant;
         Type = type;
+        RegisterSize = size;
     }
 
     public bool Memory;
     public bool Constant;
+    public byte RegisterSize;
     public RegisterType Type;
 }

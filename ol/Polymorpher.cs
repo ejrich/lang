@@ -65,7 +65,7 @@ public static class Polymorpher
             }
         }
 
-        function.Body = Polymorpher.CopyScope(baseFunction.Body, genericTypes, baseFunction.Generics);
+        function.Body = CopyScope(baseFunction.Body, genericTypes, baseFunction.Generics);
 
         return function;
     }
@@ -143,6 +143,8 @@ public static class Polymorpher
                 return CopyEach(each, genericTypes, generics);
             case CompilerDirectiveAst compilerDirective:
                 return CopyCompilerDirective(compilerDirective, genericTypes, generics);
+            case AssemblyAst assembly:
+                return assembly;
             default:
                 return CopyExpression(ast, genericTypes, generics);
         }

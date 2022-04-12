@@ -3344,7 +3344,7 @@ public static class TypeChecker
             return false;
         }
 
-        return value.Dereference == arg.Memory && value.RegisterDefinition.Type == arg.Type;
+        return value.Dereference == arg.Memory && value.RegisterDefinition.Type == arg.Type && value.RegisterDefinition.Size == arg.RegisterSize;
     }
 
     private static void VerifySwitch(SwitchAst switchAst, IFunction currentFunction, IScope scope, bool canBreak)
