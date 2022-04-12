@@ -100,6 +100,7 @@ float get_time(u64 start, u64 end, u64 freq) {
 
 // Multithreading
 init_thread_pool() {
+    create_semaphore(&semaphore, 65536);
     thread_count := get_processors();
     each i in 0..thread_count - 2 {
         create_thread(thread_worker, null);
@@ -109,12 +110,13 @@ init_thread_pool() {
 void* thread_worker(void* arg) {
     while true {
         if execute_queued_item() {
-            // TODO wait_one();
+            semaphore_wait(semaphore);
         }
     }
     return null;
 }
 
+semaphore: Semaphore*;
 thread_queue: LinkedList<QueueItem>;
 completed := 0;
 count := 0;
@@ -123,6 +125,7 @@ queue_work(Callback callback, void* data) {
     item: QueueItem = { callback = callback; data = data; }
     add_to_head(&thread_queue, item);
     atomic_increment(&count);
+    semaphore_release(semaphore);
 }
 
 bool execute_queued_item() {
