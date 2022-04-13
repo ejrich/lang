@@ -1678,14 +1678,22 @@ public static unsafe class ProgramRunner
 
         // Handle rex addressing
         var rex = definition.Rex;
-        if (register1 != null)
-        {
-            rex |= register1.Rex;
-        }
         if (register2 != null)
         {
-            rex |= register2.Rex;
+            if (register1 != null && register1.Rex)
+            {
+                rex |= 0x44; // Set REX.R
+            }
+            if (register2.Rex)
+            {
+                rex |= 0x41; // Set REX.B
+            }
         }
+        else if (register1 != null && register1.Rex)
+        {
+            rex |= 0x41; // Set REX.B
+        }
+
         if (rex != 0)
         {
             code.Add(rex);
