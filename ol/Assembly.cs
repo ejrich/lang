@@ -114,6 +114,7 @@ public static class Assembly
         {"fst",    new InstructionDefinition[]{ new() {Opcode = 0xDD, HasExtension = true, Extension = 0x10, Value1 = new(true)} }},
         {"fstp",   new InstructionDefinition[]{ new() {Opcode = 0xDD, HasExtension = true, Extension = 0x18, Value1 = new(true)} }},
         {"fyl2x",  new InstructionDefinition[]{ new() {Opcode = 0xD9, Opcode2 = 0xF1} }},
+        {"lock",   new InstructionDefinition[]{ new() {Opcode = 0xF0} }},
         {"mov",    new InstructionDefinition[]{
             // TODO Better implement REX translation
             new() {Rex = 0x48, Opcode = 0xB8, AddRegisterToOpcode = true, RMFirst = true, Value1 = new(), Value2 = new(constant: true)},
@@ -136,6 +137,12 @@ public static class Assembly
             new() {Prefix = 0x66, OF = true, Opcode = 0xC1, AddressSpace = 2, RMFirst = true, Value1 = new(true), Value2 = new(size: 2)},
             new() {OF = true, Opcode = 0xC1, AddressSpace = 4, RMFirst = true, Value1 = new(true), Value2 = new(size: 4)},
             new() {Rex = 0x48, OF = true, Opcode = 0xC1, RMFirst = true, Value1 = new(true), Value2 = new()}
+        }},
+        {"cmpxchg", new InstructionDefinition[]{
+            new() {OF = true, Opcode = 0xB0, AddressSpace = 1, RMFirst = true, Value1 = new(true), Value2 = new(size: 1)},
+            new() {Prefix = 0x66, OF = true, Opcode = 0xB1, AddressSpace = 2, RMFirst = true, Value1 = new(true), Value2 = new(size: 2)},
+            new() {OF = true, Opcode = 0xB1, AddressSpace = 4, RMFirst = true, Value1 = new(true), Value2 = new(size: 4)},
+            new() {Rex = 0x48, OF = true, Opcode = 0xB1, RMFirst = true, Value1 = new(true), Value2 = new()}
         }}
         // TODO Add more
     };
