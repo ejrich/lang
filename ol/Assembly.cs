@@ -116,26 +116,26 @@ public static class Assembly
         {"fyl2x",  new InstructionDefinition[]{ new() {Opcode = 0xD9, Opcode2 = 0xF1} }},
         {"mov",    new InstructionDefinition[]{
             // TODO Better implement REX translation
-            new() {Rex = 0x48, Opcode = 0xB8, AddRegisterToOpcode = true, Value1 = new(), Value2 = new(constant: true)},
-            new() {Rex = 0x48, Opcode = 0x89, Value1 = new(true), Value2 = new()}
+            new() {Rex = 0x48, Opcode = 0xB8, AddRegisterToOpcode = true, RMFirst = true, Value1 = new(), Value2 = new(constant: true)},
+            new() {Rex = 0x48, Opcode = 0x89, RMFirst = true, Value1 = new(true), Value2 = new()}
         }},
         {"movsd",  new InstructionDefinition[]{
-            new() {Prefix = 0x0F2, OF = true, Opcode = 0x11, Value1 = new(true), Value2 = new(type: RegisterType.SSE)},
-            new() {Prefix = 0x0F2, OF = true, Opcode = 0x10, Value1 = new(type: RegisterType.SSE), Value2 = new(true)},
-            new() {Prefix = 0x0F2, OF = true, Opcode = 0x10, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new(type: RegisterType.SSE)}
+            new() {Prefix = 0xF2, OF = true, Opcode = 0x11, RMFirst = true, Value1 = new(true), Value2 = new(type: RegisterType.SSE)},
+            new() {Prefix = 0xF2, OF = true, Opcode = 0x10, Value1 = new(type: RegisterType.SSE), Value2 = new(true)},
+            new() {Prefix = 0xF2, OF = true, Opcode = 0x10, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new(type: RegisterType.SSE)}
         }},
         {"movss",  new InstructionDefinition[]{
-            new() {Prefix = 0x0F3, OF = true, Opcode = 0x11, Value1 = new(true), Value2 = new(type: RegisterType.SSE)},
-            new() {Prefix = 0x0F3, OF = true, Opcode = 0x10, Value1 = new(type: RegisterType.SSE), Value2 = new(true)},
-            new() {Prefix = 0x0F3, OF = true, Opcode = 0x10, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new(type: RegisterType.SSE)}
+            new() {Prefix = 0xF3, OF = true, Opcode = 0x11, RMFirst = true, Value1 = new(true), Value2 = new(type: RegisterType.SSE)},
+            new() {Prefix = 0xF3, OF = true, Opcode = 0x10, Value1 = new(type: RegisterType.SSE), Value2 = new(true)},
+            new() {Prefix = 0xF3, OF = true, Opcode = 0x10, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new(type: RegisterType.SSE)}
         }},
         {"movq",   new InstructionDefinition[]{ new() {Prefix = 0x66, Rex = 0x48, OF = true, Opcode = 0x6E, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new()} }},
         {"sqrtsd", new InstructionDefinition[]{ new() {Prefix = 0xF2, OF = true, Opcode = 0x51, Mod = 0xC0, Value1 = new(type: RegisterType.SSE), Value2 = new(type: RegisterType.SSE)} }},
         {"xadd",   new InstructionDefinition[]{
-            new() {OF = true, Opcode = 0xC0, AddressSpace = 1, Value1 = new(true), Value2 = new(size: 1)},
-            new() {Prefix = 0x66, OF = true, Opcode = 0xC1, AddressSpace = 2, Value1 = new(true), Value2 = new(size: 2)},
-            new() {OF = true, Opcode = 0xC1, AddressSpace = 4, Value1 = new(true), Value2 = new(size: 4)},
-            new() {Rex = 0x48, OF = true, Opcode = 0xC1, Value1 = new(true), Value2 = new()}
+            new() {OF = true, Opcode = 0xC0, AddressSpace = 1, RMFirst = true, Value1 = new(true), Value2 = new(size: 1)},
+            new() {Prefix = 0x66, OF = true, Opcode = 0xC1, AddressSpace = 2, RMFirst = true, Value1 = new(true), Value2 = new(size: 2)},
+            new() {OF = true, Opcode = 0xC1, AddressSpace = 4, RMFirst = true, Value1 = new(true), Value2 = new(size: 4)},
+            new() {Rex = 0x48, OF = true, Opcode = 0xC1, RMFirst = true, Value1 = new(true), Value2 = new()}
         }}
         // TODO Add more
     };
@@ -175,6 +175,7 @@ public class InstructionDefinition
     public bool HasExtension;
     public byte Extension;
     public byte Mod;
+    public bool RMFirst;
     public byte AddressSpace = 8;
     public InstructionArgument Value1;
     public InstructionArgument Value2;
