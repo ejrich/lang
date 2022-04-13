@@ -1678,20 +1678,27 @@ public static unsafe class ProgramRunner
 
         // Handle rex addressing
         var rex = definition.Rex;
-        if (register2 != null)
+        if (definition.RMFirst)
+        {
+            if (register1 != null && register1.Rex)
+            {
+                rex |= 0x41; // Set REX.B
+            }
+            if (register2 != null && register2.Rex)
+            {
+                rex |= 0x44; // Set REX.R
+            }
+        }
+        else
         {
             if (register1 != null && register1.Rex)
             {
                 rex |= 0x44; // Set REX.R
             }
-            if (register2.Rex)
+            if (register2 != null && register2.Rex)
             {
                 rex |= 0x41; // Set REX.B
             }
-        }
-        else if (register1 != null && register1.Rex)
-        {
-            rex |= 0x41; // Set REX.B
         }
 
         if (rex != 0)
@@ -1730,8 +1737,16 @@ public static unsafe class ProgramRunner
             }
             else if (register1 != null && register2 != null)
             {
-                modrm |= (byte)(register1.Offset << 3);
-                modrm |= register2.Offset;
+                if (definition.RMFirst)
+                {
+                    modrm |= register1.Offset;
+                    modrm |= (byte)(register2.Offset << 3);
+                }
+                else
+                {
+                    modrm |= (byte)(register1.Offset << 3);
+                    modrm |= register2.Offset;
+                }
                 code.Add(modrm);
             }
         }
