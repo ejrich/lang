@@ -293,8 +293,11 @@ public static class Parser
                         ErrorReporter.Report($"Interfaces cannot have attributes", fileIndex, token);
                     }
                     var interfaceAst = ParseInterface(enumerator);
-                    TypeChecker.AddInterface(interfaceAst);
-                    Asts.Add(interfaceAst);
+                    if (interfaceAst?.Name != null)
+                    {
+                        TypeChecker.AddInterface(interfaceAst);
+                        Asts.Add(interfaceAst);
+                    }
                     break;
                 default:
                     ErrorReporter.Report($"Unexpected token '{token.Value}'", fileIndex, token);
