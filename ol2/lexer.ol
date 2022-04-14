@@ -452,7 +452,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                 token.value = substring(file_text, start_index, i - start_index + offset);
                 add_token(&token_list, token);
             }
-            // Handle other characters
+            // Handle other identifiers
             default; {
                 start_index := i;
                 offset := 1;
@@ -482,9 +482,46 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
 
                 token.value = substring(file_text, start_index, i - start_index + offset);
 
-                // if _reservedTokens.TryGetValue(token.Value, out var type) {
-                //     token.Type = type;
-                // }
+                switch token.value.length {
+                    case 2; {
+                        if token.value == "if" token.type = TokenType.If;
+                        else if token.value == "in" token.type = TokenType.In;
+                    }
+                    case 3; {
+                        if token.value == "asm" token.type = TokenType.Asm;
+                        else if token.value == "out" token.type = TokenType.Out;
+                    }
+                    case 4; {
+                        if token.value == "case" token.type = TokenType.Case;
+                        else if token.value == "cast" token.type = TokenType.Cast;
+                        else if token.value == "each" token.type = TokenType.Each;
+                        else if token.value == "else" token.type = TokenType.Else;
+                        else if token.value == "enum" token.type = TokenType.Enum;
+                        else if token.value == "null" token.type = TokenType.Null;
+                        else if token.value == "true" token.type = TokenType.Boolean;
+                    }
+                    case 5; {
+                        if token.value == "break" token.type = TokenType.Break;
+                        else if token.value == "false" token.type = TokenType.Boolean;
+                        else if token.value == "while" token.type = TokenType.While;
+                        else if token.value == "union" token.type = TokenType.Union;
+                    }
+                    case 6; {
+                        if token.value == "return" token.type = TokenType.Return;
+                        else if token.value == "struct" token.type = TokenType.Struct;
+                        else if token.value == "switch" token.type = TokenType.Switch;
+                    }
+                    case 7; {
+                        if token.value == "default" token.type = TokenType.Default;
+                    }
+                    case 8; {
+                        if token.value == "continue" token.type = TokenType.Continue;
+                        else if token.value == "operator" token.type = TokenType.Operator;
+                    }
+                    case 9; {
+                        if token.value == "interface" token.type = TokenType.Interface;
+                    }
+                }
 
                 add_token(&token_list, token);
             }
