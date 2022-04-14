@@ -8,7 +8,15 @@ directives: LinkedList<CompilerDirectiveAst*>;
 
 parse(string entrypoint) {
     init_lexer();
+    set_library_directory();
 
+    add_module("runtime");
+    queue_file_if_not_exists(entrypoint);
+
+    complete_work();
+}
+
+set_library_directory() {
     executable_path: CArray<u8>[4096];
     #if os == OS.Linux {
         self_path := "/proc/self/exe"; #const
@@ -27,14 +35,8 @@ parse(string entrypoint) {
         }
     }
 
-    modules_path := "/../../ol/Modules"; #const
-    memory_copy(&executable_path + length, modules_path.data, modules_path.length);
-    library_directory = { length = length + modules_path.length; data = &executable_path; }
-
-    add_module("runtime");
-    queue_file_if_not_exists(entrypoint);
-
-    complete_work();
+    executable_str: string = { length = length; data = &executable_path; }
+    library_directory = format_string("%/%", allocate, executable_str, "../../ol/Modules");
 }
 
 add_module(string module) {
