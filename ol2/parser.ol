@@ -90,6 +90,11 @@ queue_file_if_not_exists(string file) {
     queue_work(parse_file, data);
 }
 
+struct ParseData {
+    file: string;
+    file_index: int;
+}
+
 #private
 
 struct TokenEnumerator {
@@ -134,11 +139,6 @@ bool peek(TokenEnumerator* enumerator, Token* token, int steps = 0) {
 
 insert(TokenEnumerator* enumerator, Token token) {
     array_insert(&enumerator.tokens, enumerator.index, token, allocate, reallocate);
-}
-
-struct ParseData {
-    file: string;
-    file_index: int;
 }
 
 parse_file(void* data) {

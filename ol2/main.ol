@@ -205,8 +205,12 @@ Node<T>* replace_end<T>(LinkedList<T>* list, Node<T>* node) {
 
 // Memory allocation
 T* new<T>() {
+    value: T;
     size := size_of(T);
-    return allocate(size);
+    pointer: T* = allocate(size);
+    *pointer = value;
+
+    return pointer;
 }
 
 arena_size := 80000; #const

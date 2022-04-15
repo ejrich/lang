@@ -58,6 +58,7 @@ struct TypeAst : Ast {
     private: bool;
 }
 
+/*
 struct Interface : TypeAst {
     return_type: TypeAst*;
     return_type_definition: TypeDefinition*;
@@ -326,6 +327,7 @@ struct IndexAst : Ast {
     index: Ast*;
 }
 
+*/
 struct CompilerDirectiveAst : Ast {
     directive_type: DirectiveType;
     value: Ast*;
@@ -348,6 +350,7 @@ struct Library {
     has_dll: bool;
 }
 
+/*
 struct CastAst : Ast {
     target_type_definition: TypeDefinition*;
     target_type: TypeAst*;
@@ -453,6 +456,7 @@ enum UnaryOperator {
     Dereference = '*';
     Reference = '&';
 }
+*/
 
 enum DirectiveType {
     None;
