@@ -4437,7 +4437,7 @@ public static class TypeChecker
                         match = false;
                         break;
                     }
-                    else if (genericType.Private)
+                    if (genericType.Private)
                     {
                         privateGenericTypes = true;
                     }
