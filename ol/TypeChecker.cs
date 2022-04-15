@@ -748,7 +748,6 @@ public static class TypeChecker
         if (structAst.BaseTypeDefinition != null)
         {
             var baseType = VerifyType(structAst.BaseTypeDefinition, GlobalScope, out var isGeneric, out var isVarargs, out var isParams);
-            structAst.Alignment = baseType.Alignment;
 
             if (isVarargs || isParams || isGeneric)
             {
@@ -765,13 +764,31 @@ public static class TypeChecker
             else
             {
                 // Copy fields from the base struct into the new struct
-                foreach (var field in baseTypeStruct.Fields)
+                if (baseTypeStruct.Verified)
                 {
-                    fieldNames.Add(field.Name);
-                    structAst.Fields.Insert(i++, field);
+                    foreach (var field in baseTypeStruct.Fields)
+                    {
+                        fieldNames.Add(field.Name);
+                        structAst.Fields.Insert(i++, field);
+                    }
                 }
+                else
+                {
+                    foreach (var field in baseTypeStruct.Fields)
+                    {
+                        fieldNames.Add(field.Name);
+                        structAst.Fields.Insert(i++, field);
+
+                        if (field.Type == null)
+                        {
+                            field.Type = VerifyType(field.TypeDefinition, GlobalScope);
+                        }
+                    }
+                }
+
                 structAst.Size = baseTypeStruct.Size;
                 structAst.BaseStruct = baseTypeStruct;
+                structAst.Alignment = baseTypeStruct.Alignment;
             }
         }
 
@@ -992,7 +1009,10 @@ public static class TypeChecker
             }
         }
 
-        TypeTable.CreateTypeInfo(structAst);
+        if (!ErrorReporter.Errors.Any())
+        {
+            TypeTable.CreateTypeInfo(structAst);
+        }
         structAst.Verified = true;
     }
 
@@ -5462,71 +5482,80 @@ public static class TypeChecker
                     {
                         return structType;
                     }
-                    else
-                    {
-                        var generics = type.Generics.ToArray();
-                        var genericTypes = new IType[generics.Length];
-                        var error = false;
-                        var privateGenericTypes = false;
-                        for (var i = 0; i < generics.Length; i++)
-                        {
-                            var genericType = genericTypes[i] = VerifyType(generics[i], scope, out var hasGeneric, out _, out _, depth + 1, allowParams);
-                            if (genericType == null && !hasGeneric)
-                            {
-                                error = true;
-                            }
-                            else if (hasGeneric)
-                            {
-                                isGeneric = true;
-                            }
-                            else if (genericType.Private)
-                            {
-                                privateGenericTypes = true;
-                            }
-                        }
-                        if (!GetPolymorphicStruct(type.Name, type.FileIndex, out var structDef))
-                        {
-                            ErrorReporter.Report($"No polymorphic structs of type '{type.Name}'", type);
-                            return null;
-                        }
-                        else if (structDef.Generics.Count != type.Generics.Count)
-                        {
-                            ErrorReporter.Report($"Expected type '{type.Name}' to have {structDef.Generics.Count} generic(s), but got {type.Generics.Count}", type);
-                            return null;
-                        }
-                        else if (error || isGeneric)
-                        {
-                            return null;
-                        }
-                        else
-                        {
-                            var name = PrintTypeDefinition(type);
-                            var fileIndex = structDef.FileIndex;
-                            if (privateGenericTypes && !structDef.Private)
-                            {
-                                fileIndex = type.FileIndex;
-                            }
 
-                            var polyStruct = Polymorpher.CreatePolymorphedStruct(structDef, name, genericName, TypeKind.Struct, privateGenericTypes, genericTypes);
-                            AddType(genericName, polyStruct, fileIndex);
-                            VerifyStruct(polyStruct);
-                            return polyStruct;
+                    if (!GetPolymorphicStruct(type.Name, type.FileIndex, out var structDef))
+                    {
+                        ErrorReporter.Report($"No polymorphic structs of type '{type.Name}'", type);
+                        return null;
+                    }
+
+                    var generics = type.Generics.ToArray();
+                    var genericTypes = new IType[generics.Length];
+                    var error = false;
+                    var privateGenericTypes = false;
+
+                    for (var i = 0; i < generics.Length; i++)
+                    {
+                        var genericType = genericTypes[i] = VerifyType(generics[i], scope, out var hasGeneric, out _, out _, depth + 1, allowParams);
+                        if (genericType == null && !hasGeneric)
+                        {
+                            error = true;
+                        }
+                        else if (hasGeneric)
+                        {
+                            isGeneric = true;
+                        }
+                        else if (genericType.Private)
+                        {
+                            privateGenericTypes = true;
                         }
                     }
+
+                    if (structDef.Generics.Count != type.Generics.Count)
+                    {
+                        ErrorReporter.Report($"Expected type '{type.Name}' to have {structDef.Generics.Count} generic(s), but got {type.Generics.Count}", type);
+                        return null;
+                    }
+
+                    if (error || isGeneric)
+                    {
+                        return null;
+                    }
+
+                    var name = PrintTypeDefinition(type);
+                    var fileIndex = structDef.FileIndex;
+                    if (privateGenericTypes && !structDef.Private)
+                    {
+                        fileIndex = type.FileIndex;
+                    }
+
+                    var polyStruct = Polymorpher.CreatePolymorphedStruct(structDef, name, genericName, TypeKind.Struct, privateGenericTypes, genericTypes);
+                    AddType(genericName, polyStruct, fileIndex);
+                    VerifyStruct(polyStruct);
+                    return polyStruct;
                 }
                 else if (GetType(type.Name, type.FileIndex, out var typeValue))
                 {
-                    if (typeValue is StructAst structAst && !structAst.Verifying)
+                    if (typeValue is StructAst structAst)
                     {
-                        VerifyStruct(structAst);
+                        if (!structAst.Verifying)
+                        {
+                            VerifyStruct(structAst);
+                        }
                     }
-                    else if (typeValue is UnionAst union && !union.Verifying)
+                    else if (typeValue is UnionAst union)
                     {
-                        VerifyUnion(union);
+                        if (!union.Verifying)
+                        {
+                            VerifyUnion(union);
+                        }
                     }
-                    else if (typeValue is InterfaceAst interfaceAst && !interfaceAst.Verifying)
+                    else if (typeValue is InterfaceAst interfaceAst)
                     {
-                        VerifyInterface(interfaceAst);
+                        if (!interfaceAst.Verifying)
+                        {
+                            VerifyInterface(interfaceAst);
+                        }
                     }
                     return typeValue;
                 }
