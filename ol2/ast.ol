@@ -41,38 +41,36 @@ enum AstType {
 }
 
 struct Ast {
-    type: AstType;
+    ast_type: AstType;
     file_index: s32;
     line: u32;
     column: u32;
 }
 
-struct Type {
-    int FileIndex;
-    string Name;
-    string BackendName;
-    int TypeIndex;
-    TypeKind TypeKind;
-    uint Size;
-    uint Alignment;
-    bool Used;
-    bool Private;
+struct TypeAst : Ast {
+    name: string;
+    backend_name: string;
+    type_index: int;
+    type_kind: TypeKind;
+    size: u32;
+    alignment: u32;
+    used: bool;
+    private: bool;
 }
 
-struct Interface : Ast {
-    string Name;
-    IType ReturnType;
-    TypeDefinition ReturnTypeDefinition;
-    List<DeclarationAst> Arguments;
-    int ArgumentCount;
+struct Interface : TypeAst {
+    return_type: TypeAst*;
+    return_type_definition: TypeDefinition*;
+    arguments: Array<DeclarationAst*>;
+    argument_count: int;
 }
 
-interface IFunction : IInterface {
-    int ConstantCount;
-    int FunctionIndex;
-    FunctionFlags Flags;
-    List<string> Generics;
-    ScopeAst Body;
+struct Function : Interface {
+    constant_count: int;
+    function_index: int;
+    flags: FunctionFlags;
+    generics: Array<string>;
+    body: ScopeAst*;
 }
 
 [flags]
@@ -96,473 +94,332 @@ enum FunctionFlags {
 }
 
 struct Values : Ast {
-    IAst Value;
-    Dictionary<string, AssignmentAst> Assignments;
-    List<IAst> ArrayValues;
+    value: Ast*;
+    assignments: Dictionary<string, AssignmentAst*>;
+    array_values: Array<Ast*>;
 }
 
 struct Declaration : Values {
-    TypeDefinition TypeDefinition;
-    IType Type;
-    IType ArrayElementType;
+    type_definition: TypeDefinition*;
+    type: TypeAst*;
+    array_element_type: TypeAst*;
 }
 
-struct Scope {
-    IScope Parent;
-    IDictionary<string, IAst> Identifiers;
+struct Scope : Ast {
+    parent: Scope*;
+    identifiers: Dictionary<string, Ast*>;
 }
 
-struct GlobalScope : IScope {
-    IScope Parent; // This should never be set
-    IDictionary<string, IAst> Identifiers;
-    ConcurrentDictionary<string, List<FunctionAst>> Functions;
-    ConcurrentDictionary<string, IType> Types;
-    ConcurrentDictionary<string, StructAst> PolymorphicStructs;
-    ConcurrentDictionary<string, List<FunctionAst>> PolymorphicFunctions;
+struct GlobalScope : Scope {
+    functions: ConcurrentDictionary<string, Array<FunctionAst*>>;
+    types: ConcurrentDictionary<string, TypeAst*>;
+    polymorphic_structs: ConcurrentDictionary<string, StructAst*>;
+    polymorphic_functions: ConcurrentDictionary<string, Array<FunctionAst*>>;
 }
 
-struct PrivateScope : IScope {
-    IScope Parent;
-    IDictionary<string, IAst> Identifiers; = new Dictionary<string, IAst>();
-    Dictionary<string, List<FunctionAst>> Functions;
-    Dictionary<string, IType> Types;
-    Dictionary<string, StructAst> PolymorphicStructs;
-    Dictionary<string, List<FunctionAst>> PolymorphicFunctions;
+struct ScopeAst : Scope {
+    returns: bool;
+    children: Array<IAst>;
 }
 
-struct ScopeAst : IScope, IAst {
-    int FileIndex;
-    uint Line;
-    uint Column;
-    bool Returns;
-    IScope Parent;
-    IDictionary<string, IAst> Identifiers;
-    List<IAst> Children;
+struct FunctionAst : Function {
+    // TypeKind TypeKind; = TypeKind.Function;
+    extern_lib: string;
+    library_name: string;
+    library: Library*;
+    syscall: int;
+    params_element_type: TypeAst*;
+    attributes: Array<string>;
 }
 
-struct FunctionAst : IFunction, IType {
-    int FileIndex;
-    uint Line;
-    uint Column;
-    string Name;
-    string BackendName;
-    int TypeIndex;
-    TypeKind TypeKind; = TypeKind.Function;
-    int ConstantCount;
-    int FunctionIndex;
-    FunctionFlags Flags;
-    uint Size; // Will always be 0
-    uint Alignment; // Will always be 0
-    bool Used;
-    bool Private;
-    int ArgumentCount;
-    string ExternLib;
-    string LibraryName;
-    Library Library;
-    int Syscall;
-    IType ParamsElementType;
-    IType ReturnType;
-    TypeDefinition ReturnTypeDefinition;
-    List<string> Generics;
-    List<DeclarationAst> Arguments;
-    List<Type[]> VarargsCallTypes;
-    ScopeAst Body;
-    List<string> Attributes;
+struct StructAst : TypeAst {
+    attributes: Array<string>;
+    base_struct_name: string;
+    base_type_definition: TypeDefinition*;
+    base_struct: StructAst*;
+    verified: bool;
+    verifying: bool;
+    generics: Array<string>;
+    generic_types: Array<TypeAst*>;
+    fields: Array<StructFieldAst*>;
 }
 
-struct StructAst : IAst, IType {
-    int FileIndex;
-    uint Line;
-    uint Column;
-    string Name;
-    string BackendName;
-    int TypeIndex;
-    TypeKind TypeKind;
-    uint Size;
-    uint Alignment;
-    bool Used;
-    bool Private;
-    List<string> Attributes;
-    string BaseStructName;
-    TypeDefinition BaseTypeDefinition;
-    StructAst BaseStruct;
-    bool Verified;
-    bool Verifying;
-    List<string> Generics;
-    IType[] GenericTypes;
-    List<StructFieldAst> Fields;
+struct StructFieldAst : Declaration {
+    name: string;
+    offset: u32;
+    HasGenerics: bool;
+    attributes: Array<string>;
 }
 
-struct StructFieldAst : IDeclaration {
-    int FileIndex;
-    uint Line;
-    uint Column;
-    string Name;
-    uint Offset;
-    TypeDefinition TypeDefinition;
-    IType Type;
-    IType ArrayElementType;
-    bool HasGenerics;
-    IAst Value;
-    Dictionary<string, AssignmentAst> Assignments;
-    List<IAst> ArrayValues;
-    List<string> Attributes;
+struct StructFieldRefAst : Ast {
+    is_enum: bool;
+    is_constant: bool;
+    global_constant: bool;
+    constant_string_length: bool;
+    raw_constant_string: bool;
+    constant_index: int;
+    constant_value: int;
+    pointers: Array<bool>;
+    types: Array<TypeAst*>;
+    value_indices: Array<int>;
+    children: Array<Ast*>;
 }
 
-struct StructFieldRefAst : IAst {
-    bool IsEnum;
-    bool IsConstant;
-    bool GlobalConstant;
-    bool ConstantStringLength;
-    bool RawConstantString;
-    int ConstantIndex;
-    int ConstantValue;
-    bool[] Pointers;
-    IType[] Types;
-    int[] ValueIndices;
-    List<IAst> Children;
+struct EnumAst : TypeAst {
+    // TypeKind TypeKind; = TypeKind.Enum;
+    // uint Size; = 4;
+    // uint Alignment; = 4;
+    attributes: Array<string>;
+    base_type_definition: TypeDefinition*;
+    base_type: PrimitiveAst*;
+    values: Dictionary<string, EnumValueAst*>;
 }
 
-struct EnumAst : IAst, IType {
-    string Name;
-    string BackendName;
-    int TypeIndex;
-    TypeKind TypeKind; = TypeKind.Enum;
-    uint Size; = 4;
-    uint Alignment; = 4;
-    bool Used;
-    bool Private;
-    List<string> Attributes;
-    TypeDefinition BaseTypeDefinition;
-    PrimitiveAst BaseType;
-    Dictionary<string, EnumValueAst> Values;
+struct EnumValueAst : Ast {
+    index: int;
+    value: int;
+    name: string;
+    defined: bool;
 }
 
-struct EnumValueAst : IAst {
-    int Index;
-    string Name;
-    int Value;
-    bool Defined;
+struct PrimitiveAst : TypeAst {
+    signed: bool;
 }
 
-struct PrimitiveAst : IAst, IType {
-    string Name;
-    string BackendName;
-    int TypeIndex;
-    TypeKind TypeKind;
-    uint Size;
-    uint Alignment;
-    bool Used;
-    bool Private;
-    bool Signed;
+struct PointerType : TypeAst {
+    // TypeKind TypeKind; = TypeKind.Pointer;
+    // uint Size; = 8;
+    // uint Alignment; = 8;
+    pointed_type: TypeAst*;
 }
 
-struct PointerType : IType {
-    int FileIndex;
-    string Name;
-    string BackendName;
-    int TypeIndex;
-    TypeKind TypeKind; = TypeKind.Pointer;
-    uint Size; = 8;
-    uint Alignment; = 8;
-    bool Used;
-    bool Private;
-    IType PointedType;
+struct ArrayType : TypeAst {
+    // TypeKind TypeKind; = TypeKind.CArray;
+    length: u32;
+    element_type: TypeAst*;
 }
 
-struct ArrayType : IType {
-    int FileIndex;
-    string Name;
-    string BackendName;
-    int TypeIndex;
-    TypeKind TypeKind; = TypeKind.CArray;
-    uint Size;
-    uint Alignment;
-    bool Used;
-    bool Private;
-    uint Length;
-    IType ElementType;
+struct UnionAst : TypeAst {
+    // TypeKind TypeKind; = TypeKind.Union;
+    Verified: bool;
+    Verifying: bool;
+    fields: Array<UnionFieldAst*>;
 }
 
-struct UnionAst : IAst, IType {
-    string Name;
-    string BackendName;
-    int TypeIndex;
-    TypeKind TypeKind; = TypeKind.Union;
-    uint Size;
-    uint Alignment;
-    bool Used;
-    bool Private;
-    bool Verified;
-    bool Verifying;
-    List<UnionFieldAst> Fields;
+struct UnionFieldAst : Ast {
+    name: string;
+    type_definition: TypeDefinition*;
+    type: TypeAst*;
 }
 
-struct UnionFieldAst : IAst {
-    string Name;
-    TypeDefinition TypeDefinition;
-    IType Type;
+// @Note Since compound types cannot be set as struct types, the alignment doesn't matter
+struct CompoundType : TypeAst {
+    // TypeKind TypeKind; = TypeKind.Compound;
+    types: Array<TypeAst*>;
 }
 
-struct CompoundType : IType {
-    int FileIndex;
-    string Name;
-    string BackendName;
-    int TypeIndex;
-    TypeKind TypeKind; = TypeKind.Compound;
-    uint Size;
-    // @Note Since compound types cannot be set as struct types, the alignment doesn't matter
-    uint Alignment;
-    bool Used;
-    bool Private;
-    IType[] Types;
+struct ReturnAst : Ast {
+    value: Ast*;
 }
 
-struct ReturnAst : IAst {
-    IAst Value;
+struct ConstantAst : Ast {
+    type: TypeAst*;
+    value: Constant;
+    string: string;
 }
 
-struct ConstantAst : IAst {
-    string TypeName;
-    IType Type;
-    Constant Value;
-    string String;
+struct NullAst : Ast {
+    target_type: TypeAst*;
 }
 
-struct NullAst : IAst {
-    IType TargetType;
+struct IdentifierAst : Ast {
+    name: string;
+    baked_type: TypeAst*;
+    type_index := -1;
+    function_type_index := -1;
 }
 
-struct IdentifierAst : IAst {
-    string Name;
-    IType BakedType;
-    int? TypeIndex;
-    int? FunctionTypeIndex;
+struct ExpressionAst : Ast {
+    type: TypeAst*;
+    operators: Array<Operator>;
+    resulting_types: Array<TypeAst*>;
+    operator_overloads: Dictionary<int, OperatorOverloadAst>;
+    children: Array<Ast*>;
 }
 
-struct ExpressionAst : IAst {
-    IType Type;
-    List<Operator> Operators;
-    List<IType> ResultingTypes;
-    Dictionary<int, OperatorOverloadAst> OperatorOverloads;
-    List<IAst> Children;
+struct CompoundExpressionAst : Ast {
+    children: Array<Ast*>;
 }
 
-struct CompoundExpressionAst : IAst {
-    List<IAst> Children;
+struct ChangeByOneAst : Ast {
+    prefix: bool;
+    positive: bool;
+    value: Ast*;
+    type: TypeAst*;
 }
 
-struct ChangeByOneAst : IAst {
-    bool Prefix;
-    bool Positive;
-    IAst Value;
-    IType Type;
+struct UnaryAst : Ast {
+    op: UnaryOperator;
+    value: Ast*;
+    type: TypeAst*;
 }
 
-struct UnaryAst : IAst {
-    UnaryOperator Operator;
-    IAst Value;
-    IType Type;
+struct CallAst : Ast {
+    Name: string;
+    Function: FunctionAst*;
+    Interface: Interface*;
+    generices: Array<TypeDefinition*>;
+    specified_arguments: Dictionary<string, Ast*>;
+    arguments: Array<Ast*>;
+    type_info: TypeAst*;
+    inline: bool;
+    pass_array_to_params: bool;
 }
 
-struct CallAst : IAst {
-    string Name;
-    FunctionAst Function;
-    IInterface Interface;
-    int ExternIndex;
-    List<TypeDefinition> Generics;
-    Dictionary<string, IAst> SpecifiedArguments;
-    List<IAst> Arguments;
-    IType TypeInfo;
-    bool Inline;
-    bool PassArrayToParams;
+struct DeclarationAst : Declaration {
+    has_generics: bool;
+    constant: bool;
+    constant_index: int;
+    pointer_index: int;
 }
 
-struct DeclarationAst : IDeclaration {
-    int FileIndex;
-    uint Line;
-    uint Column;
-    string Name;
-    bool Global;
-    bool Private;
-    bool Verified;
-    TypeDefinition TypeDefinition;
-    IType Type;
-    IType ArrayElementType;
-    bool HasGenerics;
-    bool Constant;
-    int ConstantIndex;
-    int PointerIndex;
-    IAst Value;
-    Dictionary<string, AssignmentAst> Assignments;
-    List<IAst> ArrayValues;
+struct CompoundDeclarationAst : Declaration {
+    variables: Array<VariableAst*>;
+    has_generics: bool;
 }
 
-struct CompoundDeclarationAst : IDeclaration {
-    VariableAst[] Variables;
-    TypeDefinition TypeDefinition;
-    IType Type;
-    IType ArrayElementType;
-    bool HasGenerics;
-    IAst Value;
-    Dictionary<string, AssignmentAst> Assignments;
-    List<IAst> ArrayValues;
+struct AssignmentAst : Values {
+    reference: Ast*;
+    op: Operator;
 }
 
-struct AssignmentAst : IValues {
-    IAst Reference;
-    Operator Operator;
-    IAst Value;
-    Dictionary<string, AssignmentAst> Assignments;
-    List<IAst> ArrayValues;
+struct ConditionalAst : Ast {
+    condition: Ast*;
+    if_block: ScopeAst*;
+    else_block: ScopeAst*;
 }
 
-struct ConditionalAst : IAst {
-    IAst Condition;
-    ScopeAst IfBlock;
-    ScopeAst ElseBlock;
+struct WhileAst : Ast {
+    condition: Ast*;
+    body: ScopeAst*;
 }
 
-struct WhileAst : IAst {
-    IAst Condition;
-    ScopeAst Body;
+struct EachAst : Ast {
+    iteration_variable: VariableAst*;
+    index_variable: VariableAst*;
+    iteration: Ast*;
+    range_begin: Ast*;
+    range_end: Ast*;
+    body: ScopeAst*;
 }
 
-struct EachAst : IAst {
-    VariableAst IterationVariable;
-    VariableAst IndexVariable;
-    IAst Iteration;
-    IAst RangeBegin;
-    IAst RangeEnd;
-    ScopeAst Body;
+struct VariableAst : Ast {
+    name: string;
+    type: TypeAst*;
+    pointer_index: int;
 }
 
-struct VariableAst : IAst {
-    string Name;
-    IType Type;
-    int PointerIndex;
+struct IndexAst : Ast {
+    name: string;
+    calls_overload: bool;
+    overload: OperatorOverloadAst*;
+    index: Ast*;
 }
 
-struct IndexAst : IAst {
-    string Name;
-    bool CallsOverload;
-    OperatorOverloadAst Overload;
-    IAst Index;
-}
-
-struct CompilerDirectiveAst : IAst {
-    DirectiveType Type;
-    IAst Value;
-    Import Import;
-    Library Library;
+struct CompilerDirectiveAst : Ast {
+    directive_type: DirectiveType;
+    value: Ast*;
+    import: Import*;
+    library: Library*;
 }
 
 struct Import {
-    string Name;
-    string Path;
+    name: string;
+    path: string;
 }
 
 struct Library {
-    string Name;
-    string Path;
-    string AbsolutePath;
-    string FileName;
-    string LibPath;
-    bool HasLib;
-    bool HasDll;
+    name: string;
+    path: string;
+    absolute_path: string;
+    file_name: string;
+    lib_path: string;
+    has_lib: bool;
+    has_dll: bool;
 }
 
-struct CastAst : IAst {
-    TypeDefinition TargetTypeDefinition;
-    IType TargetType;
-    bool HasGenerics;
-    IAst Value;
+struct CastAst : Ast {
+    target_type_definition: TypeDefinition*;
+    target_type: TypeAst*;
+    has_generics: bool;
+    value: Ast*;
 }
 
-struct OperatorOverloadAst : IFunction {
-    int FileIndex;
-    uint Line;
-    uint Column;
-    string Name;
-    int ConstantCount;
-    int FunctionIndex;
-    FunctionFlags Flags;
-    Operator Operator;
-    TypeDefinition Type;
-    IType ReturnType;
-    TypeDefinition ReturnTypeDefinition;
-    List<string> Generics;
-    List<DeclarationAst> Arguments;
-    int ArgumentCount; = 2;
-    ScopeAst Body;
+struct OperatorOverloadAst : Function {
+    op: Operator;
+    type: TypeDefinition*;
 }
 
-struct InterfaceAst : IInterface, IType {
-    int FileIndex;
-    uint Line;
-    uint Column;
-    string Name;
-    string BackendName;
-    int TypeIndex;
-    TypeKind TypeKind; = TypeKind.Interface;
-    uint Size; = 8;
-    uint Alignment; = 8;
-    bool Used;
-    bool Private;
-    bool Verified;
-    bool Verifying;
-    IType ReturnType;
-    TypeDefinition ReturnTypeDefinition;
-    List<DeclarationAst> Arguments;
-    int ArgumentCount;
+struct InterfaceAst : Interface {
+    // TypeKind TypeKind; = TypeKind.Interface;
+    // uint Size; = 8;
+    // uint Alignment; = 8;
+    verified: bool;
+    verifying: bool;
 }
 
-struct AssemblyAst : IAst {
-    List<AssemblyInstructionAst> Instructions;
-    Dictionary<string, AssemblyInputAst> InRegisters;
-    List<AssemblyInputAst> OutValues;
-    bool FindStagingInputRegister;
-    Byte[] AssemblyBytes;
+struct AssemblyAst : Ast {
+    instructions: Array<AssemblyInstructionAst*>;
+    in_registers: Dictionary<string, AssemblyInputAst*>;
+    out_values: Array<AssemblyInputAst*>;
+    find_staging_input_register: bool;
+    assembly_bytes: Array<u8>;
 }
 
-struct AssemblyInputAst : IAst {
-    string Register;
-    RegisterDefinition RegisterDefinition;
-    IAst Ast;
-    bool GetPointer;
-    InstructionValue Value;
+struct AssemblyInputAst : Ast {
+    register: string;
+    register_definition: RegisterDefinition*;
+    ast: Ast*;
+    get_pointer: bool;
+    value: InstructionValue*;
 }
 
-struct AssemblyInstructionAst : IAst {
-    string Instruction;
-    AssemblyValueAst Value1;
-    AssemblyValueAst Value2;
-    InstructionDefinition Definition;
+struct AssemblyInstructionAst : Ast {
+    instruction: string;
+    value1: AssemblyValueAst*;
+    value2: AssemblyValueAst*;
+    definition: InstructionDefinition*;
 }
 
-struct AssemblyValueAst : IAst {
-    bool Dereference;
-    string Register;
-    RegisterDefinition RegisterDefinition;
-    ConstantAst Constant;
+struct AssemblyValueAst : Ast {
+    dereference: bool;
+    register: string;
+    register_definition: RegisterDefinition*;
+    constant: ConstantAst*;
 }
 
-struct SwitchAst : IAst {
-    IAst Value;
-    List<(List<IAst>, ScopeAst)> Cases;
-    ScopeAst DefaultCase;
+struct SwitchAst : Ast {
+    value: Ast*;
+    cases: Array<SwitchCases>;
+    default_case: ScopeAst*;
 }
 
-struct TypeDefinition : IAst {
-    string Name;
-    bool IsGeneric;
-    bool Compound;
-    int GenericIndex;
-    int TypeIndex;
-    List<TypeDefinition> Generics;
-    IAst Count;
-    uint? ConstCount;
-    IType BakedType;
+struct SwitchCases {
+    case_ast: Ast*;
+    cases: Array<Ast*>;
+    body: ScopeAst*;
+}
+
+struct TypeDefinition : Ast {
+    name: string;
+    is_generic: bool;
+    compound: bool;
+    generic_index: int;
+    type_index: int;
+    generics: Array<TypeDefinition*>;
+    count: Ast*;
+    const_count := -1;
+    baked_type: TypeAst*;
 }
 
 enum Operator {

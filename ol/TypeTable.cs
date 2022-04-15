@@ -37,8 +37,49 @@ public unsafe static class TypeTable
         {
             type.TypeIndex = Count++;
             Types.Add(type);
-            // Set a temporary value of null before the type data is fully determined
-            TypeInfos.Add(IntPtr.Zero);
+
+            var typeInfoPointer = IntPtr.Zero;
+            switch (type.TypeKind)
+            {
+                case TypeKind.Void:
+                case TypeKind.Boolean:
+                case TypeKind.Type:
+                case TypeKind.Float:
+                    typeInfoPointer = Allocator.Allocate(TypeInfoSize);
+                    break;
+                case TypeKind.Integer:
+                    typeInfoPointer = Allocator.Allocate(IntegerTypeInfoSize);
+                    break;
+                case TypeKind.Pointer:
+                    typeInfoPointer = Allocator.Allocate(PointerTypeInfoSize);
+                    break;
+                case TypeKind.CArray:
+                    typeInfoPointer = Allocator.Allocate(CArrayTypeInfoSize);
+                    break;
+                case TypeKind.Enum:
+                    typeInfoPointer = Allocator.Allocate(EnumTypeInfoSize);
+                    break;
+                case TypeKind.String:
+                case TypeKind.Array:
+                case TypeKind.Struct:
+                case TypeKind.Any:
+                    typeInfoPointer = Allocator.Allocate(StructTypeInfoSize);
+                    break;
+                case TypeKind.Compound:
+                    typeInfoPointer = Allocator.Allocate(CompoundTypeInfoSize);
+                    break;
+                case TypeKind.Union:
+                    typeInfoPointer = Allocator.Allocate(UnionTypeInfoSize);
+                    break;
+                case TypeKind.Interface:
+                    typeInfoPointer = Allocator.Allocate(InterfaceTypeInfoSize);
+                    break;
+                case TypeKind.Function:
+                    typeInfoPointer = Allocator.Allocate(FunctionTypeInfoSize);
+                    break;
+            }
+
+            TypeInfos.Add(typeInfoPointer);
         }
     }
 
@@ -204,7 +245,7 @@ public unsafe static class TypeTable
     {
         if (ErrorReporter.Errors.Count > 0) return;
 
-        var typeInfoPointer = IntPtr.Zero;
+        var typeInfoPointer = TypeInfos[type.TypeIndex];
         var name = Allocator.MakeString(type.Name);
 
         switch (type.TypeKind)
@@ -213,30 +254,25 @@ public unsafe static class TypeTable
             case TypeKind.Boolean:
             case TypeKind.Type:
             case TypeKind.Float:
-                typeInfoPointer = Allocator.Allocate(TypeInfoSize);
                 var typeInfo = new TypeInfo {Name = name, Type = type.TypeKind, Size = type.Size};
                 Marshal.StructureToPtr(typeInfo, typeInfoPointer, false);
                 break;
             case TypeKind.Integer:
-                typeInfoPointer = Allocator.Allocate(IntegerTypeInfoSize);
                 var integerType = (PrimitiveAst)type;
                 var integerTypeInfo = new IntegerTypeInfo {Name = name, Type = TypeKind.Integer, Size = type.Size, Signed = integerType.Signed};
                 Marshal.StructureToPtr(integerTypeInfo, typeInfoPointer, false);
                 break;
             case TypeKind.Pointer:
-                typeInfoPointer = Allocator.Allocate(PointerTypeInfoSize);
                 var pointerType = (PointerType)type;
                 var pointerTypeInfo = new PointerTypeInfo {Name = name, Type = TypeKind.Pointer, PointerType = TypeInfos[pointerType.PointedType.TypeIndex]};
                 Marshal.StructureToPtr(pointerTypeInfo, typeInfoPointer, false);
                 break;
             case TypeKind.CArray:
-                typeInfoPointer = Allocator.Allocate(CArrayTypeInfoSize);
                 var arrayType = (ArrayType)type;
                 var arrayTypeInfo = new CArrayTypeInfo {Name = name, Type = TypeKind.CArray, Size = type.Size, ElementType = TypeInfos[arrayType.ElementType.TypeIndex]};
                 Marshal.StructureToPtr(arrayTypeInfo, typeInfoPointer, false);
                 break;
             case TypeKind.Enum:
-                typeInfoPointer = Allocator.Allocate(EnumTypeInfoSize);
                 var enumType = (EnumAst)type;
                 var enumTypeInfo = new EnumTypeInfo {Name = name, Type = TypeKind.Enum, Size = type.Size, BaseType = TypeInfos[enumType.BaseType.TypeIndex]};
 
@@ -282,7 +318,6 @@ public unsafe static class TypeTable
             case TypeKind.Array:
             case TypeKind.Struct:
             case TypeKind.Any:
-                typeInfoPointer = Allocator.Allocate(StructTypeInfoSize);
                 var structType = (StructAst)type;
                 var structTypeInfo = new StructTypeInfo {Name = name, Type = type.TypeKind, Size = type.Size};
 
@@ -349,7 +384,6 @@ public unsafe static class TypeTable
                 Marshal.StructureToPtr(structTypeInfo, typeInfoPointer, false);
                 break;
             case TypeKind.Compound:
-                typeInfoPointer = Allocator.Allocate(CompoundTypeInfoSize);
                 var compoundType = (CompoundType)type;
                 var compoundTypeInfo = new CompoundTypeInfo {Name = name, Type = TypeKind.Compound, Size = type.Size};
 
@@ -373,7 +407,6 @@ public unsafe static class TypeTable
                 Marshal.StructureToPtr(compoundTypeInfo, typeInfoPointer, false);
                 break;
             case TypeKind.Union:
-                typeInfoPointer = Allocator.Allocate(UnionTypeInfoSize);
                 var union = (UnionAst)type;
                 var unionTypeInfo = new UnionTypeInfo {Name = name, Type = TypeKind.Union, Size = type.Size};
 
@@ -397,7 +430,6 @@ public unsafe static class TypeTable
                 Marshal.StructureToPtr(unionTypeInfo, typeInfoPointer, false);
                 break;
             case TypeKind.Interface:
-                typeInfoPointer = Allocator.Allocate(InterfaceTypeInfoSize);
                 var interfaceAst = (InterfaceAst)type;
                 var interfaceTypeInfo = new InterfaceTypeInfo {Name = name, Type = TypeKind.Interface, ReturnType = TypeInfos[interfaceAst.ReturnType.TypeIndex]};
 
@@ -425,7 +457,6 @@ public unsafe static class TypeTable
                 Marshal.StructureToPtr(interfaceTypeInfo, typeInfoPointer, false);
                 break;
             case TypeKind.Function:
-                typeInfoPointer = Allocator.Allocate(FunctionTypeInfoSize);
                 var function = (FunctionAst)type;
                 var functionTypeInfo = new FunctionTypeInfo {Name = name, Type = TypeKind.Function};
                 functionTypeInfo.ReturnType = TypeInfos[function.ReturnType.TypeIndex];
@@ -474,7 +505,5 @@ public unsafe static class TypeTable
                 Marshal.StructureToPtr(functionTypeInfo, typeInfoPointer, false);
                 break;
         }
-
-        TypeInfos[type.TypeIndex] = typeInfoPointer;
     }
 }
