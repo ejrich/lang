@@ -4287,9 +4287,9 @@ public static class TypeChecker
                 var genericsError = false;
                 for (var index = 0; index < call.Generics.Count; index++)
                 {
-                    var generic = call.Generics[i];
-                    genericTypes[i] = VerifyType(generic, scope);
-                    if (genericTypes[i] == null)
+                    var generic = call.Generics[index];
+                    genericTypes[index] = VerifyType(generic, scope);
+                    if (genericTypes[index] == null)
                     {
                         genericsError = true;
                         ErrorReporter.Report($"Undefined type '{PrintTypeDefinition(generic)}' in generic function call", generic);
