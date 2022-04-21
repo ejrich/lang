@@ -82,7 +82,7 @@ queue_file_if_not_exists(string file) {
 
     file_index := file_names.length;
     array_insert(&file_names, file, allocate, reallocate);
-    // TypeChecker.PrivateScopes.Add(null);
+    // TypeChecker.privateScopes.Add(null);
 
     data := new<ParseData>();
     data.file = file;
@@ -184,7 +184,7 @@ parse_file(void* data) {
                         }
                     }
                     else {
-                        struct_ast.backend_name = structAst.name;
+                        struct_ast.backend_name = struct_ast.name;
                         if add_struct(struct_ast) {
                             if struct_ast.name == "string" {
                                 string_type = struct_ast;
@@ -248,7 +248,7 @@ parse_file(void* data) {
                 interface_ast := parse_interface(&enumerator);
                 if interface_ast != null && !string_is_empty(interface_ast.name) {
                     add_interface(interface_ast);
-                    add(&asts, interfaceAst);
+                    add(&asts, interface_ast);
                 }
             }
             default;
@@ -273,7 +273,7 @@ Array<string> parse_attributes(TokenEnumerator* enumerator) {
                 if (comma_required)
                     report_error("Expected comma between attributes", enumerator.file_index, token);
 
-                attributes.Add(token.Value);
+                attributes.Add(token.value);
                 comma_required = true;
             }
             case TokenType.Comma; {
@@ -299,10 +299,10 @@ Ast* parse_top_level_ast(TokenEnumerator* enumerator) {
     attributes := parse_attributes(enumerator);
 
     token := enumerator.current;
-    switch token.Type {
+    switch token.type {
         case TokenType.Identifier; {
             if peek(enumerator, &token) {
-                if token.Type == TokenType.Colon {
+                if token.type == TokenType.Colon {
                     if attributes.length
                         report_error("Global variables cannot have attributes", enumerator.file_index, token);
 
@@ -327,10 +327,10 @@ Ast* parse_top_level_ast(TokenEnumerator* enumerator) {
             if attributes.length
                 report_error("Compiler directives cannot have attributes", enumerator.file_index, token);
 
-            return parse_top_level_directive(enumerator, directory);
+            return parse_top_level_directive(enumerator);
         }
         case TokenType.Operator; {
-            if (attributes != null)
+            if attributes.length
                 report_error("Operator overloads cannot have attributes", enumerator.file_index, token);
 
             return parse_operator_overload(enumerator);
@@ -350,9 +350,9 @@ Ast* parse_top_level_ast(TokenEnumerator* enumerator) {
 
 FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attributes) {
     // 1. Determine return type and name of the function
-    function := create_ast<FunctionAst>(enumerator);
-    function.Attributes = attributes;
-    function.Private = enumerator.Private;
+    function := create_ast<FunctionAst>(enumerator, AstType.Function);
+    function.attributes = attributes;
+    function.private = enumerator.private;
 
     // 1a. Check if the return type is void
     token: Token;
@@ -369,16 +369,16 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
     // 1b. Handle multiple return values
     if enumerator.current.type == TokenType.Comma
     {
-        returnType := create_ast<TypeDefinition>(function.return_type_definition);
-        returnType.Compound = true;
-        returnType.Generics.Add(function.return_type_definition);
+        returnType := create_ast<TypeDefinition>(function.return_type_definition, AstType.TypeDefinition);
+        returnType.compound = true;
+        returnType.generics.Add(function.return_type_definition);
         function.return_type_definition = returnType;
 
-        while enumerator.Current.Type == TokenType.Comma {
+        while enumerator.current.type == TokenType.Comma {
             if !move_next(enumerator)
                 break;
 
-            returnType.Generics.Add(parse_type(enumerator));
+            returnType.generics.Add(parse_type(enumerator));
             move_next(enumerator);
         }
     }
@@ -391,213 +391,197 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
 
     switch enumerator.current.type {
         case TokenType.Identifier; {
-            function.Name = enumerator.Current.Value;
+            function.name = enumerator.current.value;
             move_next(enumerator);
         }
         case TokenType.OpenParen; {
-            if (function.return_type_definition.Name == "*" || function.return_type_definition.Count != null)
-            {
+            if function.return_type_definition.name == "*" || function.return_type_definition.count != null {
                 report_error("Expected the function name to be declared", function.return_type_definition);
             }
-            else
-            {
-                function.Name = function.return_type_definition.Name;
-                each generic in function.return_type_definition.Generics {
-                    if (generic.Generics.Any())
-                    {
+            else {
+                function.name = function.return_type_definition.name;
+                each generic in function.return_type_definition.generics {
+                    if generic.generics.length
                         report_error("Invalid generic in function '{function.Name}'", generic);
-                    }
-                    else if (function.Generics.Contains(generic.Name))
-                    {
-                        report_error("Duplicate generic '{generic.Name}' in function '{function.Name}'", generic.file_index, generic.Line, generic.Column);
-                    }
+                    else if function.generics.contains(generic.name)
+                        report_error("Duplicate generic '{generic.Name}' in function '{function.Name}'", generic.file_index, generic.line, generic.column);
                     else
-                    {
-                        function.Generics.Add(generic.Name);
-                    }
+                        function.generics.Add(generic.name);
                 }
                 function.return_type_definition = null;
             }
         }
         default; {
-            report_error("Expected the function name to be declared", enumerator.file_index, enumerator.Current);
+            report_error("Expected the function name to be declared", enumerator.file_index, enumerator.current);
             move_next(enumerator);
         }
     }
 
     // 2. Parse generics
-    if enumerator.Current.Type == TokenType.LessThan {
-        commaRequiredBeforeNextType := false;
+    if enumerator.current.type == TokenType.LessThan {
+        comma_required_before_next_type := false;
         // var generics = new HashSet<string>();
         while move_next(enumerator) {
-            token = enumerator.Current;
+            token = enumerator.current;
 
             if token.type == TokenType.GreaterThan {
-                if !commaRequiredBeforeNextType
+                if !comma_required_before_next_type
                     report_error("Expected comma in generics of function '{function.Name}'", enumerator.file_index, token);
 
                 break;
             }
 
-            if !commaRequiredBeforeNextType {
+            if !comma_required_before_next_type {
                 if token.type == TokenType.Identifier {
                     if !generics.Add(token.value)
-                        report_error("Duplicate generic '{token.Value}' in function '{function.Name}'", enumerator.file_index, token);
+                        report_error("Duplicate generic '{token.value}' in function '{function.Name}'", enumerator.file_index, token);
                 }
                 else
-                    report_error("Unexpected token '{token.Value}' in generics of function '{function.Name}'", enumerator.file_index, token);
+                    report_error("Unexpected token '{token.value}' in generics of function '{function.Name}'", enumerator.file_index, token);
 
-                commaRequiredBeforeNextType = true;
+                comma_required_before_next_type = true;
             }
             else {
                 if token.type != TokenType.Comma
-                    report_error("Unexpected token '{token.Value}' in function '{function.Name}'", enumerator.file_index, token);
+                    report_error("Unexpected token '{token.value}' in function '{function.Name}'", enumerator.file_index, token);
 
-                commaRequiredBeforeNextType = false;
+                comma_required_before_next_type = false;
             }
         }
 
-        if (!generics.Any())
-        {
-            report_error("Expected function to contain generics", enumerator.file_index, enumerator.Current);
-        }
+        if generics.length == 0
+            report_error("Expected function to contain generics", enumerator.file_index, enumerator.current);
+
         move_next(enumerator);
-        function.Generics.AddRange(generics);
+        function.generics.AddRange(generics);
     }
 
     // 3. Search for generics in the function return type
     if (function.return_type_definition != null) {
-        each generic, i in function.Generics {
+        each generic, i in function.generics {
             if search_for_generic(generic, i, function.return_type_definition) {
-                function.Flags |= FunctionFlags.ReturnTypeHasGenerics;
+                function.flags |= FunctionFlags.ReturnTypeHasGenerics;
             }
         }
     }
 
     // 4. Find open paren to start parsing arguments
-    if (enumerator.Current.Type != TokenType.OpenParen)
+    if (enumerator.current.type != TokenType.OpenParen)
     {
         // Add an error to the function AST and continue until open paren
-        token = enumerator.Current;
-        report_error("Unexpected token '{token.Value}' in function definition", enumerator.file_index, token);
-        while (enumerator.Remaining && enumerator.Current.Type != TokenType.OpenParen)
+        token = enumerator.current;
+        report_error("Unexpected token '{token.value}' in function definition", enumerator.file_index, token);
+        while (enumerator.remaining && enumerator.current.type != TokenType.OpenParen)
             move_next(enumerator);
     }
 
     // 5. Parse arguments until a close paren
-    commaRequiredBeforeNextArgument := false;
-    currentArgument: DeclarationAst*;
+    comma_required_before_next_argument := false;
+    current_argument: DeclarationAst*;
     while move_next(enumerator) {
-        token = enumerator.Current;
+        token = enumerator.current;
 
         switch token.type {
             case TokenType.CloseParen; {
-                if commaRequiredBeforeNextArgument {
-                    function.Arguments.Add(currentArgument);
-                    currentArgument = null;
+                if comma_required_before_next_argument {
+                    function.arguments.Add(current_argument);
+                    current_argument = null;
                 }
                 break;
             }
             case TokenType.Identifier;
             case TokenType.VarArgs;
-                if commaRequiredBeforeNextArgument {
+                if comma_required_before_next_argument {
                     report_error("Comma required after declaring an argument", enumerator.file_index, token);
                 }
-                else if (currentArgument == null)
-                {
-                    currentArgument = create_ast<DeclarationAst>(token, enumerator.file_index);
-                    currentArgument.TypeDefinition = parse_type(enumerator, argument = true);
-                    each generic, i in function.Generics {
-                        if search_for_generic(generic, i, currentArgument.TypeDefinition) {
-                            currentArgument.HasGenerics = true;
+                else if current_argument == null {
+                    current_argument = create_ast<DeclarationAst>(token, enumerator.file_index, AstType.Declaration);
+                    current_argument.type_definition = parse_type(enumerator, argument = true);
+                    each generic, i in function.generics {
+                        if search_for_generic(generic, i, current_argument.type_definition) {
+                            current_argument.has_generics = true;
                         }
                     }
                 }
-                else
-                {
-                    currentArgument.Name = token.Value;
-                    commaRequiredBeforeNextArgument = true;
+                else {
+                    current_argument.name = token.value;
+                    comma_required_before_next_argument = true;
                 }
             case TokenType.Comma; {
-                if (commaRequiredBeforeNextArgument)
-                {
-                    function.Arguments.Add(currentArgument);
-                }
+                if comma_required_before_next_argument
+                    function.arguments.Add(current_argument);
                 else
-                {
                     report_error("Unexpected comma in arguments", enumerator.file_index, token);
-                }
-                currentArgument = null;
-                commaRequiredBeforeNextArgument = false;
+
+                current_argument = null;
+                comma_required_before_next_argument = false;
             }
             case TokenType.Equals; {
-                if (commaRequiredBeforeNextArgument)
-                {
+                if comma_required_before_next_argument {
                     move_next(enumerator);
-                    currentArgument.Value = ParseExpression(enumerator, function, null, TokenType.Comma, TokenType.CloseParen);
-                    if (!enumerator.Remaining)
-                    {
-                        report_error("Incomplete definition for function '{function.Name}'", enumerator.file_index, enumerator.Last);
+                    current_argument.value = parse_expression(enumerator, function, null, TokenType.Comma, TokenType.CloseParen);
+                    if !enumerator.remaining {
+                        report_error("Incomplete definition for function '{function.Name}'", enumerator.file_index, enumerator.last);
                         return null;
                     }
 
                     switch enumerator.current.type {
                         case TokenType.Comma; {
-                            commaRequiredBeforeNextArgument = false;
-                            function.Arguments.Add(currentArgument);
-                            currentArgument = null;
+                            comma_required_before_next_argument = false;
+                            function.arguments.Add(current_argument);
+                            current_argument = null;
                         }
                         case TokenType.CloseParen; {
-                            function.Arguments.Add(currentArgument);
-                            currentArgument = null;
+                            function.arguments.Add(current_argument);
+                            current_argument = null;
                         }
                         default;
-                            report_error("Unexpected token '{enumerator.Current.Value}' in arguments of function '{function.Name}'", enumerator.file_index, enumerator.Current);
+                            report_error("Unexpected token '{enumerator.current.value}' in arguments of function '{function.Name}'", enumerator.file_index, enumerator.current);
                     }
                 }
                 else
                     report_error("Unexpected comma in arguments", enumerator.file_index, token);
             }
             default;
-                report_error("Unexpected token '{token.Value}' in arguments", enumerator.file_index, token);
+                report_error("Unexpected token '{token.value}' in arguments", enumerator.file_index, token);
         }
 
         if enumerator.current.type == TokenType.CloseParen
             break;
     }
 
-    if currentArgument
-        report_error("Incomplete function argument in function '{function.Name}'", enumerator.file_index, enumerator.Current);
+    if current_argument
+        report_error("Incomplete function argument in function '{function.Name}'", enumerator.file_index, enumerator.current);
 
-    if !commaRequiredBeforeNextArgument && function.Arguments.Any()
-        report_error("Unexpected comma in arguments", enumerator.file_index, enumerator.Current);
+    if !comma_required_before_next_argument && function.arguments.length > 0
+        report_error("Unexpected comma in arguments", enumerator.file_index, enumerator.current);
 
     if !move_next(enumerator) {
-        report_error("Unexpected function body or compiler directive", enumerator.file_index, enumerator.Last);
+        report_error("Unexpected function body or compiler directive", enumerator.file_index, enumerator.last);
         return null;
     }
 
     // 6. Handle compiler directives
     while enumerator.current.type == TokenType.Pound {
         if !move_next(enumerator) {
-            report_error("Expected compiler directive value", enumerator.file_index, enumerator.Last);
+            report_error("Expected compiler directive value", enumerator.file_index, enumerator.last);
             return null;
         }
 
         switch enumerator.current.value {
             case "extern"; {
-                function.Flags |= FunctionFlags.Extern;
+                function.flags |= FunctionFlags.Extern;
                 externError := "Extern function definition should be followed by the library in use"; #const
                 if !peek(enumerator, &token) {
                     report_error(externError, enumerator.file_index, token);
                 }
                 else if token.type == TokenType.Literal {
                     move_next(enumerator);
-                    function.ExternLib = token.Value;
+                    function.extern_lib = token.value;
                 }
                 else if token.type == TokenType.Identifier {
                     move_next(enumerator);
-                    function.LibraryName = token.Value;
+                    function.library_name = token.value;
                 }
                 else
                     report_error(externError, enumerator.file_index, token);
@@ -605,72 +589,72 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
                 return function;
             }
             case "compiler"; {
-                function.Flags |= FunctionFlags.Compiler;
+                function.flags |= FunctionFlags.Compiler;
                 return function;
             }
             case "syscall"; {
-                function.Flags |= FunctionFlags.Syscall;
-                syscallError := "Syscall function definition should be followed by the number for the system call"; #const
+                function.flags |= FunctionFlags.Syscall;
+                syscall_error := "Syscall function definition should be followed by the number for the system call"; #const
                 if !peek(enumerator, &token) {
-                    report_error(syscallError, enumerator.file_index, token);
+                    report_error(syscall_error, enumerator.file_index, token);
                 }
                 else if token.type == TokenType.Number {
                     move_next(enumerator);
                     value: int;
-                    if (token.Flags == TokenFlags.None && int.TryParse(token.value, &value)) {
-                        function.Syscall = value;
+                    if token.flags == TokenFlags.None && int.TryParse(token.value, &value) {
+                        function.syscall = value;
                     }
-                    else report_error(syscallError, enumerator.file_index, token);
+                    else report_error(syscall_error, enumerator.file_index, token);
                 }
-                else report_error(syscallError, enumerator.file_index, token);
+                else report_error(syscall_error, enumerator.file_index, token);
 
                 return function;
             }
             case "print_ir";
-                function.Flags |= FunctionFlags.PrintIR;
+                function.flags |= FunctionFlags.PrintIR;
             case "call_location";
-                function.Flags |= FunctionFlags.PassCallLocation;
+                function.flags |= FunctionFlags.PassCallLocation;
             case "inline";
-                function.Flags |= FunctionFlags.Inline;
+                function.flags |= FunctionFlags.Inline;
             default;
-                report_error("Unexpected compiler directive '{enumerator.Current.Value}'", enumerator.file_index, enumerator.Current);
+                report_error("Unexpected compiler directive '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
         }
         move_next(enumerator);
     }
 
     // 7. Find open brace to start parsing body
-    if (enumerator.Current.Type != TokenType.OpenBrace)
+    if (enumerator.current.type != TokenType.OpenBrace)
     {
         // Add an error and continue until open paren
-        token = enumerator.Current;
-        report_error("Unexpected token '{token.Value}' in function definition", enumerator.file_index, token);
+        token = enumerator.current;
+        report_error("Unexpected token '{token.value}' in function definition", enumerator.file_index, token);
         while move_next(enumerator) && enumerator.current.type != TokenType.OpenBrace {}
 
-        if !enumerator.Remaining
+        if !enumerator.remaining
             return function;
     }
 
     // 8. Parse function body
-    function.Body = parse_scope(enumerator, function);
+    function.body = parse_scope(enumerator, function);
 
     return function;
 }
 
 StructAst* parse_struct(TokenEnumerator* enumerator, Array<string> attributes) {
-    structAst := create_ast<StructAst>(enumerator);
-    structAst.Attributes = attributes;
-    structAst.Private = enumerator.Private;
+    struct_ast := create_ast<StructAst>(enumerator, AstType.Struct);
+    struct_ast.attributes = attributes;
+    struct_ast.private = enumerator.private;
 
     // 1. Determine name of struct
     if !move_next(enumerator) {
-        report_error("Expected struct to have name", enumerator.file_index, enumerator.Last);
+        report_error("Expected struct to have name", enumerator.file_index, enumerator.last);
         return null;
     }
 
     if enumerator.current.type == TokenType.Identifier
-        structAst.Name = enumerator.Current.Value;
+        struct_ast.name = enumerator.current.value;
     else
-        report_error("Unexpected token '{enumerator.Current.Value}' in struct definition", enumerator.file_index, enumerator.Current);
+        report_error("Unexpected token '{enumerator.current.value}' in struct definition", enumerator.file_index, enumerator.current);
 
     // 2. Parse struct generics
     token: Token;
@@ -682,101 +666,101 @@ StructAst* parse_struct(TokenEnumerator* enumerator, Array<string> attributes) {
     if token.type == TokenType.LessThan {
         // Clear the '<' before entering loop
         move_next(enumerator);
-        commaRequiredBeforeNextType := false;
+        comma_required_before_next_type := false;
         // var generics = new HashSet<string>();
         while move_next(enumerator) {
-            token = enumerator.Current;
+            token = enumerator.current;
 
             if token.type == TokenType.GreaterThan {
-                if !commaRequiredBeforeNextType
-                    report_error("Expected comma in generics for struct '{structAst.Name}'", enumerator.file_index, token);
+                if !comma_required_before_next_type
+                    report_error("Expected comma in generics for struct '{struct_ast.Name}'", enumerator.file_index, token);
 
                 break;
             }
 
-            if !commaRequiredBeforeNextType {
-                if token.Type == TokenType.Identifier {
-                    if !generics.Add(token.Value) {
-                        report_error("Duplicate generic '{token.Value}' in struct '{structAst.Name}'", enumerator.file_index, token);
+            if !comma_required_before_next_type {
+                if token.type == TokenType.Identifier {
+                    if !generics.Add(token.value) {
+                        report_error("Duplicate generic '{token.value}' in struct '{struct_ast.Name}'", enumerator.file_index, token);
                     }
                 }
-                else report_error("Unexpected token '{token.Value}' in generics for struct '{structAst.Name}'", enumerator.file_index, token);
+                else report_error("Unexpected token '{token.value}' in generics for struct '{struct_ast.Name}'", enumerator.file_index, token);
 
-                commaRequiredBeforeNextType = true;
+                comma_required_before_next_type = true;
             }
             else {
                 if token.type != TokenType.Comma
-                    report_error("Unexpected token '{token.Value}' in definition of struct '{structAst.Name}'", enumerator.file_index, token);
+                    report_error("Unexpected token '{token.value}' in definition of struct '{struct_ast.Name}'", enumerator.file_index, token);
 
-                commaRequiredBeforeNextType = false;
+                comma_required_before_next_type = false;
             }
         }
 
         if !generics.Any()
-            report_error("Expected struct '{structAst.Name}' to contain generics", enumerator.file_index, enumerator.Current);
+            report_error("Expected struct '{struct_ast.Name}' to contain generics", enumerator.file_index, enumerator.current);
 
-        structAst.Generics = generics.ToList();
+        struct_ast.generics = generics.ToList();
     }
 
     // 3. Get any inherited structs
     move_next(enumerator);
     if enumerator.current.type == TokenType.Colon {
         move_next(enumerator);
-        structAst.BaseTypeDefinition = parse_type(enumerator);
+        struct_ast.base_type_definition = parse_type(enumerator);
         move_next(enumerator);
     }
 
     // 4. Parse over the open brace
     if enumerator.current.type != TokenType.OpenBrace {
-        report_error("Expected '{' token in struct definition", enumerator.file_index, enumerator.Current);
+        report_error("Expected '{' token in struct definition", enumerator.file_index, enumerator.current);
         while move_next(enumerator) && enumerator.current.type != TokenType.OpenBrace {}
     }
 
     // 5. Iterate through fields
     while move_next(enumerator) {
-        if enumerator.Current.Type == TokenType.CloseBrace
+        if enumerator.current.type == TokenType.CloseBrace
             break;
 
-        structAst.Fields.Add(parse_struct_field(enumerator));
+        struct_ast.fields.Add(parse_struct_field(enumerator));
     }
 
     // 6. Mark field types as generic if necessary
-    if structAst.generics.length {
-        each generic, i in structAst.generics {
-            each field in structAst.fields {
-                if field.TypeDefinition != null && search_for_generic(generic, i, field.TypeDefinition) {
-                    field.HasGenerics = true;
+    if struct_ast.generics.length {
+        each generic, i in struct_ast.generics {
+            each field in struct_ast.fields {
+                if field.type_definition != null && search_for_generic(generic, i, field.type_definition) {
+                    field.has_generics = true;
                 }
             }
         }
     }
 
-    return structAst;
+    return struct_ast;
 }
 
 StructFieldAst* parse_struct_field(TokenEnumerator* enumerator) {
-    attributes := ParseAttributes(enumerator);
-    structField := create_ast<StructFieldAst>(enumerator);
-    structField.Attributes = attributes;
+    attributes := parse_attributes(enumerator);
+    struct_field := create_ast<StructFieldAst>(enumerator, AstType.StructField);
+    struct_field.attributes = attributes;
 
     if enumerator.current.type != TokenType.Identifier
-        report_error("Expected name of struct field, but got '{enumerator.Current.Value}'", enumerator.file_index, enumerator.Current);
+        report_error("Expected name of struct field, but got '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
 
-    structField.name = enumerator.current.value;
+    struct_field.name = enumerator.current.value;
 
     // 1. Expect to get colon
     token: Token;
     move_next(enumerator);
-    if enumerator.Current.Type != TokenType.Colon {
+    if enumerator.current.type != TokenType.Colon {
         token = enumerator.current;
-        report_error("Unexpected token in struct field '{token.Value}'", enumerator.file_index, token);
+        report_error("Unexpected token in struct field '{token.value}'", enumerator.file_index, token);
         // Parse to a ; or }
         while move_next(enumerator) {
             tokenType := enumerator.current.type;
             if tokenType == TokenType.SemiColon || tokenType == TokenType.CloseBrace
                 break;
         }
-        return structField;
+        return struct_field;
     }
 
     // 2. Check if type is given
@@ -787,233 +771,241 @@ StructFieldAst* parse_struct_field(TokenEnumerator* enumerator) {
 
     if token.type == TokenType.Identifier {
         move_next(enumerator);
-        structField.TypeDefinition = parse_type(enumerator, null);
+        struct_field.type_definition = parse_type(enumerator, null);
     }
 
     // 3. Get the value or return
     if !move_next(enumerator) {
-        report_error("Expected declaration to have value", enumerator.file_index, enumerator.Last);
+        report_error("Expected declaration to have value", enumerator.file_index, enumerator.last);
         return null;
     }
 
-    token = enumerator.Current;
-    switch token.Type {
+    token = enumerator.current;
+    switch token.type {
         case TokenType.Equals;
-            parse_value(structField, enumerator, null);
+            parse_value(struct_field, enumerator, null);
         case TokenType.SemiColon;
-            if (structField.TypeDefinition == null)
+            if (struct_field.type_definition == null)
                 report_error("Expected struct field to have value", enumerator.file_index, token);
         default; {
-            report_error("Unexpected token '{token.Value}' in struct field", enumerator.file_index, token);
+            report_error("Unexpected token '{token.value}' in struct field", enumerator.file_index, token);
             // Parse until there is an equals sign or semicolon
             while move_next(enumerator) {
                 if enumerator.current.type == TokenType.SemiColon break;
                 if enumerator.current.type == TokenType.Equals {
-                    parse_value(structField, enumerator, null);
+                    parse_value(struct_field, enumerator, null);
                     break;
                 }
             }
         }
     }
 
-    return structField;
+    return struct_field;
 }
 
 EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
-    enumAst := create_ast<EnumAst>(enumerator);
-    enumAst.Attributes = attributes;
-    enumAst.Private = enumerator.Private;
+    enum_ast := create_ast<EnumAst>(enumerator, AstType.Enum);
+    enum_ast.attributes = attributes;
+    enum_ast.private = enumerator.private;
 
     // 1. Determine name of enum
     if !move_next(enumerator) {
-        report_error("Expected enum to have name", enumerator.file_index, enumerator.Last);
+        report_error("Expected enum to have name", enumerator.file_index, enumerator.last);
         return null;
     }
 
-    if enumerator.current.type == TokenType.Identifier
-        enumAst.name = enumAst.backend_name = enumerator.current.value;
+    if enumerator.current.type == TokenType.Identifier {
+        enum_ast.name = enumerator.current.value;
+        enum_ast.backend_name = enumerator.current.value;
+    }
     else
-        report_error("Unexpected token '{enumerator.Current.Value}' in enum definition", enumerator.file_index, enumerator.Current);
+        report_error("Unexpected token '{enumerator.current.value}' in enum definition", enumerator.file_index, enumerator.current);
 
     // 2. Parse over the open brace
     move_next(enumerator);
-    if enumerator.Current.Type == TokenType.Colon {
+    if enumerator.current.type == TokenType.Colon {
         move_next(enumerator);
-        enumAst.BaseTypeDefinition = parse_type(enumerator);
+        enum_ast.base_type_definition = parse_type(enumerator);
         move_next(enumerator);
 
-        baseType := TypeChecker.VerifyType(enumAst.BaseTypeDefinition, TypeChecker.GlobalScope);
-        if baseType.TypeKind != TypeKind.Integer {
-            report_error("Base type of enum must be an integer, but got '{TypeChecker.PrintTypeDefinition(enumAst.BaseTypeDefinition)}'", enumAst.BaseTypeDefinition);
-            enumAst.BaseType = TypeTable.S32Type;
+        base_type := verify_type(enum_ast.base_type_definition, &global_scope);
+        if base_type == null || base_type.type_kind != TypeKind.Integer {
+            report_error("Base type of enum must be an integer, but got '{TypeChecker.PrintTypeDefinition(enum_ast.base_type_definition)}'", enum_ast.base_type_definition);
+            enum_ast.base_type = &s32_type;
         }
         else {
-            enumAst.BaseType = cast(PrimitiveAst*, baseType);
-            enumAst.Alignment = enumAst.Size = enumAst.BaseType.Size;
+            enum_ast.base_type = cast(PrimitiveAst*, base_type);
+            enum_ast.size = base_type.size;
+            enum_ast.alignment = base_type.size;
         }
     }
-    else enumAst.BaseType = TypeTable.S32Type;
+    else {
+        enum_ast.base_type = &s32_type;
+        enum_ast.size = 4;
+        enum_ast.alignment = 4;
+    }
 
-    if enumerator.Current.Type != TokenType.OpenBrace {
-        report_error("Expected '{' token in enum definition", enumerator.file_index, enumerator.Current);
-        while move_next(enumerator) && enumerator.Current.Type != TokenType.OpenBrace {}
+    if enumerator.current.type != TokenType.OpenBrace {
+        report_error("Expected '{' token in enum definition", enumerator.file_index, enumerator.current);
+        while move_next(enumerator) && enumerator.current.type != TokenType.OpenBrace {}
     }
 
     // 3. Iterate through fields
-    lowestAllowedValue: int;
-    largestAllowedValue: int;
-    if enumAst.BaseType.Signed {
-        lowestAllowedValue = -(2 << (8 * enumAst.Size - 1));
-        largestAllowedValue = 2 << (8 * enumAst.Size - 1) - 1;
+    lowest_allowed_value: int;
+    largest_allowed_value: int;
+    if enum_ast.base_type.signed {
+        lowest_allowed_value = -(2 << (8 * enum_ast.size - 1));
+        largest_allowed_value = 2 << (8 * enum_ast.size - 1) - 1;
     }
     else {
-        largestAllowedValue = 2 << (8 * enumAst.Size) - 1;
+        largest_allowed_value = 2 << (8 * enum_ast.size) - 1;
     }
-    largestValue := -1;
+    largest_value := -1;
     enumIndex := 0;
 
-    currentValue: EnumValueAst*;
-    parsingValueDefault := false;
+    current_value: EnumValueAst*;
+    parsing_value_default := false;
     while move_next(enumerator) {
-        token := enumerator.Current;
+        token := enumerator.current;
 
-        switch (token.Type)
-        {
+        switch token.type {
             case TokenType.CloseBrace;
                 break;
             case TokenType.Identifier;
-                if currentValue == null {
-                    currentValue = create_ast<EnumValueAst>(token, enumerator.file_index);
-                    currentValue.Index = enumIndex++;
-                    currentValue.Name = token.Value;
+                if current_value == null {
+                    current_value = create_ast<EnumValueAst>(token, enumerator.file_index, AstType.EnumValue);
+                    current_value.index = enumIndex++;
+                    current_value.name = token.value;
                 }
-                else if parsingValueDefault {
-                    parsingValueDefault = false;
+                else if parsing_value_default {
+                    parsing_value_default = false;
                     value: EnumValueAst*;
-                    if enumAst.Values.TryGetValue(token.Value, &value) {
-                        if !value.Defined
-                            report_error("Expected previously defined value '{token.Value}' to have a defined value", enumerator.file_index, token);
+                    if enum_ast.values.TryGetValue(token.value, &value) {
+                        if !value.defined
+                            report_error("Expected previously defined value '{token.value}' to have a defined value", enumerator.file_index, token);
 
-                        currentValue.Value = value.Value;
-                        currentValue.Defined = true;
+                        current_value.value = value.value;
+                        current_value.defined = true;
                     }
                     else
-                        report_error("Expected value '{token.Value}' to be previously defined in enum '{enumAst.Name}'", enumerator.file_index, token);
+                        report_error("Expected value '{token.value}' to be previously defined in enum '{enum_ast.Name}'", enumerator.file_index, token);
                 }
                 else
-                    report_error("Unexpected token '{token.Value}' in enum", enumerator.file_index, token);
+                    report_error("Unexpected token '{token.value}' in enum", enumerator.file_index, token);
             case TokenType.SemiColon;
-                if currentValue {
+                if current_value {
                     // Catch if the name hasn't been set
-                    if currentValue.Name == null || parsingValueDefault {
-                        report_error("Unexpected token '{token.Value}' in enum", enumerator.file_index, token);
+                    if string_is_null(current_value.name) || parsing_value_default {
+                        report_error("Unexpected token '{token.value}' in enum", enumerator.file_index, token);
                     }
                     // Add the value to the enum and continue
                     else {
-                        if !enumAst.Values.TryAdd(currentValue.Name, currentValue)
-                            report_error("Enum '{enumAst.Name}' already contains value '{currentValue.Name}'", currentValue);
+                        if !enum_ast.values.TryAdd(current_value.name, current_value)
+                            report_error("Enum '{enum_ast.Name}' already contains value '{current_value.Name}'", current_value);
 
-                        if currentValue.Defined {
-                            if currentValue.Value > largestValue
-                                largestValue = currentValue.Value;
+                        if current_value.defined {
+                            if current_value.value > largest_value
+                                largest_value = current_value.value;
                         }
                         else
-                            currentValue.Value = ++largestValue;
+                            current_value.value = ++largest_value;
 
-                        if currentValue.Value < lowestAllowedValue || currentValue.Value > largestAllowedValue {
-                            report_error("Enum value '{enumAst.Name}.{currentValue.Name}' value '{currentValue.Value}' is out of range", currentValue);
+                        if current_value.value < lowest_allowed_value || current_value.value > largest_allowed_value {
+                            report_error("Enum value '{enum_ast.Name}.{current_value.Name}' value '{currentValue.Value}' is out of range", current_value);
                         }
                     }
 
-                    currentValue = null;
-                    parsingValueDefault = false;
+                    current_value = null;
+                    parsing_value_default = false;
                 }
             case TokenType.Equals;
-                if (currentValue?.Name != null)
-                    parsingValueDefault = true;
+                if current_value != null && !string_is_null(current_value.name)
+                    parsing_value_default = true;
                 else
-                    report_error("Unexpected token '{token.Value}' in enum", enumerator.file_index, token);
+                    report_error("Unexpected token '{token.value}' in enum", enumerator.file_index, token);
             case TokenType.Number;
-                if currentValue != null && parsingValueDefault {
-                    if token.Flags == TokenFlags.None {
+                if current_value != null && parsing_value_default {
+                    if token.flags == TokenFlags.None {
                         value: int;
                         if int.TryParse(token.value, &value) {
-                            currentValue.Value = value;
-                            currentValue.Defined = true;
+                            current_value.value = value;
+                            current_value.defined = true;
                         }
                         else
-                            report_error("Expected enum value to be an integer, but got '{token.Value}'", enumerator.file_index, token);
+                            report_error("Expected enum value to be an integer, but got '{token.value}'", enumerator.file_index, token);
                     }
-                    else if token.Flags & TokenFlags.Float {
-                        report_error("Expected enum value to be an integer, but got '{token.Value}'", enumerator.file_index, token);
+                    else if token.flags & TokenFlags.Float {
+                        report_error("Expected enum value to be an integer, but got '{token.value}'", enumerator.file_index, token);
                     }
-                    else if token.Flags & TokenFlags.HexNumber {
-                        if token.Value.Length == 2
-                            report_error("Invalid number '{token.Value}'", enumerator.file_index, token);
+                    else if token.flags & TokenFlags.HexNumber {
+                        if token.value.length == 2
+                            report_error("Invalid number '{token.value}'", enumerator.file_index, token);
 
-                        value := token.Value.Substring(2);
-                        if value.Length <= 8 {
+                        sub_value := substring(token.value, 2, token.value.length - 2);
+                        if sub_value.length <= 8 {
                             value: u32;
-                            if uint.TryParse(value, NumberStyles.HexNumber, &value) {
-                                currentValue.Value = value;
-                                currentValue.Defined = true;
+                            if uint.TryParse(sub_value, NumberStyles.HexNumber, &value) {
+                                current_value.value = value;
+                                current_value.defined = true;
                             }
                         }
-                        else if value.Length <= 16 {
+                        else if sub_value.length <= 16 {
                             value: u64;
-                            if ulong.TryParse(value, NumberStyles.HexNumber, &value) {
-                                currentValue.Value = value;
-                                currentValue.Defined = true;
+                            if ulong.TryParse(sub_value, NumberStyles.HexNumber, &value) {
+                                current_value.value = value;
+                                current_value.defined = true;
                             }
                         }
-                        else report_error("Expected enum value to be an integer, but got '{token.Value}'", enumerator.file_index, token);
+                        else report_error("Expected enum value to be an integer, but got '{token.value}'", enumerator.file_index, token);
                     }
-                    parsingValueDefault = false;
+                    parsing_value_default = false;
                 }
-                else report_error("Unexpected token '{token.Value}' in enum", enumerator.file_index, token);
+                else report_error("Unexpected token '{token.value}' in enum", enumerator.file_index, token);
             case TokenType.Character;
-                if currentValue != null && parsingValueDefault {
-                    currentValue.Value = token.Value[0];
-                    currentValue.Defined = true;
-                    parsingValueDefault = false;
+                if current_value != null && parsing_value_default {
+                    current_value.value = token.value[0];
+                    current_value.defined = true;
+                    parsing_value_default = false;
                 }
-                else report_error("Unexpected token '{token.Value}' in enum", enumerator.file_index, token);
+                else report_error("Unexpected token '{token.value}' in enum", enumerator.file_index, token);
             default;
-                report_error("Unexpected token '{token.Value}' in enum", enumerator.file_index, token);
+                report_error("Unexpected token '{token.value}' in enum", enumerator.file_index, token);
         }
     }
 
-    if currentValue {
-        token := enumerator.Current;
-        report_error("Unexpected token '{token.Value}' in enum", enumerator.file_index, token);
+    if current_value {
+        token := enumerator.current;
+        report_error("Unexpected token '{token.value}' in enum", enumerator.file_index, token);
     }
 
-    if enumAst.Values.length == 0
-        report_error("Expected enum to have 1 or more values", enumAst);
+    if enum_ast.values.length == 0
+        report_error("Expected enum to have 1 or more values", enum_ast);
 
-    return enumAst;
+    return enum_ast;
 }
 
 UnionAst* parse_union(TokenEnumerator* enumerator) {
-    union_ast := create_ast<UnionAst>(enumerator);
-    union_ast.Private = enumerator.Private;
+    union_ast := create_ast<UnionAst>(enumerator, AstType.Union);
+    union_ast.private = enumerator.private;
 
     // 1. Determine name of union
     if !move_next(enumerator) {
-        report_error("Expected union to have name", enumerator.file_index, enumerator.Last);
+        report_error("Expected union to have name", enumerator.file_index, enumerator.last);
         return null;
     }
 
-    if enumerator.current.type == TokenType.Identifier
-        union_ast.Name = union_ast.BackendName = enumerator.Current.Value;
+    if enumerator.current.type == TokenType.Identifier {
+        union_ast.name = enumerator.current.value;
+        union_ast.backend_name = enumerator.current.value;
+    }
     else
-        report_error("Unexpected token '{enumerator.Current.Value}' in union definition", enumerator.file_index, enumerator.Current);
+        report_error("Unexpected token '{enumerator.current.value}' in union definition", enumerator.file_index, enumerator.current);
 
     // 2. Parse over the open brace
     move_next(enumerator);
-    if enumerator.Current.Type != TokenType.OpenBrace {
-        report_error("Expected '{' token in union definition", enumerator.file_index, enumerator.Current);
-        while move_next(enumerator) && enumerator.Current.Type != TokenType.OpenBrace {}
+    if enumerator.current.type != TokenType.OpenBrace {
+        report_error("Expected '{' token in union definition", enumerator.file_index, enumerator.current);
+        while move_next(enumerator) && enumerator.current.type != TokenType.OpenBrace {}
     }
 
     // 3. Iterate through fields
@@ -1021,30 +1013,30 @@ UnionAst* parse_union(TokenEnumerator* enumerator) {
         if enumerator.current.type == TokenType.CloseBrace
             break;
 
-        union_ast.Fields.Add(parse_union_field(enumerator));
+        union_ast.fields.Add(parse_union_field(enumerator));
     }
 
     return union_ast;
 }
 
 UnionFieldAst* parse_union_field(TokenEnumerator* enumerator) {
-    field := create_ast<UnionFieldAst>(enumerator);
+    field := create_ast<UnionFieldAst>(enumerator, AstType.UnionField);
 
-    if enumerator.Current.Type != TokenType.Identifier
-        report_error("Expected name of union field, but got '{enumerator.Current.Value}'", enumerator.file_index, enumerator.Current);
+    if enumerator.current.type != TokenType.Identifier
+        report_error("Expected name of union field, but got '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
 
-    field.Name = enumerator.Current.Value;
+    field.name = enumerator.current.value;
 
     // 1. Expect to get colon
     token: Token;
     move_next(enumerator);
-    if enumerator.Current.Type != TokenType.Colon {
-        token = enumerator.Current;
-        report_error("Unexpected token in union field '{token.Value}'", enumerator.file_index, token);
+    if enumerator.current.type != TokenType.Colon {
+        token = enumerator.current;
+        report_error("Unexpected token in union field '{token.value}'", enumerator.file_index, token);
         // Parse to a ; or }
         while move_next(enumerator) {
-            tokenType := enumerator.Current.Type;
-            if tokenType == TokenType.SemiColon || tokenType == TokenType.CloseBrace
+            token_type := enumerator.current.type;
+            if token_type == TokenType.SemiColon || token_type == TokenType.CloseBrace
                 break;
         }
         return field;
@@ -1058,7 +1050,7 @@ UnionFieldAst* parse_union_field(TokenEnumerator* enumerator) {
 
     if token.type == TokenType.Identifier {
         move_next(enumerator);
-        field.TypeDefinition = parse_type(enumerator, null);
+        field.type_definition = parse_type(enumerator, null);
     }
 
     // 3. Get the value or return
@@ -1067,17 +1059,17 @@ UnionFieldAst* parse_union_field(TokenEnumerator* enumerator) {
         return null;
     }
 
-    token = enumerator.Current;
-    switch token.Type {
+    token = enumerator.current;
+    switch token.type {
         case TokenType.SemiColon;
-            if (field.TypeDefinition == null)
+            if (field.type_definition == null)
                 report_error("Expected union field to have a type", enumerator.file_index, token);
         default; {
-            report_error("Unexpected token '{token.Value}' in declaration", enumerator.file_index, token);
+            report_error("Unexpected token '{token.value}' in declaration", enumerator.file_index, token);
             // Parse until there is a semicolon or closing brace
             while move_next(enumerator) {
-                token = enumerator.Current;
-                if token.Type == TokenType.SemiColon || token.Type == TokenType.CloseBrace
+                token = enumerator.current;
+                if token.type == TokenType.SemiColon || token.type == TokenType.CloseBrace
                     break;
             }
         }
@@ -1087,95 +1079,97 @@ UnionFieldAst* parse_union_field(TokenEnumerator* enumerator) {
 }
 
 bool search_for_generic(string generic, int index, TypeDefinition* type) {
-    if (type.Name == generic) {
-        type.IsGeneric = true;
-        type.GenericIndex = index;
+    if (type.name == generic) {
+        type.is_generic = true;
+        type.generic_index = index;
         return true;
     }
 
-    hasGeneric := false;
-    each typeGeneric in type.Generics {
-        if (search_for_generic(generic, index, typeGeneric)) {
-            hasGeneric = true;
+    has_generic := false;
+    each type_generic in type.generics {
+        if search_for_generic(generic, index, type_generic) {
+            has_generic = true;
         }
     }
-    return hasGeneric;
+    return has_generic;
 }
 
-Ast* ParseLine(TokenEnumerator* enumerator, Function* current_function) {
+Ast* parse_line(TokenEnumerator* enumerator, Function* current_function) {
     if !enumerator.remaining {
-        report_error("End of file reached without closing scope", enumerator.file_index, enumerator.Last);
+        report_error("End of file reached without closing scope", enumerator.file_index, enumerator.last);
         return null;
     }
 
-    token := enumerator.Current;
-    switch token.Type {
+    token := enumerator.current;
+    switch token.type {
         case TokenType.Return;
-            return parse_return(enumerator, currentFunction);
+            return parse_return(enumerator, current_function);
         case TokenType.If;
-            return parse_conditional(enumerator, currentFunction);
+            return parse_conditional(enumerator, current_function);
         case TokenType.While;
-            return parse_while(enumerator, currentFunction);
+            return parse_while(enumerator, current_function);
         case TokenType.Each;
-            return parse_each(enumerator, currentFunction);
+            return parse_each(enumerator, current_function);
         case TokenType.Identifier; {
             if (!peek(enumerator, &token))
             {
-                report_error("End of file reached without closing scope", enumerator.file_index, enumerator.Last);
+                report_error("End of file reached without closing scope", enumerator.file_index, enumerator.last);
                 return null;
             }
-            switch token.Type {
+            switch token.type {
                 case TokenType.OpenParen;
-                    return parse_call(enumerator, currentFunction, true);
+                    return parse_call(enumerator, current_function, true);
                 case TokenType.Colon;
-                    return parse_declaration(enumerator, currentFunction);
-                case TokenType.Equals;
-                    return ParseAssignment(enumerator, currentFunction);
+                    return parse_declaration(enumerator, current_function);
+                case TokenType.Equals; {
+                    _: bool;
+                    return parse_assignment(enumerator, current_function, &_);
+                }
             }
-            return ParseExpression(enumerator, currentFunction);
+            return parse_expression(enumerator, current_function);
         }
         case TokenType.Increment;
         case TokenType.Decrement;
         case TokenType.Asterisk;
-            return ParseExpression(enumerator, currentFunction);
+            return parse_expression(enumerator, current_function);
         case TokenType.OpenBrace;
-            return parse_scope(enumerator, currentFunction);
+            return parse_scope(enumerator, current_function);
         case TokenType.Pound;
-            return parse_compiler_directive(enumerator, currentFunction);
+            return parse_compiler_directive(enumerator, current_function);
         case TokenType.Asm;
             return parse_inline_assembly(enumerator);
         case TokenType.Switch;
-            return parse_switch(enumerator, currentFunction);
+            return parse_switch(enumerator, current_function);
         case TokenType.Break; {
-            breakAst := create_ast<Ast>(token, enumerator.file_index);
+            breakAst := create_ast<Ast>(token, enumerator.file_index, AstType.Break);
             if move_next(enumerator) {
                 if enumerator.current.type != TokenType.SemiColon {
                     report_error("Expected ';'", enumerator.file_index, enumerator.current);
                 }
             }
-            else report_error("End of file reached without closing scope", enumerator.file_index, enumerator.Last);
+            else report_error("End of file reached without closing scope", enumerator.file_index, enumerator.last);
 
             return breakAst;
         }
         case TokenType.Continue; {
-            continueAst := create_ast<Ast>(token, enumerator.file_index);
+            continueAst := create_ast<Ast>(token, enumerator.file_index, AstType.Continue);
             if move_next(enumerator) {
-                if enumerator.Current.Type != TokenType.SemiColon {
-                    report_error("Expected ';'", enumerator.file_index, enumerator.Current);
+                if enumerator.current.type != TokenType.SemiColon {
+                    report_error("Expected ';'", enumerator.file_index, enumerator.current);
                 }
             }
-            else report_error("End of file reached without closing scope", enumerator.file_index, enumerator.Last);
+            else report_error("End of file reached without closing scope", enumerator.file_index, enumerator.last);
 
             return continueAst;
         }
     }
 
-    report_error("Unexpected token '{token.Value}'", enumerator.file_index, token);
+    report_error("Unexpected token '{token.value}'", enumerator.file_index, token);
     return null;
 }
 
 ScopeAst* parse_scope(TokenEnumerator* enumerator, Function* current_function, bool topLevel = false) {
-    scopeAst := create_ast<ScopeAst>(enumerator);
+    scope_ast := create_ast<ScopeAst>(enumerator, AstType.Scope);
 
     closed := false;
     while move_next(enumerator) {
@@ -1184,168 +1178,168 @@ ScopeAst* parse_scope(TokenEnumerator* enumerator, Function* current_function, b
             break;
         }
 
-        if topLevel scopeAst.Children.Add(parse_top_level_ast(enumerator, directory));
-        else scopeAst.Children.Add(ParseLine(enumerator, currentFunction));
+        if topLevel scope_ast.children.Add(parse_top_level_ast(enumerator));
+        else scope_ast.children.Add(parse_line(enumerator, current_function));
     }
 
     if !closed
-        report_error("Scope not closed by '}'", enumerator.file_index, enumerator.Current);
+        report_error("Scope not closed by '}'", enumerator.file_index, enumerator.current);
 
-    return scopeAst;
+    return scope_ast;
 }
 
 ConditionalAst* parse_conditional(TokenEnumerator* enumerator, Function* current_function, bool topLevel = false) {
-    conditionalAst := create_ast<ConditionalAst>(enumerator);
+    conditional_ast := create_ast<ConditionalAst>(enumerator, AstType.Conditional);
 
     // 1. Parse the conditional expression by first iterating over the initial 'if'
     move_next(enumerator);
-    conditionalAst.Condition = parse_condition_expression(enumerator, currentFunction);
+    conditional_ast.condition = parse_condition_expression(enumerator, current_function);
 
-    if !enumerator.Remaining {
-        report_error("Expected if to contain conditional expression and body", enumerator.file_index, enumerator.Last);
+    if !enumerator.remaining {
+        report_error("Expected if to contain conditional expression and body", enumerator.file_index, enumerator.last);
         return null;
     }
 
     // 2. Determine how many lines to parse
-    if enumerator.Current.Type == TokenType.OpenBrace {
+    if enumerator.current.type == TokenType.OpenBrace {
         // Parse until close brace
-        conditionalAst.IfBlock = parse_scope(enumerator, currentFunction, topLevel, directory);
+        conditional_ast.if_block = parse_scope(enumerator, current_function, topLevel);
     }
     else {
         // Parse single AST
-        conditionalAst.IfBlock = create_ast<ScopeAst>(enumerator);
-        if topLevel conditionalAst.IfBlock.Children.Add(parse_top_level_ast(enumerator));
-        else conditionalAst.IfBlock.Children.Add(ParseLine(enumerator, currentFunction));
+        conditional_ast.if_block = create_ast<ScopeAst>(enumerator, AstType.Scope);
+        if topLevel conditional_ast.if_block.children.Add(parse_top_level_ast(enumerator));
+        else conditional_ast.if_block.children.Add(parse_line(enumerator, current_function));
     }
 
     // 3. Parse else block if necessary
     token: Token;
     if !peek(enumerator, &token) {
-        return conditionalAst;
+        return conditional_ast;
     }
 
-    if token.Type == TokenType.Else {
+    if token.type == TokenType.Else {
         // First clear the else and then determine how to parse else block
         move_next(enumerator);
         if !move_next(enumerator) {
-            report_error("Expected body of else branch", enumerator.file_index, enumerator.Last);
+            report_error("Expected body of else branch", enumerator.file_index, enumerator.last);
             return null;
         }
 
         if enumerator.current.type == TokenType.OpenBrace {
             // Parse until close brace
-            conditionalAst.ElseBlock = parse_scope(enumerator, currentFunction, topLevel, directory);
+            conditional_ast.else_block = parse_scope(enumerator, current_function, topLevel);
         }
         else {
             // Parse single AST
-            conditionalAst.ElseBlock = create_ast<ScopeAst>(enumerator);
-            if topLevel conditionalAst.ElseBlock.Children.Add(parse_top_level_ast(enumerator));
-            else conditionalAst.ElseBlock.Children.Add(ParseLine(enumerator, currentFunction));
+            conditional_ast.else_block = create_ast<ScopeAst>(enumerator, AstType.Scope);
+            if topLevel conditional_ast.else_block.children.Add(parse_top_level_ast(enumerator));
+            else conditional_ast.else_block.children.Add(parse_line(enumerator, current_function));
         }
     }
 
-    return conditionalAst;
+    return conditional_ast;
 }
 
 WhileAst* parse_while(TokenEnumerator* enumerator, Function* current_function) {
-    whileAst := create_ast<WhileAst>(enumerator);
+    while_ast := create_ast<WhileAst>(enumerator, AstType.While);
 
     // 1. Parse the conditional expression by first iterating over the initial 'while'
     move_next(enumerator);
-    whileAst.Condition = parse_condition_expression(enumerator, currentFunction);
+    while_ast.condition = parse_condition_expression(enumerator, current_function);
 
     // 2. Determine how many lines to parse
-    if !enumerator.Remaining {
+    if !enumerator.remaining {
         report_error("Expected while loop to contain body", enumerator.file_index, enumerator.last);
         return null;
     }
 
-    if enumerator.Current.Type == TokenType.OpenBrace {
+    if enumerator.current.type == TokenType.OpenBrace {
         // Parse until close brace
-        whileAst.Body = parse_scope(enumerator, currentFunction);
+        while_ast.body = parse_scope(enumerator, current_function);
     }
     else {
         // Parse single AST
-        whileAst.Body = create_ast<ScopeAst>(enumerator);
-        whileAst.Body.Children.Add(ParseLine(enumerator, currentFunction));
+        while_ast.body = create_ast<ScopeAst>(enumerator, AstType.Scope);
+        while_ast.body.children.Add(parse_line(enumerator, current_function));
     }
 
-    return whileAst;
+    return while_ast;
 }
 
 EachAst* parse_each(TokenEnumerator* enumerator, Function* current_function) {
-    eachAst := create_ast<EachAst>(enumerator);
+    each_ast := create_ast<EachAst>(enumerator, AstType.Each);
 
     // 1. Parse the iteration variable by first iterating over the initial 'each'
     move_next(enumerator);
-    if enumerator.Current.Type == TokenType.Identifier {
-        eachAst.IterationVariable = create_ast<VariableAst>(enumerator);
-        eachAst.IterationVariable.Name = enumerator.Current.Value;
+    if enumerator.current.type == TokenType.Identifier {
+        each_ast.iteration_variable = create_ast<VariableAst>(enumerator, AstType.Variable);
+        each_ast.iteration_variable.name = enumerator.current.value;
     }
     else
-        report_error("Expected variable in each block definition", enumerator.file_index, enumerator.Current);
+        report_error("Expected variable in each block definition", enumerator.file_index, enumerator.current);
 
     move_next(enumerator);
-    if enumerator.Current.Type == TokenType.Comma {
+    if enumerator.current.type == TokenType.Comma {
         move_next(enumerator);
-        if enumerator.Current.Type == TokenType.Identifier {
-            eachAst.IndexVariable = create_ast<VariableAst>(enumerator);
-            eachAst.IndexVariable.Name = enumerator.Current.Value;
+        if enumerator.current.type == TokenType.Identifier {
+            each_ast.index_variable = create_ast<VariableAst>(enumerator, AstType.Variable);
+            each_ast.index_variable.name = enumerator.current.value;
             move_next(enumerator);
         }
         else
-            report_error("Expected index variable after comma in each declaration", enumerator.file_index, enumerator.Current);
+            report_error("Expected index variable after comma in each declaration", enumerator.file_index, enumerator.current);
     }
 
     // 2. Parse over the in keyword
-    if enumerator.Current.Type != TokenType.In {
-        report_error("Expected 'in' token in each block", enumerator.file_index, enumerator.Current);
-        while move_next(enumerator) && enumerator.Current.Type != TokenType.In {}
+    if enumerator.current.type != TokenType.In {
+        report_error("Expected 'in' token in each block", enumerator.file_index, enumerator.current);
+        while move_next(enumerator) && enumerator.current.type != TokenType.In {}
     }
 
     // 3. Determine the iterator
     move_next(enumerator);
-    expression := parse_condition_expression(enumerator, currentFunction);
+    expression := parse_condition_expression(enumerator, current_function);
 
     // 3a. Check if the next token is a range
-    if !enumerator.Remaining {
-        report_error("Expected each block to have iteration and body", enumerator.file_index, enumerator.Last);
+    if !enumerator.remaining {
+        report_error("Expected each block to have iteration and body", enumerator.file_index, enumerator.last);
         return null;
     }
 
     if enumerator.current.type == TokenType.Range {
-        if (eachAst.IndexVariable != null)
-            report_error("Range enumerators cannot have iteration and index variable", enumerator.file_index, enumerator.Current);
+        if (each_ast.index_variable != null)
+            report_error("Range enumerators cannot have iteration and index variable", enumerator.file_index, enumerator.current);
 
-        eachAst.RangeBegin = expression;
+        each_ast.range_begin = expression;
         if !move_next(enumerator) {
-            report_error("Expected range to have an end", enumerator.file_index, enumerator.Last);
-            return eachAst;
+            report_error("Expected range to have an end", enumerator.file_index, enumerator.last);
+            return each_ast;
         }
 
-        eachAst.RangeEnd = parse_condition_expression(enumerator, currentFunction);
-        if !enumerator.Remaining {
-            report_error("Expected each block to have iteration and body", enumerator.file_index, enumerator.Last);
-            return eachAst;
+        each_ast.range_end = parse_condition_expression(enumerator, current_function);
+        if !enumerator.remaining {
+            report_error("Expected each block to have iteration and body", enumerator.file_index, enumerator.last);
+            return each_ast;
         }
     }
     else
-        eachAst.Iteration = expression;
+        each_ast.iteration = expression;
 
     // 4. Determine how many lines to parse
-    if enumerator.Current.Type == TokenType.OpenBrace
-        eachAst.Body = parse_scope(enumerator, currentFunction);
+    if enumerator.current.type == TokenType.OpenBrace
+        each_ast.body = parse_scope(enumerator, current_function);
     else {
-        eachAst.Body = create_ast<ScopeAst>(enumerator);
-        eachAst.Body.Children.Add(ParseLine(enumerator, currentFunction));
+        each_ast.body = create_ast<ScopeAst>(enumerator, AstType.Scope);
+        each_ast.body.children.Add(parse_line(enumerator, current_function));
     }
 
-    return eachAst;
+    return each_ast;
 }
 
 Ast* parse_condition_expression(TokenEnumerator* enumerator, Function* current_function) {
-    expression := create_ast<ExpressionAst>(enumerator);
-    operatorRequired := false;
+    expression := create_ast<ExpressionAst>(enumerator, AstType.Expression);
+    operator_required := false;
 
     move(enumerator, -1);
     while move_next(enumerator) {
@@ -1354,61 +1348,61 @@ Ast* parse_condition_expression(TokenEnumerator* enumerator, Function* current_f
         if token.type == TokenType.OpenBrace
             break;
 
-        if operatorRequired {
-            if token.Type == TokenType.Increment || token.Type == TokenType.Decrement {
+        if operator_required {
+            if token.type == TokenType.Increment || token.type == TokenType.Decrement {
                 // Create subexpression to hold the operation
                 // This case would be `var b = 4 + a++`, where we have a value before the operator
-                source := expression.Children[expression.Children.length - 1];
-                changeByOneAst := create_ast<ChangeByOneAst>(source);
-                changeByOneAst.Positive = token.Type == TokenType.Increment;
-                changeByOneAst.Value = source;
-                expression.Children[expression.Children.length - 1] = changeByOneAst;
+                source := expression.children[expression.children.length - 1];
+                change_by_one := create_ast<ChangeByOneAst>(source, AstType.ChangeByOne);
+                change_by_one.positive = token.type == TokenType.Increment;
+                change_by_one.value = source;
+                expression.children[expression.children.length - 1] = change_by_one;
                 continue;
             }
-            if token.Type == TokenType.Number && token.Value[0] == '-' {
-                token.Value = substring(token.value, 1, token.value.length - 1);
-                expression.Operators.Add(Operator.Subtract);
+            if token.type == TokenType.Number && token.value[0] == '-' {
+                token.value = substring(token.value, 1, token.value.length - 1);
+                expression.operators.Add(Operator.Subtract);
                 constant := parse_constant(token, enumerator.file_index);
-                expression.Children.Add(constant);
+                expression.children.Add(constant);
                 continue;
             }
             if token.type == TokenType.Period {
-                structFieldRef := parse_struct_field_ref(enumerator, expression.Children[expression.Children.length - 1], currentFunction);
-                expression.Children[expression.Children.length - 1] = structFieldRef;
+                struct_field_ref := parse_struct_field_ref(enumerator, expression.children[expression.children.length - 1], current_function);
+                expression.children[expression.children.length - 1] = struct_field_ref;
                 continue;
             }
             op := convert_operator(token);
             if op != Operator.None {
-                expression.Operators.Add(op);
-                operatorRequired = false;
+                expression.operators.Add(op);
+                operator_required = false;
             }
             else
                 break;
         }
         else {
-            ast := parse_next_expression_unit(enumerator, currentFunction, &operatorRequired);
-            if ast expression.Children.Add(ast);
+            ast := parse_next_expression_unit(enumerator, current_function, &operator_required);
+            if ast expression.children.Add(ast);
         }
     }
 
-    return CheckExpression(enumerator, expression, operatorRequired);
+    return check_expression(enumerator, expression, operator_required);
 }
 
 DeclarationAst* parse_declaration(TokenEnumerator* enumerator, Function* current_function = null, bool global = false) {
-    declaration := create_ast<DeclarationAst>(enumerator);
-    declaration.Global = global;
-    declaration.Private = enumerator.Private;
+    declaration := create_ast<DeclarationAst>(enumerator, AstType.Declaration);
+    declaration.global = global;
+    declaration.private = enumerator.private;
 
     if enumerator.current.type != TokenType.Identifier {
-        report_error("Expected variable name to be an identifier, but got '{enumerator.Current.Value}'", enumerator.file_index, enumerator.Current);
+        report_error("Expected variable name to be an identifier, but got '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
     }
 
-    declaration.Name = enumerator.Current.Value;
+    declaration.name = enumerator.current.value;
 
     // 1. Expect to get colon
     move_next(enumerator);
     if enumerator.current.type != TokenType.Colon {
-        report_error("Unexpected token in declaration '{token.Value}'", enumerator.file_index, enumerator.Current);
+        report_error("Unexpected token in declaration '{token.value}'", enumerator.file_index, enumerator.current);
         return null;
     }
 
@@ -1418,13 +1412,13 @@ DeclarationAst* parse_declaration(TokenEnumerator* enumerator, Function* current
         report_error("Expected type or value of declaration", enumerator.file_index, token);
     }
 
-    if token.Type == TokenType.Identifier {
+    if token.type == TokenType.Identifier {
         move_next(enumerator);
-        declaration.TypeDefinition = parse_type(enumerator, currentFunction);
-        if currentFunction {
-            each generic, i in currentFunction.Generics {
-                if search_for_generic(generic, i, declaration.TypeDefinition) {
-                    declaration.HasGenerics = true;
+        declaration.type_definition = parse_type(enumerator, current_function);
+        if current_function {
+            each generic, i in current_function.generics {
+                if search_for_generic(generic, i, declaration.type_definition) {
+                    declaration.has_generics = true;
                 }
             }
         }
@@ -1432,24 +1426,24 @@ DeclarationAst* parse_declaration(TokenEnumerator* enumerator, Function* current
 
     // 3. Get the value or return
     if !move_next(enumerator) {
-        report_error("Expected declaration to have value", enumerator.file_index, enumerator.Last);
+        report_error("Expected declaration to have value", enumerator.file_index, enumerator.last);
         return null;
     }
 
-    token = enumerator.Current;
-    switch token.Type {
+    token = enumerator.current;
+    switch token.type {
         case TokenType.Equals;
-            parse_value(declaration, enumerator, currentFunction);
+            parse_value(declaration, enumerator, current_function);
         case TokenType.SemiColon;
-            if (declaration.TypeDefinition == null)
+            if (declaration.type_definition == null)
                 report_error("Expected declaration to have value", enumerator.file_index, token);
         default; {
-            report_error("Unexpected token '{token.Value}' in declaration", enumerator.file_index, token);
+            report_error("Unexpected token '{token.value}' in declaration", enumerator.file_index, token);
             // Parse until there is an equals sign or semicolon
             while move_next(enumerator) {
                 if enumerator.current.type == TokenType.SemiColon break;
                 if enumerator.current.type == TokenType.Equals {
-                    parse_value(declaration, enumerator, currentFunction);
+                    parse_value(declaration, enumerator, current_function);
                     break;
                 }
             }
@@ -1457,9 +1451,9 @@ DeclarationAst* parse_declaration(TokenEnumerator* enumerator, Function* current
     }
 
     // 4. Parse compiler directives
-    if peek(enumerator, &token) && token.Type == TokenType.Pound {
-        if (peek(enumerator, &token, 1) && token.Value == "const") {
-            declaration.Constant = true;
+    if peek(enumerator, &token) && token.type == TokenType.Pound {
+        if (peek(enumerator, &token, 1) && token.value == "const") {
+            declaration.constant = true;
             move_next(enumerator);
             move_next(enumerator);
         }
@@ -1471,7 +1465,7 @@ DeclarationAst* parse_declaration(TokenEnumerator* enumerator, Function* current
 bool parse_value(Values* values, TokenEnumerator* enumerator, Function* current_function) {
     // 1. Step over '=' sign
     if !move_next(enumerator) {
-        report_error("Expected declaration to have a value", enumerator.file_index, enumerator.Last);
+        report_error("Expected declaration to have a value", enumerator.file_index, enumerator.last);
         return false;
     }
 
@@ -1480,24 +1474,24 @@ bool parse_value(Values* values, TokenEnumerator* enumerator, Function* current_
         case TokenType.OpenBrace; {
             // values.Assignments = new Dictionary<string, AssignmentAst>();
             while move_next(enumerator) {
-                token := enumerator.Current;
-                if token.Type == TokenType.CloseBrace
+                token := enumerator.current;
+                if token.type == TokenType.CloseBrace
                     break;
 
                 move_next: bool;
-                assignment := ParseAssignment(enumerator, currentFunction, &move_next);
+                assignment := parse_assignment(enumerator, current_function, &move_next);
 
-                if !values.Assignments.TryAdd(token.Value, assignment)
-                    report_error("Multiple assignments for field '{token.Value}'", enumerator.file_index, token);
+                if !values.assignments.TryAdd(token.value, assignment)
+                    report_error("Multiple assignments for field '{token.value}'", enumerator.file_index, token);
 
                 if move_next {
                     peek(enumerator, &token);
-                    if (token.Type == TokenType.CloseBrace) {
+                    if (token.type == TokenType.CloseBrace) {
                         move_next(enumerator);
                         break;
                     }
                 }
-                else if enumerator.Current.Type == TokenType.CloseBrace
+                else if enumerator.current.type == TokenType.CloseBrace
                     break;
             }
             return true;
@@ -1508,55 +1502,55 @@ bool parse_value(Values* values, TokenEnumerator* enumerator, Function* current_
                 if enumerator.current.type == TokenType.CloseBracket
                     break;
 
-                value := ParseExpression(enumerator, currentFunction, null, TokenType.Comma, TokenType.CloseBracket);
-                values.ArrayValues.Add(value);
+                value := parse_expression(enumerator, current_function, null, TokenType.Comma, TokenType.CloseBracket);
+                values.array_values.Add(value);
                 if enumerator.current.type == TokenType.CloseBracket
                     break;
             }
         }
         default;
-            values.Value = ParseExpression(enumerator, currentFunction);
+            values.value = parse_expression(enumerator, current_function);
     }
 
     return false;
 }
 
-AssignmentAst* ParseAssignment(TokenEnumerator* enumerator, Function* current_function, bool* moveNext, IAst reference = null) {
+AssignmentAst* parse_assignment(TokenEnumerator* enumerator, Function* current_function, bool* moveNext, Ast* reference = null) {
     // 1. Set the variable
     assignment: AssignmentAst*;
-    if reference assignment = create_ast<AssignmentAst>(reference);
-    else assignment = create_ast<AssignmentAst>(enumerator);
+    if reference assignment = create_ast<AssignmentAst>(reference, AstType.Assignment);
+    else assignment = create_ast<AssignmentAst>(enumerator, AstType.Assignment);
 
-    assignment.Reference = reference;
+    assignment.reference = reference;
     *moveNext = false;
 
     // 2. When the original reference is null, set the l-value to an identifier
     if reference == null {
-        variableAst := create_ast<IdentifierAst>(enumerator);
-        if enumerator.Current.Type != TokenType.Identifier {
-            report_error("Expected variable name to be an identifier, but got '{enumerator.Current.Value}'", enumerator.file_index, enumerator.Current);
+        variable_ast := create_ast<IdentifierAst>(enumerator, AstType.Identifier);
+        if enumerator.current.type != TokenType.Identifier {
+            report_error("Expected variable name to be an identifier, but got '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
         }
-        variableAst.Name = enumerator.Current.Value;
-        assignment.Reference = variableAst;
+        variable_ast.name = enumerator.current.value;
+        assignment.reference = variable_ast;
 
         // 2a. Expect to get equals sign
         if !move_next(enumerator) {
-            report_error("Expected '=' in assignment'", enumerator.file_index, enumerator.Last);
+            report_error("Expected '=' in assignment'", enumerator.file_index, enumerator.last);
             return assignment;
         }
 
         // 2b. Assign the operator is there is one
-        token := enumerator.Current;
-        if token.Type != TokenType.Equals {
+        token := enumerator.current;
+        if token.type != TokenType.Equals {
             op := convert_operator(token);
             if op != Operator.None {
-                assignment.Operator = op;
+                assignment.op = op;
                 if !peek(enumerator, &token) {
                     report_error("Expected '=' in assignment'", enumerator.file_index, token);
                     return null;
                 }
 
-                if token.Type == TokenType.Equals
+                if token.type == TokenType.Equals
                     move_next(enumerator);
                 else
                     report_error("Expected '=' in assignment'", enumerator.file_index, token);
@@ -1567,31 +1561,29 @@ AssignmentAst* ParseAssignment(TokenEnumerator* enumerator, Function* current_fu
     }
     // 3, Get the operator on the reference expression if the expression ends with an operator
     else if reference.ast_type == AstType.Expression {
-        expression: ExpressionAst* = reference;
-        if expression.Children.length == 1 {
-            assignment.Reference = expression.Children[0];
+        expression := cast(ExpressionAst*, reference);
+        if expression.children.length == 1 {
+            assignment.reference = expression.children[0];
         }
-        if expression.Operators.length > 0 && expression.Children.length == expression.Operators.length {
-            assignment.Operator = expression.Operators.Last();
-            expression.Operators.RemoveAt(expression.Operators.Count - 1);
+        if expression.operators.length > 0 && expression.children.length == expression.operators.length {
+            assignment.op = expression.operators.Last();
+            expression.operators.RemoveAt(expression.operators.length - 1);
         }
     }
 
     // 4. Parse expression, field assignments, or array values
-    switch enumerator.Current.Type {
+    switch enumerator.current.type {
         case TokenType.Equals;
-            *moveNext = parse_value(assignment, enumerator, currentFunction);
+            *moveNext = parse_value(assignment, enumerator, current_function);
         case TokenType.SemiColon;
-            report_error("Expected assignment to have value", enumerator.file_index, enumerator.Current);
+            report_error("Expected assignment to have value", enumerator.file_index, enumerator.current);
         default; {
-            report_error("Unexpected token '{enumerator.Current.Value}' in assignment", enumerator.file_index, enumerator.Current);
+            report_error("Unexpected token '{enumerator.current.value}' in assignment", enumerator.file_index, enumerator.current);
             // Parse until there is an equals sign or semicolon
-            while (move_next(enumerator))
-            {
-                if (enumerator.Current.Type == TokenType.SemiColon) break;
-                if (enumerator.Current.Type == TokenType.Equals)
-                {
-                    moveNext = parse_value(assignment, enumerator, currentFunction);
+            while move_next(enumerator) {
+                if enumerator.current.type == TokenType.SemiColon break;
+                if enumerator.current.type == TokenType.Equals {
+                    *moveNext = parse_value(assignment, enumerator, current_function);
                     break;
                 }
             }
@@ -1602,88 +1594,93 @@ AssignmentAst* ParseAssignment(TokenEnumerator* enumerator, Function* current_fu
 }
 
 bool is_end_token(TokenType token, Array<TokenType> end_tokens) {
+    if token == TokenType.SemiColon return true;
 
+    each end_token in end_tokens {
+        if end_token == token return true;
+    }
+    return false;
 }
 
-Ast* ParseExpression(TokenEnumerator* enumerator, Function* current_function, ExpressionAst* expression = null, Params<TokenType> end_tokens) {
-    operatorRequired: bool;
+Ast* parse_expression(TokenEnumerator* enumerator, Function* current_function, ExpressionAst* expression = null, Params<TokenType> end_tokens) {
+    operator_required: bool;
 
-    if expression operatorRequired = true;
-    else expression = create_ast<ExpressionAst>(enumerator);
+    if expression operator_required = true;
+    else expression = create_ast<ExpressionAst>(enumerator, AstType.Expression);
 
     move(enumerator, -1);
     while move_next(enumerator) {
-        token := enumerator.Current;
+        token := enumerator.current;
 
         if is_end_token(token.type, end_tokens)
             break;
 
-        if token.Type == TokenType.Equals {
+        if token.type == TokenType.Equals {
             _: bool;
-            return ParseAssignment(enumerator, currentFunction, &_, expression);
+            return parse_assignment(enumerator, current_function, &_, expression);
         }
-        else if token.Type == TokenType.Comma {
-            if expression.Children.length == 1
-                return ParseCompoundExpression(enumerator, currentFunction, expression.Children[0]);
+        else if token.type == TokenType.Comma {
+            if expression.children.length == 1
+                return parse_compound_expression(enumerator, current_function, expression.children[0]);
 
-            return ParseCompoundExpression(enumerator, currentFunction, expression);
+            return parse_compound_expression(enumerator, current_function, expression);
         }
 
-        if operatorRequired {
+        if operator_required {
             if token.type == TokenType.Increment || token.type == TokenType.Decrement {
                 // Create subexpression to hold the operation
                 // This case would be `var b = 4 + a++`, where we have a value before the operator
-                source := expression.Children[expression.Children.length - 1];
-                changeByOneAst := create_ast<ChangeByOneAst>(source);
-                changeByOneAst.Positive = token.Type == TokenType.Increment;
-                changeByOneAst.Value = source;
-                expression.Children[expression.Children.length - 1] = changeByOneAst;
+                source := expression.children[expression.children.length - 1];
+                change_by_one := create_ast<ChangeByOneAst>(source, AstType.ChangeByOne);
+                change_by_one.positive = token.type == TokenType.Increment;
+                change_by_one.value = source;
+                expression.children[expression.children.length - 1] = change_by_one;
                 continue;
             }
             if token.type == TokenType.Number && token.value[0] == '-'
             {
                 token.value = substring(token.value, 1, token.value.length - 1);
-                expression.Operators.Add(Operator.Subtract);
+                expression.operators.Add(Operator.Subtract);
                 constant := parse_constant(token, enumerator.file_index);
-                expression.Children.Add(constant);
+                expression.children.Add(constant);
                 continue;
             }
-            if token.Type == TokenType.Period {
-                structFieldRef := parse_struct_field_ref(enumerator, expression.Children[expression.Children.length - 1], currentFunction);
-                expression.Children[expression.Children.length - 1] = structFieldRef;
+            if token.type == TokenType.Period {
+                struct_field_ref := parse_struct_field_ref(enumerator, expression.children[expression.children.length - 1], current_function);
+                expression.children[expression.children.length - 1] = struct_field_ref;
                 continue;
             }
             op := convert_operator(token);
             if op != Operator.None {
-                expression.Operators.Add(op);
-                operatorRequired = false;
+                expression.operators.Add(op);
+                operator_required = false;
             }
             else {
-                report_error("Unexpected token '{token.Value}' when operator was expected", enumerator.file_index, token);
+                report_error("Unexpected token '{token.value}' when operator was expected", enumerator.file_index, token);
                 return null;
             }
         }
         else {
-            ast := parse_next_expression_unit(enumerator, currentFunction, &operatorRequired);
+            ast := parse_next_expression_unit(enumerator, current_function, &operator_required);
             if ast
-                expression.Children.Add(ast);
+                expression.children.Add(ast);
         }
     }
 
-    return CheckExpression(enumerator, expression, operatorRequired);
+    return check_expression(enumerator, expression, operator_required);
 }
 
-Ast* CheckExpression(TokenEnumerator* enumerator, ExpressionAst expression, bool operatorRequired) {
-    if expression.Children.length == 0 {
-        report_error("Expression should contain elements", enumerator.file_index, enumerator.Current);
+Ast* check_expression(TokenEnumerator* enumerator, ExpressionAst* expression, bool operator_required) {
+    if expression.children.length == 0 {
+        report_error("Expression should contain elements", enumerator.file_index, enumerator.current);
     }
-    else if !operatorRequired && expression.Children.length > 0 {
-        report_error("Value required after operator", enumerator.file_index, enumerator.Current);
+    else if !operator_required && expression.children.length > 0 {
+        report_error("Value required after operator", enumerator.file_index, enumerator.current);
         return expression;
     }
 
-    if expression.Children.length == 1
-        return expression.Children[0];
+    if expression.children.length == 1
+        return expression.children[0];
 
     if errors.length == 0
         set_operator_precedence(expression);
@@ -1691,122 +1688,123 @@ Ast* CheckExpression(TokenEnumerator* enumerator, ExpressionAst expression, bool
     return expression;
 }
 
-Ast* ParseCompoundExpression(TokenEnumerator* enumerator, Function* current_function, Ast* initial) {
-    compoundExpression := create_ast<CompoundExpressionAst>(initial);
-    compoundExpression.Children.Add(initial);
-    firstToken := enumerator.Current;
+Ast* parse_compound_expression(TokenEnumerator* enumerator, Function* current_function, Ast* initial) {
+    compound_expression := create_ast<CompoundExpressionAst>(initial, AstType.CompoundExpression);
+    compound_expression.children.Add(initial);
+    first_token := enumerator.current;
 
     if !move_next(enumerator) {
-        report_error("Expected compound expression to contain multiple values", enumerator.file_index, firstToken);
-        return compoundExpression;
+        report_error("Expected compound expression to contain multiple values", enumerator.file_index, first_token);
+        return compound_expression;
     }
 
-    while enumerator.Remaining {
-        token := enumerator.Current;
+    while enumerator.remaining {
+        token := enumerator.current;
 
         switch token.type {
             case TokenType.SemiColon;
                 break;
             case TokenType.Equals; {
-                if compoundExpression.Children.length == 1
-                    report_error("Expected compound expression to contain multiple values", enumerator.file_index, firstToken);
+                if compound_expression.children.length == 1
+                    report_error("Expected compound expression to contain multiple values", enumerator.file_index, first_token);
 
                 _: bool;
-                return ParseAssignment(enumerator, currentFunction, &_, compoundExpression);
+                return parse_assignment(enumerator, current_function, &_, compound_expression);
             }
             case TokenType.Colon; {
-                compoundDeclaration := create_ast<CompoundDeclarationAst>(compoundExpression);
-                // compoundDeclaration.Variables = new VariableAst[compoundExpression.Children.Count];
+                compound_declaration := create_ast<CompoundDeclarationAst>(compound_expression, AstType.CompoundDeclaration);
+                // compound_declaration.Variables = new VariableAst[compound_expression.Children.Count];
 
                 // Copy the initial expression to variables
-                each variable, i in compoundExpression.Children {
+                each variable, i in compound_expression.children {
                     if variable.ast_type != AstType.Identifier {
                         report_error("Declaration should contain a variable", variable);
                     }
                     else {
-                        variableAst := create_ast<VariableAst>(identifier);
-                        variableAst.Name = identifier.Name;
-                        compoundDeclaration.Variables[i] = variableAst;
+                        identifier := cast(IdentifierAst*, variable);
+                        variable_ast := create_ast<VariableAst>(identifier, AstType.Variable);
+                        variable_ast.Name = identifier.Name;
+                        compound_declaration.variables[i] = variable_ast;
                     }
                 }
 
                 if !move_next(enumerator) {
-                    report_error("Expected declaration to contain type and/or value", enumerator.file_index, enumerator.Last);
+                    report_error("Expected declaration to contain type and/or value", enumerator.file_index, enumerator.last);
                     return null;
                 }
 
                 if enumerator.current.type == TokenType.Identifier {
-                    compoundDeclaration.TypeDefinition = parse_type(enumerator);
+                    compound_declaration.type_definition = parse_type(enumerator);
                     move_next(enumerator);
                 }
 
-                if !enumerator.Remaining {
-                    return compoundDeclaration;
-                }
-                switch enumerator.Current.Type {
+                if !enumerator.remaining
+                    return compound_declaration;
+
+                switch enumerator.current.type {
                     case TokenType.Equals;
-                        parse_value(compoundDeclaration, enumerator, currentFunction);
+                        parse_value(compound_declaration, enumerator, current_function);
                     case TokenType.SemiColon;
-                        if compoundDeclaration.TypeDefinition == null
+                        if compound_declaration.type_definition == null
                             report_error("Expected token declaration to have type and/or value", enumerator.file_index, enumerator.current);
                     default; {
-                        report_error("Unexpected token '{enumerator.Current.Value}' in declaration", enumerator.file_index, enumerator.current);
+                        report_error("Unexpected token '{enumerator.current.value}' in declaration", enumerator.file_index, enumerator.current);
                         // Parse until there is an equals sign or semicolon
                         while move_next(enumerator) {
                             if enumerator.current.type == TokenType.SemiColon break;
                             if enumerator.current.type == TokenType.Equals {
-                                parse_value(compoundDeclaration, enumerator, currentFunction);
+                                parse_value(compound_declaration, enumerator, current_function);
                                 break;
                             }
                         }
                     }
                 }
 
-                return compoundDeclaration;
+                return compound_declaration;
             }
             default; {
-                compoundExpression.Children.Add(ParseExpression(enumerator, currentFunction, null, TokenType.Comma, TokenType.Colon, TokenType.Equals));
+                compound_expression.children.Add(parse_expression(enumerator, current_function, null, TokenType.Comma, TokenType.Colon, TokenType.Equals));
                 if enumerator.current.type == TokenType.Comma
                     move_next(enumerator);
             }
         }
     }
 
-    if compoundExpression.Children.length == 1
-        report_error("Expected compound expression to contain multiple values", enumerator.file_index, firstToken);
+    if compound_expression.children.length == 1
+        report_error("Expected compound expression to contain multiple values", enumerator.file_index, first_token);
 
-    return compoundExpression;
+    return compound_expression;
 }
 
 Ast* parse_struct_field_ref(TokenEnumerator* enumerator, Ast* initialAst, Function* current_function) {
     // 1. Initialize and move over the dot operator
-    structFieldRef = create_ast<StructFieldRefAst>(initialAst);
-    structFieldRef.Children.Add(initialAst);
+    struct_field_ref := create_ast<StructFieldRefAst>(initialAst, AstType.StructFieldRef);
+    struct_field_ref.children.Add(initialAst);
 
     // 2. Parse expression units until the operator is not '.'
-    operatorRequired := false;
+    operator_required := false;
     while move_next(enumerator) {
-        if operatorRequired {
+        if operator_required {
             if enumerator.current.type != TokenType.Period {
-                enumerator.Move(-1);
+                move(enumerator, -1);
                 break;
             }
-            operatorRequired = false;
+            operator_required = false;
         }
         else {
-            ast := parse_next_expression_unit(enumerator, currentFunction, &operatorRequired);
+            ast := parse_next_expression_unit(enumerator, current_function, &operator_required);
             if ast
-                structFieldRef.Children.Add(ast);
+                struct_field_ref.children.Add(ast);
         }
     }
 
-    return structFieldRef;
+    return struct_field_ref;
 }
 
-Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_function, bool* operatorRequired) {
+Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_function, bool* operator_required) {
     token := enumerator.current;
-    *operatorRequired = true;
-    switch token.Type {
+    *operator_required = true;
+    switch token.type {
         case TokenType.Number;
         case TokenType.Boolean;
         case TokenType.Literal;
@@ -1814,27 +1812,27 @@ Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_f
             // Parse constant
             return parse_constant(token, enumerator.file_index);
         case TokenType.Null;
-            return create_ast<NullAst>(token, enumerator.file_index);
+            return create_ast<NullAst>(token, enumerator.file_index, AstType.Null);
         case TokenType.Identifier; {
             // Parse variable, call, or expression
-            nextToken: Token;
-            if !peek(enumerator, &nextToken) {
-                report_error("Expected token to follow '{token.Value}'", enumerator.file_index, token);
+            next_token: Token;
+            if !peek(enumerator, &next_token) {
+                report_error("Expected token to follow '{token.value}'", enumerator.file_index, token);
                 return null;
             }
-            switch nextToken.type {
+            switch next_token.type {
                 case TokenType.OpenParen;
-                    return parse_call(enumerator, currentFunction);
+                    return parse_call(enumerator, current_function);
                 case TokenType.OpenBracket;
-                    return parse_index(enumerator, currentFunction);
+                    return parse_index(enumerator, current_function);
                 case TokenType.Asterisk;
-                    if peek(enumerator, &nextToken, 1) {
-                        switch nextToken.Type {
+                    if peek(enumerator, &next_token, 1) {
+                        switch next_token.type {
                             case TokenType.Comma;
                             case TokenType.CloseParen; {
                                 type_definition: TypeDefinition*;
-                                if try_parse_type(enumerator, *type_definition) {
-                                    each generic, i in currentFunction.Generics {
+                                if try_parse_type(enumerator, &type_definition) {
+                                    each generic, i in current_function.generics {
                                         search_for_generic(generic, i, type_definition);
                                     }
                                     return type_definition;
@@ -1846,57 +1844,57 @@ Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_f
                     type_definition: TypeDefinition*;
                     if try_parse_type(enumerator, &type_definition) {
                         if enumerator.current.type == TokenType.OpenParen {
-                            callAst := create_ast<CallAst>(typeDefinition);
-                            callAst.Name = typeDefinition.Name;
-                            callAst.Generics = typeDefinition.Generics;
+                            call_ast := create_ast<CallAst>(type_definition, AstType.Call);
+                            call_ast.name = type_definition.name;
+                            call_ast.generics = type_definition.generics;
 
-                            each generic in callAst.Generics {
-                                each function_generic, i in currentFunction.Generics {
+                            each generic in call_ast.generics {
+                                each function_generic, i in current_function.generics {
                                     search_for_generic(function_generic, i, generic);
                                 }
                             }
 
                             move_next(enumerator);
-                            parse_arguments(callAst, enumerator, currentFunction);
-                            return callAst;
+                            parse_arguments(call_ast, enumerator, current_function);
+                            return call_ast;
                         }
                         else {
-                            each generic, i in currentFunction.Generics {
+                            each generic, i in current_function.generics {
                                 search_for_generic(generic, i, type_definition);
                             }
-                            return typeDefinition;
+                            return type_definition;
                         }
                     }
                 }
             }
-            identifier := create_ast<IdentifierAst>(token, enumerator.file_index);
-            identifier.Name = token.Value;
+            identifier := create_ast<IdentifierAst>(token, enumerator.file_index, AstType.Identifier);
+            identifier.name = token.value;
             return identifier;
         }
         case TokenType.Increment;
         case TokenType.Decrement; {
-            positive := token.Type == TokenType.Increment;
+            positive := token.type == TokenType.Increment;
             if move_next(enumerator) {
-                changeByOneAst := create_ast<ChangeByOneAst>(enumerator);
-                changeByOneAst.Prefix = true;
-                changeByOneAst.Positive = positive;
-                changeByOneAst.Value = parse_next_expression_unit(enumerator, currentFunction, operatorRequired);
-                if peek(enumerator, &token) && token.Type == TokenType.Period {
+                change_by_one := create_ast<ChangeByOneAst>(enumerator, AstType.ChangeByOne);
+                change_by_one.prefix = true;
+                change_by_one.positive = positive;
+                change_by_one.value = parse_next_expression_unit(enumerator, current_function, operator_required);
+                if peek(enumerator, &token) && token.type == TokenType.Period {
                     move_next(enumerator);
-                    changeByOneAst.Value = parse_struct_field_ref(enumerator, changeByOneAst.Value, currentFunction);
+                    change_by_one.value = parse_struct_field_ref(enumerator, change_by_one.value, current_function);
                 }
-                return changeByOneAst;
+                return change_by_one;
             }
 
-            report_error("Expected token to follow '{token.Value}'", enumerator.file_index, token);
+            report_error("Expected token to follow '{token.value}'", enumerator.file_index, token);
             return null;
         }
         case TokenType.OpenParen; {
             // Parse subexpression
             if move_next(enumerator)
-                return ParseExpression(enumerator, currentFunction, null, TokenType.CloseParen);
+                return parse_expression(enumerator, current_function, null, TokenType.CloseParen);
 
-            report_error("Expected token to follow '{token.Value}'", enumerator.file_index, token);
+            report_error("Expected token to follow '{token.value}'", enumerator.file_index, token);
             return null;
         }
         case TokenType.Not;
@@ -1904,92 +1902,92 @@ Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_f
         case TokenType.Asterisk;
         case TokenType.Ampersand; {
             if move_next(enumerator) {
-                unaryAst := create_ast<UnaryAst>(token, enumerator.file_index);
-                unaryAst.Operator = cast(UnaryOperator, token.Value[0]);
-                unaryAst.Value = parse_next_expression_unit(enumerator, currentFunction, operatorRequired);
-                if peek(enumerator, &token) && token.Type == TokenType.Period {
+                unaryAst := create_ast<UnaryAst>(token, enumerator.file_index, AstType.Unary);
+                unaryAst.op = cast(UnaryOperator, token.value[0]);
+                unaryAst.value = parse_next_expression_unit(enumerator, current_function, operator_required);
+                if peek(enumerator, &token) && token.type == TokenType.Period {
                     move_next(enumerator);
-                    unaryAst.Value = parse_struct_field_ref(enumerator, unaryAst.Value, currentFunction);
+                    unaryAst.value = parse_struct_field_ref(enumerator, unaryAst.value, current_function);
                 }
                 return unaryAst;
             }
 
-            report_error("Expected token to follow '{token.Value}'", enumerator.file_index, token);
+            report_error("Expected token to follow '{token.value}'", enumerator.file_index, token);
             return null;
         }
         case TokenType.Cast;
-            return parse_cast(enumerator, currentFunction);
+            return parse_cast(enumerator, current_function);
         default; {
-            report_error("Unexpected token '{token.Value}' in expression", enumerator.file_index, token);
-            *operatorRequired = false;
+            report_error("Unexpected token '{token.value}' in expression", enumerator.file_index, token);
+            *operator_required = false;
         }
    }
    return null;
 }
 
-set_operator_precedence(ExpressionAst expression) {
+set_operator_precedence(ExpressionAst* expression) {
     // 1. Set the initial operator precedence
-    operatorPrecedence := get_operator_precedence(expression.Operators[0]);
+    operator_precedence := get_operator_precedence(expression.operators[0]);
     i := 1;
-    while i < expression.Operators.length {
+    while i < expression.operators.length {
         // 2. Get the next operator
-        precedence := get_operator_precedence(expression.Operators[i]);
+        precedence := get_operator_precedence(expression.operators[i]);
 
         // 3. Create subexpressions to enforce operator precedence if necessary
-        if precedence > operatorPrecedence {
+        if precedence > operator_precedence {
             end: int;
-            subExpression := create_sub_expression(expression, precedence, i, &end);
-            expression.Children[i] = subExpression;
-            expression.Children.RemoveRange(i + 1, end - i);
-            expression.Operators.RemoveRange(i, end - i);
+            sub_expression := create_sub_expression(expression, precedence, i, &end);
+            expression.children[i] = sub_expression;
+            expression.children.RemoveRange(i + 1, end - i);
+            expression.operators.RemoveRange(i, end - i);
 
-            if (i >= expression.Operators.Count) return;
-            operatorPrecedence = get_operator_precedence(expression.Operators[--i]);
+            if (i >= expression.operators.Count) return;
+            operator_precedence = get_operator_precedence(expression.operators[--i]);
         }
         else
-            operatorPrecedence = precedence;
+            operator_precedence = precedence;
 
         i++;
     }
 }
 
-ExpressionAst* create_sub_expression(ExpressionAst expression, int parentPrecedence, int i, int* end) {
-    subExpression := create_ast<ExpressionAst>(expression.Children[i]);
+ExpressionAst* create_sub_expression(ExpressionAst* expression, int parent_precedence, int i, int* end) {
+    sub_expression := create_ast<ExpressionAst>(expression.children[i], AstType.Expression);
 
-    subExpression.Children.Add(expression.Children[i]);
-    subExpression.Operators.Add(expression.Operators[i]);
+    sub_expression.children.Add(expression.children[i]);
+    sub_expression.operators.Add(expression.operators[i]);
     ++i;
-    while i < expression.Operators.length
+    while i < expression.operators.length
     {
         // 1. Get the next operator
-        precedence := get_operator_precedence(expression.Operators[i]);
+        precedence := get_operator_precedence(expression.operators[i]);
 
         // 2. Create subexpressions to enforce operator precedence if necessary
-        if precedence > parentPrecedence {
-            subExpression.Children.Add(create_sub_expression(expression, precedence, i, &i));
-            if i == expression.Operators.length {
+        if precedence > parent_precedence {
+            sub_expression.children.Add(create_sub_expression(expression, precedence, i, &i));
+            if i == expression.operators.length {
                 *end = i;
-                return subExpression;
+                return sub_expression;
             }
 
-            subExpression.Operators.Add(expression.Operators[i]);
+            sub_expression.operators.Add(expression.operators[i]);
         }
-        else if precedence < parentPrecedence {
-            subExpression.Children.Add(expression.Children[i]);
+        else if precedence < parent_precedence {
+            sub_expression.children.Add(expression.children[i]);
             *end = i;
-            return subExpression;
+            return sub_expression;
         }
         else {
-            subExpression.Children.Add(expression.Children[i]);
-            subExpression.Operators.Add(expression.Operators[i]);
+            sub_expression.children.Add(expression.children[i]);
+            sub_expression.operators.Add(expression.operators[i]);
         }
 
         i++;
     }
 
-    subExpression.Children.Add(expression.Children[expression.Children.length - 1]);
-    end = i;
-    return subExpression;
+    sub_expression.children.Add(expression.children[expression.children.length - 1]);
+    *end = i;
+    return sub_expression;
 }
 
 int get_operator_precedence(Operator op) {
@@ -2023,66 +2021,66 @@ int get_operator_precedence(Operator op) {
 }
 
 CallAst* parse_call(TokenEnumerator* enumerator, Function* current_function, bool requiresSemicolon = false) {
-    callAst := create_ast<CallAst>(enumerator);
-    callAst.Name = enumerator.Current.Value;
+    call_ast := create_ast<CallAst>(enumerator, AstType.Call);
+    call_ast.name = enumerator.current.value;
 
     // This enumeration is the open paren
     move_next(enumerator);
     // Enumerate over the first argument
-    parse_arguments(callAst, enumerator, currentFunction);
+    parse_arguments(call_ast, enumerator, current_function);
 
-    if !enumerator.Remaining {
-        report_error("Expected to close call", enumerator.file_index, enumerator.Last);
+    if !enumerator.remaining {
+        report_error("Expected to close call", enumerator.file_index, enumerator.last);
     }
     else if requiresSemicolon {
-        if enumerator.Current.Type == TokenType.SemiColon
-            return callAst;
+        if enumerator.current.type == TokenType.SemiColon
+            return call_ast;
 
         token: Token;
-        if !peek(enumerator, &token) || token.Type != TokenType.SemiColon {
+        if !peek(enumerator, &token) || token.type != TokenType.SemiColon {
             report_error("Expected ';'", enumerator.file_index, token);
         }
         else
             move_next(enumerator);
     }
 
-    return callAst;
+    return call_ast;
 }
 
-parse_arguments(CallAst callAst, TokenEnumerator* enumerator, Function* current_function) {
-    nextArgumentRequired := false;
+parse_arguments(CallAst* call_ast, TokenEnumerator* enumerator, Function* current_function) {
+    next_argument_required := false;
     while move_next(enumerator) {
-        token := enumerator.Current;
+        token := enumerator.current;
 
         if enumerator.current.type == TokenType.CloseParen {
-            if nextArgumentRequired
+            if next_argument_required
                 report_error("Expected argument in call following a comma", enumerator.file_index, token);
 
             break;
         }
 
-        if token.Type == TokenType.Comma {
+        if token.type == TokenType.Comma {
             report_error("Expected comma before next argument", enumerator.file_index, token);
         }
         else {
-            nextToken: Token;
-            if token.Type == TokenType.Identifier && peek(enumerator, &nextToken) && nextToken.Type == TokenType.Equals {
-                argumentName := token.Value;
+            next_token: Token;
+            if token.type == TokenType.Identifier && peek(enumerator, &next_token) && next_token.type == TokenType.Equals {
+                argument_name := token.value;
 
                 move_next(enumerator);
                 move_next(enumerator);
 
-                // callAst.SpecifiedArguments ??= new Dictionary<string, IAst>();
-                argument := ParseExpression(enumerator, currentFunction, null, TokenType.Comma, TokenType.CloseParen);
-                if !callAst.SpecifiedArguments.TryAdd(argumentName, argument)
-                    report_error("Specified argument '{token.Value}' is already in the call", enumerator.file_index, token);
+                // call_ast.SpecifiedArguments ??= new Dictionary<string, IAst>();
+                argument := parse_expression(enumerator, current_function, null, TokenType.Comma, TokenType.CloseParen);
+                if !call_ast.specified_arguments.TryAdd(argument_name, argument)
+                    report_error("Specified argument '{token.value}' is already in the call", enumerator.file_index, token);
             }
             else
-                callAst.Arguments.Add(ParseExpression(enumerator, currentFunction, null, TokenType.Comma, TokenType.CloseParen));
+                call_ast.arguments.Add(parse_expression(enumerator, current_function, null, TokenType.Comma, TokenType.CloseParen));
 
             switch enumerator.current.type {
                 case TokenType.CloseParen; break;
-                case TokenType.Comma; nextArgumentRequired = true;
+                case TokenType.Comma; next_argument_required = true;
                 case TokenType.SemiColon; {
                     report_error("Expected to close call with ')'", enumerator.file_index, enumerator.current);
                     break;
@@ -2093,131 +2091,131 @@ parse_arguments(CallAst callAst, TokenEnumerator* enumerator, Function* current_
 }
 
 ReturnAst* parse_return(TokenEnumerator* enumerator, Function* current_function) {
-    returnAst := create_ast<ReturnAst>(enumerator);
+    return_ast := create_ast<ReturnAst>(enumerator, AstType.Return);
 
     if move_next(enumerator) {
         if enumerator.current.type != TokenType.SemiColon {
-            returnAst.Value = ParseExpression(enumerator, currentFunction);
+            return_ast.value = parse_expression(enumerator, current_function);
         }
     }
     else
-        report_error("Return does not have value", enumerator.file_index, enumerator.Last);
+        report_error("Return does not have value", enumerator.file_index, enumerator.last);
 
-    return returnAst;
+    return return_ast;
 }
 
 IndexAst* parse_index(TokenEnumerator* enumerator, Function* current_function) {
     // 1. Initialize the index ast
-    index := create_ast<IndexAst>(enumerator);
-    index.Name = enumerator.current.value;
+    index := create_ast<IndexAst>(enumerator, AstType.Index);
+    index.name = enumerator.current.value;
     move_next(enumerator);
 
     // 2. Parse index expression
     move_next(enumerator);
-    index.index = ParseExpression(enumerator, currentFunction, null, TokenType.CloseBracket);
+    index.index = parse_expression(enumerator, current_function, null, TokenType.CloseBracket);
 
     return index;
 }
 
 CompilerDirectiveAst* parse_top_level_directive(TokenEnumerator* enumerator, bool global = false) {
-    directive := create_ast<CompilerDirectiveAst>(enumerator);
+    directive := create_ast<CompilerDirectiveAst>(enumerator, AstType.CompilerDirective);
 
     if !move_next(enumerator) {
-        report_error("Expected compiler directive to have a value", enumerator.file_index, enumerator.Last);
+        report_error("Expected compiler directive to have a value", enumerator.file_index, enumerator.last);
         return null;
     }
 
-    token := enumerator.Current;
-    switch token.Value {
+    token := enumerator.current;
+    switch token.value {
         case "run"; {
-            directive.Type = DirectiveType.Run;
+            directive.directive_type = DirectiveType.Run;
             move_next(enumerator);
-            ast := ParseLine(enumerator, null);
-            if ast directive.Value = ast;
+            ast := parse_line(enumerator, null);
+            if ast directive.value = ast;
         }
         case "if"; {
-            directive.Type = DirectiveType.If;
-            directive.Value = parse_conditional(enumerator, null, true, directory);
+            directive.directive_type = DirectiveType.If;
+            directive.value = parse_conditional(enumerator, null, true);
         }
         case "assert"; {
-            directive.Type = DirectiveType.Assert;
+            directive.directive_type = DirectiveType.Assert;
             move_next(enumerator);
-            directive.Value = ParseExpression(enumerator, null);
+            directive.value = parse_expression(enumerator, null);
         }
         case "import"; {
             if !move_next(enumerator) {
-                report_error("Expected module name or source file", enumerator.file_index, enumerator.Last);
+                report_error("Expected module name or source file", enumerator.file_index, enumerator.last);
                 return null;
             }
-            token = enumerator.Current;
-            switch token.Type {
+            token = enumerator.current;
+            switch token.type {
                 case TokenType.Identifier; {
-                    directive.Type = DirectiveType.ImportModule;
-                    module := token.Value;
+                    directive.directive_type = DirectiveType.ImportModule;
+                    module := token.value;
                     if global
-                        AddModule(module, enumerator.file_index, token);
+                        add_module(module, enumerator.file_index, token);
                     else
-                        directive.Import = { Name = module; Path = Path.Combine(_libraryDirectory, "{token.Value}.ol"); }
+                        directive.import = { name = module; path = Path.Combine(_libraryDirectory, "{token.value}.ol"); }
                 }
                 case TokenType.Literal; {
-                    directive.Type = DirectiveType.ImportFile;
-                    file := token.Value;
+                    directive.directive_type = DirectiveType.ImportFile;
+                    file := token.value;
                     if global
-                        AddFile(file, directory, enumerator.file_index, token);
+                        add_file(file, directory, enumerator.file_index, token);
                     else
-                        directive.Import = { Name = file; Path = Path.Combine(directory, token.Value); }
+                        directive.import = { name = file; path = Path.Combine(directory, token.value); }
                 }
                 default;
-                    report_error("Expected module name or source file, but got '{token.Value}'", enumerator.file_index, token);
+                    report_error("Expected module name or source file, but got '{token.value}'", enumerator.file_index, token);
             }
         }
         case "library"; {
-            directive.Type = DirectiveType.Library;
-            if (!move_next(enumerator) || enumerator.Current.Type != TokenType.Identifier)
+            directive.directive_type = DirectiveType.Library;
+            if (!move_next(enumerator) || enumerator.current.type != TokenType.Identifier)
             {
-                report_error("Expected library name, but got '{enumerator.Current.Value}'", enumerator.file_index, enumerator.Current);
+                report_error("Expected library name, but got '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
                 return null;
             }
             name := enumerator.current.value;
             if !move_next(enumerator) || enumerator.current.type != TokenType.Literal
             {
-                report_error("Expected library path, but got '{enumerator.Current.Value}'", enumerator.file_index, enumerator.Current);
+                report_error("Expected library path, but got '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
                 return null;
             }
             path := enumerator.current.value;
-            directive.Library = { Name = name; Path = path; }
+            directive.library = { name = name; path = path; }
             if path[0] == '/'
-                directive.Library.AbsolutePath = path;
+                directive.library.absolute_path = path;
             else
-                directive.Library.AbsolutePath = Path.Combine(directory, path);
+                directive.library.absolute_path = Path.Combine(directory, path);
         }
         case "system_library"; {
-            directive.Type = DirectiveType.SystemLibrary;
-            if !move_next(enumerator) || enumerator.Current.Type != TokenType.Identifier {
-                report_error("Expected library name, but got '{enumerator.Current.Value}'", enumerator.file_index, enumerator.Current);
+            directive.directive_type = DirectiveType.SystemLibrary;
+            if !move_next(enumerator) || enumerator.current.type != TokenType.Identifier {
+                report_error("Expected library name, but got '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
                 return null;
             }
-            name := enumerator.Current.Value;
-            if !move_next(enumerator) || enumerator.Current.Type != TokenType.Literal {
-                report_error("Expected library file name, but got '{enumerator.Current.Value}'", enumerator.file_index, enumerator.Current);
+            name := enumerator.current.value;
+            if !move_next(enumerator) || enumerator.current.type != TokenType.Literal {
+                report_error("Expected library file name, but got '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
                 return null;
             }
-            fileName := enumerator.Current.Value;
-            directive.Library = { Name = name; FileName = fileName; }
-            if peek(enumerator, &token) && token.Type == TokenType.Literal {
-                directive.Library.LibPath = token.Value;
+            file_name := enumerator.current.value;
+            directive.library = { name = name; file_name = file_name; }
+            if peek(enumerator, &token) && token.type == TokenType.Literal {
+                directive.library.lib_path = token.value;
                 move_next(enumerator);
             }
         }
         case "private"; {
-            if (enumerator.Private)
+            if (enumerator.private)
                 report_error("Tried to set #private when already in private scope", enumerator.file_index, token);
             else
-                TypeChecker.PrivateScopes[enumerator.file_index] = TODO; //new PrivateScope{Parent = TypeChecker.GlobalScope};
-            enumerator.Private = true;
+                TypeChecker.privateScopes[enumerator.file_index] = TODO; //new PrivateScope{Parent = TypeChecker.GlobalScope};
+            enumerator.private = true;
         }
         default; {
-            report_error("Unsupported top-level compiler directive '{token.Value}'", enumerator.file_index, token);
+            report_error("Unsupported top-level compiler directive '{token.value}'", enumerator.file_index, token);
             return null;
         }
     }
@@ -2226,37 +2224,37 @@ CompilerDirectiveAst* parse_top_level_directive(TokenEnumerator* enumerator, boo
 }
 
 Ast* parse_compiler_directive(TokenEnumerator* enumerator, Function* current_function) {
-    directive := create_ast<CompilerDirectiveAst>(enumerator);
+    directive := create_ast<CompilerDirectiveAst>(enumerator, AstType.CompilerDirective);
 
     if !move_next(enumerator) {
-        report_error("Expected compiler directive to have a value", enumerator.file_index, enumerator.Last);
+        report_error("Expected compiler directive to have a value", enumerator.file_index, enumerator.last);
         return null;
     }
 
     token := enumerator.current;
-    switch token.Value {
+    switch token.value {
         case "if"; {
-            directive.Type = DirectiveType.If;
-            directive.Value = parse_conditional(enumerator, currentFunction);
-            currentFunction.Flags |= FunctionFlags.HasDirectives;
+            directive.directive_type = DirectiveType.If;
+            directive.value = parse_conditional(enumerator, current_function);
+            current_function.flags |= FunctionFlags.HasDirectives;
         }
         case "assert"; {
-            directive.Type = DirectiveType.Assert;
+            directive.directive_type = DirectiveType.Assert;
             move_next(enumerator);
-            directive.Value = ParseExpression(enumerator, currentFunction);
-            currentFunction.Flags |= FunctionFlags.HasDirectives;
+            directive.value = parse_expression(enumerator, current_function);
+            current_function.flags |= FunctionFlags.HasDirectives;
         }
         case "inline"; {
-            if !move_next(enumerator) || enumerator.Current.Type != TokenType.Identifier {
+            if !move_next(enumerator) || enumerator.current.type != TokenType.Identifier {
                 report_error("Expected funciton call following #inline directive", enumerator.file_index, token);
                 return null;
             }
-            call := parse_call(enumerator, currentFunction, true);
-            if call call.Inline = true;
+            call := parse_call(enumerator, current_function, true);
+            if call call.inline = true;
             return call;
         }
         default; {
-            report_error("Unsupported function level compiler directive '{token.Value}'", enumerator.file_index, token);
+            report_error("Unsupported function level compiler directive '{token.value}'", enumerator.file_index, token);
             return null;
         }
     }
@@ -2265,39 +2263,39 @@ Ast* parse_compiler_directive(TokenEnumerator* enumerator, Function* current_fun
 }
 
 AssemblyAst* parse_inline_assembly(TokenEnumerator* enumerator) {
-    assembly := create_ast<AssemblyAst>(enumerator);
+    assembly := create_ast<AssemblyAst>(enumerator, AstType.Assembly);
 
     // First move over the opening '{'
     if !move_next(enumerator) {
-        report_error("Expected an opening '{' at asm block", enumerator.file_index, enumerator.Last);
+        report_error("Expected an opening '{' at asm block", enumerator.file_index, enumerator.last);
         return null;
     }
 
     if enumerator.current.type != TokenType.OpenBrace {
-        report_error("Expected an opening '{' at asm block", enumerator.file_index, enumerator.Current);
+        report_error("Expected an opening '{' at asm block", enumerator.file_index, enumerator.current);
         return null;
     }
 
     closed := false;
-    parsingInRegisters := true;
-    parsingOutRegisters := false;
+    parsing_in_registers := true;
+    parsing_out_registers := false;
     while move_next(enumerator) {
-        token := enumerator.Current;
+        token := enumerator.current;
 
-        switch token.Type {
+        switch token.type {
             case TokenType.CloseBrace; {
                 closed = true;
                 break;
             }
             case TokenType.In; {
                 if parse_in_register(assembly, enumerator) {
-                    if parsingOutRegisters || !parsingInRegisters {
+                    if parsing_out_registers || !parsing_in_registers {
                         report_error("In instructions should be declared before body instructions", enumerator.file_index, token);
                     }
                 }
                 else {
                     // Skip through the next ';' or '}'
-                    while enumerator.Current.Type != TokenType.SemiColon && enumerator.Current.Type != TokenType.CloseBrace && move_next(enumerator) {}
+                    while enumerator.current.type != TokenType.SemiColon && enumerator.current.type != TokenType.CloseBrace && move_next(enumerator) {}
 
                     if enumerator.current.type == TokenType.CloseBrace
                         return assembly;
@@ -2305,228 +2303,228 @@ AssemblyAst* parse_inline_assembly(TokenEnumerator* enumerator) {
             }
             case TokenType.Out; {
                 if parse_out_value(assembly, enumerator) {
-                    if parsingInRegisters {
-                        parsingInRegisters = false;
-                        parsingOutRegisters = true;
+                    if parsing_in_registers {
+                        parsing_in_registers = false;
+                        parsing_out_registers = true;
                         report_error("Expected instructions before out registers", enumerator.file_index, token);
                     }
-                    else if !parsingOutRegisters
-                        parsingOutRegisters = true;
+                    else if !parsing_out_registers
+                        parsing_out_registers = true;
                 }
                 else {
                     // Skip through the next ';' or '}'
-                    while enumerator.current.type != TokenType.SemiColon && enumerator.Current.Type != TokenType.CloseBrace && move_next(enumerator) {}
+                    while enumerator.current.type != TokenType.SemiColon && enumerator.current.type != TokenType.CloseBrace && move_next(enumerator) {}
 
-                    if enumerator.Current.Type == TokenType.CloseBrace
+                    if enumerator.current.type == TokenType.CloseBrace
                         return assembly;
                 }
             }
             case TokenType.Identifier; {
                 instruction := parse_assembly_instruction(enumerator);
                 if instruction {
-                    if parsingInRegisters parsingInRegisters = false;
-                    else if parsingOutRegisters
+                    if parsing_in_registers parsing_in_registers = false;
+                    else if parsing_out_registers
                         report_error("Expected body instructions before out values", instruction);
 
-                    assembly.Instructions.Add(instruction);
+                    assembly.instructions.Add(instruction);
                 }
                 else {
                     // Skip through the next ';' or '}'
-                    while enumerator.Current.Type != TokenType.SemiColon && enumerator.Current.Type != TokenType.CloseBrace && move_next(enumerator) {}
+                    while enumerator.current.type != TokenType.SemiColon && enumerator.current.type != TokenType.CloseBrace && move_next(enumerator) {}
 
-                    if enumerator.Current.Type == TokenType.CloseBrace
+                    if enumerator.current.type == TokenType.CloseBrace
                         return assembly;
                 }
             }
             default; {
-                report_error("Expected instruction in assembly block, but got '{enumerator.Current.Value}'", enumerator.file_index, enumerator.Current);
+                report_error("Expected instruction in assembly block, but got '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
 
                 // Skip through the next ';' or '}'
-                while (enumerator.Current.Type != TokenType.SemiColon || enumerator.Current.Type != TokenType.CloseBrace) && move_next(enumerator) {}
+                while (enumerator.current.type != TokenType.SemiColon || enumerator.current.type != TokenType.CloseBrace) && move_next(enumerator) {}
 
-                if enumerator.Current.Type == TokenType.CloseBrace
+                if enumerator.current.type == TokenType.CloseBrace
                     return assembly;
             }
         }
     }
 
     if !closed
-        report_error("Assembly block not closed by '}'", enumerator.file_index, enumerator.Current);
+        report_error("Assembly block not closed by '}'", enumerator.file_index, enumerator.current);
 
     return assembly;
 }
 
 bool parse_in_register(AssemblyAst* assembly, TokenEnumerator* enumerator) {
     if !move_next(enumerator) {
-        report_error("Expected value or semicolon in instruction", enumerator.file_index, enumerator.Last);
+        report_error("Expected value or semicolon in instruction", enumerator.file_index, enumerator.last);
         return false;
     }
 
-    if enumerator.Current.Type != TokenType.Identifier {
-        report_error("Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.file_index, enumerator.Current);
+    if enumerator.current.type != TokenType.Identifier {
+        report_error("Unexpected token '{enumerator.current.value}' in assembly block", enumerator.file_index, enumerator.current);
         return false;
     }
 
-    register := enumerator.Current.Value;
-    if assembly.InRegisters.ContainsKey(register) {
-        report_error("Duplicate in register '{register}'", enumerator.file_index, enumerator.Current);
+    register := enumerator.current.value;
+    if assembly.in_registers.ContainsKey(register) {
+        report_error("Duplicate in register '{register}'", enumerator.file_index, enumerator.current);
         return false;
     }
-    input := create_ast<AssemblyInputAst>(enumerator);
-    input.Register = register;
-
-    if !move_next(enumerator) {
-        report_error("Expected comma or semicolon in instruction", enumerator.file_index, enumerator.Last);
-        return false;
-    }
-
-    if enumerator.Current.Type != TokenType.Comma {
-        report_error("Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.file_index, enumerator.Current);
-        return false;
-    }
+    input := create_ast<AssemblyInputAst>(enumerator, AstType.AssemblyInput);
+    input.register = register;
 
     if !move_next(enumerator) {
-        report_error("Expected value in instruction", enumerator.file_index, enumerator.Last);
+        report_error("Expected comma or semicolon in instruction", enumerator.file_index, enumerator.last);
+        return false;
+    }
+
+    if enumerator.current.type != TokenType.Comma {
+        report_error("Unexpected token '{enumerator.current.value}' in assembly block", enumerator.file_index, enumerator.current);
+        return false;
+    }
+
+    if !move_next(enumerator) {
+        report_error("Expected value in instruction", enumerator.file_index, enumerator.last);
         return false;
     }
 
     _: bool;
-    input.Ast = parse_next_expression_unit(enumerator, null, &_);
+    input.ast = parse_next_expression_unit(enumerator, null, &_);
 
     if !move_next(enumerator) {
-        report_error("Expected semicolon in instruction", enumerator.file_index, enumerator.Last);
+        report_error("Expected semicolon in instruction", enumerator.file_index, enumerator.last);
         return false;
     }
 
-    if enumerator.Current.Type != TokenType.SemiColon {
-        report_error("Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.file_index, enumerator.Current);
+    if enumerator.current.type != TokenType.SemiColon {
+        report_error("Unexpected token '{enumerator.current.value}' in assembly block", enumerator.file_index, enumerator.current);
         return false;
     }
 
-    assembly.InRegisters[register] = input;
+    assembly.in_registers[register] = input;
     return true;
 }
 
 bool parse_out_value(AssemblyAst* assembly, TokenEnumerator* enumerator) {
     if !move_next(enumerator) {
-        report_error("Expected value or semicolon in instruction", enumerator.file_index, enumerator.Last);
+        report_error("Expected value or semicolon in instruction", enumerator.file_index, enumerator.last);
         return false;
     }
 
-    output := create_ast<AssemblyInputAst>(enumerator);
+    output := create_ast<AssemblyInputAst>(enumerator, AstType.AssemblyInput);
 
     _: bool;
-    output.Ast = parse_next_expression_unit(enumerator, null, &_);
-    if output.Ast == null {
+    output.ast = parse_next_expression_unit(enumerator, null, &_);
+    if output.ast == null {
         return false;
     }
 
     if !move_next(enumerator) {
-        report_error("Expected comma or semicolon in instruction", enumerator.file_index, enumerator.Last);
+        report_error("Expected comma or semicolon in instruction", enumerator.file_index, enumerator.last);
         return false;
     }
 
-    if enumerator.Current.Type != TokenType.Comma {
-        report_error("Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.file_index, enumerator.Current);
+    if enumerator.current.type != TokenType.Comma {
+        report_error("Unexpected token '{enumerator.current.value}' in assembly block", enumerator.file_index, enumerator.current);
         return false;
     }
 
     if !move_next(enumerator) {
-        report_error("Expected value in instruction", enumerator.file_index, enumerator.Last);
+        report_error("Expected value in instruction", enumerator.file_index, enumerator.last);
         return false;
     }
 
-    if enumerator.Current.Type != TokenType.Identifier {
-        report_error("Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.file_index, enumerator.Current);
+    if enumerator.current.type != TokenType.Identifier {
+        report_error("Unexpected token '{enumerator.current.value}' in assembly block", enumerator.file_index, enumerator.current);
         return false;
     }
-    output.Register = enumerator.Current.Value;
+    output.register = enumerator.current.value;
 
     if !move_next(enumerator) {
-        report_error("Expected semicolon in instruction", enumerator.file_index, enumerator.Last);
+        report_error("Expected semicolon in instruction", enumerator.file_index, enumerator.last);
         return false;
     }
 
-    if enumerator.Current.Type != TokenType.SemiColon {
-        report_error("Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.file_index, enumerator.Current);
+    if enumerator.current.type != TokenType.SemiColon {
+        report_error("Unexpected token '{enumerator.current.value}' in assembly block", enumerator.file_index, enumerator.current);
         return false;
     }
 
-    assembly.OutValues.Add(output);
+    assembly.out_values.Add(output);
     return true;
 }
 
 AssemblyInstructionAst* parse_assembly_instruction(TokenEnumerator* enumerator) {
-    instruction := create_ast<AssemblyInstructionAst>(enumerator);
-    instruction.Instruction = enumerator.Current.Value;
+    instruction := create_ast<AssemblyInstructionAst>(enumerator, AstType.AssemblyInstruction);
+    instruction.instruction = enumerator.current.value;
 
     if !move_next(enumerator) {
-        report_error("Expected value or semicolon in instruction", enumerator.file_index, enumerator.Last);
+        report_error("Expected value or semicolon in instruction", enumerator.file_index, enumerator.last);
         return null;
     }
 
-    switch enumerator.Current.Type {
+    switch enumerator.current.type {
         case TokenType.Identifier; {
-            instruction.Value1 = create_ast<AssemblyValueAst>(enumerator);
-            instruction.Value1.Register = enumerator.Current.Value;
+            instruction.value1 = create_ast<AssemblyValueAst>(enumerator, AstType.AssemblyValue);
+            instruction.value1.register = enumerator.current.value;
         }
         case TokenType.Number; {
-            instruction.Value1 = create_ast<AssemblyValueAst>(enumerator);
-            instruction.Value1.Constant = parse_constant(enumerator.Current, enumerator.file_index);
+            instruction.value1 = create_ast<AssemblyValueAst>(enumerator, AstType.AssemblyValue);
+            instruction.value1.constant = parse_constant(enumerator.current, enumerator.file_index);
         }
         case TokenType.OpenBracket; {
-            instruction.Value1 = create_ast<AssemblyValueAst>(enumerator);
-            if !parse_assembly_pointer(instruction.Value1, enumerator)
+            instruction.value1 = create_ast<AssemblyValueAst>(enumerator, AstType.AssemblyValue);
+            if !parse_assembly_pointer(instruction.value1, enumerator)
                 return null;
         }
         case TokenType.SemiColon; return instruction;
         default; {
-            report_error("Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.file_index, enumerator.Current);
+            report_error("Unexpected token '{enumerator.current.value}' in assembly block", enumerator.file_index, enumerator.current);
             return null;
         }
     }
 
     if !move_next(enumerator) {
-        report_error("Expected comma or semicolon in instruction", enumerator.file_index, enumerator.Last);
+        report_error("Expected comma or semicolon in instruction", enumerator.file_index, enumerator.last);
         return null;
     }
 
-    switch enumerator.Current.Type {
+    switch enumerator.current.type {
         case TokenType.Comma; {}
         case TokenType.SemiColon; return instruction;
         default; {
-            report_error("Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.file_index, enumerator.Current);
+            report_error("Unexpected token '{enumerator.current.value}' in assembly block", enumerator.file_index, enumerator.current);
             return null;
         }
     }
 
     if !move_next(enumerator) {
-        report_error("Expected value in instruction", enumerator.file_index, enumerator.Last);
+        report_error("Expected value in instruction", enumerator.file_index, enumerator.last);
         return null;
     }
 
-    instruction.Value2 = create_ast<AssemblyValueAst>(enumerator);
-    switch enumerator.Current.Type {
+    instruction.value2 = create_ast<AssemblyValueAst>(enumerator, AstType.AssemblyValue);
+    switch enumerator.current.type {
         case TokenType.Identifier;
-            instruction.Value2.Register = enumerator.Current.Value;
+            instruction.value2.register = enumerator.current.value;
         case TokenType.Number;
-            instruction.Value2.Constant = parse_constant(enumerator.Current, enumerator.file_index);
+            instruction.value2.constant = parse_constant(enumerator.current, enumerator.file_index);
         case TokenType.OpenBracket;
-            if !parse_assembly_pointer(instruction.Value2, enumerator)
+            if !parse_assembly_pointer(instruction.value2, enumerator)
                 return null;
         default; {
-            report_error("Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.file_index, enumerator.Current);
+            report_error("Unexpected token '{enumerator.current.value}' in assembly block", enumerator.file_index, enumerator.current);
             return null;
         }
     }
 
     if !move_next(enumerator) {
-        report_error("Expected semicolon in instruction", enumerator.file_index, enumerator.Last);
+        report_error("Expected semicolon in instruction", enumerator.file_index, enumerator.last);
         return null;
     }
 
-    if enumerator.Current.Type != TokenType.SemiColon {
-        report_error("Unexpected token '{enumerator.Current.Value}' in assembly block", enumerator.file_index, enumerator.Current);
+    if enumerator.current.type != TokenType.SemiColon {
+        report_error("Unexpected token '{enumerator.current.value}' in assembly block", enumerator.file_index, enumerator.current);
         return null;
     }
 
@@ -2534,15 +2532,15 @@ AssemblyInstructionAst* parse_assembly_instruction(TokenEnumerator* enumerator) 
 }
 
 bool parse_assembly_pointer(AssemblyValueAst* value, TokenEnumerator* enumerator) {
-    if !move_next(enumerator) || enumerator.Current.Type != TokenType.Identifier {
-        report_error("Expected register after pointer in instruction", enumerator.file_index, enumerator.Current);
+    if !move_next(enumerator) || enumerator.current.type != TokenType.Identifier {
+        report_error("Expected register after pointer in instruction", enumerator.file_index, enumerator.current);
         return false;
     }
-    value.Dereference = true;
-    value.Register = enumerator.Current.Value;
+    value.dereference = true;
+    value.register = enumerator.current.value;
 
-    if !move_next(enumerator) || enumerator.Current.Type != TokenType.CloseBracket {
-        report_error("Expected to close pointer to register with ']'", enumerator.file_index, enumerator.Current);
+    if !move_next(enumerator) || enumerator.current.type != TokenType.CloseBracket {
+        report_error("Expected to close pointer to register with ']'", enumerator.file_index, enumerator.current);
         return false;
     }
 
@@ -2550,227 +2548,234 @@ bool parse_assembly_pointer(AssemblyValueAst* value, TokenEnumerator* enumerator
 }
 
 SwitchAst* parse_switch(TokenEnumerator* enumerator, Function* current_function) {
-    switchAst := create_ast<SwitchAst>(enumerator);
+    switch_ast := create_ast<SwitchAst>(enumerator, AstType.Switch);
     if !move_next(enumerator) {
-        report_error("Expected value for switch statement", enumerator.file_index, enumerator.Last);
+        report_error("Expected value for switch statement", enumerator.file_index, enumerator.last);
         return null;
     }
 
-    switchAst.Value = ParseExpression(enumerator, currentFunction, null, TokenType.OpenBrace);
+    switch_ast.value = parse_expression(enumerator, current_function, null, TokenType.OpenBrace);
 
-    if enumerator.Current.Type != TokenType.OpenBrace {
-        report_error("Expected switch statement value to be followed by '{' and cases", enumerator.file_index, enumerator.Current);
+    if enumerator.current.type != TokenType.OpenBrace {
+        report_error("Expected switch statement value to be followed by '{' and cases", enumerator.file_index, enumerator.current);
         return null;
     }
 
     closed := false;
-    currentCases: SwitchCases;
+    current_cases: SwitchCases;
     while move_next(enumerator) {
         switch enumerator.current.type {
             case TokenType.CloseBrace; {
                 closed = true;
-                if currentCases.length {
-                    report_error("Switch statement contains case(s) without bodies starting", currentCases[0]);
+                if current_cases.case_ast {
+                    report_error("Switch statement contains case(s) without bodies starting", current_cases.case_ast);
                     return null;
                 }
                 break;
             }
             case TokenType.Case; {
                 if !move_next(enumerator) {
-                    report_error("Expected value after case", enumerator.file_index, enumerator.Last);
+                    report_error("Expected value after case", enumerator.file_index, enumerator.last);
                     return null;
                 }
 
-                switchCase := ParseExpression(enumerator, currentFunction);
-                if currentCases.length
-                    currentCases.Add(switchCase);
-                else
-                    // TODO This is wrong
-                    currentCases[0] = switchCase;
+                switch_case := parse_expression(enumerator, current_function);
+
+                if current_cases.case_ast == null
+                    current_cases.case_ast = switch_case;
+                else {
+                    if current_cases.cases.length == 0
+                        current_cases.cases[0] = current_cases.case_ast;
+
+                    current_cases.cases.Add(switch_case);
+                }
             }
             case TokenType.Default; {
-                if !move_next(enumerator) || enumerator.Current.Type != TokenType.SemiColon {
-                    report_error("Expected ';' after default", enumerator.file_index, enumerator.Current);
+                if !move_next(enumerator) || enumerator.current.type != TokenType.SemiColon {
+                    report_error("Expected ';' after default", enumerator.file_index, enumerator.current);
                     return null;
                 }
                 if !move_next(enumerator) {
-                    report_error("Expected body after default", enumerator.file_index, enumerator.Last);
+                    report_error("Expected body after default", enumerator.file_index, enumerator.last);
                     return null;
                 }
 
-                if enumerator.Current.Type == TokenType.OpenBrace
-                    switchAst.DefaultCase = parse_scope(enumerator, currentFunction);
+                if enumerator.current.type == TokenType.OpenBrace
+                    switch_ast.default_case = parse_scope(enumerator, current_function);
                 else {
-                    switchAst.DefaultCase = create_ast<ScopeAst>(enumerator);
-                    switchAst.DefaultCase.Children.Add(ParseLine(enumerator, currentFunction));
+                    switch_ast.default_case = create_ast<ScopeAst>(enumerator, AstType.Scope);
+                    switch_ast.default_case.children.Add(parse_line(enumerator, current_function));
                 }
             }
             default; {
-                if currentCases.length {
+                if current_cases.case_ast {
                     // Parse through the case body and add to the list
-                    if enumerator.Current.Type == TokenType.OpenBrace
-                        currentCases.body = parse_scope(enumerator, currentFunction);
+                    if enumerator.current.type == TokenType.OpenBrace
+                        current_cases.body = parse_scope(enumerator, current_function);
                     else {
-                        currentCases.body = create_ast<ScopeAst>(enumerator);
-                        currentCases.body.Children.Add(ParseLine(enumerator, currentFunction));
+                        current_cases.body = create_ast<ScopeAst>(enumerator, AstType.Scope);
+                        current_cases.body.children.Add(parse_line(enumerator, current_function));
                     }
 
-                    switchAst.Cases.Add(currentCases);
+                    switch_ast.cases.Add(current_cases);
+                    current_cases = { case_ast = null; body = null; }
+                    current_cases.cases.length = 0;
+                    current_cases.cases.data = null;
                 }
                 else {
                     report_error("Switch statement contains case body prior to any cases", enumerator.file_index, enumerator.current);
                     // Skip through the next ';' or '}'
-                    while enumerator.Current.Type != TokenType.SemiColon && enumerator.Current.Type != TokenType.CloseBrace && move_next(enumerator) {}
+                    while enumerator.current.type != TokenType.SemiColon && enumerator.current.type != TokenType.CloseBrace && move_next(enumerator) {}
                 }
             }
         }
     }
 
     if !closed {
-        report_error("Expected switch statement to be closed by '}'", enumerator.file_index, enumerator.Current);
+        report_error("Expected switch statement to be closed by '}'", enumerator.file_index, enumerator.current);
         return null;
     }
-    else if switchAst.Cases.length == 0 {
-        report_error("Expected switch to have 1 or more non-default cases", switchAst);
+    else if switch_ast.cases.length == 0 {
+        report_error("Expected switch to have 1 or more non-default cases", switch_ast);
         return null;
     }
 
-    return switchAst;
+    return switch_ast;
 }
 
-OperatorOverloadAst parse_operator_overload(TokenEnumerator* enumerator)
+OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator)
 {
-    overload := create_ast<OperatorOverloadAst>(enumerator);
+    overload := create_ast<OperatorOverloadAst>(enumerator, AstType.OperatorOverload);
     if !move_next(enumerator) {
-        report_error("Expected an operator be specified to overload", enumerator.file_index, enumerator.Last);
+        report_error("Expected an operator be specified to overload", enumerator.file_index, enumerator.last);
         return null;
     }
 
     // 1. Determine the operator
     token: Token;
-    if enumerator.Current.Type == TokenType.OpenBracket && peek(enumerator, &token) && token.Type == TokenType.CloseBracket {
-        overload.Operator = Operator.Subscript;
+    if enumerator.current.type == TokenType.OpenBracket && peek(enumerator, &token) && token.type == TokenType.CloseBracket {
+        overload.op = Operator.Subscript;
         move_next(enumerator);
     }
     else {
-        overload.Operator = convert_operator(enumerator.Current);
-        if overload.Operator == Operator.None
-            report_error("Expected an operator to be be specified, but got '{enumerator.Current.Value}'", enumerator.file_index, enumerator.Current);
+        overload.op = convert_operator(enumerator.current);
+        if overload.op == Operator.None
+            report_error("Expected an operator to be be specified, but got '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
     }
 
     if !move_next(enumerator) {
-        report_error("Expected to get the type to overload the operator", enumerator.file_index, enumerator.Last);
+        report_error("Expected to get the type to overload the operator", enumerator.file_index, enumerator.last);
         return null;
     }
 
     // 2. Determine generics if necessary
-    if enumerator.Current.Type == TokenType.LessThan {
-        commaRequiredBeforeNextType := false;
+    if enumerator.current.type == TokenType.LessThan {
+        comma_required_before_next_type := false;
         // var generics = new HashSet<string>();
         while move_next(enumerator) {
-            token = enumerator.Current;
-            if token.Type == TokenType.GreaterThan {
-                if !commaRequiredBeforeNextType
+            token = enumerator.current;
+            if token.type == TokenType.GreaterThan {
+                if !comma_required_before_next_type
                     report_error("Expected comma in generics", enumerator.file_index, token);
 
                 break;
             }
 
-            if !commaRequiredBeforeNextType {
+            if !comma_required_before_next_type {
                 if token.type == TokenType.Identifier {
-                    if (!generics.Add(token.Value))
-                        report_error("Duplicate generic '{token.Value}'", enumerator.file_index, token);
+                    if (!generics.Add(token.value))
+                        report_error("Duplicate generic '{token.value}'", enumerator.file_index, token);
                 }
                 else
-                    report_error("Unexpected token '{token.Value}' in generics", enumerator.file_index, token);
+                    report_error("Unexpected token '{token.value}' in generics", enumerator.file_index, token);
 
-                commaRequiredBeforeNextType = true;
+                comma_required_before_next_type = true;
             }
             else {
                 if token.type != TokenType.Comma {
-                    report_error("Unexpected token '{token.Value}' when defining generics", enumerator.file_index, token);
+                    report_error("Unexpected token '{token.value}' when defining generics", enumerator.file_index, token);
                 }
 
-                commaRequiredBeforeNextType = false;
+                comma_required_before_next_type = false;
             }
         }
 
         if generics.length == 0
-            report_error("Expected operator overload to contain generics", enumerator.file_index, enumerator.Current);
+            report_error("Expected operator overload to contain generics", enumerator.file_index, enumerator.current);
 
         move_next(enumerator);
-        overload.Generics.AddRange(generics);
+        overload.generics.AddRange(generics);
     }
 
     // 3. Find open paren to start parsing arguments
-    if enumerator.Current.Type != TokenType.OpenParen {
+    if enumerator.current.type != TokenType.OpenParen {
         // Add an error to the function AST and continue until open paren
-        token = enumerator.Current;
-        report_error("Unexpected token '{token.Value}' in operator overload definition", enumerator.file_index, token);
-        while move_next(enumerator) && enumerator.Current.Type != TokenType.OpenParen {}
+        token = enumerator.current;
+        report_error("Unexpected token '{token.value}' in operator overload definition", enumerator.file_index, token);
+        while move_next(enumerator) && enumerator.current.type != TokenType.OpenParen {}
     }
 
     // 4. Get the arguments for the operator overload
-    commaRequiredBeforeNextArgument := false;
-    currentArgument: DeclarationAst*;
+    comma_required_before_next_argument := false;
+    current_argument: DeclarationAst*;
     while move_next(enumerator) {
-        token = enumerator.Current;
+        token = enumerator.current;
 
 
-        switch token.Type {
+        switch token.type {
             case TokenType.CloseParen; {
-                if commaRequiredBeforeNextArgument {
-                    overload.Arguments.Add(currentArgument);
-                    currentArgument = null;
+                if comma_required_before_next_argument {
+                    overload.arguments.Add(current_argument);
+                    current_argument = null;
                 }
                 break;
             }
             case TokenType.Identifier; {
-                if commaRequiredBeforeNextArgument {
+                if comma_required_before_next_argument {
                     report_error("Comma required after declaring an argument", enumerator.file_index, token);
                 }
-                else if currentArgument == null {
-                    currentArgument = create_ast<DeclarationAst>(token, enumerator.file_index);
-                    currentArgument.TypeDefinition = parse_type(enumerator, argument = true);
-                    each generic, i in overload.Generics {
-                        if search_for_generic(generic, i, currentArgument.TypeDefinition) {
-                            currentArgument.HasGenerics = true;
+                else if current_argument == null {
+                    current_argument = create_ast<DeclarationAst>(token, enumerator.file_index, AstType.Declaration);
+                    current_argument.type_definition = parse_type(enumerator, argument = true);
+                    each generic, i in overload.generics {
+                        if search_for_generic(generic, i, current_argument.type_definition) {
+                            current_argument.has_generics = true;
                         }
                     }
-                    if overload.Arguments.length == 0
-                        overload.Type = currentArgument.TypeDefinition;
+                    if overload.arguments.length == 0
+                        overload.type = current_argument.type_definition;
                 }
                 else {
-                    currentArgument.Name = token.Value;
-                    commaRequiredBeforeNextArgument = true;
+                    current_argument.name = token.value;
+                    comma_required_before_next_argument = true;
                 }
             }
             case TokenType.Comma; {
-                if commaRequiredBeforeNextArgument
-                    overload.Arguments.Add(currentArgument);
+                if comma_required_before_next_argument
+                    overload.arguments.Add(current_argument);
                 else
                     report_error("Unexpected comma in arguments", enumerator.file_index, token);
 
-                currentArgument = null;
-                commaRequiredBeforeNextArgument = false;
+                current_argument = null;
+                comma_required_before_next_argument = false;
             }
             default;
-                report_error("Unexpected token '{token.Value}' in arguments", enumerator.file_index, token);
+                report_error("Unexpected token '{token.value}' in arguments", enumerator.file_index, token);
         }
 
-        if enumerator.Current.Type == TokenType.CloseParen
+        if enumerator.current.type == TokenType.CloseParen
             break;
     }
 
-    if currentArgument
-        report_error("Incomplete argument in overload for type '{overload.Type.Name}'", enumerator.file_index, enumerator.Current);
+    if current_argument
+        report_error("Incomplete argument in overload for type '{overload.Type.Name}'", enumerator.file_index, enumerator.current);
 
-    if !commaRequiredBeforeNextArgument && overload.Arguments.length
-        report_error("Unexpected comma in arguments", enumerator.file_index, enumerator.Current);
+    if !comma_required_before_next_argument && overload.arguments.length > 0
+        report_error("Unexpected comma in arguments", enumerator.file_index, enumerator.current);
 
     // 5. Set the return type based on the operator
     move_next(enumerator);
-    switch overload.Operator {
+    switch overload.op {
         case Operator.And;
         case Operator.Or;
         case Operator.Equality;
@@ -2784,61 +2789,61 @@ OperatorOverloadAst parse_operator_overload(TokenEnumerator* enumerator)
             overload.return_type_definition.name = "bool"; // TODO Hardcode the ReturnType instead
         }
         case Operator.Subscript;
-            if enumerator.Current.Type != TokenType.Colon {
-                report_error("Unexpected to define return type for subscript", enumerator.file_index, enumerator.Current);
+            if enumerator.current.type != TokenType.Colon {
+                report_error("Unexpected to define return type for subscript", enumerator.file_index, enumerator.current);
             }
             else if move_next(enumerator) {
                 overload.return_type_definition = parse_type(enumerator);
-                each generic, i in overload.Generics {
+                each generic, i in overload.generics {
                     if search_for_generic(generic, i, overload.return_type_definition) {
-                        overload.Flags |= FunctionFlags.ReturnTypeHasGenerics;
+                        overload.flags |= FunctionFlags.ReturnTypeHasGenerics;
                     }
                 }
                 move_next(enumerator);
             }
         default; {
-            overload.return_type_definition = overload.Type;
-            if overload.Generics.length {
-                overload.Flags |= FunctionFlags.ReturnTypeHasGenerics;
+            overload.return_type_definition = overload.type;
+            if overload.generics.length {
+                overload.flags |= FunctionFlags.ReturnTypeHasGenerics;
             }
-            each generic, i in overload.Generics {
+            each generic, i in overload.generics {
                 search_for_generic(generic, i, overload.return_type_definition);
             }
         }
     }
 
     // 6. Handle compiler directives
-    if enumerator.Current.Type == TokenType.Pound {
+    if enumerator.current.type == TokenType.Pound {
         if !move_next(enumerator) {
-            report_error("Expected compiler directive value", enumerator.file_index, enumerator.Last);
+            report_error("Expected compiler directive value", enumerator.file_index, enumerator.last);
             return null;
         }
-        switch enumerator.Current.Value {
+        switch enumerator.current.value {
             case "print_ir";
-                overload.Flags |= FunctionFlags.PrintIR;
+                overload.flags |= FunctionFlags.PrintIR;
             default;
-                report_error("Unexpected compiler directive '{enumerator.Current.Value}'", enumerator.file_index, enumerator.Current);
+                report_error("Unexpected compiler directive '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
         }
         move_next(enumerator);
     }
 
     // 7. Find open brace to start parsing body
-    if enumerator.Current.Type != TokenType.OpenBrace {
+    if enumerator.current.type != TokenType.OpenBrace {
         // Add an error and continue until open paren
-        token = enumerator.Current;
-        report_error("Unexpected token '{token.Value}' in operator overload definition", enumerator.file_index, token);
-        while move_next(enumerator) && enumerator.Current.Type != TokenType.OpenBrace {}
+        token = enumerator.current;
+        report_error("Unexpected token '{token.value}' in operator overload definition", enumerator.file_index, token);
+        while move_next(enumerator) && enumerator.current.type != TokenType.OpenBrace {}
     }
 
     // 8. Parse body
-    overload.Body = parse_scope(enumerator, overload);
+    overload.body = parse_scope(enumerator, overload);
 
     return overload;
 }
 
 InterfaceAst* parse_interface(TokenEnumerator* enumerator) {
-    interfaceAst := create_ast<InterfaceAst>(enumerator);
-    interfaceAst.Private = enumerator.Private;
+    interface_ast := create_ast<InterfaceAst>(enumerator, AstType.Interface);
+    interface_ast.private = enumerator.private;
     move_next(enumerator);
 
     // 1a. Check if the return type is void
@@ -2847,103 +2852,102 @@ InterfaceAst* parse_interface(TokenEnumerator* enumerator) {
         report_error("Expected interface definition", enumerator.file_index, token);
         return null;
     }
-    if token.Type != TokenType.OpenParen {
-        interfaceAst.return_type_definition = parse_type(enumerator);
+    if token.type != TokenType.OpenParen {
+        interface_ast.return_type_definition = parse_type(enumerator);
         move_next(enumerator);
     }
 
     // 1b. Handle multiple return values
-    if enumerator.Current.Type == TokenType.Comma {
-        returnType := create_ast<TypeDefinition>(interfaceAst.return_type_definition);
-        returnType.Compound = true;
-        returnType.Generics.Add(interfaceAst.return_type_definition);
-        interfaceAst.return_type_definition = returnType;
+    if enumerator.current.type == TokenType.Comma {
+        returnType := create_ast<TypeDefinition>(interface_ast.return_type_definition, AstType.TypeDefinition);
+        returnType.compound = true;
+        returnType.generics.Add(interface_ast.return_type_definition);
+        interface_ast.return_type_definition = returnType;
 
-        while enumerator.Current.Type == TokenType.Comma {
+        while enumerator.current.type == TokenType.Comma {
             if !move_next(enumerator)
                 break;
 
-            returnType.Generics.Add(parse_type(enumerator));
+            returnType.generics.Add(parse_type(enumerator));
             move_next(enumerator);
         }
     }
 
     // 1b. Set the name of the interface or get the name from the type
-    if !enumerator.Remaining {
-        report_error("Expected the interface name to be declared", enumerator.file_index, enumerator.Last);
+    if !enumerator.remaining {
+        report_error("Expected the interface name to be declared", enumerator.file_index, enumerator.last);
         return null;
     }
-    switch enumerator.Current.Type {
+    switch enumerator.current.type {
         case TokenType.Identifier; {
-            interfaceAst.Name = enumerator.Current.Value;
+            interface_ast.name = enumerator.current.value;
             move_next(enumerator);
         }
         case TokenType.OpenParen;
-            if interfaceAst.return_type_definition.Name == "*" || interfaceAst.return_type_definition.Count != null {
-                report_error("Expected the interface name to be declared", interfaceAst.return_type_definition);
+            if interface_ast.return_type_definition.name == "*" || interface_ast.return_type_definition.count != null {
+                report_error("Expected the interface name to be declared", interface_ast.return_type_definition);
             }
             else {
-                interfaceAst.Name = interfaceAst.return_type_definition.Name;
-                if interfaceAst.return_type_definition.Generics.length
-                    report_error("Interface '{interfaceAst.Name}' cannot have generics", interfaceAst.return_type_definition);
+                interface_ast.name = interface_ast.return_type_definition.name;
+                if interface_ast.return_type_definition.generics.length
+                    report_error("Interface '{interface_ast.Name}' cannot have generics", interface_ast.return_type_definition);
 
-                interfaceAst.return_type_definition = null;
+                interface_ast.return_type_definition = null;
             }
         default; {
-            report_error("Expected the interface name to be declared", enumerator.file_index, enumerator.Current);
+            report_error("Expected the interface name to be declared", enumerator.file_index, enumerator.current);
             move_next(enumerator);
         }
     }
 
     // 2. Parse arguments until a close paren
-    commaRequiredBeforeNextArgument := false;
-    currentArgument: DeclarationAst*;
+    comma_required_before_next_argument := false;
+    current_argument: DeclarationAst*;
     while move_next(enumerator) {
-        token = enumerator.Current;
+        token = enumerator.current;
 
         switch token.type {
             case TokenType.CloseParen; {
-                if commaRequiredBeforeNextArgument {
-                    interfaceAst.Arguments.Add(currentArgument);
-                    currentArgument = null;
+                if comma_required_before_next_argument {
+                    interface_ast.arguments.Add(current_argument);
+                    current_argument = null;
                 }
                 break;
             }
             case TokenType.Identifier;
-                if commaRequiredBeforeNextArgument {
+                if comma_required_before_next_argument {
                     report_error("Comma required after declaring an argument", enumerator.file_index, token);
                 }
-                else if currentArgument == null {
-                    currentArgument = create_ast<DeclarationAst>(token, enumerator.file_index);
-                    currentArgument.TypeDefinition = parse_type(enumerator);
+                else if current_argument == null {
+                    current_argument = create_ast<DeclarationAst>(token, enumerator.file_index, AstType.Declaration);
+                    current_argument.type_definition = parse_type(enumerator);
                 }
                 else {
-                    currentArgument.Name = token.Value;
-                    commaRequiredBeforeNextArgument = true;
+                    current_argument.name = token.value;
+                    comma_required_before_next_argument = true;
                 }
             case TokenType.Comma; {
-                if commaRequiredBeforeNextArgument
-                    interfaceAst.Arguments.Add(currentArgument);
+                if comma_required_before_next_argument
+                    interface_ast.arguments.Add(current_argument);
                 else
                     report_error("Unexpected comma in arguments", enumerator.file_index, token);
 
-                currentArgument = null;
-                commaRequiredBeforeNextArgument = false;
+                current_argument = null;
+                comma_required_before_next_argument = false;
             }
             case TokenType.Equals;
-                if commaRequiredBeforeNextArgument
-                {
-                    report_error("Interface '{interfaceAst.Name}' cannot have default argument values", enumerator.file_index, token);
+                if comma_required_before_next_argument {
+                    report_error("Interface '{interface_ast.Name}' cannot have default argument values", enumerator.file_index, token);
                     while move_next(enumerator) {
-                        if enumerator.Current.Type == TokenType.Comma {
-                            commaRequiredBeforeNextArgument = false;
-                            interfaceAst.Arguments.Add(currentArgument);
-                            currentArgument = null;
+                        if enumerator.current.type == TokenType.Comma {
+                            comma_required_before_next_argument = false;
+                            interface_ast.arguments.Add(current_argument);
+                            current_argument = null;
                             break;
                         }
-                        else if enumerator.Current.Type == TokenType.Comma {
-                            interfaceAst.Arguments.Add(currentArgument);
-                            currentArgument = null;
+                        else if enumerator.current.type == TokenType.Comma {
+                            interface_ast.arguments.Add(current_argument);
+                            current_argument = null;
                             break;
                         }
                     }
@@ -2951,167 +2955,168 @@ InterfaceAst* parse_interface(TokenEnumerator* enumerator) {
                 else
                     report_error("Unexpected token '=' in arguments", enumerator.file_index, token);
             default;
-                report_error("Unexpected token '{token.Value}' in arguments", enumerator.file_index, token);
+                report_error("Unexpected token '{token.value}' in arguments", enumerator.file_index, token);
         }
 
-        if enumerator.Current.Type == TokenType.CloseParen
+        if enumerator.current.type == TokenType.CloseParen
             break;
     }
 
-    if currentArgument
-        report_error("Incomplete argument in interface '{interfaceAst.Name}'", enumerator.file_index, enumerator.Current);
+    if current_argument
+        report_error("Incomplete argument in interface '{interface_ast.Name}'", enumerator.file_index, enumerator.current);
 
-    if !commaRequiredBeforeNextArgument && interfaceAst.Arguments.length
-        report_error("Unexpected comma in arguments", enumerator.file_index, enumerator.Current);
+    if !comma_required_before_next_argument && interface_ast.arguments.length > 0
+        report_error("Unexpected comma in arguments", enumerator.file_index, enumerator.current);
 
-    return interfaceAst;
+    return interface_ast;
 }
 
 TypeDefinition* parse_type(TokenEnumerator* enumerator, Function* current_function = null, bool argument = false, int depth = 0) {
-    typeDefinition := create_ast<TypeDefinition>(enumerator);
-    typeDefinition.Name = enumerator.Current.Value;
+    type_definition := create_ast<TypeDefinition>(enumerator, AstType.TypeDefinition);
+    type_definition.name = enumerator.current.value;
 
     // Alias int to s32
-    if typeDefinition.Name == "int"
-        typeDefinition.Name = "s32";
+    if type_definition.name == "int"
+        type_definition.name = "s32";
 
-    if enumerator.Current.Type == TokenType.VarArgs {
+    if enumerator.current.type == TokenType.VarArgs {
         if !argument
-            report_error("Variable args type can only be used as an argument type", enumerator.file_index, enumerator.Current);
+            report_error("Variable args type can only be used as an argument type", enumerator.file_index, enumerator.current);
 
-        return typeDefinition;
+        return type_definition;
     }
 
     // Determine whether to parse a generic type, otherwise return
     token: Token;
-    if peek(enumerator, &token) && token.Type == TokenType.LessThan {
+    if peek(enumerator, &token) && token.type == TokenType.LessThan {
         // Clear the '<' before entering loop
         move_next(enumerator);
-        commaRequiredBeforeNextType := false;
+        comma_required_before_next_type := false;
         while move_next(enumerator) {
-            token = enumerator.Current;
+            token = enumerator.current;
 
-            if token.Type == TokenType.GreaterThan {
-                if !commaRequiredBeforeNextType && typeDefinition.Generics.length
+            if token.type == TokenType.GreaterThan {
+                if !comma_required_before_next_type && type_definition.generics.length > 0
                     report_error("Unexpected comma in type", enumerator.file_index, token);
 
                 break;
             }
-            else if token.Type == TokenType.ShiftRight {
+            else if token.type == TokenType.ShiftRight {
                 // Split the token and insert a greater than after the current token
-                token.Value = ">";
-                newToken: Token = { Type = TokenType.GreaterThan; Value = ">"; Line = token.Line; Column = token.Column + 1; }
-                enumerator.Insert(newToken);
+                token.value = ">";
+                new_token: Token = { type = TokenType.GreaterThan; value = ">"; line = token.line; column = token.column + 1; }
+                insert(enumerator, new_token);
                 break;
             }
-            else if token.Type == TokenType.RotateRight {
+            else if token.type == TokenType.RotateRight {
                 // Split the token and insert a shift right after the current token
-                token.Value = ">";
-                newToken: Token = { Type = TokenType.ShiftRight; Value = ">>"; Line = token.Line; Column = token.Column + 1; }
-                enumerator.Insert(newToken);
+                token.value = ">";
+                new_token: Token = { type = TokenType.ShiftRight; value = ">>"; line = token.line; column = token.column + 1; }
+                insert(enumerator, new_token);
                 break;
             }
 
-            if !commaRequiredBeforeNextType {
+            if !comma_required_before_next_type {
                 if token.type == TokenType.Identifier
-                    typeDefinition.Generics.Add(parse_type(enumerator, currentFunction, depth = depth + 1));
+                    type_definition.generics.Add(parse_type(enumerator, current_function, depth = depth + 1));
                 else
-                    report_error("Unexpected token '{token.Value}' in type definition", enumerator.file_index, token);
+                    report_error("Unexpected token '{token.value}' in type definition", enumerator.file_index, token);
 
-                commaRequiredBeforeNextType = true;
+                comma_required_before_next_type = true;
             }
             else {
                 if token.type != TokenType.Comma
-                    report_error("Unexpected token '{token.Value}' in type definition", enumerator.file_index, token);
+                    report_error("Unexpected token '{token.value}' in type definition", enumerator.file_index, token);
 
-                commaRequiredBeforeNextType = false;
+                comma_required_before_next_type = false;
             }
         }
 
-        if typeDefinition.Generics.length == 0
-            report_error("Expected type to contain generics", enumerator.file_index, enumerator.Current);
+        if type_definition.generics.length == 0
+            report_error("Expected type to contain generics", enumerator.file_index, enumerator.current);
     }
 
-    while peek(enumerator, &token) && token.Type == TokenType.Asterisk {
+    while peek(enumerator, &token) && token.type == TokenType.Asterisk {
         move_next(enumerator);
-        pointerType := create_ast<TypeDefinition>(enumerator);
-        pointerType.Name = "*";
-        pointerType.Generics.Add(typeDefinition);
-        typeDefinition = pointerType;
+        pointerType := create_ast<TypeDefinition>(enumerator, AstType.TypeDefinition);
+        pointerType.name = "*";
+        pointerType.generics.Add(type_definition);
+        type_definition = pointerType;
     }
 
-    if peek(enumerator, &token) && token.Type == TokenType.OpenBracket {
+    if peek(enumerator, &token) && token.type == TokenType.OpenBracket {
         // Skip over the open bracket and parse the expression
         move_next(enumerator);
         move_next(enumerator);
-        typeDefinition.Count = ParseExpression(enumerator, currentFunction, null, TokenType.CloseBracket);
+        type_definition.count = parse_expression(enumerator, current_function, null, TokenType.CloseBracket);
     }
 
-    return typeDefinition;
+    return type_definition;
 }
 
 bool try_parse_type(TokenEnumerator* enumerator, TypeDefinition** typeDef) {
     steps := 0;
     _: bool;
-    success, typeDefinition := try_parse_type(enumerator.Current, enumerator, &steps, typeDef, &_, &_);
+    success, type_definition := try_parse_type(enumerator.current, enumerator, &steps, &_, &_);
     if success {
         move(enumerator, steps);
-        *typeDef = typeDefinition;
+        *typeDef = type_definition;
         return true;
     }
     return false;
 }
 
-bool, TypeDefinition* try_parse_type(Token name, TokenEnumerator* enumerator, int* steps, bool* endsWithShift, bool* endsWithRotate, int depth = 0) {
-    typeDefinition := create_ast<TypeDefinition>(name, enumerator.file_index);
-    typeDefinition.Name = name.Value;
-    *endsWithShift = false;
-    *endsWithRotate = false;
+bool, TypeDefinition* try_parse_type(Token name, TokenEnumerator* enumerator, int* steps, bool* ends_with_shift, bool* ends_with_rotate, int depth = 0) {
+    type_definition := create_ast<TypeDefinition>(name, enumerator.file_index, AstType.TypeDefinition);
+    type_definition.name = name.value;
+    *ends_with_shift = false;
+    *ends_with_rotate = false;
 
     // Alias int to s32
-    if typeDefinition.Name == "int"
-        typeDefinition.Name = "s32";
+    if type_definition.name == "int"
+        type_definition.name = "s32";
 
     // Determine whether to parse a generic type, otherwise return
     token: Token;
-    if peek(enumerator, &token, steps) && token.Type == TokenType.LessThan {
+    if peek(enumerator, &token, *steps) && token.type == TokenType.LessThan {
         // Clear the '<' before entering loop
-        steps++;
-        commaRequiredBeforeNextType := false;
-        while peek(enumerator, &token, steps) {
-            steps++;
-            if token.Type == TokenType.GreaterThan {
-                if !commaRequiredBeforeNextType && typeDefinition.Generics.length > 0
+        *steps = *steps + 1;
+        comma_required_before_next_type := false;
+        while peek(enumerator, &token, *steps) {
+            *steps = *steps + 1;
+            if token.type == TokenType.GreaterThan {
+                if !comma_required_before_next_type && type_definition.generics.length > 0
                     return false, null;
 
                 break;
             }
-            else if token.Type == TokenType.ShiftRight {
-                if (depth % 3 != 1 && !endsWithShift) || (!commaRequiredBeforeNextType && typeDefinition.Generics.length > 0)
+            else if token.type == TokenType.ShiftRight {
+                if (depth % 3 != 1 && !*ends_with_shift) || (!comma_required_before_next_type && type_definition.generics.length > 0)
                     return false, null;
 
-                *endsWithShift = true;
+                *ends_with_shift = true;
                 break;
             }
-            else if (token.Type == TokenType.RotateRight)
+            else if (token.type == TokenType.RotateRight)
             {
-                if (depth % 3 != 2 && !endsWithRotate) || (!commaRequiredBeforeNextType && typeDefinition.Generics.length > 0)
+                if (depth % 3 != 2 && !*ends_with_rotate) || (!comma_required_before_next_type && type_definition.generics.length > 0)
                     return false, null;
 
-                *endsWithRotate = true;
+                *ends_with_rotate = true;
                 break;
             }
 
-            if !commaRequiredBeforeNextType {
+            if !comma_required_before_next_type {
                 if token.type == TokenType.Identifier {
-                    success, genericType := try_parse_type(token, enumerator, steps, endsWithShift, endsWithRotate, depth + 1);
+                    success, genericType := try_parse_type(token, enumerator, steps, ends_with_shift, ends_with_rotate, depth + 1);
 
                     if !success return false, null;
-                    if endsWithShift || endsWithRotate
-                        steps--;
+                    if *ends_with_shift || *ends_with_rotate {
+                        *steps = *steps - 1;
+                    }
 
-                    typeDefinition.Generics.Add(genericType);
-                    commaRequiredBeforeNextType = true;
+                    type_definition.generics.Add(genericType);
+                    comma_required_before_next_type = true;
                 }
                 else
                     return false, null;
@@ -3121,99 +3126,98 @@ bool, TypeDefinition* try_parse_type(Token name, TokenEnumerator* enumerator, in
                 if token.type != TokenType.Comma
                     return false, null;
 
-                commaRequiredBeforeNextType = false;
+                comma_required_before_next_type = false;
             }
         }
 
-        if typeDefinition.Generics.length == 0
+        if type_definition.generics.length == 0
             return false, null;
     }
 
-    while peek(enumerator, &token, steps) && token.Type == TokenType.Asterisk {
-        pointerType := create_ast<TypeDefinition>(token, enumerator.file_index);
-        pointerType.Name = "*";
-        pointerType.Generics.Add(typeDefinition);
-        typeDefinition = pointerType;
-        steps++;
-        endsWithShift = false;
-        endsWithRotate = false;
+    while peek(enumerator, &token, *steps) && token.type == TokenType.Asterisk {
+        pointerType := create_ast<TypeDefinition>(token, enumerator.file_index, AstType.TypeDefinition);
+        pointerType.name = "*";
+        pointerType.generics.Add(type_definition);
+        type_definition = pointerType;
+        *steps = *steps + 1;
+        *ends_with_shift = false;
+        *ends_with_rotate = false;
     }
 
-    return true, typeDefinition;
+    return true, type_definition;
 }
 
 ConstantAst* parse_constant(Token token, int fileIndex) {
-    constant := create_ast<ConstantAst>(token, fileIndex);
-    switch token.Type {
+    constant := create_ast<ConstantAst>(token, fileIndex, AstType.Constant);
+    switch token.type {
         case TokenType.Literal; {
-            constant.TypeName = "string";
-            constant.String = token.Value;
+            constant.string = token.value;
         }
         case TokenType.Character; {
-            constant.TypeName = "u8";
-            constant.Value.UnsignedInteger = token.Value[0];
+            constant.type = &u8_type;
+            constant.value.unsigned_integer = token.value[0];
         }
         case TokenType.Number; {
-            if token.Flags == TokenFlags.None {
-                if int.TryParse(token.Value, &constant.value.integer) {
-                    constant.TypeName = "s32";
+            if token.flags == TokenFlags.None {
+                if int.TryParse(token.value, &constant.value.integer) {
+                    constant.type = &s32_type;
                 }
-                else if long.TryParse(token.Value, &constant.value.integer) {
-                    constant.TypeName = "s64";
+                else if long.TryParse(token.value, &constant.value.integer) {
+                    constant.type = &s64_type;
                 }
-                else if (ulong.TryParse(token.Value, &constant.value.unsigned_integer)) {
-                    constant.TypeName = "u64";
+                else if (ulong.TryParse(token.value, &constant.value.unsigned_integer)) {
+                    constant.type = &u64_type;
                 }
                 else {
-                    report_error("Invalid integer '{token.Value}', must be 64 bits or less", fileIndex, token);
+                    report_error("Invalid integer '{token.value}', must be 64 bits or less", fileIndex, token);
                     return null;
                 }
             }
-            else if token.Flags & TokenFlags.Float {
-                if float.TryParse(token.Value, &constant.value.double) {
-                    constant.TypeName = "float";
+            else if token.flags & TokenFlags.Float {
+                if float.TryParse(token.value, &constant.value.double) {
+                    constant.type = &float_type;
                 }
-                else if double.TryParse(token.Value, &constant.value.double) {
-                    constant.TypeName = "float64";
+                else if double.TryParse(token.value, &constant.value.double) {
+                    constant.type = &float64_type;
                 }
                 else {
-                    report_error("Invalid floating point number '{token.Value}', must be single or double precision", fileIndex, token);
+                    report_error("Invalid floating point number '{token.value}', must be single or double precision", fileIndex, token);
                     return null;
                 }
             }
-            else if token.Flags & TokenFlags.HexNumber {
+            else if token.flags & TokenFlags.HexNumber {
                 if token.value.length == 2 {
-                    report_error("Invalid number '{token.Value}'", fileIndex, token);
+                    report_error("Invalid number '{token.value}'", fileIndex, token);
                     return null;
                 }
 
-                value := substring(token.Value, 2, token.value.length - 2);
+                value := substring(token.value, 2, token.value.length - 2);
                 if value.length <= 8 {
                     if uint.TryParse(value, NumberStyles.HexNumber, &constant.value.unsigned_integer) {
-                        constant.TypeName = "u32";
+                        constant.type = &u32_type;
                     }
                 }
-                else if value.Length <= 16 {
+                else if value.length <= 16 {
                     if ulong.TryParse(value, NumberStyles.HexNumber, &constant.value.unsigned_integer) {
-                        constant.TypeName = "u64";
+                        constant.type = &u64_type;
                     }
                 }
                 else {
-                    report_error("Invalid integer '{token.Value}'", fileIndex, token);
+                    report_error("Invalid integer '{token.value}'", fileIndex, token);
                     return null;
                 }
             }
             else {
-                report_error("Unable to determine type of token '{token.Value}'", fileIndex, token);
+                report_error("Unable to determine type of token '{token.value}'", fileIndex, token);
                 return null;
             }
         }
         case TokenType.Boolean; {
-            constant.TypeName = "bool";
-            constant.Value.boolean = token.value == "true";
+            constant.type = &bool_type;
+            constant.value.boolean = token.value == "true";
         }
         default; {
-            report_error("Unable to determine type of token '{token.Value}'", fileIndex, token);
+            report_error("Unable to determine type of token '{token.value}'", fileIndex, token);
             return null;
         }
     }
@@ -3221,64 +3225,64 @@ ConstantAst* parse_constant(Token token, int fileIndex) {
 }
 
 CastAst* parse_cast(TokenEnumerator* enumerator, Function* current_function) {
-    castAst := create_ast<CastAst>(enumerator);
+    cast_ast := create_ast<CastAst>(enumerator, AstType.Cast);
 
     // 1. Try to get the open paren to begin the cast
-    if !move_next(enumerator) || enumerator.Current.Type != TokenType.OpenParen {
-        report_error("Expected '(' after 'cast'", enumerator.file_index, enumerator.Current);
+    if !move_next(enumerator) || enumerator.current.type != TokenType.OpenParen {
+        report_error("Expected '(' after 'cast'", enumerator.file_index, enumerator.current);
         return null;
     }
 
     // 2. Get the target type
     if !move_next(enumerator) {
-        report_error("Expected to get the target type for the cast", enumerator.file_index, enumerator.Last);
+        report_error("Expected to get the target type for the cast", enumerator.file_index, enumerator.last);
         return null;
     }
-    castAst.TargetTypeDefinition = parse_type(enumerator, currentFunction);
-    if currentFunction {
-        each generic, i in currentFunction.Generics {
-            if search_for_generic(generic, i, castAst.TargetTypeDefinition) {
-                castAst.HasGenerics = true;
+    cast_ast.target_type_definition = parse_type(enumerator, current_function);
+    if current_function {
+        each generic, i in current_function.generics {
+            if search_for_generic(generic, i, cast_ast.target_type_definition) {
+                cast_ast.has_generics = true;
             }
         }
     }
 
     // 3. Expect to get a comma
-    if !move_next(enumerator) || enumerator.Current.Type != TokenType.Comma {
-        report_error("Expected ',' after type in cast", enumerator.file_index, enumerator.Current);
+    if !move_next(enumerator) || enumerator.current.type != TokenType.Comma {
+        report_error("Expected ',' after type in cast", enumerator.file_index, enumerator.current);
         return null;
     }
 
     // 4. Get the value expression
     if !move_next(enumerator) {
-        report_error("Expected to get the value for the cast", enumerator.file_index, enumerator.Last);
+        report_error("Expected to get the value for the cast", enumerator.file_index, enumerator.last);
         return null;
     }
-    castAst.Value = ParseExpression(enumerator, currentFunction, null, TokenType.CloseParen);
+    cast_ast.value = parse_expression(enumerator, current_function, null, TokenType.CloseParen);
 
-    return castAst;
+    return cast_ast;
 }
 
-T* create_ast<T>(Ast* source, AstType type = AstType.None) {
+T* create_ast<T>(Ast* source, AstType type) {
     ast := new<T>();
     ast.ast_type = type;
 
     if source {
         ast.file_index = source.file_index;
-        ast.line = source.Line;
-        ast.column = source.Column;
+        ast.line = source.line;
+        ast.column = source.column;
     }
 
     return ast;
 }
 
-T* create_ast<T>(TokenEnumerator* enumerator, AstType type = AstType.None) {
+T* create_ast<T>(TokenEnumerator* enumerator, AstType type) {
     return create_ast<T>(enumerator.current, enumerator.file_index, type);
 }
 
-T create_ast<T>(Token token, int fileIndex, AstType type = AstType.None) {
+T* create_ast<T>(Token token, int fileIndex, AstType type) {
     ast := new<T>();
-    ast.type = type;
+    ast.ast_type = type;
     ast.file_index = fileIndex;
     ast.line = token.line;
     ast.column = token.column;
@@ -3319,7 +3323,7 @@ Operator convert_operator(Token token) {
         case TokenType.Pipe;
         case TokenType.Ampersand;
         case TokenType.Percent;
-            return cast(Operator, token.type);
+            return cast(Operator, cast(s32, token.type));
     }
 
     return Operator.None;

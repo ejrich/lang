@@ -1824,25 +1824,24 @@ public static class TypeChecker
 
     private static void VerifyReturnStatement(ReturnAst returnAst, IFunction currentFunction, IScope scope)
     {
-        var returnValueType = VerifyExpression(returnAst.Value, currentFunction, scope);
-
         if (currentFunction == null)
         {
             ErrorReporter.Report("Cannot return in #run directive", returnAst);
+            return;
         }
-        // Handle void case since it's the easiest to interpret
-        else if (currentFunction.ReturnType?.TypeKind == TypeKind.Void)
+
+        if (currentFunction.ReturnType != null)
         {
-            if (returnAst.Value != null)
+            if (returnAst.Value == null)
             {
-                ErrorReporter.Report("Function return should be void", returnAst);
+                if (currentFunction.ReturnType.TypeKind != TypeKind.Void)
+                {
+                    ErrorReporter.Report($"Expected to return type '{currentFunction.ReturnType.Name}'", returnAst);
+                }
             }
-        }
-        else if (currentFunction.ReturnType != null)
-        {
-            if (returnValueType == null)
+            else if (returnAst.Value is NullAst nullAst)
             {
-                if (returnAst.Value is NullAst nullAst && currentFunction.ReturnType.TypeKind == TypeKind.Pointer)
+                if (currentFunction.ReturnType.TypeKind == TypeKind.Pointer)
                 {
                     nullAst.TargetType = currentFunction.ReturnType;
                 }
@@ -1851,13 +1850,63 @@ public static class TypeChecker
                     ErrorReporter.Report($"Expected to return type '{currentFunction.ReturnType.Name}'", returnAst);
                 }
             }
+            else if (returnAst.Value is CompoundExpressionAst compoundExpression)
+            {
+                if (currentFunction.ReturnType is CompoundType compoundType && compoundType.Types.Length == compoundExpression.Children.Count)
+                {
+                    var error = false;
+                    for (var i = 0; i < compoundType.Types.Length; i++)
+                    {
+                        var type = compoundType.Types[i];
+                        if (compoundExpression.Children[i] is NullAst nullAstChild)
+                        {
+                            if (type.TypeKind == TypeKind.Pointer)
+                            {
+                                nullAstChild.TargetType = type;
+                            }
+                            else
+                            {
+                                error = true;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            var valueType = VerifyExpression(compoundExpression.Children[i], currentFunction, scope);
+                            if (!TypeEquals(type, type))
+                            {
+                                error = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (error)
+                    {
+                        ErrorReporter.Report($"Expected to return type '{currentFunction.ReturnType.Name}'", returnAst);
+                    }
+                }
+                else
+                {
+                    VerifyExpression(returnAst.Value, currentFunction, scope);
+                    ErrorReporter.Report($"Expected to return type '{currentFunction.ReturnType.Name}'", returnAst);
+                }
+            }
             else
             {
-                if (!TypeEquals(currentFunction.ReturnType, returnValueType))
+                var returnValueType = VerifyExpression(returnAst.Value, currentFunction, scope);
+                if (returnValueType == null)
+                {
+                    ErrorReporter.Report($"Expected to return type '{currentFunction.ReturnType.Name}'", returnAst);
+                }
+                else if (!TypeEquals(currentFunction.ReturnType, returnValueType))
                 {
                     ErrorReporter.Report($"Expected to return type '{currentFunction.ReturnType.Name}', but returned type '{returnValueType.Name}'", returnAst.Value);
                 }
             }
+        }
+        else
+        {
+            VerifyExpression(returnAst.Value, currentFunction, scope);
         }
     }
 

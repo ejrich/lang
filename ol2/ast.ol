@@ -100,9 +100,11 @@ struct Values : Ast {
 }
 
 struct Declaration : Values {
+    name: string;
     type_definition: TypeDefinition*;
     type: TypeAst*;
     array_element_type: TypeAst*;
+    has_generics: bool;
 }
 
 struct Scope : Ast {
@@ -145,9 +147,7 @@ struct StructAst : TypeAst {
 }
 
 struct StructFieldAst : Declaration {
-    name: string;
     offset: u32;
-    HasGenerics: bool;
     attributes: Array<string>;
 }
 
@@ -265,10 +265,10 @@ struct UnaryAst : Ast {
 }
 
 struct CallAst : Ast {
-    Name: string;
-    Function: FunctionAst*;
-    Interface: Interface*;
-    generices: Array<TypeDefinition*>;
+    name: string;
+    function: FunctionAst*;
+    function_pointer: Interface*;
+    generics: Array<TypeDefinition*>;
     specified_arguments: Dictionary<string, Ast*>;
     arguments: Array<Ast*>;
     type_info: TypeAst*;
@@ -277,7 +277,8 @@ struct CallAst : Ast {
 }
 
 struct DeclarationAst : Declaration {
-    has_generics: bool;
+    global: bool;
+    private: bool;
     constant: bool;
     constant_index: int;
     pointer_index: int;
@@ -285,7 +286,6 @@ struct DeclarationAst : Declaration {
 
 struct CompoundDeclarationAst : Declaration {
     variables: Array<VariableAst*>;
-    has_generics: bool;
 }
 
 struct AssignmentAst : Values {
@@ -329,8 +329,8 @@ struct IndexAst : Ast {
 struct CompilerDirectiveAst : Ast {
     directive_type: DirectiveType;
     value: Ast*;
-    import: Import*;
-    library: Library*;
+    import: Import;
+    library: Library;
 }
 
 struct Import {
