@@ -1,3 +1,4 @@
+#import "ir_builder.ol"
 #import "type_table.ol"
 
 init_types() {
@@ -41,6 +42,10 @@ add_interface(InterfaceAst* interface_ast) {
 
 TypeAst* verify_type(TypeDefinition* type_def, Scope* scope) {
     return null;
+}
+
+string print_type_definition(TypeDefinition* type) {
+    return "";
 }
 
 base_array_type: StructAst*;
