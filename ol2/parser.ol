@@ -402,9 +402,9 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
                 function.name = function.return_type_definition.name;
                 each generic in function.return_type_definition.generics {
                     if generic.generics.length
-                        report_error("Invalid generic in function '{function.Name}'", generic);
+                        report_error("Invalid generic in function '%'", generic, function.name);
                     else if function.generics.contains(generic.name)
-                        report_error("Duplicate generic '{generic.Name}' in function '{function.Name}'", generic.file_index, generic.line, generic.column);
+                        report_error("Duplicate generic '%' in function '%'", generic.file_index, generic.line, generic.column, generic.name, function.name);
                     else
                         function.generics.Add(generic.name);
                 }
@@ -426,7 +426,7 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
 
             if token.type == TokenType.GreaterThan {
                 if !comma_required_before_next_type
-                    report_error("Expected comma in generics of function '{function.Name}'", enumerator.file_index, token);
+                    report_error("Expected comma in generics of function '%'", enumerator.file_index, token, function.name);
 
                 break;
             }
@@ -434,16 +434,16 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
             if !comma_required_before_next_type {
                 if token.type == TokenType.Identifier {
                     if !generics.Add(token.value)
-                        report_error("Duplicate generic '{token.value}' in function '{function.Name}'", enumerator.file_index, token);
+                        report_error("Duplicate generic '%' in function '%'", enumerator.file_index, token, token.value, function.name);
                 }
                 else
-                    report_error("Unexpected token '{token.value}' in generics of function '{function.Name}'", enumerator.file_index, token);
+                    report_error("Unexpected token '%' in generics of function '%'", enumerator.file_index, token, token.value, function.name);
 
                 comma_required_before_next_type = true;
             }
             else {
                 if token.type != TokenType.Comma
-                    report_error("Unexpected token '{token.value}' in function '{function.Name}'", enumerator.file_index, token);
+                    report_error("Unexpected token '%' in function '%'", enumerator.file_index, token, token.value, function.name);
 
                 comma_required_before_next_type = false;
             }
@@ -470,7 +470,7 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
     {
         // Add an error to the function AST and continue until open paren
         token = enumerator.current;
-        report_error("Unexpected token '{token.value}' in function definition", enumerator.file_index, token);
+        report_error("Unexpected token '%' in function definition", enumerator.file_index, token, token.value);
         while (enumerator.remaining && enumerator.current.type != TokenType.OpenParen)
             move_next(enumerator);
     }
@@ -521,7 +521,7 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
                     move_next(enumerator);
                     current_argument.value = parse_expression(enumerator, function, null, TokenType.Comma, TokenType.CloseParen);
                     if !enumerator.remaining {
-                        report_error("Incomplete definition for function '{function.Name}'", enumerator.file_index, enumerator.last);
+                        report_error("Incomplete definition for function '%'", enumerator.file_index, enumerator.last, function.name);
                         return null;
                     }
 
@@ -536,14 +536,14 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
                             current_argument = null;
                         }
                         default;
-                            report_error("Unexpected token '{enumerator.current.value}' in arguments of function '{function.Name}'", enumerator.file_index, enumerator.current);
+                            report_error("Unexpected token '%' in arguments of function '%'", enumerator.file_index, enumerator.current, enumerator.current.value, function.name);
                     }
                 }
                 else
                     report_error("Unexpected comma in arguments", enumerator.file_index, token);
             }
             default;
-                report_error("Unexpected token '{token.value}' in arguments", enumerator.file_index, token);
+                report_error("Unexpected token '%' in arguments", enumerator.file_index, token, token.value);
         }
 
         if enumerator.current.type == TokenType.CloseParen
@@ -551,7 +551,7 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
     }
 
     if current_argument
-        report_error("Incomplete function argument in function '{function.Name}'", enumerator.file_index, enumerator.current);
+        report_error("Incomplete function argument in function '%'", enumerator.file_index, enumerator.current, function.name);
 
     if !comma_required_before_next_argument && function.arguments.length > 0
         report_error("Unexpected comma in arguments", enumerator.file_index, enumerator.current);
@@ -617,7 +617,7 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
             case "inline";
                 function.flags |= FunctionFlags.Inline;
             default;
-                report_error("Unexpected compiler directive '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
+                report_error("Unexpected compiler directive '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
         }
         move_next(enumerator);
     }
@@ -627,7 +627,7 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
     {
         // Add an error and continue until open paren
         token = enumerator.current;
-        report_error("Unexpected token '{token.value}' in function definition", enumerator.file_index, token);
+        report_error("Unexpected token '%' in function definition", enumerator.file_index, token, token.value);
         while move_next(enumerator) && enumerator.current.type != TokenType.OpenBrace {}
 
         if !enumerator.remaining
@@ -654,7 +654,7 @@ StructAst* parse_struct(TokenEnumerator* enumerator, Array<string> attributes) {
     if enumerator.current.type == TokenType.Identifier
         struct_ast.name = enumerator.current.value;
     else
-        report_error("Unexpected token '{enumerator.current.value}' in struct definition", enumerator.file_index, enumerator.current);
+        report_error("Unexpected token '%' in struct definition", enumerator.file_index, enumerator.current, enumerator.current.value);
 
     // 2. Parse struct generics
     token: Token;
@@ -673,7 +673,7 @@ StructAst* parse_struct(TokenEnumerator* enumerator, Array<string> attributes) {
 
             if token.type == TokenType.GreaterThan {
                 if !comma_required_before_next_type
-                    report_error("Expected comma in generics for struct '{struct_ast.Name}'", enumerator.file_index, token);
+                    report_error("Expected comma in generics for struct '%'", enumerator.file_index, token, struct_ast.name);
 
                 break;
             }
@@ -681,23 +681,23 @@ StructAst* parse_struct(TokenEnumerator* enumerator, Array<string> attributes) {
             if !comma_required_before_next_type {
                 if token.type == TokenType.Identifier {
                     if !generics.Add(token.value) {
-                        report_error("Duplicate generic '{token.value}' in struct '{struct_ast.Name}'", enumerator.file_index, token);
+                        report_error("Duplicate generic '%' in struct '%'", enumerator.file_index, token, token.value, struct_ast.name);
                     }
                 }
-                else report_error("Unexpected token '{token.value}' in generics for struct '{struct_ast.Name}'", enumerator.file_index, token);
+                else report_error("Unexpected token '%' in generics for struct '%'", enumerator.file_index, token, token.value, struct_ast.name);
 
                 comma_required_before_next_type = true;
             }
             else {
                 if token.type != TokenType.Comma
-                    report_error("Unexpected token '{token.value}' in definition of struct '{struct_ast.Name}'", enumerator.file_index, token);
+                    report_error("Unexpected token '%' in definition of struct '%'", enumerator.file_index, token, token.value, struct_ast.name);
 
                 comma_required_before_next_type = false;
             }
         }
 
         if !generics.Any()
-            report_error("Expected struct '{struct_ast.Name}' to contain generics", enumerator.file_index, enumerator.current);
+            report_error("Expected struct '' to contain generics", enumerator.file_index, enumerator.current, struct_ast.name);
 
         struct_ast.generics = generics.ToList();
     }
@@ -744,7 +744,7 @@ StructFieldAst* parse_struct_field(TokenEnumerator* enumerator) {
     struct_field.attributes = attributes;
 
     if enumerator.current.type != TokenType.Identifier
-        report_error("Expected name of struct field, but got '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
+        report_error("Expected name of struct field, but got '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
 
     struct_field.name = enumerator.current.value;
 
@@ -753,7 +753,7 @@ StructFieldAst* parse_struct_field(TokenEnumerator* enumerator) {
     move_next(enumerator);
     if enumerator.current.type != TokenType.Colon {
         token = enumerator.current;
-        report_error("Unexpected token in struct field '{token.value}'", enumerator.file_index, token);
+        report_error("Unexpected token in struct field '%'", enumerator.file_index, token, token.value);
         // Parse to a ; or }
         while move_next(enumerator) {
             tokenType := enumerator.current.type;
@@ -788,7 +788,7 @@ StructFieldAst* parse_struct_field(TokenEnumerator* enumerator) {
             if (struct_field.type_definition == null)
                 report_error("Expected struct field to have value", enumerator.file_index, token);
         default; {
-            report_error("Unexpected token '{token.value}' in struct field", enumerator.file_index, token);
+            report_error("Unexpected token '%' in struct field", enumerator.file_index, token, token.value);
             // Parse until there is an equals sign or semicolon
             while move_next(enumerator) {
                 if enumerator.current.type == TokenType.SemiColon break;
@@ -819,7 +819,7 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
         enum_ast.backend_name = enumerator.current.value;
     }
     else
-        report_error("Unexpected token '{enumerator.current.value}' in enum definition", enumerator.file_index, enumerator.current);
+        report_error("Unexpected token '%' in enum definition", enumerator.file_index, enumerator.current, enumerator.current.value);
 
     // 2. Parse over the open brace
     move_next(enumerator);
@@ -830,7 +830,7 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
 
         base_type := verify_type(enum_ast.base_type_definition, &global_scope);
         if base_type == null || base_type.type_kind != TypeKind.Integer {
-            report_error("Base type of enum must be an integer, but got '{TypeChecker.PrintTypeDefinition(enum_ast.base_type_definition)}'", enum_ast.base_type_definition);
+            report_error("Base type of enum must be an integer, but got '%'", enum_ast.base_type_definition, print_type_definition(enum_ast.base_type_definition));
             enum_ast.base_type = &s32_type;
         }
         else {
@@ -882,26 +882,26 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
                     value: EnumValueAst*;
                     if enum_ast.values.TryGetValue(token.value, &value) {
                         if !value.defined
-                            report_error("Expected previously defined value '{token.value}' to have a defined value", enumerator.file_index, token);
+                            report_error("Expected previously defined value '%' to have a defined value", enumerator.file_index, token, token.value);
 
                         current_value.value = value.value;
                         current_value.defined = true;
                     }
                     else
-                        report_error("Expected value '{token.value}' to be previously defined in enum '{enum_ast.Name}'", enumerator.file_index, token);
+                        report_error("Expected value '%' to be previously defined in enum '{enum_ast.Name}'", enumerator.file_index, token, token.value);
                 }
                 else
-                    report_error("Unexpected token '{token.value}' in enum", enumerator.file_index, token);
+                    report_error("Unexpected token '%' in enum", enumerator.file_index, token, token.value);
             case TokenType.SemiColon;
                 if current_value {
                     // Catch if the name hasn't been set
                     if string_is_null(current_value.name) || parsing_value_default {
-                        report_error("Unexpected token '{token.value}' in enum", enumerator.file_index, token);
+                        report_error("Unexpected token '%' in enum", enumerator.file_index, token, token.value);
                     }
                     // Add the value to the enum and continue
                     else {
                         if !enum_ast.values.TryAdd(current_value.name, current_value)
-                            report_error("Enum '{enum_ast.Name}' already contains value '{current_value.Name}'", current_value);
+                            report_error("Enum '%' already contains value '%'", current_value, enum_ast.name, current_value.name);
 
                         if current_value.defined {
                             if current_value.value > largest_value
@@ -911,7 +911,7 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
                             current_value.value = ++largest_value;
 
                         if current_value.value < lowest_allowed_value || current_value.value > largest_allowed_value {
-                            report_error("Enum value '{enum_ast.Name}.{current_value.Name}' value '{currentValue.Value}' is out of range", current_value);
+                            report_error("Enum value '%.%' value '%' is out of range", current_value, enum_ast.name, current_value.name, current_value.value);
                         }
                     }
 
@@ -922,7 +922,7 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
                 if current_value != null && !string_is_null(current_value.name)
                     parsing_value_default = true;
                 else
-                    report_error("Unexpected token '{token.value}' in enum", enumerator.file_index, token);
+                    report_error("Unexpected token '%' in enum", enumerator.file_index, token, token.value);
             case TokenType.Number;
                 if current_value != null && parsing_value_default {
                     if token.flags == TokenFlags.None {
@@ -932,14 +932,14 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
                             current_value.defined = true;
                         }
                         else
-                            report_error("Expected enum value to be an integer, but got '{token.value}'", enumerator.file_index, token);
+                            report_error("Expected enum value to be an integer, but got '%'", enumerator.file_index, token, token.value);
                     }
                     else if token.flags & TokenFlags.Float {
-                        report_error("Expected enum value to be an integer, but got '{token.value}'", enumerator.file_index, token);
+                        report_error("Expected enum value to be an integer, but got '%'", enumerator.file_index, token, token.value);
                     }
                     else if token.flags & TokenFlags.HexNumber {
                         if token.value.length == 2
-                            report_error("Invalid number '{token.value}'", enumerator.file_index, token);
+                            report_error("Invalid number '%'", enumerator.file_index, token, token.value);
 
                         sub_value := substring(token.value, 2, token.value.length - 2);
                         if sub_value.length <= 8 {
@@ -956,26 +956,26 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
                                 current_value.defined = true;
                             }
                         }
-                        else report_error("Expected enum value to be an integer, but got '{token.value}'", enumerator.file_index, token);
+                        else report_error("Expected enum value to be an integer, but got '%'", enumerator.file_index, token, token.value);
                     }
                     parsing_value_default = false;
                 }
-                else report_error("Unexpected token '{token.value}' in enum", enumerator.file_index, token);
+                else report_error("Unexpected token '%' in enum", enumerator.file_index, token, token.value);
             case TokenType.Character;
                 if current_value != null && parsing_value_default {
                     current_value.value = token.value[0];
                     current_value.defined = true;
                     parsing_value_default = false;
                 }
-                else report_error("Unexpected token '{token.value}' in enum", enumerator.file_index, token);
+                else report_error("Unexpected token '%' in enum", enumerator.file_index, token, token.value);
             default;
-                report_error("Unexpected token '{token.value}' in enum", enumerator.file_index, token);
+                report_error("Unexpected token '%' in enum", enumerator.file_index, token, token.value);
         }
     }
 
     if current_value {
         token := enumerator.current;
-        report_error("Unexpected token '{token.value}' in enum", enumerator.file_index, token);
+        report_error("Unexpected token '%' in enum", enumerator.file_index, token, token.value);
     }
 
     if enum_ast.values.length == 0
@@ -999,7 +999,7 @@ UnionAst* parse_union(TokenEnumerator* enumerator) {
         union_ast.backend_name = enumerator.current.value;
     }
     else
-        report_error("Unexpected token '{enumerator.current.value}' in union definition", enumerator.file_index, enumerator.current);
+        report_error("Unexpected token '%' in union definition", enumerator.file_index, enumerator.current, enumerator.current.value);
 
     // 2. Parse over the open brace
     move_next(enumerator);
@@ -1023,7 +1023,7 @@ UnionFieldAst* parse_union_field(TokenEnumerator* enumerator) {
     field := create_ast<UnionFieldAst>(enumerator, AstType.UnionField);
 
     if enumerator.current.type != TokenType.Identifier
-        report_error("Expected name of union field, but got '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
+        report_error("Expected name of union field, but got '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
 
     field.name = enumerator.current.value;
 
@@ -1032,7 +1032,7 @@ UnionFieldAst* parse_union_field(TokenEnumerator* enumerator) {
     move_next(enumerator);
     if enumerator.current.type != TokenType.Colon {
         token = enumerator.current;
-        report_error("Unexpected token in union field '{token.value}'", enumerator.file_index, token);
+        report_error("Unexpected token in union field '%'", enumerator.file_index, token, token.value);
         // Parse to a ; or }
         while move_next(enumerator) {
             token_type := enumerator.current.type;
@@ -1065,7 +1065,7 @@ UnionFieldAst* parse_union_field(TokenEnumerator* enumerator) {
             if (field.type_definition == null)
                 report_error("Expected union field to have a type", enumerator.file_index, token);
         default; {
-            report_error("Unexpected token '{token.value}' in declaration", enumerator.file_index, token);
+            report_error("Unexpected token '%' in declaration", enumerator.file_index, token, token.value);
             // Parse until there is a semicolon or closing brace
             while move_next(enumerator) {
                 token = enumerator.current;
@@ -1164,7 +1164,7 @@ Ast* parse_line(TokenEnumerator* enumerator, Function* current_function) {
         }
     }
 
-    report_error("Unexpected token '{token.value}'", enumerator.file_index, token);
+    report_error("Unexpected token '%'", enumerator.file_index, token, token.value);
     return null;
 }
 
@@ -1394,7 +1394,7 @@ DeclarationAst* parse_declaration(TokenEnumerator* enumerator, Function* current
     declaration.private = enumerator.private;
 
     if enumerator.current.type != TokenType.Identifier {
-        report_error("Expected variable name to be an identifier, but got '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
+        report_error("Expected variable name to be an identifier, but got '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
     }
 
     declaration.name = enumerator.current.value;
@@ -1402,7 +1402,7 @@ DeclarationAst* parse_declaration(TokenEnumerator* enumerator, Function* current
     // 1. Expect to get colon
     move_next(enumerator);
     if enumerator.current.type != TokenType.Colon {
-        report_error("Unexpected token in declaration '{token.value}'", enumerator.file_index, enumerator.current);
+        report_error("Unexpected token in declaration '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
         return null;
     }
 
@@ -1438,7 +1438,7 @@ DeclarationAst* parse_declaration(TokenEnumerator* enumerator, Function* current
             if (declaration.type_definition == null)
                 report_error("Expected declaration to have value", enumerator.file_index, token);
         default; {
-            report_error("Unexpected token '{token.value}' in declaration", enumerator.file_index, token);
+            report_error("Unexpected token '%' in declaration", enumerator.file_index, token, token.value);
             // Parse until there is an equals sign or semicolon
             while move_next(enumerator) {
                 if enumerator.current.type == TokenType.SemiColon break;
@@ -1482,7 +1482,7 @@ bool parse_value(Values* values, TokenEnumerator* enumerator, Function* current_
                 assignment := parse_assignment(enumerator, current_function, &move_next);
 
                 if !values.assignments.TryAdd(token.value, assignment)
-                    report_error("Multiple assignments for field '{token.value}'", enumerator.file_index, token);
+                    report_error("Multiple assignments for field '%'", enumerator.file_index, token, token.value);
 
                 if move_next {
                     peek(enumerator, &token);
@@ -1528,7 +1528,7 @@ AssignmentAst* parse_assignment(TokenEnumerator* enumerator, Function* current_f
     if reference == null {
         variable_ast := create_ast<IdentifierAst>(enumerator, AstType.Identifier);
         if enumerator.current.type != TokenType.Identifier {
-            report_error("Expected variable name to be an identifier, but got '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
+            report_error("Expected variable name to be an identifier, but got '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
         }
         variable_ast.name = enumerator.current.value;
         assignment.reference = variable_ast;
@@ -1578,7 +1578,7 @@ AssignmentAst* parse_assignment(TokenEnumerator* enumerator, Function* current_f
         case TokenType.SemiColon;
             report_error("Expected assignment to have value", enumerator.file_index, enumerator.current);
         default; {
-            report_error("Unexpected token '{enumerator.current.value}' in assignment", enumerator.file_index, enumerator.current);
+            report_error("Unexpected token '%' in assignment", enumerator.file_index, enumerator.current, enumerator.current.value);
             // Parse until there is an equals sign or semicolon
             while move_next(enumerator) {
                 if enumerator.current.type == TokenType.SemiColon break;
@@ -1656,7 +1656,7 @@ Ast* parse_expression(TokenEnumerator* enumerator, Function* current_function, E
                 operator_required = false;
             }
             else {
-                report_error("Unexpected token '{token.value}' when operator was expected", enumerator.file_index, token);
+                report_error("Unexpected token '%' when operator was expected", enumerator.file_index, token, token.value);
                 return null;
             }
         }
@@ -1723,7 +1723,7 @@ Ast* parse_compound_expression(TokenEnumerator* enumerator, Function* current_fu
                     else {
                         identifier := cast(IdentifierAst*, variable);
                         variable_ast := create_ast<VariableAst>(identifier, AstType.Variable);
-                        variable_ast.Name = identifier.Name;
+                        variable_ast.name = identifier.name;
                         compound_declaration.variables[i] = variable_ast;
                     }
                 }
@@ -1748,7 +1748,7 @@ Ast* parse_compound_expression(TokenEnumerator* enumerator, Function* current_fu
                         if compound_declaration.type_definition == null
                             report_error("Expected token declaration to have type and/or value", enumerator.file_index, enumerator.current);
                     default; {
-                        report_error("Unexpected token '{enumerator.current.value}' in declaration", enumerator.file_index, enumerator.current);
+                        report_error("Unexpected token '%' in declaration", enumerator.file_index, enumerator.current, enumerator.current.value);
                         // Parse until there is an equals sign or semicolon
                         while move_next(enumerator) {
                             if enumerator.current.type == TokenType.SemiColon break;
@@ -1817,7 +1817,7 @@ Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_f
             // Parse variable, call, or expression
             next_token: Token;
             if !peek(enumerator, &next_token) {
-                report_error("Expected token to follow '{token.value}'", enumerator.file_index, token);
+                report_error("Expected token to follow '%'", enumerator.file_index, token, token.value);
                 return null;
             }
             switch next_token.type {
@@ -1886,7 +1886,7 @@ Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_f
                 return change_by_one;
             }
 
-            report_error("Expected token to follow '{token.value}'", enumerator.file_index, token);
+            report_error("Expected token to follow '%'", enumerator.file_index, token, token.value);
             return null;
         }
         case TokenType.OpenParen; {
@@ -1894,7 +1894,7 @@ Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_f
             if move_next(enumerator)
                 return parse_expression(enumerator, current_function, null, TokenType.CloseParen);
 
-            report_error("Expected token to follow '{token.value}'", enumerator.file_index, token);
+            report_error("Expected token to follow '%'", enumerator.file_index, token, token.value);
             return null;
         }
         case TokenType.Not;
@@ -1912,13 +1912,13 @@ Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_f
                 return unaryAst;
             }
 
-            report_error("Expected token to follow '{token.value}'", enumerator.file_index, token);
+            report_error("Expected token to follow '%'", enumerator.file_index, token, token.value);
             return null;
         }
         case TokenType.Cast;
             return parse_cast(enumerator, current_function);
         default; {
-            report_error("Unexpected token '{token.value}' in expression", enumerator.file_index, token);
+            report_error("Unexpected token '%' in expression", enumerator.file_index, token, token.value);
             *operator_required = false;
         }
    }
@@ -2073,7 +2073,7 @@ parse_arguments(CallAst* call_ast, TokenEnumerator* enumerator, Function* curren
                 // call_ast.SpecifiedArguments ??= new Dictionary<string, IAst>();
                 argument := parse_expression(enumerator, current_function, null, TokenType.Comma, TokenType.CloseParen);
                 if !call_ast.specified_arguments.TryAdd(argument_name, argument)
-                    report_error("Specified argument '{token.value}' is already in the call", enumerator.file_index, token);
+                    report_error("Specified argument '%' is already in the call", enumerator.file_index, token, token.value);
             }
             else
                 call_ast.arguments.Add(parse_expression(enumerator, current_function, null, TokenType.Comma, TokenType.CloseParen));
@@ -2155,53 +2155,53 @@ CompilerDirectiveAst* parse_top_level_directive(TokenEnumerator* enumerator, boo
                     if global
                         add_module(module, enumerator.file_index, token);
                     else
-                        directive.import = { name = module; path = Path.Combine(_libraryDirectory, "{token.value}.ol"); }
+                        directive.import = { name = module; path = format_string("%/%.ol", allocate, library_directory, token.value); }
                 }
                 case TokenType.Literal; {
                     directive.directive_type = DirectiveType.ImportFile;
                     file := token.value;
                     if global
-                        add_file(file, directory, enumerator.file_index, token);
+                        add_file(file, enumerator.directory, enumerator.file_index, token);
                     else
-                        directive.import = { name = file; path = Path.Combine(directory, token.value); }
+                        directive.import = { name = file; path = format_string("%/%", allocate, enumerator.directory, token.value); }
                 }
                 default;
-                    report_error("Expected module name or source file, but got '{token.value}'", enumerator.file_index, token);
+                    report_error("Expected module name or source file, but got '%'", enumerator.file_index, token, token.value);
             }
         }
         case "library"; {
             directive.directive_type = DirectiveType.Library;
             if (!move_next(enumerator) || enumerator.current.type != TokenType.Identifier)
             {
-                report_error("Expected library name, but got '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
+                report_error("Expected library name, but got '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
                 return null;
             }
-            name := enumerator.current.value;
+            library_name := enumerator.current.value;
             if !move_next(enumerator) || enumerator.current.type != TokenType.Literal
             {
-                report_error("Expected library path, but got '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
+                report_error("Expected library path, but got '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
                 return null;
             }
-            path := enumerator.current.value;
-            directive.library = { name = name; path = path; }
+            library_path := enumerator.current.value;
+            directive.library = { name = library_name; path = library_path; }
             if path[0] == '/'
-                directive.library.absolute_path = path;
+                directive.library.absolute_path = library_path;
             else
-                directive.library.absolute_path = Path.Combine(directory, path);
+                directive.library.absolute_path = format_string("%/%", allocate, enumerator.directory, library_path);
         }
         case "system_library"; {
             directive.directive_type = DirectiveType.SystemLibrary;
             if !move_next(enumerator) || enumerator.current.type != TokenType.Identifier {
-                report_error("Expected library name, but got '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
+                report_error("Expected library name, but got '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
                 return null;
             }
-            name := enumerator.current.value;
+            library_name := enumerator.current.value;
             if !move_next(enumerator) || enumerator.current.type != TokenType.Literal {
-                report_error("Expected library file name, but got '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
+                report_error("Expected library file name, but got '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
                 return null;
             }
             file_name := enumerator.current.value;
-            directive.library = { name = name; file_name = file_name; }
+            directive.library = { name = library_name; file_name = file_name; }
             if peek(enumerator, &token) && token.type == TokenType.Literal {
                 directive.library.lib_path = token.value;
                 move_next(enumerator);
@@ -2215,7 +2215,7 @@ CompilerDirectiveAst* parse_top_level_directive(TokenEnumerator* enumerator, boo
             enumerator.private = true;
         }
         default; {
-            report_error("Unsupported top-level compiler directive '{token.value}'", enumerator.file_index, token);
+            report_error("Unsupported top-level compiler directive '%'", enumerator.file_index, token, token.value);
             return null;
         }
     }
@@ -2254,7 +2254,7 @@ Ast* parse_compiler_directive(TokenEnumerator* enumerator, Function* current_fun
             return call;
         }
         default; {
-            report_error("Unsupported function level compiler directive '{token.value}'", enumerator.file_index, token);
+            report_error("Unsupported function level compiler directive '%'", enumerator.file_index, token, token.value);
             return null;
         }
     }
@@ -2337,7 +2337,7 @@ AssemblyAst* parse_inline_assembly(TokenEnumerator* enumerator) {
                 }
             }
             default; {
-                report_error("Expected instruction in assembly block, but got '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
+                report_error("Expected instruction in assembly block, but got '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
 
                 // Skip through the next ';' or '}'
                 while (enumerator.current.type != TokenType.SemiColon || enumerator.current.type != TokenType.CloseBrace) && move_next(enumerator) {}
@@ -2361,13 +2361,13 @@ bool parse_in_register(AssemblyAst* assembly, TokenEnumerator* enumerator) {
     }
 
     if enumerator.current.type != TokenType.Identifier {
-        report_error("Unexpected token '{enumerator.current.value}' in assembly block", enumerator.file_index, enumerator.current);
+        report_error("Unexpected token '%' in assembly block", enumerator.file_index, enumerator.current, enumerator.current.value);
         return false;
     }
 
     register := enumerator.current.value;
     if assembly.in_registers.ContainsKey(register) {
-        report_error("Duplicate in register '{register}'", enumerator.file_index, enumerator.current);
+        report_error("Duplicate in register '%'", enumerator.file_index, enumerator.current, register);
         return false;
     }
     input := create_ast<AssemblyInputAst>(enumerator, AstType.AssemblyInput);
@@ -2379,7 +2379,7 @@ bool parse_in_register(AssemblyAst* assembly, TokenEnumerator* enumerator) {
     }
 
     if enumerator.current.type != TokenType.Comma {
-        report_error("Unexpected token '{enumerator.current.value}' in assembly block", enumerator.file_index, enumerator.current);
+        report_error("Unexpected token '%' in assembly block", enumerator.file_index, enumerator.current, enumerator.current.value);
         return false;
     }
 
@@ -2397,7 +2397,7 @@ bool parse_in_register(AssemblyAst* assembly, TokenEnumerator* enumerator) {
     }
 
     if enumerator.current.type != TokenType.SemiColon {
-        report_error("Unexpected token '{enumerator.current.value}' in assembly block", enumerator.file_index, enumerator.current);
+        report_error("Unexpected token '%' in assembly block", enumerator.file_index, enumerator.current, enumerator.current.value);
         return false;
     }
 
@@ -2425,7 +2425,7 @@ bool parse_out_value(AssemblyAst* assembly, TokenEnumerator* enumerator) {
     }
 
     if enumerator.current.type != TokenType.Comma {
-        report_error("Unexpected token '{enumerator.current.value}' in assembly block", enumerator.file_index, enumerator.current);
+        report_error("Unexpected token '%' in assembly block", enumerator.file_index, enumerator.current, enumerator.current.value);
         return false;
     }
 
@@ -2435,7 +2435,7 @@ bool parse_out_value(AssemblyAst* assembly, TokenEnumerator* enumerator) {
     }
 
     if enumerator.current.type != TokenType.Identifier {
-        report_error("Unexpected token '{enumerator.current.value}' in assembly block", enumerator.file_index, enumerator.current);
+        report_error("Unexpected token '%' in assembly block", enumerator.file_index, enumerator.current, enumerator.current.value);
         return false;
     }
     output.register = enumerator.current.value;
@@ -2446,7 +2446,7 @@ bool parse_out_value(AssemblyAst* assembly, TokenEnumerator* enumerator) {
     }
 
     if enumerator.current.type != TokenType.SemiColon {
-        report_error("Unexpected token '{enumerator.current.value}' in assembly block", enumerator.file_index, enumerator.current);
+        report_error("Unexpected token '%' in assembly block", enumerator.file_index, enumerator.current, enumerator.current.value);
         return false;
     }
 
@@ -2479,7 +2479,7 @@ AssemblyInstructionAst* parse_assembly_instruction(TokenEnumerator* enumerator) 
         }
         case TokenType.SemiColon; return instruction;
         default; {
-            report_error("Unexpected token '{enumerator.current.value}' in assembly block", enumerator.file_index, enumerator.current);
+            report_error("Unexpected token '%' in assembly block", enumerator.file_index, enumerator.current, enumerator.current.value);
             return null;
         }
     }
@@ -2493,7 +2493,7 @@ AssemblyInstructionAst* parse_assembly_instruction(TokenEnumerator* enumerator) 
         case TokenType.Comma; {}
         case TokenType.SemiColon; return instruction;
         default; {
-            report_error("Unexpected token '{enumerator.current.value}' in assembly block", enumerator.file_index, enumerator.current);
+            report_error("Unexpected token '%' in assembly block", enumerator.file_index, enumerator.current, enumerator.current.value);
             return null;
         }
     }
@@ -2513,7 +2513,7 @@ AssemblyInstructionAst* parse_assembly_instruction(TokenEnumerator* enumerator) 
             if !parse_assembly_pointer(instruction.value2, enumerator)
                 return null;
         default; {
-            report_error("Unexpected token '{enumerator.current.value}' in assembly block", enumerator.file_index, enumerator.current);
+            report_error("Unexpected token '%' in assembly block", enumerator.file_index, enumerator.current, enumerator.current.value);
             return null;
         }
     }
@@ -2524,7 +2524,7 @@ AssemblyInstructionAst* parse_assembly_instruction(TokenEnumerator* enumerator) 
     }
 
     if enumerator.current.type != TokenType.SemiColon {
-        report_error("Unexpected token '{enumerator.current.value}' in assembly block", enumerator.file_index, enumerator.current);
+        report_error("Unexpected token '%' in assembly block", enumerator.file_index, enumerator.current, enumerator.current.value);
         return null;
     }
 
@@ -2660,7 +2660,7 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator)
     else {
         overload.op = convert_operator(enumerator.current);
         if overload.op == Operator.None
-            report_error("Expected an operator to be be specified, but got '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
+            report_error("Expected an operator to be be specified, but got '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
     }
 
     if !move_next(enumerator) {
@@ -2684,16 +2684,16 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator)
             if !comma_required_before_next_type {
                 if token.type == TokenType.Identifier {
                     if (!generics.Add(token.value))
-                        report_error("Duplicate generic '{token.value}'", enumerator.file_index, token);
+                        report_error("Duplicate generic '%'", enumerator.file_index, token, token.value);
                 }
                 else
-                    report_error("Unexpected token '{token.value}' in generics", enumerator.file_index, token);
+                    report_error("Unexpected token '%' in generics", enumerator.file_index, token, token.value);
 
                 comma_required_before_next_type = true;
             }
             else {
                 if token.type != TokenType.Comma {
-                    report_error("Unexpected token '{token.value}' when defining generics", enumerator.file_index, token);
+                    report_error("Unexpected token '%' when defining generics", enumerator.file_index, token, token.value);
                 }
 
                 comma_required_before_next_type = false;
@@ -2711,7 +2711,7 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator)
     if enumerator.current.type != TokenType.OpenParen {
         // Add an error to the function AST and continue until open paren
         token = enumerator.current;
-        report_error("Unexpected token '{token.value}' in operator overload definition", enumerator.file_index, token);
+        report_error("Unexpected token '%' in operator overload definition", enumerator.file_index, token, token.value);
         while move_next(enumerator) && enumerator.current.type != TokenType.OpenParen {}
     }
 
@@ -2760,7 +2760,7 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator)
                 comma_required_before_next_argument = false;
             }
             default;
-                report_error("Unexpected token '{token.value}' in arguments", enumerator.file_index, token);
+                report_error("Unexpected token '%' in arguments", enumerator.file_index, token, token.value);
         }
 
         if enumerator.current.type == TokenType.CloseParen
@@ -2768,7 +2768,7 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator)
     }
 
     if current_argument
-        report_error("Incomplete argument in overload for type '{overload.Type.Name}'", enumerator.file_index, enumerator.current);
+        report_error("Incomplete argument in overload for type '%'", enumerator.file_index, enumerator.current, overload.type.name);
 
     if !comma_required_before_next_argument && overload.arguments.length > 0
         report_error("Unexpected comma in arguments", enumerator.file_index, enumerator.current);
@@ -2822,7 +2822,7 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator)
             case "print_ir";
                 overload.flags |= FunctionFlags.PrintIR;
             default;
-                report_error("Unexpected compiler directive '{enumerator.current.value}'", enumerator.file_index, enumerator.current);
+                report_error("Unexpected compiler directive '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
         }
         move_next(enumerator);
     }
@@ -2831,7 +2831,7 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator)
     if enumerator.current.type != TokenType.OpenBrace {
         // Add an error and continue until open paren
         token = enumerator.current;
-        report_error("Unexpected token '{token.value}' in operator overload definition", enumerator.file_index, token);
+        report_error("Unexpected token '%' in operator overload definition", enumerator.file_index, token, token.value);
         while move_next(enumerator) && enumerator.current.type != TokenType.OpenBrace {}
     }
 
@@ -2890,7 +2890,7 @@ InterfaceAst* parse_interface(TokenEnumerator* enumerator) {
             else {
                 interface_ast.name = interface_ast.return_type_definition.name;
                 if interface_ast.return_type_definition.generics.length
-                    report_error("Interface '{interface_ast.Name}' cannot have generics", interface_ast.return_type_definition);
+                    report_error("Interface '%' cannot have generics", interface_ast.return_type_definition, interface_ast.name);
 
                 interface_ast.return_type_definition = null;
             }
@@ -2937,7 +2937,7 @@ InterfaceAst* parse_interface(TokenEnumerator* enumerator) {
             }
             case TokenType.Equals;
                 if comma_required_before_next_argument {
-                    report_error("Interface '{interface_ast.Name}' cannot have default argument values", enumerator.file_index, token);
+                    report_error("Interface '%' cannot have default argument values", enumerator.file_index, token, interface_ast.name);
                     while move_next(enumerator) {
                         if enumerator.current.type == TokenType.Comma {
                             comma_required_before_next_argument = false;
@@ -2955,7 +2955,7 @@ InterfaceAst* parse_interface(TokenEnumerator* enumerator) {
                 else
                     report_error("Unexpected token '=' in arguments", enumerator.file_index, token);
             default;
-                report_error("Unexpected token '{token.value}' in arguments", enumerator.file_index, token);
+                report_error("Unexpected token '%' in arguments", enumerator.file_index, token, token.value);
         }
 
         if enumerator.current.type == TokenType.CloseParen
@@ -2963,7 +2963,7 @@ InterfaceAst* parse_interface(TokenEnumerator* enumerator) {
     }
 
     if current_argument
-        report_error("Incomplete argument in interface '{interface_ast.Name}'", enumerator.file_index, enumerator.current);
+        report_error("Incomplete argument in interface '%'", enumerator.file_index, enumerator.current, interface_ast.name);
 
     if !comma_required_before_next_argument && interface_ast.arguments.length > 0
         report_error("Unexpected comma in arguments", enumerator.file_index, enumerator.current);
@@ -3020,13 +3020,13 @@ TypeDefinition* parse_type(TokenEnumerator* enumerator, Function* current_functi
                 if token.type == TokenType.Identifier
                     type_definition.generics.Add(parse_type(enumerator, current_function, depth = depth + 1));
                 else
-                    report_error("Unexpected token '{token.value}' in type definition", enumerator.file_index, token);
+                    report_error("Unexpected token '%' in type definition", enumerator.file_index, token, token.value);
 
                 comma_required_before_next_type = true;
             }
             else {
                 if token.type != TokenType.Comma
-                    report_error("Unexpected token '{token.value}' in type definition", enumerator.file_index, token);
+                    report_error("Unexpected token '%' in type definition", enumerator.file_index, token, token.value);
 
                 comma_required_before_next_type = false;
             }
@@ -3169,7 +3169,7 @@ ConstantAst* parse_constant(Token token, int fileIndex) {
                     constant.type = &u64_type;
                 }
                 else {
-                    report_error("Invalid integer '{token.value}', must be 64 bits or less", fileIndex, token);
+                    report_error("Invalid integer '%', must be 64 bits or less", fileIndex, token, token.value);
                     return null;
                 }
             }
@@ -3181,13 +3181,13 @@ ConstantAst* parse_constant(Token token, int fileIndex) {
                     constant.type = &float64_type;
                 }
                 else {
-                    report_error("Invalid floating point number '{token.value}', must be single or double precision", fileIndex, token);
+                    report_error("Invalid floating point number '%', must be single or double precision", fileIndex, token, token.value);
                     return null;
                 }
             }
             else if token.flags & TokenFlags.HexNumber {
                 if token.value.length == 2 {
-                    report_error("Invalid number '{token.value}'", fileIndex, token);
+                    report_error("Invalid number '%'", fileIndex, token, token.value);
                     return null;
                 }
 
@@ -3203,12 +3203,12 @@ ConstantAst* parse_constant(Token token, int fileIndex) {
                     }
                 }
                 else {
-                    report_error("Invalid integer '{token.value}'", fileIndex, token);
+                    report_error("Invalid integer '%'", fileIndex, token, token.value);
                     return null;
                 }
             }
             else {
-                report_error("Unable to determine type of token '{token.value}'", fileIndex, token);
+                report_error("Unable to determine type of token '%'", fileIndex, token, token.value);
                 return null;
             }
         }
@@ -3217,7 +3217,7 @@ ConstantAst* parse_constant(Token token, int fileIndex) {
             constant.value.boolean = token.value == "true";
         }
         default; {
-            report_error("Unable to determine type of token '{token.value}'", fileIndex, token);
+            report_error("Unable to determine type of token '%'", fileIndex, token, token.value);
             return null;
         }
     }
