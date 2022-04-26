@@ -1,10 +1,11 @@
 #import atomic
 #import standard
 #import thread
+#import "hash_table.ol"
+#import "link.ol"
+#import "llvm_backend.ol"
 #import "parser.ol"
 #import "type_checker.ol"
-#import "llvm_backend.ol"
-#import "link.ol"
 
 release := false;
 output_assembly := false;
