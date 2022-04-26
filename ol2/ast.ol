@@ -95,7 +95,7 @@ enum FunctionFlags {
 
 struct Values : Ast {
     value: Ast*;
-    assignments: Dictionary<string, AssignmentAst*>;
+    assignments: HashTable<string, AssignmentAst*>;
     array_values: Array<Ast*>;
 }
 
@@ -109,19 +109,19 @@ struct Declaration : Values {
 
 struct Scope : Ast {
     parent: Scope*;
-    identifiers: Dictionary<string, Ast*>;
+    identifiers: HashTable<string, Ast*>;
 }
 
 struct GlobalScope : Scope {
-    functions: ConcurrentDictionary<string, Array<FunctionAst*>>;
-    types: ConcurrentDictionary<string, TypeAst*>;
-    polymorphic_structs: ConcurrentDictionary<string, StructAst*>;
-    polymorphic_functions: ConcurrentDictionary<string, Array<FunctionAst*>>;
+    functions: HashTable<string, Array<FunctionAst*>>;
+    types: HashTable<string, TypeAst*>;
+    polymorphic_structs: HashTable<string, StructAst*>;
+    polymorphic_functions: HashTable<string, Array<FunctionAst*>>;
 }
 
 struct ScopeAst : Scope {
     returns: bool;
-    children: Array<IAst>;
+    children: Array<Ast*>;
 }
 
 struct FunctionAst : Function {
@@ -172,7 +172,7 @@ struct EnumAst : TypeAst {
     attributes: Array<string>;
     base_type_definition: TypeDefinition*;
     base_type: PrimitiveAst*;
-    values: Dictionary<string, EnumValueAst*>;
+    values: HashTable<string, EnumValueAst*>;
 }
 
 struct EnumValueAst : Ast {
@@ -243,7 +243,7 @@ struct ExpressionAst : Ast {
     type: TypeAst*;
     operators: Array<Operator>;
     resulting_types: Array<TypeAst*>;
-    operator_overloads: Dictionary<int, OperatorOverloadAst>;
+    operator_overloads: HashTable<int, OperatorOverloadAst>;
     children: Array<Ast*>;
 }
 
@@ -269,7 +269,7 @@ struct CallAst : Ast {
     function: FunctionAst*;
     function_pointer: Interface*;
     generics: Array<TypeDefinition*>;
-    specified_arguments: Dictionary<string, Ast*>;
+    specified_arguments: HashTable<string, Ast*>;
     arguments: Array<Ast*>;
     type_info: TypeAst*;
     inline: bool;
@@ -370,7 +370,7 @@ struct InterfaceAst : Interface {
 
 struct AssemblyAst : Ast {
     instructions: Array<AssemblyInstructionAst*>;
-    in_registers: Dictionary<string, AssemblyInputAst*>;
+    in_registers: HashTable<string, AssemblyInputAst*>;
     out_values: Array<AssemblyInputAst*>;
     find_staging_input_register: bool;
     assembly_bytes: Array<u8>;

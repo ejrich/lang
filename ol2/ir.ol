@@ -1,5 +1,5 @@
 entry_point: FunctionIR*;
-functions: ConcurrentDictionary<int, FunctionIR*>;
+functions: HashTable<int, FunctionIR*>;
 
 constants: Array<InstructionValue>;
 global_variables: Array<GlobalVariable>;
