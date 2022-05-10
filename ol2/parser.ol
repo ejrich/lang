@@ -54,12 +54,12 @@ add_module(string module, int fileIndex, Token token) {
         report_error("Undefined module '%'", fileIndex, token, module);
 }
 
-// add_module(CompilerDirectiveAst* module) {
-//     if file_exists(module.import.path)
-//         queue_file_if_not_exists(module.Import.Path);
-//     else
-//         report_error("Undefined module '%'", module, module.import.name);
-// }
+add_module(CompilerDirectiveAst* module) {
+    if file_exists(module.import.path)
+        queue_file_if_not_exists(module.import.path);
+    else
+        report_error("Undefined module '%'", module, module.import.name);
+}
 
 add_file(string file, string directory, int fileIndex, Token token) {
     file_path := format_string("%/%", directory, file);
@@ -69,12 +69,12 @@ add_file(string file, string directory, int fileIndex, Token token) {
         report_error("File '%' does not exist", fileIndex, token, file);
 }
 
-// add_file(CompilerDirectiveAst* import) {
-//     if file_exists(import.import.path)
-//         queue_file_if_not_exists(import.Import.Path);
-//     else
-//         report_error("File '%' does not exist", import, import.import.name);
-// }
+add_file(CompilerDirectiveAst* import) {
+    if file_exists(import.import.path)
+        queue_file_if_not_exists(import.import.path);
+    else
+        report_error("File '%' does not exist", import, import.import.name);
+}
 
 queue_file_if_not_exists(string file) {
     each file_name in file_names {
@@ -3160,13 +3160,17 @@ ConstantAst* parse_constant(Token token, int fileIndex) {
         }
         case TokenType.Number; {
             if token.flags == TokenFlags.None {
-                if int.TryParse(token.value, &constant.value.integer) {
+                // 32 bit signed integer
+                // TODO Implement parsing
+                if token.value.length < 10 || (token.value.length == 10 && token.value[0] <= '2') {
                     constant.type = &s32_type;
                 }
-                else if long.TryParse(token.value, &constant.value.integer) {
+                // 64 bit signed integer
+                else if token.value.length < 19 {
                     constant.type = &s64_type;
                 }
-                else if (ulong.TryParse(token.value, &constant.value.unsigned_integer)) {
+                // 64 bit unsigned integer
+                else if token.value.length == 19 || (token.value.length == 20 && token.value[0] <= '1') {
                     constant.type = &u64_type;
                 }
                 else {
@@ -3175,10 +3179,10 @@ ConstantAst* parse_constant(Token token, int fileIndex) {
                 }
             }
             else if token.flags & TokenFlags.Float {
-                if float.TryParse(token.value, &constant.value.double) {
+                if try_parse_float(token.value, &constant.value.double) {
                     constant.type = &float_type;
                 }
-                else if double.TryParse(token.value, &constant.value.double) {
+                else if try_parse_float64(token.value, &constant.value.double) {
                     constant.type = &float64_type;
                 }
                 else {
@@ -3194,13 +3198,23 @@ ConstantAst* parse_constant(Token token, int fileIndex) {
 
                 value := substring(token.value, 2, token.value.length - 2);
                 if value.length <= 8 {
-                    if uint.TryParse(value, NumberStyles.HexNumber, &constant.value.unsigned_integer) {
-                        constant.type = &u32_type;
+                    constant.type = &u32_type;
+                    each i in 0..value.length - 1 {
+                        digit := value[i];
+                        if digit <= '9' digit -= '0';
+                        else digit -= 55;
+
+                        constant.value.unsigned_integer += digit << (value.length - i - 1) * 4;
                     }
                 }
                 else if value.length <= 16 {
-                    if ulong.TryParse(value, NumberStyles.HexNumber, &constant.value.unsigned_integer) {
-                        constant.type = &u64_type;
+                    constant.type = &u64_type;
+                    each i in 0..value.length - 1 {
+                        digit := value[i];
+                        if digit <= '9' digit -= '0';
+                        else digit -= 55;
+
+                        constant.value.unsigned_integer += digit << (value.length - i - 1) * 4;
                     }
                 }
                 else {
@@ -3223,6 +3237,15 @@ ConstantAst* parse_constant(Token token, int fileIndex) {
         }
     }
     return constant;
+}
+
+// TODO Implement me
+bool try_parse_float(string input, float64* value) {
+    return false;
+}
+
+bool try_parse_float64(string input, float64* value) {
+    return false;
 }
 
 CastAst* parse_cast(TokenEnumerator* enumerator, Function* current_function) {
