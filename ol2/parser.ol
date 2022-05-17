@@ -885,8 +885,8 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
                 }
                 else if parsing_value_default {
                     parsing_value_default = false;
-                    value: EnumValueAst*;
-                    if enum_ast.values.TryGetValue(token.value, &value) {
+                    found, value := table_get(enum_ast.values, token.value);
+                    if found {
                         if !value.defined
                             report_error("Expected previously defined value '%' to have a defined value", enumerator.file_index, token, token.value);
 
@@ -906,7 +906,7 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
                     }
                     // Add the value to the enum and continue
                     else {
-                        if !enum_ast.values.TryAdd(current_value.name, current_value)
+                        if !table_add(&enum_ast.values, current_value.name, current_value)
                             report_error("Enum '%' already contains value '%'", current_value, enum_ast.name, current_value.name);
 
                         if current_value.defined {
@@ -1487,7 +1487,7 @@ bool parse_value(Values* values, TokenEnumerator* enumerator, Function* current_
                 move_next: bool;
                 assignment := parse_assignment(enumerator, current_function, &move_next);
 
-                if !values.assignments.TryAdd(token.value, assignment)
+                if !table_add(&values.assignments, token.value, assignment)
                     report_error("Multiple assignments for field '%'", enumerator.file_index, token, token.value);
 
                 if move_next {
@@ -2078,7 +2078,7 @@ parse_arguments(CallAst* call_ast, TokenEnumerator* enumerator, Function* curren
 
                 // call_ast.SpecifiedArguments ??= new Dictionary<string, IAst>();
                 argument := parse_expression(enumerator, current_function, null, TokenType.Comma, TokenType.CloseParen);
-                if !call_ast.specified_arguments.TryAdd(argument_name, argument)
+                if !table_add(&call_ast.specified_arguments, argument_name, argument)
                     report_error("Specified argument '%' is already in the call", enumerator.file_index, token, token.value);
             }
             else
@@ -2372,12 +2372,13 @@ bool parse_in_register(AssemblyAst* assembly, TokenEnumerator* enumerator) {
     }
 
     register := enumerator.current.value;
-    if assembly.in_registers.ContainsKey(register) {
+    input := create_ast<AssemblyInputAst>(enumerator, AstType.AssemblyInput);
+    input.register = register;
+
+    if !table_add(&assembly.in_registers, register, input) {
         report_error("Duplicate in register '%'", enumerator.file_index, enumerator.current, register);
         return false;
     }
-    input := create_ast<AssemblyInputAst>(enumerator, AstType.AssemblyInput);
-    input.register = register;
 
     if !move_next(enumerator) {
         report_error("Expected comma or semicolon in instruction", enumerator.file_index, enumerator.last);
@@ -2407,7 +2408,6 @@ bool parse_in_register(AssemblyAst* assembly, TokenEnumerator* enumerator) {
         return false;
     }
 
-    assembly.in_registers[register] = input;
     return true;
 }
 
