@@ -349,6 +349,15 @@ Ast* parse_top_level_ast(TokenEnumerator* enumerator) {
     return null;
 }
 
+bool try_add_generic(string generic, Array<string>* generics) {
+    each existing_generic in *generics {
+        if generic == existing_generic return false;
+    }
+
+    array_insert(generics, generic, allocate, reallocate);
+    return true;
+}
+
 FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attributes) {
     // 1. Determine return type and name of the function
     function := create_ast<FunctionAst>(enumerator, AstType.Function);
@@ -404,10 +413,8 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
                 each generic in function.return_type_definition.generics {
                     if generic.generics.length
                         report_error("Invalid generic in function '%'", generic, function.name);
-                    else if function.generics.contains(generic.name)
+                    else if !try_add_generic(generic.name, &function.generics)
                         report_error("Duplicate generic '%' in function '%'", generic.file_index, generic.line, generic.column, generic.name, function.name);
-                    else
-                        function.generics.Add(generic.name);
                 }
                 function.return_type_definition = null;
             }
@@ -434,8 +441,9 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
 
             if !comma_required_before_next_type {
                 if token.type == TokenType.Identifier {
-                    if !generics.Add(token.value)
+                    if !try_add_generic(token.value, &function.generics) {
                         report_error("Duplicate generic '%' in function '%'", enumerator.file_index, token, token.value, function.name);
+                    }
                 }
                 else
                     report_error("Unexpected token '%' in generics of function '%'", enumerator.file_index, token, token.value, function.name);
@@ -450,11 +458,10 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
             }
         }
 
-        if generics.length == 0
+        if function.generics.length == 0
             report_error("Expected function to contain generics", enumerator.file_index, enumerator.current);
 
         move_next(enumerator);
-        function.generics.AddRange(generics);
     }
 
     // 3. Search for generics in the function return type
@@ -681,7 +688,7 @@ StructAst* parse_struct(TokenEnumerator* enumerator, Array<string> attributes) {
 
             if !comma_required_before_next_type {
                 if token.type == TokenType.Identifier {
-                    if !generics.Add(token.value) {
+                    if !try_add_generic(token.value, &struct_ast.generics) {
                         report_error("Duplicate generic '%' in struct '%'", enumerator.file_index, token, token.value, struct_ast.name);
                     }
                 }
@@ -697,10 +704,8 @@ StructAst* parse_struct(TokenEnumerator* enumerator, Array<string> attributes) {
             }
         }
 
-        if !generics.Any()
+        if struct_ast.generics.length == 0
             report_error("Expected struct '' to contain generics", enumerator.file_index, enumerator.current, struct_ast.name);
-
-        struct_ast.generics = generics.ToList();
     }
 
     // 3. Get any inherited structs
@@ -2644,8 +2649,7 @@ SwitchAst* parse_switch(TokenEnumerator* enumerator, Function* current_function)
     return switch_ast;
 }
 
-OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator)
-{
+OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator) {
     overload := create_ast<OperatorOverloadAst>(enumerator, AstType.OperatorOverload);
     if !move_next(enumerator) {
         report_error("Expected an operator be specified to overload", enumerator.file_index, enumerator.last);
@@ -2684,8 +2688,9 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator)
 
             if !comma_required_before_next_type {
                 if token.type == TokenType.Identifier {
-                    if (!generics.Add(token.value))
+                    if !try_add_generic(token.value, &overload.generics) {
                         report_error("Duplicate generic '%'", enumerator.file_index, token, token.value);
+                    }
                 }
                 else
                     report_error("Unexpected token '%' in generics", enumerator.file_index, token, token.value);
@@ -2701,11 +2706,10 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator)
             }
         }
 
-        if generics.length == 0
+        if overload.generics.length == 0
             report_error("Expected operator overload to contain generics", enumerator.file_index, enumerator.current);
 
         move_next(enumerator);
-        overload.generics.AddRange(generics);
     }
 
     // 3. Find open paren to start parsing arguments
