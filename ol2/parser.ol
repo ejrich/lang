@@ -121,8 +121,7 @@ bool move_next(TokenEnumerator* enumerator) {
 
 bool move(TokenEnumerator* enumerator, int steps) {
     enumerator.index += steps;
-    if (enumerator.tokens.length > enumerator.index)
-    {
+    if (enumerator.tokens.length > enumerator.index) {
         enumerator.current = enumerator.tokens[enumerator.index];
         return true;
     }
@@ -130,8 +129,7 @@ bool move(TokenEnumerator* enumerator, int steps) {
 }
 
 bool peek(TokenEnumerator* enumerator, Token* token, int steps = 0) {
-    if (enumerator.tokens.length > enumerator.index + steps)
-    {
+    if (enumerator.tokens.length > enumerator.index + steps) {
         *token = enumerator.tokens[enumerator.index + steps];
         return true;
     }
@@ -271,20 +269,29 @@ Array<string> parse_attributes(TokenEnumerator* enumerator) {
             case TokenType.CloseBracket;
                 break;
             case TokenType.Identifier; {
-                if (comma_required)
+                if (comma_required) {
                     report_error("Expected comma between attributes", enumerator.file_index, token);
+                    move_past_next_token(enumerator, TokenType.CloseBracket);
+                    return attributes;
+                }
 
-                attributes.Add(token.value);
+                array_insert(&attributes, token.value, allocate, reallocate);
                 comma_required = true;
             }
             case TokenType.Comma; {
-                if !comma_required
+                if !comma_required {
                     report_error("Expected attribute after comma or at beginning of attribute list", enumerator.file_index, token);
+                    move_past_next_token(enumerator, TokenType.CloseBracket);
+                    return attributes;
+                }
 
                 comma_required = false;
             }
-            default;
+            default; {
                 report_error("Unexpected token '%' in attribute list", enumerator.file_index, token, token.value);
+                move_past_next_token(enumerator, TokenType.CloseBracket);
+                return attributes;
+            }
         }
     }
 
@@ -294,6 +301,12 @@ Array<string> parse_attributes(TokenEnumerator* enumerator) {
     move_next(enumerator);
 
     return attributes;
+}
+
+move_past_next_token(TokenEnumerator* enumerator, TokenType type) {
+    while move_next(enumerator) || enumerator.current.type == type {}
+
+    move_next(enumerator);
 }
 
 Ast* parse_top_level_ast(TokenEnumerator* enumerator) {
@@ -377,18 +390,17 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
     }
 
     // 1b. Handle multiple return values
-    if enumerator.current.type == TokenType.Comma
-    {
-        returnType := create_ast<TypeDefinition>(function.return_type_definition, AstType.TypeDefinition);
-        returnType.compound = true;
-        returnType.generics.Add(function.return_type_definition);
-        function.return_type_definition = returnType;
+    if enumerator.current.type == TokenType.Comma {
+        return_type := create_ast<TypeDefinition>(function.return_type_definition, AstType.TypeDefinition);
+        return_type.compound = true;
+        array_insert(&return_type.generics, function.return_type_definition, allocate, reallocate);
+        function.return_type_definition = return_type;
 
         while enumerator.current.type == TokenType.Comma {
             if !move_next(enumerator)
                 break;
 
-            returnType.generics.Add(parse_type(enumerator));
+            array_insert(&return_type.generics, parse_type(enumerator), allocate, reallocate);
             move_next(enumerator);
         }
     }
@@ -492,7 +504,7 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
         switch token.type {
             case TokenType.CloseParen; {
                 if comma_required_before_next_argument {
-                    function.arguments.Add(current_argument);
+                    array_insert(&function.arguments, current_argument, allocate, reallocate);
                     current_argument = null;
                 }
                 break;
@@ -517,7 +529,7 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
                 }
             case TokenType.Comma; {
                 if comma_required_before_next_argument
-                    function.arguments.Add(current_argument);
+                    array_insert(&function.arguments, current_argument, allocate, reallocate);
                 else
                     report_error("Unexpected comma in arguments", enumerator.file_index, token);
 
@@ -536,11 +548,11 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
                     switch enumerator.current.type {
                         case TokenType.Comma; {
                             comma_required_before_next_argument = false;
-                            function.arguments.Add(current_argument);
+                            array_insert(&function.arguments, current_argument, allocate, reallocate);
                             current_argument = null;
                         }
                         case TokenType.CloseParen; {
-                            function.arguments.Add(current_argument);
+                            array_insert(&function.arguments, current_argument, allocate, reallocate);
                             current_argument = null;
                         }
                         default;
@@ -727,7 +739,7 @@ StructAst* parse_struct(TokenEnumerator* enumerator, Array<string> attributes) {
         if enumerator.current.type == TokenType.CloseBrace
             break;
 
-        struct_ast.fields.Add(parse_struct_field(enumerator));
+        array_insert(&struct_ast.fields, parse_struct_field(enumerator), allocate, reallocate);
     }
 
     // 6. Mark field types as generic if necessary
@@ -1019,7 +1031,7 @@ UnionAst* parse_union(TokenEnumerator* enumerator) {
         if enumerator.current.type == TokenType.CloseBrace
             break;
 
-        union_ast.fields.Add(parse_union_field(enumerator));
+        array_insert(&union_ast.fields, parse_union_field(enumerator), allocate, reallocate);
     }
 
     return union_ast;
@@ -1184,8 +1196,8 @@ ScopeAst* parse_scope(TokenEnumerator* enumerator, Function* current_function, b
             break;
         }
 
-        if topLevel scope_ast.children.Add(parse_top_level_ast(enumerator));
-        else scope_ast.children.Add(parse_line(enumerator, current_function));
+        if topLevel array_insert(&scope_ast.children, parse_top_level_ast(enumerator), allocate, reallocate);
+        else array_insert(&scope_ast.children, parse_line(enumerator, current_function), allocate, reallocate);
     }
 
     if !closed
@@ -1214,8 +1226,10 @@ ConditionalAst* parse_conditional(TokenEnumerator* enumerator, Function* current
     else {
         // Parse single AST
         conditional_ast.if_block = create_ast<ScopeAst>(enumerator, AstType.Scope);
-        if topLevel conditional_ast.if_block.children.Add(parse_top_level_ast(enumerator));
-        else conditional_ast.if_block.children.Add(parse_line(enumerator, current_function));
+        conditional_ast.if_block.children.length = 1;
+        conditional_ast.if_block.children.data = allocate(size_of(Ast*));
+        if topLevel conditional_ast.if_block.children[0] = parse_top_level_ast(enumerator);
+        else conditional_ast.if_block.children[0] = parse_line(enumerator, current_function);
     }
 
     // 3. Parse else block if necessary
@@ -1239,8 +1253,10 @@ ConditionalAst* parse_conditional(TokenEnumerator* enumerator, Function* current
         else {
             // Parse single AST
             conditional_ast.else_block = create_ast<ScopeAst>(enumerator, AstType.Scope);
-            if topLevel conditional_ast.else_block.children.Add(parse_top_level_ast(enumerator));
-            else conditional_ast.else_block.children.Add(parse_line(enumerator, current_function));
+            conditional_ast.else_block.children.length = 1;
+            conditional_ast.else_block.children.data = allocate(size_of(Ast*));
+            if topLevel conditional_ast.else_block.children[0] = parse_top_level_ast(enumerator);
+            else conditional_ast.else_block.children[0] = parse_line(enumerator, current_function);
         }
     }
 
@@ -1267,7 +1283,9 @@ WhileAst* parse_while(TokenEnumerator* enumerator, Function* current_function) {
     else {
         // Parse single AST
         while_ast.body = create_ast<ScopeAst>(enumerator, AstType.Scope);
-        while_ast.body.children.Add(parse_line(enumerator, current_function));
+        while_ast.body.children.length = 1;
+        while_ast.body.children.data = allocate(size_of(Ast*));
+        while_ast.body.children[0] = parse_line(enumerator, current_function);
     }
 
     return while_ast;
@@ -1337,7 +1355,9 @@ EachAst* parse_each(TokenEnumerator* enumerator, Function* current_function) {
         each_ast.body = parse_scope(enumerator, current_function);
     else {
         each_ast.body = create_ast<ScopeAst>(enumerator, AstType.Scope);
-        each_ast.body.children.Add(parse_line(enumerator, current_function));
+        each_ast.body.children.length = 1;
+        each_ast.body.children.data = allocate(size_of(Ast*));
+        each_ast.body.children[0] = parse_line(enumerator, current_function);
     }
 
     return each_ast;
@@ -1509,7 +1529,7 @@ bool parse_value(Values* values, TokenEnumerator* enumerator, Function* current_
                     break;
 
                 value := parse_expression(enumerator, current_function, null, TokenType.Comma, TokenType.CloseBracket);
-                values.array_values.Add(value);
+                array_insert(&values.array_values, value);
                 if enumerator.current.type == TokenType.CloseBracket
                     break;
             }
@@ -1696,7 +1716,7 @@ Ast* check_expression(TokenEnumerator* enumerator, ExpressionAst* expression, bo
 
 Ast* parse_compound_expression(TokenEnumerator* enumerator, Function* current_function, Ast* initial) {
     compound_expression := create_ast<CompoundExpressionAst>(initial, AstType.CompoundExpression);
-    compound_expression.children.Add(initial);
+    array_insert(&compound_expression.children, initial, allocate, reallocate);
     first_token := enumerator.current;
 
     if !move_next(enumerator) {
@@ -1769,7 +1789,7 @@ Ast* parse_compound_expression(TokenEnumerator* enumerator, Function* current_fu
                 return compound_declaration;
             }
             default; {
-                compound_expression.children.Add(parse_expression(enumerator, current_function, null, TokenType.Comma, TokenType.Colon, TokenType.Equals));
+                array_insert(&compound_expression.children, parse_expression(enumerator, current_function, null, TokenType.Comma, TokenType.Colon, TokenType.Equals), allocate, reallocate);
                 if enumerator.current.type == TokenType.Comma
                     move_next(enumerator);
             }
@@ -1782,10 +1802,10 @@ Ast* parse_compound_expression(TokenEnumerator* enumerator, Function* current_fu
     return compound_expression;
 }
 
-Ast* parse_struct_field_ref(TokenEnumerator* enumerator, Ast* initialAst, Function* current_function) {
+Ast* parse_struct_field_ref(TokenEnumerator* enumerator, Ast* initial_ast, Function* current_function) {
     // 1. Initialize and move over the dot operator
-    struct_field_ref := create_ast<StructFieldRefAst>(initialAst, AstType.StructFieldRef);
-    struct_field_ref.children.Add(initialAst);
+    struct_field_ref := create_ast<StructFieldRefAst>(initial_ast, AstType.StructFieldRef);
+    array_insert(&struct_field_ref.children, initial_ast, allocate, reallocate);
 
     // 2. Parse expression units until the operator is not '.'
     operator_required := false;
@@ -1800,7 +1820,7 @@ Ast* parse_struct_field_ref(TokenEnumerator* enumerator, Ast* initialAst, Functi
         else {
             ast := parse_next_expression_unit(enumerator, current_function, &operator_required);
             if ast
-                struct_field_ref.children.Add(ast);
+                array_insert(struct_field_ref.children, ast, allocate, reallocate);
         }
     }
 
@@ -2082,7 +2102,7 @@ parse_arguments(CallAst* call_ast, TokenEnumerator* enumerator, Function* curren
                     report_error("Specified argument '%' is already in the call", enumerator.file_index, token, token.value);
             }
             else
-                call_ast.arguments.Add(parse_expression(enumerator, current_function, null, TokenType.Comma, TokenType.CloseParen));
+                array_insert(&call_ast.arguments, parse_expression(enumerator, current_function, null, TokenType.Comma, TokenType.CloseParen), allocate, reallocate);
 
             switch enumerator.current.type {
                 case TokenType.CloseParen; break;
@@ -2332,7 +2352,7 @@ AssemblyAst* parse_inline_assembly(TokenEnumerator* enumerator) {
                     else if parsing_out_registers
                         report_error("Expected body instructions before out values", instruction);
 
-                    assembly.instructions.Add(instruction);
+                    array_insert(&assembly.instructions, instruction, allocate, reallocate);
                 }
                 else {
                     // Skip through the next ';' or '}'
@@ -2456,7 +2476,7 @@ bool parse_out_value(AssemblyAst* assembly, TokenEnumerator* enumerator) {
         return false;
     }
 
-    assembly.out_values.Add(output);
+    array_insert(&assembly.out_values, output, allocate, reallocate);
     return true;
 }
 
@@ -2593,7 +2613,7 @@ SwitchAst* parse_switch(TokenEnumerator* enumerator, Function* current_function)
                     if current_cases.cases.length == 0
                         current_cases.cases[0] = current_cases.case_ast;
 
-                    current_cases.cases.Add(switch_case);
+                    array_insert(&current_cases.cases, switch_case, allocate, reallocate);
                 }
             }
             case TokenType.Default; {
@@ -2610,7 +2630,9 @@ SwitchAst* parse_switch(TokenEnumerator* enumerator, Function* current_function)
                     switch_ast.default_case = parse_scope(enumerator, current_function);
                 else {
                     switch_ast.default_case = create_ast<ScopeAst>(enumerator, AstType.Scope);
-                    switch_ast.default_case.children.Add(parse_line(enumerator, current_function));
+                    switch_ast.default_case.children.length = 1;
+                    switch_ast.default_case.children.data = allocate(size_of(Ast*));
+                    switch_ast.default_case.children[0] = parse_line(enumerator, current_function);
                 }
             }
             default; {
@@ -2620,10 +2642,12 @@ SwitchAst* parse_switch(TokenEnumerator* enumerator, Function* current_function)
                         current_cases.body = parse_scope(enumerator, current_function);
                     else {
                         current_cases.body = create_ast<ScopeAst>(enumerator, AstType.Scope);
-                        current_cases.body.children.Add(parse_line(enumerator, current_function));
+                        current_cases.body.children.length = 1;
+                        current_cases.body.children.data = allocate(size_of(Ast*));
+                        current_cases.body.children[0] = parse_line(enumerator, current_function);
                     }
 
-                    switch_ast.cases.Add(current_cases);
+                    array_insert(&switch_ast.cases, current_cases, allocate, reallocate);
                     current_cases = { case_ast = null; body = null; }
                     current_cases.cases.length = 0;
                     current_cases.cases.data = null;
@@ -2730,7 +2754,7 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator) {
         switch token.type {
             case TokenType.CloseParen; {
                 if comma_required_before_next_argument {
-                    overload.arguments.Add(current_argument);
+                    array_insert(&overload.arguments, current_argument, allocate, reallocate);
                     current_argument = null;
                 }
                 break;
@@ -2757,7 +2781,7 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator) {
             }
             case TokenType.Comma; {
                 if comma_required_before_next_argument
-                    overload.arguments.Add(current_argument);
+                    array_insert(&overload.arguments, current_argument, allocate, reallocate);
                 else
                     report_error("Unexpected comma in arguments", enumerator.file_index, token);
 
@@ -2864,16 +2888,16 @@ InterfaceAst* parse_interface(TokenEnumerator* enumerator) {
 
     // 1b. Handle multiple return values
     if enumerator.current.type == TokenType.Comma {
-        returnType := create_ast<TypeDefinition>(interface_ast.return_type_definition, AstType.TypeDefinition);
-        returnType.compound = true;
-        returnType.generics.Add(interface_ast.return_type_definition);
-        interface_ast.return_type_definition = returnType;
+        return_type := create_ast<TypeDefinition>(interface_ast.return_type_definition, AstType.TypeDefinition);
+        return_type.compound = true;
+        array_insert(&return_type.generics, interface_ast.return_type_definition, allocate, reallocate);
+        interface_ast.return_type_definition = return_type;
 
         while enumerator.current.type == TokenType.Comma {
             if !move_next(enumerator)
                 break;
 
-            returnType.generics.Add(parse_type(enumerator));
+            array_insert(&return_type.generics, parse_type(enumerator), allocate, reallocate);
             move_next(enumerator);
         }
     }
@@ -2914,7 +2938,7 @@ InterfaceAst* parse_interface(TokenEnumerator* enumerator) {
         switch token.type {
             case TokenType.CloseParen; {
                 if comma_required_before_next_argument {
-                    interface_ast.arguments.Add(current_argument);
+                    array_insert(&interface_ast.arguments, current_argument, allocate, reallocate);
                     current_argument = null;
                 }
                 break;
@@ -2933,7 +2957,7 @@ InterfaceAst* parse_interface(TokenEnumerator* enumerator) {
                 }
             case TokenType.Comma; {
                 if comma_required_before_next_argument
-                    interface_ast.arguments.Add(current_argument);
+                    array_insert(&interface_ast.arguments, current_argument, allocate, reallocate);
                 else
                     report_error("Unexpected comma in arguments", enumerator.file_index, token);
 
@@ -2946,12 +2970,12 @@ InterfaceAst* parse_interface(TokenEnumerator* enumerator) {
                     while move_next(enumerator) {
                         if enumerator.current.type == TokenType.Comma {
                             comma_required_before_next_argument = false;
-                            interface_ast.arguments.Add(current_argument);
+                            array_insert(&interface_ast.arguments, current_argument, allocate, reallocate);
                             current_argument = null;
                             break;
                         }
                         else if enumerator.current.type == TokenType.Comma {
-                            interface_ast.arguments.Add(current_argument);
+                            array_insert(&interface_ast.arguments, current_argument, allocate, reallocate);
                             current_argument = null;
                             break;
                         }
@@ -3023,7 +3047,7 @@ TypeDefinition* parse_type(TokenEnumerator* enumerator, Function* current_functi
 
             if !comma_required_before_next_type {
                 if token.type == TokenType.Identifier
-                    type_definition.generics.Add(parse_type(enumerator, current_function, depth = depth + 1));
+                    array_insert(&type_definition.generics, parse_type(enumerator, current_function, depth = depth + 1), allocate, reallocate);
                 else
                     report_error("Unexpected token '%' in type definition", enumerator.file_index, token, token.value);
 
@@ -3043,9 +3067,11 @@ TypeDefinition* parse_type(TokenEnumerator* enumerator, Function* current_functi
 
     while peek(enumerator, &token) && token.type == TokenType.Asterisk {
         move_next(enumerator);
-        pointerType := create_ast<TypeDefinition>(enumerator, AstType.TypeDefinition);
-        pointerType.name = "*";
-        pointerType.generics.Add(type_definition);
+        pointer_type := create_ast<TypeDefinition>(enumerator, AstType.TypeDefinition);
+        pointer_type.name = "*";
+        pointer_type.generics.length = 1;
+        pointer_type.generics.data = allocate(size_of(TypeDefinition*));
+        pointer_type.generics[0] = type_definition;
         type_definition = pointerType;
     }
 
@@ -3120,7 +3146,7 @@ bool, TypeDefinition* try_parse_type(Token name, TokenEnumerator* enumerator, in
                         *steps = *steps - 1;
                     }
 
-                    type_definition.generics.Add(genericType);
+                    array_insert(&type_definition.generics, genericType, allocate, reallocate);
                     comma_required_before_next_type = true;
                 }
                 else
@@ -3140,10 +3166,13 @@ bool, TypeDefinition* try_parse_type(Token name, TokenEnumerator* enumerator, in
     }
 
     while peek(enumerator, &token, *steps) && token.type == TokenType.Asterisk {
-        pointerType := create_ast<TypeDefinition>(token, enumerator.file_index, AstType.TypeDefinition);
-        pointerType.name = "*";
-        pointerType.generics.Add(type_definition);
-        type_definition = pointerType;
+        pointer_type := create_ast<TypeDefinition>(token, enumerator.file_index, AstType.TypeDefinition);
+        pointer_type.name = "*";
+        pointer_type.generics.length = 1;
+        pointer_type.generics.data = allocate(size_of(TypeDefinition*));
+        pointer_type.generics[0] = type_definition;
+
+        type_definition = pointer_type;
         *steps = *steps + 1;
         *ends_with_shift = false;
         *ends_with_rotate = false;
