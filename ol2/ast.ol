@@ -241,10 +241,16 @@ struct IdentifierAst : Ast {
 
 struct ExpressionAst : Ast {
     type: TypeAst*;
-    operators: Array<Operator>;
-    resulting_types: Array<TypeAst*>;
-    operator_overloads: HashTable<int, OperatorOverloadAst>;
-    children: Array<Ast*>;
+    op: Operator;
+    resulting_type: TypeAst*;
+    overload: OperatorOverloadAst*;
+    l_value: Ast*;
+    r_value: Ast*;
+
+    // operators: Array<Operator>;
+    // resulting_types: Array<TypeAst*>;
+    // operator_overloads: HashTable<int, OperatorOverloadAst>;
+    // children: Array<Ast*>;
 }
 
 struct CompoundExpressionAst : Ast {
