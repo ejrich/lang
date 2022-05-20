@@ -50,3 +50,4 @@ string print_type_definition(TypeDefinition* type) {
 
 base_array_type: StructAst*;
 global_scope: GlobalScope;
+private_scopes: Array<GlobalScope*>;
