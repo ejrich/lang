@@ -539,7 +539,7 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
             case TokenType.Equals; {
                 if comma_required_before_next_argument {
                     move_next(enumerator);
-                    current_argument.value = parse_expression(enumerator, function, null, TokenType.Comma, TokenType.CloseParen);
+                    current_argument.value = parse_expression(enumerator, function, TokenType.Comma, TokenType.CloseParen);
                     if !enumerator.remaining {
                         report_error("Incomplete definition for function '%'", enumerator.file_index, enumerator.last, function.name);
                         return null;
@@ -626,7 +626,7 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
                     else if token.type == TokenType.Number {
                         move_next(enumerator);
                         value: int;
-                        if token.flags == TokenFlags.None && int.TryParse(token.value, &value) {
+                        if token.flags == TokenFlags.None && try_parse_integer(token.value, &value) {
                             function.syscall = value;
                         }
                         else report_error(syscall_error, enumerator.file_index, token);
@@ -964,7 +964,7 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
                 if current_value != null && parsing_value_default {
                     if token.flags == TokenFlags.None {
                         value: int;
-                        if int.TryParse(token.value, &value) {
+                        if try_parse_integer(token.value, &value) {
                             current_value.value = value;
                             current_value.defined = true;
                         }
@@ -979,19 +979,9 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
                             report_error("Invalid number '%'", enumerator.file_index, token, token.value);
 
                         sub_value := substring(token.value, 2, token.value.length - 2);
-                        if sub_value.length <= 8 {
-                            value: u32;
-                            if uint.TryParse(sub_value, NumberStyles.HexNumber, &value) {
-                                current_value.value = value;
-                                current_value.defined = true;
-                            }
-                        }
-                        else if sub_value.length <= 16 {
-                            value: u64;
-                            if ulong.TryParse(sub_value, NumberStyles.HexNumber, &value) {
-                                current_value.value = value;
-                                current_value.defined = true;
-                            }
+                        if sub_value.length <= 16 {
+                            current_value.value = parse_hex_number(sub_value);
+                            current_value.defined = true;
                         }
                         else report_error("Expected enum value to be an integer, but got '%'", enumerator.file_index, token, token.value);
                     }
@@ -1383,9 +1373,92 @@ EachAst* parse_each(TokenEnumerator* enumerator, Function* current_function) {
 }
 
 Ast* parse_condition_expression(TokenEnumerator* enumerator, Function* current_function) {
+    // Parse l-value
+    first_token := enumerator.current;
+    l_value := parse_next_expression_unit(enumerator, current_function);
+    if l_value == null return null;
+
+    // Get the operator
+    if !move_next(enumerator) || enumerator.current.type == TokenType.OpenBrace {
+        return l_value;
+    }
+
+    token := enumerator.current;
+    check_for_end := false;
+    if token.type == TokenType.Increment || token.type == TokenType.Decrement {
+        // Create subexpression to hold the operation
+        // This case would be `var b = 4 + a++`, where we have a value before the operator
+        change_by_one := create_ast<ChangeByOneAst>(l_value, AstType.ChangeByOne);
+        change_by_one.positive = token.type == TokenType.Increment;
+        change_by_one.value = l_value;
+        l_value = change_by_one;
+        move_next(enumerator);
+        token = enumerator.current;
+        check_for_end = true;
+    }
+
+    if token.type == TokenType.Period {
+        l_value = parse_struct_field_ref(enumerator, l_value, current_function);
+        move_next(enumerator);
+        token = enumerator.current;
+        check_for_end = true;
+    }
+
+    expression := create_ast<ExpressionAst>(first_token, enumerator.file_index, AstType.Expression);
+    expression.l_value = l_value;
+
+    if token.type == TokenType.Number && token.value[0] == '-' {
+        expression.op = Operator.Subtract;
+
+        // Get the constant for the initial r_value
+        token.value = substring(token.value, 1, token.value.length - 1);
+        constant := parse_constant(token, enumerator.file_index);
+
+        // If an end token is next, set constant as r_value and return
+        move_next(enumerator);
+        token = enumerator.current;
+        if token.type == TokenType.OpenBrace {
+            expression.r_value = constant;
+            return expression;
+        }
+
+        // If next is an operator, then create a new expression and set constant as l-value, then get r-value
+        op := convert_operator(token);
+        if op != Operator.None {
+            move_next(enumerator);
+
+            sub_expression := create_ast<ExpressionAst>(enumerator, AstType.Expression);
+            sub_expression.l_value = constant;
+            sub_expression.op = op;
+            sub_expression.r_value = parse_condition_expression(enumerator, current_function);
+            expression.r_value = sub_expression;
+            return expression;
+        }
+
+        return expression;
+    }
+
+    if check_for_end || token.type == TokenType.OpenBrace {
+        return l_value;
+    }
+
+    op := convert_operator(token);
+    if op != Operator.None
+        expression.op = op;
+    else
+        return expression;
+
+    // Parse r-value
+    if !move_next(enumerator) {
+        report_error("Expected r-value for expression", enumerator.file_index, enumerator.last);
+        return null;
+    }
+
+    expression.r_value = parse_condition_expression(enumerator, current_function);
+
+    /*
     expression := create_ast<ExpressionAst>(enumerator, AstType.Expression);
     operator_required := false;
-
     move(enumerator, -1);
     while move_next(enumerator) {
         token := enumerator.current;
@@ -1429,8 +1502,9 @@ Ast* parse_condition_expression(TokenEnumerator* enumerator, Function* current_f
             if ast expression.children.Add(ast);
         }
     }
+    */
 
-    return check_expression(enumerator, expression, operator_required);
+    return check_expression(expression);
 }
 
 DeclarationAst* parse_declaration(TokenEnumerator* enumerator, Function* current_function = null, bool global = false) {
@@ -1547,7 +1621,7 @@ bool parse_value(Values* values, TokenEnumerator* enumerator, Function* current_
                 if enumerator.current.type == TokenType.CloseBracket
                     break;
 
-                value := parse_expression(enumerator, current_function, null, TokenType.Comma, TokenType.CloseBracket);
+                value := parse_expression(enumerator, current_function, TokenType.Comma, TokenType.CloseBracket);
                 array_insert(&values.array_values, value);
                 if enumerator.current.type == TokenType.CloseBracket
                     break;
@@ -1647,12 +1721,109 @@ bool is_end_token(TokenType token, Array<TokenType> end_tokens) {
     return false;
 }
 
-Ast* parse_expression(TokenEnumerator* enumerator, Function* current_function, ExpressionAst* expression = null, Params<TokenType> end_tokens) {
-    operator_required: bool;
+Ast* parse_expression(TokenEnumerator* enumerator, Function* current_function, Params<TokenType> end_tokens) {
+    if !enumerator.remaining {
+        report_error("Expected expression", enumerator.file_index, enumerator.last);
+        return null;
+    }
 
-    if expression operator_required = true;
-    else expression = create_ast<ExpressionAst>(enumerator, AstType.Expression);
+    // Parse l-value
+    first_token := enumerator.current;
+    l_value := parse_next_expression_unit(enumerator, current_function);
+    if l_value == null return null;
 
+    // Get the operator
+    if !move_next(enumerator) || is_end_token(enumerator.current.type, end_tokens) {
+        return l_value;
+    }
+
+    token := enumerator.current;
+    if token.type == TokenType.Equals {
+        _: bool;
+        return parse_assignment(enumerator, current_function, &_, l_value);
+    }
+    if token.type == TokenType.Comma {
+        return parse_compound_expression(enumerator, current_function, l_value);
+    }
+
+    check_for_end := false;
+    if token.type == TokenType.Increment || token.type == TokenType.Decrement {
+        // Create subexpression to hold the operation
+        // This case would be `var b = 4 + a++`, where we have a value before the operator
+        change_by_one := create_ast<ChangeByOneAst>(l_value, AstType.ChangeByOne);
+        change_by_one.positive = token.type == TokenType.Increment;
+        change_by_one.value = l_value;
+        l_value = change_by_one;
+        move_next(enumerator);
+        token = enumerator.current;
+        check_for_end = true;
+    }
+
+    if token.type == TokenType.Period {
+        l_value = parse_struct_field_ref(enumerator, l_value, current_function);
+        move_next(enumerator);
+        token = enumerator.current;
+        check_for_end = true;
+    }
+
+    expression := create_ast<ExpressionAst>(first_token, enumerator.file_index, AstType.Expression);
+    expression.l_value = l_value;
+
+    if token.type == TokenType.Number && token.value[0] == '-' {
+        expression.op = Operator.Subtract;
+
+        // Get the constant for the initial r_value
+        token.value = substring(token.value, 1, token.value.length - 1);
+        constant := parse_constant(token, enumerator.file_index);
+
+        // If an end token is next, set constant as r_value and return
+        move_next(enumerator);
+        token = enumerator.current;
+        if is_end_token(token.type, end_tokens) {
+            expression.r_value = constant;
+            return expression;
+        }
+
+        // If next is an operator, then create a new expression and set constant as l-value, then get r-value
+        op := convert_operator(token);
+        if op != Operator.None {
+            move_next(enumerator);
+
+            sub_expression := create_ast<ExpressionAst>(enumerator, AstType.Expression);
+            sub_expression.l_value = constant;
+            sub_expression.op = op;
+            sub_expression.r_value = parse_expression(enumerator, current_function, end_tokens);
+            expression.r_value = sub_expression;
+            return expression;
+        }
+
+        // Else, report an error
+        report_error("Unexpected token '%' when operator was expected", enumerator.file_index, token, token.value);
+        return null;
+    }
+
+    if check_for_end || is_end_token(token.type, end_tokens) {
+        return l_value;
+    }
+
+    op := convert_operator(token);
+    if op != Operator.None
+        expression.op = op;
+    else {
+        report_error("Unexpected token '%' when operator was expected", enumerator.file_index, token, token.value);
+        return null;
+    }
+
+    // Parse r-value
+    if !move_next(enumerator) {
+        report_error("Expected r-value for expression", enumerator.file_index, enumerator.last);
+        return null;
+    }
+
+    expression.r_value = parse_expression(enumerator, current_function, end_tokens);
+
+    /*
+    operator_required := false;
     move(enumerator, -1);
     while move_next(enumerator) {
         token := enumerator.current;
@@ -1711,24 +1882,22 @@ Ast* parse_expression(TokenEnumerator* enumerator, Function* current_function, E
                 expression.children.Add(ast);
         }
     }
+    */
 
-    return check_expression(enumerator, expression, operator_required);
+    return check_expression(expression);
 }
 
-Ast* check_expression(TokenEnumerator* enumerator, ExpressionAst* expression, bool operator_required) {
-    if expression.children.length == 0 {
-        report_error("Expression should contain elements", enumerator.file_index, enumerator.current);
-    }
-    else if !operator_required && expression.children.length > 0 {
-        report_error("Value required after operator", enumerator.file_index, enumerator.current);
-        return expression;
+Ast* check_expression(ExpressionAst* expression) {
+    if expression.r_value == null {
+        if expression.op != Operator.None {
+            report_error("Value required after operator", enumerator.file_index, enumerator.current);
+            return null;
+        }
+        return expression.l_value;
     }
 
-    if expression.children.length == 1
-        return expression.children[0];
-
-    if errors.length == 0
-        set_operator_precedence(expression);
+    // if errors.length == 0
+    //     set_operator_precedence(expression);
 
     return expression;
 }
@@ -1808,7 +1977,7 @@ Ast* parse_compound_expression(TokenEnumerator* enumerator, Function* current_fu
                 return compound_declaration;
             }
             default; {
-                array_insert(&compound_expression.children, parse_expression(enumerator, current_function, null, TokenType.Comma, TokenType.Colon, TokenType.Equals), allocate, reallocate);
+                array_insert(&compound_expression.children, parse_expression(enumerator, current_function, TokenType.Comma, TokenType.Colon, TokenType.Equals), allocate, reallocate);
                 if enumerator.current.type == TokenType.Comma
                     move_next(enumerator);
             }
@@ -1837,7 +2006,8 @@ Ast* parse_struct_field_ref(TokenEnumerator* enumerator, Ast* initial_ast, Funct
             operator_required = false;
         }
         else {
-            ast := parse_next_expression_unit(enumerator, current_function, &operator_required);
+            ast := parse_next_expression_unit(enumerator, current_function);
+            operator_required = true;
             if ast
                 array_insert(&struct_field_ref.children, ast, allocate, reallocate);
         }
@@ -1846,9 +2016,8 @@ Ast* parse_struct_field_ref(TokenEnumerator* enumerator, Ast* initial_ast, Funct
     return struct_field_ref;
 }
 
-Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_function, bool* operator_required) {
+Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_function) {
     token := enumerator.current;
-    *operator_required = true;
     switch token.type {
         case TokenType.Number;
         case TokenType.Boolean;
@@ -1923,7 +2092,7 @@ Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_f
                 change_by_one := create_ast<ChangeByOneAst>(enumerator, AstType.ChangeByOne);
                 change_by_one.prefix = true;
                 change_by_one.positive = positive;
-                change_by_one.value = parse_next_expression_unit(enumerator, current_function, operator_required);
+                change_by_one.value = parse_next_expression_unit(enumerator, current_function);
                 if peek(enumerator, &token) && token.type == TokenType.Period {
                     move_next(enumerator);
                     change_by_one.value = parse_struct_field_ref(enumerator, change_by_one.value, current_function);
@@ -1937,7 +2106,7 @@ Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_f
         case TokenType.OpenParen; {
             // Parse subexpression
             if move_next(enumerator)
-                return parse_expression(enumerator, current_function, null, TokenType.CloseParen);
+                return parse_expression(enumerator, current_function, TokenType.CloseParen);
 
             report_error("Expected token to follow '%'", enumerator.file_index, token, token.value);
             return null;
@@ -1949,7 +2118,7 @@ Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_f
             if move_next(enumerator) {
                 unaryAst := create_ast<UnaryAst>(token, enumerator.file_index, AstType.Unary);
                 unaryAst.op = cast(UnaryOperator, token.value[0]);
-                unaryAst.value = parse_next_expression_unit(enumerator, current_function, operator_required);
+                unaryAst.value = parse_next_expression_unit(enumerator, current_function);
                 if peek(enumerator, &token) && token.type == TokenType.Period {
                     move_next(enumerator);
                     unaryAst.value = parse_struct_field_ref(enumerator, unaryAst.value, current_function);
@@ -1962,14 +2131,13 @@ Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_f
         }
         case TokenType.Cast;
             return parse_cast(enumerator, current_function);
-        default; {
+        default;
             report_error("Unexpected token '%' in expression", enumerator.file_index, token, token.value);
-            *operator_required = false;
-        }
    }
    return null;
 }
 
+/*
 set_operator_precedence(ExpressionAst* expression) {
     // 1. Set the initial operator precedence
     operator_precedence := get_operator_precedence(expression.operators[0]);
@@ -2034,6 +2202,7 @@ ExpressionAst* create_sub_expression(ExpressionAst* expression, int parent_prece
     *end = i;
     return sub_expression;
 }
+*/
 
 int get_operator_precedence(Operator op) {
     switch op {
@@ -2116,12 +2285,12 @@ parse_arguments(CallAst* call_ast, TokenEnumerator* enumerator, Function* curren
                 move_next(enumerator);
 
                 // call_ast.SpecifiedArguments ??= new Dictionary<string, IAst>();
-                argument := parse_expression(enumerator, current_function, null, TokenType.Comma, TokenType.CloseParen);
+                argument := parse_expression(enumerator, current_function, TokenType.Comma, TokenType.CloseParen);
                 if !table_add(&call_ast.specified_arguments, argument_name, argument)
                     report_error("Specified argument '%' is already in the call", enumerator.file_index, token, token.value);
             }
             else
-                array_insert(&call_ast.arguments, parse_expression(enumerator, current_function, null, TokenType.Comma, TokenType.CloseParen), allocate, reallocate);
+                array_insert(&call_ast.arguments, parse_expression(enumerator, current_function, TokenType.Comma, TokenType.CloseParen), allocate, reallocate);
 
             switch enumerator.current.type {
                 case TokenType.CloseParen; break;
@@ -2157,7 +2326,7 @@ IndexAst* parse_index(TokenEnumerator* enumerator, Function* current_function) {
 
     // 2. Parse index expression
     move_next(enumerator);
-    index.index = parse_expression(enumerator, current_function, null, TokenType.CloseBracket);
+    index.index = parse_expression(enumerator, current_function, TokenType.CloseBracket);
 
     return index;
 }
@@ -2433,8 +2602,7 @@ bool parse_in_register(AssemblyAst* assembly, TokenEnumerator* enumerator) {
         return false;
     }
 
-    _: bool;
-    input.ast = parse_next_expression_unit(enumerator, null, &_);
+    input.ast = parse_next_expression_unit(enumerator, null);
 
     if !move_next(enumerator) {
         report_error("Expected semicolon in instruction", enumerator.file_index, enumerator.last);
@@ -2457,8 +2625,7 @@ bool parse_out_value(AssemblyAst* assembly, TokenEnumerator* enumerator) {
 
     output := create_ast<AssemblyInputAst>(enumerator, AstType.AssemblyInput);
 
-    _: bool;
-    output.ast = parse_next_expression_unit(enumerator, null, &_);
+    output.ast = parse_next_expression_unit(enumerator, null);
     if output.ast == null {
         return false;
     }
@@ -2598,7 +2765,7 @@ SwitchAst* parse_switch(TokenEnumerator* enumerator, Function* current_function)
         return null;
     }
 
-    switch_ast.value = parse_expression(enumerator, current_function, null, TokenType.OpenBrace);
+    switch_ast.value = parse_expression(enumerator, current_function, TokenType.OpenBrace);
 
     if enumerator.current.type != TokenType.OpenBrace {
         report_error("Expected switch statement value to be followed by '{' and cases", enumerator.file_index, enumerator.current);
@@ -3096,7 +3263,7 @@ TypeDefinition* parse_type(TokenEnumerator* enumerator, Function* current_functi
         // Skip over the open bracket and parse the expression
         move_next(enumerator);
         move_next(enumerator);
-        type_definition.count = parse_expression(enumerator, current_function, null, TokenType.CloseBracket);
+        type_definition.count = parse_expression(enumerator, current_function, TokenType.CloseBracket);
     }
 
     return type_definition;
@@ -3249,23 +3416,11 @@ ConstantAst* parse_constant(Token token, int fileIndex) {
                 value := substring(token.value, 2, token.value.length - 2);
                 if value.length <= 8 {
                     constant.type = &u32_type;
-                    each i in 0..value.length - 1 {
-                        digit := value[i];
-                        if digit <= '9' digit -= '0';
-                        else digit -= 55;
-
-                        constant.value.unsigned_integer += digit << (value.length - i - 1) * 4;
-                    }
+                    constant.value.unsigned_integer = parse_hex_number(value);
                 }
                 else if value.length <= 16 {
                     constant.type = &u64_type;
-                    each i in 0..value.length - 1 {
-                        digit := value[i];
-                        if digit <= '9' digit -= '0';
-                        else digit -= 55;
-
-                        constant.value.unsigned_integer += digit << (value.length - i - 1) * 4;
-                    }
+                    constant.value.unsigned_integer = parse_hex_number(value);
                 }
                 else {
                     report_error("Invalid integer '%'", fileIndex, token, token.value);
@@ -3290,12 +3445,29 @@ ConstantAst* parse_constant(Token token, int fileIndex) {
 }
 
 // TODO Implement me
+bool try_parse_integer(string input, int* value) {
+    return true;
+}
+
+u64 parse_hex_number(string input) {
+    value: u64;
+    each i in 0..input.length - 1 {
+        digit := input[i];
+        if digit <= '9' digit -= '0';
+        else digit -= 55;
+
+        value += digit << (input.length - i - 1) * 4;
+    }
+
+    return value;
+}
+
 bool try_parse_float(string input, float64* value) {
-    return false;
+    return true;
 }
 
 bool try_parse_float64(string input, float64* value) {
-    return false;
+    return true;
 }
 
 CastAst* parse_cast(TokenEnumerator* enumerator, Function* current_function) {
@@ -3332,7 +3504,7 @@ CastAst* parse_cast(TokenEnumerator* enumerator, Function* current_function) {
         report_error("Expected to get the value for the cast", enumerator.file_index, enumerator.last);
         return null;
     }
-    cast_ast.value = parse_expression(enumerator, current_function, null, TokenType.CloseParen);
+    cast_ast.value = parse_expression(enumerator, current_function, TokenType.CloseParen);
 
     return cast_ast;
 }

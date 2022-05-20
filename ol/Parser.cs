@@ -2279,11 +2279,14 @@ public static class Parser
                                 callAst.Name = typeDefinition.Name;
                                 callAst.Generics = typeDefinition.Generics;
 
-                                foreach (var generic in callAst.Generics)
+                                if (currentFunction != null)
                                 {
-                                    for (var i = 0; i < currentFunction.Generics.Count; i++)
+                                    foreach (var generic in callAst.Generics)
                                     {
-                                        SearchForGeneric(currentFunction.Generics[i], i, generic);
+                                        for (var i = 0; i < currentFunction.Generics.Count; i++)
+                                        {
+                                            SearchForGeneric(currentFunction.Generics[i], i, generic);
+                                        }
                                     }
                                 }
 
@@ -2293,9 +2296,12 @@ public static class Parser
                             }
                             else
                             {
-                                for (var i = 0; i < currentFunction.Generics.Count; i++)
+                                if (currentFunction != null)
                                 {
-                                    SearchForGeneric(currentFunction.Generics[i], i, typeDefinition);
+                                    for (var i = 0; i < currentFunction.Generics.Count; i++)
+                                    {
+                                        SearchForGeneric(currentFunction.Generics[i], i, typeDefinition);
+                                    }
                                 }
                                 return typeDefinition;
                             }
