@@ -83,7 +83,7 @@ queue_file_if_not_exists(string file) {
 
     file_index := file_names.length;
     array_insert(&file_names, file, allocate, reallocate);
-    // TypeChecker.privateScopes.Add(null);
+    array_insert(&private_scopes, null, allocate, reallocate);
 
     data := new<ParseData>();
     data.file = file;
@@ -583,61 +583,80 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
 
     // 6. Handle compiler directives
     while enumerator.current.type == TokenType.Pound {
-        if !move_next(enumerator) {
-            report_error("Expected compiler directive value", enumerator.file_index, enumerator.last);
+        if !move_next(enumerator) || enumerator.current.type != TokenType.Identifier {
+            report_error("Expected compiler directive value", enumerator.file_index, enumerator.current);
             return null;
         }
 
-        switch enumerator.current.value {
-            case "extern"; {
-                function.flags |= FunctionFlags.Extern;
-                externError := "Extern function definition should be followed by the library in use"; #const
-                if !peek(enumerator, &token) {
-                    report_error(externError, enumerator.file_index, token);
-                }
-                else if token.type == TokenType.Literal {
-                    move_next(enumerator);
-                    function.extern_lib = token.value;
-                }
-                else if token.type == TokenType.Identifier {
-                    move_next(enumerator);
-                    function.library_name = token.value;
-                }
-                else
-                    report_error(externError, enumerator.file_index, token);
+        directive := enumerator.current.value;
+        unexpected_directive := "Unexpected compiler directive '%'"; #const
+        switch directive.length {
+            case 6; {
+                if directive == "extern" {
+                    function.flags |= FunctionFlags.Extern;
+                    extern_error := "Extern function definition should be followed by the library in use"; #const
+                    if !peek(enumerator, &token) {
+                        report_error(extern_error, enumerator.file_index, token);
+                    }
+                    else if token.type == TokenType.Literal {
+                        move_next(enumerator);
+                        function.extern_lib = token.value;
+                    }
+                    else if token.type == TokenType.Identifier {
+                        move_next(enumerator);
+                        function.library_name = token.value;
+                    }
+                    else
+                        report_error(extern_error, enumerator.file_index, token);
 
-                return function;
-            }
-            case "compiler"; {
-                function.flags |= FunctionFlags.Compiler;
-                return function;
-            }
-            case "syscall"; {
-                function.flags |= FunctionFlags.Syscall;
-                syscall_error := "Syscall function definition should be followed by the number for the system call"; #const
-                if !peek(enumerator, &token) {
-                    report_error(syscall_error, enumerator.file_index, token);
+                    return function;
                 }
-                else if token.type == TokenType.Number {
-                    move_next(enumerator);
-                    value: int;
-                    if token.flags == TokenFlags.None && int.TryParse(token.value, &value) {
-                        function.syscall = value;
+                else if directive == "inline"
+                    function.flags |= FunctionFlags.Inline;
+                else
+                    report_error(unexpected_directive, enumerator.file_index, enumerator.current, directive);
+            }
+            case 7; {
+                if directive == "syscall" {
+                    function.flags |= FunctionFlags.Syscall;
+                    syscall_error := "Syscall function definition should be followed by the number for the system call"; #const
+                    if !peek(enumerator, &token) {
+                        report_error(syscall_error, enumerator.file_index, token);
+                    }
+                    else if token.type == TokenType.Number {
+                        move_next(enumerator);
+                        value: int;
+                        if token.flags == TokenFlags.None && int.TryParse(token.value, &value) {
+                            function.syscall = value;
+                        }
+                        else report_error(syscall_error, enumerator.file_index, token);
                     }
                     else report_error(syscall_error, enumerator.file_index, token);
-                }
-                else report_error(syscall_error, enumerator.file_index, token);
 
-                return function;
+                    return function;
+                }
+                else
+                    report_error(unexpected_directive, enumerator.file_index, enumerator.current, directive);
             }
-            case "print_ir";
-                function.flags |= FunctionFlags.PrintIR;
-            case "call_location";
-                function.flags |= FunctionFlags.PassCallLocation;
-            case "inline";
-                function.flags |= FunctionFlags.Inline;
+            case 8; {
+                if directive == "compiler" {
+                    function.flags |= FunctionFlags.Compiler;
+                    return function;
+                }
+                else if directive == "print_ir" {
+                    function.flags |= FunctionFlags.PrintIR;
+                }
+                else
+                    report_error(unexpected_directive, enumerator.file_index, enumerator.current, directive);
+            }
+            case 13; {
+                if directive == "call_location"
+                    function.flags |= FunctionFlags.PassCallLocation;
+                else
+                    report_error(unexpected_directive, enumerator.file_index, enumerator.current, directive);
+            }
             default;
-                report_error("Unexpected compiler directive '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
+                report_error(unexpected_directive, enumerator.file_index, enumerator.current, directive);
         }
         move_next(enumerator);
     }
@@ -1820,7 +1839,7 @@ Ast* parse_struct_field_ref(TokenEnumerator* enumerator, Ast* initial_ast, Funct
         else {
             ast := parse_next_expression_unit(enumerator, current_function, &operator_required);
             if ast
-                array_insert(struct_field_ref.children, ast, allocate, reallocate);
+                array_insert(&struct_field_ref.children, ast, allocate, reallocate);
         }
     }
 
@@ -2146,104 +2165,105 @@ IndexAst* parse_index(TokenEnumerator* enumerator, Function* current_function) {
 CompilerDirectiveAst* parse_top_level_directive(TokenEnumerator* enumerator, bool global = false) {
     directive := create_ast<CompilerDirectiveAst>(enumerator, AstType.CompilerDirective);
 
-    if !move_next(enumerator) {
-        report_error("Expected compiler directive to have a value", enumerator.file_index, enumerator.last);
+    if !move_next(enumerator) || enumerator.current.type != TokenType.Identifier {
+        report_error("Expected compiler directive to specify type and value", enumerator.file_index, enumerator.last);
         return null;
     }
 
     token := enumerator.current;
-    switch token.value {
-        case "run"; {
-            directive.directive_type = DirectiveType.Run;
-            move_next(enumerator);
-            ast := parse_line(enumerator, null);
-            if ast directive.value = ast;
-        }
-        case "if"; {
-            directive.directive_type = DirectiveType.If;
-            directive.value = parse_conditional(enumerator, null, true);
-        }
-        case "assert"; {
-            directive.directive_type = DirectiveType.Assert;
-            move_next(enumerator);
-            directive.value = parse_expression(enumerator, null);
-        }
-        case "import"; {
-            if !move_next(enumerator) {
-                report_error("Expected module name or source file", enumerator.file_index, enumerator.last);
-                return null;
-            }
-            token = enumerator.current;
-            switch token.type {
-                case TokenType.Identifier; {
-                    directive.directive_type = DirectiveType.ImportModule;
-                    module := token.value;
-                    if global
-                        add_module(module, enumerator.file_index, token);
-                    else
-                        directive.import = { name = module; path = format_string("%/%.ol", allocate, library_directory, token.value); }
-                }
-                case TokenType.Literal; {
-                    directive.directive_type = DirectiveType.ImportFile;
-                    file := token.value;
-                    if global
-                        add_file(file, enumerator.directory, enumerator.file_index, token);
-                    else
-                        directive.import = { name = file; path = format_string("%/%", allocate, enumerator.directory, token.value); }
-                }
-                default;
-                    report_error("Expected module name or source file, but got '%'", enumerator.file_index, token, token.value);
-            }
-        }
-        case "library"; {
-            directive.directive_type = DirectiveType.Library;
-            if (!move_next(enumerator) || enumerator.current.type != TokenType.Identifier)
-            {
-                report_error("Expected library name, but got '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
-                return null;
-            }
-            library_name := enumerator.current.value;
-            if !move_next(enumerator) || enumerator.current.type != TokenType.Literal
-            {
-                report_error("Expected library path, but got '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
-                return null;
-            }
-            library_path := enumerator.current.value;
-            directive.library = { name = library_name; path = library_path; }
-            if path[0] == '/'
-                directive.library.absolute_path = library_path;
-            else
-                directive.library.absolute_path = format_string("%/%", allocate, enumerator.directory, library_path);
-        }
-        case "system_library"; {
-            directive.directive_type = DirectiveType.SystemLibrary;
-            if !move_next(enumerator) || enumerator.current.type != TokenType.Identifier {
-                report_error("Expected library name, but got '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
-                return null;
-            }
-            library_name := enumerator.current.value;
-            if !move_next(enumerator) || enumerator.current.type != TokenType.Literal {
-                report_error("Expected library file name, but got '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
-                return null;
-            }
-            file_name := enumerator.current.value;
-            directive.library = { name = library_name; file_name = file_name; }
-            if peek(enumerator, &token) && token.type == TokenType.Literal {
-                directive.library.lib_path = token.value;
-                move_next(enumerator);
-            }
-        }
-        case "private"; {
-            if (enumerator.private)
-                report_error("Tried to set #private when already in private scope", enumerator.file_index, token);
-            else
-                TypeChecker.privateScopes[enumerator.file_index] = TODO; //new PrivateScope{Parent = TypeChecker.GlobalScope};
-            enumerator.private = true;
-        }
-        default; {
-            report_error("Unsupported top-level compiler directive '%'", enumerator.file_index, token, token.value);
+    if token.value == "run" {
+        directive.directive_type = DirectiveType.Run;
+        move_next(enumerator);
+        ast := parse_line(enumerator, null);
+        if ast directive.value = ast;
+    }
+    else if token.value == "if" {
+        directive.directive_type = DirectiveType.If;
+        directive.value = parse_conditional(enumerator, null, true);
+    }
+    else if token.value == "assert" {
+        directive.directive_type = DirectiveType.Assert;
+        move_next(enumerator);
+        directive.value = parse_expression(enumerator, null);
+    }
+    else if token.value == "import" {
+        if !move_next(enumerator) {
+            report_error("Expected module name or source file", enumerator.file_index, enumerator.last);
             return null;
         }
+        token = enumerator.current;
+        switch token.type {
+            case TokenType.Identifier; {
+                directive.directive_type = DirectiveType.ImportModule;
+                module := token.value;
+                if global
+                    add_module(module, enumerator.file_index, token);
+                else
+                    directive.import = { name = module; path = format_string("%/%.ol", allocate, library_directory, token.value); }
+            }
+            case TokenType.Literal; {
+                directive.directive_type = DirectiveType.ImportFile;
+                file := token.value;
+                if global
+                    add_file(file, enumerator.directory, enumerator.file_index, token);
+                else
+                    directive.import = { name = file; path = format_string("%/%", allocate, enumerator.directory, token.value); }
+            }
+            default;
+                report_error("Expected module name or source file, but got '%'", enumerator.file_index, token, token.value);
+        }
+    }
+    else if token.value == "library" {
+        directive.directive_type = DirectiveType.Library;
+        if (!move_next(enumerator) || enumerator.current.type != TokenType.Identifier)
+        {
+            report_error("Expected library name, but got '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
+            return null;
+        }
+        library_name := enumerator.current.value;
+        if !move_next(enumerator) || enumerator.current.type != TokenType.Literal
+        {
+            report_error("Expected library path, but got '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
+            return null;
+        }
+        library_path := enumerator.current.value;
+        directive.library = { name = library_name; path = library_path; }
+        if path[0] == '/'
+            directive.library.absolute_path = library_path;
+        else
+            directive.library.absolute_path = format_string("%/%", allocate, enumerator.directory, library_path);
+    }
+    else if token.value == "system_library" {
+        directive.directive_type = DirectiveType.SystemLibrary;
+        if !move_next(enumerator) || enumerator.current.type != TokenType.Identifier {
+            report_error("Expected library name, but got '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
+            return null;
+        }
+        library_name := enumerator.current.value;
+        if !move_next(enumerator) || enumerator.current.type != TokenType.Literal {
+            report_error("Expected library file name, but got '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
+            return null;
+        }
+        file_name := enumerator.current.value;
+        directive.library = { name = library_name; file_name = file_name; }
+        if peek(enumerator, &token) && token.type == TokenType.Literal {
+            directive.library.lib_path = token.value;
+            move_next(enumerator);
+        }
+    }
+    else if token.value == "private" {
+        if enumerator.private
+            report_error("Tried to set #private when already in private scope", enumerator.file_index, token);
+        else {
+            private_scope := new<GlobalScope>();
+            private_scope.parent = &global_scope;
+            private_scopes[enumerator.file_index] = private_scope;
+        }
+        enumerator.private = true;
+    }
+    else {
+        report_error("Unsupported top-level compiler directive '%'", enumerator.file_index, token, token.value);
+        return null;
     }
 
     return directive;
@@ -2252,37 +2272,35 @@ CompilerDirectiveAst* parse_top_level_directive(TokenEnumerator* enumerator, boo
 Ast* parse_compiler_directive(TokenEnumerator* enumerator, Function* current_function) {
     directive := create_ast<CompilerDirectiveAst>(enumerator, AstType.CompilerDirective);
 
-    if !move_next(enumerator) {
-        report_error("Expected compiler directive to have a value", enumerator.file_index, enumerator.last);
+    if !move_next(enumerator) || enumerator.current.type != TokenType.Identifier {
+        report_error("Expected compiler directive to specify type and value", enumerator.file_index, enumerator.last);
         return null;
     }
 
     token := enumerator.current;
-    switch token.value {
-        case "if"; {
-            directive.directive_type = DirectiveType.If;
-            directive.value = parse_conditional(enumerator, current_function);
-            current_function.flags |= FunctionFlags.HasDirectives;
-        }
-        case "assert"; {
-            directive.directive_type = DirectiveType.Assert;
-            move_next(enumerator);
-            directive.value = parse_expression(enumerator, current_function);
-            current_function.flags |= FunctionFlags.HasDirectives;
-        }
-        case "inline"; {
-            if !move_next(enumerator) || enumerator.current.type != TokenType.Identifier {
-                report_error("Expected funciton call following #inline directive", enumerator.file_index, token);
-                return null;
-            }
-            call := parse_call(enumerator, current_function, true);
-            if call call.inline = true;
-            return call;
-        }
-        default; {
-            report_error("Unsupported function level compiler directive '%'", enumerator.file_index, token, token.value);
+    if token.value == "if" {
+        directive.directive_type = DirectiveType.If;
+        directive.value = parse_conditional(enumerator, current_function);
+        current_function.flags |= FunctionFlags.HasDirectives;
+    }
+    else if token.value == "assert" {
+        directive.directive_type = DirectiveType.Assert;
+        move_next(enumerator);
+        directive.value = parse_expression(enumerator, current_function);
+        current_function.flags |= FunctionFlags.HasDirectives;
+    }
+    else if token.value == "inline" {
+        if !move_next(enumerator) || enumerator.current.type != TokenType.Identifier {
+            report_error("Expected function call following #inline directive", enumerator.file_index, token);
             return null;
         }
+        call := parse_call(enumerator, current_function, true);
+        if call call.inline = true;
+        return call;
+    }
+    else {
+        report_error("Unsupported function level compiler directive '%'", enumerator.file_index, token, token.value);
+        return null;
     }
 
     return directive;
@@ -2847,12 +2865,11 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator) {
             report_error("Expected compiler directive value", enumerator.file_index, enumerator.last);
             return null;
         }
-        switch enumerator.current.value {
-            case "print_ir";
-                overload.flags |= FunctionFlags.PrintIR;
-            default;
-                report_error("Unexpected compiler directive '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
-        }
+        if enumerator.current.value == "print_ir"
+            overload.flags |= FunctionFlags.PrintIR;
+        else
+            report_error("Unexpected compiler directive '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
+
         move_next(enumerator);
     }
 
@@ -3072,7 +3089,7 @@ TypeDefinition* parse_type(TokenEnumerator* enumerator, Function* current_functi
         pointer_type.generics.length = 1;
         pointer_type.generics.data = allocate(size_of(TypeDefinition*));
         pointer_type.generics[0] = type_definition;
-        type_definition = pointerType;
+        type_definition = pointer_type;
     }
 
     if peek(enumerator, &token) && token.type == TokenType.OpenBracket {
