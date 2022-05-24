@@ -1504,7 +1504,7 @@ Ast* parse_condition_expression(TokenEnumerator* enumerator, Function* current_f
     }
     */
 
-    return check_expression(expression);
+    return check_expression(enumerator, expression);
 }
 
 DeclarationAst* parse_declaration(TokenEnumerator* enumerator, Function* current_function = null, bool global = false) {
@@ -1571,7 +1571,7 @@ DeclarationAst* parse_declaration(TokenEnumerator* enumerator, Function* current
 
     // 4. Parse compiler directives
     if peek(enumerator, &token) && token.type == TokenType.Pound {
-        if (peek(enumerator, &token, 1) && token.value == "const") {
+        if peek(enumerator, &token, 1) && token.value == "const" {
             declaration.constant = true;
             move_next(enumerator);
             move_next(enumerator);
@@ -1681,13 +1681,8 @@ AssignmentAst* parse_assignment(TokenEnumerator* enumerator, Function* current_f
     // 3, Get the operator on the reference expression if the expression ends with an operator
     else if reference.ast_type == AstType.Expression {
         expression := cast(ExpressionAst*, reference);
-        if expression.children.length == 1 {
-            assignment.reference = expression.children[0];
-        }
-        if expression.operators.length > 0 && expression.children.length == expression.operators.length {
-            assignment.op = expression.operators.Last();
-            expression.operators.RemoveAt(expression.operators.length - 1);
-        }
+        assignment.op = expression.op;
+        assignment.reference = expression.l_value;
     }
 
     // 4. Parse expression, field assignments, or array values
@@ -1884,10 +1879,10 @@ Ast* parse_expression(TokenEnumerator* enumerator, Function* current_function, P
     }
     */
 
-    return check_expression(expression);
+    return check_expression(enumerator, expression);
 }
 
-Ast* check_expression(ExpressionAst* expression) {
+Ast* check_expression(TokenEnumerator* enumerator, ExpressionAst* expression) {
     if expression.r_value == null {
         if expression.op != Operator.None {
             report_error("Value required after operator", enumerator.file_index, enumerator.current);
