@@ -606,11 +606,11 @@ public static class TypeChecker
         }
         else
         {
-            overload.Name = $"operator.{overload.Operator}.{overload.Type.GenericName}";
+            overload.Name = $"operator {PrintOperator(overload.Operator)} {overload.Type.Name}";
             overload.FunctionIndex = TypeTable.GetFunctionIndex();
-            if (!_operatorOverloads.TryGetValue(overload.Type.GenericName, out var overloads))
+            if (!_operatorOverloads.TryGetValue(overload.Type.Name, out var overloads))
             {
-                _operatorOverloads[overload.Type.GenericName] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
+                _operatorOverloads[overload.Type.Name] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
             }
             if (overloads.ContainsKey(overload.Operator))
             {
@@ -4496,14 +4496,14 @@ public static class TypeChecker
             if (match && (function.Flags.HasFlag(FunctionFlags.Varargs) || callArgIndex == call.Arguments.Count))
             {
                 call.PassArrayToParams = passArrayToParams;
-                var name = $"{function.Name}.{i}.{string.Join('.', genericTypes.Select(type => type.TypeIndex))}";
+                var uniqueName = $"{function.Name}.{i}.{string.Join('.', genericTypes.Select(type => type.TypeIndex))}";
 
-                if (GetExistingFunction(name, call.FileIndex, out polymorphedFunction, out var functionCount))
+                if (GetExistingFunction(uniqueName, call.FileIndex, out polymorphedFunction, out var functionCount))
                 {
                     return true;
                 }
 
-                polymorphedFunction = Polymorpher.CreatePolymorphedFunction(function, name, privateGenericTypes, genericTypes);
+                polymorphedFunction = Polymorpher.CreatePolymorphedFunction(function, $"{function.Name}<{string.Join(", ", genericTypes.Select(type => type.Name))}>", privateGenericTypes, genericTypes);
                 if (polymorphedFunction.ReturnType == null)
                 {
                     polymorphedFunction.ReturnType = VerifyType(polymorphedFunction.ReturnTypeDefinition, scope);
@@ -4528,7 +4528,7 @@ public static class TypeChecker
                     fileIndex = call.FileIndex;
                 }
 
-                AddFunction(name, fileIndex, polymorphedFunction);
+                AddFunction(uniqueName, fileIndex, polymorphedFunction);
                 polymorphedFunction.Flags |= FunctionFlags.Queued;
                 _astCompleteQueue.Enqueue(polymorphedFunction);
 
@@ -5686,7 +5686,7 @@ public static class TypeChecker
         return sb.ToString();
     }
 
-    private static string PrintOperator(Operator op)
+    public static string PrintOperator(Operator op)
     {
         return op switch
         {
