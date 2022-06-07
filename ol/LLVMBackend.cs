@@ -81,25 +81,25 @@ public static unsafe class LLVMBackend
 
         _structTypeInfoType = CreateStruct("StructTypeInfo");
         _typeInfoType = CreateStruct("TypeInfo");
-        _typeInfoArrayType = CreateStruct("Array.*.TypeInfo");
+        _typeInfoArrayType = CreateStruct("Array<TypeInfo*>");
         _integerTypeInfoType = CreateStruct("IntegerTypeInfo");
         _pointerTypeInfoType = CreateStruct("PointerTypeInfo");
         _arrayTypeInfoType = CreateStruct("CArrayTypeInfo");
         _enumTypeInfoType = CreateStruct("EnumTypeInfo");
         _compoundTypeInfoType = CreateStruct("CompoundTypeInfo");
         _stringType = CreateStruct("string");
-        _stringArrayType = CreateStruct("Array.string");
+        _stringArrayType = CreateStruct("Array<string>");
         _enumValueType = CreateStruct("EnumValue");
-        _enumValueArrayType = CreateStruct("Array.EnumValue");
+        _enumValueArrayType = CreateStruct("Array<EnumValue>");
         _unionTypeInfoType = CreateStruct("UnionTypeInfo");
         _unionFieldType = CreateStruct("UnionField");
-        _unionFieldArrayType = CreateStruct("Array.UnionField");
+        _unionFieldArrayType = CreateStruct("Array<UnionField>");
         _interfaceTypeInfoType = CreateStruct("InterfaceTypeInfo");
         _typeFieldType = CreateStruct("TypeField");
-        _typeFieldArrayType = CreateStruct("Array.TypeField");
+        _typeFieldArrayType = CreateStruct("Array<TypeField>");
         _functionTypeInfoType = CreateStruct("FunctionTypeInfo");
         _argumentType = CreateStruct("ArgumentType");
-        _argumentArrayType = CreateStruct("Array.ArgumentType");
+        _argumentArrayType = CreateStruct("Array<ArgumentType>");
 
         _typeInfoPointerType = LLVM.PointerType(_typeInfoType, 0);
         _defaultAttributes = LLVMValueRef.CreateConstNamedStruct(_stringArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(_stringType, 0))});
