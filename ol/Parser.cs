@@ -220,7 +220,6 @@ public static class Parser
                     }
                     else
                     {
-                        structAst.BackendName = structAst.Name;
                         if (TypeChecker.AddStruct(structAst))
                         {
                             if (structAst.Name == "string")
@@ -1019,7 +1018,7 @@ public static class Parser
 
         if (enumerator.Current.Type == TokenType.Identifier)
         {
-            enumAst.Name = enumAst.BackendName = enumerator.Current.Value;
+            enumAst.Name = enumerator.Current.Value;
         }
         else
         {
@@ -1254,7 +1253,7 @@ public static class Parser
 
         if (enumerator.Current.Type == TokenType.Identifier)
         {
-            union.Name = union.BackendName = enumerator.Current.Value;
+            union.Name = enumerator.Current.Value;
         }
         else
         {

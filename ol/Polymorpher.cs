@@ -5,12 +5,12 @@ namespace ol;
 
 public static class Polymorpher
 {
-    public static StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, string backendName, TypeKind typeKind, bool privateGenericTypes, params IType[] genericTypes)
+    public static StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, TypeKind typeKind, bool privateGenericTypes, params IType[] genericTypes)
     {
         var polyStruct = new StructAst
         {
             FileIndex = baseStruct.FileIndex, Line = baseStruct.Line, Column = baseStruct.Column, Name = name,
-            BackendName = backendName, TypeKind = typeKind, Private = baseStruct.Private || privateGenericTypes,
+            TypeKind = typeKind, Private = baseStruct.Private || privateGenericTypes,
             BaseStructName = baseStruct.Name, BaseTypeDefinition = baseStruct.BaseTypeDefinition,
             BaseStruct = baseStruct.BaseStruct, GenericTypes = genericTypes
         };
@@ -97,7 +97,7 @@ public static class Polymorpher
         if (type.IsGeneric)
         {
             var genericType = genericTypes[type.GenericIndex];
-            copyType.Name = genericType.BackendName;
+            copyType.Name = genericType.Name;
             copyType.BakedType = genericType;
         }
         else

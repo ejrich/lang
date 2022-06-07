@@ -16,7 +16,6 @@ public interface IType
 {
     int FileIndex { get; set; }
     string Name { get; set; }
-    string BackendName { get; set; }
     int TypeIndex { get; set; }
     TypeKind TypeKind { get; set; }
     uint Size { get; set; }
@@ -121,7 +120,6 @@ public class FunctionAst : IFunction, IType
     public uint Line { get; init; }
     public uint Column { get; init; }
     public string Name { get; set; }
-    public string BackendName { get; set; }
     public int TypeIndex { get; set; }
     public TypeKind TypeKind { get; set; } = TypeKind.Function;
     public int ConstantCount { get; set; }
@@ -152,7 +150,6 @@ public class StructAst : IAst, IType
     public uint Line { get; init; }
     public uint Column { get; init; }
     public string Name { get; set; }
-    public string BackendName { get; set; }
     public int TypeIndex { get; set; }
     public TypeKind TypeKind { get; set; }
     public uint Size { get; set; }
@@ -211,7 +208,6 @@ public class EnumAst : IAst, IType
     public uint Line { get; init; }
     public uint Column { get; init; }
     public string Name { get; set; }
-    public string BackendName { get; set; }
     public int TypeIndex { get; set; }
     public TypeKind TypeKind { get; set; } = TypeKind.Enum;
     public uint Size { get; set; } = 4;
@@ -241,7 +237,6 @@ public class PrimitiveAst : IAst, IType
     public uint Line { get; init; }
     public uint Column { get; init; }
     public string Name { get; set; }
-    public string BackendName { get; set; }
     public int TypeIndex { get; set; }
     public TypeKind TypeKind { get; set; }
     public uint Size { get; set; }
@@ -255,7 +250,6 @@ public class PointerType : IType
 {
     public int FileIndex { get; set; }
     public string Name { get; set; }
-    public string BackendName { get; set; }
     public int TypeIndex { get; set; }
     public TypeKind TypeKind { get; set; } = TypeKind.Pointer;
     public uint Size { get; set; } = 8;
@@ -269,7 +263,6 @@ public class ArrayType : IType
 {
     public int FileIndex { get; set; }
     public string Name { get; set; }
-    public string BackendName { get; set; }
     public int TypeIndex { get; set; }
     public TypeKind TypeKind { get; set; } = TypeKind.CArray;
     public uint Size { get; set; }
@@ -286,7 +279,6 @@ public class UnionAst : IAst, IType
     public uint Line { get; init; }
     public uint Column { get; init; }
     public string Name { get; set; }
-    public string BackendName { get; set; }
     public int TypeIndex { get; set; }
     public TypeKind TypeKind { get; set; } = TypeKind.Union;
     public uint Size { get; set; }
@@ -312,7 +304,6 @@ public class CompoundType : IType
 {
     public int FileIndex { get; set; }
     public string Name { get; set; }
-    public string BackendName { get; set; }
     public int TypeIndex { get; set; }
     public TypeKind TypeKind { get; set; } = TypeKind.Compound;
     public uint Size { get; set; }
@@ -598,7 +589,6 @@ public class InterfaceAst : IInterface, IType
     public uint Line { get; init; }
     public uint Column { get; init; }
     public string Name { get; set; }
-    public string BackendName { get; set; }
     public int TypeIndex { get; set; }
     public TypeKind TypeKind { get; set; } = TypeKind.Interface;
     public uint Size { get; set; } = 8;
@@ -683,26 +673,6 @@ public class TypeDefinition : IAst
     public IAst Count { get; set; }
     public uint? ConstCount { get; set; }
     public IType BakedType { get; set; }
-
-    private string _genericName;
-    public string GenericName
-    {
-        get
-        {
-            if (_genericName == null)
-            {
-                if (Compound)
-                {
-                    return _genericName = string.Join("-", Generics.Select(g => g.GenericName));
-                }
-                else
-                {
-                    return _genericName = Generics.Aggregate(Name, (current, generic) => current + $".{generic.GenericName}");
-                }
-            }
-            return _genericName;
-        }
-    }
 }
 
 public enum Operator
