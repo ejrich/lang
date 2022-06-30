@@ -7,6 +7,8 @@ main() {
 
     success, files := get_files_in_directory("test/tests");
     if success {
+        defer default_free(files.data);
+
         each file in files {
             if file.type == FileType.Directory && file.name != "." && file.name != ".." {
                 test_dir := format_string("test/tests/%", file.name);
@@ -20,7 +22,6 @@ main() {
                 default_free(file.name.data);
             }
         }
-        default_free(files.data);
     }
     default_free(command_buffer);
 
