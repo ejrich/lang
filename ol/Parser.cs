@@ -1426,6 +1426,17 @@ public static class Parser
                 return ParseInlineAssembly(enumerator);
             case TokenType.Switch:
                 return ParseSwitch(enumerator, currentFunction);
+            case TokenType.Defer:
+                var deferAst = CreateAst<DeferAst>(token, enumerator.FileIndex);
+                if (enumerator.MoveNext())
+                {
+                    deferAst.Statement = ParseLine(enumerator, currentFunction);
+                }
+                else
+                {
+                    ErrorReporter.Report("End of file reached without closing scope", enumerator.FileIndex, enumerator.Last);
+                }
+                return deferAst;
             case TokenType.Break:
                 var breakAst = CreateAst<BreakAst>(token, enumerator.FileIndex);
                 if (enumerator.MoveNext())

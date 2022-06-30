@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace ol;
 
@@ -657,6 +656,14 @@ public class SwitchAst : IAst
     public IAst Value { get; set; }
     public List<(List<IAst>, ScopeAst)> Cases { get; } = new();
     public ScopeAst DefaultCase { get; set; }
+}
+
+public class DeferAst : IAst
+{
+    public int FileIndex { get; set; }
+    public uint Line { get; init; }
+    public uint Column { get; init; }
+    public IAst Statement { get; set; }
 }
 
 public class TypeDefinition : IAst

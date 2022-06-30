@@ -45,6 +45,7 @@ public static class Lexer
         {"switch", TokenType.Switch},
         {"case", TokenType.Case},
         {"default", TokenType.Default},
+        {"defer", TokenType.Defer},
     };
 
     public static List<Token> LoadFileTokens(string filePath, int fileIndex)
@@ -775,7 +776,8 @@ public enum TokenType
     Asm,
     Switch,
     Case,
-    Default
+    Default,
+    Defer
 }
 
 [Flags]
