@@ -199,7 +199,7 @@ public static class Parser
                         else
                         {
                             var function = ParseFunction(enumerator, attributes);
-                            if (function != null)
+                            if (function?.Name != null)
                             {
                                 TypeChecker.AddFunction(function);
                                 Asts.Add(function);
