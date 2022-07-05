@@ -386,6 +386,11 @@ public static unsafe class ProgramRunner
         }
     }
 
+    private static void SetOutputArchitecture(byte arch)
+    {
+        BuildSettings.OutputArchitecture = (OutputArchitecture)arch;
+    }
+
     private static Register ExecuteFunction(FunctionIR function, ReadOnlySpan<Register> arguments)
     {
         var instructionPointer = 0;
@@ -1646,6 +1651,12 @@ public static unsafe class ProgramRunner
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
                     var file = Marshal.PtrToStructure<String>(value.Pointer);
                     CopyToOutputDirectory(file);
+                    break;
+                }
+                case "set_output_architecture":
+                {
+                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    SetOutputArchitecture(value.Byte);
                     break;
                 }
                 default:

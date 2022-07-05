@@ -152,14 +152,37 @@ public static class Linker
             return "-static";
         }
 
-        const string linkerPattern = "ld-linux-x86-64.so*";
+        string linkerPattern = null, lib = null;
+        switch (BuildSettings.OutputArchitecture)
+        {
+            case OutputArchitecture.X86:
+                linkerPattern = "ld-linux.so*";
+                lib = "x86";
+                break;
+            case OutputArchitecture.X64:
+                linkerPattern = "ld-linux-x86-64.so*";
+                lib = "x86_64";
+                break;
+            case OutputArchitecture.Arm:
+                linkerPattern = "ld-linux.so*";
+                lib = "arm"; // @Cleanup Find example for this
+                break;
+            case OutputArchitecture.Arm64:
+                linkerPattern = "ld-linux-aarch64.so*";
+                lib = "aarch64";
+                break;
+            default:
+                Debug.Assert(false, "Incompatible target architecture");
+                break;
+        }
+
         var linker = libDirectory.GetFiles(linkerPattern).FirstOrDefault();
         if (linker == null)
         {
-            var platformDirectory = libDirectory.GetDirectories("x86_64*gnu").FirstOrDefault();
+            var platformDirectory = libDirectory.GetDirectories($"{lib}*gnu").FirstOrDefault();
             if (platformDirectory == null)
             {
-                Console.WriteLine($"Cannot find x86_64 libs in directory '{platformDirectory.FullName}'");
+                Console.WriteLine($"Cannot find {lib} libs in directory '{platformDirectory.FullName}'");
                 Environment.Exit(ErrorCodes.LinkError);
             }
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using LLVMSharp.Interop;
 
@@ -2355,21 +2356,78 @@ public static unsafe class LLVMBackend
         LLVM.VerifyModule(_module, LLVMVerifierFailureAction.LLVMPrintMessageAction, null);
         #endif
 
-        LLVM.InitializeX86TargetInfo();
-        LLVM.InitializeX86Target();
-        LLVM.InitializeX86TargetMC();
-        LLVM.InitializeX86AsmParser();
-        LLVM.InitializeX86AsmPrinter();
+        // Use current architecture of machine if not specified
+        if (BuildSettings.OutputArchitecture == OutputArchitecture.None)
+        {
+            switch (RuntimeInformation.ProcessArchitecture)
+            {
+                case Architecture.X86:
+                    BuildSettings.OutputArchitecture = OutputArchitecture.X86;
+                    break;
+                case Architecture.X64:
+                    BuildSettings.OutputArchitecture = OutputArchitecture.X64;
+                    break;
+                case Architecture.Arm:
+                    BuildSettings.OutputArchitecture = OutputArchitecture.Arm;
+                    break;
+                case Architecture.Arm64:
+                    BuildSettings.OutputArchitecture = OutputArchitecture.Arm64;
+                    break;
+                default:
+                    Console.WriteLine("Unsupported output architecture {RuntimeInformation.ProcessArchitecture}");
+                    Environment.Exit(ErrorCodes.BuildError);
+                    break;
+            }
+        }
 
-        var target = LLVMTargetRef.Targets.FirstOrDefault(t => t.Name == "x86-64");
-        var defaultTriple = LLVMTargetRef.DefaultTriple;
-        _module.Target = defaultTriple;
+        string targetName = null, arch = null;
+        switch (BuildSettings.OutputArchitecture)
+        {
+            case OutputArchitecture.X86:
+                InitializeX86LLVM();
+                targetName = "x86";
+                arch = "i386";
+                break;
+            case OutputArchitecture.X64:
+                InitializeX86LLVM();
+                targetName = "x86-64";
+                arch = "x86_64";
+                break;
+            case OutputArchitecture.Arm:
+                InitializeArmLLVM();
+                targetName = "arm";
+                arch = "arm";
+                break;
+            case OutputArchitecture.Arm64:
+                InitializeArm64LLVM();
+                targetName = "aarch64";
+                arch = "aarch64";
+                break;
+            default:
+                Console.WriteLine("Unsupported output architecture");
+                Environment.Exit(ErrorCodes.BuildError);
+                break;
+        }
+
+        var target = LLVMTargetRef.Targets.FirstOrDefault(t => t.Name == targetName);
+        if (target == null)
+        {
+            Console.WriteLine($"Build target {targetName} not found");
+            Environment.Exit(ErrorCodes.BuildError);
+        }
+
+        #if _LINUX
+        var targetTriple = $"{arch}-linux-gnu";
+        #elif _WINDOWS
+        var targetTriple = $"{arch}-pc-windows-msvc";
+        #endif
+        _module.Target = targetTriple;
 
         if (outputIntermediate)
         {
             using var test = new MarshaledString("test");
             using var intelString = new MarshaledString("--x86-asm-syntax=intel");
-            var args = new sbyte*[] {test.Value, intelString.Value};
+            var args = new[] {test.Value, intelString.Value};
 
             fixed (sbyte** pointer = &args[0])
             {
@@ -2377,7 +2435,7 @@ public static unsafe class LLVMBackend
             }
         }
 
-        var targetMachine = target.CreateTargetMachine(defaultTriple, "generic", string.Empty, _codeGenLevel, LLVMRelocMode.LLVMRelocDefault, LLVMCodeModel.LLVMCodeModelDefault);
+        var targetMachine = target.CreateTargetMachine(targetTriple, "generic", string.Empty, _codeGenLevel, LLVMRelocMode.LLVMRelocDefault, LLVMCodeModel.LLVMCodeModelDefault);
 
         if (outputIntermediate)
         {
@@ -2401,6 +2459,33 @@ public static unsafe class LLVMBackend
         }
 
         return objectFile;
+    }
+
+    private static void InitializeX86LLVM()
+    {
+        LLVM.InitializeX86TargetInfo();
+        LLVM.InitializeX86Target();
+        LLVM.InitializeX86TargetMC();
+        LLVM.InitializeX86AsmParser();
+        LLVM.InitializeX86AsmPrinter();
+    }
+
+    private static void InitializeArmLLVM()
+    {
+        LLVM.InitializeARMTargetInfo();
+        LLVM.InitializeARMTarget();
+        LLVM.InitializeARMTargetMC();
+        LLVM.InitializeARMAsmParser();
+        LLVM.InitializeARMAsmPrinter();
+    }
+
+    private static void InitializeArm64LLVM()
+    {
+        LLVM.InitializeAArch64TargetInfo();
+        LLVM.InitializeAArch64Target();
+        LLVM.InitializeAArch64TargetMC();
+        LLVM.InitializeAArch64AsmParser();
+        LLVM.InitializeAArch64AsmPrinter();
     }
 
     private static void CreateTemporaryDebugStructType(StructAst structAst)
