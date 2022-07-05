@@ -10,6 +10,7 @@ public static class BuildSettings
     public static string Name { get; set; }
     public static LinkerType Linker { get; set; }
     public static OutputTypeTableConfiguration OutputTypeTable { get; set; }
+    public static OutputArchitecture OutputArchitecture { get; set; }
     public static bool Release { get; set; }
     public static bool OutputAssembly { get; set; }
     public static string Path { get; set; }
@@ -35,6 +36,15 @@ public enum OutputTypeTableConfiguration : byte
     Full,
     Used,
     None
+}
+
+public enum OutputArchitecture : byte
+{
+    None,
+    X86,
+    X64,
+    Arm,
+    Arm64
 }
 
 public static class ol
