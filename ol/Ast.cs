@@ -111,6 +111,8 @@ public class ScopeAst : IScope, IAst
     public IScope Parent { get; set; }
     public IDictionary<string, IAst> Identifiers { get; } = new Dictionary<string, IAst>();
     public List<IAst> Children { get; } = new();
+    public int DeferCount { get; set; }
+    public List<IAst> DeferredAsts { get; set; }
 }
 
 public class FunctionAst : IFunction, IType
