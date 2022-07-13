@@ -7,7 +7,10 @@ main() {
 
     success, files := get_files_in_directory("test/tests");
     if success {
-        defer default_free(files.data);
+        defer {
+            default_free(files.data);
+            print("Freed data\n");
+        }
 
         each file in files {
             if file.type == FileType.Directory && file.name != "." && file.name != ".." {
