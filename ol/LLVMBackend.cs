@@ -18,6 +18,7 @@ public static unsafe class LLVMBackend
     private static LLVMBuilderRef _builder;
     private static LLVMPassManagerRef _passManager;
     private static LLVMCodeGenOptLevel _codeGenLevel;
+    private static uint _elementTypeAttributeKind;
 
     private static LLVMTypeRef[] _types;
     private static LLVMTypeRef[] _functionTypes;
@@ -211,6 +212,9 @@ public static unsafe class LLVMBackend
         _context = _module.Context;
         _builder = LLVMBuilderRef.Create(_context);
         _passManager = _module.CreateFunctionPassManager();
+        using var elementType = new MarshaledString("elementtype");
+        _elementTypeAttributeKind = LLVM.GetEnumAttributeKindForName(elementType.Value, (UIntPtr)elementType.Length);
+
         if (BuildSettings.Release)
         {
             LLVM.AddBasicAliasAnalysisPass(_passManager);
@@ -1633,14 +1637,17 @@ public static unsafe class LLVMBackend
                         {
                             arguments = new LLVMValueRef[assembly.OutValues.Count];
                             argumentTypes = new LLVMTypeRef[assembly.OutValues.Count];
+                            var argumentElementTypes = new LLVMAttributeRef[assembly.OutValues.Count];
                             assemblyString = new StringBuilder();
                             constraintString = new StringBuilder();
                             for (i = 0; i < assembly.OutValues.Count; i++)
                             {
                                 var output = assembly.OutValues[i];
-                                var argument = arguments[i] = GetValue(output.Value, values, allocations, functionPointer);
+                                arguments[i] = GetValue(output.Value, values, allocations, functionPointer);
                                 var type = output.Value.Type;
-                                argumentTypes[i] = LLVM.PointerType(_types[type.TypeIndex], 0);
+                                var pointedType = _types[type.TypeIndex];
+                                argumentTypes[i] = LLVM.PointerType(pointedType, 0);
+                                argumentElementTypes[i] = LLVM.CreateTypeAttribute(_context, _elementTypeAttributeKind, pointedType);
 
                                 switch (type.TypeKind)
                                 {
@@ -1671,7 +1678,12 @@ public static unsafe class LLVMBackend
                             constraintString.Remove(constraintString.Length-1, 1);
 
                             var assemblyOutputType = LLVMTypeRef.CreateFunction(LLVM.VoidType(), argumentTypes);
-                            BuildAssemblyCall(assemblyString.ToString(), constraintString.ToString(), assemblyOutputType, arguments, LLVMInlineAsmDialect.LLVMInlineAsmDialectATT);
+                            var call = BuildAssemblyCall(assemblyString.ToString(), constraintString.ToString(), assemblyOutputType, arguments, LLVMInlineAsmDialect.LLVMInlineAsmDialectATT);
+
+                            for (i = 0; i < argumentElementTypes.Length; i++)
+                            {
+                                LLVM.AddCallSiteAttribute(call, (LLVMAttributeIndex)i + 1, argumentElementTypes[i]);
+                            }
                         }
                         break;
                     }
@@ -2331,7 +2343,7 @@ public static unsafe class LLVMBackend
         using var constraintString = new MarshaledString(constraint);
         using var name = new MarshaledString(string.Empty);
 
-        var asm = LLVM.GetInlineAsm(assemblyFunctionType, assemblyString.Value, (UIntPtr)assemblyString.Length, constraintString.Value, (UIntPtr)constraintString.Length, 1, 0, dialect);
+        var asm = LLVM.GetInlineAsm(assemblyFunctionType, assemblyString.Value, (UIntPtr)assemblyString.Length, constraintString.Value, (UIntPtr)constraintString.Length, 1, 0, dialect, 1);
         if (arguments.Length > 0)
         {
             fixed (LLVMValueRef* pArgs = &arguments[0])
@@ -2417,7 +2429,7 @@ public static unsafe class LLVMBackend
         }
 
         #if _LINUX
-        var targetTriple = $"{arch}-linux-gnu";
+        var targetTriple = $"{arch}-pc-linux-gnu";
         #elif _WINDOWS
         var targetTriple = $"{arch}-pc-windows-msvc";
         #endif
