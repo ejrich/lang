@@ -1378,18 +1378,27 @@ public static class Parser
         return hasGeneric;
     }
 
-    private static IAst ParseLine(TokenEnumerator enumerator, IFunction currentFunction)
+    private static void ParseLine(TokenEnumerator enumerator, ScopeAst scope, IFunction currentFunction)
     {
         if (!enumerator.Remaining)
         {
             ErrorReporter.Report("End of file reached without closing scope", enumerator.FileIndex, enumerator.Last);
-            return null;
+            return;
         }
 
+        scope.Children.Add(ParseAst(enumerator, scope, currentFunction));
+    }
+
+    private static IAst ParseAst(TokenEnumerator enumerator, ScopeAst scope, IFunction currentFunction, bool inDefer = false)
+    {
         var token = enumerator.Current;
         switch (token.Type)
         {
             case TokenType.Return:
+                if (inDefer)
+                {
+                    ErrorReporter.Report("Cannot defer a return statement", enumerator.FileIndex, token);
+                }
                 return ParseReturn(enumerator, currentFunction);
             case TokenType.If:
                 return ParseConditional(enumerator, currentFunction);
@@ -1428,9 +1437,14 @@ public static class Parser
                 return ParseSwitch(enumerator, currentFunction);
             case TokenType.Defer:
                 var deferAst = CreateAst<DeferAst>(token, enumerator.FileIndex);
-                if (enumerator.MoveNext())
+                if (inDefer)
                 {
-                    deferAst.Statement = ParseLine(enumerator, currentFunction);
+                    ErrorReporter.Report("Unable to nest defer statements", enumerator.FileIndex, token);
+                }
+                else if (enumerator.MoveNext())
+                {
+                    scope.DeferCount++;
+                    deferAst.Statement = ParseAst(enumerator, scope, currentFunction, true);
                 }
                 else
                 {
@@ -1471,9 +1485,35 @@ public static class Parser
         }
     }
 
+    private static ScopeAst ParseScopeBody(TokenEnumerator enumerator, IFunction currentFunction, bool topLevel = false, string directory = null)
+    {
+        if (enumerator.Current.Type == TokenType.OpenBrace)
+        {
+            // Parse until close brace
+            return ParseScope(enumerator, currentFunction, topLevel, directory);
+        }
+
+        // Parse single AST
+        var scope = CreateAst<ScopeAst>(enumerator);
+        if (topLevel)
+        {
+            scope.Children.Add(ParseTopLevelAst(enumerator, directory));
+        }
+        else
+        {
+            ParseLine(enumerator, scope, currentFunction);
+        }
+
+        if (scope.DeferCount > 0)
+        {
+            scope.DeferredAsts = new List<IAst>(scope.DeferCount);
+        }
+        return scope;
+    }
+
     private static ScopeAst ParseScope(TokenEnumerator enumerator, IFunction currentFunction, bool topLevel = false, string directory = null)
     {
-        var scopeAst = CreateAst<ScopeAst>(enumerator);
+        var scope = CreateAst<ScopeAst>(enumerator);
 
         var closed = false;
         while (enumerator.MoveNext())
@@ -1484,7 +1524,14 @@ public static class Parser
                 break;
             }
 
-            scopeAst.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory) : ParseLine(enumerator, currentFunction));
+            if (topLevel)
+            {
+                scope.Children.Add(ParseTopLevelAst(enumerator, directory));
+            }
+            else
+            {
+                ParseLine(enumerator, scope, currentFunction);
+            }
         }
 
         if (!closed)
@@ -1492,7 +1539,11 @@ public static class Parser
             ErrorReporter.Report("Scope not closed by '}'", enumerator.FileIndex, enumerator.Current);
         }
 
-        return scopeAst;
+        if (scope.DeferCount > 0)
+        {
+            scope.DeferredAsts = new List<IAst>(scope.DeferCount);
+        }
+        return scope;
     }
 
     private static ConditionalAst ParseConditional(TokenEnumerator enumerator, IFunction currentFunction, bool topLevel = false, string directory = null)
@@ -1510,17 +1561,7 @@ public static class Parser
         }
 
         // 2. Determine how many lines to parse
-        if (enumerator.Current.Type == TokenType.OpenBrace)
-        {
-            // Parse until close brace
-            conditionalAst.IfBlock = ParseScope(enumerator, currentFunction, topLevel, directory);
-        }
-        else
-        {
-            // Parse single AST
-            conditionalAst.IfBlock = CreateAst<ScopeAst>(enumerator);
-            conditionalAst.IfBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory) : ParseLine(enumerator, currentFunction));
-        }
+        conditionalAst.IfBlock = ParseScopeBody(enumerator, currentFunction, topLevel, directory);
 
         // 3. Parse else block if necessary
         if (!enumerator.Peek(out var token))
@@ -1538,17 +1579,7 @@ public static class Parser
                 return null;
             }
 
-            if (enumerator.Current.Type == TokenType.OpenBrace)
-            {
-                // Parse until close brace
-                conditionalAst.ElseBlock = ParseScope(enumerator, currentFunction, topLevel, directory);
-            }
-            else
-            {
-                // Parse single AST
-                conditionalAst.ElseBlock = CreateAst<ScopeAst>(enumerator);
-                conditionalAst.ElseBlock.Children.Add(topLevel ? ParseTopLevelAst(enumerator, directory) : ParseLine(enumerator, currentFunction));
-            }
+            conditionalAst.ElseBlock = ParseScopeBody(enumerator, currentFunction, topLevel, directory);
         }
 
         return conditionalAst;
@@ -1569,18 +1600,7 @@ public static class Parser
             return null;
         }
 
-        if (enumerator.Current.Type == TokenType.OpenBrace)
-        {
-            // Parse until close brace
-            whileAst.Body = ParseScope(enumerator, currentFunction);
-        }
-        else
-        {
-            // Parse single AST
-            whileAst.Body = CreateAst<ScopeAst>(enumerator);
-            whileAst.Body.Children.Add(ParseLine(enumerator, currentFunction));
-        }
-
+        whileAst.Body = ParseScopeBody(enumerator, currentFunction);
         return whileAst;
     }
 
@@ -1661,16 +1681,7 @@ public static class Parser
         }
 
         // 4. Determine how many lines to parse
-        if (enumerator.Current.Type == TokenType.OpenBrace)
-        {
-            eachAst.Body = ParseScope(enumerator, currentFunction);
-        }
-        else
-        {
-            eachAst.Body = CreateAst<ScopeAst>(enumerator);
-            eachAst.Body.Children.Add(ParseLine(enumerator, currentFunction));
-        }
-
+        eachAst.Body = ParseScopeBody(enumerator, currentFunction);
         return eachAst;
     }
 
@@ -2621,8 +2632,12 @@ public static class Parser
         {
             case "run":
                 directive.Type = DirectiveType.Run;
-                enumerator.MoveNext();
-                var ast = ParseLine(enumerator, null);
+                if (!enumerator.MoveNext())
+                {
+                    ErrorReporter.Report("End of file reached without closing #run directive", enumerator.FileIndex, enumerator.Last);
+                    return null;
+                }
+                var ast = ParseAst(enumerator, null, null);
                 if (ast != null)
                     directive.Value = ast;
                 break;
@@ -3195,15 +3210,7 @@ public static class Parser
                     return null;
                 }
 
-                if (enumerator.Current.Type == TokenType.OpenBrace)
-                {
-                    switchAst.DefaultCase = ParseScope(enumerator, currentFunction);
-                }
-                else
-                {
-                    switchAst.DefaultCase = CreateAst<ScopeAst>(enumerator);
-                    switchAst.DefaultCase.Children.Add(ParseLine(enumerator, currentFunction));
-                }
+                switchAst.DefaultCase = ParseScopeBody(enumerator, currentFunction);
             }
             else if (currentCases == null)
             {
@@ -3214,17 +3221,7 @@ public static class Parser
             else
             {
                 // Parse through the case body and add to the list
-                ScopeAst caseScope;
-                if (enumerator.Current.Type == TokenType.OpenBrace)
-                {
-                    caseScope = ParseScope(enumerator, currentFunction);
-                }
-                else
-                {
-                    caseScope = CreateAst<ScopeAst>(enumerator);
-                    caseScope.Children.Add(ParseLine(enumerator, currentFunction));
-                }
-
+                var caseScope = ParseScopeBody(enumerator, currentFunction);
                 switchAst.Cases.Add((currentCases, caseScope));
                 currentCases = null;
             }

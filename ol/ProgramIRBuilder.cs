@@ -521,6 +521,7 @@ public static class ProgramIRBuilder
             switch (ast)
             {
                 case ReturnAst returnAst:
+                    EmitDeferredStatements(function, scope);
                     EmitReturn(function, returnAst, returnType, scope);
                     return;
                 case DeclarationAst declaration:
@@ -563,10 +564,31 @@ public static class ProgramIRBuilder
                 case ContinueAst:
                     EmitJump(function, scope, continueBlock);
                     return;
+                case DeferAst deferAst:
+                    scope.DeferredAsts.Add(deferAst.Statement);
+                    break;
                 default:
                     EmitIR(function, ast, scope);
                     break;
             }
+        }
+
+        EmitDeferredStatements(function, scope);
+    }
+
+    private static void EmitDeferredStatements(FunctionIR function, ScopeAst scope)
+    {
+        if (scope.DeferredAsts != null)
+        {
+            foreach (var ast in scope.DeferredAsts)
+            {
+                // EmitAst(function, scope);
+            }
+        }
+
+        if (scope.Parent is ScopeAst parent)
+        {
+            EmitDeferredStatements(function, parent);
         }
     }
 
@@ -2539,6 +2561,7 @@ public static class ProgramIRBuilder
                             EmitStore(function, returnAllocation, returnValue, scope);
                         }
                     }
+                    EmitDeferredStatements(function, scope);
                     EmitJump(function, scope, returnBlock);
                     return;
                 case DeclarationAst declaration:
@@ -2584,11 +2607,16 @@ public static class ProgramIRBuilder
                 case ContinueAst:
                     EmitJump(function, scope, continueBlock);
                     return;
+                case DeferAst deferAst:
+                    scope.DeferredAsts.Add(deferAst.Statement);
+                    break;
                 default:
                     EmitIR(function, ast, scope);
                     break;
             }
         }
+
+        EmitDeferredStatements(function, scope);
     }
 
     private static InstructionValue EmitGetIndexPointer(FunctionIR function, IndexAst index, IScope scope, IType type = null, InstructionValue variable = null)
