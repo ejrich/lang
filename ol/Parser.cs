@@ -1378,7 +1378,7 @@ public static class Parser
         return hasGeneric;
     }
 
-    private static void ParseLine(TokenEnumerator enumerator, ScopeAst scope, IFunction currentFunction)
+    private static void ParseLine(TokenEnumerator enumerator, ScopeAst scope, IFunction currentFunction, bool inDefer = false)
     {
         if (!enumerator.Remaining)
         {
@@ -1386,7 +1386,7 @@ public static class Parser
             return;
         }
 
-        scope.Children.Add(ParseAst(enumerator, scope, currentFunction));
+        scope.Children.Add(ParseAst(enumerator, scope, currentFunction, inDefer));
     }
 
     private static IAst ParseAst(TokenEnumerator enumerator, ScopeAst scope, IFunction currentFunction, bool inDefer = false)
@@ -1444,7 +1444,7 @@ public static class Parser
                 else if (enumerator.MoveNext())
                 {
                     scope.DeferCount++;
-                    deferAst.Statement = ParseAst(enumerator, scope, currentFunction, true);
+                    deferAst.Statement = ParseScopeBody(enumerator, currentFunction, inDefer: true);
                 }
                 else
                 {
@@ -1485,7 +1485,7 @@ public static class Parser
         }
     }
 
-    private static ScopeAst ParseScopeBody(TokenEnumerator enumerator, IFunction currentFunction, bool topLevel = false, string directory = null)
+    private static ScopeAst ParseScopeBody(TokenEnumerator enumerator, IFunction currentFunction, bool topLevel = false, string directory = null, bool inDefer = false)
     {
         if (enumerator.Current.Type == TokenType.OpenBrace)
         {
@@ -1506,7 +1506,7 @@ public static class Parser
 
         if (scope.DeferCount > 0)
         {
-            scope.DeferredAsts = new List<IAst>(scope.DeferCount);
+            scope.DeferredAsts = new(scope.DeferCount);
         }
         return scope;
     }
@@ -1541,7 +1541,7 @@ public static class Parser
 
         if (scope.DeferCount > 0)
         {
-            scope.DeferredAsts = new List<IAst>(scope.DeferCount);
+            scope.DeferredAsts = new(scope.DeferCount);
         }
         return scope;
     }

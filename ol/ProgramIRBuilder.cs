@@ -142,7 +142,7 @@ public static class ProgramIRBuilder
                 EmitWhile(function, whileAst, TypeChecker.GlobalScope, null);
                 break;
             case EachAst each:
-                EmitEach(function, each, null);
+                EmitEach(function, each, TypeChecker.GlobalScope, null);
                 break;
             case AssemblyAst assembly:
                 EmitInlineAssembly(function, assembly, TypeChecker.GlobalScope);
@@ -512,12 +512,15 @@ public static class ProgramIRBuilder
         return constArray;
     }
 
+    private static void SetDebugLocation(FunctionIR function, IAst ast, IScope scope)
+    {
+        function.Instructions.Add(new Instruction {Type = InstructionType.DebugSetLocation, Source = ast, Scope = scope});
+    }
+
     private static void EmitScope(FunctionIR function, ScopeAst scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock)
     {
         foreach (var ast in scope.Children)
         {
-            function.Instructions.Add(new Instruction {Type = InstructionType.DebugSetLocation, Source = ast, Scope = scope});
-
             switch (ast)
             {
                 case ReturnAst returnAst:
@@ -537,12 +540,14 @@ public static class ProgramIRBuilder
                     EmitScope(function, childScope, returnType, breakBlock, continueBlock);
                     if (childScope.Returns)
                     {
+                        EmitDeferredStatements(function, scope);
                         return;
                     }
                     break;
                 case ConditionalAst conditional:
                     if (EmitConditional(function, conditional, scope, returnType, breakBlock, continueBlock))
                     {
+                        EmitDeferredStatements(function, scope);
                         return;
                     }
                     break;
@@ -550,7 +555,7 @@ public static class ProgramIRBuilder
                     EmitWhile(function, whileAst, scope, returnType);
                     break;
                 case EachAst each:
-                    EmitEach(function, each, returnType);
+                    EmitEach(function, each, scope, returnType);
                     break;
                 case AssemblyAst assembly:
                     EmitInlineAssembly(function, assembly, scope);
@@ -559,36 +564,55 @@ public static class ProgramIRBuilder
                     EmitSwitch(function, switchAst, scope, returnType, breakBlock, continueBlock);
                     break;
                 case BreakAst:
+                    if (!BuildSettings.Release)
+                    {
+                        SetDebugLocation(function, ast, scope);
+                    }
                     EmitJump(function, scope, breakBlock);
                     return;
                 case ContinueAst:
+                    if (!BuildSettings.Release)
+                    {
+                        SetDebugLocation(function, ast, scope);
+                    }
                     EmitJump(function, scope, continueBlock);
                     return;
                 case DeferAst deferAst:
-                    scope.DeferredAsts.Add(deferAst.Statement);
+                    if (!deferAst.Added)
+                    {
+                        scope.DeferredAsts.Add(deferAst.Statement);
+                    }
                     break;
                 default:
+                    if (!BuildSettings.Release)
+                    {
+                        SetDebugLocation(function, ast, scope);
+                    }
                     EmitIR(function, ast, scope);
                     break;
             }
         }
 
-        EmitDeferredStatements(function, scope);
+        EmitDeferredStatements(function, scope, false);
     }
 
-    private static void EmitDeferredStatements(FunctionIR function, ScopeAst scope)
+    private static void EmitDeferredStatements(FunctionIR function, ScopeAst scope, bool returning = true)
     {
-        if (scope.DeferredAsts != null)
+        while (true)
         {
-            foreach (var ast in scope.DeferredAsts)
+            if (scope.DeferredAsts != null)
             {
-                // EmitAst(function, scope);
+                foreach (var ast in scope.DeferredAsts)
+                {
+                    EmitScope(function, ast, null, null, null);
+                }
             }
-        }
 
-        if (scope.Parent is ScopeAst parent)
-        {
-            EmitDeferredStatements(function, parent);
+            if (!returning || scope.Parent is not ScopeAst parent)
+            {
+                break;
+            }
+            scope = parent;
         }
     }
 
@@ -604,6 +628,7 @@ public static class ProgramIRBuilder
 
             if (!BuildSettings.Release)
             {
+                SetDebugLocation(function, declaration, scope);
                 DeclareVariable(function, declaration, scope, allocation);
             }
 
@@ -679,6 +704,7 @@ public static class ProgramIRBuilder
             {
                 if (!BuildSettings.Release)
                 {
+                    SetDebugLocation(function, declaration, scope);
                     for (var i = 0; i < variableCount; i++)
                     {
                         var variable = declaration.Variables[i];
@@ -712,6 +738,7 @@ public static class ProgramIRBuilder
                 uint offset = 0;
                 if (!BuildSettings.Release)
                 {
+                    SetDebugLocation(function, declaration, scope);
                     for (var i = 0; i < variableCount; i++)
                     {
                         var variable = declaration.Variables[i];
@@ -741,6 +768,7 @@ public static class ProgramIRBuilder
             var allocations = new InstructionValue[variableCount];
             if (!BuildSettings.Release)
             {
+                SetDebugLocation(function, declaration, scope);
                 for (var i = 0; i < variableCount; i++)
                 {
                     var variable = declaration.Variables[i];
@@ -1064,6 +1092,11 @@ public static class ProgramIRBuilder
 
     private static void EmitAssignment(FunctionIR function, AssignmentAst assignment, IScope scope)
     {
+        if (!BuildSettings.Release)
+        {
+            SetDebugLocation(function, assignment, scope);
+        }
+
         if (assignment.Reference is CompoundExpressionAst compoundReference)
         {
             var pointers = new InstructionValue[compoundReference.Children.Count];
@@ -1203,6 +1236,11 @@ public static class ProgramIRBuilder
 
     private static void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, IScope scope)
     {
+        if (!BuildSettings.Release)
+        {
+            SetDebugLocation(function, returnAst, scope);
+        }
+
         if (returnAst.Value == null)
         {
             var instruction = new Instruction {Type = InstructionType.ReturnVoid, Scope = scope};
@@ -1234,6 +1272,11 @@ public static class ProgramIRBuilder
 
     private static bool EmitConditional(FunctionIR function, ConditionalAst conditional, IScope scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock)
     {
+        if (!BuildSettings.Release)
+        {
+            SetDebugLocation(function, conditional, scope);
+        }
+
         // Run the condition expression in the current basic block and then jump to the following
         var bodyBlock = new BasicBlock();
         var elseBlock = new BasicBlock();
@@ -1256,6 +1299,11 @@ public static class ProgramIRBuilder
 
     private static bool EmitInlineConditional(FunctionIR function, ConditionalAst conditional, IScope scope, IType returnType, InstructionValue returnAllocation, BasicBlock returnBlock, BasicBlock breakBlock, BasicBlock continueBlock)
     {
+        if (!BuildSettings.Release)
+        {
+            SetDebugLocation(function, conditional, scope);
+        }
+
         // Run the condition expression in the current basic block and then jump to the following
         var bodyBlock = new BasicBlock();
         var elseBlock = new BasicBlock();
@@ -1335,6 +1383,11 @@ public static class ProgramIRBuilder
 
     private static (BasicBlock, BasicBlock) BeginWhile(FunctionIR function, IAst condition, IScope scope)
     {
+        if (!BuildSettings.Release)
+        {
+            SetDebugLocation(function, condition, scope);
+        }
+
         // Create a block for the condition expression and then jump to the following
         var conditionBlock = function.BasicBlocks[^1];
         if (conditionBlock.Location < function.Instructions.Count)
@@ -1400,8 +1453,13 @@ public static class ProgramIRBuilder
         EmitConditionalJump(function, scope, condition, elseBlock);
     }
 
-    private static void EmitEach(FunctionIR function, EachAst each, IType returnType)
+    private static void EmitEach(FunctionIR function, EachAst each, IScope scope, IType returnType)
     {
+        if (!BuildSettings.Release)
+        {
+            SetDebugLocation(function, each, scope);
+        }
+
         if (each.Iteration != null)
         {
             var (indexValue, indexVariable, condition, conditionBlock) = BeginEachIteration(function, each);
@@ -1535,6 +1593,11 @@ public static class ProgramIRBuilder
 
     private static void EmitInlineEach(FunctionIR function, EachAst each, IScope scope, IType returnType, InstructionValue returnAllocation, BasicBlock returnBlock)
     {
+        if (!BuildSettings.Release)
+        {
+            SetDebugLocation(function, each, scope);
+        }
+
         if (each.Iteration != null)
         {
             var (indexValue, indexVariable, condition, conditionBlock) = BeginEachIteration(function, each);
@@ -1562,6 +1625,11 @@ public static class ProgramIRBuilder
 
     private static void EmitInlineAssembly(FunctionIR function, AssemblyAst assembly, IScope scope)
     {
+        if (!BuildSettings.Release)
+        {
+            SetDebugLocation(function, assembly, scope);
+        }
+
         // Get the values to place in the input registers
         foreach (var (_, input) in assembly.InRegisters)
         {
@@ -1581,6 +1649,11 @@ public static class ProgramIRBuilder
 
     private static BasicBlock EmitSwitch(FunctionIR function, SwitchAst switchAst, IScope scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock)
     {
+        if (!BuildSettings.Release)
+        {
+            SetDebugLocation(function, switchAst, scope);
+        }
+
         var value = EmitIR(function, switchAst.Value, scope);
         var afterBlock = new BasicBlock();
 
@@ -1666,6 +1739,11 @@ public static class ProgramIRBuilder
 
     private static BasicBlock EmitInlineSwitch(FunctionIR function, SwitchAst switchAst, IScope scope, IType returnType, InstructionValue returnAllocation, BasicBlock returnBlock, BasicBlock breakBlock, BasicBlock continueBlock)
     {
+        if (!BuildSettings.Release)
+        {
+            SetDebugLocation(function, switchAst, scope);
+        }
+
         var value = EmitIR(function, switchAst.Value, scope);
         var afterBlock = new BasicBlock();
 
@@ -2534,11 +2612,13 @@ public static class ProgramIRBuilder
     {
         foreach (var ast in scope.Children)
         {
-            function.Instructions.Add(new Instruction {Type = InstructionType.DebugSetLocation, Source = ast, Scope = scope});
-
             switch (ast)
             {
                 case ReturnAst returnAst:
+                    if (!BuildSettings.Release)
+                    {
+                        SetDebugLocation(function, returnAst, scope);
+                    }
                     if (returnAst.Value != null)
                     {
                         if (returnType is CompoundType compoundReturnType && returnAst.Value is CompoundExpressionAst compoundExpression)
@@ -2561,7 +2641,7 @@ public static class ProgramIRBuilder
                             EmitStore(function, returnAllocation, returnValue, scope);
                         }
                     }
-                    EmitDeferredStatements(function, scope);
+                    EmitInlineDeferredStatements(function, scope);
                     EmitJump(function, scope, returnBlock);
                     return;
                 case DeclarationAst declaration:
@@ -2577,12 +2657,14 @@ public static class ProgramIRBuilder
                     EmitScopeInline(function, childScope, returnType, returnAllocation, returnBlock, breakBlock, continueBlock);
                     if (childScope.Returns)
                     {
+                        EmitInlineDeferredStatements(function, scope);
                         return;
                     }
                     break;
                 case ConditionalAst conditional:
                     if (EmitInlineConditional(function, conditional, scope, returnType, returnAllocation, returnBlock, breakBlock, continueBlock))
                     {
+                        EmitInlineDeferredStatements(function, scope);
                         return;
                     }
                     break;
@@ -2602,22 +2684,58 @@ public static class ProgramIRBuilder
                     EmitInlineSwitch(function, switchAst, scope, returnType, returnAllocation, returnBlock, breakBlock, continueBlock);
                     break;
                 case BreakAst:
+                    if (!BuildSettings.Release)
+                    {
+                        SetDebugLocation(function, ast, scope);
+                    }
                     EmitJump(function, scope, breakBlock);
                     return;
                 case ContinueAst:
+                    if (!BuildSettings.Release)
+                    {
+                        SetDebugLocation(function, ast, scope);
+                    }
                     EmitJump(function, scope, continueBlock);
                     return;
                 case DeferAst deferAst:
-                    scope.DeferredAsts.Add(deferAst.Statement);
+                    if (!deferAst.Added)
+                    {
+                        scope.DeferredAsts.Add(deferAst.Statement);
+                    }
                     break;
                 default:
+                    if (!BuildSettings.Release)
+                    {
+                        SetDebugLocation(function, ast, scope);
+                    }
                     EmitIR(function, ast, scope);
                     break;
             }
         }
 
-        EmitDeferredStatements(function, scope);
+        EmitInlineDeferredStatements(function, scope, false);
     }
+
+    private static void EmitInlineDeferredStatements(FunctionIR function, ScopeAst scope, bool returning = true)
+    {
+        while (true)
+        {
+            if (scope.DeferredAsts != null)
+            {
+                foreach (var ast in scope.DeferredAsts)
+                {
+                    EmitScopeInline(function, ast, null, null, null, null, null);
+                }
+            }
+
+            if (!returning || scope.Parent is not ScopeAst parent)
+            {
+                break;
+            }
+            scope = parent;
+        }
+    }
+
 
     private static InstructionValue EmitGetIndexPointer(FunctionIR function, IndexAst index, IScope scope, IType type = null, InstructionValue variable = null)
     {
