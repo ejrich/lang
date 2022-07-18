@@ -112,7 +112,7 @@ public class ScopeAst : IScope, IAst
     public IDictionary<string, IAst> Identifiers { get; } = new Dictionary<string, IAst>();
     public List<IAst> Children { get; } = new();
     public int DeferCount { get; set; }
-    public List<IAst> DeferredAsts { get; set; }
+    public List<ScopeAst> DeferredAsts { get; set; }
 }
 
 public class FunctionAst : IFunction, IType
@@ -665,7 +665,8 @@ public class DeferAst : IAst
     public int FileIndex { get; set; }
     public uint Line { get; init; }
     public uint Column { get; init; }
-    public IAst Statement { get; set; }
+    public bool Added { get; set; }
+    public ScopeAst Statement { get; set; }
 }
 
 public class TypeDefinition : IAst

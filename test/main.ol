@@ -1,16 +1,13 @@
 #import standard
 #import compiler
 
-main() {
+main() #print_ir {
     command_buffer = default_allocator(1000);
     failed_test_count := 0;
 
     success, files := get_files_in_directory("test/tests");
     if success {
-        defer {
-            default_free(files.data);
-            print("Freed data\n");
-        }
+        defer default_free(files.data);
 
         each file in files {
             if file.type == FileType.Directory && file.name != "." && file.name != ".." {

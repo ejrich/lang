@@ -156,11 +156,11 @@ public static class TypeChecker
                     break;
                 case WhileAst whileAst:
                     whileAst.Body.Parent = scope;
-                    VerifyScope(whileAst.Body, null, true);
+                    VerifyScope(whileAst.Body, null, canBreak: true);
                     break;
                 case EachAst each:
                     each.Body.Parent = scope;
-                    VerifyScope(each.Body, null, true);
+                    VerifyScope(each.Body, null, canBreak: true);
                     break;
                 case ConditionalAst conditional:
                     conditional.IfBlock.Parent = scope;
@@ -187,7 +187,7 @@ public static class TypeChecker
                     VerifyInlineAssembly(assembly, scope);
                     break;
                 case SwitchAst switchAst:
-                    VerifySwitch(switchAst, null, scope, false);
+                    VerifySwitch(switchAst, null, scope, false, false);
                     break;
                 case BreakAst:
                     ErrorReporter.Report("No parent loop to break", runDirective.Value);
@@ -1694,7 +1694,7 @@ public static class TypeChecker
         ProgramIRBuilder.AddOperatorOverload((OperatorOverloadAst)overload);
     }
 
-    private static void VerifyScope(ScopeAst scope, IFunction function, bool canBreak = false)
+    private static void VerifyScope(ScopeAst scope, IFunction function, bool inDefer = false, bool canBreak = false)
     {
         for (var i = 0; i < scope.Children.Count; i++)
         {
@@ -1703,7 +1703,7 @@ public static class TypeChecker
             {
                 case ScopeAst childScope:
                     childScope.Parent = scope;
-                    VerifyScope(childScope, function, canBreak);
+                    VerifyScope(childScope, function, inDefer, canBreak);
                     if (childScope.Returns)
                     {
                         scope.Returns = true;
@@ -1712,21 +1712,21 @@ public static class TypeChecker
                 case WhileAst whileAst:
                     whileAst.Body.Parent = scope;
                     VerifyCondition(whileAst.Condition, function, scope, out _);
-                    VerifyScope(whileAst.Body, function, true);
+                    VerifyScope(whileAst.Body, function, inDefer, true);
                     break;
                 case EachAst each:
                     each.Body.Parent = scope;
                     VerifyEach(each, function, scope);
-                    VerifyScope(each.Body, function, true);
+                    VerifyScope(each.Body, function, inDefer, true);
                     break;
                 case ConditionalAst conditional:
                     VerifyCondition(conditional.Condition, function, scope, out _);
                     conditional.IfBlock.Parent = scope;
-                    VerifyScope(conditional.IfBlock, function, canBreak);
+                    VerifyScope(conditional.IfBlock, function, inDefer, canBreak);
                     if (conditional.ElseBlock != null)
                     {
                         conditional.ElseBlock.Parent = scope;
-                        VerifyScope(conditional.ElseBlock, function, canBreak);
+                        VerifyScope(conditional.ElseBlock, function, inDefer, canBreak);
 
                         if (conditional.IfBlock.Returns && conditional.ElseBlock.Returns)
                         {
@@ -1786,6 +1786,10 @@ public static class TypeChecker
                     i--;
                     break;
                 case ReturnAst returnAst:
+                    if (inDefer)
+                    {
+                        ErrorReporter.Report("Cannot return in a defer statement", returnAst);
+                    }
                     VerifyReturnStatement(returnAst, function, scope);
                     scope.Returns = true;
                     break;
@@ -1802,21 +1806,22 @@ public static class TypeChecker
                     VerifyInlineAssembly(assembly, scope);
                     break;
                 case SwitchAst switchAst:
-                    VerifySwitch(switchAst, function, scope, canBreak);
+                    VerifySwitch(switchAst, function, scope, inDefer, canBreak);
                     break;
                 case DeferAst defer:
-                    VerifyDefer(defer, function, scope);
+                    defer.Statement.Parent = scope;
+                    VerifyScope(defer.Statement, function, true);
                     break;
                 case BreakAst:
                     scope.Returns = true;
-                    if (!canBreak)
+                    if (!canBreak || inDefer)
                     {
                         ErrorReporter.Report("No parent loop to break", ast);
                     }
                     break;
                 case ContinueAst:
                     scope.Returns = true;
-                    if (!canBreak)
+                    if (!canBreak || inDefer)
                     {
                         ErrorReporter.Report("No parent loop to continue", ast);
                     }
@@ -3422,7 +3427,7 @@ public static class TypeChecker
         return value.Dereference == arg.Memory && value.RegisterDefinition.Type == arg.Type && value.RegisterDefinition.Size == arg.RegisterSize;
     }
 
-    private static void VerifySwitch(SwitchAst switchAst, IFunction currentFunction, IScope scope, bool canBreak)
+    private static void VerifySwitch(SwitchAst switchAst, IFunction currentFunction, IScope scope, bool inDefer, bool canBreak)
     {
         var valueType = VerifyExpression(switchAst.Value, currentFunction, scope);
         if (valueType != null)
@@ -3465,106 +3470,14 @@ public static class TypeChecker
             }
 
             body.Parent = scope;
-            VerifyScope(body, currentFunction, canBreak);
+            VerifyScope(body, currentFunction, inDefer, canBreak);
         }
 
         if (switchAst.DefaultCase != null)
         {
             switchAst.DefaultCase.Parent = scope;
-            VerifyScope(switchAst.DefaultCase, currentFunction, canBreak);
+            VerifyScope(switchAst.DefaultCase, currentFunction, inDefer, canBreak);
         }
-    }
-
-    private static void VerifyDefer(DeferAst deferAst, IFunction function, ScopeAst scope)
-    {
-        switch (deferAst.Statement)
-        {
-            case ScopeAst childScope:
-                childScope.Parent = scope;
-                VerifyScope(childScope, function);
-                break;
-            case WhileAst whileAst:
-                whileAst.Body.Parent = scope;
-                VerifyCondition(whileAst.Condition, function, scope, out _);
-                VerifyScope(whileAst.Body, function, true);
-                break;
-            case EachAst each:
-                each.Body.Parent = scope;
-                VerifyEach(each, function, scope);
-                VerifyScope(each.Body, function, true);
-                break;
-            case ConditionalAst conditional:
-                VerifyCondition(conditional.Condition, function, scope, out _);
-                conditional.IfBlock.Parent = scope;
-                VerifyScope(conditional.IfBlock, function);
-                if (conditional.ElseBlock != null)
-                {
-                    conditional.ElseBlock.Parent = scope;
-                    VerifyScope(conditional.ElseBlock, function);
-                }
-                break;
-            case CompilerDirectiveAst directive:
-                switch (directive.Type)
-                {
-                    case DirectiveType.If:
-                        var conditional = directive.Value as ConditionalAst;
-                        if (VerifyCondition(conditional.Condition, null, GlobalScope, out var constant, true))
-                        {
-                            if (!constant)
-                            {
-                                ThreadPool.CompleteWork();
-                            }
-                            var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition);
-                            ProgramRunner.Init();
-
-                            if (ProgramRunner.ExecuteCondition(condition, conditional.Condition))
-                            {
-                                conditional.IfBlock.Parent = scope;
-                                VerifyScope(conditional.IfBlock, function);
-                                deferAst.Statement = conditional.IfBlock;
-                            }
-                            else if (conditional.ElseBlock != null)
-                            {
-                                conditional.ElseBlock.Parent = scope;
-                                VerifyScope(conditional.ElseBlock, function);
-                                deferAst.Statement = conditional.ElseBlock;
-                            }
-                            else
-                            {
-                                // Set empty scope so no codegen will occur
-                                deferAst.Statement = new ScopeAst();
-                            }
-                        }
-                        break;
-                    case DirectiveType.Assert:
-                        ErrorReporter.Report("Cannot defer compile-time assertions", directive);
-                        break;
-                }
-                break;
-            case DeclarationAst declaration:
-                VerifyDeclaration(declaration, function, scope);
-                break;
-            case CompoundDeclarationAst compoundDeclaration:
-                VerifyCompoundDeclaration(compoundDeclaration, function, scope);
-                break;
-            case AssignmentAst assignment:
-                VerifyAssignment(assignment, function, scope);
-                break;
-            case AssemblyAst assembly:
-                VerifyInlineAssembly(assembly, scope);
-                break;
-            case SwitchAst switchAst:
-                VerifySwitch(switchAst, function, scope, false);
-                break;
-            case BreakAst breakAst:
-                ErrorReporter.Report("No parent loop to break", breakAst);
-                break;
-            case ContinueAst continueAst:
-                ErrorReporter.Report("No parent loop to continue", continueAst);
-                break;
-        }
-
-        scope.DeferredAsts.Add(deferAst.Statement);
     }
 
     private static void VerifyFunctionIfNecessary(FunctionAst function, IFunction currentFunction)
