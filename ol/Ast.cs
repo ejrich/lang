@@ -328,7 +328,6 @@ public class ConstantAst : IAst
     public int FileIndex { get; set; }
     public uint Line { get; init; }
     public uint Column { get; init; }
-    public string TypeName { get; set; }
     public IType Type { get; set; }
     public Constant Value { get; set; }
     public string String { get; set; }

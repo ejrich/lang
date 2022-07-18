@@ -53,6 +53,13 @@ public static class Lexer
         var fileText = File.ReadAllText(filePath);
 
         var tokens = new List<Token>();
+        ParseTokens(fileText, fileIndex, tokens);
+
+        return tokens;
+    }
+
+    public static void ParseTokens(string fileText, int fileIndex, List<Token> tokens)
+    {
         Token token;
         uint line = 1, column = 0;
 
@@ -145,7 +152,7 @@ public static class Lexer
                         Column = column
                     };
 
-                    while (true)
+                    while (i < fileText.Length - 1)
                     {
                         character = fileText[++i];
                         column++;
@@ -375,7 +382,7 @@ public static class Lexer
                         var startIndex = i++;
                         var offset = 1;
 
-                        while (true)
+                        while (i < fileText.Length - 1)
                         {
                             character = fileText[i+1];
 
@@ -558,7 +565,7 @@ public static class Lexer
                         Column = column
                     };
 
-                    while (true)
+                    while (i < fileText.Length - 1)
                     {
                         var nextCharacter = fileText[i+1];
 
@@ -622,7 +629,7 @@ public static class Lexer
                     var offset = 1;
                     token = new Token {Line = line, Column = column};
 
-                    while (true)
+                    while (i < fileText.Length - 1)
                     {
                         character = fileText[i+1];
                         if (character == '\n')
@@ -661,8 +668,6 @@ public static class Lexer
                 }
             }
         }
-
-        return tokens;
     }
 
     private static bool IsHexLetter(char character)
@@ -688,6 +693,7 @@ public static class Lexer
             '-' => true,
             '*' => true,
             '/' => true,
+            '\\' => true,
             '%' => true,
             '=' => true,
             ':' => true,

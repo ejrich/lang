@@ -23,6 +23,7 @@ public static class BuildSettings
     public static HashSet<string> LibraryDirectories { get; } = new();
     // These are additional dependencies that need to be linked with the executable
     public static HashSet<Library> Libraries { get; } = new();
+    public static Dictionary<string, Token> InputVariables { get; } = new();
 }
 
 public enum LinkerType : byte
@@ -57,6 +58,7 @@ public static class ol
         // 1. Load cli args into build settings
         string entrypoint = null;
         var noThreads = false;
+        var parsingVariables = false;
         foreach (var arg in args)
         {
             switch (arg)
@@ -68,6 +70,9 @@ public static class ol
                 case "-S":
                     BuildSettings.OutputAssembly = true;
                     break;
+                case "-V":
+                    parsingVariables = true;
+                    break;
                 case "-noThreads":
                     noThreads = true;
                     break;
@@ -75,6 +80,19 @@ public static class ol
                     if (arg[0] == '-')
                     {
                         ErrorReporter.Report($"Unrecognized compiler flag '{arg}'");
+                    }
+                    else if (parsingVariables)
+                    {
+                        var tokens = new List<Token>(3);
+                        Lexer.ParseTokens(arg, -1, tokens);
+                        if (tokens.Count != 3 || tokens[0].Type != TokenType.Identifier || tokens[1].Type != TokenType.Equals || tokens[2].Type is not (TokenType.Number or TokenType.Boolean))
+                        {
+                            ErrorReporter.Report($"Malformed input variable '{arg}', should be formatted like 'foo=true'");
+                        }
+                        else if (!BuildSettings.InputVariables.TryAdd(tokens[0].Value, tokens[2]))
+                        {
+                            ErrorReporter.Report($"Multiple definitions for input variable '{arg}'");
+                        }
                     }
                     else if (entrypoint != null)
                     {
