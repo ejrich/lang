@@ -40,7 +40,7 @@ public static class TypeChecker
         TypeTable.U32Type = AddPrimitive("u32", TypeKind.Integer, 4);
         TypeTable.S64Type = AddPrimitive("s64", TypeKind.Integer, 8, true);
         TypeTable.U64Type = AddPrimitive("u64", TypeKind.Integer, 8);
-        AddPrimitive("float", TypeKind.Float, 4, true);
+        TypeTable.FloatType = AddPrimitive("float", TypeKind.Float, 4, true);
         TypeTable.Float64Type = AddPrimitive("float64", TypeKind.Float, 8, true);
         TypeTable.TypeType = AddPrimitive("Type", TypeKind.Type, 4, true);
     }
@@ -2070,7 +2070,32 @@ public static class TypeChecker
             }
         }
 
-        // 8. Verify constant values
+        // 8. Check if the variable was set from input variables
+        if (BuildSettings.InputVariables.TryGetValue(declaration.Name, out var inputValue))
+        {
+            if (!declaration.Constant)
+            {
+                ErrorReporter.Report($"Cannot set value from input of non-constant variable '{declaration.Name}'", declaration);
+            }
+            else
+            {
+                var constantValue = Parser.ParseConstant(inputValue, -1);
+                if (constantValue != null)
+                {
+                    if (!TypeEquals(declaration.Type, constantValue.Type))
+                    {
+                        ErrorReporter.Report($"Expected type from input variable '{declaration.Name}' to be '{declaration.Type}', but got '{constantValue.Type.Name}'", constantValue);
+                    }
+                    else
+                    {
+                        VerifyConstantIfNecessary(constantValue, declaration.Type);
+                        declaration.Value = constantValue;
+                    }
+                }
+            }
+        }
+
+        // 9. Verify constant values
         if (declaration.Constant)
         {
             if (declaration.Value == null)
@@ -3319,10 +3344,6 @@ public static class TypeChecker
                         ErrorReporter.Report($"Unknown register '{instruction.Value1.Register}'", instruction.Value1);
                     }
                 }
-                else
-                {
-                    instruction.Value1.Constant.Type = GlobalScope.Types[instruction.Value1.Constant.TypeName];
-                }
             }
 
             if (instruction.Value2 != null)
@@ -3338,10 +3359,6 @@ public static class TypeChecker
                         valid = false;
                         ErrorReporter.Report($"Unknown register '{instruction.Value2.Register}'", instruction.Value2);
                     }
-                }
-                else if (instruction.Value2.Constant != null)
-                {
-                    instruction.Value2.Constant.Type = GlobalScope.Types[instruction.Value2.Constant.TypeName];
                 }
             }
 
@@ -3536,7 +3553,6 @@ public static class TypeChecker
         {
             case ConstantAst constant:
                 isConstant = true;
-                constant.Type = GlobalScope.Types[constant.TypeName];
                 if (getArrayLength && constant.Type.TypeKind == TypeKind.Integer)
                 {
                     arrayLength = (uint)constant.Value.UnsignedInteger;
@@ -3929,7 +3945,6 @@ public static class TypeChecker
             }
 
             constant.Type = targetType;
-            constant.TypeName = targetType.Name;
         }
     }
 

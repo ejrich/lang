@@ -2247,14 +2247,7 @@ public static class ProgramIRBuilder
     {
         if (call.TypeInfo != null)
         {
-            if (call.Name == "type_of")
-            {
-                return GetTypeInfo(call.TypeInfo);
-            }
-            else
-            {
-                return GetConstantInteger(call.TypeInfo.Size);
-            }
+            return call.Name == "type_of" ? GetTypeInfo(call.TypeInfo) : GetConstantInteger(call.TypeInfo.Size);
         }
 
         if (call.Function == null)

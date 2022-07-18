@@ -3897,17 +3897,17 @@ public static class Parser
         return true;
     }
 
-    private static ConstantAst ParseConstant(Token token, int fileIndex)
+    public static ConstantAst ParseConstant(Token token, int fileIndex)
     {
         var constant = CreateAst<ConstantAst>(token, fileIndex);
         switch (token.Type)
         {
             case TokenType.Literal:
-                constant.TypeName = "string";
+                constant.Type = TypeTable.StringType;
                 constant.String = token.Value;
                 return constant;
             case TokenType.Character:
-                constant.TypeName = "u8";
+                constant.Type = TypeTable.U8Type;
                 constant.Value = new Constant {UnsignedInteger = (byte)token.Value[0]};
                 return constant;
             case TokenType.Number:
@@ -3915,21 +3915,21 @@ public static class Parser
                 {
                     if (int.TryParse(token.Value, out var s32))
                     {
-                        constant.TypeName = "s32";
+                        constant.Type = TypeTable.S32Type;
                         constant.Value = new Constant {Integer = s32};
                         return constant;
                     }
 
                     if (long.TryParse(token.Value, out var s64))
                     {
-                        constant.TypeName = "s64";
+                        constant.Type = TypeTable.S64Type;
                         constant.Value = new Constant {Integer = s64};
                         return constant;
                     }
 
                     if (ulong.TryParse(token.Value, out var u64))
                     {
-                        constant.TypeName = "u64";
+                        constant.Type = TypeTable.U64Type;
                         constant.Value = new Constant {UnsignedInteger = u64};
                         return constant;
                     }
@@ -3942,14 +3942,14 @@ public static class Parser
                 {
                     if (float.TryParse(token.Value, out var f32))
                     {
-                        constant.TypeName = "float";
+                        constant.Type = TypeTable.FloatType;
                         constant.Value = new Constant {Double = (double)f32};
                         return constant;
                     }
 
                     if (double.TryParse(token.Value, out var f64))
                     {
-                        constant.TypeName = "float64";
+                        constant.Type = TypeTable.Float64Type;
                         constant.Value = new Constant {Double = f64};
                         return constant;
                     }
@@ -3971,7 +3971,7 @@ public static class Parser
                     {
                         if (uint.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u32))
                         {
-                            constant.TypeName = "u32";
+                            constant.Type = TypeTable.U32Type;
                             constant.Value = new Constant {UnsignedInteger = u32};
                             return constant;
                         }
@@ -3980,7 +3980,7 @@ public static class Parser
                     {
                         if (ulong.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u64))
                         {
-                            constant.TypeName = "u64";
+                            constant.Type = TypeTable.U64Type;
                             constant.Value = new Constant {UnsignedInteger = u64};
                             return constant;
                         }
@@ -3991,7 +3991,7 @@ public static class Parser
                 ErrorReporter.Report($"Unable to determine type of token '{token.Value}'", fileIndex, token);
                 return null;
             case TokenType.Boolean:
-                constant.TypeName = "bool";
+                constant.Type = TypeTable.BoolType;
                 constant.Value = new Constant {Boolean = token.Value == "true"};
                 return constant;
             default:

@@ -23,6 +23,7 @@ public unsafe static class TypeTable
     public static IType U32Type;
     public static IType S64Type;
     public static IType U64Type;
+    public static IType FloatType;
     public static IType Float64Type;
     public static IType TypeType;
     public static StructAst StringType;
