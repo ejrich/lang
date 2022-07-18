@@ -564,17 +564,11 @@ public static class ProgramIRBuilder
                     EmitSwitch(function, switchAst, scope, returnType, breakBlock, continueBlock);
                     break;
                 case BreakAst:
-                    if (!BuildSettings.Release)
-                    {
-                        SetDebugLocation(function, ast, scope);
-                    }
+                    SetDebugLocation(function, ast, scope);
                     EmitJump(function, scope, breakBlock);
                     return;
                 case ContinueAst:
-                    if (!BuildSettings.Release)
-                    {
-                        SetDebugLocation(function, ast, scope);
-                    }
+                    SetDebugLocation(function, ast, scope);
                     EmitJump(function, scope, continueBlock);
                     return;
                 case DeferAst deferAst:
@@ -584,10 +578,7 @@ public static class ProgramIRBuilder
                     }
                     break;
                 default:
-                    if (!BuildSettings.Release)
-                    {
-                        SetDebugLocation(function, ast, scope);
-                    }
+                    SetDebugLocation(function, ast, scope);
                     EmitIR(function, ast, scope);
                     break;
             }
@@ -626,9 +617,9 @@ public static class ProgramIRBuilder
         {
             var allocation = AddAllocation(function, declaration);
 
+            SetDebugLocation(function, declaration, scope);
             if (!BuildSettings.Release)
             {
-                SetDebugLocation(function, declaration, scope);
                 DeclareVariable(function, declaration, scope, allocation);
             }
 
@@ -696,6 +687,7 @@ public static class ProgramIRBuilder
     private static void EmitCompoundDeclaration(FunctionIR function, CompoundDeclarationAst declaration, IScope scope)
     {
         var variableCount = declaration.Variables.Length;
+        SetDebugLocation(function, declaration, scope);
 
         if (declaration.Type.TypeKind == TypeKind.Compound)
         {
@@ -704,7 +696,6 @@ public static class ProgramIRBuilder
             {
                 if (!BuildSettings.Release)
                 {
-                    SetDebugLocation(function, declaration, scope);
                     for (var i = 0; i < variableCount; i++)
                     {
                         var variable = declaration.Variables[i];
@@ -738,7 +729,6 @@ public static class ProgramIRBuilder
                 uint offset = 0;
                 if (!BuildSettings.Release)
                 {
-                    SetDebugLocation(function, declaration, scope);
                     for (var i = 0; i < variableCount; i++)
                     {
                         var variable = declaration.Variables[i];
@@ -768,7 +758,6 @@ public static class ProgramIRBuilder
             var allocations = new InstructionValue[variableCount];
             if (!BuildSettings.Release)
             {
-                SetDebugLocation(function, declaration, scope);
                 for (var i = 0; i < variableCount; i++)
                 {
                     var variable = declaration.Variables[i];
@@ -1092,10 +1081,7 @@ public static class ProgramIRBuilder
 
     private static void EmitAssignment(FunctionIR function, AssignmentAst assignment, IScope scope)
     {
-        if (!BuildSettings.Release)
-        {
-            SetDebugLocation(function, assignment, scope);
-        }
+        SetDebugLocation(function, assignment, scope);
 
         if (assignment.Reference is CompoundExpressionAst compoundReference)
         {
@@ -1236,10 +1222,7 @@ public static class ProgramIRBuilder
 
     private static void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, IScope scope)
     {
-        if (!BuildSettings.Release)
-        {
-            SetDebugLocation(function, returnAst, scope);
-        }
+        SetDebugLocation(function, returnAst, scope);
 
         if (returnAst.Value == null)
         {
@@ -1272,10 +1255,7 @@ public static class ProgramIRBuilder
 
     private static bool EmitConditional(FunctionIR function, ConditionalAst conditional, IScope scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock)
     {
-        if (!BuildSettings.Release)
-        {
-            SetDebugLocation(function, conditional, scope);
-        }
+        SetDebugLocation(function, conditional, scope);
 
         // Run the condition expression in the current basic block and then jump to the following
         var bodyBlock = new BasicBlock();
@@ -1299,10 +1279,7 @@ public static class ProgramIRBuilder
 
     private static bool EmitInlineConditional(FunctionIR function, ConditionalAst conditional, IScope scope, IType returnType, InstructionValue returnAllocation, BasicBlock returnBlock, BasicBlock breakBlock, BasicBlock continueBlock)
     {
-        if (!BuildSettings.Release)
-        {
-            SetDebugLocation(function, conditional, scope);
-        }
+        SetDebugLocation(function, conditional, scope);
 
         // Run the condition expression in the current basic block and then jump to the following
         var bodyBlock = new BasicBlock();
@@ -1383,10 +1360,7 @@ public static class ProgramIRBuilder
 
     private static (BasicBlock, BasicBlock) BeginWhile(FunctionIR function, IAst condition, IScope scope)
     {
-        if (!BuildSettings.Release)
-        {
-            SetDebugLocation(function, condition, scope);
-        }
+        SetDebugLocation(function, condition, scope);
 
         // Create a block for the condition expression and then jump to the following
         var conditionBlock = function.BasicBlocks[^1];
@@ -1455,10 +1429,7 @@ public static class ProgramIRBuilder
 
     private static void EmitEach(FunctionIR function, EachAst each, IScope scope, IType returnType)
     {
-        if (!BuildSettings.Release)
-        {
-            SetDebugLocation(function, each, scope);
-        }
+        SetDebugLocation(function, each, scope);
 
         if (each.Iteration != null)
         {
@@ -1565,7 +1536,7 @@ public static class ProgramIRBuilder
 
     private static void FinishEachBody(FunctionIR function, ScopeAst eachBody, int instructionCount, IType indexType, InstructionValue indexValue, InstructionValue indexVariable, Instruction conditionJump, BasicBlock conditionBlock, BasicBlock eachBodyBlock, BasicBlock eachIncrementBlock, BasicBlock afterBlock)
     {
-        if (eachBodyBlock.Location < function.Instructions.Count)
+        if (function.BasicBlocks[^1].Location < function.Instructions.Count)
         {
             AddBasicBlock(function, eachIncrementBlock);
         }
@@ -1593,10 +1564,7 @@ public static class ProgramIRBuilder
 
     private static void EmitInlineEach(FunctionIR function, EachAst each, IScope scope, IType returnType, InstructionValue returnAllocation, BasicBlock returnBlock)
     {
-        if (!BuildSettings.Release)
-        {
-            SetDebugLocation(function, each, scope);
-        }
+        SetDebugLocation(function, each, scope);
 
         if (each.Iteration != null)
         {
@@ -1625,10 +1593,7 @@ public static class ProgramIRBuilder
 
     private static void EmitInlineAssembly(FunctionIR function, AssemblyAst assembly, IScope scope)
     {
-        if (!BuildSettings.Release)
-        {
-            SetDebugLocation(function, assembly, scope);
-        }
+        SetDebugLocation(function, assembly, scope);
 
         // Get the values to place in the input registers
         foreach (var (_, input) in assembly.InRegisters)
@@ -1649,10 +1614,7 @@ public static class ProgramIRBuilder
 
     private static BasicBlock EmitSwitch(FunctionIR function, SwitchAst switchAst, IScope scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock)
     {
-        if (!BuildSettings.Release)
-        {
-            SetDebugLocation(function, switchAst, scope);
-        }
+        SetDebugLocation(function, switchAst, scope);
 
         var value = EmitIR(function, switchAst.Value, scope);
         var afterBlock = new BasicBlock();
@@ -1739,10 +1701,7 @@ public static class ProgramIRBuilder
 
     private static BasicBlock EmitInlineSwitch(FunctionIR function, SwitchAst switchAst, IScope scope, IType returnType, InstructionValue returnAllocation, BasicBlock returnBlock, BasicBlock breakBlock, BasicBlock continueBlock)
     {
-        if (!BuildSettings.Release)
-        {
-            SetDebugLocation(function, switchAst, scope);
-        }
+        SetDebugLocation(function, switchAst, scope);
 
         var value = EmitIR(function, switchAst.Value, scope);
         var afterBlock = new BasicBlock();
@@ -2615,10 +2574,7 @@ public static class ProgramIRBuilder
             switch (ast)
             {
                 case ReturnAst returnAst:
-                    if (!BuildSettings.Release)
-                    {
-                        SetDebugLocation(function, returnAst, scope);
-                    }
+                    SetDebugLocation(function, returnAst, scope);
                     if (returnAst.Value != null)
                     {
                         if (returnType is CompoundType compoundReturnType && returnAst.Value is CompoundExpressionAst compoundExpression)
@@ -2684,17 +2640,11 @@ public static class ProgramIRBuilder
                     EmitInlineSwitch(function, switchAst, scope, returnType, returnAllocation, returnBlock, breakBlock, continueBlock);
                     break;
                 case BreakAst:
-                    if (!BuildSettings.Release)
-                    {
-                        SetDebugLocation(function, ast, scope);
-                    }
+                    SetDebugLocation(function, ast, scope);
                     EmitJump(function, scope, breakBlock);
                     return;
                 case ContinueAst:
-                    if (!BuildSettings.Release)
-                    {
-                        SetDebugLocation(function, ast, scope);
-                    }
+                    SetDebugLocation(function, ast, scope);
                     EmitJump(function, scope, continueBlock);
                     return;
                 case DeferAst deferAst:
@@ -2704,10 +2654,7 @@ public static class ProgramIRBuilder
                     }
                     break;
                 default:
-                    if (!BuildSettings.Release)
-                    {
-                        SetDebugLocation(function, ast, scope);
-                    }
+                    SetDebugLocation(function, ast, scope);
                     EmitIR(function, ast, scope);
                     break;
             }

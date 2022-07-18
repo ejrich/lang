@@ -1,8 +1,9 @@
 #import standard
 #import compiler
 
-main() #print_ir {
+main() {
     command_buffer = default_allocator(1000);
+    defer default_free(command_buffer);
     failed_test_count := 0;
 
     success, files := get_files_in_directory("test/tests");
@@ -12,10 +13,9 @@ main() #print_ir {
         each file in files {
             if file.type == FileType.Directory && file.name != "." && file.name != ".." {
                 test_dir := format_string("test/tests/%", file.name);
+                defer default_free(test_dir.data);
 
                 if !run_test(test_dir, file.name) failed_test_count++;
-
-                default_free(test_dir.data);
             }
 
             #if os == OS.Windows {
@@ -23,7 +23,6 @@ main() #print_ir {
             }
         }
     }
-    default_free(command_buffer);
 
     if failed_test_count {
         print("\n% Test(s) Failed\n", failed_test_count);
