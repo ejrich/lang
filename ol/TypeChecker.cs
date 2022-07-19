@@ -3553,9 +3553,13 @@ public static class TypeChecker
         {
             case ConstantAst constant:
                 isConstant = true;
-                if (getArrayLength && constant.Type.TypeKind == TypeKind.Integer)
+                if (getArrayLength && constant.Type?.TypeKind == TypeKind.Integer)
                 {
                     arrayLength = (uint)constant.Value.UnsignedInteger;
+                }
+                else if (constant.Type == null && constant.String != null)
+                {
+                    constant.Type = TypeTable.StringType;
                 }
                 return constant.Type;
             case NullAst:
