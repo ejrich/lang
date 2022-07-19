@@ -23,7 +23,7 @@ public static class BuildSettings
     public static HashSet<string> LibraryDirectories { get; } = new();
     // These are additional dependencies that need to be linked with the executable
     public static HashSet<Library> Libraries { get; } = new();
-    public static Dictionary<string, Token> InputVariables { get; } = new();
+    public static Dictionary<string, InputVariable> InputVariables { get; } = new();
 }
 
 public enum LinkerType : byte
@@ -46,6 +46,12 @@ public enum OutputArchitecture : byte
     X64,
     Arm,
     Arm64
+}
+
+public class InputVariable
+{
+    public Token Token { get; set; }
+    public bool Used { get; set; }
 }
 
 public static class ol
@@ -89,7 +95,7 @@ public static class ol
                         {
                             ErrorReporter.Report($"Malformed input variable '{arg}', should be formatted like 'foo=true'");
                         }
-                        else if (!BuildSettings.InputVariables.TryAdd(tokens[0].Value, tokens[2]))
+                        else if (!BuildSettings.InputVariables.TryAdd(tokens[0].Value, new InputVariable {Token = tokens[2]}))
                         {
                             ErrorReporter.Report($"Multiple definitions for input variable '{arg}'");
                         }
