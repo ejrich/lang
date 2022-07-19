@@ -59,7 +59,7 @@ public static class ErrorReporter
 
             foreach (var error in Errors)
             {
-                if (error.FileIndex.HasValue)
+                if (error.FileIndex.HasValue && error.FileIndex >= 0)
                 {
                     Console.WriteLine($"{BuildSettings.Files[error.FileIndex.Value].Replace(BuildSettings.Path, string.Empty)}: {error.Message} at line {error.Line}:{error.Column}");
                 }

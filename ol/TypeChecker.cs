@@ -225,6 +225,11 @@ public static class TypeChecker
         {
             ErrorReporter.Report("'main' function of the program is not defined");
         }
+
+        foreach (var (name, inputVariable) in BuildSettings.InputVariables.Where(v => !v.Value.Used))
+        {
+            ErrorReporter.Report($"Input variable '{name}' was not found as a global constant");
+        }
     }
 
     private static void RemoveNode<T>(SafeLinkedList<T> list, Node<T> previous, Node<T> current)
@@ -2071,7 +2076,7 @@ public static class TypeChecker
         }
 
         // 8. Check if the variable was set from input variables
-        if (BuildSettings.InputVariables.TryGetValue(declaration.Name, out var inputValue))
+        if (BuildSettings.InputVariables.TryGetValue(declaration.Name, out var inputVariable))
         {
             if (!declaration.Constant)
             {
@@ -2079,7 +2084,8 @@ public static class TypeChecker
             }
             else
             {
-                var constantValue = Parser.ParseConstant(inputValue, -1);
+                inputVariable.Used = true;
+                var constantValue = Parser.ParseConstant(inputVariable.Token, -1);
                 if (constantValue != null)
                 {
                     if (!TypeEquals(declaration.Type, constantValue.Type))
