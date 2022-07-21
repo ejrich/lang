@@ -43,9 +43,10 @@ public static class TypeChecker
         TypeTable.FloatType = AddPrimitive("float", TypeKind.Float, 4, true);
         TypeTable.Float64Type = AddPrimitive("float64", TypeKind.Float, 8, true);
         TypeTable.TypeType = AddPrimitive("Type", TypeKind.Type, 4, true);
+        TypeTable.CodeType = new() {Name = "Code"};
     }
 
-    private static PrimitiveAst AddPrimitive(string name, TypeKind typeKind, uint size = 0, bool signed = false)
+    private static PrimitiveAst AddPrimitive(string name, TypeKind typeKind, uint size, bool signed = false)
     {
         var primitiveAst = new PrimitiveAst {Name = name, TypeKind = typeKind, Size = size, Alignment = size, Signed = signed};
         GlobalScope.Identifiers[name] = primitiveAst;
@@ -1204,6 +1205,10 @@ public static class TypeChecker
                 {
                     argument.Type = TypeTable.RawStringType;
                 }
+                else if (!function.Flags.HasFlag(FunctionFlags.Macro) && argument.Type?.TypeKind == TypeKind.Code)
+                {
+                    ErrorReporter.Report($"Cannot only pass Code argument '{argument.Name}' in a macro", argument);
+                }
             }
 
             // 3c. Check for default arguments
@@ -1274,6 +1279,34 @@ public static class TypeChecker
             else if (function.Flags.HasFlag(FunctionFlags.Syscall))
             {
                 ErrorReporter.Report("System calls are already inlined, remove #inline directive", function);
+            }
+            else if (function.Flags.HasFlag(FunctionFlags.Macro))
+            {
+                ErrorReporter.Report("Macros cannot be inlined, as they are expanded when evaluated", function);
+            }
+        }
+
+        if (function.Flags.HasFlag(FunctionFlags.Macro))
+        {
+            if (function.Generics.Any())
+            {
+                ErrorReporter.Report("Macros cannot have generics", function);
+            }
+            else if (function.Flags.HasFlag(FunctionFlags.Extern))
+            {
+                ErrorReporter.Report("Extern functions cannot be macros", function);
+            }
+            else if (function.Flags.HasFlag(FunctionFlags.Compiler))
+            {
+                ErrorReporter.Report("Functions that call the compiler are not macros", function);
+            }
+            else if (function.Flags.HasFlag(FunctionFlags.Syscall))
+            {
+                ErrorReporter.Report("System calls are are not macros", function);
+            }
+            else if (function.Flags.HasFlag(FunctionFlags.Inline))
+            {
+                ErrorReporter.Report("Macros cannot be inlined, as they are expanded when evaluated", function);
             }
         }
 
@@ -1641,7 +1674,7 @@ public static class TypeChecker
             }
         }
 
-        if (!ErrorReporter.Errors.Any() && !function.Flags.HasFlag(FunctionFlags.Inline))
+        if (!ErrorReporter.Errors.Any() && !function.Flags.HasFlag(FunctionFlags.Inline) && !function.Flags.HasFlag(FunctionFlags.Macro))
         {
             ThreadPool.QueueWork(WriteFunctionJob, function);
         }
@@ -1740,10 +1773,10 @@ public static class TypeChecker
                     }
                     break;
                 case CompilerDirectiveAst directive:
-                    scope.Children.RemoveAt(i);
                     switch (directive.Type)
                     {
                         case DirectiveType.If:
+                            scope.Children.RemoveAt(i);
                             var conditional = directive.Value as ConditionalAst;
                             if (VerifyCondition(conditional.Condition, null, GlobalScope, out var constant, true))
                             {
@@ -1763,8 +1796,10 @@ public static class TypeChecker
                                     scope.Children.InsertRange(i, conditional.ElseBlock.Children);
                                 }
                             }
+                            i--;
                             break;
                         case DirectiveType.Assert:
+                            scope.Children.RemoveAt(i--);
                             if (VerifyCondition(directive.Value, null, GlobalScope, out constant, true))
                             {
                                 if (!constant)
@@ -1787,8 +1822,14 @@ public static class TypeChecker
                                 }
                             }
                             break;
+                        case DirectiveType.Insert:
+                            var valueType = VerifyExpression(directive.Value, function, scope);
+                            if (valueType != null && valueType.TypeKind != TypeKind.Code)
+                            {
+                                ErrorReporter.Report($"Expected to insert type 'Code', but got '{valueType.Name}'", directive.Value);
+                            }
+                            break;
                     }
-                    i--;
                     break;
                 case ReturnAst returnAst:
                     if (inDefer)
@@ -4335,7 +4376,7 @@ public static class TypeChecker
                 VerifyFunctionDefinition(function);
             }
 
-            if (VerifyArguments(call, arguments, specifiedArguments, function, function.Flags.HasFlag(FunctionFlags.Varargs), function.Flags.HasFlag(FunctionFlags.Params), function.ParamsElementType, function.Flags.HasFlag(FunctionFlags.Extern)))
+            if (VerifyArguments(call, arguments, specifiedArguments, function, function.Flags.HasFlag(FunctionFlags.Varargs), function.Flags.HasFlag(FunctionFlags.Params), function.ParamsElementType, function.Flags.HasFlag(FunctionFlags.Extern), function.Flags.HasFlag(FunctionFlags.Macro)))
             {
                 matchedFunction = function;
                 return true;
@@ -4573,7 +4614,7 @@ public static class TypeChecker
         return false;
     }
 
-    private static bool VerifyArguments(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments, IInterface function, bool varargs = false, bool Params = false, IType paramsElementType = null, bool Extern = false)
+    private static bool VerifyArguments(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments, IInterface function, bool varargs = false, bool Params = false, IType paramsElementType = null, bool Extern = false, bool macro = false)
     {
         var match = true;
         var callArgIndex = 0;
@@ -4589,7 +4630,7 @@ public static class TypeChecker
                     var functionArg = function.Arguments[argIndex];
                     if (functionArg.Name == name)
                     {
-                        if (VerifyArgument(argument, specifiedArguments[name], functionArg.Type, Extern))
+                        if (VerifyArgument(argument, specifiedArguments[name], functionArg.Type, Extern, macro))
                         {
                             found = true;
                         }
@@ -4626,7 +4667,7 @@ public static class TypeChecker
             }
             else
             {
-                if (VerifyArgument(argumentAst, arguments[callArgIndex], functionArg.Type, Extern))
+                if (VerifyArgument(argumentAst, arguments[callArgIndex], functionArg.Type, Extern, macro))
                 {
                     callArgIndex++;
                 }
@@ -4818,7 +4859,7 @@ public static class TypeChecker
         }
     }
 
-    private static bool VerifyArgument(IAst argumentAst, IType callType, IType argumentType, bool externCall = false)
+    private static bool VerifyArgument(IAst argumentAst, IType callType, IType argumentType, bool externCall = false, bool macro = false)
     {
         if (argumentType == null)
         {
@@ -4831,7 +4872,7 @@ public static class TypeChecker
                 return false;
             }
         }
-        else if (argumentType.TypeKind != TypeKind.Type && argumentType.TypeKind != TypeKind.Any)
+        else if (argumentType.TypeKind != TypeKind.Type && argumentType.TypeKind != TypeKind.Any && !(macro && argumentType.TypeKind == TypeKind.Code))
         {
             if (externCall && callType.TypeKind == TypeKind.String)
             {
@@ -5558,6 +5599,12 @@ public static class TypeChecker
                     ErrorReporter.Report("Type 'Any' cannot have generics", type);
                 }
                 return TypeTable.AnyType;
+            case "Code":
+                if (hasGenerics || depth > 0 || !allowParams)
+                {
+                    ErrorReporter.Report("Type 'Code' must be a standalone type used as an argument", type);
+                }
+                return TypeTable.CodeType;
             default:
                 if (hasGenerics)
                 {
