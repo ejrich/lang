@@ -2387,6 +2387,11 @@ public static class ProgramIRBuilder
             arguments[i+1] = GetConstantInteger(call.Line);
             arguments[i+2] = GetConstantInteger(call.Column);
         }
+        else if (callFunction.Flags.HasFlag(FunctionFlags.Macro))
+        {
+            // TODO Emit body of macro
+            return null;
+        }
         else
         {
             var externCall = callFunction.Flags.HasFlag(FunctionFlags.Extern);

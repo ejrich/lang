@@ -41,3 +41,5 @@ enum OutputArchitecture : u8 {
 }
 
 set_output_architecture(OutputArchitecture arch) #compiler
+
+// insert_code(Scope* scope, Code code) #compiler
