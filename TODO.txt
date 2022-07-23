@@ -1,1 +1,0 @@
-- Only write the IR for functions starting from entrypoint or run directives

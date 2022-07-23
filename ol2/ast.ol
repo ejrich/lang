@@ -1,3 +1,6 @@
+#import "assembly.ol"
+#import "hash_table.ol"
+
 enum AstType {
     None;
     Function;

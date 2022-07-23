@@ -4,7 +4,24 @@
 init_types() {
 }
 
+init_necessary_types() {
+}
+
+verify_compiler_directives() {
+    // Verify compiler directives, collecting run directives to be handled afterwards
+
+    // Evaluate run directives on separate thread to handle metaprogramming
+}
+
 check_types() {
+    // Process the ast queue, emitting a message on success/failure
+
+    // If the metaprogram takes control, let the message queue flow until it has been cleared
+    // - Wait for sent messages to be processed before moving to next flow
+    // - Once fully typechecked, generate ir
+    // - Send message that code is ready to be generated, wait for processing
+    // - Send message that exe is ready to be linked, wait for processing
+    // - Send message that exe has been linked, wait for processing and send null
 }
 
 bool add_global_variable(DeclarationAst* declaration) {
