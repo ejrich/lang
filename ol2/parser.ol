@@ -3505,8 +3505,7 @@ CastAst* parse_cast(TokenEnumerator* enumerator, Function* current_function) {
 }
 
 T* create_ast<T>(Ast* source, AstType type) {
-    ast := new<T>();
-    ast.ast_type = type;
+    ast: T = { ast_type = type; }
 
     if source {
         ast.file_index = source.file_index;
@@ -3514,21 +3513,23 @@ T* create_ast<T>(Ast* source, AstType type) {
         ast.column = source.column;
     }
 
-    return ast;
+    pointer: T* = allocate(size_of(T));
+    *pointer = ast;
+
+    return pointer;
 }
 
 T* create_ast<T>(TokenEnumerator* enumerator, AstType type) {
     return create_ast<T>(enumerator.current, enumerator.file_index, type);
 }
 
-T* create_ast<T>(Token token, int fileIndex, AstType type) {
-    ast := new<T>();
-    ast.ast_type = type;
-    ast.file_index = fileIndex;
-    ast.line = token.line;
-    ast.column = token.column;
+T* create_ast<T>(Token token, int file_index, AstType type) {
+    ast: T = { ast_type = type; file_index = file_index; line = token.line; column = token.column; }
 
-    return ast;
+    pointer: T* = allocate(size_of(T));
+    *pointer = ast;
+
+    return pointer;
 }
 
 Operator convert_operator(Token token) {

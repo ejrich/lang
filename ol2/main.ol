@@ -1,7 +1,7 @@
 #import atomic
 #import standard
 #import thread
-#import "hash_table.ol"
+#import "ast.ol"
 #import "link.ol"
 #import "llvm_backend.ol"
 #import "parser.ol"
@@ -55,9 +55,72 @@ main() {
     // Parse source files to asts
     if !noThreads init_thread_pool();
     init_types();
+    // parse(entrypoint);
+    list_errors_and_exit(ParsingError);
+
+    // Check types and build the program ir
+    // check_types();
+    list_errors_and_exit(CompilationError);
+    complete_work();
+    front_end_time := get_performance_counter();
+
+    // Build program
+    // object_file := llvm_build();
+    build_time := get_performance_counter();
+
+    // Link binaries
+    // link(object_file);
+    link_time := get_performance_counter();
+
+    // Log statistics
+    print("Front-end time: % seconds\nLLVM build time: % seconds\nLinking time: % seconds\n", get_time(start, front_end_time, freq), get_time(front_end_time, build_time, freq), get_time(build_time, link_time, freq));
+    deallocate_arenas();
+}
+
+_main() {
+    freq := get_performance_frequency();
+    start := get_performance_counter();
+
+    // Load cli args into build settings
+    entrypoint: string;
+    noThreads := false;
+    each arg in command_line_arguments {
+        if arg == "-R" || arg == "--release" release = true;
+        else if arg == "-S" output_assembly = true;
+        else if arg == "-noThreads" noThreads = true;
+        else {
+            if arg[0] == '-' {
+                report_error_message("Unrecognized compiler flag '%'", arg);
+            }
+            else if !string_is_empty(entrypoint) {
+                report_error_message("Multiple program entrypoints defined '%'", arg);
+            }
+            else {
+                if !file_exists(arg) || !ends_with(arg, ".ol") {
+                    report_error_message("Entrypoint file does not exist or is not an .ol file '%'", arg);
+                }
+                else {
+                    name = name_without_extension(arg);
+                    entrypoint = arg; // Path.GetFullPath(arg);
+                    // path = Path.GetDirectoryName(entrypoint);
+                }
+            }
+        }
+    }
+
+    // Initialize subsystems
+    if !noThreads init_thread_pool();
+    init_types();
+
+    // Parse what is available
     parse(entrypoint);
     list_errors_and_exit(ParsingError);
 
+    // Verify necessary asts for compiler directives
+    init_necessary_types();
+    verify_compiler_directives();
+
+    // Handle messages
     // Check types and build the program ir
     check_types();
     list_errors_and_exit(CompilationError);
@@ -77,6 +140,7 @@ main() {
     deallocate_arenas();
 }
 
+
 bool ends_with(string value, string ending) {
     if ending.length > value.length return false;
 
@@ -90,6 +154,7 @@ bool ends_with(string value, string ending) {
 
 string name_without_extension(string file) {
     result: string;
+    // TODO Implement me
 
     return result;
 }
@@ -122,8 +187,8 @@ thread_queue: LinkedList<QueueItem>;
 completed := 0;
 count := 0;
 
-queue_work(Callback callback, void* data) {
-    item: QueueItem = { callback = callback; data = data; }
+queue_work(Callback callback, void* data, bool clear = false) {
+    item: QueueItem = { callback = callback; data = data; clear = clear; }
     add_to_head(&thread_queue, item);
     atomic_increment(&count);
     semaphore_release(semaphore);
@@ -137,8 +202,14 @@ bool execute_queued_item() {
 
     if value == head {
         queue_item := head.data;
-        queue_item.callback(queue_item.data);
-        atomic_increment(&completed);
+
+        if queue_item.clear {
+            atomic_increment(&completed);
+        }
+        else {
+            queue_item.callback(queue_item.data);
+            atomic_increment(&completed);
+        }
     }
 
     return false;
@@ -155,6 +226,7 @@ complete_work() {
 struct QueueItem {
     callback: Callback;
     data: void*;
+    clear: bool;
 }
 
 interface Callback(void* data)
@@ -202,6 +274,25 @@ Node<T>* replace_end<T>(LinkedList<T>* list, Node<T>* node) {
 
     return originalEnd;
 }
+
+
+// Messages
+enum CompilerMessageType {
+    ReadyToBeTypeChecked = 1;
+    TypeCheckFailed;
+    TypeCheckSucceeded;
+    IRGenerated;
+    ReadyForCodeGeneration;
+    CodeGenerated;
+    ExecutableLinked;
+}
+
+struct CompilerMessage {
+    type: CompilerMessageType;
+    ast: Ast*;
+}
+
+message_queue: LinkedList<CompilerMessage>;
 
 
 // Memory allocation
