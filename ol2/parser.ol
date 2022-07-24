@@ -12,20 +12,20 @@ parse(string entrypoint) {
     set_library_directory();
 
     add_module("runtime");
-    queue_file_if_not_exists(entrypoint);
+    queue_file_if_not_exists(entrypoint, name_with_extension(entrypoint));
 
     complete_work();
 }
 
 set_library_directory() {
-    executable_path: CArray<u8>[4096];
+    executable_path: CArray<u8>[PATH_MAX];
     #if os == OS.Linux {
         self_path := "/proc/self/exe"; #const
-        bytes := readlink(self_path.data, &executable_path, 4095);
+        bytes := readlink(self_path.data, &executable_path, PATH_MAX-1);
         dir_char := '/'; #const
     }
     #if os == OS.Windows {
-        bytes := GetModuleFileNameA(null, &executable_path, 4096);
+        bytes := GetModuleFileNameA(null, &executable_path, PATH_MAX);
         dir_char := '\\'; #const
     }
 
@@ -37,26 +37,27 @@ set_library_directory() {
     }
 
     executable_str: string = { length = length; data = &executable_path; }
-    library_directory = format_string("%/%", allocate, executable_str, "../../ol/Modules");
+    relative_library_directory := format_string("%/%", allocate, executable_str, "../../ol/Modules");
+    library_directory = get_full_path(relative_library_directory);
 }
 
 add_module(string module) {
     file := format_string("%/%.ol", allocate, library_directory, module);
     if file_exists(file)
-        queue_file_if_not_exists(file);
+        queue_file_if_not_exists(file, file);
 }
 
 add_module(string module, int fileIndex, Token token) {
     file := format_string("%/%.ol", allocate, library_directory, module);
     if file_exists(file)
-        queue_file_if_not_exists(file);
+        queue_file_if_not_exists(file, file);
     else
         report_error("Undefined module '%'", fileIndex, token, module);
 }
 
 add_module(CompilerDirectiveAst* module) {
     if file_exists(module.import.path)
-        queue_file_if_not_exists(module.import.path);
+        queue_file_if_not_exists(module.import.path, module.import.path);
     else
         report_error("Undefined module '%'", module, module.import.name);
 }
@@ -64,25 +65,26 @@ add_module(CompilerDirectiveAst* module) {
 add_file(string file, string directory, int fileIndex, Token token) {
     file_path := format_string("%/%", allocate, directory, file);
     if file_exists(file_path)
-        queue_file_if_not_exists(file_path);
+        queue_file_if_not_exists(file_path, file);
     else
         report_error("File '%' does not exist", fileIndex, token, file);
 }
 
 add_file(CompilerDirectiveAst* import) {
     if file_exists(import.import.path)
-        queue_file_if_not_exists(import.import.path);
+        queue_file_if_not_exists(import.import.path, import.import.name);
     else
         report_error("File '%' does not exist", import, import.import.name);
 }
 
-queue_file_if_not_exists(string file) {
-    each file_name in file_names {
+queue_file_if_not_exists(string file, string name) {
+    each file_name in file_paths {
         if file_name == file return;
     }
 
-    file_index := file_names.length;
-    array_insert(&file_names, file, allocate, reallocate);
+    file_index := file_paths.length;
+    array_insert(&file_paths, file, allocate, reallocate);
+    array_insert(&file_names, name, allocate, reallocate);
     array_insert(&private_scopes, null, allocate, reallocate);
 
     data := new<ParseData>();
@@ -147,7 +149,7 @@ parse_file(void* data) {
 
     tokens := load_file_tokens(parse_data.file, file_index);
 
-    enumerator: TokenEnumerator = { tokens = tokens; file_index = file_index; directory = get_directory(parse_data.file); }
+    enumerator: TokenEnumerator = { tokens = tokens; file_index = file_index; last = tokens[tokens.length - 1]; directory = get_directory(parse_data.file); }
 
     while move_next(&enumerator) {
         attributes := parse_attributes(&enumerator);
@@ -166,7 +168,7 @@ parse_file(void* data) {
                     }
                     else {
                         function := parse_function(&enumerator, attributes);
-                        if function {
+                        if function != null && !string_is_empty(function.name){
                             add_function(function);
                             add(&asts, function);
                         }
@@ -182,7 +184,6 @@ parse_file(void* data) {
                         }
                     }
                     else {
-                        struct_ast.backend_name = struct_ast.name;
                         if add_struct(struct_ast) {
                             if struct_ast.name == "string" {
                                 string_type = struct_ast;
@@ -852,7 +853,6 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
 
     if enumerator.current.type == TokenType.Identifier {
         enum_ast.name = enumerator.current.value;
-        enum_ast.backend_name = enumerator.current.value;
     }
     else
         report_error("Unexpected token '%' in enum definition", enumerator.file_index, enumerator.current, enumerator.current.value);
@@ -1024,7 +1024,6 @@ UnionAst* parse_union(TokenEnumerator* enumerator) {
 
     if enumerator.current.type == TokenType.Identifier {
         union_ast.name = enumerator.current.value;
-        union_ast.backend_name = enumerator.current.value;
     }
     else
         report_error("Unexpected token '%' in union definition", enumerator.file_index, enumerator.current, enumerator.current.value);
@@ -1122,7 +1121,7 @@ bool search_for_generic(string generic, int index, TypeDefinition* type) {
     return has_generic;
 }
 
-Ast* parse_line(TokenEnumerator* enumerator, Function* current_function) {
+Ast* parse_line(TokenEnumerator* enumerator, ScopeAst* scope, Function* current_function, bool in_defer = false) {
     if !enumerator.remaining {
         report_error("End of file reached without closing scope", enumerator.file_index, enumerator.last);
         return null;
@@ -1130,8 +1129,12 @@ Ast* parse_line(TokenEnumerator* enumerator, Function* current_function) {
 
     token := enumerator.current;
     switch token.type {
-        case TokenType.Return;
+        case TokenType.Return; {
+            if in_defer
+                report_error("Cannot defer a return statement", enumerator.file_index, token);
+
             return parse_return(enumerator, current_function);
+        }
         case TokenType.If;
             return parse_conditional(enumerator, current_function);
         case TokenType.While;
@@ -1168,6 +1171,19 @@ Ast* parse_line(TokenEnumerator* enumerator, Function* current_function) {
             return parse_inline_assembly(enumerator);
         case TokenType.Switch;
             return parse_switch(enumerator, current_function);
+        case TokenType.Defer; {
+            defer_ast := create_ast<DeferAst>(token, enumerator.file_index, AstType.Defer);
+            if in_defer
+                report_error("Unable to nest defer statements", enumerator.file_index, token);
+            else if move_next(enumerator) {
+                scope.defer_count++;
+                defer_ast.statement = parse_scope_body(enumerator, current_function, in_defer = true);
+            }
+            else
+                report_error("End of file reached without closing scope", enumerator.file_index, enumerator.last);
+
+            return defer_ast;
+        }
         case TokenType.Break; {
             breakAst := create_ast<Ast>(token, enumerator.file_index, AstType.Break);
             if move_next(enumerator) {
@@ -1196,7 +1212,27 @@ Ast* parse_line(TokenEnumerator* enumerator, Function* current_function) {
     return null;
 }
 
-ScopeAst* parse_scope(TokenEnumerator* enumerator, Function* current_function, bool topLevel = false) {
+ScopeAst* parse_scope_body(TokenEnumerator* enumerator, Function* current_function, bool top_level = false, bool in_defer = false) {
+    if (enumerator.current.type == TokenType.OpenBrace)
+        return parse_scope(enumerator, current_function, top_level);
+
+    // Parse single AST
+    scope_ast := create_ast<ScopeAst>(enumerator, AstType.Scope);
+    array_resize(&scope_ast.children, 1, allocate, reallocate);
+    if top_level {
+        ast := parse_top_level_ast(enumerator);
+        scope_ast.children[0] = ast;
+    }
+    else
+        scope_ast.children[0] = parse_line(enumerator, scope_ast, current_function, in_defer);
+
+    if scope_ast.defer_count
+        array_resize(&scope_ast.deferred_asts, scope_ast.defer_count, allocate, reallocate);
+
+    return scope_ast;
+}
+
+ScopeAst* parse_scope(TokenEnumerator* enumerator, Function* current_function, bool top_level = false) {
     scope_ast := create_ast<ScopeAst>(enumerator, AstType.Scope);
 
     closed := false;
@@ -1206,17 +1242,20 @@ ScopeAst* parse_scope(TokenEnumerator* enumerator, Function* current_function, b
             break;
         }
 
-        if topLevel array_insert(&scope_ast.children, parse_top_level_ast(enumerator), allocate, reallocate);
-        else array_insert(&scope_ast.children, parse_line(enumerator, current_function), allocate, reallocate);
+        if top_level array_insert(&scope_ast.children, parse_top_level_ast(enumerator), allocate, reallocate);
+        else array_insert(&scope_ast.children, parse_line(enumerator, scope_ast, current_function), allocate, reallocate);
     }
 
     if !closed
         report_error("Scope not closed by '}'", enumerator.file_index, enumerator.current);
 
+    if scope_ast.defer_count
+        array_resize(&scope_ast.deferred_asts, scope_ast.defer_count, allocate, reallocate);
+
     return scope_ast;
 }
 
-ConditionalAst* parse_conditional(TokenEnumerator* enumerator, Function* current_function, bool topLevel = false) {
+ConditionalAst* parse_conditional(TokenEnumerator* enumerator, Function* current_function, bool top_level = false) {
     conditional_ast := create_ast<ConditionalAst>(enumerator, AstType.Conditional);
 
     // 1. Parse the conditional expression by first iterating over the initial 'if'
@@ -1229,18 +1268,7 @@ ConditionalAst* parse_conditional(TokenEnumerator* enumerator, Function* current
     }
 
     // 2. Determine how many lines to parse
-    if enumerator.current.type == TokenType.OpenBrace {
-        // Parse until close brace
-        conditional_ast.if_block = parse_scope(enumerator, current_function, topLevel);
-    }
-    else {
-        // Parse single AST
-        conditional_ast.if_block = create_ast<ScopeAst>(enumerator, AstType.Scope);
-        conditional_ast.if_block.children.length = 1;
-        conditional_ast.if_block.children.data = allocate(size_of(Ast*));
-        if topLevel conditional_ast.if_block.children[0] = parse_top_level_ast(enumerator);
-        else conditional_ast.if_block.children[0] = parse_line(enumerator, current_function);
-    }
+    conditional_ast.if_block = parse_scope_body(enumerator, current_function, top_level);
 
     // 3. Parse else block if necessary
     token: Token;
@@ -1256,18 +1284,7 @@ ConditionalAst* parse_conditional(TokenEnumerator* enumerator, Function* current
             return null;
         }
 
-        if enumerator.current.type == TokenType.OpenBrace {
-            // Parse until close brace
-            conditional_ast.else_block = parse_scope(enumerator, current_function, topLevel);
-        }
-        else {
-            // Parse single AST
-            conditional_ast.else_block = create_ast<ScopeAst>(enumerator, AstType.Scope);
-            conditional_ast.else_block.children.length = 1;
-            conditional_ast.else_block.children.data = allocate(size_of(Ast*));
-            if topLevel conditional_ast.else_block.children[0] = parse_top_level_ast(enumerator);
-            else conditional_ast.else_block.children[0] = parse_line(enumerator, current_function);
-        }
+        conditional_ast.else_block = parse_scope_body(enumerator, current_function, top_level);
     }
 
     return conditional_ast;
@@ -1286,18 +1303,7 @@ WhileAst* parse_while(TokenEnumerator* enumerator, Function* current_function) {
         return null;
     }
 
-    if enumerator.current.type == TokenType.OpenBrace {
-        // Parse until close brace
-        while_ast.body = parse_scope(enumerator, current_function);
-    }
-    else {
-        // Parse single AST
-        while_ast.body = create_ast<ScopeAst>(enumerator, AstType.Scope);
-        while_ast.body.children.length = 1;
-        while_ast.body.children.data = allocate(size_of(Ast*));
-        while_ast.body.children[0] = parse_line(enumerator, current_function);
-    }
-
+    while_ast.body = parse_scope_body(enumerator, current_function);
     return while_ast;
 }
 
@@ -1361,15 +1367,7 @@ EachAst* parse_each(TokenEnumerator* enumerator, Function* current_function) {
         each_ast.iteration = expression;
 
     // 4. Determine how many lines to parse
-    if enumerator.current.type == TokenType.OpenBrace
-        each_ast.body = parse_scope(enumerator, current_function);
-    else {
-        each_ast.body = create_ast<ScopeAst>(enumerator, AstType.Scope);
-        each_ast.body.children.length = 1;
-        each_ast.body.children.data = allocate(size_of(Ast*));
-        each_ast.body.children[0] = parse_line(enumerator, current_function);
-    }
-
+    each_ast.body = parse_scope_body(enumerator, current_function);
     return each_ast;
 }
 
@@ -1439,7 +1437,7 @@ Ast* parse_condition_expression(TokenEnumerator* enumerator, Function* current_f
         return expression;
     }
 
-    if check_for_end || token.type == TokenType.OpenBrace {
+    if check_for_end && token.type == TokenType.OpenBrace {
         return l_value;
     }
 
@@ -1636,14 +1634,14 @@ bool parse_value(Values* values, TokenEnumerator* enumerator, Function* current_
     return false;
 }
 
-AssignmentAst* parse_assignment(TokenEnumerator* enumerator, Function* current_function, bool* moveNext, Ast* reference = null) {
+AssignmentAst* parse_assignment(TokenEnumerator* enumerator, Function* current_function, bool* move_next, Ast* reference = null) {
     // 1. Set the variable
     assignment: AssignmentAst*;
     if reference assignment = create_ast<AssignmentAst>(reference, AstType.Assignment);
     else assignment = create_ast<AssignmentAst>(enumerator, AstType.Assignment);
 
     assignment.reference = reference;
-    *moveNext = false;
+    *move_next = false;
 
     // 2. When the original reference is null, set the l-value to an identifier
     if reference == null {
@@ -1690,7 +1688,7 @@ AssignmentAst* parse_assignment(TokenEnumerator* enumerator, Function* current_f
     // 4. Parse expression, field assignments, or array values
     switch enumerator.current.type {
         case TokenType.Equals;
-            *moveNext = parse_value(assignment, enumerator, current_function);
+            *move_next = parse_value(assignment, enumerator, current_function);
         case TokenType.SemiColon;
             report_error("Expected assignment to have value", enumerator.file_index, enumerator.current);
         default; {
@@ -1699,7 +1697,7 @@ AssignmentAst* parse_assignment(TokenEnumerator* enumerator, Function* current_f
             while move_next(enumerator) {
                 if enumerator.current.type == TokenType.SemiColon break;
                 if enumerator.current.type == TokenType.Equals {
-                    *moveNext = parse_value(assignment, enumerator, current_function);
+                    *move_next = parse_value(assignment, enumerator, current_function);
                     break;
                 }
             }
@@ -1799,7 +1797,7 @@ Ast* parse_expression(TokenEnumerator* enumerator, Function* current_function, P
         return null;
     }
 
-    if check_for_end || is_end_token(token.type, end_tokens) {
+    if check_for_end && is_end_token(token.type, end_tokens) {
         return l_value;
     }
 
@@ -1815,6 +1813,11 @@ Ast* parse_expression(TokenEnumerator* enumerator, Function* current_function, P
     if !move_next(enumerator) {
         report_error("Expected r-value for expression", enumerator.file_index, enumerator.last);
         return null;
+    }
+
+    if enumerator.current.type == TokenType.Equals {
+        _: bool;
+        return parse_assignment(enumerator, current_function, &_, expression);
     }
 
     expression.r_value = parse_expression(enumerator, current_function, end_tokens);
@@ -2059,9 +2062,11 @@ Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_f
                             call_ast.name = type_definition.name;
                             call_ast.generics = type_definition.generics;
 
-                            each generic in call_ast.generics {
-                                each function_generic, i in current_function.generics {
-                                    search_for_generic(function_generic, i, generic);
+                            if current_function {
+                                each generic in call_ast.generics {
+                                    each function_generic, i in current_function.generics {
+                                        search_for_generic(function_generic, i, generic);
+                                    }
                                 }
                             }
 
@@ -2070,8 +2075,10 @@ Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_f
                             return call_ast;
                         }
                         else {
-                            each generic, i in current_function.generics {
-                                search_for_generic(generic, i, type_definition);
+                            if current_function {
+                                each generic, i in current_function.generics {
+                                    search_for_generic(generic, i, type_definition);
+                                }
                             }
                             return type_definition;
                         }
@@ -2332,7 +2339,7 @@ CompilerDirectiveAst* parse_top_level_directive(TokenEnumerator* enumerator, boo
     directive := create_ast<CompilerDirectiveAst>(enumerator, AstType.CompilerDirective);
 
     if !move_next(enumerator) || enumerator.current.type != TokenType.Identifier {
-        report_error("Expected compiler directive to specify type and value", enumerator.file_index, enumerator.last);
+        report_error("Expected compiler directive to specify type and value", enumerator.file_index, enumerator.current);
         return null;
     }
 
@@ -2340,8 +2347,7 @@ CompilerDirectiveAst* parse_top_level_directive(TokenEnumerator* enumerator, boo
     if token.value == "run" {
         directive.directive_type = DirectiveType.Run;
         move_next(enumerator);
-        ast := parse_line(enumerator, null);
-        if ast directive.value = ast;
+        directive.value = parse_scope_body(enumerator, null);
     }
     else if token.value == "if" {
         directive.directive_type = DirectiveType.If;
@@ -2439,7 +2445,7 @@ Ast* parse_compiler_directive(TokenEnumerator* enumerator, Function* current_fun
     directive := create_ast<CompilerDirectiveAst>(enumerator, AstType.CompilerDirective);
 
     if !move_next(enumerator) || enumerator.current.type != TokenType.Identifier {
-        report_error("Expected compiler directive to specify type and value", enumerator.file_index, enumerator.last);
+        report_error("Expected compiler directive to specify type and value", enumerator.file_index, enumerator.current);
         return null;
     }
 
@@ -2805,26 +2811,12 @@ SwitchAst* parse_switch(TokenEnumerator* enumerator, Function* current_function)
                     return null;
                 }
 
-                if enumerator.current.type == TokenType.OpenBrace
-                    switch_ast.default_case = parse_scope(enumerator, current_function);
-                else {
-                    switch_ast.default_case = create_ast<ScopeAst>(enumerator, AstType.Scope);
-                    switch_ast.default_case.children.length = 1;
-                    switch_ast.default_case.children.data = allocate(size_of(Ast*));
-                    switch_ast.default_case.children[0] = parse_line(enumerator, current_function);
-                }
+                switch_ast.default_case = parse_scope_body(enumerator, current_function);
             }
             default; {
                 if current_cases.first_case {
                     // Parse through the case body and add to the list
-                    if enumerator.current.type == TokenType.OpenBrace
-                        current_cases.body = parse_scope(enumerator, current_function);
-                    else {
-                        current_cases.body = create_ast<ScopeAst>(enumerator, AstType.Scope);
-                        current_cases.body.children.length = 1;
-                        current_cases.body.children.data = allocate(size_of(Ast*));
-                        current_cases.body.children[0] = parse_line(enumerator, current_function);
-                    }
+                    current_cases.body = parse_scope_body(enumerator, current_function);
 
                     array_insert(&switch_ast.cases, current_cases, allocate, reallocate);
                     current_cases = { first_case = null; body = null; }

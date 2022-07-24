@@ -96,23 +96,57 @@ bool ends_with(string value, string ending) {
     return true;
 }
 
+string name_with_extension(string file) {
+    length := 0;
+    each i in 0..file.length - 1 {
+        if file[i] == '/' length = i;
+    }
+
+    if length return substring(file, length + 1, file.length - length - 1);
+    return file;
+}
+
 string name_without_extension(string file) {
     length := 0;
     extension_index := 0;
-    each i in 0..path.length - 1 {
-        switch path[i] {
+    each i in 0..file.length - 1 {
+        switch file[i] {
             case '/'; length = i;
             case '.'; extension_index = i;
         }
     }
 
-    if length >= extension_index return substring(path, length, path.length - length);
-    return substring(path, length, extension_index);
+    if length >= extension_index return substring(file, length, file.length - length);
+    return substring(file, length + 1, file.length - extension_index + 1);
 }
 
+PATH_MAX := 4096; #const
 string get_full_path(string path) {
+    null_terminated_path: Array<u8>[path.length + 1];
+    memory_copy(null_terminated_path.data, path.data, path.length);
+    null_terminated_path[path.length] = 0;
+
+    full_path: CArray<u8>[PATH_MAX];
     result: string;
-    // TODO Implement me
+    #if os == OS.Linux {
+        path_pointer := realpath(null_terminated_path.data, &full_path);
+        if path_pointer {
+            each char, i in full_path {
+                if char == 0 {
+                    result.length = i;
+                    break;
+                }
+            }
+        }
+        else return path;
+    }
+    #if os == OS.Windows {
+        result.length = GetFullPathNameA(path, PATH_MAX, &full_path, null);
+        if result.length == 0 return path;
+    }
+
+    result.data = allocate(result.length);
+    memory_copy(result.data, &full_path, result.length);
 
     return result;
 }
