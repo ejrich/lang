@@ -414,8 +414,8 @@ struct SwitchAst : Ast {
 }
 
 struct SwitchCases {
-    case_ast: Ast*;
-    cases: Array<Ast*>;
+    first_case: Ast*;
+    additional_cases: Array<Ast*>;
     body: ScopeAst*;
 }
 

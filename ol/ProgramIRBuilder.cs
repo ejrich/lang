@@ -2390,6 +2390,7 @@ public static class ProgramIRBuilder
         else if (callFunction.Flags.HasFlag(FunctionFlags.Macro))
         {
             // TODO Emit body of macro
+            Debug.Assert(false, "Macros not yet implemented");
             return null;
         }
         else

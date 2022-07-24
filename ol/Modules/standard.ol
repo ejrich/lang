@@ -77,6 +77,7 @@ bool array_remove<T>(Array<T>* array, int index) {
     return true;
 }
 
+// Resize the array to the next largest array block size
 array_reserve<T>(Array<T>* array, int length, Allocate allocator = default_allocator, Reallocate reallocator = default_reallocator) {
     if array.length >= length || length <= 0 return;
 
@@ -88,6 +89,26 @@ array_reserve<T>(Array<T>* array, int length, Allocate allocator = default_alloc
     }
     else {
         array.data = allocator(element_size * reserve_length);
+    }
+
+    array.length = length;
+}
+
+// Resize the array to the exact length specified
+array_resize<T>(Array<T>* array, int length, Allocate allocator = default_allocator, Reallocate reallocator = default_reallocator) {
+    if array.length >= length {
+        array.length = length;
+        return;
+    }
+    else if length <= 0 return;
+
+    element_size := size_of(T);
+
+    if array.length {
+        array.data = reallocator(array.data, array.length * element_size, element_size * length);
+    }
+    else {
+        array.data = allocator(element_size * length);
     }
 
     array.length = length;

@@ -1146,6 +1146,10 @@ public static class TypeChecker
             {
                 ErrorReporter.Report($"Size of Array does not need to be specified for return type of function '{function.Name}'", function.ReturnTypeDefinition.Count);
             }
+            else if (function.Flags.HasFlag(FunctionFlags.Extern) && function.ReturnType?.TypeKind == TypeKind.String)
+            {
+                function.ReturnType = TypeTable.RawStringType;
+            }
         }
 
         // 2. Verify the argument types
