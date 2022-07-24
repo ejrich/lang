@@ -1377,35 +1377,30 @@ Ast* parse_condition_expression(TokenEnumerator* enumerator, Function* current_f
     l_value := parse_next_expression_unit(enumerator, current_function);
     if l_value == null return null;
 
-    // Get the operator
-    if !move_next(enumerator) || enumerator.current.type == TokenType.OpenBrace {
-        return l_value;
-    }
+    // Handle any additional expressions before the operator
+    while true {
+        if !move_next(enumerator) {
+            return l_value;
+        }
 
-    token := enumerator.current;
-    check_for_end := false;
-    if token.type == TokenType.Increment || token.type == TokenType.Decrement {
-        // Create subexpression to hold the operation
-        // This case would be `var b = 4 + a++`, where we have a value before the operator
-        change_by_one := create_ast<ChangeByOneAst>(l_value, AstType.ChangeByOne);
-        change_by_one.positive = token.type == TokenType.Increment;
-        change_by_one.value = l_value;
-        l_value = change_by_one;
-        move_next(enumerator);
-        token = enumerator.current;
-        check_for_end = true;
-    }
-
-    if token.type == TokenType.Period {
-        l_value = parse_struct_field_ref(enumerator, l_value, current_function);
-        move_next(enumerator);
-        token = enumerator.current;
-        check_for_end = true;
+        switch enumerator.current.type {
+            case TokenType.OpenBrace;
+                return l_value;
+            case TokenType.Period; {
+                l_value = parse_struct_field_ref(enumerator, l_value, current_function);
+            }
+            case TokenType.Increment;
+            case TokenType.Decrement; {
+                parse_change_by_one(enumerator, &l_value, enumerator.current);
+            }
+            default; break;
+        }
     }
 
     expression := create_ast<ExpressionAst>(first_token, enumerator.file_index, AstType.Expression);
     expression.l_value = l_value;
 
+    token := enumerator.current;
     if token.type == TokenType.Number && token.value[0] == '-' {
         expression.op = Operator.Subtract;
 
@@ -1437,7 +1432,7 @@ Ast* parse_condition_expression(TokenEnumerator* enumerator, Function* current_f
         return expression;
     }
 
-    if check_for_end && token.type == TokenType.OpenBrace {
+    if token.type == TokenType.OpenBrace {
         return l_value;
     }
 
@@ -1454,55 +1449,6 @@ Ast* parse_condition_expression(TokenEnumerator* enumerator, Function* current_f
     }
 
     expression.r_value = parse_condition_expression(enumerator, current_function);
-
-    /*
-    expression := create_ast<ExpressionAst>(enumerator, AstType.Expression);
-    operator_required := false;
-    move(enumerator, -1);
-    while move_next(enumerator) {
-        token := enumerator.current;
-
-        if token.type == TokenType.OpenBrace
-            break;
-
-        if operator_required {
-            if token.type == TokenType.Increment || token.type == TokenType.Decrement {
-                // Create subexpression to hold the operation
-                // This case would be `var b = 4 + a++`, where we have a value before the operator
-                source := expression.children[expression.children.length - 1];
-                change_by_one := create_ast<ChangeByOneAst>(source, AstType.ChangeByOne);
-                change_by_one.positive = token.type == TokenType.Increment;
-                change_by_one.value = source;
-                expression.children[expression.children.length - 1] = change_by_one;
-                continue;
-            }
-            if token.type == TokenType.Number && token.value[0] == '-' {
-                token.value = substring(token.value, 1, token.value.length - 1);
-                expression.operators.Add(Operator.Subtract);
-                constant := parse_constant(token, enumerator.file_index);
-                expression.children.Add(constant);
-                continue;
-            }
-            if token.type == TokenType.Period {
-                struct_field_ref := parse_struct_field_ref(enumerator, expression.children[expression.children.length - 1], current_function);
-                expression.children[expression.children.length - 1] = struct_field_ref;
-                continue;
-            }
-            op := convert_operator(token);
-            if op != Operator.None {
-                expression.operators.Add(op);
-                operator_required = false;
-            }
-            else
-                break;
-        }
-        else {
-            ast := parse_next_expression_unit(enumerator, current_function, &operator_required);
-            if ast expression.children.Add(ast);
-        }
-    }
-    */
-
     return check_expression(enumerator, expression);
 }
 
@@ -1727,43 +1673,34 @@ Ast* parse_expression(TokenEnumerator* enumerator, Function* current_function, P
     l_value := parse_next_expression_unit(enumerator, current_function);
     if l_value == null return null;
 
-    // Get the operator
-    if !move_next(enumerator) || is_end_token(enumerator.current.type, end_tokens) {
-        return l_value;
-    }
+    // Handle any additional expressions before the operator
+    while true {
+        if !move_next(enumerator) || is_end_token(enumerator.current.type, end_tokens) {
+            return l_value;
+        }
 
-    token := enumerator.current;
-    if token.type == TokenType.Equals {
-        _: bool;
-        return parse_assignment(enumerator, current_function, &_, l_value);
-    }
-    if token.type == TokenType.Comma {
-        return parse_compound_expression(enumerator, current_function, l_value);
-    }
-
-    check_for_end := false;
-    if token.type == TokenType.Increment || token.type == TokenType.Decrement {
-        // Create subexpression to hold the operation
-        // This case would be `var b = 4 + a++`, where we have a value before the operator
-        change_by_one := create_ast<ChangeByOneAst>(l_value, AstType.ChangeByOne);
-        change_by_one.positive = token.type == TokenType.Increment;
-        change_by_one.value = l_value;
-        l_value = change_by_one;
-        move_next(enumerator);
-        token = enumerator.current;
-        check_for_end = true;
-    }
-
-    if token.type == TokenType.Period {
-        l_value = parse_struct_field_ref(enumerator, l_value, current_function);
-        move_next(enumerator);
-        token = enumerator.current;
-        check_for_end = true;
+        switch enumerator.current.type {
+            case TokenType.Equals; {
+                _: bool;
+                return parse_assignment(enumerator, current_function, &_, l_value);
+            }
+            case TokenType.Comma;
+                return parse_compound_expression(enumerator, current_function, l_value);
+            case TokenType.Period; {
+                l_value = parse_struct_field_ref(enumerator, l_value, current_function);
+            }
+            case TokenType.Increment;
+            case TokenType.Decrement; {
+                parse_change_by_one(enumerator, &l_value, enumerator.current);
+            }
+            default; break;
+        }
     }
 
     expression := create_ast<ExpressionAst>(first_token, enumerator.file_index, AstType.Expression);
     expression.l_value = l_value;
 
+    token := enumerator.current;
     if token.type == TokenType.Number && token.value[0] == '-' {
         expression.op = Operator.Subtract;
 
@@ -1797,7 +1734,7 @@ Ast* parse_expression(TokenEnumerator* enumerator, Function* current_function, P
         return null;
     }
 
-    if check_for_end && is_end_token(token.type, end_tokens) {
+    if is_end_token(token.type, end_tokens) {
         return l_value;
     }
 
@@ -1821,70 +1758,16 @@ Ast* parse_expression(TokenEnumerator* enumerator, Function* current_function, P
     }
 
     expression.r_value = parse_expression(enumerator, current_function, end_tokens);
-
-    /*
-    operator_required := false;
-    move(enumerator, -1);
-    while move_next(enumerator) {
-        token := enumerator.current;
-
-        if is_end_token(token.type, end_tokens)
-            break;
-
-        if token.type == TokenType.Equals {
-            _: bool;
-            return parse_assignment(enumerator, current_function, &_, expression);
-        }
-        else if token.type == TokenType.Comma {
-            if expression.children.length == 1
-                return parse_compound_expression(enumerator, current_function, expression.children[0]);
-
-            return parse_compound_expression(enumerator, current_function, expression);
-        }
-
-        if operator_required {
-            if token.type == TokenType.Increment || token.type == TokenType.Decrement {
-                // Create subexpression to hold the operation
-                // This case would be `var b = 4 + a++`, where we have a value before the operator
-                source := expression.children[expression.children.length - 1];
-                change_by_one := create_ast<ChangeByOneAst>(source, AstType.ChangeByOne);
-                change_by_one.positive = token.type == TokenType.Increment;
-                change_by_one.value = source;
-                expression.children[expression.children.length - 1] = change_by_one;
-                continue;
-            }
-            if token.type == TokenType.Number && token.value[0] == '-'
-            {
-                token.value = substring(token.value, 1, token.value.length - 1);
-                expression.operators.Add(Operator.Subtract);
-                constant := parse_constant(token, enumerator.file_index);
-                expression.children.Add(constant);
-                continue;
-            }
-            if token.type == TokenType.Period {
-                struct_field_ref := parse_struct_field_ref(enumerator, expression.children[expression.children.length - 1], current_function);
-                expression.children[expression.children.length - 1] = struct_field_ref;
-                continue;
-            }
-            op := convert_operator(token);
-            if op != Operator.None {
-                expression.operators.Add(op);
-                operator_required = false;
-            }
-            else {
-                report_error("Unexpected token '%' when operator was expected", enumerator.file_index, token, token.value);
-                return null;
-            }
-        }
-        else {
-            ast := parse_next_expression_unit(enumerator, current_function, &operator_required);
-            if ast
-                expression.children.Add(ast);
-        }
-    }
-    */
-
     return check_expression(enumerator, expression);
+}
+
+parse_change_by_one(TokenEnumerator* enumerator, Ast** l_value, Token token) {
+    // Create subexpression to hold the operation
+    // This case would be `var b = 4 + a++`, where we have a value before the operator
+    change_by_one := create_ast<ChangeByOneAst>(*l_value, AstType.ChangeByOne);
+    change_by_one.positive = token.type == TokenType.Increment;
+    change_by_one.value = *l_value;
+    *l_value = change_by_one;
 }
 
 Ast* check_expression(TokenEnumerator* enumerator, ExpressionAst* expression) {
@@ -2338,7 +2221,7 @@ IndexAst* parse_index(TokenEnumerator* enumerator, Function* current_function) {
 CompilerDirectiveAst* parse_top_level_directive(TokenEnumerator* enumerator, bool global = false) {
     directive := create_ast<CompilerDirectiveAst>(enumerator, AstType.CompilerDirective);
 
-    if !move_next(enumerator) || enumerator.current.type != TokenType.Identifier {
+    if !move_next(enumerator) {
         report_error("Expected compiler directive to specify type and value", enumerator.file_index, enumerator.current);
         return null;
     }
@@ -2444,8 +2327,8 @@ CompilerDirectiveAst* parse_top_level_directive(TokenEnumerator* enumerator, boo
 Ast* parse_compiler_directive(TokenEnumerator* enumerator, Function* current_function) {
     directive := create_ast<CompilerDirectiveAst>(enumerator, AstType.CompilerDirective);
 
-    if !move_next(enumerator) || enumerator.current.type != TokenType.Identifier {
-        report_error("Expected compiler directive to specify type and value", enumerator.file_index, enumerator.current);
+    if !move_next(enumerator) {
+        report_error("Expected compiler directive to specify type and value", enumerator.file_index, enumerator.last);
         return null;
     }
 

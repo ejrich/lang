@@ -284,7 +284,7 @@ parse_tokens(string file_text, int file_index, TokenList* token_list) {
                     i++;
                     column++;
                 }
-                else if character >= '0' || character <= '9' {
+                else if character >= '0' && character <= '9' {
                     token.type = TokenType.Number;
                     start_index := i++;
                     offset := 1;
