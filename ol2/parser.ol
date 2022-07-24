@@ -62,7 +62,7 @@ add_module(CompilerDirectiveAst* module) {
 }
 
 add_file(string file, string directory, int fileIndex, Token token) {
-    file_path := format_string("%/%", directory, file);
+    file_path := format_string("%/%", allocate, directory, file);
     if file_exists(file_path)
         queue_file_if_not_exists(file_path);
     else
@@ -145,10 +145,9 @@ parse_file(void* data) {
     parse_data: ParseData* = data;
     file_index := parse_data.file_index;
 
-    print("Parsing file: %\n", parse_data.file);
     tokens := load_file_tokens(parse_data.file, file_index);
 
-    enumerator: TokenEnumerator = { tokens = tokens; file_index = file_index; }
+    enumerator: TokenEnumerator = { tokens = tokens; file_index = file_index; directory = get_directory(parse_data.file); }
 
     while move_next(&enumerator) {
         attributes := parse_attributes(&enumerator);
@@ -869,6 +868,8 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
         if base_type == null || base_type.type_kind != TypeKind.Integer {
             report_error("Base type of enum must be an integer, but got '%'", enum_ast.base_type_definition, print_type_definition(enum_ast.base_type_definition));
             enum_ast.base_type = &s32_type;
+            enum_ast.size = 4;
+            enum_ast.alignment = 4;
         }
         else {
             enum_ast.base_type = cast(PrimitiveAst*, base_type);
@@ -888,14 +889,14 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
     }
 
     // 3. Iterate through fields
-    lowest_allowed_value: int;
-    largest_allowed_value: int;
+    lowest_allowed_value: s64;
+    largest_allowed_value: u64;
     if enum_ast.base_type.signed {
-        lowest_allowed_value = -(2 << (8 * enum_ast.size - 1));
-        largest_allowed_value = 2 << (8 * enum_ast.size - 1) - 1;
+        lowest_allowed_value = -(1 << (8 * enum_ast.size - 1));
+        largest_allowed_value = 1 << (8 * enum_ast.size - 1) - 1;
     }
     else {
-        largest_allowed_value = 2 << (8 * enum_ast.size) - 1;
+        largest_allowed_value = 1 << (8 * enum_ast.size) - 1;
     }
     largest_value := -1;
     enumIndex := 0;
@@ -1923,7 +1924,7 @@ Ast* parse_compound_expression(TokenEnumerator* enumerator, Function* current_fu
             }
             case TokenType.Colon; {
                 compound_declaration := create_ast<CompoundDeclarationAst>(compound_expression, AstType.CompoundDeclaration);
-                // compound_declaration.Variables = new VariableAst[compound_expression.Children.Count];
+                array_resize(&compound_declaration.variables, compound_expression.children.length, allocate, reallocate);
 
                 // Copy the initial expression to variables
                 each variable, i in compound_expression.children {
@@ -2774,8 +2775,8 @@ SwitchAst* parse_switch(TokenEnumerator* enumerator, Function* current_function)
         switch enumerator.current.type {
             case TokenType.CloseBrace; {
                 closed = true;
-                if current_cases.case_ast {
-                    report_error("Switch statement contains case(s) without bodies starting", current_cases.case_ast);
+                if current_cases.first_case {
+                    report_error("Switch statement contains case(s) without bodies starting", current_cases.first_case);
                     return null;
                 }
                 break;
@@ -2788,13 +2789,10 @@ SwitchAst* parse_switch(TokenEnumerator* enumerator, Function* current_function)
 
                 switch_case := parse_expression(enumerator, current_function);
 
-                if current_cases.case_ast == null
-                    current_cases.case_ast = switch_case;
+                if current_cases.first_case == null
+                    current_cases.first_case = switch_case;
                 else {
-                    if current_cases.cases.length == 0
-                        current_cases.cases[0] = current_cases.case_ast;
-
-                    array_insert(&current_cases.cases, switch_case, allocate, reallocate);
+                    array_insert(&current_cases.additional_cases, switch_case, allocate, reallocate);
                 }
             }
             case TokenType.Default; {
@@ -2817,7 +2815,7 @@ SwitchAst* parse_switch(TokenEnumerator* enumerator, Function* current_function)
                 }
             }
             default; {
-                if current_cases.case_ast {
+                if current_cases.first_case {
                     // Parse through the case body and add to the list
                     if enumerator.current.type == TokenType.OpenBrace
                         current_cases.body = parse_scope(enumerator, current_function);
@@ -2829,9 +2827,9 @@ SwitchAst* parse_switch(TokenEnumerator* enumerator, Function* current_function)
                     }
 
                     array_insert(&switch_ast.cases, current_cases, allocate, reallocate);
-                    current_cases = { case_ast = null; body = null; }
-                    current_cases.cases.length = 0;
-                    current_cases.cases.data = null;
+                    current_cases = { first_case = null; body = null; }
+                    current_cases.additional_cases.length = 0;
+                    current_cases.additional_cases.data = null;
                 }
                 else {
                     report_error("Switch statement contains case body prior to any cases", enumerator.file_index, enumerator.current);

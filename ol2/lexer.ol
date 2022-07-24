@@ -167,7 +167,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                             token.value = substring(file_text, start_index, i - start_index);
                         }
 
-                        if error report_error(format_string("Unexpected token '%'", allocate, token.value), file_index, token);
+                        if error report_error("Unexpected token '%'", file_index, token, token.value);
 
                         add_token(&token_list, token);
                         break;
@@ -184,7 +184,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                         token = { type = TokenType.Character; value = escaped_character; line = line; column = column; }
                         add_token(&token_list, token);
                     }
-                    else report_error(format_string("Unknown escaped character '\\%'", allocate, character), file_index, line, column);
+                    else report_error("Unknown escaped character '\\%'", file_index, line, column, character);
                     column += 2;
                 }
                 else {

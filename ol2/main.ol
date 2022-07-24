@@ -16,6 +16,7 @@ output_directory: string;
 linker: LinkerType;
 output_type_table: OutputTypeTableConfiguration;
 
+file_paths: Array<string>;
 file_names: Array<string>;
 
 main() {
@@ -42,12 +43,15 @@ main() {
                 }
                 else {
                     name = name_without_extension(arg);
-                    entrypoint = arg; // Path.GetFullPath(arg);
-                    // path = Path.GetDirectoryName(entrypoint);
+                    entrypoint = get_full_path(arg);
+                    path = get_directory(entrypoint);
                 }
             }
         }
     }
+
+    if string_is_empty(entrypoint) report_error_message("Program entrypoint not defined");
+    list_errors_and_exit(ArgumentsError);
 
     // Initialize subsystems
     if !noThreads init_thread_pool();
@@ -93,10 +97,33 @@ bool ends_with(string value, string ending) {
 }
 
 string name_without_extension(string file) {
+    length := 0;
+    extension_index := 0;
+    each i in 0..path.length - 1 {
+        switch path[i] {
+            case '/'; length = i;
+            case '.'; extension_index = i;
+        }
+    }
+
+    if length >= extension_index return substring(path, length, path.length - length);
+    return substring(path, length, extension_index);
+}
+
+string get_full_path(string path) {
     result: string;
     // TODO Implement me
 
     return result;
+}
+
+string get_directory(string path) {
+    length := 0;
+    each i in 0..path.length - 1 {
+        if path[i] == '/' length = i;
+    }
+
+    return substring(path, 0, length);
 }
 
 float get_time(u64 start, u64 end, u64 freq) {
@@ -259,10 +286,15 @@ void* allocate(int size) {
         return allocate_arena(size, size);
 
     each arena in arenas {
-        if size <= arena.size - arena.cursor {
-            pointer := arena.pointer + arena.cursor;
-            arena.cursor += size;
-            return pointer;
+        while true {
+            cursor := arena.cursor;
+            if size <= arena.size - cursor {
+                if compare_exchange(&arena.cursor, cursor + size, cursor) == cursor {
+                    pointer := arena.pointer + cursor;
+                    return pointer;
+                }
+            }
+            else break;
         }
     }
 
