@@ -41,65 +41,6 @@ main() {
                     report_error_message("Entrypoint file does not exist or is not an .ol file '%'", arg);
                 }
                 else {
-                    // name = Path.GetFileNameWithoutExtension(arg);
-                    entrypoint = arg; // Path.GetFullPath(arg);
-                    // path = Path.GetDirectoryName(entrypoint);
-                }
-            }
-        }
-    }
-
-    if string_is_empty(entrypoint) report_error_message("Program entrypoint not defined");
-    list_errors_and_exit(ArgumentsError);
-
-    // Parse source files to asts
-    if !noThreads init_thread_pool();
-    init_types();
-    // parse(entrypoint);
-    list_errors_and_exit(ParsingError);
-
-    // Check types and build the program ir
-    // check_types();
-    list_errors_and_exit(CompilationError);
-    complete_work();
-    front_end_time := get_performance_counter();
-
-    // Build program
-    // object_file := llvm_build();
-    build_time := get_performance_counter();
-
-    // Link binaries
-    // link(object_file);
-    link_time := get_performance_counter();
-
-    // Log statistics
-    print("Front-end time: % seconds\nLLVM build time: % seconds\nLinking time: % seconds\n", get_time(start, front_end_time, freq), get_time(front_end_time, build_time, freq), get_time(build_time, link_time, freq));
-    deallocate_arenas();
-}
-
-_main() {
-    freq := get_performance_frequency();
-    start := get_performance_counter();
-
-    // Load cli args into build settings
-    entrypoint: string;
-    noThreads := false;
-    each arg in command_line_arguments {
-        if arg == "-R" || arg == "--release" release = true;
-        else if arg == "-S" output_assembly = true;
-        else if arg == "-noThreads" noThreads = true;
-        else {
-            if arg[0] == '-' {
-                report_error_message("Unrecognized compiler flag '%'", arg);
-            }
-            else if !string_is_empty(entrypoint) {
-                report_error_message("Multiple program entrypoints defined '%'", arg);
-            }
-            else {
-                if !file_exists(arg) || !ends_with(arg, ".ol") {
-                    report_error_message("Entrypoint file does not exist or is not an .ol file '%'", arg);
-                }
-                else {
                     name = name_without_extension(arg);
                     entrypoint = arg; // Path.GetFullPath(arg);
                     // path = Path.GetDirectoryName(entrypoint);
@@ -139,7 +80,6 @@ _main() {
     print("Front-end time: % seconds\nLLVM build time: % seconds\nLinking time: % seconds\n", get_time(start, front_end_time, freq), get_time(front_end_time, build_time, freq), get_time(build_time, link_time, freq));
     deallocate_arenas();
 }
-
 
 bool ends_with(string value, string ending) {
     if ending.length > value.length return false;
@@ -401,6 +341,7 @@ list_errors_and_exit(int errorCode) {
 
 #run {
     set_executable_name("ol");
+    set_output_type_table(OutputTypeTableConfiguration.Used);
 
     if os != OS.Windows {
         set_linker(LinkerType.Dynamic);

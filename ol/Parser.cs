@@ -2811,6 +2811,9 @@ public static class Parser
     private static AssemblyAst ParseInlineAssembly(TokenEnumerator enumerator)
     {
         var assembly = CreateAst<AssemblyAst>(enumerator);
+        assembly.Instructions = new();
+        assembly.InRegisters = new();
+        assembly.OutValues = new();
 
         // First move over the opening '{'
         if (!enumerator.MoveNext())

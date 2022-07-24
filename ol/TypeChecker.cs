@@ -586,9 +586,9 @@ public static class TypeChecker
         {
             var privateScope = PrivateScopes[fileIndex];
 
-            if (!privateScope.Functions.TryGetValue(function.Name, out var functions))
+            if (!privateScope.Functions.TryGetValue(name, out var functions))
             {
-                privateScope.Functions[function.Name] = functions = new List<FunctionAst>();
+                privateScope.Functions[name] = functions = new List<FunctionAst>();
             }
             functions.Add(function);
         }
@@ -4573,7 +4573,7 @@ public static class TypeChecker
                 call.PassArrayToParams = passArrayToParams;
                 var uniqueName = $"{function.Name}.{i}.{string.Join('.', genericTypes.Select(type => type.TypeIndex))}";
 
-                if (GetExistingFunction(uniqueName, call.FileIndex, out polymorphedFunction, out var functionCount))
+                if (GetExistingFunction(uniqueName, call.FileIndex, out polymorphedFunction, out _))
                 {
                     return true;
                 }

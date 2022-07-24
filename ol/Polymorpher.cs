@@ -144,7 +144,7 @@ public static class Polymorpher
             case CompilerDirectiveAst compilerDirective:
                 return CopyCompilerDirective(compilerDirective, genericTypes, generics);
             case AssemblyAst assembly:
-                return assembly;
+                return CopyAssembly(assembly, genericTypes, generics);
             default:
                 return CopyExpression(ast, genericTypes, generics);
         }
@@ -234,6 +234,39 @@ public static class Polymorpher
         var copy = CopyAst(compilerDirective);
         copy.Type = compilerDirective.Type;
         copy.Value = CopyAst(compilerDirective.Value, genericTypes, generics);
+        return copy;
+    }
+
+    private static AssemblyAst CopyAssembly(AssemblyAst assembly, IType[] genericTypes, List<string> generics)
+    {
+        if (!assembly.InRegisters.Any() && !assembly.OutValues.Any())
+        {
+            return assembly;
+        }
+
+        var copy = CopyAst(assembly);
+        copy.Instructions = assembly.Instructions;
+        copy.InRegisters = new(assembly.InRegisters.Count);
+        copy.OutValues = new(assembly.OutValues.Count);
+
+        foreach (var (register, input) in assembly.InRegisters)
+        {
+            var inputCopy = CopyAst(input);
+            inputCopy.Register = register;
+            inputCopy.Ast = CopyAst(input.Ast, genericTypes, generics);
+
+            copy.InRegisters[register] = inputCopy;
+        }
+
+        foreach (var outValue in assembly.OutValues)
+        {
+            var outValueCopy = CopyAst(outValue);
+            outValueCopy.Register = outValue.Register;
+            outValueCopy.Ast = CopyAst(outValue.Ast, genericTypes, generics);
+
+            copy.OutValues.Add(outValueCopy);
+        }
+
         return copy;
     }
 

@@ -609,9 +609,9 @@ public class AssemblyAst : IAst
     public int FileIndex { get; set; }
     public uint Line { get; init; }
     public uint Column { get; init; }
-    public List<AssemblyInstructionAst> Instructions { get; } = new();
-    public Dictionary<string, AssemblyInputAst> InRegisters { get; } = new();
-    public List<AssemblyInputAst> OutValues { get; } = new();
+    public List<AssemblyInstructionAst> Instructions { get; set; }
+    public Dictionary<string, AssemblyInputAst> InRegisters { get; set; }
+    public List<AssemblyInputAst> OutValues { get; set; }
     public bool FindStagingInputRegister { get; set; }
     public Byte[] AssemblyBytes { get; set; }
 }
