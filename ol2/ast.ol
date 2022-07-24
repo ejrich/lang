@@ -98,7 +98,7 @@ enum FunctionFlags {
 
 struct Values : Ast {
     value: Ast*;
-    assignments: HashTable<string, AssignmentAst*>;
+    // assignments: HashTable<string, AssignmentAst*>;
     array_values: Array<Ast*>;
 }
 

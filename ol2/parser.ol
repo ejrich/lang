@@ -1600,8 +1600,9 @@ bool parse_value(Values* values, TokenEnumerator* enumerator, Function* current_
                 move_next: bool;
                 assignment := parse_assignment(enumerator, current_function, &move_next);
 
-                if !table_add(&values.assignments, token.value, assignment)
-                    report_error("Multiple assignments for field '%'", enumerator.file_index, token, token.value);
+                // TODO Fix me
+                // if !table_add(&values.assignments, token.value, assignment)
+                //     report_error("Multiple assignments for field '%'", enumerator.file_index, token, token.value);
 
                 if move_next {
                     peek(enumerator, &token);
@@ -3505,7 +3506,8 @@ CastAst* parse_cast(TokenEnumerator* enumerator, Function* current_function) {
 }
 
 T* create_ast<T>(Ast* source, AstType type) {
-    ast: T = { ast_type = type; }
+    ast := new<T>();
+    ast.ast_type = type;
 
     if source {
         ast.file_index = source.file_index;
@@ -3513,10 +3515,7 @@ T* create_ast<T>(Ast* source, AstType type) {
         ast.column = source.column;
     }
 
-    pointer: T* = allocate(size_of(T));
-    *pointer = ast;
-
-    return pointer;
+    return ast;
 }
 
 T* create_ast<T>(TokenEnumerator* enumerator, AstType type) {
@@ -3524,12 +3523,13 @@ T* create_ast<T>(TokenEnumerator* enumerator, AstType type) {
 }
 
 T* create_ast<T>(Token token, int file_index, AstType type) {
-    ast: T = { ast_type = type; file_index = file_index; line = token.line; column = token.column; }
+    ast := new<T>();
+    ast.ast_type = type;
+    ast.file_index = file_index;
+    ast.line = token.line;
+    ast.column = token.column;
 
-    pointer: T* = allocate(size_of(T));
-    *pointer = ast;
-
-    return pointer;
+    return ast;
 }
 
 Operator convert_operator(Token token) {
