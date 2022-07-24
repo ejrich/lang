@@ -41,6 +41,7 @@ enum AstType {
     TypeDefinition;
     Break;
     Continue;
+    Defer;
 }
 
 struct Ast {
@@ -52,7 +53,6 @@ struct Ast {
 
 struct TypeAst : Ast {
     name: string;
-    backend_name: string;
     type_index: int;
     type_kind: TypeKind;
     size: u32;
@@ -124,7 +124,9 @@ struct GlobalScope : Scope {
 
 struct ScopeAst : Scope {
     returns: bool;
+    defer_count: int;
     children: Array<Ast*>;
+    deferred_asts: Array<ScopeAst*>;
 }
 
 struct FunctionAst : Function {
@@ -417,6 +419,11 @@ struct SwitchCases {
     first_case: Ast*;
     additional_cases: Array<Ast*>;
     body: ScopeAst*;
+}
+
+struct DeferAst : Ast {
+    added: bool;
+    statement: ScopeAst*;
 }
 
 struct TypeDefinition : Ast {

@@ -56,10 +56,16 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
         return token_list.tokens;
     }
 
-    estimated_tokens := file_text.length / 4;
+    estimated_tokens := file_text.length / 2;
     token_list.allocated_length = estimated_tokens;
     token_list.tokens.data = allocate(estimated_tokens * size_of(Token));
 
+    parse_tokens(file_text, file_index, &token_list);
+
+    return token_list.tokens;
+}
+
+parse_tokens(string file_text, int file_index, TokenList* token_list) {
     line: u32 = 1;
     column: u32;
     i := 0;
@@ -113,7 +119,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                 else
                 {
                     token = { type = TokenType.ForwardSlash; value = "/"; line = line; column = column; }
-                    add_token(&token_list, token);
+                    add_token(token_list, token);
                 }
             }
             // Handle literals
@@ -125,7 +131,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                 token = { type = TokenType.Literal; value = ""; line = line; column = column; }
                 string_buffer: StringBuffer;
 
-                while true {
+                while i < file_text.length - 1 {
                     character = file_text[++i];
                     column++;
 
@@ -169,7 +175,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
 
                         if error report_error("Unexpected token '%'", file_index, token, token.value);
 
-                        add_token(&token_list, token);
+                        add_token(token_list, token);
                         break;
                     }
                 }
@@ -182,7 +188,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                     char_found, escaped_character := get_escaped_character(character);
                     if char_found {
                         token = { type = TokenType.Character; value = escaped_character; line = line; column = column; }
-                        add_token(&token_list, token);
+                        add_token(token_list, token);
                     }
                     else report_error("Unknown escaped character '\\%'", file_index, line, column, character);
                     column += 2;
@@ -190,7 +196,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                 else {
                     column++;
                     token = { type = TokenType.Character; value = substring(file_text, i, 1); line = line; column = column; }
-                    add_token(&token_list, token);
+                    add_token(token_list, token);
                 }
 
                 character = file_text[i+1];
@@ -219,7 +225,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                 }
                 else token = { type = TokenType.Period; value = "."; }
 
-                add_token(&token_list, token);
+                add_token(token_list, token);
             }
             case '!'; {
                 token = { line = line; column = column; }
@@ -231,7 +237,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                 }
                 else token = { type = TokenType.Not; value = "!"; }
 
-                add_token(&token_list, token);
+                add_token(token_list, token);
             }
             case '&'; {
                 token = { line = line; column = column; }
@@ -243,7 +249,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                 }
                 else token = { type = TokenType.Ampersand; value = "&"; }
 
-                add_token(&token_list, token);
+                add_token(token_list, token);
             }
             case '|'; {
                 token = { line = line; column = column; }
@@ -255,7 +261,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                 }
                 else token = { type = TokenType.Pipe; value = "|"; }
 
-                add_token(&token_list, token);
+                add_token(token_list, token);
             }
             case '+'; {
                 token = { line = line; column = column; }
@@ -267,7 +273,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                 }
                 else token = { type = TokenType.Plus; value = "+"; }
 
-                add_token(&token_list, token);
+                add_token(token_list, token);
             }
             case '-'; {
                 token = { line = line; column = column; }
@@ -283,7 +289,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                     start_index := i++;
                     offset := 1;
 
-                    while true {
+                    while i < file_text.length - 1 {
                         character = file_text[i+1];
 
                         if character < '0' || character > '9' {
@@ -317,7 +323,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                 }
                 else token = { type = TokenType.Minus; value = "-"; }
 
-                add_token(&token_list, token);
+                add_token(token_list, token);
             }
             case '='; {
                 token = { line = line; column = column; }
@@ -329,7 +335,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                 }
                 else token = { type = TokenType.Equals; value = "="; }
 
-                add_token(&token_list, token);
+                add_token(token_list, token);
             }
             case '<'; {
                 token = { line = line; column = column; }
@@ -354,7 +360,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                 }
                 else token = { type = TokenType.LessThan; value = "<"; }
 
-                add_token(&token_list, token);
+                add_token(token_list, token);
             }
             case '>'; {
                 token = { line = line; column = column; }
@@ -379,7 +385,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                 }
                 else token = { type = TokenType.GreaterThan; value = ">"; }
 
-                add_token(&token_list, token);
+                add_token(token_list, token);
             }
             case '(';
             case ')';
@@ -395,7 +401,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
             case ',';
             case '#'; {
                 token = { type = cast(TokenType, character); value = substring(file_text, i, 1); line = line; column = column; }
-                add_token(&token_list, token);
+                add_token(token_list, token);
             }
             // Handle numbers
             case '0';
@@ -412,7 +418,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                 offset := 1;
                 token = { type = TokenType.Number; line = line; column = column; }
 
-                while true {
+                while i < file_text.length - 1 {
                     next_character := file_text[i+1];
 
                     if next_character < '0' || next_character > '9' {
@@ -450,7 +456,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                 }
 
                 token.value = substring(file_text, start_index, i - start_index + offset);
-                add_token(&token_list, token);
+                add_token(token_list, token);
             }
             // Handle other identifiers
             default; {
@@ -458,7 +464,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                 offset := 1;
                 token = { line = line; column = column; }
 
-                while true {
+                while i < file_text.length - 1 {
                     character = file_text[i+1];
                     if character == '\n' {
                         i++;
@@ -505,6 +511,7 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                         else if token.value == "false" token.type = TokenType.Boolean;
                         else if token.value == "while" token.type = TokenType.While;
                         else if token.value == "union" token.type = TokenType.Union;
+                        else if token.value == "defer" token.type = TokenType.Defer;
                     }
                     case 6; {
                         if token.value == "return" token.type = TokenType.Return;
@@ -523,13 +530,11 @@ Array<Token> load_file_tokens(string file_path, int file_index) {
                     }
                 }
 
-                add_token(&token_list, token);
+                add_token(token_list, token);
             }
         }
         i++;
     }
-
-    return token_list.tokens;
 }
 
 string substring(string str, int start, int length) {
@@ -600,6 +605,7 @@ enum TokenType {
     Switch;
     Case;
     Default;
+    Defer;
 }
 
 [flags]
@@ -618,7 +624,7 @@ struct TokenList {
 
 add_token(TokenList* token_list, Token token) {
     if token_list.tokens.length > token_list.allocated_length {
-        report_error_message("Whoops, out of memory, FIX ME!!!!!!!!\n");
+        report_error_message("Whoops, out of memory, FIX ME!!!!!!!!");
         return;
     }
 

@@ -19,6 +19,7 @@ Handle* GetStdHandle(int nStdHandle) #extern "kernel32"
 bool WriteConsoleA(Handle* hConsoleOutput, void* lpBuffer, int nNumberOfCharsToWrite, int* lpNumberOfCharsWritten, void* lpReserved) #extern "kernel32"
 
 bool PathFileExistsA(string pszPath) #extern "shlwapi"
+int GetFullPathNameA(string lpFileName, int nBufferLength, u8* lpBuffer, u8** lpFilePart) #extern "kernel32"
 Handle* OpenFile(string lpFileName, OFSTRUCT* lpReOpenBuff, OpenFileType uStyle) #extern "kernel32"
 bool CloseHandle(Handle* hObject) #extern "kernel32"
 int SetFilePointer(Handle* hFile, u64 lDistanceToMove, u64* lpDistanceToMoveHigh, MoveMethod dwMoveMethod) #extern "kernel32"

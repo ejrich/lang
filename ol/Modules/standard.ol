@@ -742,6 +742,9 @@ enum FileFlags {
 
 bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
     file: File;
+    null_terminated_path: Array<u8>[path.length + 1];
+    memory_copy(null_terminated_path.data, path.data, path.length);
+    null_terminated_path[path.length] = 0;
 
     #if os == OS.Linux {
         open_flags: OpenFlags;
@@ -770,7 +773,7 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
             open_flags |= OpenFlags.O_CREAT | OpenFlags.O_APPEND;
         }
 
-        file.handle = open(path.data, open_flags, OpenMode.S_RWALL);
+        file.handle = open(null_terminated_path.data, open_flags, OpenMode.S_RWALL);
 
         if file.handle < 0 {
             return false, file;
@@ -805,7 +808,7 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
                 open_type |= OpenFileType.OF_WRITE;
             }
 
-            if PathFileExistsA(path) {
+            if PathFileExistsA(null_terminated_path.data) {
                 open_type |= OpenFileType.OF_WRITE;
             }
             else {
@@ -813,7 +816,7 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
             }
         }
 
-        file_handle := OpenFile(path, &file_info, open_type);
+        file_handle := OpenFile(null_terminated_path.data, &file_info, open_type);
 
         if file_handle == null {
             return false, file;
