@@ -3121,8 +3121,7 @@ TypeDefinition* parse_type(TokenEnumerator* enumerator, Function* current_functi
         move_next(enumerator);
         pointer_type := create_ast<TypeDefinition>(enumerator, AstType.TypeDefinition);
         pointer_type.name = "*";
-        pointer_type.generics.length = 1;
-        pointer_type.generics.data = allocate(size_of(TypeDefinition*));
+        array_resize(&pointer_type.generics, 1, allocate, reallocate);
         pointer_type.generics[0] = type_definition;
         type_definition = pointer_type;
     }
@@ -3220,8 +3219,7 @@ bool, TypeDefinition* try_parse_type(Token name, TokenEnumerator* enumerator, in
     while peek(enumerator, &token, *steps) && token.type == TokenType.Asterisk {
         pointer_type := create_ast<TypeDefinition>(token, enumerator.file_index, AstType.TypeDefinition);
         pointer_type.name = "*";
-        pointer_type.generics.length = 1;
-        pointer_type.generics.data = allocate(size_of(TypeDefinition*));
+        array_resize(&pointer_type.generics, 1, allocate, reallocate);
         pointer_type.generics[0] = type_definition;
 
         type_definition = pointer_type;

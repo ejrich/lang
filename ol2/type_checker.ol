@@ -62,9 +62,64 @@ TypeAst* verify_type(TypeDefinition* type_def, Scope* scope) {
 }
 
 string print_type_definition(TypeDefinition* type) {
-    return "";
+    if type.baked_type return type.baked_type.name;
+    if type.generics.length == 0 return type.name;
+
+    // Determine how much space to reserve
+    length := determine_type_definition_length(type);
+
+    result: string = { length = length; data = allocate(length); }
+    add_type_to_string(type, result, 0);
+
+    return result;
 }
 
 base_array_type: StructAst*;
 global_scope: GlobalScope;
 private_scopes: Array<GlobalScope*>;
+
+#private
+
+int determine_type_definition_length(TypeDefinition* type) {
+    if type.baked_type return type.baked_type.name.length;
+
+    length := type.name.length;
+    if type.name == "*" {
+        length += determine_type_definition_length(type.generics[0]);
+    }
+    else {
+        each generic in type.generics {
+            length += determine_type_definition_length(generic) + 2; // Add 2 for the ", " after each generic
+        }
+    }
+
+    return length;
+}
+
+int add_type_to_string(TypeDefinition* type, string result, int index) {
+    if type.baked_type {
+        memory_copy(result.data + index, type.baked_type.name.data, type.baked_type.name.length);
+        index += type.baked_type.name.length;
+    }
+    else if type.name == "*" {
+        index = add_type_to_string(type.generics[0], result, index);
+        result[index++] = '*';
+    }
+    else {
+        memory_copy(result.data + index, type.name.data, type.name.length);
+        index += type.name.length;
+        if type.generics.length {
+            result[index++] = '<';
+            i := 0;
+            while i < type.generics.length - 1 {
+                index = add_type_to_string(type.generics[i++], result, index);
+                result[index++] = ',';
+                result[index++] = ' ';
+            }
+            index = add_type_to_string(type.generics[i], result, index);
+            result[index++] = '>';
+        }
+    }
+
+    return index;
+}
