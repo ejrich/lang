@@ -1544,9 +1544,8 @@ bool parse_value(Values* values, TokenEnumerator* enumerator, Function* current_
                 move_next: bool;
                 assignment := parse_assignment(enumerator, current_function, &move_next);
 
-                // TODO Fix me
-                // if !table_add(&values.assignments, token.value, assignment)
-                //     report_error("Multiple assignments for field '%'", enumerator.file_index, token, token.value);
+                if !table_add(values.assignments, token.value, assignment)
+                    report_error("Multiple assignments for field '%'", enumerator.file_index, token, token.value);
 
                 if move_next {
                     peek(enumerator, &token);
