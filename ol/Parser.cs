@@ -213,7 +213,7 @@ public static class Parser
                     var structAst = ParseStruct(enumerator, attributes);
                     if (structAst.Generics != null)
                     {
-                        
+                        if (TypeChecker.AddPolymorphicStruct(structAst) && structAst.Name == "Array")
                         {
                             TypeChecker.BaseArrayType = structAst;
                         }

@@ -5,7 +5,7 @@ main() {
     print("Hello world\n");
 
     i := 0;
-    macro_with_code(print("i = %\n", i++));
+    // macro_with_code(print("i = %\n", i++));
 }
 
 #run {
