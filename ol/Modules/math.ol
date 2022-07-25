@@ -61,6 +61,10 @@ float64 log_2(float64 value) #inline {
     return value;
 }
 
+float64 log_x(float64 value, int x) #inline {
+    return log_2(value) / log_2(x);
+}
+
 T float_mod<T>(T x, T y) {
     #assert T == float || T == float64;
 
@@ -76,6 +80,32 @@ T floor<T>(T value) {
 
     result := cast(s64, value);
     return cast(T, result);
+}
+
+T ceil<T>(T value) {
+    #assert T == float || T == float64;
+
+    result := cast(s64, value) + 1;
+    return cast(T, result);
+}
+
+int integer_length(s64 value) {
+    count := 1;
+    if value < 0 {
+        value *= -1;
+        count++;
+    }
+
+    while true {
+        if value < 10    return count;
+        if value < 100   return count + 1;
+        if value < 1000  return count + 2;
+        if value < 10000 return count + 3;
+        value /= 10000;
+        count += 4;
+    }
+
+    return count;
 }
 
 

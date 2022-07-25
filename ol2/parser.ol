@@ -98,6 +98,33 @@ struct ParseData {
     file_index: int;
 }
 
+T* create_ast<T>(Ast* source, AstType type) {
+    ast := new<T>();
+    ast.ast_type = type;
+
+    if source {
+        ast.file_index = source.file_index;
+        ast.line = source.line;
+        ast.column = source.column;
+    }
+
+    return ast;
+}
+
+T* create_ast<T>(TokenEnumerator* enumerator, AstType type) {
+    return create_ast<T>(enumerator.current, enumerator.file_index, type);
+}
+
+T* create_ast<T>(Token token, int file_index, AstType type) {
+    ast := new<T>();
+    ast.ast_type = type;
+    ast.file_index = file_index;
+    ast.line = token.line;
+    ast.column = token.column;
+
+    return ast;
+}
+
 #private
 
 struct TokenEnumerator {
@@ -3490,33 +3517,6 @@ CastAst* parse_cast(TokenEnumerator* enumerator, Function* current_function) {
     cast_ast.value = parse_expression(enumerator, current_function, TokenType.CloseParen);
 
     return cast_ast;
-}
-
-T* create_ast<T>(Ast* source, AstType type) {
-    ast := new<T>();
-    ast.ast_type = type;
-
-    if source {
-        ast.file_index = source.file_index;
-        ast.line = source.line;
-        ast.column = source.column;
-    }
-
-    return ast;
-}
-
-T* create_ast<T>(TokenEnumerator* enumerator, AstType type) {
-    return create_ast<T>(enumerator.current, enumerator.file_index, type);
-}
-
-T* create_ast<T>(Token token, int file_index, AstType type) {
-    ast := new<T>();
-    ast.ast_type = type;
-    ast.file_index = file_index;
-    ast.line = token.line;
-    ast.column = token.column;
-
-    return ast;
 }
 
 Operator convert_operator(Token token) {

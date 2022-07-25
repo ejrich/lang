@@ -14,6 +14,9 @@ enum AstType {
     EnumValue;
     Union;
     UnionField;
+    Primitive;
+    Pointer;
+    Array;
     Return;
     Constant;
     Null;
