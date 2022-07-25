@@ -851,9 +851,8 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
         return null;
     }
 
-    if enumerator.current.type == TokenType.Identifier {
+    if enumerator.current.type == TokenType.Identifier
         enum_ast.name = enumerator.current.value;
-    }
     else
         report_error("Unexpected token '%' in enum definition", enumerator.file_index, enumerator.current, enumerator.current.value);
 
@@ -3247,16 +3246,17 @@ ConstantAst* parse_constant(Token token, int fileIndex) {
         case TokenType.Number; {
             if token.flags == TokenFlags.None {
                 // 32 bit signed integer
-                // TODO Implement parsing
-                if token.value.length < 10 || (token.value.length == 10 && token.value[0] <= '2') {
+                int_value: int;
+                if try_parse_integer(token.value, &int_value) {
+                    constant.value.integer = int_value;
                     constant.type = &s32_type;
                 }
                 // 64 bit signed integer
-                else if token.value.length < 19 {
+                else if try_parse_s64(token.value, &constant.value.integer) {
                     constant.type = &s64_type;
                 }
                 // 64 bit unsigned integer
-                else if token.value.length == 19 || (token.value.length == 20 && token.value[0] <= '1') {
+                else if try_parse_u64(token.value, &constant.value.unsigned_integer) {
                     constant.type = &u64_type;
                 }
                 else {
@@ -3313,8 +3313,75 @@ ConstantAst* parse_constant(Token token, int fileIndex) {
     return constant;
 }
 
-// TODO Implement me
 bool try_parse_integer(string input, int* value) {
+    accum: int;
+    if input[0] == '-' {
+        if input.length > 11 || (input.length == 11 && input[1] > '2')
+            return false;
+
+        each i in 1..input.length - 1 {
+            accum *= 10;
+            accum += input[i] - '0';
+        }
+
+        if accum < 0 return false;
+        *value = -accum;
+    }
+    else if input.length > 10 || (input.length == 10 && input[0] > '2') {
+        return false;
+    }
+    else {
+        each i in 0..input.length - 1 {
+            accum *= 10;
+            accum += input[i] - '0';
+        }
+        if accum < 0 return false;
+        *value = accum;
+    }
+
+    return true;
+}
+
+bool try_parse_s64(string input, s64* value) {
+    accum: s64;
+    if input[0] == '-' {
+        if input.length > 20
+            return false;
+
+        each i in 1..input.length - 1 {
+            accum *= 10;
+            accum += input[i] - '0';
+        }
+
+        if accum < 0 return false;
+        *value = -accum;
+    }
+    else if input.length > 19 {
+        return false;
+    }
+    else {
+        each i in 0..input.length - 1 {
+            accum *= 10;
+            accum += input[i] - '0';
+        }
+        if accum < 0 return false;
+        *value = accum;
+    }
+
+    return true;
+}
+
+bool try_parse_u64(string input, u64* value) {
+    if input[0] == '-' || input.length > 19 || (input.length == 19 && input[0] > '1')
+        return false;
+
+    accum: u64;
+    each i in 0..input.length - 1 {
+        accum *= 10;
+        accum += input[i] - '0';
+    }
+    *value = accum;
+
     return true;
 }
 
@@ -3331,12 +3398,62 @@ u64 parse_hex_number(string input) {
     return value;
 }
 
+// Not the best, but will likely work for now
 bool try_parse_float(string input, float64* value) {
+    accum: float64;
+    part: u64;
+    divisor: u64 = 1;
+    if input[0] == '-' {
+        i := 1;
+        while i < input.length - 1 {
+            char := input[i++];
+            if char == '.' break;
+
+            part *= 10;
+            part += char - '0';
+        }
+
+        accum += part;
+        part = 0;
+
+        while i < input.length - 1 {
+            part *= 10;
+            divisor *= 10;
+            part += input[i++] - '0';
+        }
+
+        accum += cast(float64, part) / divisor;
+        *value = -accum;
+    }
+    else {
+        i := 0;
+        while i < input.length - 1 {
+            char := input[i++];
+            if char == '.' break;
+
+            part *= 10;
+            part += char - '0';
+        }
+
+        accum += part;
+        part = 0;
+
+        while i < input.length - 1 {
+            part *= 10;
+            divisor *= 10;
+            part += input[i++] - '0';
+        }
+
+        accum += cast(float64, part) / divisor;
+        *value = accum;
+    }
+
     return true;
 }
 
+// @Cleanup Shouldn't be necessary
 bool try_parse_float64(string input, float64* value) {
-    return true;
+    return try_parse_float(input, value);
 }
 
 CastAst* parse_cast(TokenEnumerator* enumerator, Function* current_function) {
