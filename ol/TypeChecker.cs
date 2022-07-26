@@ -1955,11 +1955,12 @@ public static class TypeChecker
             else
             {
                 var returnValueType = VerifyExpression(returnAst.Value, currentFunction, scope);
-                if (returnValueType == null)
-                {
-                    ErrorReporter.Report($"Expected to return type '{currentFunction.ReturnType.Name}'", returnAst);
-                }
-                else if (!TypeEquals(currentFunction.ReturnType, returnValueType))
+                // if (returnValueType == null)
+                // {
+                //     ErrorReporter.Report($"Expected to return type '{currentFunction.ReturnType.Name}'", returnAst);
+                // }
+                // else if (!TypeEquals(currentFunction.ReturnType, returnValueType))
+                if (returnValueType != null && !TypeEquals(currentFunction.ReturnType, returnValueType))
                 {
                     ErrorReporter.Report($"Expected to return type '{currentFunction.ReturnType.Name}', but returned type '{returnValueType.Name}'", returnAst.Value);
                 }

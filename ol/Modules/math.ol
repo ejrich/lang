@@ -62,7 +62,7 @@ float64 log_2(float64 value) #inline {
 }
 
 float64 log_x(float64 value, int x) #inline {
-    return log_2(value) / log_2(x);
+    return log_2(value) / log_2(cast(float64, x));
 }
 
 T float_mod<T>(T x, T y) {

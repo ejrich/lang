@@ -10,6 +10,7 @@ s64_type: PrimitiveAst;
 u64_type: PrimitiveAst;
 float_type: PrimitiveAst;
 float64_type: PrimitiveAst;
+type_type: PrimitiveAst;
 
 string_type: StructAst*;
 any_type: StructAst*;

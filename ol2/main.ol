@@ -10,7 +10,7 @@
 release := false;
 output_assembly := false;
 path: string;
-name: string;
+executable_name: string;
 output_directory: string;
 
 linker: LinkerType;
@@ -42,7 +42,7 @@ main() {
                     report_error_message("Entrypoint file does not exist or is not an .ol file '%'", arg);
                 }
                 else {
-                    name = name_without_extension(arg);
+                    executable_name = name_without_extension(arg);
                     entrypoint = get_full_path(arg);
                     path = get_directory(entrypoint);
                 }
@@ -186,12 +186,12 @@ void* thread_worker(void* arg) {
 semaphore: Semaphore*;
 thread_queue: LinkedList<QueueItem>;
 completed := 0;
-count := 0;
+job_count := 0;
 
 queue_work(Callback callback, void* data, bool clear = false) {
     item: QueueItem = { callback = callback; data = data; clear = clear; }
     add_to_head(&thread_queue, item);
-    atomic_increment(&count);
+    atomic_increment(&job_count);
     semaphore_release(semaphore);
 }
 
@@ -206,6 +206,7 @@ bool execute_queued_item() {
 
         if queue_item.clear {
             atomic_increment(&completed);
+            queue_item.callback(queue_item.data);
         }
         else {
             queue_item.callback(queue_item.data);
@@ -217,11 +218,11 @@ bool execute_queued_item() {
 }
 
 complete_work() {
-    while completed < count
+    while completed < job_count
         execute_queued_item();
 
     completed = 0;
-    count = 0;
+    job_count = 0;
 }
 
 struct QueueItem {
