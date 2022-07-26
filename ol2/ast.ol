@@ -209,8 +209,8 @@ struct ArrayType : TypeAst {
 
 struct UnionAst : TypeAst {
     // TypeKind TypeKind; = TypeKind.Union;
-    Verified: bool;
-    Verifying: bool;
+    verified: bool;
+    verifying: bool;
     fields: Array<UnionFieldAst*>;
 }
 

@@ -1,3 +1,4 @@
+#import math
 #import "ir_builder.ol"
 #import "type_table.ol"
 
@@ -57,32 +58,51 @@ add_overload(OperatorOverloadAst* overload) {
 add_interface(InterfaceAst* interface_ast) {
 }
 
-TypeAst* verify_type(TypeDefinition* type, Scope* scope) {
-    isGeneric := false;
-    isVarargs := false;
-    isParams := false;
+TypeAst* get_type(string name, int file_index) {
+    private_scope := private_scopes[file_index];
 
+    if private_scope == null {
+        // TODO Get from global scope
+    }
+
+    // TODO Get from private scope
+    // TODO Get from global scope
+    return null;
+}
+
+TypeAst* verify_type(TypeDefinition* type, Scope* scope, int depth = 0) {
+    _: bool;
+    return verify_type(type, scope, &_, &_, &_, depth);
+}
+
+TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, int depth = 0) {
+    _: bool;
+    return verify_type(type, scope, is_generic, &_, &_, depth);
+}
+
+TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, bool* is_varargs, bool* is_params, int depth = 0, bool allow_params = false, int* initial_array_length = null) {
     if type == null return null;
-    if type.BakedType return type.BakedType;
+    if type.baked_type return type.baked_type;
 
     if type.is_generic {
         if type.generics.length
             report_error("Generic type cannot have additional generic types", type);
 
-        isGeneric = true;
+        *is_generic = true;
         return null;
     }
 
     if type.compound {
         compound_type_name := print_compound_type(type);
-        compound_type := GetType(compound_type_name, type.file_index);
-        if compound_type
-            return compoundType;
+        compound_type := get_type(compound_type_name, type.file_index);
+        if compound_type return compound_type;
 
         types: Array<TypeAst*>[type.generics.length];
         size: u32;
+        private_type := false;
         each generic, i in type.generics {
-            sub_type = verify_type(generic, scope);
+            has_generic := false;
+            sub_type := verify_type(generic, scope, &has_generic);
             if sub_type == null {
                 return null;
             }
@@ -104,7 +124,7 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope) {
             return null;
         }
 
-        return VerifyArray(type, scope, depth);
+        return verify_array(type, scope, depth);
     }
     if type.name == "CArray" {
         if type.generics.length != 1 {
@@ -112,10 +132,8 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope) {
             return null;
         }
 
-        element_type := verify_type(type.Generics[0], scope, depth + 1, allowParams);
-        if element_type == null {
-            return null;
-        }
+        element_type := verify_type(type.generics[0], scope, depth + 1);
+        if element_type == null return null;
 
         array_length: u32;
         if initial_array_length {
@@ -143,11 +161,11 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope) {
         }
         name[name.length - 1] = ']';
 
-        array_type := get_type(name, type.FileIndex);
+        array_type := cast(ArrayType*, get_type(name, type.file_index));
         if array_type == null {
             array_type = create_ast<ArrayType>(null, AstType.Array);
             array_type.name = name;
-            array_type.size = element_type.Size * array_length;
+            array_type.size = element_type.size * array_length;
             array_type.alignment = element_type.alignment;
             array_type.private = element_type.private;
             array_type.length = array_length;
@@ -190,31 +208,30 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope) {
             return null;
         }
 
-        pointer_type_name := PrintTypeDefinition(type);
-        pointer_type := get_type(pointerTypeName, type.file_index);
-        if pointer_type return pointerType;
+        pointer_type_name := print_type_definition(type);
+        pointer_type := get_type(pointer_type_name, type.file_index);
+        if pointer_type return pointer_type;
 
-        pointed_to_type = verify_type(type.generics[0], scope, &is_generic, depth + 1, allow_params);
-        if pointedToType == null
-            return null;
+        pointed_to_type := verify_type(type.generics[0], scope, is_generic, depth + 1);
+        if pointed_to_type == null return null;
 
         // There are some cases where the pointed to type is a struct that contains a field for the pointer type
         // To account for this, the type table needs to be checked for again for the type
-        pointer_type := get_type(pointerTypeName, type.file_index);
-        if pointer_type == null {
-            pointer_type = create_pointer_type(pointerTypeName, pointedToType);
-        }
+        pointer_type = get_type(pointer_type_name, type.file_index);
+        if pointer_type == null
+            pointer_type = create_pointer_type(pointer_type_name, pointed_to_type);
+
         return pointer_type;
     }
     if type.name == "..." {
         if has_generics
             report_error("Type 'varargs' cannot have generics", type);
 
-        isVarargs = true;
+        *is_varargs = true;
         return null;
     }
     if type.name == "Params" {
-        if (!allowParams) return null;
+        if (!allow_params) return null;
         if depth != 0 {
             report_error("Params can only be declared as a top level type, such as 'Params<int>'", type);
             return null;
@@ -222,18 +239,16 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope) {
 
         switch type.generics.length {
             case 0; {
-                isParams = true;
-                arrayAny := "Array<Any>"; #const
-                if (GlobalScope.Types.TryGetValue(arrayAny, arrayType))
-                {
-                    return arrayType;
-                }
+                *is_params = true;
+                array_any := "Array<Any>"; #const
+                found, array_type := table_get(global_scope.types, array_any);
+                if found return array_type;
 
-                return CreateArrayStruct(arrayAny, TypeTable.AnyType);
+                return create_array_struct(array_any, any_type);
             }
             case 1; {
-                isParams = true;
-                return VerifyArray(type, scope, depth, &isGeneric);
+                *is_params = true;
+                return verify_array(type, scope, depth, is_generic);
             }
         }
 
@@ -250,98 +265,81 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope) {
         if has_generics
             report_error("Type 'Any' cannot have generics", type);
 
-        return &any_type;
+        return any_type;
     }
-    // case "Code":
-    //     if (has_generics || depth > 0 || !allowParams)
-    //     {
+    // if type.name == "Code" {
+    //     if has_generics || depth > 0 || !allow_params
     //         report_error("Type 'Code' must be a standalone type used as an argument", type);
-    //     }
-    //     return TypeTable.CodeType;
+    //
+    //     return &code_type;
+    // }
 
     if has_generics {
-        genericName := PrintTypeDefinition(type);
-        if (GetType(genericName, type.FileIndex, out var structType))
-        {
-            return structType;
-        }
+        generic_name := print_type_definition(type);
+        struct_type := get_type(generic_name, type.file_index);
+        if struct_type return struct_type;
 
-        if (!GetPolymorphicStruct(type.Name, type.FileIndex, out var structDef))
-        {
-            report_error($"No polymorphic structs of type '{type.Name}'", type);
+        struct_def := get_polymorphic_struct(type.name, type.file_index);
+        if struct_def == null {
+            report_error("No polymorphic structs of type '%'", type, type.name);
             return null;
         }
 
-        var generics = type.Generics.ToArray();
-        var genericTypes = new IType[generics.Length];
-        var error = false;
-        var privateGenericTypes = false;
-
-        for (var i = 0; i < generics.Length; i++)
-        {
-            var genericType = genericTypes[i] = verify_type(generics[i], scope, out var hasGeneric, out _, out _, depth + 1, allowParams);
-            if (genericType == null && !hasGeneric)
-            {
-                error = true;
-            }
-            else if (hasGeneric)
-            {
-                isGeneric = true;
-            }
-            else if (genericType.Private)
-            {
-                privateGenericTypes = true;
-            }
-        }
-
-        if (structDef.Generics.Count != type.Generics.Count)
-        {
-            report_error($"Expected type '{type.Name}' to have {structDef.Generics.Count} generic(s), but got {type.Generics.Count}", type);
+        if struct_def.generics.count != type.generics.length {
+            report_error("Expected type '%' to have % generic(s), but got %", type, type.name, struct_def.generics.length, type.generics.length);
             return null;
         }
 
-        if (error || isGeneric)
-        {
-            return null;
+        generic_types: Array<TypeAst*>[type.generics.length];
+        private_generic_types := false;
+
+        each generic, i in type.generics {
+            has_generic: bool;
+            generic_type := verify_type(generic, scope, &has_generic, depth + 1);
+            if generic_type == null && !has_generic {
+                return null;
+            }
+            else if has_generic {
+                *is_generic = true;
+            }
+            else if generic_type.private {
+                private_generic_types = true;
+            }
+
+            generic_types[i] = generic_type;
         }
 
-        var fileIndex = structDef.FileIndex;
-        if (privateGenericTypes && !structDef.Private)
-        {
-            fileIndex = type.FileIndex;
-        }
+        if is_generic return null;
 
-        var polyStruct = Polymorpher.CreatePolymorphedStruct(structDef, genericName, TypeKind.Struct, privateGenericTypes, genericTypes);
-        AddType(genericName, polyStruct, fileIndex);
-        VerifyStruct(polyStruct);
-        return polyStruct;
+        file_index := struct_def.file_index;
+        if private_generic_types && !struct_def.private
+            file_index = type.file_index;
+
+        poly_struct := create_polymorphed_struct(struct_def, generic_name, TypeKind.Struct, private_generic_types, generic_types);
+        add_type(generic_name, poly_struct, file_index);
+        verify_struct(poly_struct);
+        return poly_struct;
     }
-    else if (GetType(type.Name, type.FileIndex, out var typeValue))
-    {
-        if (typeValue is StructAst structAst)
-        {
-            if (!structAst.Verifying)
-            {
-                VerifyStruct(structAst);
+
+    type_value := get_type(type.name, type.file_index);
+    if type_value {
+        switch type_value.ast_type {
+            case AstType.Struct; {
+                struct_ast := cast(StructAst*, type_value);
+                if !struct_ast.verifying verify_struct(struct_ast);
+            }
+            case AstType.Union; {
+                union_ast := cast(UnionAst*, type_value);
+                if !union_ast.verifying verify_union(union_ast);
+            }
+            case AstType.Interface; {
+                interface_ast := cast(InterfaceAst*, type_value);
+                if !interface_ast.verifying verify_interface(interface_ast);
             }
         }
-        else if (typeValue is UnionAst union)
-        {
-            if (!union.Verifying)
-            {
-                VerifyUnion(union);
-            }
-        }
-        else if (typeValue is InterfaceAst interfaceAst)
-        {
-            if (!interfaceAst.Verifying)
-            {
-                VerifyInterface(interfaceAst);
-            }
-        }
-        return typeValue;
     }
-    return null;
+
+    return type_value;
 }
 
 string print_type_definition(TypeDefinition* type, int padding = 0) {
