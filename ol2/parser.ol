@@ -2893,8 +2893,7 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator) {
         case Operator.GreaterThan;
         case Operator.LessThan;
         case Operator.Xor; {
-            overload.return_type_definition = new<TypeDefinition>();
-            overload.return_type_definition.name = "bool"; // TODO Hardcode the ReturnType instead
+            overload.return_type = &bool_type;
         }
         case Operator.Subscript;
             if enumerator.current.type != TokenType.Colon {
@@ -2910,12 +2909,11 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator) {
                 move_next(enumerator);
             }
         default; {
-            overload.return_type_definition = overload.type;
             if overload.generics.length {
                 overload.flags |= FunctionFlags.ReturnTypeHasGenerics;
             }
             each generic, i in overload.generics {
-                search_for_generic(generic, i, overload.return_type_definition);
+                search_for_generic(generic, i, overload.type);
             }
         }
     }
