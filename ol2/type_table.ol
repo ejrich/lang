@@ -14,3 +14,7 @@ type_type: PrimitiveAst;
 
 string_type: StructAst*;
 any_type: StructAst*;
+
+create_type_info(TypeAst* type) {
+
+}

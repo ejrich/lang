@@ -3117,6 +3117,18 @@ public static class TypeChecker
                         return null;
                 }
                 break;
+            case ConstantAst constant:
+                if (constant.String == null)
+                {
+                    refType = constant.Type;
+                }
+                else
+                {
+                    constant.Type ??= TypeTable.StringType;
+                    structField.String = constant.String;
+                    return VerifyConstantStringField(structField);
+                }
+                break;
             default:
                 refType = VerifyExpression(structField.Children[0], currentFunction, scope);
                 break;
@@ -3165,24 +3177,22 @@ public static class TypeChecker
             ErrorReporter.Report("Type 'string' does not contain field", structField);
             return null;
         }
-        else
+
+        switch (structField.Children[1])
         {
-            switch (structField.Children[1])
-            {
-                case IdentifierAst identifier:
-                    if (identifier.Name == "length")
-                    {
-                        structField.ConstantStringLength = true;
-                        return TypeTable.S64Type;
-                    }
-                    if (identifier.Name == "data")
-                    {
-                        structField.RawConstantString = true;
-                        return TypeTable.RawStringType;
-                    }
-                    ErrorReporter.Report($"Type 'string' does not contain field '{identifier.Name}'", identifier);
-                    break;
-            }
+            case IdentifierAst identifier:
+                if (identifier.Name == "length")
+                {
+                    structField.ConstantStringLength = true;
+                    return TypeTable.S64Type;
+                }
+                if (identifier.Name == "data")
+                {
+                    structField.RawConstantString = true;
+                    return TypeTable.RawStringType;
+                }
+                ErrorReporter.Report($"Type 'string' does not contain field '{identifier.Name}'", identifier);
+                break;
         }
         return null;
     }
