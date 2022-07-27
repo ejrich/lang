@@ -17,6 +17,7 @@ enum AstType {
     Primitive;
     Pointer;
     Array;
+    Compound;
     Return;
     Constant;
     Null;

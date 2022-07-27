@@ -1,5 +1,6 @@
 #import math
 #import "ir_builder.ol"
+#import "polymorph.ol"
 #import "type_table.ol"
 
 init_types() {
@@ -58,6 +59,14 @@ add_overload(OperatorOverloadAst* overload) {
 add_interface(InterfaceAst* interface_ast) {
 }
 
+bool add_type(string name, TypeAst* type) {
+    return add_type(name, type, type.file_index);
+}
+
+bool add_type(string name, TypeAst* type, int file_index) {
+    return true;
+}
+
 TypeAst* get_type(string name, int file_index) {
     private_scope := private_scopes[file_index];
 
@@ -67,6 +76,41 @@ TypeAst* get_type(string name, int file_index) {
 
     // TODO Get from private scope
     // TODO Get from global scope
+    return null;
+}
+
+StructAst* get_polymorphic_struct(string name, int file_index) {
+    return null;
+}
+
+verify_struct(StructAst* struct_ast) {
+
+}
+
+verify_union(UnionAst* union_ast) {
+
+}
+
+verify_interface(InterfaceAst* interface_ast) {
+
+}
+
+TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope) {
+    _: bool;
+    return verify_expression(ast, function, scope, &_, &_);
+}
+
+TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_constant) {
+    _: bool;
+    return verify_expression(ast, function, scope, is_constant, &_);
+}
+
+TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_constant, u32* array_length) {
+    _: bool;
+    return verify_expression(ast, function, scope, is_constant, &_, true, array_length);
+}
+
+TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_constant, bool* is_type, bool get_array_length = false, u32* array_length = null) {
     return null;
 }
 
@@ -124,7 +168,7 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, bool*
             return null;
         }
 
-        return verify_array(type, scope, depth);
+        return verify_array(type, scope, depth, is_generic);
     }
     if type.name == "CArray" {
         if type.generics.length != 1 {
@@ -142,7 +186,7 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, bool*
         else {
             is_constant := false;
             count_type := verify_expression(type.count, null, scope, &is_constant, &array_length);
-            if count_type == null || count_type.TypeKind != TypeKind.Integer || !is_constant || array_length < 0 {
+            if count_type == null || count_type.type_kind != TypeKind.Integer || !is_constant || array_length < 0 {
                 report_error("Expected size of C array to be a constant, positive integer", type);
                 return null;
             }
@@ -164,7 +208,7 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, bool*
         array_type := cast(ArrayType*, get_type(name, type.file_index));
         if array_type == null {
             array_type = create_ast<ArrayType>(null, AstType.Array);
-            array_type.name = name;
+            array_type.name = allocate_string(name);
             array_type.size = element_type.size * array_length;
             array_type.alignment = element_type.alignment;
             array_type.private = element_type.private;
@@ -285,7 +329,7 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, bool*
             return null;
         }
 
-        if struct_def.generics.count != type.generics.length {
+        if struct_def.generics.length != type.generics.length {
             report_error("Expected type '%' to have % generic(s), but got %", type, type.name, struct_def.generics.length, type.generics.length);
             return null;
         }
@@ -342,18 +386,92 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, bool*
     return type_value;
 }
 
-string print_type_definition(TypeDefinition* type, int padding = 0) {
+TypeAst* verify_array(TypeDefinition* type, Scope* scope, int depth, bool* is_generic) {
+    element_type_def := type.generics[0];
+    element_type := verify_type(element_type_def, scope, is_generic, depth + 1);
+    if element_type == null return null;
+
+    // Create a temporary string for the name of the array type
+    name_data: Array<u8>[element_type.name.length + "Array<>".length];
+    name: string = { length = name_data.length; data = name_data.data; }
+    array_prefix := "Array<"; #const
+    memory_copy(name.data, array_prefix.data, array_prefix.length);
+    memory_copy(name.data + array_prefix.length, element_type.name.data, element_type.name.length);
+    name[name.length - 1] = '>';
+
+    array_type := get_type(name, type.file_index);
+    if array_type return array_type;
+
+    return create_array_struct(allocate_string(name), element_type, element_type_def);
+}
+
+TypeAst* create_array_struct(string name, TypeAst* element_type, TypeDefinition* element_type_def = null) {
+    if base_array_type == null return null;
+
+    array_struct := create_polymorphed_struct(base_array_type, name, TypeKind.Array, element_type.private, element_type);
+    add_type(name, array_struct, element_type.file_index);
+    verify_struct(array_struct);
+    return array_struct;
+}
+
+TypeAst* create_pointer_type(string name, TypeAst* pointed_to_type) {
+    pointer_type: PointerType = { file_index = pointed_to_type.file_index; name = allocate_string(name); private = pointed_to_type.private; pointed_type = pointed_to_type; }
+
+    type_pointer := new<PointerType>();
+    *type_pointer = pointer_type;
+
+    add_type(name, type_pointer);
+    create_type_info(type_pointer);
+    return type_pointer;
+}
+
+TypeAst* create_compound_type(Array<TypeAst*> types, string name, u32 size, bool private_type, int file_index) {
+    compound_type: CompoundType = { ast_type = AstType.Compound; file_index = file_index; name = allocate_string(name); size = size; private = private_type; types = allocate_array(types); }
+
+    type_pointer := new<CompoundType>();
+    *type_pointer = compound_type;
+
+    add_type(name, type_pointer);
+    create_type_info(type_pointer);
+    return type_pointer;
+}
+
+string print_compound_type(TypeDefinition* type) {
+    length := -2; // Start at -2 to offset the last type not ending with ", "
+    each sub_type in type.generics {
+        length += determine_type_definition_length(sub_type) + 2; // Add 2 for the ", " after each sub-type
+    }
+
+    result_data: Array<u8>[length];
+    result: string = { length = length; data = result_data.data; }
+    add_generics_to_string(type, result, 0);
+
+    return result;
+}
+
+string print_type_definition(TypeDefinition* type, int padding = 0) #inline {
+    _: bool;
+    return print_type_definition(type, &_, padding);
+}
+
+string print_type_definition(TypeDefinition* type, bool* allocated, int padding = 0) #inline {
     if type == null return "";
 
     if padding == 0 {
-        if type.baked_type return type.baked_type.name;
-        if type.generics.length == 0 return type.name;
+        if type.baked_type {
+            *allocated = true;
+            return type.baked_type.name;
+        }
+        if type.generics.length == 0 {
+            *allocated = true;
+            return type.name;
+        }
     }
 
     // Determine how much space to reserve
     length := determine_type_definition_length(type) + padding;
-
-    result: string = { length = length; data = allocate(length); }
+    result_data: Array<u8>[length];
+    result: string = { length = length; data = result_data.data; }
     add_type_to_string(type, result, 0);
 
     return result;
@@ -364,6 +482,24 @@ global_scope: GlobalScope;
 private_scopes: Array<GlobalScope*>;
 
 #private
+
+string allocate_string(string input) {
+    result: string = { length = input.length; data = allocate(input.length); }
+    memory_copy(result.data, input.data, input.length);
+
+    return result;
+}
+
+Array<T> allocate_array<T>(Array<T> input) {
+    result: Array<T>;
+    array_resize(&result, input.length, allocate, reallocate);
+
+    each value, i in input {
+        result[i] = value;
+    }
+
+    return result;
+}
 
 int determine_type_definition_length(TypeDefinition* type) {
     if type.baked_type return type.baked_type.name.length;
@@ -391,16 +527,20 @@ int add_type_to_string(TypeDefinition* type, string result, int index) {
         index += type.name.length;
         if type.generics.length {
             result[index++] = '<';
-            i := 0;
-            while i < type.generics.length - 1 {
-                index = add_type_to_string(type.generics[i++], result, index);
-                result[index++] = ',';
-                result[index++] = ' ';
-            }
-            index = add_type_to_string(type.generics[i], result, index);
+            index = add_generics_to_string(type, result, index);
             result[index++] = '>';
         }
     }
 
     return index;
+}
+
+int add_generics_to_string(TypeDefinition* type, string result, int index) {
+    i := 0;
+    while i < type.generics.length - 1 {
+        index = add_type_to_string(type.generics[i++], result, index);
+        result[index++] = ',';
+        result[index++] = ' ';
+    }
+    return add_type_to_string(type.generics[i], result, index);
 }

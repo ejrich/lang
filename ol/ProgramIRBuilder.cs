@@ -1830,7 +1830,7 @@ public static class ProgramIRBuilder
                 {
                     return GetConstantInteger(identifierAst.TypeIndex.Value);
                 }
-                else if (identifierAst.FunctionTypeIndex.HasValue)
+                if (identifierAst.FunctionTypeIndex.HasValue)
                 {
                     var functionDef = (FunctionAst)TypeTable.Types[identifierAst.FunctionTypeIndex.Value];
                     return new InstructionValue
@@ -1851,25 +1851,37 @@ public static class ProgramIRBuilder
                         ConstantValue = new Constant {Integer = structField.ConstantValue}
                     };
                 }
-                else if (structField.IsConstant)
+                if (structField.IsConstant)
                 {
                     return GetConstantInteger(structField.ConstantValue);
                 }
-                else if (structField.ConstantStringLength)
+                if (structField.ConstantStringLength)
                 {
-                    var constantValue = structField.GlobalConstant ? Program.Constants[structField.ConstantIndex] : function.Constants[structField.ConstantIndex];
+                    if (structField.String != null)
+                    {
+                        return GetConstantS64(structField.String.Length);
+                    }
 
+                    var constantValue = structField.GlobalConstant ? Program.Constants[structField.ConstantIndex] : function.Constants[structField.ConstantIndex];
                     return GetConstantS64(constantValue.ConstantString.Length);
                 }
-                else if (structField.RawConstantString)
+                if (structField.RawConstantString)
                 {
-                    var constantValue = structField.GlobalConstant ? Program.Constants[structField.ConstantIndex] : function.Constants[structField.ConstantIndex];
-
-                    return new InstructionValue
+                    var stringValue = new InstructionValue
                     {
-                        ValueType = InstructionValueType.Constant, Type = TypeTable.RawStringType,
-                        ConstantString = constantValue.ConstantString, UseRawString = true
+                        ValueType = InstructionValueType.Constant, Type = TypeTable.RawStringType, UseRawString = true
                     };
+
+                    if (structField.String != null)
+                    {
+                        stringValue.ConstantString = structField.String;
+                    }
+                    else
+                    {
+                        var constantValue = structField.GlobalConstant ? Program.Constants[structField.ConstantIndex] : function.Constants[structField.ConstantIndex];
+                        stringValue.ConstantString = constantValue.ConstantString;
+                    }
+                    return stringValue;
                 }
                 var structFieldPointer = EmitGetStructRefPointer(function, structField, scope, out var loaded, out hasCall);
                 if (!loaded)

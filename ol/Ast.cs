@@ -194,6 +194,7 @@ public class StructFieldRefAst : IAst
     public bool IsEnum { get; set; }
     public bool IsConstant { get; set; }
     public bool GlobalConstant { get; set; }
+    public string String { get; set; }
     public bool ConstantStringLength { get; set; }
     public bool RawConstantString { get; set; }
     public int ConstantIndex { get; set; }
