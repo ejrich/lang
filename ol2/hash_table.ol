@@ -4,11 +4,15 @@ struct HashTable<T, U> {
 }
 
 struct HashTableEntry<T, U> {
+    filled: bool;
     key: T;
     value: U;
 }
 
 // TODO Add hash table init, get, add, update, etc...
+table_init<T, U>(HashTable<T, U>* table, int capacity) {
+    array_resize(table.data, capacity, allocate, reallocate);
+}
 
 bool, U table_get<T, U>(HashTable<T, U> table, T key) {
     value: U;
