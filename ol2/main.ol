@@ -350,6 +350,7 @@ void* allocate_arena(int cursor, int size = arena_size) {
 }
 
 deallocate_arenas() {
+    // print("% arenas allocated, % kb memory\n", arenas.length, arenas.length * arena_size / 1000.0);
     each arena in arenas {
         free_memory(arena.pointer, arena.size);
     }

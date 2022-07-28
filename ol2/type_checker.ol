@@ -109,12 +109,15 @@ TypeAst* get_type(string name, int file_index) {
     private_scope := private_scopes[file_index];
 
     if private_scope == null {
-        // TODO Get from global scope
+        _, type := table_get(global_scope.types, name);
+        return type;
     }
 
-    // TODO Get from private scope
-    // TODO Get from global scope
-    return null;
+    found, type := table_get(private_scope.types, name);
+    if found return type;
+
+    found, type = table_get(global_scope.types, name);
+    return type;
 }
 
 StructAst* get_polymorphic_struct(string name, int file_index) {
