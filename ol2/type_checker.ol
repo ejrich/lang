@@ -4,9 +4,47 @@
 #import "type_table.ol"
 
 init_types() {
+    init_global_scope(&global_scope, 50);
+
+    add_primitive(&void_type);
+    add_primitive(&bool_type);
+    add_primitive(&s8_type);
+    add_primitive(&u8_type);
+    add_primitive(&s16_type);
+    add_primitive(&u16_type);
+    add_primitive(&s32_type);
+    add_primitive(&u32_type);
+    add_primitive(&s64_type);
+    add_primitive(&u64_type);
+    add_primitive(&float_type);
+    add_primitive(&float64_type);
+    add_primitive(&type_type);
+}
+
+init_global_scope(GlobalScope* scope, int capacity = 10) {
+    table_init(&scope.identifiers, capacity);
+    table_init(&scope.functions, capacity);
+    table_init(&scope.types, capacity);
+    table_init(&scope.polymorphic_structs, capacity);
+    table_init(&scope.polymorphic_functions, capacity);
+}
+
+add_primitive(PrimitiveAst* type) {
+    table_add(&global_scope.identifiers, type.name, type);
+    table_add(&global_scope.types, type.name, type);
+
+    add_to_type_table(type);
+    create_type_info(type);
 }
 
 init_necessary_types() {
+    verify_struct(string_type);
+    verify_struct(any_type);
+
+    _: bool;
+    _, raw_string_type = table_get(global_scope.types, "u8*");
+    _, type_info_pointer_type = table_get(global_scope.types, "TypeInfo*");
+    _, void_pointer_type = table_get(global_scope.types, "void*");
 }
 
 verify_compiler_directives() {

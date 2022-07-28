@@ -13,7 +13,16 @@ float64_type: PrimitiveAst;
 type_type: PrimitiveAst;
 
 string_type: StructAst*;
+raw_string_type: TypeAst*;
+
 any_type: StructAst*;
+type_info_pointer_type: TypeAst*;
+void_pointer_type: TypeAst*;
+
+
+add_to_type_table(TypeAst* type) {
+
+}
 
 create_type_info(TypeAst* type) {
 

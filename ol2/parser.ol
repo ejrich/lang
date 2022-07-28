@@ -2334,6 +2334,7 @@ CompilerDirectiveAst* parse_top_level_directive(TokenEnumerator* enumerator, boo
             report_error("Tried to set #private when already in private scope", enumerator.file_index, token);
         else {
             private_scope := new<GlobalScope>();
+            init_global_scope(private_scope);
             private_scope.parent = &global_scope;
             private_scopes[enumerator.file_index] = private_scope;
         }
