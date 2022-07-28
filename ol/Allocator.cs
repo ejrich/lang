@@ -118,6 +118,34 @@ public static class Allocator
         return stringPointer;
     }
 
+    public static IntPtr MakeString(ConstantString value, bool useRawString)
+    {
+        if (useRawString)
+        {
+            if (value.RawPointer != IntPtr.Zero)
+            {
+                return value.RawPointer;
+            }
+            return value.RawPointer = AllocateString(value.Value);
+        }
+
+        if (value.Pointer != IntPtr.Zero)
+        {
+            return value.Pointer;
+        }
+
+        if (value.RawPointer == IntPtr.Zero)
+        {
+            value.RawPointer = AllocateString(value.Value);
+        }
+
+        var stringPointer = Allocate(StringLength);
+        var stringStruct = new String {Length = value.Value.Length, Data = value.RawPointer};
+        Marshal.StructureToPtr(stringStruct, stringPointer, false);
+
+        return value.Pointer = stringPointer;
+    }
+
     public static String MakeString(string value)
     {
         var s = AllocateString(value);

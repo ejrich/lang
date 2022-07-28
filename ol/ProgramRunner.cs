@@ -1565,7 +1565,7 @@ public static unsafe class ProgramRunner
         return new Register();
     }
 
-    private static Register GetConstant(InstructionValue value, bool constant = false)
+    private static Register GetConstant(InstructionValue value)
     {
         var register = new Register();
         switch (value.Type.TypeKind)

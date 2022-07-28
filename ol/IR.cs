@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using LLVMSharp.Interop;
 
 namespace ol;
 
@@ -87,7 +88,7 @@ public class InstructionValue
 
     // For constant values
     public Constant ConstantValue { get; set; }
-    public string ConstantString { get; set; }
+    public ConstantString ConstantString { get; set; }
     public bool UseRawString { get; set; }
 
     // For calls and constant structs/arrays
@@ -96,6 +97,14 @@ public class InstructionValue
 
     // For Jumps
     public BasicBlock JumpBlock { get; set; }
+}
+
+public class ConstantString
+{
+    public string Value { get; set; }
+    public IntPtr RawPointer { get; set; }
+    public IntPtr Pointer { get; set; }
+    public LLVMValueRef LLVMValue { get; set; }
 }
 
 [StructLayout(LayoutKind.Explicit)]
