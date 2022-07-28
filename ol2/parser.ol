@@ -467,7 +467,6 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
     // 2. Parse generics
     if enumerator.current.type == TokenType.LessThan {
         comma_required_before_next_type := false;
-        // var generics = new HashSet<string>();
         while move_next(enumerator) {
             token = enumerator.current;
 
@@ -733,7 +732,6 @@ StructAst* parse_struct(TokenEnumerator* enumerator, Array<string> attributes) {
         // Clear the '<' before entering loop
         move_next(enumerator);
         comma_required_before_next_type := false;
-        // var generics = new HashSet<string>();
         while move_next(enumerator) {
             token = enumerator.current;
 
@@ -927,6 +925,7 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
     largest_value := -1;
     enumIndex := 0;
 
+    table_init(&enum_ast.values, 10);
     current_value: EnumValueAst*;
     parsing_value_default := false;
     while move_next(enumerator) {
@@ -1562,7 +1561,7 @@ bool parse_value(Values* values, TokenEnumerator* enumerator, Function* current_
     // 2. Parse expression, constant, or object/array initialization as the value
     switch enumerator.current.type {
         case TokenType.OpenBrace; {
-            // values.Assignments = new Dictionary<string, AssignmentAst>();
+            values.assignments = table_create<string, AssignmentAst*>();
             while move_next(enumerator) {
                 token := enumerator.current;
                 if token.type == TokenType.CloseBrace
@@ -1587,7 +1586,6 @@ bool parse_value(Values* values, TokenEnumerator* enumerator, Function* current_
             return true;
         }
         case TokenType.OpenBracket; {
-            // values.ArrayValues = new List<IAst>();
             while move_next(enumerator) {
                 if enumerator.current.type == TokenType.CloseBracket
                     break;
@@ -2196,7 +2194,7 @@ parse_arguments(CallAst* call_ast, TokenEnumerator* enumerator, Function* curren
                 move_next(enumerator);
                 move_next(enumerator);
 
-                // call_ast.SpecifiedArguments ??= new Dictionary<string, IAst>();
+                table_init(&call_ast.specified_arguments, 5);
                 argument := parse_expression(enumerator, current_function, TokenType.Comma, TokenType.CloseParen);
                 if !table_add(&call_ast.specified_arguments, argument_name, argument)
                     report_error("Specified argument '%' is already in the call", enumerator.file_index, token, token.value);
@@ -2779,7 +2777,6 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator) {
     // 2. Determine generics if necessary
     if enumerator.current.type == TokenType.LessThan {
         comma_required_before_next_type := false;
-        // var generics = new HashSet<string>();
         while move_next(enumerator) {
             token = enumerator.current;
             if token.type == TokenType.GreaterThan {

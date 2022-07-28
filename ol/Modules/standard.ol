@@ -699,7 +699,15 @@ write_struct_to_buffer(StringBuffer* buffer, StructTypeInfo* type_info, void* da
         add_to_string_buffer(buffer, field.name);
         add_to_string_buffer(buffer, ": ");
         element_data := data + field.offset;
-        write_value_to_buffer(buffer, field.type_info, element_data);
+        switch field.type_info.type {
+            case TypeKind.Pointer;
+            case TypeKind.Interface; {
+                pointer_value := *cast(void**, element_data);
+                write_value_to_buffer(buffer, field.type_info, pointer_value);
+            }
+            default;
+                write_value_to_buffer(buffer, field.type_info, element_data);
+        }
         add_to_string_buffer(buffer, ", ");
     }
 
