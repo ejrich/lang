@@ -92,7 +92,7 @@ table_expand<T, U>(HashTable<T, U>* table) {
 }
 
 bool table_set<T, U>(Array<HashTableEntry<T, U>> entries, HashTableEntry<T, U> entry) {
-    index := entry.hash % entries.length;
+    index := cast(u64, entry.hash) % entries.length;
 
     candidate_entry := entries[index];
     while candidate_entry.filled {
@@ -111,6 +111,24 @@ bool table_set<T, U>(Array<HashTableEntry<T, U>> entries, HashTableEntry<T, U> e
     return true;
 }
 
+fnv_offset: u32 = 0x811C9DC5; #const
+fnv_prime : u32 = 0x01000193; #const
+
 u32 hash<T>(T value) {
-    return 0;
+    #if T == string {
+        hash := fnv_offset;
+
+        each i in 0..value.length - 1 {
+            hash ^= value[i];
+            hash *= fnv_prime;
+        }
+
+        return hash;
+    }
+    else #if type_of(T).type_kind == TypeKind.Integer {
+        return value;
+    }
+    else {
+        return 0;
+    }
 }
