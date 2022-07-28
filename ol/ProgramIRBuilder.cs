@@ -1863,7 +1863,7 @@ public static class ProgramIRBuilder
                     }
 
                     var constantValue = structField.GlobalConstant ? Program.Constants[structField.ConstantIndex] : function.Constants[structField.ConstantIndex];
-                    return GetConstantS64(constantValue.ConstantString.Length);
+                    return GetConstantS64(constantValue.ConstantString.Value.Length);
                 }
                 if (structField.RawConstantString)
                 {
@@ -1874,7 +1874,7 @@ public static class ProgramIRBuilder
 
                     if (structField.String != null)
                     {
-                        stringValue.ConstantString = structField.String;
+                        stringValue.ConstantString = new ConstantString { Value = structField.String };
                     }
                     else
                     {
@@ -2034,7 +2034,7 @@ public static class ProgramIRBuilder
         var value = new InstructionValue {ValueType = InstructionValueType.Constant, Type = constant.Type};
         if (constant.Type.TypeKind == TypeKind.String)
         {
-            value.ConstantString = constant.String;
+            value.ConstantString = new ConstantString { Value = constant.String };
             value.UseRawString = useRawString;
         }
         else

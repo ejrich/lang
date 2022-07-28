@@ -2237,7 +2237,7 @@ public static unsafe class LLVMBackend
             case TypeKind.Float:
                 return LLVMValueRef.CreateConstReal(_types[value.Type.TypeIndex], value.ConstantValue.Double);
             default:
-                return GetString(value.ConstantString, value.UseRawString, false);
+                return GetString(value.ConstantString, value.UseRawString);
         }
     }
 
@@ -2309,8 +2309,27 @@ public static unsafe class LLVMBackend
             return stringPointer;
         }
 
-        var length = LLVMValueRef.CreateConstInt(LLVM.Int64Type(), (ulong)value.Length, false);
+        var length = LLVMValueRef.CreateConstInt(LLVM.Int64Type(), (ulong)value.Length);
         return LLVMValueRef.CreateConstNamedStruct(_stringType, new [] {length, stringPointer});
+    }
+
+    private static LLVMValueRef GetString(ConstantString value, bool useRawString)
+    {
+        if (value.LLVMValue == null)
+        {
+            var stringValue = _context.GetConstString(value.Value, false);
+            var stringGlobal = _module.AddGlobal(LLVM.TypeOf(stringValue), "str");
+            LLVM.SetInitializer(stringGlobal, stringValue);
+            value.LLVMValue = LLVMValueRef.CreateConstBitCast(stringGlobal, _u8PointerType);
+        }
+
+        if (useRawString)
+        {
+            return value.LLVMValue;
+        }
+
+        var length = LLVMValueRef.CreateConstInt(LLVM.Int64Type(), (ulong)value.Value.Length);
+        return LLVMValueRef.CreateConstNamedStruct(_stringType, new [] {length, value.LLVMValue});
     }
 
     private static void BuildStackRestore(LLVMValueRef stackPointer)
