@@ -93,6 +93,7 @@ table_expand<T, U>(HashTable<T, U>* table) {
 
 bool table_set<T, U>(Array<HashTableEntry<T, U>> entries, HashTableEntry<T, U> entry) {
     index := cast(u64, entry.hash) % entries.length;
+    assert(index >= 0);
 
     candidate_entry := entries[index];
     while candidate_entry.filled {

@@ -2165,6 +2165,17 @@ public static class Parser
                     if (enumerator.Current.Type == TokenType.Identifier)
                     {
                         compoundDeclaration.TypeDefinition = ParseType(enumerator);
+                        if (currentFunction != null)
+                        {
+                            for (var i = 0; i < currentFunction.Generics.Count; i++)
+                            {
+                                var generic = currentFunction.Generics[i];
+                                if (SearchForGeneric(generic, i, compoundDeclaration.TypeDefinition))
+                                {
+                                    compoundDeclaration.HasGenerics = true;
+                                }
+                            }
+                        }
                         enumerator.MoveNext();
                     }
 

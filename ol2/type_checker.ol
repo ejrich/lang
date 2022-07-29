@@ -102,6 +102,18 @@ bool add_type(string name, TypeAst* type) {
 }
 
 bool add_type(string name, TypeAst* type, int file_index) {
+    if type.private {
+        private_scope := private_scopes[file_index];
+
+        if table_contains(private_scope.types, name) || table_contains(global_scope.types, name) return false;
+
+        table_add(&private_scope.types, name, type);
+    }
+    else {
+        if !table_add(&global_scope.types, name, type) return false;
+    }
+
+    add_to_type_table(type);
     return true;
 }
 
