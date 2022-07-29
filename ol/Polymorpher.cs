@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace ol;
@@ -131,6 +132,8 @@ public static class Polymorpher
                 return CopyReturn(returnAst, genericTypes, generics);
             case DeclarationAst declaration:
                 return CopyDeclaration(declaration, genericTypes, generics);
+            case CompoundDeclarationAst compoundDeclaration:
+                return CopyCompoundDeclaration(compoundDeclaration, genericTypes, generics);
             case AssignmentAst assignment:
                 return CopyAssignment(assignment, genericTypes, generics);
             case ScopeAst scope:
@@ -162,6 +165,35 @@ public static class Polymorpher
         var copy = CopyAst(declaration);
         copy.Name = declaration.Name;
         copy.Constant = declaration.Constant;
+        copy.TypeDefinition = declaration.HasGenerics ? CopyType(declaration.TypeDefinition, genericTypes) : declaration.TypeDefinition;
+        copy.Value = CopyExpression(declaration.Value, genericTypes, generics);
+
+        if (declaration.Assignments != null)
+        {
+            copy.Assignments = new();
+            foreach (var (name, assignment) in declaration.Assignments)
+            {
+                copy.Assignments[name] = CopyAssignment(assignment, genericTypes, generics);
+            }
+        }
+        else if (declaration.ArrayValues != null)
+        {
+            copy.ArrayValues = declaration.ArrayValues.Select(value => CopyExpression(value, genericTypes, generics)).ToList();
+        }
+
+        return copy;
+    }
+
+    private static CompoundDeclarationAst CopyCompoundDeclaration(CompoundDeclarationAst declaration, IType[] genericTypes, List<string> generics)
+    {
+        var copy = CopyAst(declaration);
+        copy.Variables = new VariableAst[declaration.Variables.Length];
+        for (var i = 0; i < copy.Variables.Length; i++)
+        {
+            var variable = declaration.Variables[i];
+            var variableCopy = copy.Variables[i] = CopyAst(variable);
+            variableCopy.Name = variable.Name;
+        }
         copy.TypeDefinition = declaration.HasGenerics ? CopyType(declaration.TypeDefinition, genericTypes) : declaration.TypeDefinition;
         copy.Value = CopyExpression(declaration.Value, genericTypes, generics);
 
@@ -367,7 +399,10 @@ public static class Polymorpher
                     compoundCopy.Children.Add(CopyExpression(child, genericTypes, generics));
                 }
                 return compoundCopy;
+            case null:
+                return null;
             default:
+                Debug.Assert(false, $"Expected to return an ast, got {ast.GetType().Name}");
                 return null;
         }
     }
