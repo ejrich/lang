@@ -29,7 +29,7 @@ init_global_scope(GlobalScope* scope, int capacity = 10) {
     table_init(&scope.polymorphic_functions, capacity);
 }
 
-add_primitive(PrimitiveAst* type) {
+add_primitive(TypeAst* type) {
     table_add(&global_scope.identifiers, type.name, type);
     table_add(&global_scope.types, type.name, type);
 
@@ -65,6 +65,25 @@ check_types() {
 }
 
 bool add_global_variable(DeclarationAst* declaration) {
+    name := declaration.name;
+
+    if declaration.flags & AstFlags.Private {
+        private_scope := private_scopes[declaration.file_index];
+
+        if table_contains(private_scope.identifiers, name) || table_contains(global_scope.identifiers, name) {
+            report_error("Identifier '%' already defined", declaration, name);
+            return false;
+        }
+
+        table_add(&private_scope.identifiers, name, declaration);
+    }
+    else {
+        if !table_add(&global_scope.identifiers, name, declaration) {
+            report_error("Identifier '%' already defined", declaration, name);
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -80,6 +99,9 @@ bool add_struct(StructAst* struct_ast) {
 }
 
 add_enum(EnumAst* enum_ast) {
+    if !add_type_and_identifier(enum_ast) {
+        create_type_info(enum_ast);
+    }
 }
 
 add_union(UnionAst* union_ast) {
@@ -102,7 +124,7 @@ bool add_type(string name, TypeAst* type) {
 }
 
 bool add_type(string name, TypeAst* type, int file_index) {
-    if type.private {
+    if type.flags & AstFlags.Private {
         private_scope := private_scopes[file_index];
 
         if table_contains(private_scope.types, name) || table_contains(global_scope.types, name) return false;
@@ -111,6 +133,32 @@ bool add_type(string name, TypeAst* type, int file_index) {
     }
     else {
         if !table_add(&global_scope.types, name, type) return false;
+    }
+
+    add_to_type_table(type);
+    return true;
+}
+
+bool add_type_and_identifier(TypeAst* type) {
+    name := type.name;
+
+    if type.flags & AstFlags.Private {
+        private_scope := private_scopes[type.file_index];
+
+        if table_contains(private_scope.types, name) || table_contains(global_scope.types, name) {
+            report_error("Multiple definitions of type '%'", type, name);
+            return false;
+        }
+
+        table_add(&private_scope.types, name, type);
+        table_add(&private_scope.identifiers, name, type);
+    }
+    else {
+        if !table_add(&global_scope.types, name, type) {
+            report_error("Multiple definitions of type '%'", type, name);
+            return false;
+        }
+        else table_add(&global_scope.identifiers, name, type);
     }
 
     add_to_type_table(type);
@@ -206,7 +254,7 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, bool*
             else {
                 size += sub_type.size;
                 types[i] = sub_type;
-                if sub_type.private {
+                if sub_type.flags & AstFlags.Private {
                     private_type = true;
                 }
             }
@@ -264,7 +312,7 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, bool*
             array_type.name = allocate_string(name);
             array_type.size = element_type.size * array_length;
             array_type.alignment = element_type.alignment;
-            array_type.private = element_type.private;
+            array_type.flags |= AstFlags.IsType | (element_type.flags & AstFlags.Private);
             array_type.length = array_length;
             array_type.element_type = element_type;
 
@@ -399,7 +447,7 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, bool*
             else if has_generic {
                 *is_generic = true;
             }
-            else if generic_type.private {
+            else if generic_type.flags & AstFlags.Private {
                 private_generic_types = true;
             }
 
@@ -409,7 +457,7 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, bool*
         if is_generic return null;
 
         file_index := struct_def.file_index;
-        if private_generic_types && !struct_def.private
+        if private_generic_types && (struct_def.flags & AstFlags.Private) != AstFlags.Private
             file_index = type.file_index;
 
         poly_struct := create_polymorphed_struct(struct_def, generic_name, TypeKind.Struct, private_generic_types, generic_types);
@@ -423,15 +471,15 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, bool*
         switch type_value.ast_type {
             case AstType.Struct; {
                 struct_ast := cast(StructAst*, type_value);
-                if !struct_ast.verifying verify_struct(struct_ast);
+                if (struct_ast.flags & AstFlags.Verifying) != AstFlags.Verifying verify_struct(struct_ast);
             }
             case AstType.Union; {
                 union_ast := cast(UnionAst*, type_value);
-                if !union_ast.verifying verify_union(union_ast);
+                if (union_ast.flags & AstFlags.Verifying) != AstFlags.Verifying verify_union(union_ast);
             }
             case AstType.Interface; {
                 interface_ast := cast(InterfaceAst*, type_value);
-                if !interface_ast.verifying verify_interface(interface_ast);
+                if (interface_ast.flags & AstFlags.Verifying) != AstFlags.Verifying verify_interface(interface_ast);
             }
         }
     }
@@ -461,14 +509,14 @@ TypeAst* verify_array(TypeDefinition* type, Scope* scope, int depth, bool* is_ge
 TypeAst* create_array_struct(string name, TypeAst* element_type, TypeDefinition* element_type_def = null) {
     if base_array_type == null return null;
 
-    array_struct := create_polymorphed_struct(base_array_type, name, TypeKind.Array, element_type.private, element_type);
+    array_struct := create_polymorphed_struct(base_array_type, name, TypeKind.Array, (element_type.flags & AstFlags.Private) == AstFlags.Private, element_type);
     add_type(name, array_struct, element_type.file_index);
     verify_struct(array_struct);
     return array_struct;
 }
 
 TypeAst* create_pointer_type(string name, TypeAst* pointed_to_type) {
-    pointer_type: PointerType = { file_index = pointed_to_type.file_index; name = allocate_string(name); private = pointed_to_type.private; pointed_type = pointed_to_type; }
+    pointer_type: PointerType = { flags = AstFlags.IsType | (pointed_to_type.flags & AstFlags.Private); file_index = pointed_to_type.file_index; name = allocate_string(name); type_kind = TypeKind.Pointer; size = 8; alignment = 8; pointed_type = pointed_to_type; }
 
     type_pointer := new<PointerType>();
     *type_pointer = pointer_type;
@@ -479,7 +527,8 @@ TypeAst* create_pointer_type(string name, TypeAst* pointed_to_type) {
 }
 
 TypeAst* create_compound_type(Array<TypeAst*> types, string name, u32 size, bool private_type, int file_index) {
-    compound_type: CompoundType = { ast_type = AstType.Compound; file_index = file_index; name = allocate_string(name); size = size; private = private_type; types = allocate_array(types); }
+    compound_type: CompoundType = { flags = AstFlags.IsType; ast_type = AstType.Compound; file_index = file_index; name = allocate_string(name); size = size; types = allocate_array(types); }
+    if private_type compound_type.flags |= AstFlags.Private;
 
     type_pointer := new<CompoundType>();
     *type_pointer = compound_type;

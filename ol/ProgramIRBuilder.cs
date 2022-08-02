@@ -166,7 +166,7 @@ public static class ProgramIRBuilder
     public static FunctionIR CreateRunnableCondition(IAst ast)
     {
         var function = new FunctionIR {Allocations = new(), Instructions = new(), BasicBlocks = new()};
-        var entryBlock = AddBasicBlock(function);
+        AddBasicBlock(function);
 
         var value = EmitIR(function, ast, TypeChecker.GlobalScope);
 
@@ -1959,20 +1959,7 @@ public static class ProgramIRBuilder
                 }
                 return index.CallsOverload ? indexPointer : EmitLoad(function, indexPointer.Type, indexPointer, scope);
             case ExpressionAst expression:
-                var expressionValue = EmitIR(function, expression.Children[0], scope);
-                for (var i = 1; i < expression.Children.Count; i++)
-                {
-                    var rhs = EmitIR(function, expression.Children[i], scope);
-                    if (expression.OperatorOverloads.TryGetValue(i, out var overload))
-                    {
-                        expressionValue = EmitCall(function, overload, new []{expressionValue, rhs}, scope);
-                    }
-                    else
-                    {
-                        expressionValue = EmitExpression(function, expressionValue, rhs, expression.Operators[i - 1], expression.ResultingTypes[i - 1], scope);
-                    }
-                }
-                return expressionValue;
+                return EmitExpression(function, expression, scope);
             case TypeDefinition typeDef:
                 return GetConstantInteger(typeDef.TypeIndex);
             case CastAst cast:
@@ -1981,6 +1968,24 @@ public static class ProgramIRBuilder
 
         Debug.Assert(false, "Expected to emit an expression");
         return null;
+    }
+
+    private static InstructionValue EmitExpression(FunctionIR function, ExpressionAst expression, IScope scope)
+    {
+        var expressionValue = EmitIR(function, expression.Children[0], scope);
+        for (var i = 1; i < expression.Children.Count; i++)
+        {
+            var rhs = EmitIR(function, expression.Children[i], scope);
+            if (expression.OperatorOverloads.TryGetValue(i, out var overload))
+            {
+                expressionValue = EmitCall(function, overload, new []{expressionValue, rhs}, scope);
+            }
+            else
+            {
+                expressionValue = EmitExpression(function, expressionValue, rhs, expression.Operators[i - 1], expression.ResultingTypes[i - 1], scope);
+            }
+        }
+        return expressionValue;
     }
 
     private static InstructionValue EmitConstantIR(IAst ast, FunctionIR function, IScope scope = null)
@@ -1996,7 +2001,7 @@ public static class ProgramIRBuilder
                 {
                     return GetConstantInteger(identifierAst.TypeIndex.Value);
                 }
-                else if (identifierAst.FunctionTypeIndex.HasValue)
+                if (identifierAst.FunctionTypeIndex.HasValue)
                 {
                     return GetConstantInteger(identifierAst.FunctionTypeIndex.Value);
                 }
@@ -2024,6 +2029,19 @@ public static class ProgramIRBuilder
                     };
                 }
                 break;
+            case ExpressionAst expression:
+                var expressionFunction = new FunctionIR {Instructions = new(), BasicBlocks = new(1)};
+                AddBasicBlock(expressionFunction);
+                var returnValue = EmitExpression(expressionFunction, expression, TypeChecker.GlobalScope);
+                expressionFunction.Instructions.Add(new Instruction {Type = InstructionType.Return, Value1 = returnValue});
+
+                var result = ProgramRunner.ExecuteFunction(expressionFunction);
+
+                return new InstructionValue
+                {
+                    ValueType = InstructionValueType.Constant, Type = expression.Type,
+                    ConstantValue = new Constant {Integer = result.Long}
+                };
         }
         Debug.Assert(false, "Value is not constant");
         return null;
