@@ -289,7 +289,7 @@ public static unsafe class ProgramRunner
     {
         try
         {
-            var returnRegister = ExecuteFunction(function, new Register[0]);
+            var returnRegister = ExecuteFunction(function);
         }
         catch (Exception e)
         {
@@ -304,7 +304,7 @@ public static unsafe class ProgramRunner
     {
         try
         {
-            var returnRegister = ExecuteFunction(function, new Register[0]);
+            var returnRegister = ExecuteFunction(function);
             return returnRegister.Bool;
         }
         catch (Exception e)
@@ -389,6 +389,11 @@ public static unsafe class ProgramRunner
     private static void SetOutputArchitecture(byte arch)
     {
         BuildSettings.OutputArchitecture = (OutputArchitecture)arch;
+    }
+
+    public static Register ExecuteFunction(FunctionIR function)
+    {
+        return ExecuteFunction(function, ReadOnlySpan<Register>.Empty);
     }
 
     private static Register ExecuteFunction(FunctionIR function, ReadOnlySpan<Register> arguments)

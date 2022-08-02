@@ -14,7 +14,6 @@ enum AstType {
     EnumValue;
     Union;
     UnionField;
-    Primitive;
     Pointer;
     Array;
     Compound;
@@ -48,8 +47,54 @@ enum AstType {
     Defer;
 }
 
+[flags]
+enum AstFlags {
+    // Relating to types
+    IsType = 0x1;
+    Used = 0x2;
+    Signed = 0x4;
+    Private = 0x8;
+    Verified = 0x10;
+    Verifying = 0x20;
+
+    // Misc
+    HasGenerics = 0x40;
+    Global = 0x80;
+    Constant = 0x100;
+    Returns = 0x200;
+    EnumValueDefined = 0x400;
+
+    // Struct field refs
+    IsEnum = 0x800;
+    ConstantStringLength = 0x1000;
+    RawConstantString = 0x2000;
+
+    // ++ and --
+    Prefixed = 0x4000;
+    Positive = 0x8000;
+
+    // Calls
+    InlineCall = 0x10000;
+    PassArrayToParams = 0x20000;
+
+    // Libraries
+    HasLib = 0x40000;
+    HasDll = 0x80000;
+
+    // Assembly
+    FindStagingInputRegister = 0x100000;
+    GetPointer = 0x200000;
+    Dereference = 0x400000;
+    Added = 0x800000;
+
+    // Type Definitions
+    IsGeneric = 0x1000000;
+    Compound = 0x2000000;
+}
+
 struct Ast {
     ast_type: AstType;
+    flags: AstFlags;
     file_index: s32;
     line: u32;
     column: u32;
@@ -61,21 +106,19 @@ struct TypeAst : Ast {
     type_kind: TypeKind;
     size: u32;
     alignment: u32;
-    used: bool;
-    private: bool;
 }
 
-struct Interface : TypeAst {
+struct InterfaceAst : TypeAst {
     return_type: TypeAst*;
     return_type_definition: TypeDefinition*;
     arguments: Array<DeclarationAst*>;
     argument_count: int;
 }
 
-struct Function : Interface {
+struct Function : InterfaceAst {
     constant_count: int;
     function_index: int;
-    flags: FunctionFlags;
+    function_flags: FunctionFlags;
     generics: Array<string>;
     body: ScopeAst*;
 }
@@ -111,7 +154,6 @@ struct Declaration : Values {
     type_definition: TypeDefinition*;
     type: TypeAst*;
     array_element_type: TypeAst*;
-    has_generics: bool;
 }
 
 struct Scope : Ast {
@@ -127,7 +169,6 @@ struct GlobalScope : Scope {
 }
 
 struct ScopeAst : Scope {
-    returns: bool;
     defer_count: int;
     children: Array<Ast*>;
     deferred_asts: Array<ScopeAst*>;
@@ -148,8 +189,6 @@ struct StructAst : TypeAst {
     base_struct_name: string;
     base_type_definition: TypeDefinition*;
     base_struct: StructAst*;
-    verified: bool;
-    verifying: bool;
     generics: Array<string>;
     generic_types: Array<TypeAst*>;
     fields: Array<StructFieldAst*>;
@@ -161,11 +200,6 @@ struct StructFieldAst : Declaration {
 }
 
 struct StructFieldRefAst : Ast {
-    is_enum: bool;
-    is_constant: bool;
-    global_constant: bool;
-    constant_string_length: bool;
-    raw_constant_string: bool;
     constant_index: int;
     constant_value: int;
     pointers: Array<bool>;
@@ -180,7 +214,7 @@ struct EnumAst : TypeAst {
     // uint Alignment; = 4;
     attributes: Array<string>;
     base_type_definition: TypeDefinition*;
-    base_type: PrimitiveAst*;
+    base_type: TypeAst*;
     values: HashTable<string, EnumValueAst*>;
 }
 
@@ -188,17 +222,9 @@ struct EnumValueAst : Ast {
     index: int;
     value: int;
     name: string;
-    defined: bool;
-}
-
-struct PrimitiveAst : TypeAst {
-    signed: bool;
 }
 
 struct PointerType : TypeAst {
-    // TypeKind TypeKind; = TypeKind.Pointer;
-    // uint Size; = 8;
-    // uint Alignment; = 8;
     pointed_type: TypeAst*;
 }
 
@@ -210,8 +236,6 @@ struct ArrayType : TypeAst {
 
 struct UnionAst : TypeAst {
     // TypeKind TypeKind; = TypeKind.Union;
-    verified: bool;
-    verifying: bool;
     fields: Array<UnionFieldAst*>;
 }
 
@@ -267,8 +291,6 @@ struct CompoundExpressionAst : Ast {
 }
 
 struct ChangeByOneAst : Ast {
-    prefix: bool;
-    positive: bool;
     value: Ast*;
     type: TypeAst*;
 }
@@ -282,19 +304,14 @@ struct UnaryAst : Ast {
 struct CallAst : Ast {
     name: string;
     function: FunctionAst*;
-    function_pointer: Interface*;
+    function_pointer: InterfaceAst*;
     generics: Array<TypeDefinition*>;
     specified_arguments: HashTable<string, Ast*>;
     arguments: Array<Ast*>;
     type_info: TypeAst*;
-    inline: bool;
-    pass_array_to_params: bool;
 }
 
 struct DeclarationAst : Declaration {
-    global: bool;
-    private: bool;
-    constant: bool;
     constant_index: int;
     pointer_index: int;
 }
@@ -336,7 +353,6 @@ struct VariableAst : Ast {
 
 struct IndexAst : Ast {
     name: string;
-    calls_overload: bool;
     overload: OperatorOverloadAst*;
     index: Ast*;
 }
@@ -359,28 +375,17 @@ struct Library {
     absolute_path: string;
     file_name: string;
     lib_path: string;
-    has_lib: bool;
-    has_dll: bool;
 }
 
 struct CastAst : Ast {
     target_type_definition: TypeDefinition*;
     target_type: TypeAst*;
-    has_generics: bool;
     value: Ast*;
 }
 
 struct OperatorOverloadAst : Function {
     op: Operator;
     type: TypeDefinition*;
-}
-
-struct InterfaceAst : Interface {
-    // TypeKind TypeKind; = TypeKind.Interface;
-    // uint Size; = 8;
-    // uint Alignment; = 8;
-    verified: bool;
-    verifying: bool;
 }
 
 struct AssemblyAst : Ast {

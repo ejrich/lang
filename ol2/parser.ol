@@ -215,12 +215,12 @@ parse_file(void* data) {
                             if struct_ast.name == "string" {
                                 string_type = struct_ast;
                                 struct_ast.type_kind = TypeKind.String;
-                                struct_ast.used = true;
+                                struct_ast.flags |= AstFlags.Used;
                             }
                             else if struct_ast.name == "Any" {
                                 any_type = struct_ast;
                                 struct_ast.type_kind = TypeKind.Any;
-                                struct_ast.used = true;
+                                struct_ast.flags |= AstFlags.Used;
                             }
                             else {
                                 struct_ast.type_kind = TypeKind.Struct;
@@ -402,7 +402,7 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
     // 1. Determine return type and name of the function
     function := create_ast<FunctionAst>(enumerator, AstType.Function);
     function.attributes = attributes;
-    function.private = enumerator.private;
+    if enumerator.private function.flags = AstFlags.Private;
 
     // 1a. Check if the return type is void
     token: Token;
@@ -506,7 +506,7 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
     if (function.return_type_definition != null) {
         each generic, i in function.generics {
             if search_for_generic(generic, i, function.return_type_definition) {
-                function.flags |= FunctionFlags.ReturnTypeHasGenerics;
+                function.function_flags |= FunctionFlags.ReturnTypeHasGenerics;
             }
         }
     }
@@ -545,7 +545,7 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
                     current_argument.type_definition = parse_type(enumerator, argument = true);
                     each generic, i in function.generics {
                         if search_for_generic(generic, i, current_argument.type_definition) {
-                            current_argument.has_generics = true;
+                            current_argument.flags |= AstFlags.HasGenerics;
                         }
                     }
                 }
@@ -619,7 +619,7 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
         switch directive.length {
             case 6; {
                 if directive == "extern" {
-                    function.flags |= FunctionFlags.Extern;
+                    function.function_flags |= FunctionFlags.Extern;
                     extern_error := "Extern function definition should be followed by the library in use"; #const
                     if !peek(enumerator, &token) {
                         report_error(extern_error, enumerator.file_index, token);
@@ -638,13 +638,13 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
                     return function;
                 }
                 else if directive == "inline"
-                    function.flags |= FunctionFlags.Inline;
+                    function.function_flags |= FunctionFlags.Inline;
                 else
                     report_error(unexpected_directive, enumerator.file_index, enumerator.current, directive);
             }
             case 7; {
                 if directive == "syscall" {
-                    function.flags |= FunctionFlags.Syscall;
+                    function.function_flags |= FunctionFlags.Syscall;
                     syscall_error := "Syscall function definition should be followed by the number for the system call"; #const
                     if !peek(enumerator, &token) {
                         report_error(syscall_error, enumerator.file_index, token);
@@ -666,18 +666,18 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
             }
             case 8; {
                 if directive == "compiler" {
-                    function.flags |= FunctionFlags.Compiler;
+                    function.function_flags |= FunctionFlags.Compiler;
                     return function;
                 }
                 else if directive == "print_ir" {
-                    function.flags |= FunctionFlags.PrintIR;
+                    function.function_flags |= FunctionFlags.PrintIR;
                 }
                 else
                     report_error(unexpected_directive, enumerator.file_index, enumerator.current, directive);
             }
             case 13; {
                 if directive == "call_location"
-                    function.flags |= FunctionFlags.PassCallLocation;
+                    function.function_flags |= FunctionFlags.PassCallLocation;
                 else
                     report_error(unexpected_directive, enumerator.file_index, enumerator.current, directive);
             }
@@ -708,7 +708,8 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
 StructAst* parse_struct(TokenEnumerator* enumerator, Array<string> attributes) {
     struct_ast := create_ast<StructAst>(enumerator, AstType.Struct);
     struct_ast.attributes = attributes;
-    struct_ast.private = enumerator.private;
+    if enumerator.private struct_ast.flags = AstFlags.IsType | AstFlags.Private;
+    else struct_ast.flags = AstFlags.IsType;
 
     // 1. Determine name of struct
     if !move_next(enumerator) {
@@ -791,7 +792,7 @@ StructAst* parse_struct(TokenEnumerator* enumerator, Array<string> attributes) {
         each generic, i in struct_ast.generics {
             each field in struct_ast.fields {
                 if field.type_definition != null && search_for_generic(generic, i, field.type_definition) {
-                    field.has_generics = true;
+                    field.flags |= AstFlags.HasGenerics;
                 }
             }
         }
@@ -868,7 +869,8 @@ StructFieldAst* parse_struct_field(TokenEnumerator* enumerator) {
 EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
     enum_ast := create_ast<EnumAst>(enumerator, AstType.Enum);
     enum_ast.attributes = attributes;
-    enum_ast.private = enumerator.private;
+    if enumerator.private enum_ast.flags = AstFlags.IsType | AstFlags.Private;
+    else enum_ast.flags = AstFlags.IsType;
 
     // 1. Determine name of enum
     if !move_next(enumerator) {
@@ -896,7 +898,7 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
             enum_ast.alignment = 4;
         }
         else {
-            enum_ast.base_type = cast(PrimitiveAst*, base_type);
+            enum_ast.base_type = base_type;
             enum_ast.size = base_type.size;
             enum_ast.alignment = base_type.size;
         }
@@ -915,7 +917,7 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
     // 3. Iterate through fields
     lowest_allowed_value: s64;
     largest_allowed_value: u64;
-    if enum_ast.base_type.signed {
+    if enum_ast.base_type.flags & AstFlags.Signed {
         lowest_allowed_value = -(1 << (8 * enum_ast.size - 1));
         largest_allowed_value = 1 << (8 * enum_ast.size - 1) - 1;
     }
@@ -944,11 +946,11 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
                     parsing_value_default = false;
                     found, value := table_get(enum_ast.values, token.value);
                     if found {
-                        if !value.defined
+                        if (value.flags & AstFlags.EnumValueDefined) != AstFlags.EnumValueDefined
                             report_error("Expected previously defined value '%' to have a defined value", enumerator.file_index, token, token.value);
 
                         current_value.value = value.value;
-                        current_value.defined = true;
+                        current_value.flags |= AstFlags.EnumValueDefined;
                     }
                     else
                         report_error("Expected value '%' to be previously defined in enum '{enum_ast.Name}'", enumerator.file_index, token, token.value);
@@ -966,7 +968,7 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
                         if !table_add(&enum_ast.values, current_value.name, current_value)
                             report_error("Enum '%' already contains value '%'", current_value, enum_ast.name, current_value.name);
 
-                        if current_value.defined {
+                        if current_value.flags & AstFlags.EnumValueDefined {
                             if current_value.value > largest_value
                                 largest_value = current_value.value;
                         }
@@ -992,7 +994,7 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
                         value: int;
                         if try_parse_integer(token.value, &value) {
                             current_value.value = value;
-                            current_value.defined = true;
+                            current_value.flags |= AstFlags.EnumValueDefined;
                         }
                         else
                             report_error("Expected enum value to be an integer, but got '%'", enumerator.file_index, token, token.value);
@@ -1007,7 +1009,7 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
                         sub_value := substring(token.value, 2, token.value.length - 2);
                         if sub_value.length <= 16 {
                             current_value.value = parse_hex_number(sub_value);
-                            current_value.defined = true;
+                            current_value.flags |= AstFlags.EnumValueDefined;
                         }
                         else report_error("Expected enum value to be an integer, but got '%'", enumerator.file_index, token, token.value);
                     }
@@ -1017,7 +1019,7 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
             case TokenType.Character;
                 if current_value != null && parsing_value_default {
                     current_value.value = token.value[0];
-                    current_value.defined = true;
+                    current_value.flags |= AstFlags.EnumValueDefined;
                     parsing_value_default = false;
                 }
                 else report_error("Unexpected token '%' in enum", enumerator.file_index, token, token.value);
@@ -1039,7 +1041,8 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
 
 UnionAst* parse_union(TokenEnumerator* enumerator) {
     union_ast := create_ast<UnionAst>(enumerator, AstType.Union);
-    union_ast.private = enumerator.private;
+    if enumerator.private union_ast.flags = AstFlags.IsType | AstFlags.Private;
+    else union_ast.flags = AstFlags.IsType;
 
     // 1. Determine name of union
     if !move_next(enumerator) {
@@ -1479,8 +1482,8 @@ Ast* parse_condition_expression(TokenEnumerator* enumerator, Function* current_f
 
 DeclarationAst* parse_declaration(TokenEnumerator* enumerator, Function* current_function = null, bool global = false) {
     declaration := create_ast<DeclarationAst>(enumerator, AstType.Declaration);
-    declaration.global = global;
-    declaration.private = enumerator.private;
+    if global declaration.flags |= AstFlags.Global;
+    if enumerator.private declaration.flags |= AstFlags.Private;
 
     if enumerator.current.type != TokenType.Identifier {
         report_error("Expected variable name to be an identifier, but got '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
@@ -1507,7 +1510,7 @@ DeclarationAst* parse_declaration(TokenEnumerator* enumerator, Function* current
         if current_function {
             each generic, i in current_function.generics {
                 if search_for_generic(generic, i, declaration.type_definition) {
-                    declaration.has_generics = true;
+                    declaration.flags |= AstFlags.HasGenerics;
                 }
             }
         }
@@ -1542,7 +1545,7 @@ DeclarationAst* parse_declaration(TokenEnumerator* enumerator, Function* current
     // 4. Parse compiler directives
     if peek(enumerator, &token) && token.type == TokenType.Pound {
         if peek(enumerator, &token, 1) && token.value == "const" {
-            declaration.constant = true;
+            declaration.flags |= AstFlags.Constant;
             move_next(enumerator);
             move_next(enumerator);
         }
@@ -1788,7 +1791,7 @@ parse_change_by_one(TokenEnumerator* enumerator, Ast** l_value, Token token) {
     // Create subexpression to hold the operation
     // This case would be `var b = 4 + a++`, where we have a value before the operator
     change_by_one := create_ast<ChangeByOneAst>(*l_value, AstType.ChangeByOne);
-    change_by_one.positive = token.type == TokenType.Increment;
+    if token.type == TokenType.Increment change_by_one.flags |= AstFlags.Positive;
     change_by_one.value = *l_value;
     *l_value = change_by_one;
 }
@@ -1997,11 +2000,12 @@ Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_f
         }
         case TokenType.Increment;
         case TokenType.Decrement; {
-            positive := token.type == TokenType.Increment;
             if move_next(enumerator) {
                 change_by_one := create_ast<ChangeByOneAst>(enumerator, AstType.ChangeByOne);
-                change_by_one.prefix = true;
-                change_by_one.positive = positive;
+
+                if token.type == TokenType.Increment change_by_one.flags = AstFlags.Prefixed | AstFlags.Positive;
+                else change_by_one.flags = AstFlags.Prefixed;
+
                 change_by_one.value = parse_next_expression_unit(enumerator, current_function);
                 if peek(enumerator, &token) && token.type == TokenType.Period {
                     move_next(enumerator);
@@ -2360,13 +2364,13 @@ Ast* parse_compiler_directive(TokenEnumerator* enumerator, Function* current_fun
     if token.value == "if" {
         directive.directive_type = DirectiveType.If;
         directive.value = parse_conditional(enumerator, current_function);
-        current_function.flags |= FunctionFlags.HasDirectives;
+        current_function.function_flags |= FunctionFlags.HasDirectives;
     }
     else if token.value == "assert" {
         directive.directive_type = DirectiveType.Assert;
         move_next(enumerator);
         directive.value = parse_expression(enumerator, current_function);
-        current_function.flags |= FunctionFlags.HasDirectives;
+        current_function.function_flags |= FunctionFlags.HasDirectives;
     }
     else if token.value == "inline" {
         if !move_next(enumerator) || enumerator.current.type != TokenType.Identifier {
@@ -2374,7 +2378,7 @@ Ast* parse_compiler_directive(TokenEnumerator* enumerator, Function* current_fun
             return null;
         }
         call := parse_call(enumerator, current_function, true);
-        if call call.inline = true;
+        if call call.flags |= AstFlags.InlineCall;
         return call;
     }
     else {
@@ -2845,7 +2849,7 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator) {
                     current_argument.type_definition = parse_type(enumerator, argument = true);
                     each generic, i in overload.generics {
                         if search_for_generic(generic, i, current_argument.type_definition) {
-                            current_argument.has_generics = true;
+                            current_argument.flags |= AstFlags.HasGenerics;
                         }
                     }
                     if overload.arguments.length == 0
@@ -2901,14 +2905,14 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator) {
                 overload.return_type_definition = parse_type(enumerator);
                 each generic, i in overload.generics {
                     if search_for_generic(generic, i, overload.return_type_definition) {
-                        overload.flags |= FunctionFlags.ReturnTypeHasGenerics;
+                        overload.function_flags |= FunctionFlags.ReturnTypeHasGenerics;
                     }
                 }
                 move_next(enumerator);
             }
         default; {
             if overload.generics.length {
-                overload.flags |= FunctionFlags.ReturnTypeHasGenerics;
+                overload.function_flags |= FunctionFlags.ReturnTypeHasGenerics;
             }
             each generic, i in overload.generics {
                 search_for_generic(generic, i, overload.type);
@@ -2923,7 +2927,7 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator) {
             return null;
         }
         if enumerator.current.value == "print_ir"
-            overload.flags |= FunctionFlags.PrintIR;
+            overload.function_flags |= FunctionFlags.PrintIR;
         else
             report_error("Unexpected compiler directive '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
 
@@ -2946,7 +2950,8 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator) {
 
 InterfaceAst* parse_interface(TokenEnumerator* enumerator) {
     interface_ast := create_ast<InterfaceAst>(enumerator, AstType.Interface);
-    interface_ast.private = enumerator.private;
+    if enumerator.private interface_ast.flags = AstFlags.IsType | AstFlags.Private;
+    else interface_ast.flags = AstFlags.IsType;
     move_next(enumerator);
 
     // 1a. Check if the return type is void
@@ -3494,7 +3499,7 @@ CastAst* parse_cast(TokenEnumerator* enumerator, Function* current_function) {
     if current_function {
         each generic, i in current_function.generics {
             if search_for_generic(generic, i, cast_ast.target_type_definition) {
-                cast_ast.has_generics = true;
+                cast_ast.flags |= AstFlags.HasGenerics;
             }
         }
     }
