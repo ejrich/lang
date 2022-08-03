@@ -190,7 +190,7 @@ parse_file(void* data) {
                             report_error("Global variables cannot have attributes", file_index, token);
 
                         variable := parse_declaration(&enumerator, global = true);
-                        if add_global_variable(variable)
+                        if variable != null && add_global_variable(variable)
                             add(&asts, variable);
                     }
                     else {
@@ -784,7 +784,9 @@ StructAst* parse_struct(TokenEnumerator* enumerator, Array<string> attributes) {
         if enumerator.current.type == TokenType.CloseBrace
             break;
 
-        array_insert(&struct_ast.fields, parse_struct_field(enumerator), allocate, reallocate);
+        field := parse_struct_field(enumerator);
+        if field
+            array_insert(&struct_ast.fields, field, allocate, reallocate);
     }
 
     // 6. Mark field types as generic if necessary
