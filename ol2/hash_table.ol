@@ -80,7 +80,9 @@ bool table_contains<T, U>(HashTable<T, U> table, T key) {
 
 table_expand<T, U>(HashTable<T, U>* table) {
     new_entries: Array<HashTableEntry<T, U>>;
-    array_resize(&new_entries, table.entries.length * 2, allocate, reallocate);
+    length := table.entries.length * 2;
+    if length <= 0 length = 10;
+    array_resize(&new_entries, length, allocate, reallocate);
 
     each entry in table.entries {
         if entry.filled {

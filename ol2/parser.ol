@@ -211,7 +211,7 @@ parse_file(void* data) {
                         }
                     }
                     else {
-                        if add_struct(struct_ast) {
+                        if add_type(struct_ast) {
                             if struct_ast.name == "string" {
                                 string_type = struct_ast;
                                 struct_ast.type_kind = TypeKind.String;
@@ -240,7 +240,7 @@ parse_file(void* data) {
 
                 union_ast := parse_union(&enumerator);
                 if union_ast {
-                    add_union(union_ast);
+                    add_type(union_ast);
                     add(&asts, union_ast);
                 }
             }
@@ -273,7 +273,7 @@ parse_file(void* data) {
 
                 interface_ast := parse_interface(&enumerator);
                 if interface_ast != null && !string_is_empty(interface_ast.name) {
-                    add_interface(interface_ast);
+                    add_type(interface_ast);
                     add(&asts, interface_ast);
                 }
             }
