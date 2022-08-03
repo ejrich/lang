@@ -48,7 +48,9 @@ bool, U table_get<T, U>(HashTable<T, U> table, T key) {
 }
 
 bool table_add<T, U>(HashTable<T, U>* table, T key, U value) {
-    if cast(float, table.length) / table.entries.length > table.load_factor
+    if !table.initialized
+        table_init(table, 10);
+    else if cast(float, table.length) / table.entries.length > table.load_factor
         table_expand(table);
 
     entry: HashTableEntry<T, U> = { filled = true; hash = hash(key); key = key; value = value; }

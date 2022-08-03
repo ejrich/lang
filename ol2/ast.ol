@@ -79,19 +79,15 @@ enum AstFlags {
     InlineCall = 0x10000;
     PassArrayToParams = 0x20000;
 
-    // Libraries
-    HasLib = 0x40000;
-    HasDll = 0x80000;
-
     // Assembly
-    FindStagingInputRegister = 0x100000;
-    GetPointer = 0x200000;
-    Dereference = 0x400000;
-    Added = 0x800000;
+    FindStagingInputRegister = 0x40000;
+    GetPointer = 0x80000;
+    Dereference = 0x100000;
+    Added = 0x200000;
 
     // Type Definitions
-    IsGeneric = 0x1000000;
-    Compound = 0x2000000;
+    IsGeneric = 0x4000000;
+    Compound = 0x8000000;
 }
 
 struct Ast {

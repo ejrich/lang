@@ -232,7 +232,7 @@ parse_file(void* data) {
             }
             case TokenType.Enum; {
                 enum_ast := parse_enum(&enumerator, attributes);
-                add_enum(enum_ast);
+                if add_type(enum_ast) create_type_info(enum_ast);
             }
             case TokenType.Union; {
                 if attributes.length
@@ -1482,8 +1482,10 @@ Ast* parse_condition_expression(TokenEnumerator* enumerator, Function* current_f
 
 DeclarationAst* parse_declaration(TokenEnumerator* enumerator, Function* current_function = null, bool global = false) {
     declaration := create_ast<DeclarationAst>(enumerator, AstType.Declaration);
-    if global declaration.flags |= AstFlags.Global;
-    if enumerator.private declaration.flags |= AstFlags.Private;
+    if global {
+        if enumerator.private declaration.flags = AstFlags.Global | AstFlags.Private;
+        else declaration.flags = AstFlags.Global;
+    }
 
     if enumerator.current.type != TokenType.Identifier {
         report_error("Expected variable name to be an identifier, but got '%'", enumerator.file_index, enumerator.current, enumerator.current.value);
