@@ -71,46 +71,49 @@ check_types() {
 }
 
 bool add_global_variable(DeclarationAst* declaration) {
-    name := declaration.name;
-
-    if declaration.flags & AstFlags.Private {
-        private_scope := private_scopes[declaration.file_index];
-
-        if table_contains(private_scope.identifiers, name) || table_contains(global_scope.identifiers, name) {
-            report_error("Identifier '%' already defined", declaration, name);
-            return false;
-        }
-
-        table_add(&private_scope.identifiers, name, declaration);
-    }
-    else {
-        if !table_add(&global_scope.identifiers, name, declaration) {
-            report_error("Identifier '%' already defined", declaration, name);
-            return false;
-        }
-    }
-
-    return true;
+    return add_identifier(declaration.name, declaration, declaration.file_index);
 }
 
 add_function(FunctionAst* function) {
+}
+
+add_overload(OperatorOverloadAst* overload) {
 }
 
 bool add_polymorphic_struct(StructAst* struct_ast) {
     return true;
 }
 
-add_enum(EnumAst* enum_ast) {
-    if add_type(enum_ast) create_type_info(enum_ast);
-}
-
 add_library(CompilerDirectiveAst* directive) {
+    library := directive.library;
+
+    #if os == OS.Linux {
+        archive := concat_temp(library.absolute_path, ".a");
+        shared_library := concat_temp(library.absolute_path, ".so");
+
+        if !file_exists(archive) && !file_exists(shared_library)
+            report_error("Unable to find .a/.so '%' of library '%'", directive, library.path, library.name);
+    }
+    #if os == OS.Windows {
+        lib := concat_temp(library.absolute_path, ".lib");
+        dll := concat_temp(library.absolute_path, ".dll");
+
+        if !file_exists(lib) && !file_exists(dll)
+            report_error("Unable to find .lib/.dll '%' of library '%'", directive, library.path, library.name);
+    }
+
+    if !table_add(&libraries, library.name, &directive.library)
+        report_error("Library '%' already defined", directive, library.name);
 }
 
 add_system_library(CompilerDirectiveAst* directive) {
-}
+    library := directive.library;
 
-add_overload(OperatorOverloadAst* overload) {
+    if !string_is_empty(library.lib_path) && !file_exists(library.lib_path)
+        report_error("Library path '%' of library '%' does not exist", directive, library.lib_path, library.name);
+
+    if !table_add(&libraries, library.name, &directive.library)
+        report_error("Library '%' already defined", directive, library.name);
 }
 
 bool add_type(TypeAst* type) {
@@ -565,6 +568,7 @@ string print_type_definition(TypeDefinition* type, bool* allocated, int padding 
 base_array_type: StructAst*;
 global_scope: GlobalScope;
 private_scopes: Array<GlobalScope*>;
+libraries: HashTable<string, Library*>;
 
 #private
 
@@ -628,4 +632,13 @@ int add_generics_to_string(TypeDefinition* type, string result, int index) {
         result[index++] = ' ';
     }
     return add_type_to_string(type.generics[i], result, index);
+}
+
+string concat_temp(string l, string r) #inline {
+    string_data: Array<u8>[l.length + r.length];
+    result: string = { length = string_data.length; data = string_data.data; }
+    memory_copy(result.data, l.data, l.length);
+    memory_copy(result.data + l.length, r.data, r.length);
+
+    return result;
 }
