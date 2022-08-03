@@ -49,6 +49,8 @@ enum AstType {
 
 [flags]
 enum AstFlags {
+    None;
+
     // Relating to types
     IsType = 0x1;
     Used = 0x2;
@@ -163,7 +165,6 @@ struct Scope : Ast {
 
 struct GlobalScope : Scope {
     functions: HashTable<string, Array<FunctionAst*>>;
-    types: HashTable<string, TypeAst*>;
     polymorphic_structs: HashTable<string, StructAst*>;
     polymorphic_functions: HashTable<string, Array<FunctionAst*>>;
 }
