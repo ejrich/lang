@@ -160,9 +160,9 @@ struct Scope : Ast {
 }
 
 struct GlobalScope : Scope {
-    functions: HashTable<string, Array<FunctionAst*>>;
+    functions: HashTable<string, Array<FunctionAst*>*>;
     polymorphic_structs: HashTable<string, StructAst*>;
-    polymorphic_functions: HashTable<string, Array<FunctionAst*>>;
+    polymorphic_functions: HashTable<string, Array<FunctionAst*>*>;
 }
 
 struct ScopeAst : Scope {

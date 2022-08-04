@@ -75,12 +75,187 @@ bool add_global_variable(DeclarationAst* declaration) {
 }
 
 add_function(FunctionAst* function) {
+    if function.generics.length {
+        if add_overload_if_not_exists_for_polymorphic_function(function) {
+            report_error("Polymorphic function '%' has multiple overloads with arguments (%)", function, function.name, print_argument_types(function.arguments));
+        }
+    }
+    else {
+        if function.function_flags & FunctionFlags.Extern {
+            if function.flags & AstFlags.Private {
+                report_error("Extern function '%' must be public to avoid linking failures", function, function.name);
+            }
+            else {
+                found, _ := get_existing_function(function.name, function.file_index);
+                if found report_error("Multiple definitions of extern function '%'", function, function.name);
+            }
+        }
+        else if overload_exists_for_function(function) {
+            report_error("Function '%' has multiple overloads with arguments (%)", function, function.name, print_argument_types(function.arguments));
+        }
+
+        add_function(function.name, function.file_index, function);
+    }
+}
+
+bool overload_exists_for_function(FunctionAst* function) {
+    name := function.name;
+    if string_is_empty(name) return false;
+
+    private_scope := private_scopes[function.file_index];
+
+    if private_scope {
+        found, functions := table_get(private_scope.functions, name);
+
+        if found && overload_exists(function, *functions)
+            return true;
+
+        found, functions = table_get(global_scope.functions, name);
+        if found return overload_exists(function, *functions);
+    }
+    else {
+        found, functions := table_get(global_scope.functions, name);
+
+        if found return overload_exists(function, *functions);
+    }
+
+    return false;
+}
+
+bool add_overload_if_not_exists_for_polymorphic_function(FunctionAst* function) {
+    name := function.name;
+    if string_is_empty(name) return false;
+
+    private_scope := private_scopes[function.file_index];
+
+    if private_scope {
+        found, functions := table_get(private_scope.polymorphic_functions, name);
+        if found && overload_exists(function, *functions) return true;
+
+        found_global, global_functions := table_get(global_scope.polymorphic_functions, name);
+        if found_global && overload_exists(function, *global_functions) return true;
+
+        if !found {
+            functions = new<Array<FunctionAst*>>();
+            table_add(&private_scope.polymorphic_functions, name, functions);
+        }
+
+        array_insert(functions, function, allocate, reallocate);
+    }
+    else {
+        found, functions := table_get(global_scope.polymorphic_functions, name);
+
+        if found {
+            if overload_exists(function, *functions) return true;
+        }
+        else {
+            functions = new<Array<FunctionAst*>>();
+            table_add(&global_scope.polymorphic_functions, name, functions);
+        }
+
+        array_insert(functions, function, allocate, reallocate);
+    }
+
+    return false;
+}
+
+bool overload_exists(FunctionAst* function, Array<FunctionAst*> functions) {
+    each func in functions {
+        if func.arguments.length == function.arguments.length {
+            match := true;
+
+            each argument, i in function.arguments {
+                if !type_definition_equals(argument.type_definition, func.arguments[i].type_definition) {
+                    match = false;
+                    break;
+                }
+            }
+
+            if match return true;
+        }
+    }
+
+    return false;
+}
+
+bool type_definition_equals(TypeDefinition* a, TypeDefinition* b) {
+    if a == null || b == null return false;
+    if a.name != b.name || a.generics.length != b.generics.length return false;
+
+    each generic, i in a.generics {
+        if !type_definition_equals(generic, b.generics[i]) return false;
+    }
+
+    return true;
+}
+
+string print_argument_types(Array<DeclarationAst*> arguments) #inline {
+    if arguments.length == 0 return "";
+
+    length := -2;
+    each argument in arguments {
+        length += determine_type_definition_length(argument.type_definition) + 2; // Add 2 for the ", " after each argument
+    }
+
+    result_data: Array<u8>[length];
+    result: string = { length = length; data = result_data.data; }
+
+    i, index := 0;
+    while i < arguments.length - 1 {
+        index = add_type_to_string(arguments[i++].type_definition, result, index);
+        result[index++] = ',';
+        result[index++] = ' ';
+    }
+    add_type_to_string(arguments[i].type_definition, result, index);
+
+    return result;
+}
+
+add_function(string name, int file_index, FunctionAst* function) {
+    if string_is_null(name) return;
+
+    function.function_index = get_function_index();
+
+    if function.flags & AstFlags.Private {
+        private_scope := private_scopes[file_index];
+
+        add_function_to_scope(name, function, private_scope);
+    }
+    else add_function_to_scope(name, function, &global_scope);
+}
+
+add_function_to_scope(string name, FunctionAst* function, GlobalScope* scope) {
+    found, functions := table_get(scope.functions, name);
+    if !found {
+        functions = new<Array<FunctionAst*>>();
+        table_add(&scope.functions, name, functions);
+    }
+
+    array_insert(functions, function, allocate, reallocate);
 }
 
 add_overload(OperatorOverloadAst* overload) {
 }
 
 bool add_polymorphic_struct(StructAst* struct_ast) {
+    name := struct_ast.name;
+    error_format := "Multiple definitions of polymorphic struct '%'"; #const
+
+    if struct_ast.flags & AstFlags.Private {
+        private_scope := private_scopes[struct_ast.file_index];
+
+        if table_contains(private_scope.polymorphic_structs, name) || table_contains(global_scope.polymorphic_structs, name) {
+            report_error(error_format, struct_ast, name);
+            return false;
+        }
+
+        table_add(&private_scope.polymorphic_structs, name, struct_ast);
+    }
+    else if !table_add(&global_scope.polymorphic_structs, name, struct_ast) {
+        report_error(error_format, struct_ast, name);
+        return false;
+    }
+
     return true;
 }
 
@@ -128,18 +303,20 @@ bool add_type(string name, TypeAst* type, int file_index) {
 }
 
 bool add_identifier(string name, Ast* ast, int file_index) {
+    error_format :=  "Identifier '%' already defined"; #const
+
     if ast.flags & AstFlags.Private {
         private_scope := private_scopes[file_index];
 
         if table_contains(private_scope.identifiers, name) || table_contains(global_scope.identifiers, name) {
-            report_error("Identifier '%' already defined", ast, name);
+            report_error(error_format, ast, name);
             return false;
         }
 
         table_add(&private_scope.identifiers, name, ast);
     }
     else if !table_add(&global_scope.identifiers, name, ast) {
-        report_error("Identifier '%' already defined", ast, name);
+        report_error(error_format, ast, name);
         return false;
     }
 
@@ -474,6 +651,92 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, bool*
     return type_value;
 }
 
+string print_compound_type(TypeDefinition* type) #inline {
+    length := -2; // Start at -2 to offset the last type not ending with ", "
+    each sub_type in type.generics {
+        length += determine_type_definition_length(sub_type) + 2; // Add 2 for the ", " after each sub-type
+    }
+
+    result_data: Array<u8>[length];
+    result: string = { length = length; data = result_data.data; }
+    add_generics_to_string(type, result, 0);
+
+    return result;
+}
+
+string print_type_definition(TypeDefinition* type, int padding = 0) #inline {
+    _: bool;
+    return print_type_definition(type, &_, padding);
+}
+
+string print_type_definition(TypeDefinition* type, bool* allocated, int padding = 0) #inline {
+    if type == null return "";
+
+    if padding == 0 {
+        if type.baked_type {
+            *allocated = true;
+            return type.baked_type.name;
+        }
+        if type.generics.length == 0 {
+            *allocated = true;
+            return type.name;
+        }
+    }
+
+    // Determine how much space to reserve
+    length := determine_type_definition_length(type) + padding;
+    result_data: Array<u8>[length];
+    result: string = { length = length; data = result_data.data; }
+    add_type_to_string(type, result, 0);
+
+    return result;
+}
+
+base_array_type: StructAst*;
+global_scope: GlobalScope;
+private_scopes: Array<GlobalScope*>;
+libraries: HashTable<string, Library*>;
+
+#private
+
+bool, FunctionAst* get_existing_function(string name, int file_index, int* count = null) {
+    private_scope := private_scopes[file_index];
+
+    if private_scope {
+        found, functions := table_get(private_scope.functions, name);
+
+        if found {
+            function_count := functions.length;
+            function := functions.data[0];
+
+            found, functions = table_get(global_scope.functions, name);
+            if found {
+                function_count += functions.length;
+            }
+
+            if count { *count = function_count; }
+            return true, function;
+        }
+
+        found, functions = table_get(global_scope.functions, name);
+
+        if found {
+            if count { *count = functions.length; }
+            return true, functions.data[0];
+        }
+    }
+    else {
+        found, functions := table_get(global_scope.functions, name);
+
+        if found {
+            if count { *count = functions.length; }
+            return true, functions.data[0];
+        }
+    }
+
+    return false, null;
+}
+
 TypeAst* verify_array(TypeDefinition* type, Scope* scope, int depth, bool* is_generic) {
     element_type_def := type.generics[0];
     element_type := verify_type(element_type_def, scope, is_generic, depth + 1);
@@ -523,54 +786,6 @@ TypeAst* create_compound_type(Array<TypeAst*> types, string name, u32 size, AstF
     create_type_info(type_pointer);
     return type_pointer;
 }
-
-string print_compound_type(TypeDefinition* type) {
-    length := -2; // Start at -2 to offset the last type not ending with ", "
-    each sub_type in type.generics {
-        length += determine_type_definition_length(sub_type) + 2; // Add 2 for the ", " after each sub-type
-    }
-
-    result_data: Array<u8>[length];
-    result: string = { length = length; data = result_data.data; }
-    add_generics_to_string(type, result, 0);
-
-    return result;
-}
-
-string print_type_definition(TypeDefinition* type, int padding = 0) #inline {
-    _: bool;
-    return print_type_definition(type, &_, padding);
-}
-
-string print_type_definition(TypeDefinition* type, bool* allocated, int padding = 0) #inline {
-    if type == null return "";
-
-    if padding == 0 {
-        if type.baked_type {
-            *allocated = true;
-            return type.baked_type.name;
-        }
-        if type.generics.length == 0 {
-            *allocated = true;
-            return type.name;
-        }
-    }
-
-    // Determine how much space to reserve
-    length := determine_type_definition_length(type) + padding;
-    result_data: Array<u8>[length];
-    result: string = { length = length; data = result_data.data; }
-    add_type_to_string(type, result, 0);
-
-    return result;
-}
-
-base_array_type: StructAst*;
-global_scope: GlobalScope;
-private_scopes: Array<GlobalScope*>;
-libraries: HashTable<string, Library*>;
-
-#private
 
 string allocate_string(string input) {
     result: string = { length = input.length; data = allocate(input.length); }

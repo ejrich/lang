@@ -1,5 +1,5 @@
 entry_point: FunctionIR*;
-functions: HashTable<int, FunctionIR*>;
+function_ir: HashTable<int, FunctionIR*>;
 
 constants: Array<InstructionValue>;
 global_variables: Array<GlobalVariable>;

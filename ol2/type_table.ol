@@ -22,6 +22,10 @@ any_type: StructAst*;
 type_info_pointer_type: TypeAst*;
 void_pointer_type: TypeAst*;
 
+int get_function_index() {
+    return 0;
+}
+
 
 add_to_type_table(TypeAst* type) {
 
