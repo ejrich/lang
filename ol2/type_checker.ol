@@ -348,7 +348,15 @@ TypeAst* is_type(Ast* ast) {
 }
 
 StructAst* get_polymorphic_struct(string name, int file_index) {
-    return null;
+    private_scope := private_scopes[file_index];
+
+    if private_scope {
+        found, type := table_get(private_scope.polymorphic_structs, name);
+        if found return type;
+    }
+
+    _, type := table_get(global_scope.polymorphic_structs, name);
+    return type;
 }
 
 verify_struct(StructAst* struct_ast) {
