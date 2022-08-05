@@ -229,7 +229,7 @@ public static unsafe class LLVMBackend
             LLVM.InitializeFunctionPassManager(_passManager);
             _codeGenLevel = LLVMCodeGenOptLevel.LLVMCodeGenLevelAggressive;
         }
-        else
+        if (BuildSettings.EmitDebug)
         {
             _emitDebug = true;
             _debugBuilder = _module.CreateDIBuilder();
@@ -1586,6 +1586,7 @@ public static unsafe class LLVMBackend
                             }
                             constraintString.Remove(constraintString.Length-1, 1);
                         }
+                        constraintString.Append("~{dirflag},~{fpsr},~{flags}");
 
                         foreach (var instr in assembly.Instructions)
                         {
@@ -1640,6 +1641,7 @@ public static unsafe class LLVMBackend
                             var argumentElementTypes = new LLVMAttributeRef[assembly.OutValues.Count];
                             assemblyString = new StringBuilder();
                             constraintString = new StringBuilder();
+                            var clobberedRegisters = new StringBuilder();
                             for (i = 0; i < assembly.OutValues.Count; i++)
                             {
                                 var output = assembly.OutValues[i];
@@ -1674,8 +1676,11 @@ public static unsafe class LLVMBackend
                                 }
                                 assemblyString.AppendFormat("%{0}, ${1}; ", output.Register, i);
                                 constraintString.Append("=*m,");
+                                clobberedRegisters.AppendFormat("~{{{0}}},", output.Register);
                             }
-                            constraintString.Remove(constraintString.Length-1, 1);
+                            clobberedRegisters.Remove(clobberedRegisters.Length-1, 1);
+                            constraintString.Append(clobberedRegisters);
+                            constraintString.Append("~{dirflag},~{fpsr},~{flags}");
 
                             var assemblyOutputType = LLVMTypeRef.CreateFunction(LLVM.VoidType(), argumentTypes);
                             var call = BuildAssemblyCall(assemblyString.ToString(), constraintString.ToString(), assemblyOutputType, arguments, LLVMInlineAsmDialect.LLVMInlineAsmDialectATT);
@@ -2119,7 +2124,7 @@ public static unsafe class LLVMBackend
                         LLVM.SetCurrentDebugLocation2(_builder, location);
                         break;
                     }
-                    case InstructionType.DebugDeclareParameter:
+                    case InstructionType.DebugDeclareParameter when _emitDebug:
                     {
                         var argument = LLVM.GetParam(functionPointer, (uint)instruction.Index);
                         var functionArg = function.Source.Arguments[instruction.Index];
@@ -2133,7 +2138,7 @@ public static unsafe class LLVMBackend
                         LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, allocations[instruction.Index], debugVariable, expression, location, basicBlocks[blockIndex]);
                         break;
                     }
-                    case InstructionType.DebugDeclareVariable:
+                    case InstructionType.DebugDeclareVariable when _emitDebug:
                     {
                         using var name = new MarshaledString(instruction.String);
 

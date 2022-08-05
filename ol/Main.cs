@@ -12,6 +12,7 @@ public static class BuildSettings
     public static OutputTypeTableConfiguration OutputTypeTable { get; set; }
     public static OutputArchitecture OutputArchitecture { get; set; }
     public static bool Release { get; set; }
+    public static bool EmitDebug { get; set; } = true;
     public static bool OutputAssembly { get; set; }
     public static string Path { get; set; }
     public static string OutputDirectory { get; set; }
@@ -72,6 +73,9 @@ public static class ol
                 case "-R":
                 case "--release":
                     BuildSettings.Release = true;
+                    break;
+                case "--no-debug":
+                    BuildSettings.EmitDebug = false;
                     break;
                 case "-S":
                     BuildSettings.OutputAssembly = true;
