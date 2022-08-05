@@ -26,26 +26,13 @@ public static class ProgramIRBuilder
 
         var entryBlock = AddBasicBlock(functionIR);
 
-        if (BuildSettings.Release)
+        for (var i = 0; i < function.Arguments.Count; i++)
         {
-            for (var i = 0; i < function.Arguments.Count; i++)
-            {
-                var argument = function.Arguments[i];
-                var allocation = AddAllocation(functionIR, argument);
+            var argument = function.Arguments[i];
+            var allocation = AddAllocation(functionIR, argument);
 
-                EmitStore(functionIR, allocation, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i, Type = argument.Type}, function.Body);
-            }
-        }
-        else
-        {
-            for (var i = 0; i < function.Arguments.Count; i++)
-            {
-                var argument = function.Arguments[i];
-                var allocation = AddAllocation(functionIR, argument);
-
-                EmitStore(functionIR, allocation, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i, Type = argument.Type}, function.Body);
-                functionIR.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareParameter, Scope = function.Body, Index = i});
-            }
+            EmitStore(functionIR, allocation, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i, Type = argument.Type}, function.Body);
+            functionIR.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareParameter, Scope = function.Body, Index = i});
         }
 
         if (function.ReturnType.TypeKind == TypeKind.Compound)
@@ -78,26 +65,13 @@ public static class ProgramIRBuilder
         var functionIR = new FunctionIR {Source = overload, Constants = new InstructionValue[overload.ConstantCount], Allocations = new(), Pointers = new(), Instructions = new(), BasicBlocks = new()};
         AddBasicBlock(functionIR);
 
-        if (BuildSettings.Release)
+        for (var i = 0; i < overload.Arguments.Count; i++)
         {
-            for (var i = 0; i < overload.Arguments.Count; i++)
-            {
-                var argument = overload.Arguments[i];
-                var allocation = AddAllocation(functionIR, argument);
+            var argument = overload.Arguments[i];
+            var allocation = AddAllocation(functionIR, argument);
 
-                EmitStore(functionIR, allocation, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i, Type = argument.Type}, overload.Body);
-            }
-        }
-        else
-        {
-            for (var i = 0; i < overload.Arguments.Count; i++)
-            {
-                var argument = overload.Arguments[i];
-                var allocation = AddAllocation(functionIR, argument);
-
-                EmitStore(functionIR, allocation, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i, Type = argument.Type}, overload.Body);
-                functionIR.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareParameter, Scope = overload.Body, Index = i});
-            }
+            EmitStore(functionIR, allocation, new InstructionValue {ValueType = InstructionValueType.Argument, ValueIndex = i, Type = argument.Type}, overload.Body);
+            functionIR.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareParameter, Scope = overload.Body, Index = i});
         }
 
         Program.Functions[overload.FunctionIndex] = functionIR;
@@ -618,10 +592,7 @@ public static class ProgramIRBuilder
             var allocation = AddAllocation(function, declaration);
 
             SetDebugLocation(function, declaration, scope);
-            if (!BuildSettings.Release)
-            {
-                DeclareVariable(function, declaration, scope, allocation);
-            }
+            DeclareVariable(function, declaration, scope, allocation);
 
             if (declaration.Value != null)
             {
@@ -694,30 +665,15 @@ public static class ProgramIRBuilder
             var compoundType = (CompoundType)declaration.Type;
             if (declaration.Value is CompoundExpressionAst compoundExpression)
             {
-                if (!BuildSettings.Release)
+                for (var i = 0; i < variableCount; i++)
                 {
-                    for (var i = 0; i < variableCount; i++)
-                    {
-                        var variable = declaration.Variables[i];
-                        var allocation = AddAllocation(function, variable.Type);
-                        variable.PointerIndex = AddPointer(function, allocation);
-                        DeclareVariable(function, variable, scope, allocation);
+                    var variable = declaration.Variables[i];
+                    var allocation = AddAllocation(function, variable.Type);
+                    variable.PointerIndex = AddPointer(function, allocation);
+                    DeclareVariable(function, variable, scope, allocation);
 
-                        var value = EmitIR(function, compoundExpression.Children[i], scope);
-                        EmitStore(function, allocation, value, scope);
-                    }
-                }
-                else
-                {
-                    for (var i = 0; i < variableCount; i++)
-                    {
-                        var variable = declaration.Variables[i];
-                        var allocation = AddAllocation(function, variable.Type);
-                        variable.PointerIndex = AddPointer(function, allocation);
-
-                        var value = EmitIR(function, compoundExpression.Children[i], scope);
-                        EmitStore(function, allocation, value, scope);
-                    }
+                    var value = EmitIR(function, compoundExpression.Children[i], scope);
+                    EmitStore(function, allocation, value, scope);
                 }
             }
             else
@@ -727,54 +683,28 @@ public static class ProgramIRBuilder
                 EmitStore(function, allocation, value, scope);
 
                 uint offset = 0;
-                if (!BuildSettings.Release)
+                for (var i = 0; i < variableCount; i++)
                 {
-                    for (var i = 0; i < variableCount; i++)
-                    {
-                        var variable = declaration.Variables[i];
-                        var type = compoundType.Types[i];
-                        var pointer = EmitGetStructPointer(function, allocation, scope, i, offset, type);
-                        variable.PointerIndex = AddPointer(function, pointer);
-                        offset += type.Size;
+                    var variable = declaration.Variables[i];
+                    var type = compoundType.Types[i];
+                    var pointer = EmitGetStructPointer(function, allocation, scope, i, offset, type);
+                    variable.PointerIndex = AddPointer(function, pointer);
+                    offset += type.Size;
 
-                        DeclareVariable(function, variable, scope, pointer);
-                    }
-                }
-                else
-                {
-                    for (var i = 0; i < variableCount; i++)
-                    {
-                        var variable = declaration.Variables[i];
-                        var type = compoundType.Types[i];
-                        var pointer = EmitGetStructPointer(function, allocation, scope, i, offset, type);
-                        variable.PointerIndex = AddPointer(function, pointer);
-                        offset += type.Size;
-                    }
+                    DeclareVariable(function, variable, scope, pointer);
                 }
             }
         }
         else
         {
             var allocations = new InstructionValue[variableCount];
-            if (!BuildSettings.Release)
+            for (var i = 0; i < variableCount; i++)
             {
-                for (var i = 0; i < variableCount; i++)
-                {
-                    var variable = declaration.Variables[i];
-                    var allocation = allocations[i] = AddAllocation(function, declaration.Type);
-                    variable.PointerIndex = AddPointer(function, allocation);
+                var variable = declaration.Variables[i];
+                var allocation = allocations[i] = AddAllocation(function, declaration.Type);
+                variable.PointerIndex = AddPointer(function, allocation);
 
-                    DeclareVariable(function, variable, scope, allocation);
-                }
-            }
-            else
-            {
-                for (var i = 0; i < variableCount; i++)
-                {
-                    var variable = declaration.Variables[i];
-                    var allocation = allocations[i] = AddAllocation(function, declaration.Type);
-                    variable.PointerIndex = AddPointer(function, allocation);
-                }
+                DeclareVariable(function, variable, scope, allocation);
             }
 
             if (declaration.Value != null)
@@ -1449,10 +1379,7 @@ public static class ProgramIRBuilder
         if (each.IndexVariable != null)
         {
             each.IndexVariable.PointerIndex = AddPointer(function, indexVariable);
-            if (!BuildSettings.Release)
-            {
-                DeclareVariable(function, each.IndexVariable, each.Body, indexVariable);
-            }
+            DeclareVariable(function, each.IndexVariable, each.Body, indexVariable);
         }
         EmitStore(function, indexVariable, GetConstantS64(0), each.Body);
 
@@ -1489,10 +1416,7 @@ public static class ProgramIRBuilder
         var iterationPointer = EmitGetPointer(function, arrayData, indexValue, each.IterationVariable.Type, each.Body, cArrayIteration);
         each.IterationVariable.PointerIndex = AddPointer(function, iterationPointer);
 
-        if (!BuildSettings.Release)
-        {
-            DeclareVariable(function, each.IterationVariable, each.Body, iterationPointer);
-        }
+        DeclareVariable(function, each.IterationVariable, each.Body, iterationPointer);
 
         return (indexValue, indexVariable, condition, conditionBlock);
     }
@@ -1506,10 +1430,7 @@ public static class ProgramIRBuilder
         EmitStore(function, indexVariable, value, each.Body);
         each.IterationVariable.PointerIndex = AddPointer(function, indexVariable);
 
-        if (!BuildSettings.Release)
-        {
-            DeclareVariable(function, each.IterationVariable, each.Body, indexVariable);
-        }
+        DeclareVariable(function, each.IterationVariable, each.Body, indexVariable);
 
         // Get the end of the range
         var compareTarget = EmitAndCast(function, each.RangeEnd, each.Body, TypeTable.S32Type);
@@ -2461,27 +2382,15 @@ public static class ProgramIRBuilder
             // Copy the arguments onto the stack
             var pointerOffset = function.PointerOffset;
             function.PointerOffset = function.Pointers.Count;
-            if (BuildSettings.Release)
+            for (var i = 0; i < arguments.Length; i++)
             {
-                for (var i = 0; i < arguments.Length; i++)
-                {
-                    var argument = arguments[i];
-                    var allocation = AddAllocation(function, callFunction.Arguments[i]);
-                    EmitStore(function, allocation, argument, callFunction.Body);
-                }
-            }
-            else
-            {
-                for (var i = 0; i < arguments.Length; i++)
-                {
-                    var argument = arguments[i];
-                    var allocation = AddAllocation(function, callFunction.Arguments[i]);
-                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugSetLocation, Source = callFunction.Body, Scope = callFunction.Body});
-                    DeclareVariable(function, callFunction.Arguments[i], callFunction.Body, allocation);
+                var argument = arguments[i];
+                var allocation = AddAllocation(function, callFunction.Arguments[i]);
+                function.Instructions.Add(new Instruction {Type = InstructionType.DebugSetLocation, Source = callFunction.Body, Scope = callFunction.Body});
+                DeclareVariable(function, callFunction.Arguments[i], callFunction.Body, allocation);
 
-                    function.Instructions.Add(new Instruction {Type = InstructionType.DebugSetLocation, Source = call, Scope = scope});
-                    EmitStore(function, allocation, argument, scope);
-                }
+                function.Instructions.Add(new Instruction {Type = InstructionType.DebugSetLocation, Source = call, Scope = scope});
+                EmitStore(function, allocation, argument, scope);
             }
 
             // Emit the function body and for returns, jump to the following basic block
