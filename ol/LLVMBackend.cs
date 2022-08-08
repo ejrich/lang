@@ -1586,7 +1586,6 @@ public static unsafe class LLVMBackend
                             }
                             constraintString.Remove(constraintString.Length-1, 1);
                         }
-                        constraintString.Append("~{dirflag},~{fpsr},~{flags}");
 
                         foreach (var instr in assembly.Instructions)
                         {
@@ -1676,11 +1675,8 @@ public static unsafe class LLVMBackend
                                 }
                                 assemblyString.AppendFormat("%{0}, ${1}; ", output.Register, i);
                                 constraintString.Append("=*m,");
-                                clobberedRegisters.AppendFormat("~{{{0}}},", output.Register);
                             }
-                            clobberedRegisters.Remove(clobberedRegisters.Length-1, 1);
-                            constraintString.Append(clobberedRegisters);
-                            constraintString.Append("~{dirflag},~{fpsr},~{flags}");
+                            constraintString.Remove(constraintString.Length-1, 1);
 
                             var assemblyOutputType = LLVMTypeRef.CreateFunction(LLVM.VoidType(), argumentTypes);
                             var call = BuildAssemblyCall(assemblyString.ToString(), constraintString.ToString(), assemblyOutputType, arguments, LLVMInlineAsmDialect.LLVMInlineAsmDialectATT);
