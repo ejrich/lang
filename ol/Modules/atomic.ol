@@ -11,7 +11,7 @@ T compare_exchange<T>(T* pointer, T value, T comparand) {
             in rdx, value;
             lock;
             cmpxchg [rcx], dl;
-            out result, rax;
+            out result, al;
         }
     }
     else #if size_of(T) == 2 {
@@ -21,7 +21,7 @@ T compare_exchange<T>(T* pointer, T value, T comparand) {
             in rdx, value;
             lock;
             cmpxchg [rcx], dx;
-            out result, rax;
+            out result, ax;
         }
     }
     else #if size_of(T) == 4 {
@@ -31,7 +31,7 @@ T compare_exchange<T>(T* pointer, T value, T comparand) {
             in rdx, value;
             lock;
             cmpxchg [rcx], edx;
-            out result, rax;
+            out result, eax;
         }
     }
     else {
