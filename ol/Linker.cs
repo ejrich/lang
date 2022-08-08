@@ -51,7 +51,7 @@ public static class Linker
             string.Join(' ', BuildSettings.Libraries.Select(lib => GetLibraryName(lib, "a"))) :
             string.Join(' ', BuildSettings.Libraries.Select(lib => GetLibraryName(lib, "so")));
 
-        var linkerArguments = $"{linker} -o {executableFile} {objectFile} {defaultObjects} {libraryDirectories} --start-group {libraries} {dependencies} --end-group";
+        var linkerArguments = $"{linker} -o {executableFile} {objectFile} {defaultObjects} {libraryDirectories} --start-group {libraries} {dependencies} --end-group --no-warn-execstack";
 
         Console.WriteLine($"Linking: ld {linkerArguments}\n");
         #elif _WINDOWS
