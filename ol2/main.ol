@@ -9,6 +9,7 @@
 
 release := false;
 output_assembly := false;
+emit_debug := true;
 path: string;
 executable_name: string;
 output_directory: string;
@@ -25,14 +26,18 @@ main() {
 
     // Load cli args into build settings
     entrypoint: string;
-    noThreads := false;
+    no_threads, parsing_variables := false;
     each arg in command_line_arguments {
         if arg == "-R" || arg == "--release" release = true;
         else if arg == "-S" output_assembly = true;
-        else if arg == "-noThreads" noThreads = true;
+        else if arg == "-V" parsing_variables = true;
+        else if arg == "-noThreads" no_threads = true;
         else {
             if arg[0] == '-' {
                 report_error_message("Unrecognized compiler flag '%'", arg);
+            }
+            else if parsing_variables {
+                // TODO Implement me
             }
             else if !string_is_empty(entrypoint) {
                 report_error_message("Multiple program entrypoints defined '%'", arg);
@@ -54,7 +59,7 @@ main() {
     list_errors_and_exit(ArgumentsError);
 
     // Initialize subsystems
-    if !noThreads init_thread_pool();
+    if !no_threads init_thread_pool();
     init_types();
 
     // Parse what is available
@@ -295,6 +300,25 @@ struct CompilerMessage {
 }
 
 message_queue: LinkedList<CompilerMessage>;
+
+
+// String and Array helpers
+string allocate_string(string input) {
+    result: string = { length = input.length; data = allocate(input.length); }
+    memory_copy(result.data, input.data, input.length);
+
+    return result;
+}
+
+Array<T> allocate_array<T>(Array<T> source) {
+    array: Array<T>;
+    array.length = source.length;
+    bytes := source.length * size_of(T);
+    array.data = allocate(bytes);
+    memory_copy(array.data, source.data, bytes);
+
+    return array;
+}
 
 
 // Memory allocation

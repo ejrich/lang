@@ -480,7 +480,7 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, bool*
 
         array_type := cast(ArrayType*, get_type(name, type.file_index));
         if array_type == null {
-            array_type = create_ast<ArrayType>(null, AstType.Array);
+            array_type = create_ast<ArrayType>(type, AstType.Array);
             array_type.name = allocate_string(name);
             array_type.size = element_type.size * array_length;
             array_type.alignment = element_type.alignment;
@@ -700,6 +700,34 @@ string print_type_definition(TypeDefinition* type, bool* allocated, int padding 
     return result;
 }
 
+string print_operator(Operator op) {
+    switch op {
+        case Operator.And;              return "&&";
+        case Operator.Or;               return "||";
+        case Operator.Equality;         return "==";
+        case Operator.NotEqual;         return "!=";
+        case Operator.GreaterThanEqual; return ">=";
+        case Operator.LessThanEqual;    return "<=";
+        case Operator.ShiftLeft;        return "<<";
+        case Operator.ShiftRight;       return ">>";
+        case Operator.RotateLeft;       return "<<<";
+        case Operator.RotateRight;      return ">>>";
+        case Operator.Subscript;        return "[]";
+        case Operator.Add;              return "+";
+        case Operator.Subtract;         return "-";
+        case Operator.Multiply;         return "*";
+        case Operator.Divide;           return "/";
+        case Operator.GreaterThan;      return ">";
+        case Operator.LessThan;         return "<";
+        case Operator.BitwiseOr;        return "|";
+        case Operator.BitwiseAnd;       return "&";
+        case Operator.Xor;              return "^";
+        case Operator.Modulus;          return "%";
+    }
+    assert(false);
+    return "";
+}
+
 base_array_type: StructAst*;
 global_scope: GlobalScope;
 private_scopes: Array<GlobalScope*>;
@@ -774,7 +802,7 @@ TypeAst* create_array_struct(string name, TypeAst* element_type, TypeDefinition*
 }
 
 TypeAst* create_pointer_type(string name, TypeAst* pointed_to_type) {
-    pointer_type: PointerType = { flags = AstFlags.IsType | (pointed_to_type.flags & AstFlags.Private); file_index = pointed_to_type.file_index; name = allocate_string(name); type_kind = TypeKind.Pointer; size = 8; alignment = 8; pointed_type = pointed_to_type; }
+    pointer_type: PointerType = { ast_type = AstType.Pointer; flags = AstFlags.IsType | (pointed_to_type.flags & AstFlags.Private); file_index = pointed_to_type.file_index; name = allocate_string(name); type_kind = TypeKind.Pointer; size = 8; alignment = 8; pointed_type = pointed_to_type; }
 
     type_pointer := new<PointerType>();
     *type_pointer = pointer_type;
@@ -785,7 +813,7 @@ TypeAst* create_pointer_type(string name, TypeAst* pointed_to_type) {
 }
 
 TypeAst* create_compound_type(Array<TypeAst*> types, string name, u32 size, AstFlags flags, int file_index) {
-    compound_type: CompoundType = { flags = AstFlags.IsType | flags; ast_type = AstType.Compound; file_index = file_index; name = allocate_string(name); size = size; types = allocate_array(types); }
+    compound_type: CompoundType = { ast_type = AstType.Compound; flags = AstFlags.IsType | flags; file_index = file_index; name = allocate_string(name); size = size; types = allocate_array(types); }
 
     type_pointer := new<CompoundType>();
     *type_pointer = compound_type;
@@ -793,24 +821,6 @@ TypeAst* create_compound_type(Array<TypeAst*> types, string name, u32 size, AstF
     add_type(type_pointer);
     create_type_info(type_pointer);
     return type_pointer;
-}
-
-string allocate_string(string input) {
-    result: string = { length = input.length; data = allocate(input.length); }
-    memory_copy(result.data, input.data, input.length);
-
-    return result;
-}
-
-Array<T> allocate_array<T>(Array<T> input) {
-    result: Array<T>;
-    array_resize(&result, input.length, allocate, reallocate);
-
-    each value, i in input {
-        result[i] = value;
-    }
-
-    return result;
 }
 
 int determine_type_definition_length(TypeDefinition* type) {

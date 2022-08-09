@@ -7,6 +7,7 @@ enum AstType {
     OperatorOverload;
     Interface;
     Scope;
+    Type;
     Struct;
     StructField;
     StructFieldRef;
@@ -172,7 +173,6 @@ struct ScopeAst : Scope {
 }
 
 struct FunctionAst : Function {
-    // TypeKind TypeKind; = TypeKind.Function;
     extern_lib: string;
     library_name: string;
     library: Library*;
@@ -206,9 +206,6 @@ struct StructFieldRefAst : Ast {
 }
 
 struct EnumAst : TypeAst {
-    // TypeKind TypeKind; = TypeKind.Enum;
-    // uint Size; = 4;
-    // uint Alignment; = 4;
     attributes: Array<string>;
     base_type_definition: TypeDefinition*;
     base_type: TypeAst*;
@@ -226,13 +223,11 @@ struct PointerType : TypeAst {
 }
 
 struct ArrayType : TypeAst {
-    // TypeKind TypeKind; = TypeKind.CArray;
     length: u32;
     element_type: TypeAst*;
 }
 
 struct UnionAst : TypeAst {
-    // TypeKind TypeKind; = TypeKind.Union;
     fields: Array<UnionFieldAst*>;
 }
 
@@ -244,7 +239,6 @@ struct UnionFieldAst : Ast {
 
 // @Note Since compound types cannot be set as struct types, the alignment doesn't matter
 struct CompoundType : TypeAst {
-    // TypeKind TypeKind; = TypeKind.Compound;
     types: Array<TypeAst*>;
 }
 
@@ -276,11 +270,6 @@ struct ExpressionAst : Ast {
     overload: OperatorOverloadAst*;
     l_value: Ast*;
     r_value: Ast*;
-
-    // operators: Array<Operator>;
-    // resulting_types: Array<TypeAst*>;
-    // operator_overloads: HashTable<int, OperatorOverloadAst>;
-    // children: Array<Ast*>;
 }
 
 struct CompoundExpressionAst : Ast {
