@@ -1809,6 +1809,7 @@ Ast* check_expression(TokenEnumerator* enumerator, ExpressionAst* expression) {
         return expression.l_value;
     }
 
+    // TODO Implement me
     // if errors.length == 0
     //     set_operator_precedence(expression);
 
