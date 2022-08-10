@@ -1,3 +1,4 @@
+// Hash table
 struct HashTable<T, U> {
     length: int;
     load_factor := 0.75;
@@ -75,6 +76,51 @@ bool table_contains<T, U>(HashTable<T, U> table, T key) {
         }
         print("\n");
     }
+}
+
+
+// Hash set
+// These are assumed to be intialized with the full size and do not expand
+struct HashSet<T> {
+    length: int;
+    entries: Array<HashSetEntry<T>>;
+}
+
+struct HashSetEntry<T> {
+    filled: bool;
+    hash: u32;
+    value: T;
+}
+
+HashSet<T> create_temp_set<T>(int capacity) #inline {
+    entries: Array<HashSetEntry<T>>[capacity * 2];
+    set: HashSet<T> = { entries = entries; }
+    return set;
+}
+
+bool set_add<T>(HashSet<T>* set, T value) {
+    hash := hash(value);
+    entry: HashSetEntry<T> = { filled = true; hash = hash; value = value; }
+
+    entries := set.entries.length;
+    index := cast(u64, entry.hash) % entries;
+    assert(index >= 0);
+
+    candidate_entry := set.entries[index];
+    while candidate_entry.filled {
+        if value == candidate_entry.value {
+            return false;
+        }
+
+        // @Cleanup Make sure this doesn't infinitely loop
+        index++;
+        if index >= entries index = 0;
+
+        candidate_entry = set.entries[index];
+    }
+
+    set.entries[index] = entry;
+    return true;
 }
 
 #private

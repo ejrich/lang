@@ -892,7 +892,7 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
         enum_ast.base_type_definition = parse_type(enumerator);
         move_next(enumerator);
 
-        base_type := verify_type(enum_ast.base_type_definition, &global_scope);
+        base_type := verify_type(enum_ast.base_type_definition);
         if base_type == null || base_type.type_kind != TypeKind.Integer {
             report_error("Base type of enum must be an integer, but got '%'", enum_ast.base_type_definition, print_type_definition(enum_ast.base_type_definition));
             enum_ast.base_type = &s32_type;
