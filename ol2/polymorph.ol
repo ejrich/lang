@@ -120,35 +120,224 @@ Ast* copy_ast(Ast* ast, Array<TypeAst*> generic_types, Array<string> generics) {
             return ast;
         case AstType.Scope;
             return copy_scope(cast(ScopeAst*, ast), generic_types, generics);
-        case AstType.StructFieldRef; {}
-        case AstType.Return; {}
-        case AstType.Identifier; {}
-        case AstType.Expression; {}
-        case AstType.CompoundExpression; {}
-        case AstType.ChangeByOne; {}
-        case AstType.Unary; {}
-        case AstType.Call; {}
-        case AstType.Declaration; {}
-        case AstType.CompoundDeclaration; {}
-        case AstType.Assignment; {}
-        case AstType.Conditional; {}
-        case AstType.While; {}
-        case AstType.Each; {}
-        case AstType.Index; {}
-        case AstType.CompilerDirective; {}
-        case AstType.Cast; {}
-        case AstType.Assembly; {}
+        case AstType.StructFieldRef; {
+            struct_field := cast(StructFieldRefAst*, ast);
+            copy := copy_ast(struct_field);
+            array_resize(&copy.children, struct_field.children.length, allocate, reallocate);
+            each child, i in struct_field.children {
+                if child.ast_type == AstType.Identifier copy.children[i] = child;
+                else copy.children[i] = copy_ast(child, generic_types, generics);
+            }
+            return copy;
+        }
+        case AstType.Return; {
+            return_ast := cast(ReturnAst*, ast);
+            copy := copy_ast(return_ast);
+            copy.value = copy_ast(return_ast.value, generic_types, generics);
+            return copy;
+        }
+        case AstType.Identifier; {
+            identifier := cast(IdentifierAst*, ast);
+            each generic, i in generics {
+                if generic == identifier.name {
+                    generic_type := generic_types[i];
+                    copy := copy_ast(identifier);
+                    copy.name = generic_type.name;
+                    copy.type_index = generic_type.type_index;
+                    copy.baked_type = generic_type;
+                    return copy;
+                }
+            }
+            return ast;
+        }
+        case AstType.Expression; {
+            expression := cast(ExpressionAst*, ast);
+            copy := copy_ast(expression);
+            copy.op = expression.op;
+            copy.l_value = copy_ast(expression.l_value, generic_types, generics);
+            copy.r_value = copy_ast(expression.r_value, generic_types, generics);
+            return copy;
+        }
+        case AstType.CompoundExpression; {
+            expression := cast(CompoundExpressionAst*, ast);
+            copy := copy_ast(expression);
+            array_resize(&copy.children, expression.children.length, allocate, reallocate);
+            each subexpression, i in expression.children {
+                copy.children[i] = copy_ast(subexpression, generic_types, generics);
+            }
+            return copy;
+        }
+        case AstType.ChangeByOne; {
+            change_by_one := cast(ChangeByOneAst*, ast);
+            copy := copy_ast(change_by_one);
+            copy.flags = change_by_one.flags;
+            copy.value = copy_ast(change_by_one.value, generic_types, generics);
+            return copy;
+        }
+        case AstType.Unary; {
+            unary := cast(UnaryAst*, ast);
+            copy := copy_ast(unary);
+            copy.op = unary.op;
+            copy.value = copy_ast(unary.value, generic_types, generics);
+            return copy;
+        }
+        case AstType.Call; {
+            call := cast(CallAst*, ast);
+            copy := copy_ast(call);
+            if call.generics.length {
+                array_resize(&copy.generics, call.generics.length, allocate, reallocate);
+                each generic, i in call.generics {
+                    copy.generics[i] = copy_type(generic, generic_types);
+                }
+            }
+            if call.specified_arguments.initialized {
+                copy.specified_arguments = call.specified_arguments;
+            }
+            if call.arguments.length {
+                array_resize(&copy.arguments, call.arguments.length, allocate, reallocate);
+                each argument, i in call.arguments {
+                    copy.arguments[i] = copy_ast(argument, generic_types, generics);
+                }
+            }
+            return copy;
+        }
+        case AstType.Declaration;
+            return copy_declaration(cast(DeclarationAst*, ast), generic_types, generics);
+        case AstType.CompoundDeclaration; {
+            declaration := cast(CompoundDeclarationAst*, ast);
+            copy := copy_ast(declaration);
+            array_resize(&copy.variables, declaration.variables.length, allocate, reallocate);
+            each variable, i in declaration.variables {
+                var_copy := copy_ast(variable);
+                var_copy.name = variable.name;
+                copy.variables[i] = var_copy;
+            }
+            copy_declarations(declaration, copy, generic_types, generics);
+            return copy;
+        }
+        case AstType.Assignment;
+            return copy_assignment(cast(AssignmentAst*, ast), generic_types, generics);
+        case AstType.Conditional; {
+            conditional := cast(ConditionalAst*, ast);
+            copy := copy_ast(conditional);
+            copy.condition = copy_ast(conditional.condition, generic_types, generics);
+            copy.if_block = copy_scope(conditional.if_block, generic_types, generics);
+            if conditional.else_block
+                copy.else_block = copy_scope(conditional.else_block, generic_types, generics);
+            return copy;
+        }
+        case AstType.While; {
+            while_ast := cast(WhileAst*, ast);
+            copy := copy_ast(while_ast);
+            copy.condition = copy_ast(while_ast.condition, generic_types, generics);
+            copy.body = copy_scope(while_ast.body, generic_types, generics);
+            return copy;
+        }
+        case AstType.Each; {
+            each_ast := cast(EachAst*, ast);
+            copy := copy_ast(each_ast);
+            copy.iteration_variable = each_ast.iteration_variable;
+            copy.index_variable = each_ast.index_variable;
+            copy.iteration = copy_ast(each_ast.iteration, generic_types, generics);
+            copy.range_begin = copy_ast(each_ast.range_begin, generic_types, generics);
+            copy.range_end = copy_ast(each_ast.range_end, generic_types, generics);
+            copy.body = copy_scope(each_ast.body, generic_types, generics);
+            return copy;
+        }
+        case AstType.Index; {
+            index := cast(IndexAst*, ast);
+            copy := copy_ast(index);
+            copy.name = index.name;
+            copy.index = copy_ast(index.index, generic_types, generics);
+            return copy;
+        }
+        case AstType.CompilerDirective; {
+            directive := cast(CompilerDirectiveAst*, ast);
+            copy := copy_ast(directive);
+            copy.directive_type = directive.directive_type;
+            copy.value = copy_ast(directive.value, generic_types, generics);
+            return copy;
+        }
+        case AstType.Cast; {
+            cast_ast := cast(CastAst*, ast);
+            copy := copy_ast(cast_ast);
+            if cast_ast.flags & AstFlags.HasGenerics copy.target_type_definition = copy_type(cast_ast.target_type_definition, generic_types);
+            else copy.target_type_definition = cast_ast.target_type_definition;
+            copy.value = copy_ast(cast_ast.value, generic_types, generics);
+            return copy;
+        }
+        case AstType.Assembly; {
+            assembly := cast(AssemblyAst*, ast);
+            if assembly.in_registers.length == 0 || assembly.out_values.length == 0 return assembly;
+
+            copy := copy_ast(assembly);
+            copy.instructions = assembly.instructions;
+            table_init(&copy.in_registers, assembly.in_registers.length, 1.0);
+            array_resize(&copy.out_values, assembly.out_values.length, allocate, reallocate);
+
+            each entry in assembly.in_registers.entries {
+                if entry.filled {
+                    in_copy := copy_ast(entry.value);
+                    in_copy.register = entry.key;
+                    in_copy.ast = copy_ast(entry.value.ast, generic_types, generics);
+                    table_add(&copy.in_registers, entry.key, in_copy);
+                }
+            }
+
+            each out_value, i in assembly.out_values {
+                value_copy := copy_ast(out_value);
+                value_copy.register = out_value.register;
+                value_copy.ast = copy_ast(out_value.ast, generic_types, generics);
+                copy.out_values[i] = value_copy;
+            }
+            return copy;
+        }
         case AstType.TypeDefinition;
             return copy_type(cast(TypeDefinition*, ast), generic_types);
-        case AstType.Defer; {}
+        case AstType.Defer; {
+            defer_ast := cast(DeferAst*, ast);
+            copy := copy_ast(defer_ast);
+            copy.statement = copy_scope(defer_ast.statement, generic_types, generics);
+            return copy;
+        }
     }
 
     assert(false);
     return null;
 }
 
-DeclarationAst* copy_declaration(Ast* ast, Array<TypeAst*> generic_types, Array<string> generics) {
-    return null;
+DeclarationAst* copy_declaration(DeclarationAst* ast, Array<TypeAst*> generic_types, Array<string> generics) {
+    copy := copy_ast(ast);
+    copy.name = ast.name;
+    if ast.flags & AstFlags.Constant copy.flags = AstFlags.Constant;
+    copy_declarations(ast, copy, generic_types, generics);
+
+    return copy;
+}
+
+copy_declarations(Declaration* source, Declaration* target, Array<TypeAst*> generic_types, Array<string> generics) {
+    if source.flags & AstFlags.HasGenerics target.type_definition = copy_type(source.type_definition, generic_types);
+    else target.type_definition = source.type_definition;
+
+    target.value = copy_ast(source.value, generic_types, generics);
+
+    if source.assignments {
+        target.assignments = source.assignments;
+    }
+    else if source.array_values.length {
+        array_resize(&target.array_values, source.array_values.length, allocate, reallocate);
+        each value, i in source.array_values {
+            target.array_values[i] = copy_ast(value, generic_types, generics);
+        }
+    }
+}
+
+AssignmentAst* copy_assignment(AssignmentAst* ast, Array<TypeAst*> generic_types, Array<string> generics) {
+    copy := copy_ast(ast);
+    copy.reference = copy_ast(ast.reference, generic_types, generics);
+    copy.op = ast.op;
+    copy.value = copy_ast(ast.value, generic_types, generics);
+    return copy;
 }
 
 T* copy_ast<T>(T* source) {

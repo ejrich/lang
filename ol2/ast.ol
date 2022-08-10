@@ -266,7 +266,6 @@ struct IdentifierAst : Ast {
 struct ExpressionAst : Ast {
     type: TypeAst*;
     op: Operator;
-    resulting_type: TypeAst*;
     overload: OperatorOverloadAst*;
     l_value: Ast*;
     r_value: Ast*;
