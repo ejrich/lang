@@ -6,7 +6,7 @@ StructAst* create_polymorphed_struct(StructAst* base, string name, TypeKind type
     }
 
     if private_generic_types poly_struct.flags |= AstFlags.Private;
-    array_resize(&poly_struct.fields, base.fields.length, allocate, reallocate);
+    array_reserve(&poly_struct.fields, base.fields.length, allocate, reallocate);
 
     each field, i in base.fields {
         if field.flags & AstFlags.HasGenerics {

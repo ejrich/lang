@@ -360,12 +360,77 @@ StructAst* get_polymorphic_struct(string name, int file_index) {
 }
 
 verify_struct(StructAst* struct_ast) {
+    struct_ast.flags |= AstFlags.Verifying;
+
+    // TODO Implement me
+
+    struct_ast.flags |= AstFlags.Verified;
 }
 
 verify_union(UnionAst* union_ast) {
+    union_ast.flags |= AstFlags.Verifying;
+
+    if union_ast.fields.length {
+        field_names := create_temp_set<string>(union_ast.fields.length);
+
+        each field in union_ast.fields {
+            if !set_add(&field_names, field.name) {
+                report_error("Union '%' already contains field '%'", union_ast, field.name);
+            }
+
+            is_generic, is_varargs, is_params: bool;
+            field.type = verify_type(field.type_definition, &is_generic, &is_varargs, &is_params);
+
+            if is_varargs || is_params {
+                report_error("Union field '%.%' cannot have varargs or params", field.type_definition, union_ast.name, field.name);
+            }
+            else if field.type == null {
+                report_error("Undefined type '%' union field '%.%' cannot have varargs or params", field.type_definition, print_type_definition(field.type_definition), union_ast.name, field.name);
+            }
+            else if field.type.type_kind == TypeKind.Void {
+                report_error("Union field '%.%' cannot be assigned type 'void'", field.type_definition, union_ast.name, field.name);
+            }
+            else {
+                if field.type.type_kind == TypeKind.Array && field.type_definition.count != null {
+                    is_constant: bool;
+                    array_length: s32;
+                    scope := private_scopes[union_ast.file_index];
+                    if scope == null scope = &global_scope;
+
+                    count_type := verify_expression(field.type_definition.count, null, scope, &is_constant, &array_length);
+
+                    if count_type != null && count_type.type_kind != TypeKind.Integer || is_constant || array_length < 0
+                        report_error("Expected size of '%.%' to be a constant, positive integer", field.type_definition.count, union_ast.name, field.name);
+                    else field.type_definition.const_count = array_length;
+                }
+
+                if union_ast == field.type
+                    report_error("Union '%' contains circular reference in field '%'", field, union_ast.name, field.name);
+                else {
+                    if field.type.alignment > union_ast.alignment union_ast.alignment = field.type.alignment;
+                    if field.type.size > union_ast.size           union_ast.size = field.type.size;
+                }
+            }
+        }
+    }
+    else report_error("Union '%' must have 1 or more fields", union_ast, union_ast.name);
+
+    if union_ast.size {
+        alignment_offset := union_ast.size % union_ast.alignment;
+        if alignment_offset union_ast.size += union_ast.alignment - alignment_offset;
+    }
+
+    if errors.length == 0 create_type_info();
+
+    union_ast.flags |= AstFlags.Verified;
 }
 
 verify_interface(InterfaceAst* interface_ast) {
+    interface_ast.flags |= AstFlags.Verifying;
+
+    // TODO Implement me
+
+    interface_ast.flags |= AstFlags.Verified;
 }
 
 TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope) {
@@ -378,26 +443,26 @@ TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_
     return verify_expression(ast, function, scope, is_constant, &_);
 }
 
-TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_constant, u32* array_length) {
+TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_constant, s32* array_length) {
     _: bool;
     return verify_expression(ast, function, scope, is_constant, &_, true, array_length);
 }
 
-TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_constant, bool* is_type, bool get_array_length = false, u32* array_length = null) {
+TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_constant, bool* is_type, bool get_array_length = false, s32* array_length = null) {
     return null;
 }
 
-TypeAst* verify_type(TypeDefinition* type, Scope* scope, int depth = 0) {
+TypeAst* verify_type(TypeDefinition* type, int depth = 0) {
     _: bool;
-    return verify_type(type, scope, &_, &_, &_, depth);
+    return verify_type(type, &_, &_, &_, depth);
 }
 
-TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, int depth = 0) {
+TypeAst* verify_type(TypeDefinition* type, bool* is_generic, int depth = 0) {
     _: bool;
-    return verify_type(type, scope, is_generic, &_, &_, depth);
+    return verify_type(type, is_generic, &_, &_, depth);
 }
 
-TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, bool* is_varargs, bool* is_params, int depth = 0, bool allow_params = false, int* initial_array_length = null) {
+TypeAst* verify_type(TypeDefinition* type, bool* is_generic, bool* is_varargs, bool* is_params, int depth = 0, bool allow_params = false, int* initial_array_length = null) {
     if type == null return null;
     if type.baked_type return type.baked_type;
 
@@ -419,7 +484,7 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, bool*
         flags := AstFlags.None;
         each generic, i in type.generics {
             has_generic := false;
-            sub_type := verify_type(generic, scope, &has_generic);
+            sub_type := verify_type(generic, &has_generic);
             if sub_type == null {
                 return null;
             }
@@ -441,7 +506,7 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, bool*
             return null;
         }
 
-        return verify_array(type, scope, depth, is_generic);
+        return verify_array(type, depth, is_generic);
     }
     if type.name == "CArray" {
         if type.generics.length != 1 {
@@ -449,15 +514,18 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, bool*
             return null;
         }
 
-        element_type := verify_type(type.generics[0], scope, depth + 1);
+        element_type := verify_type(type.generics[0], depth + 1);
         if element_type == null return null;
 
-        array_length: u32;
+        array_length: s32;
         if initial_array_length {
             array_length = *initial_array_length;
         }
         else {
             is_constant := false;
+            scope := private_scopes[type.file_index];
+            if scope == null scope = &global_scope;
+
             count_type := verify_expression(type.count, null, scope, &is_constant, &array_length);
             if count_type == null || count_type.type_kind != TypeKind.Integer || !is_constant || array_length < 0 {
                 report_error("Expected size of C array to be a constant, positive integer", type);
@@ -529,7 +597,7 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, bool*
         pointer_type := get_type(pointer_type_name, type.file_index);
         if pointer_type return pointer_type;
 
-        pointed_to_type := verify_type(type.generics[0], scope, is_generic, depth + 1);
+        pointed_to_type := verify_type(type.generics[0], is_generic, depth + 1);
         if pointed_to_type == null return null;
 
         // There are some cases where the pointed to type is a struct that contains a field for the pointer type
@@ -565,7 +633,7 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, bool*
             }
             case 1; {
                 *is_params = true;
-                return verify_array(type, scope, depth, is_generic);
+                return verify_array(type, depth, is_generic);
             }
         }
 
@@ -612,7 +680,7 @@ TypeAst* verify_type(TypeDefinition* type, Scope* scope, bool* is_generic, bool*
 
         each generic, i in type.generics {
             has_generic: bool;
-            generic_type := verify_type(generic, scope, &has_generic, depth + 1);
+            generic_type := verify_type(generic, &has_generic, depth + 1);
             if generic_type == null && !has_generic {
                 return null;
             }
@@ -773,9 +841,9 @@ bool, FunctionAst* get_existing_function(string name, int file_index, int* count
     return false, null;
 }
 
-TypeAst* verify_array(TypeDefinition* type, Scope* scope, int depth, bool* is_generic) {
+TypeAst* verify_array(TypeDefinition* type, int depth, bool* is_generic) {
     element_type_def := type.generics[0];
-    element_type := verify_type(element_type_def, scope, is_generic, depth + 1);
+    element_type := verify_type(element_type_def, is_generic, depth + 1);
     if element_type == null return null;
 
     // Create a temporary string for the name of the array type
