@@ -12,8 +12,6 @@ struct HashTableEntry<T, U> {
     value: U;
 }
 
-// TODO Add hash table init, get, add, update, etc...
-
 HashTable<T, U>* table_create<T, U>(int capacity = 10) {
     table := new<HashTable<T, U>>();
     table_init(table, capacity);
@@ -21,9 +19,10 @@ HashTable<T, U>* table_create<T, U>(int capacity = 10) {
     return table;
 }
 
-table_init<T, U>(HashTable<T, U>* table, int capacity) {
+table_init<T, U>(HashTable<T, U>* table, int capacity, float load_factor = 0.75) {
     if table.initialized return;
 
+    table.load_factor = load_factor;
     array_resize(&table.entries, capacity, allocate, reallocate);
     table.initialized = true;
 }
