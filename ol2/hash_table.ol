@@ -119,6 +119,7 @@ bool set_add<T>(HashSet<T>* set, T value) {
         candidate_entry = set.entries[index];
     }
 
+    set.length++;
     set.entries[index] = entry;
     return true;
 }

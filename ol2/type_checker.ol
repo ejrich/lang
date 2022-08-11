@@ -420,16 +420,51 @@ verify_union(UnionAst* union_ast) {
         if alignment_offset union_ast.size += union_ast.alignment - alignment_offset;
     }
 
-    if errors.length == 0 create_type_info();
-
+    create_type_info(union_ast);
     union_ast.flags |= AstFlags.Verified;
 }
 
 verify_interface(InterfaceAst* interface_ast) {
     interface_ast.flags |= AstFlags.Verifying;
 
-    // TODO Implement me
+    if interface_ast.return_type_definition {
+        _, is_varargs, is_params: bool;
+        interface_ast.return_type = verify_type(interface_ast.return_type_definition, &_, &is_varargs, &is_params);
 
+        if is_varargs || is_params {
+            report_error("Return type of interface '%' cannot be varargs or Params", interface_ast.return_type_definition, interface_ast.name);
+        }
+        else if interface_ast.return_type == null {
+            report_error("Return type '%' of interface '%' is not defined", interface_ast.return_type_definition, print_type_definition(interface_ast.return_type_definition), interface_ast.name);
+        }
+        else if interface_ast.return_type.type_kind == TypeKind.Array && interface_ast.return_type_definition.count != null {
+            report_error("Size of Array does not need to be specified for return type of interface '%'", interface_ast.return_type_definition.count, interface_ast.name);
+        }
+    }
+    else interface_ast.return_type = &void_type;
+
+    if interface_ast.arguments.length {
+        interface_ast.argument_count = interface_ast.arguments.length;
+        arg_names := create_temp_set<string>(interface_ast.arguments.length);
+
+        each argument in interface_ast.arguments {
+            if !set_add(&arg_names, argument.name) {
+                report_error("Interface '%' already contains argument '%'", argument, interface_ast.name, argument.name);
+            }
+
+            _, is_varargs, is_params: bool;
+            argument.type = verify_type(argument.type_definition, &_, &is_varargs, &is_params);
+
+            if is_varargs || is_params {
+                report_error("Interface '%' cannot be varargs or Params arguments", argument, interface_ast.name);
+            }
+            else {
+                report_error("Type '%' of argument '%' in interface '%' is not defined", argument.type_definition, print_type_definition(argument.type_definition), argument.name, interface_ast.name);
+            }
+        }
+    }
+
+    create_type_info(interface_ast);
     interface_ast.flags |= AstFlags.Verified;
 }
 

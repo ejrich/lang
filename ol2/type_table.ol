@@ -32,5 +32,5 @@ add_to_type_table(TypeAst* type) {
 }
 
 create_type_info(TypeAst* type) {
-
+    if errors.length return;
 }
