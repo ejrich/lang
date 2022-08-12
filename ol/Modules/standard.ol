@@ -24,25 +24,30 @@ array_insert<T>(Array<T>* array, T value, Allocate allocator = default_allocator
 
 array_insert<T>(Array<T>* array, int index, T value, Allocate allocator = default_allocator, Reallocate reallocator = default_reallocator) {
     length := array.length;
-    if length > index {
-        reserve_length := length + ARRAY_BLOCK_SIZE - length % ARRAY_BLOCK_SIZE;
-        element_size := size_of(T);
+    element_size := size_of(T);
 
-        if length {
-            array.data = reallocator(array.data, length * element_size, element_size * reserve_length);
-        }
-        else {
-            array.data = allocator(element_size * reserve_length);
+    if index > length {
+        new_length := index + 1;
+        available_padding := length % ARRAY_BLOCK_SIZE;
+        diff := index - length;
+        if diff >= available_padding {
+            reserve_length := new_length + ARRAY_BLOCK_SIZE - new_length % ARRAY_BLOCK_SIZE;
+
+            if length {
+                array.data = reallocator(array.data, length * element_size, element_size * reserve_length);
+            }
+            else {
+                array.data = allocator(element_size * reserve_length);
+            }
         }
 
-        array.length = index;
+        array.length = new_length;
         array.data[index] = value;
         return;
     }
 
     if length % ARRAY_BLOCK_SIZE == 0 {
         new_blocks := length / ARRAY_BLOCK_SIZE + 1;
-        element_size := size_of(T);
 
         if length {
             array.data = reallocator(array.data, length * element_size, element_size * new_blocks * ARRAY_BLOCK_SIZE);
@@ -59,6 +64,58 @@ array_insert<T>(Array<T>* array, int index, T value, Allocate allocator = defaul
 
     array.data[index] = value;
     array.length++;
+}
+
+array_insert_range<T>(Array<T>* array, int index, Array<T> values, Allocate allocator = default_allocator, Reallocate reallocator = default_reallocator) {
+    if values.length == 0 return;
+
+    length := array.length;
+    element_size := size_of(T);
+    available_padding := length % ARRAY_BLOCK_SIZE;
+
+    if index > length {
+        new_length := index + values.length + 1;
+        diff := new_length - length;
+        if diff > available_padding {
+            reserve_length := new_length + ARRAY_BLOCK_SIZE - new_length % ARRAY_BLOCK_SIZE;
+
+            if length {
+                array.data = reallocator(array.data, length * element_size, element_size * reserve_length);
+            }
+            else {
+                array.data = allocator(element_size * reserve_length);
+            }
+        }
+
+        array.length = new_length;
+        each value, i in values {
+            array.data[index + i] = value;
+        }
+        return;
+    }
+
+    new_length := length + values.length;
+    diff := new_length - length;
+    if diff > available_padding {
+        reserve_length := new_length + ARRAY_BLOCK_SIZE - new_length % ARRAY_BLOCK_SIZE;
+
+        if length {
+            array.data = reallocator(array.data, length * element_size, element_size * reserve_length);
+        }
+        else {
+            array.data = allocator(element_size * reserve_length);
+        }
+    }
+
+    array.length = new_length;
+    // Copy existing and new data
+    while length > index {
+        array.data[--new_length] = array.data[--length];
+    }
+
+    each value, i in values {
+        array.data[index + i] = value;
+    }
 }
 
 bool array_remove<T>(Array<T>* array, int index) {

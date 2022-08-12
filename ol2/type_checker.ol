@@ -361,9 +361,194 @@ StructAst* get_polymorphic_struct(string name, int file_index) {
 
 verify_struct(StructAst* struct_ast) {
     struct_ast.flags |= AstFlags.Verifying;
+    field_names: HashSet<string>;
+    i := 0;
 
-    // TODO Implement me
+    if struct_ast.base_type_definition {
+        not_struct: bool;
+        base_type := verify_type(struct_ast.base_type_definition, &not_struct, &not_struct, &not_struct);
 
+        if not_struct {
+            report_error("Struct base type must be a struct", struct_ast.base_type_definition);
+        }
+        else if base_type == null {
+            report_error("Undefined type '%' as the base type of struct '%'", struct_ast.base_type_definition, print_type_definition(struct_ast.base_type_definition), struct_ast.name);
+        }
+        else if base_type.ast_type != AstType.Struct {
+            report_error("Base type '%' of struct '%' is not a struct", struct_ast.base_type_definition, print_type_definition(struct_ast.base_type_definition), struct_ast.name);
+        }
+        else {
+            base_struct := cast(StructAst*, base_type);
+            if struct_ast == base_struct {
+                report_error("Base struct cannot be the same as the struct", struct_ast.base_type_definition);
+            }
+            else {
+                assert((struct_ast.flags & AstFlags.Verified) == AstFlags.Verified);
+                array_insert_range(&struct_ast.fields, 0, base_struct.fields, allocate, reallocate);
+
+                field_names = create_temp_set<string>(struct_ast.fields.length);
+                each field in base_struct.fields {
+                    set_add(&field_names, field.name);
+                }
+
+                struct_ast.size = base_struct.size;
+                struct_ast.alignment = base_struct.alignment;
+                struct_ast.base_struct = base_struct;
+                i = base_struct.fields.length;
+            }
+        }
+    }
+
+    if !field_names.initialized field_names = create_temp_set<string>(struct_ast.fields.length);
+
+    while i < struct_ast.fields.length {
+        field := struct_ast.fields[i++];
+
+        if !set_add(&field_names, field.name) {
+            report_error("Struct '%' already contains field '%'", struct_ast, field.name);
+        }
+
+        if field.type_definition {
+            is_generics, is_varargs, is_params: bool;
+            field.type = verify_type(field.type_definition, &is_generic, &is_varargs, &is_params);
+
+            if (is_varargs || is_params)
+            {
+                report_error("Struct field '%.%' cannot be varargs or Params", field.type_definition, struct_ast.name, field.name);
+            }
+            else if field.type == null {
+                report_error("Undefined type '%' in struct field '%.%'", field.type_definition, print_type_definition(field.type_definition), struct_ast.name, field.name);
+            }
+            else if field.type.TypeKind == TypeKind.Void {
+                report_error("Struct field '%.%' cannot be assigned type 'void'", field.type_definition, struct_ast.name, field.name);
+            }
+            else if (field.type.TypeKind == TypeKind.Array) {
+                array_struct := cast(StructAst*, field.type);
+                field.array_element_type = array_struct.generic_types[0];
+            }
+            else if (field.type.TypeKind == TypeKind.CArray) {
+                array_type := cast(StructAst*, field.type);
+                field.array_element_type = array_type.element_type;
+            }
+
+            if field.value {
+                if field.value.ast_type == AstType.Null {
+                    if field.type != null && field.type.typeKind != TypeKind.Pointer
+                        report_error("Cannot assign null to non-pointer type", field.value);
+                    else {
+                        null_ast := cast(NullAst*, field.value);
+                        null_ast.target_type = field.type;
+                    }
+                }
+                else {
+                    is_constant: bool;
+                    value_type = verify_expression(field.Value, null, &is_constant);
+
+                    // Verify the type is correct
+                    if value_type {
+                        if !type_equals(field.type, value_type)
+                            report_error("Expected struct field value to be type '%', but got '%'", field.value, print_type_definition(field.type_definition), value_type.name);
+                        else if !is_constant
+                            report_error("Default values in structs must be constant", field.value);
+                        else
+                            VerifyConstantIfNecessary(field.value, field.type);
+                    }
+                }
+            }
+            else if field.assignments {
+                if field.type != null && field.type.type_kind != TypeKind.Struct && field.type.type_kind != TypeKind.String {
+                    report_error("Can only use object initializer with struct type, got '%'", field.type_definition, print_type_definition(field.type_definition));
+                }
+                // Catch circular references
+                else if field.type != null && field.type != struct_ast {
+                    struct_def := cast(StructAst*, field.type);
+                    // foreach (var (name, assignment) in field.Assignments)
+                    // {
+                    //     VerifyFieldAssignment(structDef, name, assignment, null, GlobalScope, field: true);
+                    // }
+                }
+            }
+            else if field.array_values.length {
+                if field.type != null && field.type.type_kind != TypeKind.Array && field.type.type_kind != TypeKind.CArray {
+                    report_error("Cannot use array initializer to declare non-array type '%'", field.type_definition, print_type_definition(field.type_definition));
+                }
+                else {
+                    field.type_definition.const_count = field.array_values.length;
+                    element_type := field.array_element_type;
+                    each value in field.array_values {
+                        is_constant: bool;
+                        value_type := VerifyExpression(value, null, GlobalScope, &is_constant);
+                        if value_type {
+                            if !type_equals(element_type, value_type)
+                                report_error("Expected array value to be type '%', but got '%'", value, element_type.Name, value_type.name);
+                            else if !is_constant
+                                report_error("Default values in structs array initializers should be constant", value);
+                            else
+                                VerifyConstantIfNecessary(value, elementtype);
+                        }
+                    }
+                }
+            }
+
+            // Check type count
+            if field.type?.TypeKind == TypeKind.Array && field.type_definition.count != null {
+                // Verify the count is a constant
+                is_constant: bool;
+                array_length: s32;
+                counttype := VerifyExpression(field.type_definition.count, null, GlobalScope, &is_constant, &array_length);
+
+                if counttype?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0
+                    report_error("Expected size of '%.%' to be a constant, positive integer", field.type_definition.count, struct_ast.name, field.name);
+                else
+                    field.type_definition.const_count = array_length;
+            }
+        }
+        else {
+            if field.value {
+                if (field.value.ast_type == AstType.Null) {
+                    report_error("Cannot assign null value without declaring a type", field.value);
+                }
+                else {
+                    is_constant: bool;
+                    valuetype = VerifyExpression(field.value, null, GlobalScope, &is_constant);
+
+                    if !is_constant {
+                        report_error("Default values in structs must be constant", field.value);
+                    }
+                    if valuetype?.TypeKind == TypeKind.Void {
+                        report_error("Struct field '' cannot be assigned type 'void'", field.value, struct_ast.name, field.name);
+                    }
+                    field.type = valueType;
+                }
+            }
+            else if field.assignments
+                report_error("Struct literals are not yet supported", field);
+            else if field.array_values.length
+                report_error("Declaration for struct field '%.%' with array initializer must have the type declared", field, struct_ast.name, field.vame);
+        }
+
+        // Check for circular dependencies and set the size and offset
+        if struct_ast == field.type {
+            report_error("Struct '{struct_ast.Name}' contains circular reference in field '{field.Name}'", field);
+        }
+        else if field.type {
+            if field.type.alignment > struct_ast.alignment
+                struct_ast.alignment = field.type.alignment;
+
+            alignmentOffset := struct_ast.Size % field.type.alignment;
+            if alignmentOffset struct_ast.Size += field.type.alignment - alignmentOffset;
+
+            field.Offset = struct_ast.Size;
+            struct_ast.Size += field.type.Size;
+        }
+    }
+
+    if struct_ast.size {
+        alignment_offset := struct_ast.size % struct_ast.alignment;
+        if alignment_offset struct_ast.size += struct_ast.alignment - alignment_offset;
+    }
+
+    create_type_info(struct_ast);
     struct_ast.flags |= AstFlags.Verified;
 }
 

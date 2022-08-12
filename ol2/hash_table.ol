@@ -83,6 +83,7 @@ bool table_contains<T, U>(HashTable<T, U> table, T key) {
 // These are assumed to be intialized with the full size and do not expand
 struct HashSet<T> {
     length: int;
+    initialized: bool;
     entries: Array<HashSetEntry<T>>;
 }
 
@@ -94,7 +95,7 @@ struct HashSetEntry<T> {
 
 HashSet<T> create_temp_set<T>(int capacity) #inline {
     entries: Array<HashSetEntry<T>>[capacity * 2];
-    set: HashSet<T> = { entries = entries; }
+    set: HashSet<T> = { initialized = true; entries = entries; }
     return set;
 }
 
