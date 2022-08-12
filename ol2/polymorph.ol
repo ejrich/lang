@@ -2,7 +2,7 @@ StructAst* create_polymorphed_struct(StructAst* base, string name, TypeKind type
     poly_struct: StructAst = {
         ast_type = AstType.Struct; flags = AstFlags.IsType; file_index = base.file_index; line = base.line; column = base.column; name = name;
         type_kind = type_kind; attributes = base.attributes; base_struct_name = base.name; base_type_definition = base.base_type_definition;
-        base_struct = base.base_struct; generic_types = allocate_array(generic_types);
+        generic_types = allocate_array(generic_types);
     }
 
     if private_generic_types poly_struct.flags |= AstFlags.Private;
@@ -16,6 +16,7 @@ StructAst* create_polymorphed_struct(StructAst* base, string name, TypeKind type
             new_field.value = field.value;
             new_field.assignments = field.assignments;
             new_field.array_values = field.array_values;
+            new_field.attributes = field.attributes;
             poly_struct.fields[i] = new_field;
         }
         else
