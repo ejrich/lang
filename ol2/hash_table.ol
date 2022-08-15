@@ -31,7 +31,8 @@ table_init<T, U>(HashTable<T, U>* table, int capacity, float load_factor = 0.75)
 bool, U table_get<T, U>(HashTable<T, U> table, T key) {
     hash := hash(key);
     capacity := table.entries.length;
-    index := hash % capacity;
+    index := cast(u64, hash) % capacity;
+    assert(index >= 0);
 
     entry := table.entries[index];
     while entry.filled {
@@ -94,7 +95,9 @@ struct HashSetEntry<T> {
 }
 
 HashSet<T> create_temp_set<T>(int capacity) #inline {
-    entries: Array<HashSetEntry<T>>[capacity * 2];
+    length := capacity * 2;
+    entries: Array<HashSetEntry<T>>[length];
+    clear_memory(entries.data, length * size_of(HashSetEntry<T>));
     set: HashSet<T> = { initialized = true; entries = entries; }
     return set;
 }

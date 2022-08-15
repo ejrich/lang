@@ -125,6 +125,22 @@ T* create_ast<T>(Token token, int file_index, AstType type) {
     return ast;
 }
 
+T* create_type_ast<T>(TokenEnumerator* enumerator, AstType type, TypeKind type_kind) {
+    ast := new<T>();
+    ast.ast_type = type;
+    ast.type_kind = type_kind;
+    ast.file_index = enumerator.file_index;
+
+    token := enumerator.current;
+    ast.line = token.line;
+    ast.column = token.column;
+
+    if enumerator.private ast.flags = AstFlags.IsType | AstFlags.Private;
+    else ast.flags = AstFlags.IsType;
+
+    return ast;
+}
+
 #private
 
 struct TokenEnumerator {
@@ -400,9 +416,8 @@ bool try_add_generic(string generic, Array<string>* generics) {
 
 FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attributes) {
     // 1. Determine return type and name of the function
-    function := create_ast<FunctionAst>(enumerator, AstType.Function);
+    function := create_type_ast<FunctionAst>(enumerator, AstType.Function, TypeKind.Function);
     function.attributes = attributes;
-    if enumerator.private function.flags = AstFlags.Private;
 
     // 1a. Check if the return type is void
     token: Token;
@@ -706,10 +721,8 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
 }
 
 StructAst* parse_struct(TokenEnumerator* enumerator, Array<string> attributes) {
-    struct_ast := create_ast<StructAst>(enumerator, AstType.Struct);
+    struct_ast := create_type_ast<StructAst>(enumerator, AstType.Struct, TypeKind.Struct);
     struct_ast.attributes = attributes;
-    if enumerator.private struct_ast.flags = AstFlags.IsType | AstFlags.Private;
-    else struct_ast.flags = AstFlags.IsType;
 
     // 1. Determine name of struct
     if !move_next(enumerator) {
@@ -869,10 +882,8 @@ StructFieldAst* parse_struct_field(TokenEnumerator* enumerator) {
 }
 
 EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
-    enum_ast := create_ast<EnumAst>(enumerator, AstType.Enum);
+    enum_ast := create_type_ast<EnumAst>(enumerator, AstType.Enum, TypeKind.Enum);
     enum_ast.attributes = attributes;
-    if enumerator.private enum_ast.flags = AstFlags.IsType | AstFlags.Private;
-    else enum_ast.flags = AstFlags.IsType;
 
     // 1. Determine name of enum
     if !move_next(enumerator) {
@@ -1042,9 +1053,7 @@ EnumAst* parse_enum(TokenEnumerator* enumerator, Array<string> attributes) {
 }
 
 UnionAst* parse_union(TokenEnumerator* enumerator) {
-    union_ast := create_ast<UnionAst>(enumerator, AstType.Union);
-    if enumerator.private union_ast.flags = AstFlags.IsType | AstFlags.Private;
-    else union_ast.flags = AstFlags.IsType;
+    union_ast := create_type_ast<UnionAst>(enumerator, AstType.Union, TypeKind.Union);
 
     // 1. Determine name of union
     if !move_next(enumerator) {
@@ -2954,9 +2963,7 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator) {
 }
 
 InterfaceAst* parse_interface(TokenEnumerator* enumerator) {
-    interface_ast := create_ast<InterfaceAst>(enumerator, AstType.Interface);
-    if enumerator.private interface_ast.flags = AstFlags.IsType | AstFlags.Private;
-    else interface_ast.flags = AstFlags.IsType;
+    interface_ast := create_type_ast<InterfaceAst>(enumerator, AstType.Interface, TypeKind.Interface);
     move_next(enumerator);
 
     // 1a. Check if the return type is void
