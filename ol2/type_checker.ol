@@ -1031,6 +1031,60 @@ libraries: HashTable<string, Library*>;
 #private
 
 verify_constant_if_necessary(Ast* ast, TypeAst* type) {
+    if ast.ast_type != AstType.Constant return;
+    constant := cast(ConstantAst*, ast);
+
+    if constant.type == null || constant.type == type || type.type_kind == TypeKind.Any return;
+
+    error_format := "Type '%' cannot be converted to '%'"; #const
+    out_of_range_error_format := "Value '%' out of range for type '%'"; #const
+    switch constant.type.type_kind {
+        case TypeKind.Integer; {
+            switch type.type_kind {
+                case TypeKind.Integer; {
+                    if type.flags & AstFlags.Signed {
+                        largest_allowed_value: s64 = 1 << (8 * type.size - 1) - 1;
+                        if constant.type.flags & AstFlags.Signed {
+                            lowest_allowed_value: s64 = -(1 << (8 * type.size - 1));
+                            if constant.value.integer < lowest_allowed_value || constant.value.integer > largest_allowed_value
+                                report_error(out_of_range_error_format, constant, constant.value.integer, type.name);
+                        }
+                        else if constant.value.integer > largest_allowed_value
+                            report_error(out_of_range_error_format, constant, constant.value.integer, type.name);
+                    }
+                    else {
+                        if (constant.type.flags & AstFlags.Signed) == AstFlags.Signed && constant.value.integer < 0
+                            report_error("Value for unsigned type '%' cannot be negative", constant, type.name);
+                        else {
+                            largest_allowed_value: u64 = 1 << (8 * type.size) - 1;
+                            if constant.value.unsigned_integer > largest_allowed_value
+                                report_error(out_of_range_error_format, constant, constant.value.unsigned_integer, type.name);
+                        }
+                    }
+                }
+                // Convert int to float
+                case TypeKind.Float; {
+                    if constant.type.flags & AstFlags.Signed constant.value.double = cast(float64, constant.value.integer);
+                    else constant.value.double = cast(float64, constant.value.unsigned_integer);
+                }
+                default; report_error(error_format, constant, constant.type.name, type.name);
+            }
+            constant.type = type;
+        }
+        case TypeKind.Float; {
+            switch type.type_kind {
+                // Convert float to int shelved for now
+                // case TypeKind.Integer; {}
+                case TypeKind.Float; {
+                    if constant.type.flags & AstFlags.Signed constant.value.double = cast(float64, constant.value.integer);
+                    else constant.value.double = cast(float64, constant.value.unsigned_integer);
+                }
+                default; report_error(error_format, constant, constant.type.name, type.name);
+            }
+            constant.type = type;
+        }
+    }
+
     // TODO Implement me
 }
 
