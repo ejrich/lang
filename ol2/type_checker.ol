@@ -46,9 +46,8 @@ init_necessary_types() {
 
 TypeAst* get_global_type(string name) {
     found, type := table_get(global_scope.identifiers, name);
-    // TODO Uncomment when these have been added
-    // assert(found);
-    // assert((type.flags & AstFlags.IsType) == AstFlags.IsType);
+    assert(found);
+    assert((type.flags & AstFlags.IsType) == AstFlags.IsType);
 
     return cast(TypeAst*, type);
 }
@@ -409,7 +408,7 @@ verify_struct(StructAst* struct_ast) {
         }
 
         if field.type_definition {
-            is_generics, is_varargs, is_params: bool;
+            is_generic, is_varargs, is_params: bool;
             field.type = verify_type(field.type_definition, &is_generic, &is_varargs, &is_params);
 
             if (is_varargs || is_params)
@@ -419,21 +418,21 @@ verify_struct(StructAst* struct_ast) {
             else if field.type == null {
                 report_error("Undefined type '%' in struct field '%.%'", field.type_definition, print_type_definition(field.type_definition), struct_ast.name, field.name);
             }
-            else if field.type.TypeKind == TypeKind.Void {
+            else if field.type.type_kind == TypeKind.Void {
                 report_error("Struct field '%.%' cannot be assigned type 'void'", field.type_definition, struct_ast.name, field.name);
             }
-            else if (field.type.TypeKind == TypeKind.Array) {
+            else if (field.type.type_kind == TypeKind.Array) {
                 array_struct := cast(StructAst*, field.type);
                 field.array_element_type = array_struct.generic_types[0];
             }
-            else if (field.type.TypeKind == TypeKind.CArray) {
-                array_type := cast(StructAst*, field.type);
+            else if (field.type.type_kind == TypeKind.CArray) {
+                array_type := cast(ArrayType*, field.type);
                 field.array_element_type = array_type.element_type;
             }
 
             if field.value {
                 if field.value.ast_type == AstType.Null {
-                    if field.type != null && field.type.typeKind != TypeKind.Pointer
+                    if field.type != null && field.type.type_kind != TypeKind.Pointer
                         report_error("Cannot assign null to non-pointer type", field.value);
                     else {
                         null_ast := cast(NullAst*, field.value);
@@ -442,7 +441,7 @@ verify_struct(StructAst* struct_ast) {
                 }
                 else {
                     is_constant: bool;
-                    value_type = verify_expression(field.Value, null, &is_constant);
+                    value_type := verify_expression(field.value, null, &is_constant);
 
                     // Verify the type is correct
                     if value_type {
@@ -451,7 +450,7 @@ verify_struct(StructAst* struct_ast) {
                         else if !is_constant
                             report_error("Default values in structs must be constant", field.value);
                         else
-                            VerifyConstantIfNecessary(field.value, field.type);
+                            verify_constant_if_necessary(field.value, field.type);
                     }
                 }
             }
@@ -477,27 +476,27 @@ verify_struct(StructAst* struct_ast) {
                     element_type := field.array_element_type;
                     each value in field.array_values {
                         is_constant: bool;
-                        value_type := VerifyExpression(value, null, GlobalScope, &is_constant);
+                        value_type := verify_expression(value, null, &is_constant);
                         if value_type {
                             if !type_equals(element_type, value_type)
-                                report_error("Expected array value to be type '%', but got '%'", value, element_type.Name, value_type.name);
+                                report_error("Expected array value to be type '%', but got '%'", value, element_type.name, value_type.name);
                             else if !is_constant
                                 report_error("Default values in structs array initializers should be constant", value);
                             else
-                                VerifyConstantIfNecessary(value, elementtype);
+                                verify_constant_if_necessary(value, element_type);
                         }
                     }
                 }
             }
 
             // Check type count
-            if field.type?.TypeKind == TypeKind.Array && field.type_definition.count != null {
+            if field.type != null && field.type.type_kind == TypeKind.Array && field.type_definition.count != null {
                 // Verify the count is a constant
                 is_constant: bool;
                 array_length: s32;
-                counttype := VerifyExpression(field.type_definition.count, null, GlobalScope, &is_constant, &array_length);
+                count_type := verify_expression(field.type_definition.count, null, &is_constant, &array_length);
 
-                if counttype?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0
+                if count_type == null || count_type.type_kind != TypeKind.Integer || !is_constant || array_length < 0
                     report_error("Expected size of '%.%' to be a constant, positive integer", field.type_definition.count, struct_ast.name, field.name);
                 else
                     field.type_definition.const_count = array_length;
@@ -510,21 +509,21 @@ verify_struct(StructAst* struct_ast) {
                 }
                 else {
                     is_constant: bool;
-                    valuetype = VerifyExpression(field.value, null, GlobalScope, &is_constant);
+                    value_type := verify_expression(field.value, null, &is_constant);
 
                     if !is_constant {
                         report_error("Default values in structs must be constant", field.value);
                     }
-                    if valuetype?.TypeKind == TypeKind.Void {
-                        report_error("Struct field '' cannot be assigned type 'void'", field.value, struct_ast.name, field.name);
+                    else if value_type != null && value_type.type_kind == TypeKind.Void {
+                        report_error("Struct field '%.%' cannot be assigned type 'void'", field.value, struct_ast.name, field.name);
                     }
-                    field.type = valueType;
+                    field.type = value_type;
                 }
             }
             else if field.assignments
                 report_error("Struct literals are not yet supported", field);
             else if field.array_values.length
-                report_error("Declaration for struct field '%.%' with array initializer must have the type declared", field, struct_ast.name, field.vame);
+                report_error("Declaration for struct field '%.%' with array initializer must have the type declared", field, struct_ast.name, field.name);
         }
 
         // Check for circular dependencies and set the size and offset
@@ -535,11 +534,11 @@ verify_struct(StructAst* struct_ast) {
             if field.type.alignment > struct_ast.alignment
                 struct_ast.alignment = field.type.alignment;
 
-            alignmentOffset := struct_ast.Size % field.type.alignment;
-            if alignmentOffset struct_ast.Size += field.type.alignment - alignmentOffset;
+            alignment_offset := struct_ast.size % field.type.alignment;
+            if alignment_offset struct_ast.size += field.type.alignment - alignment_offset;
 
-            field.Offset = struct_ast.Size;
-            struct_ast.Size += field.type.Size;
+            field.offset = struct_ast.size;
+            struct_ast.size += field.type.size;
         }
     }
 
@@ -579,10 +578,7 @@ verify_union(UnionAst* union_ast) {
                 if field.type.type_kind == TypeKind.Array && field.type_definition.count != null {
                     is_constant: bool;
                     array_length: s32;
-                    scope := private_scopes[union_ast.file_index];
-                    if scope == null scope = &global_scope;
-
-                    count_type := verify_expression(field.type_definition.count, null, scope, &is_constant, &array_length);
+                    count_type := verify_expression(field.type_definition.count, null, &is_constant, &array_length);
 
                     if count_type != null && count_type.type_kind != TypeKind.Integer || is_constant || array_length < 0
                         report_error("Expected size of '%.%' to be a constant, positive integer", field.type_definition.count, union_ast.name, field.name);
@@ -658,9 +654,23 @@ TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope) {
     return verify_expression(ast, function, scope, &_, &_);
 }
 
+TypeAst* verify_expression(Ast* ast, Function* function, bool* is_constant) {
+    _: bool;
+    scope := private_scopes[ast.file_index];
+    if scope == null scope = &global_scope;
+    return verify_expression(ast, function, scope, is_constant, &_);
+}
+
 TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_constant) {
     _: bool;
     return verify_expression(ast, function, scope, is_constant, &_);
+}
+
+TypeAst* verify_expression(Ast* ast, Function* function, bool* is_constant, s32* array_length) {
+    _: bool;
+    scope := private_scopes[ast.file_index];
+    if scope == null scope = &global_scope;
+    return verify_expression(ast, function, scope, is_constant, &_, true, array_length);
 }
 
 TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_constant, s32* array_length) {
@@ -743,10 +753,7 @@ TypeAst* verify_type(TypeDefinition* type, bool* is_generic, bool* is_varargs, b
         }
         else {
             is_constant := false;
-            scope := private_scopes[type.file_index];
-            if scope == null scope = &global_scope;
-
-            count_type := verify_expression(type.count, null, scope, &is_constant, &array_length);
+            count_type := verify_expression(type.count, null, &is_constant, &array_length);
             if count_type == null || count_type.type_kind != TypeKind.Integer || !is_constant || array_length < 0 {
                 report_error("Expected size of C array to be a constant, positive integer", type);
                 return null;
@@ -1022,6 +1029,76 @@ private_scopes: Array<GlobalScope*>;
 libraries: HashTable<string, Library*>;
 
 #private
+
+verify_constant_if_necessary(Ast* ast, TypeAst* type) {
+    // TODO Implement me
+}
+
+bool type_equals(TypeAst* target, TypeAst* source, bool check_primitives = false) {
+    if target == null || source == null return false;
+    if target == source return true;
+
+    switch target.type_kind {
+        case TypeKind.Integer; {
+            if source.type_kind == TypeKind.Integer {
+                if !check_primitives return true;
+                return target.size == source.size && (target.flags & AstFlags.Signed) == (source.flags & AstFlags.Signed);
+            }
+        }
+        case TypeKind.Float; {
+            if source.type_kind == TypeKind.Float {
+                if !check_primitives return true;
+                return target.size == source.size;
+            }
+        }
+        case TypeKind.Pointer; {
+            if source.type_kind != TypeKind.Pointer return false;
+
+            target_pointer := cast(PointerType*, target);
+            target_pointer_type := target_pointer.pointed_type;
+            source_pointer := cast(PointerType*, source);
+            source_pointer_type := source_pointer.pointed_type;
+
+            if target_pointer_type == &void_type || source_pointer_type == &void_type return true;
+
+            if target_pointer_type.ast_type == AstType.Struct && source_pointer_type.ast_type == AstType.Struct {
+                target_struct := cast(StructAst*, target_pointer_type);
+                source_struct := cast(StructAst*, source_pointer_type);
+                source_base_struct := source_struct.base_struct;
+
+                while source_base_struct {
+                    if target_struct == source_base_struct return true;
+
+                    source_base_struct = source_base_struct.base_struct;
+                }
+            }
+        }
+        case TypeKind.Interface; {
+            switch source.type_kind {
+                // Cannot assign interfaces to interface types
+                case TypeKind.Interface; return false;
+                case TypeKind.Pointer; {
+                    pointer_type := cast(PointerType*, source);
+                    return pointer_type.pointed_type == &void_type;
+                }
+                case TypeKind.Function; {
+                    interface_ast := cast(InterfaceAst*, target);
+                    function_ast := cast(FunctionAst*, source);
+
+                    if interface_ast.return_type == function_ast.return_type && interface_ast.arguments.length == function_ast.arguments.length {
+                        each interface_arg, i in interface_ast.arguments {
+                            function_arg := function_ast.arguments[i];
+                            if interface_arg.type != function_arg.type return false;
+                        }
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    return false;
+}
 
 bool, FunctionAst* get_existing_function(string name, int file_index, int* count = null) {
     private_scope := private_scopes[file_index];

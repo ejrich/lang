@@ -208,6 +208,14 @@ void* memory_copy(void* dest, void* src, int length) {
     return dest;
 }
 
+clear_memory(void* dest, int length) {
+    dest_buffer := cast(u8*, dest);
+
+    each i in 0..length-1 {
+        dest_buffer[i] = 0;
+    }
+}
+
 void* allocate_memory(u64 size) {
     pointer: void*;
     #if os == OS.Linux {

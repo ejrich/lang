@@ -748,6 +748,7 @@ public enum DirectiveType
 
 public enum TypeKind
 {
+    None,
     Void,
     Boolean,
     Integer,

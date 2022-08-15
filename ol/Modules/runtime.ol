@@ -115,6 +115,7 @@ struct FunctionTypeInfo : InterfaceTypeInfo {
 }
 
 enum TypeKind {
+    None;
     Void;
     Boolean;
     Integer;
