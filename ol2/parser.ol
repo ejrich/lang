@@ -3565,6 +3565,7 @@ Operator convert_operator(Token token) {
         case TokenType.Pipe;
         case TokenType.Ampersand;
         case TokenType.Percent;
+        case TokenType.Caret;
             return cast(Operator, cast(s32, token.type));
     }
 
