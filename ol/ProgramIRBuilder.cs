@@ -512,16 +512,14 @@ public static class ProgramIRBuilder
                     break;
                 case ScopeAst childScope:
                     EmitScope(function, childScope, returnType, breakBlock, continueBlock);
-                    if (childScope.Returns)
+                    if (childScope.Returns || childScope.Breaks)
                     {
-                        EmitDeferredStatements(function, scope);
                         return;
                     }
                     break;
                 case ConditionalAst conditional:
                     if (EmitConditional(function, conditional, scope, returnType, breakBlock, continueBlock))
                     {
-                        EmitDeferredStatements(function, scope);
                         return;
                     }
                     break;
@@ -1236,7 +1234,7 @@ public static class ProgramIRBuilder
         Instruction jumpToAfter = null;
 
         // For when the the if block does not return and there is an else block, a jump to the after block is required
-        if (!conditional.IfBlock.Returns && conditional.ElseBlock != null)
+        if (!(conditional.IfBlock.Returns || conditional.IfBlock.Breaks) && conditional.ElseBlock != null)
         {
             jumpToAfter = new Instruction {Type = InstructionType.Jump, Scope = scope};
             function.Instructions.Add(jumpToAfter);
@@ -1265,14 +1263,22 @@ public static class ProgramIRBuilder
 
     private static bool FinishConditional(FunctionIR function, ConditionalAst conditional, BasicBlock elseBlock, Instruction jumpToAfter)
     {
-        if (conditional.IfBlock.Returns && conditional.ElseBlock.Returns)
+        if ((conditional.IfBlock.Returns && conditional.ElseBlock.Returns) || (conditional.IfBlock.Breaks && conditional.ElseBlock.Breaks))
         {
             return true;
         }
 
-        var afterBlock = elseBlock.Location < function.Instructions.Count ? AddBasicBlock(function) : elseBlock;
+        BasicBlock afterBlock;
+        if (conditional.ElseBlock.Returns || conditional.ElseBlock.Breaks)
+        {
+            afterBlock = AddBasicBlock(function);
+        }
+        else
+        {
+            afterBlock = elseBlock.Location < function.Instructions.Count ? AddBasicBlock(function) : elseBlock;
+        }
 
-        if (!conditional.IfBlock.Returns)
+        if (jumpToAfter != null)
         {
             jumpToAfter.Value1 = BasicBlockValue(afterBlock);
         }
@@ -1614,7 +1620,7 @@ public static class ProgramIRBuilder
 
         AddBasicBlock(function, bodyBlock);
         EmitScope(function, body, returnType, breakBlock, continueBlock);
-        if (!body.Returns && emitJump)
+        if (!body.Returns && !body.Breaks && emitJump)
         {
             EmitJump(function, body, afterBlock);
         }
@@ -1701,7 +1707,7 @@ public static class ProgramIRBuilder
 
         AddBasicBlock(function, bodyBlock);
         EmitScopeInline(function, body, returnType, returnAllocation, returnBlock, breakBlock, continueBlock);
-        if (!body.Returns && emitJump)
+        if (!body.Returns && !body.Breaks && emitJump)
         {
             EmitJump(function, body, afterBlock);
         }
@@ -2549,16 +2555,14 @@ public static class ProgramIRBuilder
                     break;
                 case ScopeAst childScope:
                     EmitScopeInline(function, childScope, returnType, returnAllocation, returnBlock, breakBlock, continueBlock);
-                    if (childScope.Returns)
+                    if (childScope.Returns || childScope.Breaks)
                     {
-                        EmitInlineDeferredStatements(function, scope);
                         return;
                     }
                     break;
                 case ConditionalAst conditional:
                     if (EmitInlineConditional(function, conditional, scope, returnType, returnAllocation, returnBlock, breakBlock, continueBlock))
                     {
-                        EmitInlineDeferredStatements(function, scope);
                         return;
                     }
                     break;
