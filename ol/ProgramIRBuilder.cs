@@ -460,7 +460,6 @@ public static class ProgramIRBuilder
             switch (ast)
             {
                 case ReturnAst returnAst:
-                    EmitDeferredStatements(function, scope);
                     EmitReturn(function, returnAst, returnType, scope);
                     return;
                 case DeclarationAst declaration:
@@ -1110,12 +1109,13 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, IScope scope)
+    private static void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, ScopeAst scope)
     {
         SetDebugLocation(function, returnAst, scope);
 
         if (returnAst.Value == null)
         {
+            EmitDeferredStatements(function, scope);
             var instruction = new Instruction {Type = InstructionType.ReturnVoid, Scope = scope};
             function.Instructions.Add(instruction);
         }
@@ -1134,11 +1134,13 @@ public static class ProgramIRBuilder
             }
 
             var returnValue = EmitLoad(function, compoundReturnType, function.CompoundReturnAllocation, scope);
+            EmitDeferredStatements(function, scope);
             EmitInstruction(InstructionType.Return, function, null, scope, returnValue);
         }
         else
         {
             var returnValue = EmitAndCast(function, returnAst.Value, scope, returnType, returnValue: true);
+            EmitDeferredStatements(function, scope);
             EmitInstruction(InstructionType.Return, function, null, scope, returnValue);
         }
     }

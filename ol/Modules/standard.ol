@@ -180,6 +180,7 @@ assert(bool assertion, int exit_code = 1) #call_location #inline {
 
         print("Assertion failed at % %:%\n", file, line, column);
 
+        asm { int3; }
         exit_program(exit_code);
     }
 }
@@ -191,6 +192,7 @@ assert(bool assertion, string message, int exit_code = 1) #call_location #inline
         if message.length == 0 print("Assertion failed\n");
         else print("Assertion failed: % at % %:%\n", message, file, line, column);
 
+        asm { int3; }
         exit_program(exit_code);
     }
 }
