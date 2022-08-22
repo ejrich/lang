@@ -109,6 +109,7 @@ public class ScopeAst : IScope, IAst
     public uint Line { get; init; }
     public uint Column { get; init; }
     public bool Returns { get; set; }
+    public bool Breaks { get; set; }
     public IScope Parent { get; set; }
     public IDictionary<string, IAst> Identifiers { get; } = new Dictionary<string, IAst>();
     public List<IAst> Children { get; } = new();

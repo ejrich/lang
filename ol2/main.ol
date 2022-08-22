@@ -172,6 +172,7 @@ float get_time(u64 start, u64 end, u64 freq) {
 
 // Multithreading
 init_thread_pool() {
+    create_semaphore(&allocate_mutex);
     create_semaphore(&semaphore, 65536);
     thread_count := get_processors();
     each i in 0..thread_count - 2 {
@@ -331,7 +332,7 @@ T* new<T>() {
     return pointer;
 }
 
-arena_size := 80000; #const
+default_arena_size := 80000; #const
 arenas: Array<Arena>;
 
 struct Arena {
@@ -341,13 +342,14 @@ struct Arena {
 }
 
 void* allocate(int size) {
-    if size > arena_size
+    if size > default_arena_size
         return allocate_arena(size, size);
 
     each arena in arenas {
+        arena_size := arena.size;
         while true {
             cursor := arena.cursor;
-            if size <= arena.size - cursor {
+            if size <= arena_size - cursor {
                 if compare_exchange(&arena.cursor, cursor + size, cursor) == cursor {
                     pointer := arena.pointer + cursor;
                     return pointer;
@@ -367,17 +369,30 @@ void* reallocate(void* pointer, int old_size, int size) {
     return new_pointer;
 }
 
-void* allocate_arena(int cursor, int size = arena_size) {
+allocate_mutex: Semaphore*;
+
+void* allocate_arena(int cursor, int size = default_arena_size) {
     arena: Arena = { pointer = allocate_memory(size); cursor = cursor; size = size; }
-    array_insert(&arenas, arena);
+
+    if allocate_mutex {
+        semaphore_wait(allocate_mutex);
+        array_insert(&arenas, arena);
+        semaphore_release(allocate_mutex);
+    }
+    else {
+        array_insert(&arenas, arena);
+    }
+
     return arena.pointer;
 }
 
 deallocate_arenas() {
-    // print("% arenas allocated, % kb memory\n", arenas.length, arenas.length * arena_size / 1000.0);
+    total_allocated := 0;
     each arena in arenas {
         free_memory(arena.pointer, arena.size);
+        total_allocated += arena.size;
     }
+    // print("% arenas allocated, % kb memory\n", arenas.length, total_allocated / 1000.0);
 }
 
 

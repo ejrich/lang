@@ -1750,6 +1750,10 @@ public static class TypeChecker
                     {
                         scope.Returns = true;
                     }
+                    if (childScope.Breaks)
+                    {
+                        scope.Breaks = true;
+                    }
                     break;
                 case WhileAst whileAst:
                     whileAst.Body.Parent = scope;
@@ -1773,6 +1777,10 @@ public static class TypeChecker
                         if (conditional.IfBlock.Returns && conditional.ElseBlock.Returns)
                         {
                             scope.Returns = true;
+                        }
+                        if (conditional.IfBlock.Breaks && conditional.ElseBlock.Breaks)
+                        {
+                            scope.Breaks = true;
                         }
                     }
                     break;
@@ -1863,14 +1871,14 @@ public static class TypeChecker
                     VerifyScope(defer.Statement, function, true);
                     break;
                 case BreakAst:
-                    scope.Returns = true;
+                    scope.Breaks = true;
                     if (!canBreak || inDefer)
                     {
                         ErrorReporter.Report("No parent loop to break", ast);
                     }
                     break;
                 case ContinueAst:
-                    scope.Returns = true;
+                    scope.Breaks = true;
                     if (!canBreak || inDefer)
                     {
                         ErrorReporter.Report("No parent loop to continue", ast);
