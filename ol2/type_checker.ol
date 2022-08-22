@@ -382,16 +382,38 @@ verify_struct(StructAst* struct_ast) {
                 report_error("Base struct cannot be the same as the struct", struct_ast.base_type_definition);
             }
             else {
-                assert((struct_ast.flags & AstFlags.Verified) == AstFlags.Verified);
                 array_insert_range(&struct_ast.fields, 0, base_struct.fields, allocate, reallocate);
-
                 field_names = create_temp_set<string>(struct_ast.fields.length);
-                each field in base_struct.fields {
-                    set_add(&field_names, field.name);
+
+                if base_struct.flags & AstFlags.Verified {
+                    each field in base_struct.fields {
+                        set_add(&field_names, field.name);
+                    }
+
+                    struct_ast.size = base_struct.size;
+                    struct_ast.alignment = base_struct.alignment;
+                }
+                else {
+                    each field in base_struct.fields {
+                        set_add(&field_names, field.name);
+
+                        if field.type == null {
+                            field.type = verify_type(field.type_definition);
+                        }
+
+                        if field.type {
+                            if field.type.alignment > struct_ast.alignment
+                                struct_ast.alignment = field.type.alignment;
+
+                            alignment_offset := struct_ast.size % field.type.alignment;
+                            if alignment_offset struct_ast.size += field.type.alignment - alignment_offset;
+
+                            field.offset = struct_ast.size;
+                            struct_ast.size += field.type.size;
+                        }
+                    }
                 }
 
-                struct_ast.size = base_struct.size;
-                struct_ast.alignment = base_struct.alignment;
                 struct_ast.base_struct = base_struct;
                 i = base_struct.fields.length;
             }
