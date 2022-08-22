@@ -230,6 +230,14 @@ string realpath(string file_name, string resolved_name) #extern "c"
 int pthread_create(u64* thread, pthread_attr_t* attr, ThreadProcedure start_routine, void* arg) #extern "c"
 struct pthread_attr_t {}
 
-int sem_init(void* sem, int pshared, int value) #extern "c"
-int sem_wait(void* sem) #extern "c"
-int sem_post(void* sem) #extern "c"
+struct sem_t {
+    a: u64;
+    b: u64;
+    c: u64;
+    d: u64;
+    // __size: CArray<u8>[32];
+}
+
+int sem_init(sem_t* sem, int pshared, int value) #extern "c"
+int sem_wait(sem_t* sem) #extern "c"
+int sem_post(sem_t* sem) #extern "c"

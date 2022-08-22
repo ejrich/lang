@@ -23,6 +23,7 @@ file_names: Array<string>;
 main() {
     freq := get_performance_frequency();
     start := get_performance_counter();
+    create_semaphore(&allocate_mutex);
 
     // Load cli args into build settings
     entrypoint: string;
@@ -172,8 +173,7 @@ float get_time(u64 start, u64 end, u64 freq) {
 
 // Multithreading
 init_thread_pool() {
-    create_semaphore(&allocate_mutex);
-    create_semaphore(&semaphore, 65536);
+    create_semaphore(&queue_semaphore, 65536);
     thread_count := get_processors();
     each i in 0..thread_count - 2 {
         create_thread(thread_worker, null);
@@ -183,13 +183,13 @@ init_thread_pool() {
 void* thread_worker(void* arg) {
     while true {
         if execute_queued_item() {
-            semaphore_wait(semaphore);
+            semaphore_wait(&queue_semaphore);
         }
     }
     return null;
 }
 
-semaphore: Semaphore*;
+queue_semaphore: Semaphore;
 thread_queue: LinkedList<QueueItem>;
 completed := 0;
 job_count := 0;
@@ -198,7 +198,7 @@ queue_work(Callback callback, void* data, bool clear = false) {
     item: QueueItem = { callback = callback; data = data; clear = clear; }
     add_to_head(&thread_queue, item);
     atomic_increment(&job_count);
-    semaphore_release(semaphore);
+    semaphore_release(&queue_semaphore);
 }
 
 bool execute_queued_item() {
@@ -369,20 +369,13 @@ void* reallocate(void* pointer, int old_size, int size) {
     return new_pointer;
 }
 
-allocate_mutex: Semaphore*;
+allocate_mutex: Semaphore;
 
 void* allocate_arena(int cursor, int size = default_arena_size) {
     arena: Arena = { pointer = allocate_memory(size); cursor = cursor; size = size; }
-
-    if allocate_mutex {
-        semaphore_wait(allocate_mutex);
-        array_insert(&arenas, arena);
-        semaphore_release(allocate_mutex);
-    }
-    else {
-        array_insert(&arenas, arena);
-    }
-
+    semaphore_wait(&allocate_mutex);
+    array_insert(&arenas, arena);
+    semaphore_release(&allocate_mutex);
     return arena.pointer;
 }
 

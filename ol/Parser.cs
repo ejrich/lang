@@ -2651,9 +2651,7 @@ public static class Parser
                     ErrorReporter.Report("End of file reached without closing #run directive", enumerator.FileIndex, enumerator.Last);
                     return null;
                 }
-                var ast = ParseAst(enumerator, null, null);
-                if (ast != null)
-                    directive.Value = ast;
+                directive.Value = ParseScopeBody(enumerator, null);
                 break;
             case "if":
                 directive.Type = DirectiveType.If;

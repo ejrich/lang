@@ -12,16 +12,25 @@ u64 create_thread(ThreadProcedure proc, void* arg) {
     return thread_id;
 }
 
-struct Semaphore {}
+#if os == OS.Linux {
+    struct Semaphore {
+        sem: sem_t;
+    }
+}
+#if os == OS.Windows {
+    struct Semaphore {
+        handle: Handle*;
+    }
+}
 
-bool create_semaphore(Semaphore** semaphore, int allowed = 1) {
+bool create_semaphore(Semaphore* semaphore, int allowed = 1) {
     success: bool;
     #if os == OS.Linux {
-        success = sem_init(semaphore, 0, allowed) == 0;
+        success = sem_init(&semaphore.sem, 0, allowed) == 0;
     }
     #if os == OS.Windows {
-        *semaphore = CreateSemaphore(null, 0, allowed, null);
-        success = *semaphore != null;
+        semaphore.handle = CreateSemaphore(null, 0, allowed, null);
+        success = semaphore.handle != null;
     }
 
     return success;
@@ -29,18 +38,18 @@ bool create_semaphore(Semaphore** semaphore, int allowed = 1) {
 
 semaphore_wait(Semaphore* semaphore) {
     #if os == OS.Linux {
-        sem_wait(&semaphore);
+        sem_wait(&semaphore.sem);
     }
     #if os == OS.Windows {
-        WaitForSingleObject(semaphore, INFINITE);
+        WaitForSingleObject(&semaphore.handle, INFINITE);
     }
 }
 
 semaphore_release(Semaphore* semaphore) {
     #if os == OS.Linux {
-        sem_post(&semaphore);
+        sem_post(&semaphore.sem);
     }
     #if os == OS.Windows {
-        ReleaseSemaphore(semaphore, 1, null);
+        ReleaseSemaphore(&semaphore.handle, 1, null);
     }
 }

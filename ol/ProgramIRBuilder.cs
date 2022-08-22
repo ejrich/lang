@@ -84,52 +84,14 @@ public static class ProgramIRBuilder
         }
     }
 
-    public static FunctionIR CreateRunnableFunction(IAst ast)
+    public static FunctionIR CreateRunnableFunction(ScopeAst scope)
     {
         var function = new FunctionIR {Allocations = new(), Instructions = new(), BasicBlocks = new()};
         AddBasicBlock(function);
 
-        var returns = false;
-        switch (ast)
-        {
-            case ReturnAst returnAst:
-                EmitReturn(function, returnAst, null, TypeChecker.GlobalScope);
-                returns = true;
-                break;
-            case DeclarationAst declaration:
-                EmitDeclaration(function, declaration, TypeChecker.GlobalScope);
-                break;
-            case CompoundDeclarationAst compoundDeclaration:
-                EmitCompoundDeclaration(function, compoundDeclaration, TypeChecker.GlobalScope);
-                break;
-            case AssignmentAst assignment:
-                EmitAssignment(function, assignment, TypeChecker.GlobalScope);
-                break;
-            case ScopeAst childScope:
-                EmitScope(function, childScope, null, null, null);
-                returns = childScope.Returns;
-                break;
-            case ConditionalAst conditional:
-                EmitConditional(function, conditional, TypeChecker.GlobalScope, null, null, null);
-                break;
-            case WhileAst whileAst:
-                EmitWhile(function, whileAst, TypeChecker.GlobalScope, null);
-                break;
-            case EachAst each:
-                EmitEach(function, each, TypeChecker.GlobalScope, null);
-                break;
-            case AssemblyAst assembly:
-                EmitInlineAssembly(function, assembly, TypeChecker.GlobalScope);
-                break;
-            case SwitchAst switchAst:
-                EmitSwitch(function, switchAst, TypeChecker.GlobalScope, null, null, null);
-                break;
-            default:
-                EmitIR(function, ast, TypeChecker.GlobalScope);
-                break;
-        }
+        EmitScope(function, scope, null, null, null);
 
-        if (!returns)
+        if (!scope.Returns)
         {
             function.Instructions.Add(new Instruction {Type = InstructionType.ReturnVoid});
         }
