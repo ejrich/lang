@@ -149,67 +149,19 @@ public static class TypeChecker
         {
             var privateScope = PrivateScopes[runDirective.FileIndex];
             IScope scope = privateScope == null ? GlobalScope : privateScope;
-            switch (runDirective.Value)
-            {
-                case ScopeAst childScope:
-                    childScope.Parent = scope;
-                    VerifyScope(childScope, null);
-                    break;
-                case WhileAst whileAst:
-                    whileAst.Body.Parent = scope;
-                    VerifyScope(whileAst.Body, null, canBreak: true);
-                    break;
-                case EachAst each:
-                    each.Body.Parent = scope;
-                    VerifyScope(each.Body, null, canBreak: true);
-                    break;
-                case ConditionalAst conditional:
-                    conditional.IfBlock.Parent = scope;
-                    VerifyScope(conditional.IfBlock, null);
-                    if (conditional.ElseBlock != null)
-                    {
-                        conditional.ElseBlock.Parent = scope;
-                        VerifyScope(conditional.ElseBlock, null);
-                    }
-                    break;
-                case ReturnAst returnAst:
-                    ErrorReporter.Report("Cannot return from run directive", returnAst);
-                    break;
-                case DeclarationAst declaration:
-                    VerifyDeclaration(declaration, null, scope);
-                    break;
-                case CompoundDeclarationAst compoundDeclaration:
-                    VerifyCompoundDeclaration(compoundDeclaration, null, scope);
-                    break;
-                case AssignmentAst assignment:
-                    VerifyAssignment(assignment, null, scope);
-                    break;
-                case AssemblyAst assembly:
-                    VerifyInlineAssembly(assembly, scope);
-                    break;
-                case SwitchAst switchAst:
-                    VerifySwitch(switchAst, null, scope, false, false);
-                    break;
-                case BreakAst:
-                    ErrorReporter.Report("No parent loop to break", runDirective.Value);
-                    break;
-                case ContinueAst:
-                    ErrorReporter.Report("No parent loop to continue", runDirective.Value);
-                    break;
-                default:
-                    VerifyExpression(runDirective.Value, null, scope);
-                    break;
-            }
+            var scopeAst = (ScopeAst)runDirective.Value;
+            scopeAst.Parent = scope;
+            VerifyScope(scopeAst, null);
 
             ClearAstQueue();
             if (!ErrorReporter.Errors.Any())
             {
                 ThreadPool.CompleteWork();
 
-                var function = ProgramIRBuilder.CreateRunnableFunction(runDirective.Value);
+                var function = ProgramIRBuilder.CreateRunnableFunction(scopeAst);
                 ProgramRunner.Init();
 
-                ProgramRunner.RunProgram(function, runDirective.Value);
+                ProgramRunner.RunProgram(function, scopeAst);
             }
         }
 
