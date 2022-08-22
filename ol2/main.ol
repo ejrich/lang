@@ -23,7 +23,6 @@ file_names: Array<string>;
 main() {
     freq := get_performance_frequency();
     start := get_performance_counter();
-    create_semaphore(&allocate_mutex);
 
     // Load cli args into build settings
     entrypoint: string;
@@ -369,13 +368,9 @@ void* reallocate(void* pointer, int old_size, int size) {
     return new_pointer;
 }
 
-allocate_mutex: Semaphore;
-
 void* allocate_arena(int cursor, int size = default_arena_size) {
     arena: Arena = { pointer = allocate_memory(size); cursor = cursor; size = size; }
-    semaphore_wait(&allocate_mutex);
     array_insert(&arenas, arena);
-    semaphore_release(&allocate_mutex);
     return arena.pointer;
 }
 

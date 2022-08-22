@@ -732,6 +732,9 @@ public static class TypeChecker
                         fieldNames.Add(field.Name);
                         structAst.Fields.Insert(i++, field);
                     }
+
+                    structAst.Size = baseTypeStruct.Size;
+                    structAst.Alignment = baseTypeStruct.Alignment;
                 }
                 else
                 {
@@ -744,12 +747,27 @@ public static class TypeChecker
                         {
                             field.Type = VerifyType(field.TypeDefinition, GlobalScope);
                         }
+
+                        if (field.Type != null)
+                        {
+                            if (field.Type.Alignment > structAst.Alignment)
+                            {
+                                structAst.Alignment = field.Type.Alignment;
+                            }
+
+                            var alignmentOffset = structAst.Size % field.Type.Alignment;
+                            if (alignmentOffset > 0)
+                            {
+                                structAst.Size += field.Type.Alignment - alignmentOffset;
+                            }
+
+                            field.Offset = structAst.Size;
+                            structAst.Size += field.Type.Size;
+                        }
                     }
                 }
 
-                structAst.Size = baseTypeStruct.Size;
                 structAst.BaseStruct = baseTypeStruct;
-                structAst.Alignment = baseTypeStruct.Alignment;
             }
         }
 

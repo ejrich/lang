@@ -143,6 +143,9 @@ public static class Assembly
             new() {Prefix = 0x66, OF = true, Opcode = 0xB1, AddressSpace = 2, RMFirst = true, Value1 = new(true), Value2 = new(size: 2)},
             new() {OF = true, Opcode = 0xB1, AddressSpace = 4, RMFirst = true, Value1 = new(true), Value2 = new(size: 4)},
             new() {Rex = 0x48, OF = true, Opcode = 0xB1, RMFirst = true, Value1 = new(true), Value2 = new()}
+        }},
+        {"int3", new InstructionDefinition[]{
+            new() {Opcode = 0xCC}
         }}
         // TODO Add more
     };
