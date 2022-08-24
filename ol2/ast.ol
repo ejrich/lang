@@ -53,42 +53,42 @@ enum AstFlags {
     None;
 
     // Relating to types
-    IsType = 0x1;
-    Used = 0x2;
-    Signed = 0x4;
-    Private = 0x8;
-    Verified = 0x10;
+    IsType    = 0x1;
+    Used      = 0x2;
+    Signed    = 0x4;
+    Private   = 0x8;
+    Verified  = 0x10;
     Verifying = 0x20;
 
     // Misc
-    Generic = 0x40;
-    Global = 0x80;
-    Constant = 0x100;
-    Returns = 0x200;
-    Final = 0x400;
-    EnumValueDefined = 0x800;
+    Generic          = 0x40;
+    Global           = 0x80;
+    Constant         = 0x100;
+    Returns          = 0x200;
+    Final            = 0x400;
+    Added            = 0x800;
+    EnumValueDefined = 0x1000;
 
     // Struct field refs
-    IsEnum = 0x800;
-    ConstantStringLength = 0x2000;
-    RawConstantString = 0x4000;
+    IsEnum               = 0x2000;
+    ConstantStringLength = 0x4000;
+    RawConstantString    = 0x8000;
 
     // ++ and --
-    Prefixed = 0x8000;
-    Positive = 0x10000;
+    Prefixed = 0x10000;
+    Positive = 0x20000;
 
     // Calls
-    InlineCall = 0x20000;
-    PassArrayToParams = 0x40000;
+    InlineCall        = 0x40000;
+    PassArrayToParams = 0x80000;
 
     // Assembly
-    FindStagingInputRegister = 0x80000;
-    GetPointer = 0x100000;
-    Dereference = 0x200000;
-    Added = 0x400000;
+    FindStagingInputRegister = 0x100000;
+    GetPointer               = 0x200000;
+    Dereference              = 0x400000;
 
     // Type Definitions
-    Compound = 0x8000000;
+    Compound = 0x10000000;
 }
 
 struct Ast {
@@ -377,7 +377,6 @@ struct AssemblyAst : Ast {
     instructions: Array<AssemblyInstructionAst*>;
     in_registers: HashTable<string, AssemblyInputAst*>;
     out_values: Array<AssemblyInputAst*>;
-    find_staging_input_register: bool;
     assembly_bytes: Array<u8>;
 }
 
@@ -385,7 +384,6 @@ struct AssemblyInputAst : Ast {
     register: string;
     register_definition: RegisterDefinition*;
     ast: Ast*;
-    get_pointer: bool;
     value: InstructionValue*;
 }
 
@@ -397,7 +395,6 @@ struct AssemblyInstructionAst : Ast {
 }
 
 struct AssemblyValueAst : Ast {
-    dereference: bool;
     register: string;
     register_definition: RegisterDefinition*;
     constant: ConstantAst*;
@@ -416,7 +413,6 @@ struct SwitchCases {
 }
 
 struct DeferAst : Ast {
-    added: bool;
     statement: ScopeAst*;
 }
 

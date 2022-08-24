@@ -2712,7 +2712,7 @@ bool parse_assembly_pointer(AssemblyValueAst* value, TokenEnumerator* enumerator
         report_error("Expected register after pointer in instruction", enumerator.file_index, enumerator.current);
         return false;
     }
-    value.dereference = true;
+    value.flags |= AstFlags.Dereference;
     value.register = enumerator.current.value;
 
     if !move_next(enumerator) || enumerator.current.type != TokenType.CloseBracket {
