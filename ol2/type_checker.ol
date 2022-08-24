@@ -718,7 +718,7 @@ TypeAst* verify_type(TypeDefinition* type, bool* is_generic, bool* is_varargs, b
     if type == null return null;
     if type.baked_type return type.baked_type;
 
-    if type.is_generic {
+    if type.flags & AstFlags.Generic {
         if type.generics.length
             report_error("Generic type cannot have additional generic types", type);
 
@@ -726,7 +726,7 @@ TypeAst* verify_type(TypeDefinition* type, bool* is_generic, bool* is_varargs, b
         return null;
     }
 
-    if type.compound {
+    if type.flags & AstFlags.Compound {
         compound_type_name := print_compound_type(type);
         compound_type := get_type(compound_type_name, type.file_index);
         if compound_type return compound_type;

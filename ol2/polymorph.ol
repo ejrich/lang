@@ -9,7 +9,7 @@ StructAst* create_polymorphed_struct(StructAst* base, string name, TypeKind type
     array_reserve(&poly_struct.fields, base.fields.length, allocate, reallocate);
 
     each field, i in base.fields {
-        if field.flags & AstFlags.HasGenerics {
+        if field.flags & AstFlags.Generic {
             new_field := copy_ast(field);
             new_field.type_definition = copy_type(field.type_definition, generic_types);
             new_field.name = field.name;
@@ -43,7 +43,7 @@ FunctionAst* create_polymorphed_function(FunctionAst* base, string name, bool pr
 
     array_resize(&function.arguments, base.arguments.length, allocate, reallocate);
     each argument, i in base.arguments {
-        if argument.flags & AstFlags.HasGenerics
+        if argument.flags & AstFlags.Generic
             function.arguments[i] = copy_declaration(argument, generic_types, base.generics);
         else
             function.arguments[i] = argument;
@@ -80,7 +80,7 @@ OperatorOverloadAst* create_polymorphed_operator_overload(OperatorOverloadAst* b
 TypeDefinition* copy_type(TypeDefinition* type, Array<TypeAst*> generic_types) {
     copy_type := copy_ast(type);
 
-    if type.flags & AstFlags.IsGeneric {
+    if type.flags & AstFlags.Generic {
         generic_type := generic_types[type.generic_index];
         copy_type.name = generic_type.name;
         copy_type.baked_type = generic_type;
@@ -262,7 +262,7 @@ Ast* copy_ast(Ast* ast, Array<TypeAst*> generic_types, Array<string> generics) {
         case AstType.Cast; {
             cast_ast := cast(CastAst*, ast);
             copy := copy_ast(cast_ast);
-            if cast_ast.flags & AstFlags.HasGenerics copy.target_type_definition = copy_type(cast_ast.target_type_definition, generic_types);
+            if cast_ast.flags & AstFlags.Generic copy.target_type_definition = copy_type(cast_ast.target_type_definition, generic_types);
             else copy.target_type_definition = cast_ast.target_type_definition;
             copy.value = copy_ast(cast_ast.value, generic_types, generics);
             return copy;
@@ -317,7 +317,7 @@ DeclarationAst* copy_declaration(DeclarationAst* ast, Array<TypeAst*> generic_ty
 }
 
 copy_declarations(Declaration* source, Declaration* target, Array<TypeAst*> generic_types, Array<string> generics) {
-    if source.flags & AstFlags.HasGenerics target.type_definition = copy_type(source.type_definition, generic_types);
+    if source.flags & AstFlags.Generic target.type_definition = copy_type(source.type_definition, generic_types);
     else target.type_definition = source.type_definition;
 
     target.value = copy_ast(source.value, generic_types, generics);
