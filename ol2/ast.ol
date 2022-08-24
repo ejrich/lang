@@ -61,33 +61,33 @@ enum AstFlags {
     Verifying = 0x20;
 
     // Misc
-    HasGenerics = 0x40;
+    Generic = 0x40;
     Global = 0x80;
     Constant = 0x100;
     Returns = 0x200;
-    EnumValueDefined = 0x400;
+    Final = 0x400;
+    EnumValueDefined = 0x800;
 
     // Struct field refs
     IsEnum = 0x800;
-    ConstantStringLength = 0x1000;
-    RawConstantString = 0x2000;
+    ConstantStringLength = 0x2000;
+    RawConstantString = 0x4000;
 
     // ++ and --
-    Prefixed = 0x4000;
-    Positive = 0x8000;
+    Prefixed = 0x8000;
+    Positive = 0x10000;
 
     // Calls
-    InlineCall = 0x10000;
-    PassArrayToParams = 0x20000;
+    InlineCall = 0x20000;
+    PassArrayToParams = 0x40000;
 
     // Assembly
-    FindStagingInputRegister = 0x40000;
-    GetPointer = 0x80000;
-    Dereference = 0x100000;
-    Added = 0x200000;
+    FindStagingInputRegister = 0x80000;
+    GetPointer = 0x100000;
+    Dereference = 0x200000;
+    Added = 0x400000;
 
     // Type Definitions
-    IsGeneric = 0x4000000;
     Compound = 0x8000000;
 }
 
@@ -422,8 +422,6 @@ struct DeferAst : Ast {
 
 struct TypeDefinition : Ast {
     name: string;
-    is_generic: bool;
-    compound: bool;
     generic_index: int;
     type_index: int;
     generics: Array<TypeDefinition*>;

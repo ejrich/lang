@@ -434,7 +434,7 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
     // 1b. Handle multiple return values
     if enumerator.current.type == TokenType.Comma {
         return_type := create_ast<TypeDefinition>(function.return_type_definition, AstType.TypeDefinition);
-        return_type.compound = true;
+        return_type.flags = AstFlags.Compound;
         array_insert(&return_type.generics, function.return_type_definition, allocate, reallocate);
         function.return_type_definition = return_type;
 
@@ -560,7 +560,7 @@ FunctionAst* parse_function(TokenEnumerator* enumerator, Array<string> attribute
                     current_argument.type_definition = parse_type(enumerator, argument = true);
                     each generic, i in function.generics {
                         if search_for_generic(generic, i, current_argument.type_definition) {
-                            current_argument.flags |= AstFlags.HasGenerics;
+                            current_argument.flags |= AstFlags.Generic;
                         }
                     }
                 }
@@ -807,7 +807,7 @@ StructAst* parse_struct(TokenEnumerator* enumerator, Array<string> attributes) {
         each generic, i in struct_ast.generics {
             each field in struct_ast.fields {
                 if field.type_definition != null && search_for_generic(generic, i, field.type_definition) {
-                    field.flags |= AstFlags.HasGenerics;
+                    field.flags |= AstFlags.Generic;
                 }
             }
         }
@@ -1146,7 +1146,7 @@ UnionFieldAst* parse_union_field(TokenEnumerator* enumerator) {
 
 bool search_for_generic(string generic, int index, TypeDefinition* type) {
     if (type.name == generic) {
-        type.is_generic = true;
+        type.flags |= AstFlags.Generic;
         type.generic_index = index;
         return true;
     }
@@ -1418,77 +1418,118 @@ Ast* parse_condition_expression(TokenEnumerator* enumerator, Function* current_f
 
     // Handle any additional expressions before the operator
     while true {
-        if !move_next(enumerator) {
+        if !move_next(enumerator)
             return l_value;
-        }
 
         switch enumerator.current.type {
             case TokenType.OpenBrace;
                 return l_value;
-            case TokenType.Period; {
+            case TokenType.Period;
                 l_value = parse_struct_field_ref(enumerator, l_value, current_function);
-            }
             case TokenType.Increment;
-            case TokenType.Decrement; {
+                parse_change_by_one(enumerator, &l_value, enumerator.current, AstFlags.Positive);
+            case TokenType.Decrement;
                 parse_change_by_one(enumerator, &l_value, enumerator.current);
-            }
             default; break;
         }
     }
 
-    expression := create_ast<ExpressionAst>(first_token, enumerator.file_index, AstType.Expression);
-    expression.l_value = l_value;
+    expression: ExpressionAst*;
 
+    // Get the initial r-value
     token := enumerator.current;
     if token.type == TokenType.Number && token.value[0] == '-' {
-        expression.op = Operator.Subtract;
-
         // Get the constant for the initial r_value
         token.value = substring(token.value, 1, token.value.length - 1);
-        constant := parse_constant(token, enumerator.file_index);
 
-        // If an end token is next, set constant as r_value and return
+        expression = create_ast<ExpressionAst>(first_token, enumerator.file_index, AstType.Expression);
+        expression.op = Operator.Subtract;
+        expression.l_value = l_value;
+        expression.r_value = parse_constant(token, enumerator.file_index);
         move_next(enumerator);
-        token = enumerator.current;
-        if token.type == TokenType.OpenBrace {
-            expression.r_value = constant;
-            return expression;
-        }
-
-        // If next is an operator, then create a new expression and set constant as l-value, then get r-value
+    }
+    else {
         op := convert_operator(token);
-        if op != Operator.None {
-            move_next(enumerator);
-
-            sub_expression := create_ast<ExpressionAst>(enumerator, AstType.Expression);
-            sub_expression.l_value = constant;
-            sub_expression.op = op;
-            sub_expression.r_value = parse_condition_expression(enumerator, current_function);
-            expression.r_value = sub_expression;
-            return expression;
+        if op == Operator.None {
+            return l_value;
         }
 
-        return expression;
-    }
-
-    if token.type == TokenType.OpenBrace {
-        return l_value;
-    }
-
-    op := convert_operator(token);
-    if op != Operator.None
+        expression = create_ast<ExpressionAst>(first_token, enumerator.file_index, AstType.Expression);
         expression.op = op;
-    else
-        return expression;
+        expression.l_value = l_value;
 
-    // Parse r-value
-    if !move_next(enumerator) {
-        report_error("Expected r-value for expression", enumerator.file_index, enumerator.last);
-        return null;
+        move_next(enumerator);
+        r_value := parse_next_expression_unit(enumerator, current_function);
+        if r_value == null return null;
+
+        while true {
+            if !move_next(enumerator) {
+                expression.r_value = r_value;
+                expression.flags = AstFlags.Final;
+                return expression;
+            }
+
+            switch enumerator.current.type {
+                case TokenType.Period;
+                    r_value = parse_struct_field_ref(enumerator, r_value, current_function);
+                case TokenType.Increment;
+                    parse_change_by_one(enumerator, &r_value, enumerator.current, AstFlags.Positive);
+                case TokenType.Decrement;
+                    parse_change_by_one(enumerator, &r_value, enumerator.current);
+                default; break;
+            }
+        }
+
+        expression.r_value = r_value;
     }
 
-    expression.r_value = parse_condition_expression(enumerator, current_function);
-    return check_expression(enumerator, expression);
+    // Get any additional values following the r-value
+    token = enumerator.current;
+    while enumerator.remaining {
+        r_value: Ast*;
+        op: Operator;
+        if token.type == TokenType.Number && token.value[0] == '-' {
+            op = Operator.Subtract;
+            token.value = substring(token.value, 1, token.value.length - 1);
+            r_value = parse_constant(token, enumerator.file_index);
+            move_next(enumerator);
+        }
+        else {
+            op = convert_operator(token);
+            if op == Operator.None {
+                break;
+            }
+
+            move_next(enumerator);
+            token = enumerator.current;
+            r_value = parse_next_expression_unit(enumerator, current_function);
+            if r_value == null return null;
+        }
+
+        while true {
+            if !move_next(enumerator) {
+                expression = add_value_to_expression(op, r_value, expression, token, enumerator.file_index);
+                expression.flags = AstFlags.Final;
+                return expression;
+            }
+
+            switch enumerator.current.type {
+                case TokenType.Period;
+                    r_value = parse_struct_field_ref(enumerator, r_value, current_function);
+                case TokenType.Increment;
+                    parse_change_by_one(enumerator, &r_value, enumerator.current, AstFlags.Positive);
+                case TokenType.Decrement;
+                    parse_change_by_one(enumerator, &r_value, enumerator.current);
+                default; break;
+            }
+        }
+
+        expression = add_value_to_expression(op, r_value, expression, token, enumerator.file_index);
+        token = enumerator.current;
+    }
+
+    expression.flags = AstFlags.Final;
+    return expression;
 }
 
 DeclarationAst* parse_declaration(TokenEnumerator* enumerator, Function* current_function = null, bool global = false) {
@@ -1523,7 +1564,7 @@ DeclarationAst* parse_declaration(TokenEnumerator* enumerator, Function* current
         if current_function {
             each generic, i in current_function.generics {
                 if search_for_generic(generic, i, declaration.type_definition) {
-                    declaration.flags |= AstFlags.HasGenerics;
+                    declaration.flags |= AstFlags.Generic;
                 }
             }
         }
@@ -1725,13 +1766,12 @@ Ast* parse_expression(TokenEnumerator* enumerator, Function* current_function, P
             }
             case TokenType.Comma;
                 return parse_compound_expression(enumerator, current_function, l_value);
-            case TokenType.Period; {
+            case TokenType.Period;
                 l_value = parse_struct_field_ref(enumerator, l_value, current_function);
-            }
             case TokenType.Increment;
-            case TokenType.Decrement; {
+                parse_change_by_one(enumerator, &l_value, enumerator.current, AstFlags.Positive);
+            case TokenType.Decrement;
                 parse_change_by_one(enumerator, &l_value, enumerator.current);
-            }
             default; break;
         }
     }
@@ -1739,89 +1779,184 @@ Ast* parse_expression(TokenEnumerator* enumerator, Function* current_function, P
     expression := create_ast<ExpressionAst>(first_token, enumerator.file_index, AstType.Expression);
     expression.l_value = l_value;
 
+    // Get the initial r-value
     token := enumerator.current;
     if token.type == TokenType.Number && token.value[0] == '-' {
         expression.op = Operator.Subtract;
 
         // Get the constant for the initial r_value
         token.value = substring(token.value, 1, token.value.length - 1);
-        constant := parse_constant(token, enumerator.file_index);
-
-        // If an end token is next, set constant as r_value and return
+        expression.r_value = parse_constant(token, enumerator.file_index);
         move_next(enumerator);
-        token = enumerator.current;
-        if is_end_token(token.type, end_tokens) {
-            expression.r_value = constant;
-            return expression;
-        }
-
-        // If next is an operator, then create a new expression and set constant as l-value, then get r-value
-        op := convert_operator(token);
-        if op != Operator.None {
-            move_next(enumerator);
-
-            sub_expression := create_ast<ExpressionAst>(enumerator, AstType.Expression);
-            sub_expression.l_value = constant;
-            sub_expression.op = op;
-            sub_expression.r_value = parse_expression(enumerator, current_function, end_tokens);
-            expression.r_value = sub_expression;
-            return expression;
-        }
-
-        // Else, report an error
-        report_error("Unexpected token '%' when operator was expected", enumerator.file_index, token, token.value);
-        return null;
     }
-
-    if is_end_token(token.type, end_tokens) {
-        return l_value;
-    }
-
-    op := convert_operator(token);
-    if op != Operator.None
-        expression.op = op;
     else {
-        report_error("Unexpected token '%' when operator was expected", enumerator.file_index, token, token.value);
-        return null;
+        op := convert_operator(token);
+        if op == Operator.None {
+            report_error("Unexpected token '%' when operator was expected", enumerator.file_index, token, token.value);
+            return null;
+        }
+
+        move_next(enumerator);
+        expression.op = op;
+        if enumerator.current.type == TokenType.Equals {
+            _: bool;
+            return parse_assignment(enumerator, current_function, &_, expression);
+        }
+
+        r_value := parse_next_expression_unit(enumerator, current_function);
+        if r_value == null return null;
+
+        while true {
+            if !move_next(enumerator) || is_end_token(enumerator.current.type, end_tokens) {
+                expression.r_value = r_value;
+                expression.flags = AstFlags.Final;
+                return expression;
+            }
+
+            switch enumerator.current.type {
+                case TokenType.Comma; {
+                    expression.r_value = r_value;
+                    return parse_compound_expression(enumerator, current_function, expression);
+                }
+                case TokenType.Period;
+                    r_value = parse_struct_field_ref(enumerator, r_value, current_function);
+                case TokenType.Increment;
+                    parse_change_by_one(enumerator, &r_value, enumerator.current, AstFlags.Positive);
+                case TokenType.Decrement;
+                    parse_change_by_one(enumerator, &r_value, enumerator.current);
+                default; break;
+            }
+        }
+
+        expression.r_value = r_value;
     }
 
-    // Parse r-value
-    if !move_next(enumerator) {
-        report_error("Expected r-value for expression", enumerator.file_index, enumerator.last);
-        return null;
+    // Get any additional values following the r-value
+    token = enumerator.current;
+    while !is_end_token(token.type, end_tokens) {
+        r_value: Ast*;
+        op: Operator;
+        if token.type == TokenType.Number && token.value[0] == '-' {
+            op = Operator.Subtract;
+            token.value = substring(token.value, 1, token.value.length - 1);
+            r_value = parse_constant(token, enumerator.file_index);
+            move_next(enumerator);
+        }
+        else {
+            op = convert_operator(token);
+            if op == Operator.None {
+                report_error("Unexpected token '%' when operator was expected", enumerator.file_index, token, token.value);
+                return null;
+            }
+
+            move_next(enumerator);
+            token = enumerator.current;
+            r_value = parse_next_expression_unit(enumerator, current_function);
+            if r_value == null return null;
+        }
+
+        while true {
+            if !move_next(enumerator) || is_end_token(enumerator.current.type, end_tokens) {
+                expression = add_value_to_expression(op, r_value, expression, token, enumerator.file_index);
+                expression.flags = AstFlags.Final;
+                return expression;
+            }
+
+            switch enumerator.current.type {
+                case TokenType.Comma; {
+                    expression = add_value_to_expression(op, r_value, expression, token, enumerator.file_index);
+                    return parse_compound_expression(enumerator, current_function, expression);
+                }
+                case TokenType.Period;
+                    r_value = parse_struct_field_ref(enumerator, r_value, current_function);
+                case TokenType.Increment;
+                    parse_change_by_one(enumerator, &r_value, enumerator.current, AstFlags.Positive);
+                case TokenType.Decrement;
+                    parse_change_by_one(enumerator, &r_value, enumerator.current);
+                default; break;
+            }
+        }
+
+        expression = add_value_to_expression(op, r_value, expression, token, enumerator.file_index);
+        token = enumerator.current;
     }
 
-    if enumerator.current.type == TokenType.Equals {
-        _: bool;
-        return parse_assignment(enumerator, current_function, &_, expression);
-    }
-
-    expression.r_value = parse_expression(enumerator, current_function, end_tokens);
-    return check_expression(enumerator, expression);
+    expression.flags = AstFlags.Final;
+    return expression;
 }
 
-parse_change_by_one(TokenEnumerator* enumerator, Ast** l_value, Token token) {
+ExpressionAst* add_value_to_expression(Operator op, Ast* r_value, ExpressionAst* expression, Token token, int file_index) {
+    precedence := get_operator_precedence(op);
+    current := expression;
+    depth := 0;
+
+    while true {
+        if precedence <= get_operator_precedence(current.op) {
+            sub_expression := create_ast<ExpressionAst>(token, file_index, AstType.Expression);
+            sub_expression.op = op;
+            sub_expression.l_value = current;
+            sub_expression.r_value = r_value;
+
+            // Replace the top-level expression if necessary
+            if current == expression expression = sub_expression;
+            break;
+        }
+        else if r_value.ast_type != AstType.Expression || (r_value.flags & AstFlags.Final) == AstFlags.Final {
+            sub_expression := create_ast<ExpressionAst>(token, file_index, AstType.Expression);
+            sub_expression.op = op;
+            sub_expression.l_value = current.r_value;
+            sub_expression.r_value = r_value;
+            current.r_value = sub_expression;
+            break;
+        }
+        else current = cast(ExpressionAst*, r_value);
+    }
+
+    return expression;
+}
+
+int get_operator_precedence(Operator op) {
+    switch op {
+        // Boolean comparisons
+        case Operator.And;
+        case Operator.Or;
+        case Operator.BitwiseOr;
+        case Operator.BitwiseAnd;
+        case Operator.Xor;
+            return 0;
+        // Value comparisons
+        case Operator.Equality;
+        case Operator.NotEqual;
+        case Operator.GreaterThan;
+        case Operator.LessThan;
+        case Operator.GreaterThanEqual;
+        case Operator.LessThanEqual;
+            return 5;
+        // First order operators
+        case Operator.Add;
+        case Operator.Subtract;
+            return 10;
+        // Second order operators
+        case Operator.ShiftLeft;
+        case Operator.ShiftRight;
+        case Operator.RotateLeft;
+        case Operator.RotateRight;
+        case Operator.Multiply;
+        case Operator.Divide;
+        case Operator.Modulus;
+            return 20;
+    }
+
+    return 0;
+}
+
+parse_change_by_one(TokenEnumerator* enumerator, Ast** l_value, Token token, AstFlags flags = AstFlags.None) {
     // Create subexpression to hold the operation
     // This case would be `var b = 4 + a++`, where we have a value before the operator
     change_by_one := create_ast<ChangeByOneAst>(*l_value, AstType.ChangeByOne);
-    if token.type == TokenType.Increment change_by_one.flags |= AstFlags.Positive;
+    change_by_one.flags = flags;
     change_by_one.value = *l_value;
     *l_value = change_by_one;
-}
-
-Ast* check_expression(TokenEnumerator* enumerator, ExpressionAst* expression) {
-    if expression.r_value == null {
-        if expression.op != Operator.None {
-            report_error("Value required after operator", enumerator.file_index, enumerator.current);
-            return null;
-        }
-        return expression.l_value;
-    }
-
-    // if errors.length == 0
-    //     set_operator_precedence(expression);
-
-    return expression;
 }
 
 Ast* parse_compound_expression(TokenEnumerator* enumerator, Function* current_function, Ast* initial) {
@@ -2062,103 +2197,6 @@ Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_f
             report_error("Unexpected token '%' in expression", enumerator.file_index, token, token.value);
    }
    return null;
-}
-
-/*
-set_operator_precedence(ExpressionAst* expression) {
-    // 1. Set the initial operator precedence
-    operator_precedence := get_operator_precedence(expression.operators[0]);
-    i := 1;
-    while i < expression.operators.length {
-        // 2. Get the next operator
-        precedence := get_operator_precedence(expression.operators[i]);
-
-        // 3. Create subexpressions to enforce operator precedence if necessary
-        if precedence > operator_precedence {
-            end: int;
-            sub_expression := create_sub_expression(expression, precedence, i, &end);
-            expression.children[i] = sub_expression;
-            expression.children.RemoveRange(i + 1, end - i);
-            expression.operators.RemoveRange(i, end - i);
-
-            if (i >= expression.operators.Count) return;
-            operator_precedence = get_operator_precedence(expression.operators[--i]);
-        }
-        else
-            operator_precedence = precedence;
-
-        i++;
-    }
-}
-
-ExpressionAst* create_sub_expression(ExpressionAst* expression, int parent_precedence, int i, int* end) {
-    sub_expression := create_ast<ExpressionAst>(expression.children[i], AstType.Expression);
-
-    sub_expression.children.Add(expression.children[i]);
-    sub_expression.operators.Add(expression.operators[i]);
-    ++i;
-    while i < expression.operators.length
-    {
-        // 1. Get the next operator
-        precedence := get_operator_precedence(expression.operators[i]);
-
-        // 2. Create subexpressions to enforce operator precedence if necessary
-        if precedence > parent_precedence {
-            sub_expression.children.Add(create_sub_expression(expression, precedence, i, &i));
-            if i == expression.operators.length {
-                *end = i;
-                return sub_expression;
-            }
-
-            sub_expression.operators.Add(expression.operators[i]);
-        }
-        else if precedence < parent_precedence {
-            sub_expression.children.Add(expression.children[i]);
-            *end = i;
-            return sub_expression;
-        }
-        else {
-            sub_expression.children.Add(expression.children[i]);
-            sub_expression.operators.Add(expression.operators[i]);
-        }
-
-        i++;
-    }
-
-    sub_expression.children.Add(expression.children[expression.children.length - 1]);
-    *end = i;
-    return sub_expression;
-}
-*/
-
-int get_operator_precedence(Operator op) {
-    switch op {
-        // Boolean comparisons
-        case Operator.And;
-        case Operator.Or;
-        case Operator.BitwiseAnd;
-        case Operator.BitwiseOr;
-        case Operator.Xor;
-            return 0;
-        // Value comparisons
-        case Operator.Equality;
-        case Operator.NotEqual;
-        case Operator.GreaterThan;
-        case Operator.LessThan;
-        case Operator.GreaterThanEqual;
-        case Operator.LessThanEqual;
-            return 5;
-        // First order operators
-        case Operator.Add;
-        case Operator.Subtract;
-            return 10;
-        // Second order operators
-        case Operator.Multiply;
-        case Operator.Divide;
-        case Operator.Modulus;
-            return 20;
-    }
-    return 0;
 }
 
 CallAst* parse_call(TokenEnumerator* enumerator, Function* current_function, bool requiresSemicolon = false) {
@@ -2862,7 +2900,7 @@ OperatorOverloadAst* parse_operator_overload(TokenEnumerator* enumerator) {
                     current_argument.type_definition = parse_type(enumerator, argument = true);
                     each generic, i in overload.generics {
                         if search_for_generic(generic, i, current_argument.type_definition) {
-                            current_argument.flags |= AstFlags.HasGenerics;
+                            current_argument.flags |= AstFlags.Generic;
                         }
                     }
                     if overload.arguments.length == 0
@@ -2979,7 +3017,7 @@ InterfaceAst* parse_interface(TokenEnumerator* enumerator) {
     // 1b. Handle multiple return values
     if enumerator.current.type == TokenType.Comma {
         return_type := create_ast<TypeDefinition>(interface_ast.return_type_definition, AstType.TypeDefinition);
-        return_type.compound = true;
+        return_type.flags = AstFlags.Compound;
         array_insert(&return_type.generics, interface_ast.return_type_definition, allocate, reallocate);
         interface_ast.return_type_definition = return_type;
 
@@ -3510,7 +3548,7 @@ CastAst* parse_cast(TokenEnumerator* enumerator, Function* current_function) {
     if current_function {
         each generic, i in current_function.generics {
             if search_for_generic(generic, i, cast_ast.target_type_definition) {
-                cast_ast.flags |= AstFlags.HasGenerics;
+                cast_ast.flags |= AstFlags.Generic;
             }
         }
     }
