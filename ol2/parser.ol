@@ -55,11 +55,12 @@ add_module(string module, int fileIndex, Token token) {
         report_error("Undefined module '%'", fileIndex, token, module);
 }
 
-add_module(CompilerDirectiveAst* module) {
+bool add_module(CompilerDirectiveAst* module) {
     if file_exists(module.import.path)
-        queue_file_if_not_exists(module.import.path, module.import.path);
-    else
-        report_error("Undefined module '%'", module, module.import.name);
+        return queue_file_if_not_exists(module.import.path, module.import.path);
+
+    report_error("Undefined module '%'", module, module.import.name);
+    return false;
 }
 
 add_file(string file, string directory, int fileIndex, Token token) {
@@ -70,16 +71,17 @@ add_file(string file, string directory, int fileIndex, Token token) {
         report_error("File '%' does not exist", fileIndex, token, file);
 }
 
-add_file(CompilerDirectiveAst* import) {
+bool add_file(CompilerDirectiveAst* import) {
     if file_exists(import.import.path)
-        queue_file_if_not_exists(import.import.path, import.import.name);
-    else
-        report_error("File '%' does not exist", import, import.import.name);
+        return queue_file_if_not_exists(import.import.path, import.import.name);
+
+    report_error("File '%' does not exist", import, import.import.name);
+    return false;
 }
 
-queue_file_if_not_exists(string file, string name) {
+bool queue_file_if_not_exists(string file, string name) {
     each file_name in file_paths {
-        if file_name == file return;
+        if file_name == file return false;
     }
 
     file_index := file_paths.length;
@@ -91,6 +93,7 @@ queue_file_if_not_exists(string file, string name) {
     data.file = file;
     data.file_index = file_index;
     queue_work(parse_file, data);
+    return true;
 }
 
 struct ParseData {
@@ -266,13 +269,16 @@ parse_file(void* data) {
 
                 directive := parse_top_level_directive(&enumerator, true);
                 if directive {
-                    if directive.directive_type == DirectiveType.Library {
-                        add_library(directive);
+                    switch directive.directive_type {
+                        case DirectiveType.Library;
+                            add_library(directive);
+                        case DirectiveType.SystemLibrary;
+                            add_system_library(directive);
+                        case DirectiveType.ImportModule;
+                        case DirectiveType.ImportFile; {}
+                        default;
+                            add(&directives, directive);
                     }
-                    else if directive.directive_type == DirectiveType.SystemLibrary {
-                        add_system_library(directive);
-                    }
-                    else add(&directives, directive);
                 }
             }
             case TokenType.Operator; {
@@ -2394,6 +2400,7 @@ CompilerDirectiveAst* parse_top_level_directive(TokenEnumerator* enumerator, boo
             private_scopes[enumerator.file_index] = private_scope;
         }
         enumerator.private = true;
+        return null;
     }
     else {
         report_error("Unsupported top-level compiler directive '%'", enumerator.file_index, token, token.value);

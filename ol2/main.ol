@@ -269,6 +269,7 @@ struct Node<T> {
 
 add<T>(LinkedList<T>* list, T data) {
     node := new<Node<T>>();
+    node.data = data;
 
     if list.head {
         originalEnd := replace_end(list, node);
@@ -299,6 +300,20 @@ Node<T>* replace_end<T>(LinkedList<T>* list, Node<T>* node) {
     }
 
     return originalEnd;
+}
+
+remove_node<T>(LinkedList<T>* list, Node<T>* node, Node<T>* previous) {
+    if previous == null {
+        list.head = node.next;
+        if node.next == null replace_end(list, null);
+    }
+    else if node.next {
+        previous.next = node.next;
+    }
+    else {
+        replace_end(list, previous);
+        previous.next = null;
+    }
 }
 
 

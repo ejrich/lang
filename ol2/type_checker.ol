@@ -1,6 +1,7 @@
 #import math
 #import "ir_builder.ol"
 #import "polymorph.ol"
+#import "runner.ol"
 #import "type_table.ol"
 
 init_types() {
@@ -54,6 +55,55 @@ TypeAst* get_global_type(string name) {
 
 verify_compiler_directives() {
     // Verify compiler directives, collecting run directives to be handled afterwards
+    while directives.head {
+        node := directives.head;
+        parsing_additional: bool;
+
+        while node {
+            directive := node.data;
+            remove_node(&directives, node, null);
+
+            switch directive.directive_type {
+                case DirectiveType.Run; {} // TODO Figure out how to do this
+                case DirectiveType.If; {
+                    conditional := cast(ConditionalAst*, directive.value);
+                    constant: bool;
+                    if verify_condition(conditional.condition, null, &constant, true) {
+                        if !constant complete_work();
+
+                        condition := create_runnable_condition(directive.value);
+                        if execute_condition(condition, directive.value) {
+                            each ast in conditional.if_block.children {
+                                add_additional_ast(ast, &parsing_additional);
+                            }
+                        }
+                        else if conditional.else_block {
+                            each ast in conditional.else_block.children {
+                                add_additional_ast(ast, &parsing_additional);
+                            }
+                        }
+                    }
+                }
+                case DirectiveType.Assert; {
+                    constant: bool;
+                    if verify_condition(directive.value, null, &constant, true) {
+                        if !constant complete_work();
+
+                        condition := create_runnable_condition(directive.value);
+                        if !execute_condition(condition, directive.value)
+                            report_error("Assertion failed", directive.value);
+                    }
+                }
+                default; assert(false);
+            }
+
+            node = node.next;
+        }
+
+        if parsing_additional complete_work();
+    }
+
+
 
     // Evaluate run directives on separate thread to handle metaprogramming
 }
@@ -67,6 +117,54 @@ check_types() {
     // - Send message that code is ready to be generated, wait for processing
     // - Send message that exe is ready to be linked, wait for processing
     // - Send message that exe has been linked, wait for processing and send null
+}
+
+clear_ast_queue() {
+    // TODO Implement me
+}
+
+add_additional_ast(Ast* ast, bool* parsing_additional) {
+    switch ast.ast_type {
+        case AstType.Function;
+            add_function(cast(FunctionAst*, ast));
+        case AstType.OperatorOverload;
+            add_overload(cast(OperatorOverloadAst*, ast));
+        case AstType.Enum; {
+            enum_ast := cast(EnumAst*, ast);
+            if add_type(enum_ast) create_type_info(enum_ast);
+        }
+        case AstType.Struct; {
+            struct_ast := cast(StructAst*, ast);
+            if struct_ast.generics.length {
+                add_polymorphic_struct(struct_ast);
+                return;
+            }
+            add_type(struct_ast);
+        }
+        case AstType.Union;
+        case AstType.Interface;
+            add_type(cast(TypeAst*, ast));
+        case AstType.Declaration;
+            add_global_variable(cast(DeclarationAst*, ast));
+        case AstType.CompilerDirective; {
+            directive := cast(CompilerDirectiveAst*, ast);
+            switch directive.directive_type {
+                case DirectiveType.ImportModule;
+                    if add_module(directive) { *parsing_additional = true; }
+                case DirectiveType.ImportFile;
+                    if add_file(directive) { *parsing_additional = true; }
+                case DirectiveType.Library;
+                    add_library(directive);
+                case DirectiveType.SystemLibrary;
+                    add_system_library(directive);
+                default;
+                    add(&directives, directive);
+            }
+            return;
+        }
+    }
+
+    add(&asts, ast);
 }
 
 bool add_global_variable(DeclarationAst* declaration) {
@@ -671,6 +769,27 @@ verify_interface(InterfaceAst* interface_ast) {
     interface_ast.flags |= AstFlags.Verified;
 }
 
+bool verify_condition(Ast* ast, Function* function, bool* constant, bool will_run = false) {
+    type := verify_expression(ast, function, constant);
+
+    if will_run && !*constant clear_ast_queue();
+
+    if type {
+        switch type.type_kind {
+            case TypeKind.Boolean;
+            case TypeKind.Integer;
+            case TypeKind.Float;
+            case TypeKind.Pointer;
+            case TypeKind.Enum;
+                return errors.length == 0;
+        }
+
+        report_error("Expected condition to be bool, int, float, or pointer, but got '%'", ast, type.name);
+    }
+
+    return false;
+}
+
 TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope) {
     _: bool;
     return verify_expression(ast, function, scope, &_, &_);
@@ -701,6 +820,7 @@ TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_
 }
 
 TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_constant, bool* is_type, bool get_array_length = false, s32* array_length = null) {
+    // TODO Implement me
     return null;
 }
 
