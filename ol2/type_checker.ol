@@ -1106,8 +1106,6 @@ verify_constant_if_necessary(Ast* ast, TypeAst* type) {
             constant.type = type;
         }
     }
-
-    // TODO Implement me
 }
 
 bool type_equals(TypeAst* target, TypeAst* source, bool check_primitives = false) {

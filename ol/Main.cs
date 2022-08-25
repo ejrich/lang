@@ -74,7 +74,7 @@ public static class ol
                 case "--release":
                     BuildSettings.Release = true;
                     break;
-                case "--no-debug":
+                case "--noDebug":
                     BuildSettings.EmitDebug = false;
                     break;
                 case "-S":
