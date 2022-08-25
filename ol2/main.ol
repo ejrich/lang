@@ -13,6 +13,12 @@ emit_debug := true;
 path: string;
 executable_name: string;
 output_directory: string;
+input_variables: HashTable<string, InputVariable*>;
+
+struct InputVariable {
+    token: Token;
+    used: bool;
+}
 
 linker: LinkerType;
 output_type_table: OutputTypeTableConfiguration;
@@ -32,16 +38,23 @@ main() {
         else if arg == "-S" output_assembly = true;
         else if arg == "-V" parsing_variables = true;
         else if arg == "-noThreads" no_threads = true;
+        else if arg == "-noDebug" emit_debug = false;
         else {
-            if arg[0] == '-' {
+            if arg[0] == '-'
                 report_error_message("Unrecognized compiler flag '%'", arg);
-            }
             else if parsing_variables {
-                // TODO Implement me
+                initial_allocated_length := 5; #const
+                token_list: TokenList = { allocated_length = initial_allocated_length; }
+                token_list.tokens.data = allocate(initial_allocated_length * size_of(Token));
+                parse_tokens(arg, -1, &token_list);
+
+                if token_list.tokens.length != 3 || token_list.tokens[0].type != TokenType.Identifier || token_list.tokens[1].type != TokenType.Equals || (token_list.tokens[2].type != TokenType.Number && token_list.tokens[2].type != TokenType.Boolean)
+                    report_error_message("Malformed input variable '%', should be formatted like 'foo=true'", arg);
+                else if !add_input_variable(token_list.tokens[0].value, token_list.tokens[2])
+                    report_error_message("Multiple definitions for input variable '%'", arg);
             }
-            else if !string_is_empty(entrypoint) {
+            else if !string_is_empty(entrypoint)
                 report_error_message("Multiple program entrypoints defined '%'", arg);
-            }
             else {
                 if !file_exists(arg) || !ends_with(arg, ".ol") {
                     report_error_message("Entrypoint file does not exist or is not an .ol file '%'", arg);
@@ -88,6 +101,12 @@ main() {
     // Log statistics
     print("Front-end time: % seconds\nLLVM build time: % seconds\nLinking time: % seconds\n", get_time(start, front_end_time, freq), get_time(front_end_time, build_time, freq), get_time(build_time, link_time, freq));
     deallocate_arenas();
+}
+
+bool add_input_variable(string name, Token value) {
+    input_variable := new<InputVariable>();
+    input_variable.token = value;
+    return table_add(&input_variables, name, input_variable);
 }
 
 bool ends_with(string value, string ending) {
@@ -322,7 +341,7 @@ Array<T> allocate_array<T>(Array<T> source) {
 
 
 // Memory allocation
-T* new<T>() {
+T* new<T>() #inline {
     value: T;
     size := size_of(T);
     pointer: T* = allocate(size);

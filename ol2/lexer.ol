@@ -615,17 +615,18 @@ enum TokenFlags {
     HexNumber = 2;
 }
 
-#private
-
 struct TokenList {
     allocated_length: int;
     tokens: Array<Token>;
 }
 
+#private
+
 add_token(TokenList* token_list, Token token) {
     if token_list.tokens.length > token_list.allocated_length {
-        report_error_message("Whoops, out of memory, FIX ME!!!!!!!!");
-        return;
+        new_allocated_length := token_list.allocated_length + 20;
+        token_list.tokens.data = reallocate(token_list.tokens.data, token_list.allocated_length * size_of(Token), new_allocated_length * size_of(Token));
+        token_list.allocated_length = new_allocated_length;
     }
 
     token_list.tokens[token_list.tokens.length++] = token;
