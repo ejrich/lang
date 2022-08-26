@@ -1744,7 +1744,7 @@ public static class ProgramIRBuilder
                 }
                 if (structField.IsConstant)
                 {
-                    return GetConstantInteger(structField.ConstantValue);
+                    return GetConstantS64(structField.ConstantValue);
                 }
                 if (structField.ConstantStringLength)
                 {

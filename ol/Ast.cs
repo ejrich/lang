@@ -199,7 +199,7 @@ public class StructFieldRefAst : IAst
     public bool ConstantStringLength { get; set; }
     public bool RawConstantString { get; set; }
     public int ConstantIndex { get; set; }
-    public int ConstantValue { get; set; }
+    public long ConstantValue { get; set; }
     public bool[] Pointers { get; set; }
     public IType[] Types { get; set; }
     public int[] ValueIndices { get; set; }
@@ -231,7 +231,7 @@ public class EnumValueAst : IAst
     public uint Column { get; init; }
     public int Index { get; set; }
     public string Name { get; set; }
-    public int Value { get; set; }
+    public long Value { get; set; }
     public bool Defined { get; set; }
 }
 

@@ -148,7 +148,7 @@ struct UnionField {
 
 struct EnumValue {
     name: string;
-    value: int;
+    value: s64;
 }
 
 struct ArgumentType {

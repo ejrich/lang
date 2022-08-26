@@ -1062,7 +1062,7 @@ public static class Parser
         // 3. Iterate through fields
         var lowestAllowedValue = enumAst.BaseType.Signed ? -Math.Pow(2, 8 * enumAst.Size - 1) : 0;
         var largestAllowedValue = enumAst.BaseType.Signed ? Math.Pow(2, 8 * enumAst.Size - 1) - 1 : Math.Pow(2, 8 * enumAst.Size) - 1;
-        var largestValue = -1;
+        long largestValue = -1;
         var enumIndex = 0;
 
         EnumValueAst currentValue = null;
@@ -1186,7 +1186,7 @@ public static class Parser
                             {
                                 if (uint.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u32))
                                 {
-                                    currentValue.Value = (int)u32;
+                                    currentValue.Value = (long)u32;
                                     currentValue.Defined = true;
                                 }
                             }
@@ -1194,7 +1194,7 @@ public static class Parser
                             {
                                 if (ulong.TryParse(value, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var u64))
                                 {
-                                    currentValue.Value = (int)u64;
+                                    currentValue.Value = (long)u64;
                                     currentValue.Defined = true;
                                 }
                             }
