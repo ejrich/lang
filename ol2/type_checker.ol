@@ -178,7 +178,7 @@ add_function(FunctionAst* function) {
         }
     }
     else {
-        if function.function_flags & FunctionFlags.Extern {
+        if function.flags & AstFlags.Extern {
             if function.flags & AstFlags.Private {
                 report_error("Extern function '%' must be public to avoid linking failures", function, function.name);
             }

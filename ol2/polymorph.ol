@@ -31,12 +31,12 @@ StructAst* create_polymorphed_struct(StructAst* base, string name, TypeKind type
 
 FunctionAst* create_polymorphed_function(FunctionAst* base, string name, bool private_generic_types, Array<TypeAst*> generic_types) {
     function := copy_ast(base);
-    function.function_flags = base.function_flags;
+    function.flags = base.flags;
     function.name = name;
     if private_generic_types || (base.flags & AstFlags.Private) == AstFlags.Private
         function.flags |= AstFlags.Private;
 
-    if function.function_flags & FunctionFlags.ReturnTypeHasGenerics
+    if function.flags & AstFlags.ReturnTypeHasGenerics
         function.return_type_definition = copy_type(base.return_type_definition, generic_types);
     else
         function.return_type = base.return_type;
@@ -60,9 +60,9 @@ OperatorOverloadAst* create_polymorphed_operator_overload(OperatorOverloadAst* b
     overload.type = copy_type(base.type, generic_types);
     overload.name = format_string("operator % %", allocate, print_operator(overload.op), print_type_definition(overload.type));
     overload.function_index = get_function_index();
-    overload.function_flags = base.function_flags;
+    overload.flags = base.flags;
 
-    if overload.function_flags & FunctionFlags.ReturnTypeHasGenerics
+    if overload.flags & AstFlags.ReturnTypeHasGenerics
         overload.return_type_definition = copy_type(base.return_type_definition, generic_types);
     else
         overload.return_type = base.return_type;

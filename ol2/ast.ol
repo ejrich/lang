@@ -49,7 +49,7 @@ enum AstType {
 }
 
 [flags]
-enum AstFlags {
+enum AstFlags : u64 {
     None;
 
     // Relating to types
@@ -59,15 +59,15 @@ enum AstFlags {
     Private   = 0x8;
     Verified  = 0x10;
     Verifying = 0x20;
+    Queued    = 0x40;
 
     // Misc
-    Generic          = 0x40;
-    Global           = 0x80;
-    Constant         = 0x100;
-    Returns          = 0x200;
-    Final            = 0x400;
-    Added            = 0x800;
-    EnumValueDefined = 0x1000;
+    Generic  = 0x80;
+    Global   = 0x100;
+    Constant = 0x200;
+    Returns  = 0x400;
+    Final    = 0x800;
+    Added    = 0x1000;
 
     // Struct field refs
     IsEnum               = 0x2000;
@@ -79,8 +79,8 @@ enum AstFlags {
     Positive = 0x20000;
 
     // Calls
-    InlineCall        = 0x40000;
-    PassArrayToParams = 0x80000;
+    Inline            = 0x40000;
+    PassArrayToParams = 0x800000;
 
     // Assembly
     FindStagingInputRegister = 0x100000;
@@ -88,7 +88,18 @@ enum AstFlags {
     Dereference              = 0x400000;
 
     // Type Definitions
-    Compound = 0x10000000;
+    Compound = 0x800000;
+
+    // Functions
+    Extern                = 0x1000000;
+    Compiler              = 0x2000000;
+    Syscall               = 0x4000000;
+    Varargs               = 0x8000000;
+    Params                = 0x10000000;
+    CallsCompiler         = 0x20000000;
+    ReturnTypeHasGenerics = 0x40000000;
+    PrintIR               = 0x80000000;
+    PassCallLocation      = 0x100000000;
 }
 
 struct Ast {
@@ -117,29 +128,8 @@ struct InterfaceAst : TypeAst {
 struct Function : InterfaceAst {
     constant_count: int;
     function_index: int;
-    function_flags: FunctionFlags;
     generics: Array<string>;
     body: ScopeAst*;
-}
-
-[flags]
-enum FunctionFlags {
-    Extern                = 0x1;
-    Compiler              = 0x2;
-    Syscall               = 0x4;
-    Varargs               = 0x8;
-    Params                = 0x10;
-    DefinitionVerified    = 0x20;
-    Verified              = 0x40;
-    HasDirectives         = 0x80;
-    CallsCompiler         = 0x100;
-    ReturnVoidAtEnd       = 0x200;
-    ReturnTypeHasGenerics = 0x400;
-    PrintIR               = 0x800;
-    ExternInitted         = 0x1000;
-    Queued                = 0x2000;
-    PassCallLocation      = 0x4000;
-    Inline                = 0x8000;
 }
 
 struct Values : Ast {
@@ -214,7 +204,7 @@ struct EnumAst : TypeAst {
 
 struct EnumValueAst : Ast {
     index: int;
-    value: int;
+    value: s64;
     name: string;
 }
 

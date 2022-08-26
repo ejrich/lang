@@ -3187,8 +3187,8 @@ public static class TypeChecker
         if (structType is ArrayType arrayType && fieldName == "length")
         {
             structField.IsConstant = true;
-            structField.ConstantValue = (int)arrayType.Length;
-            return TypeTable.S32Type;
+            structField.ConstantValue = arrayType.Length;
+            return TypeTable.S64Type;
         }
 
         structField.Types[fieldIndex] = structType;

@@ -190,7 +190,7 @@ public unsafe static class TypeTable
     public struct EnumValue
     {
         [FieldOffset(0)] public String Name;
-        [FieldOffset(16)] public int Value;
+        [FieldOffset(16)] public long Value;
     }
 
     private const int ArgumentTypeSize = 24;
