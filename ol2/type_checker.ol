@@ -821,6 +821,69 @@ TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_
 
 TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_constant, bool* is_type, bool get_array_length = false, s32* array_length = null) {
     // TODO Implement me
+    if ast == null return null;
+
+    switch ast.ast_type {
+        case AstType.StructFieldRef; {
+        }
+        case AstType.Constant; {
+            *is_constant = true;
+            constant := cast(ConstantAst*, ast);
+            if get_array_length && constant.type != null && constant.type.type_kind == TypeKind.Integer {
+                *array_length = constant.value.unsigned_integer;
+            }
+            else if constant.type == null && constant.string.data != null
+                constant.type = string_type;
+
+            return constant.type;
+        }
+        case AstType.Null; {
+            *is_constant = true;
+            return null;
+        }
+        case AstType.Identifier; {
+        }
+        case AstType.Expression; {
+        }
+        case AstType.CompoundExpression; {
+        }
+        case AstType.ChangeByOne; {
+        }
+        case AstType.Unary; {
+        }
+        case AstType.Call; {
+        }
+        case AstType.Index; {
+        }
+        case AstType.Cast; {
+            cast_ast := cast(CastAst*, ast);
+            target_type := verify_type(cast_ast.target_type_definition);
+            value_type := verify_expression(cast_ast.value, function, scope);
+
+            if target_type == null {
+                report_error("Unable to cast to invalid type '%'", cast_ast, print_type_definition(cast_ast.target_type_definition));
+                return null;
+            }
+            else if value_type == null
+                return target_type;
+
+            switch target_type.type_kind {
+                case TypeKind.Integer;
+                case TypeKind.Float;
+                case TypeKind.Pointer;
+                case TypeKind.Enum; {}
+                default;
+                    if value_type report_error("Unable to cast type '%' to '%'", cast_ast, value_type.name, target_type.name);
+            }
+
+            cast_ast.target_type = target_type;
+            return target_type;
+        }
+        case AstType.TypeDefinition; {
+        }
+        default; report_error("Invalid expression", ast);
+    }
+
     return null;
 }
 
