@@ -790,6 +790,11 @@ bool verify_condition(Ast* ast, Function* function, bool* constant, bool will_ru
     return false;
 }
 
+TypeAst* get_reference(Ast* ast, Function* function, Scope* scope, bool* has_pointer, bool from_unary_reference = false) {
+    // TODO Implement me
+    return null;
+}
+
 TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope) {
     _: bool;
     return verify_expression(ast, function, scope, &_, &_);
@@ -846,10 +851,145 @@ TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_
         case AstType.Expression; {
         }
         case AstType.CompoundExpression; {
+            compound_expression := cast(CompoundExpressionAst*, ast);
+            types: Array<TypeAst*>[compound_expression.children.length];
+            type_names: Array<string>[types.length];
+
+            error: bool;
+            flags := AstFlags.None;
+            size: u32;
+            name_length := -2;
+            each expr, i in compound_expression.children {
+                type := verify_expression(expr, function, scope);
+                if type == null
+                    error = true;
+                else {
+                    size += type.size;
+                    types[i] = type;
+                    type_names[i] = type.name;
+                    name_length += type.name.length + 2;
+                    if type.flags & AstFlags.Private
+                        flags = AstFlags.Private;
+                }
+            }
+
+            if error return null;
+
+            name_data: Array<u8>[name_length];
+            name: string = { length = name_length; data = name_data.data; }
+
+            i, index := 0;
+            while i < types.length - 1 {
+                type_name := type_names[i];
+                memory_copy(name.data + index, type_name.data, type_name.length);
+                index += type_name.length;
+                name[index++] = ',';
+                name[index++] = ' ';
+            }
+            type_name := type_names[i];
+            memory_copy(name.data + index, type_name.data, type_name.length);
+
+            compound_type := get_type(name, compound_expression.file_index);
+            if compound_type return compound_type;
+
+            return create_compound_type(types, name, size, flags, compound_expression.file_index);
         }
         case AstType.ChangeByOne; {
+            change_by_one := cast(ChangeByOneAst*, ast);
+            switch change_by_one.value.ast_type {
+                case AstType.Identifier;
+                case AstType.StructFieldRef;
+                case AstType.Index; {
+                    _: bool;
+                    value_type := get_reference(change_by_one.value, function, scope, &_);
+                    if value_type == null return null;
+
+                    switch value_type.type_kind {
+                        case TypeKind.Integer;
+                        case TypeKind.Float; {
+                            change_by_one.type = value_type;
+                            return value_type;
+                        }
+                    }
+
+                    if change_by_one.flags & AstFlags.Positive
+                        report_error("Expected to increment int or float, but got type '%'", change_by_one, value_type.name);
+                    else
+                        report_error("Expected to decrement int or float, but got type '%'", change_by_one, value_type.name);
+                    return null;
+                }
+            }
+
+            if change_by_one.flags & AstFlags.Positive
+                report_error("Expected to increment variable", change_by_one);
+            else
+                report_error("Expected to decrement variable", change_by_one);
+            return null;
         }
         case AstType.Unary; {
+            unary := cast(UnaryAst*, ast);
+
+            if unary.op == UnaryOperator.Reference {
+                has_pointer: bool;
+                reference_type := get_reference(unary.value, function, scope, &has_pointer, true);
+
+                if reference_type == null return null;
+                if !has_pointer {
+                    report_error("Unable to get reference of unary value", unary.value);
+                    return null;
+                }
+
+                pointer_type: TypeAst*;
+                if reference_type.type_kind == TypeKind.CArray {
+                    array_type := cast(ArrayType*, reference_type);
+                    name := concat_temp(array_type.element_type.name, "*");
+                    pointer_type = get_type(name, unary.file_index);
+                    if pointer_type == null
+                        pointer_type = create_pointer_type(name, array_type.element_type);
+                    unary.type = pointer_type;
+                }
+                else {
+                    name := concat_temp(reference_type.name, "*");
+                    pointer_type = get_type(name, unary.file_index);
+                    if pointer_type == null
+                        pointer_type = create_pointer_type(name, reference_type);
+                    unary.type = pointer_type;
+                }
+
+                return pointer_type;
+            }
+
+            value_type := verify_expression(unary.value, function, scope);
+            if value_type == null return null;
+
+            switch unary.op {
+                case UnaryOperator.Dereference; {
+                    if value_type.type_kind == TypeKind.Pointer {
+                        pointer_type := cast(PointerType*, value_type);
+                        unary.type = pointer_type.pointed_type;
+                        return pointer_type.pointed_type;
+                    }
+
+                    report_error("Cannot dereference type '%'", unary.value, value_type.name);
+                    return null;
+                }
+                case UnaryOperator.Negate; {
+                    switch value_type.type_kind {
+                        case TypeKind.Integer;
+                        case TypeKind.Float;
+                            return value_type;
+                    }
+
+                    report_error("Unable to negate type '%'", unary.value, value_type.name);
+                    return null;
+                }
+                case UnaryOperator.Not; {
+                    if value_type.type_kind == TypeKind.Boolean return value_type;
+
+                    report_error("Expected type 'bool', but got type '%'", unary.value, value_type.name);
+                    return null;
+                }
+            }
         }
         case AstType.Call; {
         }
@@ -880,6 +1020,13 @@ TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_
             return target_type;
         }
         case AstType.TypeDefinition; {
+            type_def := cast(TypeDefinition*, ast);
+            type := verify_type(type_def);
+
+            if type == null return null;
+            *is_constant = true;
+            *is_type = true;
+            return type;
         }
         default; report_error("Invalid expression", ast);
     }
