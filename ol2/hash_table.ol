@@ -170,20 +170,18 @@ fnv_offset: u32 = 0x811C9DC5; #const
 fnv_prime : u32 = 0x01000193; #const
 
 u32 hash<T>(T value) {
+    hash: u32;
     #if T == string {
-        hash := fnv_offset;
+        hash = fnv_offset;
 
         each i in 0..value.length - 1 {
             hash ^= value[i];
             hash *= fnv_prime;
         }
-
-        return hash;
     }
     else #if type_of(T).type_kind == TypeKind.Integer {
         return value;
     }
-    else {
-        return 0;
-    }
+
+    return hash;
 }
