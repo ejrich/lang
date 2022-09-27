@@ -183,8 +183,8 @@ add_function(FunctionAst* function) {
                 report_error("Extern function '%' must be public to avoid linking failures", function, function.name);
             }
             else {
-                found, _ := get_existing_function(function.name, function.file_index);
-                if found report_error("Multiple definitions of extern function '%'", function, function.name);
+                found_function := get_existing_function(function.name, function.file_index);
+                if found_function report_error("Multiple definitions of extern function '%'", function, function.name);
             }
         }
         else if overload_exists_for_function(function) {
@@ -418,6 +418,22 @@ bool add_identifier(string name, Ast* ast, int file_index) {
     }
 
     return true;
+}
+
+Ast* get_scope_identifier(Scope* scope, string name) #inline {
+    _: bool;
+    return get_scope_identifier(scope, name, &_);
+}
+
+Ast* get_scope_identifier(Scope* scope, string name, bool* global) {
+    while scope {
+        found, ast := table_get(scope.identifiers, name);
+        if found {
+            *global = scope.parent == null;
+            return ast;
+        }
+    }
+    return null;
 }
 
 TypeAst* get_type(string name, int file_index) {
@@ -769,6 +785,11 @@ verify_interface(InterfaceAst* interface_ast) {
     interface_ast.flags |= AstFlags.Verified;
 }
 
+bool verify_function_definition(FunctionAst* function) {
+    // TODO Implement me
+    return true;
+}
+
 bool verify_condition(Ast* ast, Function* function, bool* constant, bool will_run = false) {
     type := verify_expression(ast, function, constant);
 
@@ -795,31 +816,46 @@ TypeAst* get_reference(Ast* ast, Function* function, Scope* scope, bool* has_poi
     return null;
 }
 
-TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope) {
+verify_function_if_necessary(FunctionAst* function, Function* current_function) {
+    if function.flags & AstFlags.Verified return;
+
+    if function.flags & AstFlags.Extern {
+        verify_function_definition(function);
+    }
+    else if function != current_function && (function.flags & AstFlags.Queued) == AstFlags.Queued {
+        if (function.flags & AstFlags.Verifying) != AstFlags.Verifying
+            verify_function_definition(function);
+
+        function.flags |= AstFlags.Queued;
+        // TODO Enqueue ast complete queue
+    }
+}
+
+TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope) #inline {
     _: bool;
     return verify_expression(ast, function, scope, &_, &_);
 }
 
-TypeAst* verify_expression(Ast* ast, Function* function, bool* is_constant) {
+TypeAst* verify_expression(Ast* ast, Function* function, bool* is_constant) #inline {
     _: bool;
     scope := private_scopes[ast.file_index];
     if scope == null scope = &global_scope;
     return verify_expression(ast, function, scope, is_constant, &_);
 }
 
-TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_constant) {
+TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_constant) #inline {
     _: bool;
     return verify_expression(ast, function, scope, is_constant, &_);
 }
 
-TypeAst* verify_expression(Ast* ast, Function* function, bool* is_constant, s32* array_length) {
+TypeAst* verify_expression(Ast* ast, Function* function, bool* is_constant, s32* array_length) #inline {
     _: bool;
     scope := private_scopes[ast.file_index];
     if scope == null scope = &global_scope;
     return verify_expression(ast, function, scope, is_constant, &_, true, array_length);
 }
 
-TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_constant, s32* array_length) {
+TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_constant, s32* array_length) #inline {
     _: bool;
     return verify_expression(ast, function, scope, is_constant, &_, true, array_length);
 }
@@ -847,6 +883,32 @@ TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_
             return null;
         }
         case AstType.Identifier; {
+            identifier_ast := cast(IdentifierAst*, ast);
+            if identifier_ast.baked_type {
+                *is_type = true;
+                return identifier_ast.baked_type;
+            }
+
+            identifier := get_scope_identifier(scope, identifier_ast.name);
+            if identifier == null {
+                function_count: int;
+                found_function := get_existing_function(identifier_ast.name, identifier_ast.file_index, &function_count);
+                if found_function {
+                    if function_count > 1 {
+                        report_error("Cannot determine type for function '%' that has multiple overloads", identifier_ast, identifier_ast.name);
+                        return null;
+                    }
+
+                    verify_function_if_necessary(found_function, function);
+                    identifier_ast.function_type_index = found_function.type_index;
+                    *is_constant = true;
+                    return found_function;
+                }
+
+                report_error("Identifier '%' not defined", identifier_ast, identifier_ast.name);
+                return null;
+            }
+
         }
         case AstType.Expression; {
         }
@@ -1504,7 +1566,7 @@ bool type_equals(TypeAst* target, TypeAst* source, bool check_primitives = false
     return false;
 }
 
-bool, FunctionAst* get_existing_function(string name, int file_index, int* count = null) {
+FunctionAst* get_existing_function(string name, int file_index, int* count = null) {
     private_scope := private_scopes[file_index];
 
     if private_scope {
@@ -1520,14 +1582,14 @@ bool, FunctionAst* get_existing_function(string name, int file_index, int* count
             }
 
             if count { *count = function_count; }
-            return true, function;
+            return function;
         }
 
         found, functions = table_get(global_scope.functions, name);
 
         if found {
             if count { *count = functions.length; }
-            return true, functions.data[0];
+            return functions.data[0];
         }
     }
     else {
@@ -1535,11 +1597,11 @@ bool, FunctionAst* get_existing_function(string name, int file_index, int* count
 
         if found {
             if count { *count = functions.length; }
-            return true, functions.data[0];
+            return functions.data[0];
         }
     }
 
-    return false, null;
+    return null;
 }
 
 TypeAst* verify_array(TypeDefinition* type, int depth, bool* is_generic) {
