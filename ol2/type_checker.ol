@@ -472,6 +472,10 @@ StructAst* get_polymorphic_struct(string name, int file_index) {
     return type;
 }
 
+verify_global_variable(DeclarationAst* declaration) {
+    // TODO Implement me
+}
+
 verify_struct(StructAst* struct_ast) {
     struct_ast.flags |= AstFlags.Verifying;
     field_names: HashSet<string>;
@@ -866,6 +870,7 @@ TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_
 
     switch ast.ast_type {
         case AstType.StructFieldRef; {
+            // TODO
         }
         case AstType.Constant; {
             *is_constant = true;
@@ -909,8 +914,102 @@ TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_
                 return null;
             }
 
+            switch identifier.ast_type {
+                case AstType.Declaration; {
+                    declaration := cast(DeclarationAst*, identifier);
+                    if (declaration.flags & AstFlags.Global) == AstFlags.Global && (declaration.flags & AstFlags.Verified) != AstFlags.Verified
+                        verify_global_variable(declaration);
+
+                    *is_constant = (declaration.flags & AstFlags.Constant) == AstFlags.Constant;
+                    if declaration.type == null return null;
+
+                    if get_array_length && *is_constant && declaration.type.type_kind == TypeKind.Integer && declaration.value != null && declaration.value.ast_type == AstType.Constant {
+                        constant := cast(ConstantAst*, declaration.value);
+                        *array_length = constant.value.integer;
+                    }
+                    return declaration.type;
+                }
+                case AstType.Variable; {
+                    variable := cast(VariableAst*, identifier);
+                    return variable.type;
+                }
+                case AstType.Struct; {
+                    struct_ast := cast(StructAst*, identifier);
+                    if struct_ast.generics.length {
+                        report_error("Cannot reference polymorphic type '%' without specifying generics", identifier_ast, struct_ast.name);
+                        return null;
+                    }
+                    else if struct_ast.flags & AstFlags.Verified
+                        verify_struct(struct_ast);
+
+                    *is_constant = true;
+                    *is_type = true;
+                    identifier_ast.type_index = struct_ast.type_index;
+                    return struct_ast;
+                }
+                case AstType.Union; {
+                    union_ast := cast(UnionAst*, identifier);
+                    if union_ast.flags & AstFlags.Verified
+                        verify_union(union_ast);
+
+                    *is_constant = true;
+                    *is_type = true;
+                    identifier_ast.type_index = union_ast.type_index;
+                    return union_ast;
+                }
+                case AstType.Interface; {
+                    interface_ast := cast(InterfaceAst*, identifier);
+                    if interface_ast.flags & AstFlags.Verified
+                        verify_interface(interface_ast);
+
+                    *is_constant = true;
+                    *is_type = true;
+                    identifier_ast.type_index = interface_ast.type_index;
+                    return interface_ast;
+                }
+            }
+
+            if identifier.flags & AstFlags.IsType {
+                type := cast(TypeAst*, identifier);
+                *is_constant = true;
+                *is_type = true;
+                identifier_ast.type_index = type.type_index;
+                return type;
+            }
         }
         case AstType.Expression; {
+            expression := cast(ExpressionAst*, ast);
+            l_is_type, r_is_type, l_is_constant, r_is_constant: bool;
+            l_type := verify_expression(expression.l_value, function, scope, &l_is_constant, &l_is_type);
+            if l_type == null return null;
+
+            op := expression.op;
+            if expression.r_value.ast_type == AstType.Null {
+                if (l_type.type_kind != TypeKind.Pointer && l_type.type_kind != TypeKind.Interface) || (op != Operator.Equality && op != Operator.Equality) {
+                    report_error("Operator % not applicable to types '%' and null", expression.r_value, print_operator(op), l_type.name);
+                    return null;
+                }
+
+                null_ast := cast(NullAst*, expression.r_value);
+                null_ast.target_type = l_type;
+                expression.type = &bool_type;
+                return &bool_type;
+            }
+
+            r_type := verify_expression(expression.l_value, function, scope, &r_is_constant, &r_is_type);
+            if r_type == null return null;
+
+            if l_is_type && r_is_type {
+                if op != Operator.Equality && op != Operator.Equality {
+                    report_error("Operator % not applicable when comparing types", expression, print_operator(op));
+                    return null;
+                }
+
+                expression.type = &bool_type;
+                return &bool_type;
+            }
+
+            // TODO
         }
         case AstType.CompoundExpression; {
             compound_expression := cast(CompoundExpressionAst*, ast);
@@ -1054,8 +1153,10 @@ TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_
             }
         }
         case AstType.Call; {
+            // TODO
         }
         case AstType.Index; {
+            // TODO
         }
         case AstType.Cast; {
             cast_ast := cast(CastAst*, ast);
