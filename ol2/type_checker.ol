@@ -1009,7 +1009,102 @@ TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_
                 return &bool_type;
             }
 
-            // TODO
+            operator_not_applicable := "Operator % not applicable to types '%' and '%'"; #const
+            l_type_kind := l_type.type_kind;
+            r_type_kind := r_type.type_kind;
+            if (l_type_kind == TypeKind.Struct && r_type_kind == TypeKind.Struct) || (l_type_kind == TypeKind.String && r_type_kind == TypeKind.String) {
+                if type_equals(l_type, r_type, true) {
+                    overload := verify_operator_overload_call(cast(StructAst*, l_type), op, function, expression, scope);
+                    if overload == null return null;
+
+                    expression.overload = overload;
+                    expression.type = overload.return_type;
+                    return overload.return_type;
+                }
+
+                report_error(operator_not_applicable, expression.r_value, print_operator(op), l_type.name, r_type.name);
+                return null;
+            }
+
+            switch op {
+                // Both need to be bool and returns bool
+                case Operator.And;
+                case Operator.Or; {
+                    if l_type_kind == TypeKind.Boolean && r_type_kind == TypeKind.Boolean {
+                        expression.type = l_type;
+                        return l_type;
+                    }
+
+                    report_error(operator_not_applicable, expression, print_operator(op), l_type.name, r_type.name);
+                    return null;
+                }
+                // Requires same types and returns bool
+                case Operator.Equality;
+                case Operator.NotEqual;
+                case Operator.GreaterThan;
+                case Operator.LessThan;
+                case Operator.GreaterThanEqual;
+                case Operator.LessThanEqual; {
+                    if (l_type_kind == TypeKind.Boolean && r_type_kind == TypeKind.Boolean) || (l_type_kind == TypeKind.Type && r_type_kind == TypeKind.Type) || (l_type_kind == TypeKind.Enum && r_type_kind == TypeKind.Enum) {
+                        if (op != Operator.Equality && op != Operator.NotEqual) || !type_equals(l_type, r_type) {
+                            report_error(operator_not_applicable, expression, print_operator(op), l_type.name, r_type.name);
+                            return null;
+                        }
+                    }
+                    else if !(((l_type_kind == TypeKind.Integer || l_type_kind == TypeKind.Float) && (r_type_kind == TypeKind.Integer || r_type_kind == TypeKind.Float)) || (l_type_kind == TypeKind.Pointer && r_type_kind == TypeKind.Pointer)) {
+                        report_error(operator_not_applicable, expression, print_operator(op), l_type.name, r_type.name);
+                        return null;
+                    }
+                    expression.type = &bool_type;
+                    return &bool_type;
+                }
+                // Requires same types and returns more precise type
+                case Operator.Add;
+                case Operator.Subtract;
+                case Operator.Multiply;
+                case Operator.Divide; {
+                    // TODO
+                }
+                case Operator.Modulus; {
+                    if l_type_kind == TypeKind.Integer && r_type_kind == TypeKind.Integer {
+                        expression.type = get_next_integer_type(l_type, r_type);
+                        return expression.type;
+                    }
+
+                    report_error(operator_not_applicable, expression, print_operator(op), l_type.name, r_type.name);
+                    return null;
+                }
+                // Requires both integer or bool types and returns more same type
+                case Operator.BitwiseAnd;
+                case Operator.BitwiseOr;
+                case Operator.Xor; {
+                    if l_type_kind == TypeKind.Integer && r_type_kind == TypeKind.Integer {
+                        expression.type = get_next_integer_type(l_type, r_type);
+                    }
+                    else if l_type_kind == TypeKind.Enum && r_type_kind == TypeKind.Enum {
+                        if l_type != r_type {
+                            report_error(operator_not_applicable, expression, print_operator(op), l_type.name, r_type.name);
+                            return null;
+                        }
+                        expression.type = l_type;
+                    }
+                    else if l_type_kind == TypeKind.Boolean && r_type_kind == TypeKind.Boolean {
+                        expression.type = l_type;
+                    }
+                    else {
+                        report_error(operator_not_applicable, expression, print_operator(op), l_type.name, r_type.name);
+                        return null;
+                    }
+                    return expression.type;
+                }
+                case Operator.ShiftLeft;
+                case Operator.ShiftRight;
+                case Operator.RotateLeft;
+                case Operator.RotateRight; {
+                    // TODO
+                }
+                default; assert(false, "Invalid operator");
+            }
         }
         case AstType.CompoundExpression; {
             compound_expression := cast(CompoundExpressionAst*, ast);
@@ -1194,6 +1289,44 @@ TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_
         default; report_error("Invalid expression", ast);
     }
 
+    return null;
+}
+
+TypeAst* get_next_integer_type(TypeAst* l_type, TypeAst* r_type) {
+    if l_type == r_type return l_type;
+
+    size := l_type.size;
+    if r_type.size > size size = r_type.size;
+
+    if (l_type.flags | r_type.flags) & AstFlags.Signed {
+        switch size {
+            case 1; return &s8_type;
+            case 2; return &s16_type;
+            case 8; return &s64_type;
+            default; return &s32_type;
+        }
+    }
+
+    switch size {
+        case 1; return &u8_type;
+        case 2; return &u16_type;
+        case 8; return &u64_type;
+    }
+    return &u32_type;
+}
+
+TypeAst* verify_call() {
+    // TODO
+    return null;
+}
+
+TypeAst* verify_index() {
+    // TODO
+    return null;
+}
+
+OperatorOverloadAst* verify_operator_overload_call(StructAst* type, Operator op, Function* function, Ast* ast, Scope* scope) {
+    // TODO
     return null;
 }
 
