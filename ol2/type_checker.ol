@@ -1063,7 +1063,47 @@ TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_
                 case Operator.Subtract;
                 case Operator.Multiply;
                 case Operator.Divide; {
-                    // TODO
+                    if (l_type_kind == TypeKind.Pointer && r_type_kind == TypeKind.Integer) || (l_type_kind == TypeKind.Integer && r_type_kind == TypeKind.Pointer) {
+                        if op == Operator.Add || op == Operator.Subtract {
+                            if r_type_kind == TypeKind.Pointer {
+                                expression.type = r_type;
+                                return r_type;
+                            }
+
+                            expression.type = l_type;
+                            return l_type;
+                        }
+
+                        report_error(operator_not_applicable, expression, print_operator(op), l_type.name, r_type.name);
+                        return null;
+                    }
+                    else if (l_type_kind == TypeKind.Integer || l_type_kind == TypeKind.Float) && (r_type_kind == TypeKind.Integer || r_type_kind == TypeKind.Float) {
+                        if l_type == r_type {
+                            expression.type = l_type;
+                            return l_type;
+                        }
+
+                        // For integer operations, use the larger size and convert to signed if one type is signed
+                        if l_type_kind == TypeKind.Integer && r_type_kind == TypeKind.Integer {
+                            expression.type = get_next_integer_type(l_type, r_type);
+                        }
+                        // For floating point operations, convert to the larger size
+                        else if l_type_kind == TypeKind.Float && r_type_kind == TypeKind.Float {
+                            if l_type.size < r_type.size
+                                expression.type = r_type;
+                        }
+                        // For an int lhs and float rhs, convert to the floating point type
+                        // Note that float lhs and int rhs are covered since the floating point is already selected
+                        else if r_type_kind == TypeKind.Float
+                            expression.type = r_type;
+                        else
+                            expression.type = l_type;
+
+                        return expression.type;
+                    }
+
+                    report_error(operator_not_applicable, expression, print_operator(op), l_type.name, r_type.name);
+                    return null;
                 }
                 case Operator.Modulus; {
                     if l_type_kind == TypeKind.Integer && r_type_kind == TypeKind.Integer {
@@ -1101,7 +1141,16 @@ TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_
                 case Operator.ShiftRight;
                 case Operator.RotateLeft;
                 case Operator.RotateRight; {
-                    // TODO
+                    if l_type_kind != TypeKind.Integer || r_type_kind != TypeKind.Integer {
+                        report_error(operator_not_applicable, expression, print_operator(op), l_type.name, r_type.name);
+                        return null;
+                    }
+                    else if expression.r_value.ast_type == AstType.Constant {
+                        constant := cast(ConstantAst*, expression.r_value);
+                        constant.type = l_type;
+                    }
+                    expression.type = l_type;
+                    return l_type;
                 }
                 default; assert(false, "Invalid operator");
             }
