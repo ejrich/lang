@@ -820,6 +820,38 @@ TypeAst* get_reference(Ast* ast, Function* function, Scope* scope, bool* has_poi
     return null;
 }
 
+TypeAst* get_variable(string name, Ast* ast, Scope* scope, bool* constant, bool allow_enums = false) {
+    identifier := get_scope_identifier(scope, name);
+    if identifier == null {
+        report_error("Variable '%' not defined", ast, name);
+        return null;
+    }
+
+    switch identifier.ast_type {
+        case AstType.Enum; {
+            if allow_enums {
+                *constant = true;
+                return cast(TypeAst*, identifier);
+            }
+        }
+        case AstType.Declaration; {
+            declaration := cast(DeclarationAst*, identifier);
+            if (declaration.flags & AstFlags.Global) == AstFlags.Global && (declaration.flags & AstFlags.Verified) != AstFlags.Verified
+                verify_global_variable(declaration);
+
+            *constant = (declaration.flags & AstFlags.Constant) == AstFlags.Constant;
+            return declaration.type;
+        }
+        case AstType.Variable; {
+            variable := cast(VariableAst*, identifier);
+            return variable.type;
+        }
+    }
+
+    report_error("Identifier '%' is not a variable", ast, name);
+    return null;
+}
+
 verify_function_if_necessary(FunctionAst* function, Function* current_function) {
     if function.flags & AstFlags.Verified return;
 
@@ -865,7 +897,6 @@ TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_
 }
 
 TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_constant, bool* is_type, bool get_array_length = false, s32* array_length = null) {
-    // TODO Implement me
     if ast == null return null;
 
     switch ast.ast_type {
@@ -1300,7 +1331,10 @@ TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_
             // TODO
         }
         case AstType.Index; {
-            // TODO
+            _: bool;
+            index := cast(IndexAst*, ast);
+            index_type := get_variable(index.name, index, scope, &_);
+            return verify_index(index, index_type, function, scope, &_);
         }
         case AstType.Cast; {
             cast_ast := cast(CastAst*, ast);
@@ -1369,9 +1403,44 @@ TypeAst* verify_call() {
     return null;
 }
 
-TypeAst* verify_index() {
-    // TODO
-    return null;
+TypeAst* verify_index(IndexAst* index, TypeAst* type, Function* function, Scope* scope, bool* overloaded) {
+    element_type: TypeAst*;
+
+    if type {
+        switch type.type_kind {
+            case TypeKind.Struct; {
+                struct_ast := cast(StructAst*, type);
+                overload := verify_operator_overload_call(struct_ast, Operator.Subscript, function, index, scope);
+                if overload {
+                    *overloaded = true;
+                    element_type = overload.return_type;
+                    index.overload = overload;
+                }
+            }
+            case TypeKind.Array; {
+                array_struct := cast(StructAst*, type);
+                element_type = array_struct.generic_types[0];
+            }
+            case TypeKind.CArray; {
+                array_type := cast(ArrayType*, type);
+                element_type = array_type.element_type;
+            }
+            case TypeKind.Pointer; {
+                pointer_type := cast(PointerType*, type);
+                element_type = pointer_type.pointed_type;
+            }
+            case TypeKind.String;
+                element_type = &u8_type;
+            default;
+                report_error("Cannot index type '%'", index, type.name);
+        }
+    }
+
+    index_type := verify_expression(index.index, function, scope);
+    if index_type != null && index_type.type_kind != TypeKind.Integer && index_type.type_kind != TypeKind.Type
+        report_error("Expected index to be type 'int', but got '%'", index, index_type.name);
+
+    return element_type;
 }
 
 OperatorOverloadAst* verify_operator_overload_call(StructAst* type, Operator op, Function* function, Ast* ast, Scope* scope) {
