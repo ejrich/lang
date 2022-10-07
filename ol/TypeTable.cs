@@ -79,7 +79,7 @@ public unsafe static class TypeTable
     {
         [FieldOffset(0)] public String Name;
         [FieldOffset(16)] public TypeKind Type;
-        [FieldOffset(20)] public uint Size = 8;
+        [FieldOffset(20)] public uint Size;
         [FieldOffset(24)] public IntPtr PointerType;
     }
 
@@ -143,7 +143,7 @@ public unsafe static class TypeTable
     {
         [FieldOffset(0)] public String Name;
         [FieldOffset(16)] public TypeKind Type;
-        [FieldOffset(20)] public uint Size = 8;
+        [FieldOffset(20)] public uint Size;
         [FieldOffset(24)] public IntPtr ReturnType;
         [FieldOffset(32)] public Array Arguments;
     }
@@ -227,7 +227,7 @@ public unsafe static class TypeTable
             case TypeKind.Pointer:
                 typeInfoPointer = Allocator.Allocate(PointerTypeInfoSize);
                 var pointerType = (PointerType)type;
-                var pointerTypeInfo = new PointerTypeInfo {Name = name, Type = TypeKind.Pointer, PointerType = TypeInfos[pointerType.PointedType.TypeIndex]};
+                var pointerTypeInfo = new PointerTypeInfo {Name = name, Type = TypeKind.Pointer, Size = 8, PointerType = TypeInfos[pointerType.PointedType.TypeIndex]};
                 Marshal.StructureToPtr(pointerTypeInfo, typeInfoPointer, false);
                 break;
             case TypeKind.CArray:
@@ -400,7 +400,7 @@ public unsafe static class TypeTable
             case TypeKind.Interface:
                 typeInfoPointer = Allocator.Allocate(InterfaceTypeInfoSize);
                 var interfaceAst = (InterfaceAst)type;
-                var interfaceTypeInfo = new InterfaceTypeInfo {Name = name, Type = TypeKind.Interface, ReturnType = TypeInfos[interfaceAst.ReturnType.TypeIndex]};
+                var interfaceTypeInfo = new InterfaceTypeInfo {Name = name, Type = TypeKind.Interface, Size = 8, ReturnType = TypeInfos[interfaceAst.ReturnType.TypeIndex]};
 
                 if (interfaceAst.Arguments.Count > 0)
                 {
