@@ -80,6 +80,10 @@ public static unsafe class LLVMBackend
         // 3. Declare types
         _types = new LLVMTypeRef[TypeTable.Count];
         _typeInfos = new LLVMValueRef[TypeTable.Count];
+        _functionTypes = new LLVMTypeRef[TypeTable.FunctionCount];
+        _functions = new LLVMValueRef[TypeTable.FunctionCount];
+        _fileNames = new LLVMValueRef[BuildSettings.Files.Count];
+        _functionsToWrite = new();
 
         _structTypeInfoType = CreateStruct("StructTypeInfo");
         _typeInfoType = CreateStruct("TypeInfo");
@@ -186,10 +190,6 @@ public static unsafe class LLVMBackend
         }
 
         // 5. Write the program beginning at the entrypoint
-        _functionTypes = new LLVMTypeRef[TypeTable.FunctionCount];
-        _functions = new LLVMValueRef[TypeTable.FunctionCount];
-        _fileNames = new LLVMValueRef[BuildSettings.Files.Count];
-        _functionsToWrite = new();
         WriteFunctionDefinition("__start", Program.EntryPoint);
         while (_functionsToWrite.Any())
         {
@@ -2208,6 +2208,8 @@ public static unsafe class LLVMBackend
                 return GetConstant(value);
             case InstructionValueType.Null:
                 return LLVM.ConstNull(_types[value.Type.TypeIndex]);
+            case InstructionValueType.Function:
+                return GetOrCreateFunctionDefinition(value.ValueIndex);
             case InstructionValueType.ConstantStruct:
                 var fieldValues = new LLVMValueRef[value.Values.Length];
                 for (var i = 0; i < fieldValues.Length; i++)

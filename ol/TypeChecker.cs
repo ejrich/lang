@@ -83,7 +83,7 @@ public static class TypeChecker
                         break;
                     case DirectiveType.If:
                         var conditional = directive.Value as ConditionalAst;
-                        if (VerifyCondition(conditional.Condition, null, GlobalScope, out var constant, true))
+                        if (VerifyCondition(conditional.Condition, null, GetFileScope(conditional), out var constant, true))
                         {
                             if (!constant)
                             {
@@ -112,7 +112,7 @@ public static class TypeChecker
                         }
                         break;
                     case DirectiveType.Assert:
-                        if (VerifyCondition(directive.Value, null, GlobalScope, out constant, true))
+                        if (VerifyCondition(directive.Value, null, GetFileScope(directive), out constant, true))
                         {
                             if (!constant)
                             {
@@ -147,8 +147,7 @@ public static class TypeChecker
         // 3. Execute any other compiler directives
         foreach (var runDirective in runQueue)
         {
-            var privateScope = PrivateScopes[runDirective.FileIndex];
-            IScope scope = privateScope == null ? GlobalScope : privateScope;
+            var scope = GetFileScope(runDirective);
             var scopeAst = (ScopeAst)runDirective.Value;
             scopeAst.Parent = scope;
             VerifyScope(scopeAst, null);
@@ -314,6 +313,12 @@ public static class TypeChecker
                 return;
         }
         Parser.Asts.Add(ast);
+    }
+
+    private static IScope GetFileScope(IAst ast)
+    {
+        var privateScope = PrivateScopes[ast.FileIndex];
+        return privateScope == null ? GlobalScope : privateScope;
     }
 
     public static bool AddType(string name, IType type)
@@ -705,10 +710,11 @@ public static class TypeChecker
         var fieldNames = new HashSet<string>();
         structAst.Verifying = true;
         var i = 0;
+        var scope = GetFileScope(structAst);
 
         if (structAst.BaseTypeDefinition != null)
         {
-            var baseType = VerifyType(structAst.BaseTypeDefinition, GlobalScope, out var isGeneric, out var isVarargs, out var isParams);
+            var baseType = VerifyType(structAst.BaseTypeDefinition, scope, out var isGeneric, out var isVarargs, out var isParams);
 
             if (isVarargs || isParams || isGeneric)
             {
@@ -745,7 +751,7 @@ public static class TypeChecker
 
                         if (field.Type == null)
                         {
-                            field.Type = VerifyType(field.TypeDefinition, GlobalScope);
+                            field.Type = VerifyType(field.TypeDefinition, scope);
                         }
 
                         if (field.Type != null)
@@ -782,7 +788,7 @@ public static class TypeChecker
 
             if (structField.TypeDefinition != null)
             {
-                structField.Type = VerifyType(structField.TypeDefinition, GlobalScope, out var isGeneric, out var isVarargs, out var isParams);
+                structField.Type = VerifyType(structField.TypeDefinition, scope, out var isGeneric, out var isVarargs, out var isParams);
 
                 if (isVarargs || isParams)
                 {
@@ -820,7 +826,7 @@ public static class TypeChecker
                     }
                     else
                     {
-                        var valueType = VerifyExpression(structField.Value, null, GlobalScope, out var isConstant);
+                        var valueType = VerifyExpression(structField.Value, null, scope, out var isConstant);
 
                         // Verify the type is correct
                         if (valueType != null)
@@ -856,7 +862,7 @@ public static class TypeChecker
                         }
                         foreach (var (name, assignment) in structField.Assignments)
                         {
-                            VerifyFieldAssignment(structDef, name, assignment, null, GlobalScope, structField: true);
+                            VerifyFieldAssignment(structDef, name, assignment, null, scope, structField: true);
                         }
                     }
                 }
@@ -872,7 +878,7 @@ public static class TypeChecker
                         var elementType = structField.ArrayElementType;
                         foreach (var value in structField.ArrayValues)
                         {
-                            var valueType = VerifyExpression(value, null, GlobalScope, out var isConstant);
+                            var valueType = VerifyExpression(value, null, scope, out var isConstant);
                             if (valueType != null)
                             {
                                 if (!TypeEquals(elementType, valueType))
@@ -896,7 +902,7 @@ public static class TypeChecker
                 if (structField.Type?.TypeKind == TypeKind.Array && structField.TypeDefinition.Count != null)
                 {
                     // Verify the count is a constant
-                    var countType = VerifyExpression(structField.TypeDefinition.Count, null, GlobalScope, out var isConstant, out uint arrayLength);
+                    var countType = VerifyExpression(structField.TypeDefinition.Count, null, scope, out var isConstant, out uint arrayLength);
 
                     if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
                     {
@@ -918,7 +924,7 @@ public static class TypeChecker
                     }
                     else
                     {
-                        var valueType = VerifyExpression(structField.Value, null, GlobalScope, out var isConstant);
+                        var valueType = VerifyExpression(structField.Value, null, scope, out var isConstant);
 
                         if (!isConstant)
                         {
@@ -999,6 +1005,7 @@ public static class TypeChecker
     {
         var fieldNames = new HashSet<string>();
         union.Verifying = true;
+        var scope = GetFileScope(union);
 
         if (union.Fields.Count == 0)
         {
@@ -1015,7 +1022,7 @@ public static class TypeChecker
                     ErrorReporter.Report($"Union '{union.Name}' already contains field '{field.Name}'", field);
                 }
 
-                field.Type = VerifyType(field.TypeDefinition, GlobalScope, out var isGeneric, out var isVarargs, out var isParams);
+                field.Type = VerifyType(field.TypeDefinition, scope, out var isGeneric, out var isVarargs, out var isParams);
 
                 if (isVarargs || isParams)
                 {
@@ -1034,7 +1041,7 @@ public static class TypeChecker
                 if (field.Type?.TypeKind == TypeKind.Array && field.TypeDefinition.Count != null)
                 {
                     // Verify the count is a constant
-                    var countType = VerifyExpression(field.TypeDefinition.Count, null, GlobalScope, out var isConstant, out uint arrayLength);
+                    var countType = VerifyExpression(field.TypeDefinition.Count, null, scope, out var isConstant, out uint arrayLength);
 
                     if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
                     {
@@ -1095,6 +1102,7 @@ public static class TypeChecker
     private static bool VerifyFunctionDefinition(FunctionAst function)
     {
         function.Flags |= FunctionFlags.DefinitionVerified;
+        var scope = GetFileScope(function);
 
         // 1. Verify the return type of the function is valid
         if (function.ReturnTypeDefinition == null)
@@ -1103,7 +1111,7 @@ public static class TypeChecker
         }
         else
         {
-            function.ReturnType = VerifyType(function.ReturnTypeDefinition, GlobalScope, out var isGeneric, out var isVarargs, out var isParams);
+            function.ReturnType = VerifyType(function.ReturnTypeDefinition, scope, out var isGeneric, out var isVarargs, out var isParams);
             if (isVarargs || isParams)
             {
                 ErrorReporter.Report($"Return type of function '{function.Name}' cannot be varargs or Params", function.ReturnTypeDefinition);
@@ -1133,7 +1141,7 @@ public static class TypeChecker
             }
 
             // 3b. Check for errored or undefined field types
-            argument.Type = VerifyType(argument.TypeDefinition, GlobalScope, out var isGeneric, out var isVarargs, out var isParams, allowParams: true);
+            argument.Type = VerifyType(argument.TypeDefinition, scope, out var isGeneric, out var isVarargs, out var isParams, allowParams: true);
 
             if (isVarargs)
             {
@@ -1188,7 +1196,7 @@ public static class TypeChecker
             // 3c. Check for default arguments
             if (argument.Value != null)
             {
-                var defaultType = VerifyExpression(argument.Value, null, GlobalScope, out var isConstant);
+                var defaultType = VerifyExpression(argument.Value, null, scope, out var isConstant);
 
                 if (argument.HasGenerics)
                 {
@@ -1440,6 +1448,7 @@ public static class TypeChecker
     private static bool VerifyOperatorOverloadDefinition(OperatorOverloadAst overload)
     {
         overload.Flags |= FunctionFlags.DefinitionVerified;
+        var scope = GetFileScope(overload);
 
         // 1. Verify the operator type exists and is a struct
         if (overload.Generics.Any())
@@ -1458,7 +1467,7 @@ public static class TypeChecker
         }
         else
         {
-            var targetType = VerifyType(overload.Type, GlobalScope, out var isGeneric, out var isVarargs, out var isParams);
+            var targetType = VerifyType(overload.Type, scope, out var isGeneric, out var isVarargs, out var isParams);
             if (isVarargs || isParams)
             {
                 ErrorReporter.Report($"Cannot overload operator '{PrintOperator(overload.Operator)}' for type '{PrintTypeDefinition(overload.Type)}'", overload.Type);
@@ -1494,7 +1503,7 @@ public static class TypeChecker
             }
 
             // 2b. Check the argument is the same type as the overload type
-            argument.Type = VerifyType(argument.TypeDefinition, GlobalScope);
+            argument.Type = VerifyType(argument.TypeDefinition, scope);
             if (i > 0)
             {
                 if (overload.Operator == Operator.Subscript)
@@ -1510,7 +1519,7 @@ public static class TypeChecker
                 }
             }
         }
-        overload.ReturnType = VerifyType(overload.ReturnTypeDefinition, GlobalScope);
+        overload.ReturnType = VerifyType(overload.ReturnTypeDefinition, scope);
 
         return !overload.Generics.Any();
     }
@@ -1518,6 +1527,8 @@ public static class TypeChecker
     private static void VerifyInterface(InterfaceAst interfaceAst)
     {
         interfaceAst.Verifying = true;
+        var scope = GetFileScope(interfaceAst);
+
         // 1. Verify the return type of the function is valid
         if (interfaceAst.ReturnTypeDefinition == null)
         {
@@ -1525,7 +1536,7 @@ public static class TypeChecker
         }
         else
         {
-            interfaceAst.ReturnType = VerifyType(interfaceAst.ReturnTypeDefinition, GlobalScope, out _, out var isVarargs, out var isParams);
+            interfaceAst.ReturnType = VerifyType(interfaceAst.ReturnTypeDefinition, scope, out _, out var isVarargs, out var isParams);
             if (isVarargs || isParams)
             {
                 ErrorReporter.Report($"Return type of interface '{interfaceAst.Name}' cannot be varargs or Params", interfaceAst.ReturnTypeDefinition);
@@ -1551,7 +1562,7 @@ public static class TypeChecker
             }
 
             // 3b. Check for errored or undefined field types
-            argument.Type = VerifyType(argument.TypeDefinition, GlobalScope, out _, out var isVarargs, out var isParams);
+            argument.Type = VerifyType(argument.TypeDefinition, scope, out _, out var isVarargs, out var isParams);
 
             if (isVarargs)
             {
@@ -1609,12 +1620,13 @@ public static class TypeChecker
         // Set the function as verified to prevent multiple verifications
         function.Flags |= FunctionFlags.Verified;
         Debug.Assert(function.Body != null, "Should not verify function without body");
+        var scope = GetFileScope(function);
 
         // 1. Initialize local variables
         foreach (var argument in function.Arguments)
         {
             // Arguments with the same name as a global variable will be used instead of the global
-            if (GetScopeIdentifier(GlobalScope, argument.Name, out var identifier))
+            if (GetScopeIdentifier(scope, argument.Name, out var identifier))
             {
                 if (identifier is not DeclarationAst)
                 {
@@ -1625,8 +1637,7 @@ public static class TypeChecker
         }
 
         // 2. Loop through function body and verify all ASTs
-        var privateScope = PrivateScopes[function.FileIndex];
-        function.Body.Parent = privateScope == null ? GlobalScope : privateScope;
+        function.Body.Parent = scope;
         VerifyScope(function.Body, function);
 
         // 3. Verify the main function doesn't call the compiler
@@ -1669,12 +1680,13 @@ public static class TypeChecker
         // Set the overload as verified to prevent multiple verifications
         overload.Flags |= FunctionFlags.Verified;
         Debug.Assert(overload.Body != null, "Should not verify overload without body");
+        var scope = GetFileScope(overload);
 
         // 1. Initialize local variables
         foreach (var argument in overload.Arguments)
         {
             // Arguments with the same name as a global variable will be used instead of the global
-            if (GetScopeIdentifier(GlobalScope, argument.Name, out var identifier))
+            if (GetScopeIdentifier(scope, argument.Name, out var identifier))
             {
                 if (identifier is not DeclarationAst)
                 {
@@ -1685,8 +1697,7 @@ public static class TypeChecker
         }
 
         // 2. Loop through body and verify all ASTs
-        var privateScope = PrivateScopes[overload.FileIndex];
-        overload.Body.Parent = privateScope == null ? GlobalScope : privateScope;
+        overload.Body.Parent = scope;
         VerifyScope(overload.Body, overload);
 
         // 3. Verify the body returns on all paths
@@ -1760,7 +1771,7 @@ public static class TypeChecker
                         case DirectiveType.If:
                             scope.Children.RemoveAt(i);
                             var conditional = directive.Value as ConditionalAst;
-                            if (VerifyCondition(conditional.Condition, null, GlobalScope, out var constant, true))
+                            if (VerifyCondition(conditional.Condition, null, scope, out var constant, true))
                             {
                                 if (!constant)
                                 {
@@ -1782,7 +1793,7 @@ public static class TypeChecker
                             break;
                         case DirectiveType.Assert:
                             scope.Children.RemoveAt(i--);
-                            if (VerifyCondition(directive.Value, null, GlobalScope, out constant, true))
+                            if (VerifyCondition(directive.Value, null, scope, out constant, true))
                             {
                                 if (!constant)
                                 {
@@ -1953,8 +1964,7 @@ public static class TypeChecker
     private static void VerifyGlobalVariable(DeclarationAst declaration)
     {
         declaration.Verified = true;
-        IScope scope = PrivateScopes[declaration.FileIndex];
-        if (scope == null) scope = GlobalScope;
+        var scope = GetFileScope(declaration);
 
         if (declaration.TypeDefinition != null)
         {
@@ -2142,7 +2152,8 @@ public static class TypeChecker
 
     private static void VerifyGlobalVariableValue(DeclarationAst declaration)
     {
-        var valueType = VerifyExpression(declaration.Value, null, GlobalScope, out var isConstant);
+        var scope = GetFileScope(declaration);
+        var valueType = VerifyExpression(declaration.Value, null, scope, out var isConstant);
         if (!isConstant)
         {
             ErrorReporter.Report($"Global variables can only be initialized with constant values", declaration.Value);

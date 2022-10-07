@@ -275,7 +275,7 @@ public static class ProgramIRBuilder
 
             if (declaration.Value != null)
             {
-                globalVariable.InitialValue = EmitConstantIR(declaration.Value, null, scope);
+                globalVariable.InitialValue = EmitConstantIR(declaration.Value, null, scope, true);
             }
             else
             {
@@ -340,7 +340,7 @@ public static class ProgramIRBuilder
                 {
                     if (assignment.Value != null)
                     {
-                        constantStruct.Values[i] = EmitConstantIR(assignment.Value, null, scope);
+                        constantStruct.Values[i] = EmitConstantIR(assignment.Value, null, scope, true);
                     }
                     else if (assignment.Assignments != null)
                     {
@@ -1879,7 +1879,7 @@ public static class ProgramIRBuilder
         return expressionValue;
     }
 
-    private static InstructionValue EmitConstantIR(IAst ast, FunctionIR function, IScope scope = null)
+    private static InstructionValue EmitConstantIR(IAst ast, FunctionIR function, IScope scope = null, bool allowFunctions = false)
     {
         switch (ast)
         {
@@ -1894,6 +1894,11 @@ public static class ProgramIRBuilder
                 }
                 if (identifierAst.FunctionTypeIndex.HasValue)
                 {
+                    if (allowFunctions)
+                    {
+                        var functionDef = (FunctionAst)TypeTable.Types[identifierAst.FunctionTypeIndex.Value];
+                        return new InstructionValue { ValueType = InstructionValueType.Function, Type = functionDef, ValueIndex = functionDef.FunctionIndex };
+                    }
                     return GetConstantInteger(identifierAst.FunctionTypeIndex.Value);
                 }
 
