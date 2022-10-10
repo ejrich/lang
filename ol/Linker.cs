@@ -51,7 +51,7 @@ public static class Linker
             string.Join(' ', BuildSettings.Libraries.Select(lib => GetLibraryName(lib, "a"))) :
             string.Join(' ', BuildSettings.Libraries.Select(lib => GetLibraryName(lib, "so")));
 
-        var linkerArguments = $"{linker} -o {executableFile} {objectFile} {defaultObjects} {libraryDirectories} --start-group {libraries} {dependencies} --end-group --no-warn-execstack";
+        var linkerArguments = $"{linker} -o \"{executableFile}\" \"{objectFile}\" \"{defaultObjects}\" {libraryDirectories} --start-group {libraries} {dependencies} --end-group --no-warn-execstack";
 
         Console.WriteLine($"Linking: ld {linkerArguments}\n");
         #elif _WINDOWS
@@ -60,7 +60,7 @@ public static class Linker
         var libraryDirectories = string.Join(' ', BuildSettings.LibraryDirectories.Select(d => $"/libpath:\"{d}\""));
         var dependencies = string.Join(' ', BuildSettings.Libraries.Select(lib => GetLibraryName(lib, "lib")));
 
-        var linkerArguments = $"/entry:_start {debug}/out:{executableFile}.exe {objectFile} {defaultObjects} /libpath:\"{libDirectory.FullName}\" {libraryDirectories} {libraries} {dependencies}";
+        var linkerArguments = $"/entry:_start {debug}/out:\"{executableFile}.exe\" \"{objectFile}\" \"{defaultObjects}\" /libpath:\"{libDirectory.FullName}\" {libraryDirectories} {libraries} {dependencies}";
 
         Console.WriteLine($"Linking: lld-link {linkerArguments}\n");
         #endif
@@ -203,7 +203,7 @@ public static class Linker
     {
         if (library.FileName == null)
         {
-            return $"{library.AbsolutePath}.{extension}";
+            return $"\"{library.AbsolutePath}.{extension}\"";
         }
 
         #if _LINUX
@@ -211,7 +211,7 @@ public static class Linker
         {
             return $"-l{library.FileName}";
         }
-        return $"-L{library.LibPath} -l{library.FileName}";
+        return $"-L\"{library.LibPath}\" -l{library.FileName}";
         #elif _WINDOWS
         if (library.LibPath == null)
         {
