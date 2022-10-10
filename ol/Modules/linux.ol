@@ -225,6 +225,7 @@ enum RandomFlags {
 
 int get_nprocs() #extern "c"
 string realpath(string file_name, string resolved_name) #extern "c"
+u8* getenv(string name) #extern "c"
 
 
 int pthread_create(u64* thread, pthread_attr_t* attr, ThreadProcedure start_routine, void* arg) #extern "c"
