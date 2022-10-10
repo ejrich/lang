@@ -61,5 +61,4 @@ bool ci() {
     }
 
     return false;
-    sts
 }
