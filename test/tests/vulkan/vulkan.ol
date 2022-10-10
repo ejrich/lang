@@ -6,6 +6,8 @@
 // This test follows vulkan-tutorial.com
 
 main() {
+    if ci() return;
+
     create_window();
 
     init_vulkan();
@@ -2486,4 +2488,14 @@ create_color_resources() {
     else {
         set_linker(LinkerType.Dynamic);
     }
+}
+
+bool ci() {
+    ci := get_environment_variable("CI");
+    if ci.length {
+        defer default_free(ci.data);
+        return ci == "true";
+    }
+
+    return false;
 }

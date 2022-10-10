@@ -1,7 +1,10 @@
 #import X11
 #import compiler
+#import standard
 
 main() {
+    if ci() return;
+
     window := create_window();
 
     close_window(window);
@@ -48,4 +51,14 @@ close_window(Window window) {
 #run {
     set_linker(LinkerType.Dynamic);
     main();
+}
+
+bool ci() {
+    ci := get_environment_variable("CI");
+    if ci.length {
+        defer default_free(ci.data);
+        return ci == "true";
+    }
+
+    return false;
 }

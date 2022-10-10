@@ -1069,3 +1069,26 @@ int get_processors() {
 
     return result;
 }
+
+string get_environment_variable(string name, Allocate allocator = default_allocator) {
+    result: string;
+    #if os == OS.Linux {
+        variable := getenv(name);
+        if variable {
+            variable_string := convert_c_string(variable);
+            result = { length = variable_string.length; data = allocator(variable_string.length); }
+            memory_copy(result.data, variable_string.data, result.length);
+        }
+    }
+    #if os == OS.Windows {
+        max_length := 32767; #const
+        buffer: Array<u8>[max_length];
+        result.length = GetEnvironmentVariable(name, buffer.data, max_length);
+        if result.length {
+            result.data = allocator(result.length);
+            memory_copy(result.data, buffer.data, result.length);
+        }
+    }
+
+    return result;
+}
