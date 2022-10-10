@@ -11,7 +11,7 @@ main() {
         defer default_free(files.data);
 
         each file in files {
-            if file.type == FileType.Directory && file.name != "." && file.name != ".." {
+            if file.type == FileType.Directory && file.name[0] != '.' {
                 test_dir := format_string("test/tests/%", file.name);
                 defer default_free(test_dir.data);
 
