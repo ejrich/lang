@@ -3741,7 +3741,7 @@ public static class TypeChecker
                     {
                         var arrayType = (ArrayType)referenceType;
                         var name = $"{arrayType.ElementType.Name}*";
-                        if (!GetType(name, unary.FileIndex, out var pointerType))
+                        if (!GetType(name, arrayType.ElementType.FileIndex, out var pointerType))
                         {
                             pointerType = CreatePointerType(name, arrayType.ElementType);
                         }
@@ -3750,7 +3750,7 @@ public static class TypeChecker
                     else
                     {
                         var name = $"{referenceType.Name}*";
-                        if (!GetType(name, unary.FileIndex, out var pointerType))
+                        if (!GetType(name, referenceType.FileIndex, out var pointerType))
                         {
                             pointerType = CreatePointerType(name, referenceType);
                         }
@@ -5482,43 +5482,39 @@ public static class TypeChecker
                     ErrorReporter.Report($"Type 'CArray' should have 1 generic type, but got {type.Generics.Count}", type);
                     return null;
                 }
+
+                var elementType = VerifyType(type.Generics[0], scope, out isGeneric, out _, out _, depth + 1, allowParams);
+                if (elementType == null || isGeneric)
+                {
+                    return null;
+                }
+
+                uint arrayLength;
+                if (initialArrayLength.HasValue)
+                {
+                    arrayLength = (uint)initialArrayLength.Value;
+                }
                 else
                 {
-                    var elementType = VerifyType(type.Generics[0], scope, out isGeneric, out _, out _, depth + 1, allowParams);
-                    if (elementType == null || isGeneric)
+                    var countType = VerifyExpression(type.Count, null, scope, out var isConstant, out arrayLength);
+                    if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
                     {
-                        return null;
-                    }
-                    else
-                    {
-                        uint arrayLength;
-                        if (initialArrayLength.HasValue)
-                        {
-                            arrayLength = (uint)initialArrayLength.Value;
-                        }
-                        else
-                        {
-                            var countType = VerifyExpression(type.Count, null, scope, out var isConstant, out arrayLength);
-                            if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
-                            {
-                                ErrorReporter.Report($"Expected size of C array to be a constant, positive integer", type);
-                            }
-                        }
-
-                        var name = $"{PrintTypeDefinition(type)}[{arrayLength}]";
-                        if (!GetType(name, type.FileIndex, out var arrayType))
-                        {
-                            arrayType = new ArrayType
-                            {
-                                FileIndex = elementType.FileIndex, Name = name, Size = elementType.Size * arrayLength,
-                                Alignment = elementType.Alignment, Private = elementType.Private, Length = arrayLength, ElementType = elementType
-                            };
-                            AddType(name, arrayType);
-                            TypeTable.CreateTypeInfo(arrayType);
-                        }
-                        return arrayType;
+                        ErrorReporter.Report($"Expected size of C array to be a constant, positive integer", type);
                     }
                 }
+
+                var name = $"{PrintTypeDefinition(type)}[{arrayLength}]";
+                if (!GetType(name, elementType.FileIndex, out var arrayType))
+                {
+                    arrayType = new ArrayType
+                    {
+                        FileIndex = elementType.FileIndex, Name = name, Size = elementType.Size * arrayLength,
+                        Alignment = elementType.Alignment, Private = elementType.Private, Length = arrayLength, ElementType = elementType
+                    };
+                    AddType(name, arrayType);
+                    TypeTable.CreateTypeInfo(arrayType);
+                }
+                return arrayType;
             case "void":
                 if (hasGenerics)
                 {
@@ -5537,25 +5533,21 @@ public static class TypeChecker
                 {
                     return pointerType;
                 }
-                else
+
+                var typeDef = type.Generics[0];
+                var pointedToType = VerifyType(typeDef, scope, out isGeneric, out _, out _, depth + 1, allowParams);
+                if (pointedToType == null || isGeneric)
                 {
-                    var typeDef = type.Generics[0];
-                    var pointedToType = VerifyType(typeDef, scope, out isGeneric, out _, out _, depth + 1, allowParams);
-                    if (pointedToType == null || isGeneric)
-                    {
-                        return null;
-                    }
-                    else
-                    {
-                        // There are some cases where the pointed to type is a struct that contains a field for the pointer type
-                        // To account for this, the type table needs to be checked for again for the type
-                        if (!GetType(pointerTypeName, type.FileIndex, out pointerType))
-                        {
-                            pointerType = CreatePointerType(pointerTypeName, pointedToType);
-                        }
-                        return pointerType;
-                    }
+                    return null;
                 }
+
+                // There are some cases where the pointed to type is a struct that contains a field for the pointer type
+                // To account for this, the type table needs to be checked for again for the type
+                if (!GetType(pointerTypeName, pointedToType.FileIndex, out pointerType))
+                {
+                    pointerType = CreatePointerType(pointerTypeName, pointedToType);
+                }
+                return pointerType;
             case "...":
                 if (hasGenerics)
                 {
@@ -5577,9 +5569,9 @@ public static class TypeChecker
                 {
                     isParams = true;
                     const string arrayAny = "Array<Any>";
-                    if (GlobalScope.Types.TryGetValue(arrayAny, out var arrayType))
+                    if (GlobalScope.Types.TryGetValue(arrayAny, out var arrayAnyType))
                     {
-                        return arrayType;
+                        return arrayAnyType;
                     }
 
                     return CreateArrayStruct(arrayAny, TypeTable.AnyType);
@@ -5663,12 +5655,18 @@ public static class TypeChecker
                         fileIndex = type.FileIndex;
                     }
 
-                    var polyStruct = Polymorpher.CreatePolymorphedStruct(structDef, genericName, TypeKind.Struct, privateGenericTypes, genericTypes);
+                    // Check that the type wasn't created while verifying the generics
+                    if (GetType(genericName, fileIndex, out var polyType))
+                    {
+                        return polyType;
+                    }
+
+                    var polyStruct = Polymorpher.CreatePolymorphedStruct(structDef, fileIndex, genericName, TypeKind.Struct, privateGenericTypes, genericTypes);
                     AddType(genericName, polyStruct, fileIndex);
                     VerifyStruct(polyStruct);
                     return polyStruct;
                 }
-                else if (GetType(type.Name, type.FileIndex, out var typeValue))
+                if (GetType(type.Name, type.FileIndex, out var typeValue))
                 {
                     if (typeValue is StructAst structAst)
                     {
@@ -5708,23 +5706,24 @@ public static class TypeChecker
         }
 
         var name = $"Array<{elementType.Name}>";
-        if (GetType(name, typeDef.FileIndex, out var arrayType))
+        var fileIndex = elementType.Private ? elementType.FileIndex : 0;
+        if (GetType(name, fileIndex, out var arrayType))
         {
             return arrayType;
         }
 
-        return CreateArrayStruct(name, elementType, elementTypeDef);
+        return CreateArrayStruct(name, elementType, fileIndex);
     }
 
-    private static IType CreateArrayStruct(string name, IType elementType, TypeDefinition elementTypeDef = null)
+    private static IType CreateArrayStruct(string name, IType elementType, int fileIndex = 0)
     {
         if (BaseArrayType == null)
         {
             return null;
         }
 
-        var arrayStruct = Polymorpher.CreatePolymorphedStruct(BaseArrayType, name, TypeKind.Array, elementType.Private, elementType);
-        AddType(name, arrayStruct, elementType.Private ? elementType.FileIndex : 0);
+        var arrayStruct = Polymorpher.CreatePolymorphedStruct(BaseArrayType, fileIndex, name, TypeKind.Array, elementType.Private, elementType);
+        AddType(name, arrayStruct, fileIndex);
         VerifyStruct(arrayStruct);
         return arrayStruct;
     }
