@@ -260,7 +260,7 @@ free_memory(void* pointer, u64 size) {
     }
 }
 
-void* default_allocator(int size) {
+void* default_allocator(u64 size) {
     // The default allocator is a crude allocation method that will always request memory from the operating system
     pointer := allocate_memory(size);
 
@@ -301,7 +301,7 @@ void* default_allocator(int size) {
     return pointer;
 }
 
-void* default_reallocator(void* pointer, int old_size, int size) {
+void* default_reallocator(void* pointer, u64 old_size, u64 size) {
     each allocation in default_allocations {
         if allocation.pointer == pointer {
             // Try to reallocate the memory from the os
