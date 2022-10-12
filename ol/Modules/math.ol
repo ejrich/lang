@@ -135,6 +135,13 @@ struct Matrix4 {
     d: Vector4;
 }
 
+struct Quaternion {
+    x: float;
+    y: float;
+    z: float;
+    w: float;
+}
+
 
 operator + (Vector3 a, Vector3 b) {
     c: Vector3 = { x = a.x + b.x; y = a.y + b.y; z = a.z + b.z; }
