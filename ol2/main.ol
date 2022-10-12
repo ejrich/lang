@@ -374,7 +374,7 @@ struct Arena {
     size: int;
 }
 
-void* allocate(int size) {
+void* allocate(u64 size) {
     if size > default_arena_size
         return allocate_arena(size, size);
 
@@ -395,7 +395,7 @@ void* allocate(int size) {
     return allocate_arena(size);
 }
 
-void* reallocate(void* pointer, int old_size, int size) {
+void* reallocate(void* pointer, u64 old_size, u64 size) {
     // @Cleanup Write general purpose allocator to replace this
     new_pointer := allocate(size);
     memory_copy(new_pointer, pointer, old_size);

@@ -119,8 +119,8 @@ bool, T search<T>(HashTable<T>* table, string key) {
         }
     }
 
-    default: T;
-    return false, default;
+    _: T;
+    return false, _;
 }
 
 T* new<T>() {
@@ -138,7 +138,7 @@ struct Arena {
     size: int;
 }
 
-void* allocate(int size) {
+void* allocate(u64 size) {
     if size > arena_size
         return allocate_arena(size, size);
 
