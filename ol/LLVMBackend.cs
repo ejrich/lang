@@ -62,7 +62,7 @@ public static unsafe class LLVMBackend
     private static LLVMMetadataRef[] _debugTypes;
     private static LLVMMetadataRef[] _debugFunctions;
 
-    private static readonly LLVMTypeRef _u8PointerType = LLVM.PointerType(LLVM.Int8Type(), 0);
+    private static LLVMTypeRef _u8PointerType;
     private static readonly LLVMValueRef _zeroInt = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), 0, false);
     private static readonly LLVMValueRef _interfaceTypeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Interface, 0);
     private static readonly LLVMValueRef _functionTypeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Function, 0);
@@ -248,6 +248,9 @@ public static unsafe class LLVMBackend
             _debugTypes = new LLVMMetadataRef[TypeTable.Count];
             _debugFunctions = new LLVMMetadataRef[TypeTable.FunctionCount];
         }
+
+        LLVM.ContextSetOpaquePointers(_context, 0);
+        _u8PointerType = LLVM.PointerType(LLVM.Int8Type(), 0);
     }
 
     private static void AddModuleFlag(string flagName, uint flagValue)
@@ -2373,10 +2376,8 @@ public static unsafe class LLVMBackend
                 return LLVM.BuildCall2(_builder, assemblyFunctionType, asm, (LLVMOpaqueValue**)pArgs, (uint)arguments.Length, name);
             }
         }
-        else
-        {
-            return LLVM.BuildCall2(_builder, assemblyFunctionType, asm, null, 0, name);
-        }
+
+        return LLVM.BuildCall2(_builder, assemblyFunctionType, asm, null, 0, name);
     }
 
     private static string Compile(string baseFileName, bool outputIntermediate)
