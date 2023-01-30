@@ -21,6 +21,7 @@ public static unsafe class LLVMBackend
     private static uint _elementTypeAttributeKind;
 
     private static LLVMTypeRef[] _types;
+    private static LLVMTypeRef[] _interfaceTypes;
     private static LLVMTypeRef[] _functionTypes;
     private static LLVMValueRef[] _typeInfos;
     private static LLVMValueRef[] _globals;
@@ -53,7 +54,6 @@ public static unsafe class LLVMBackend
 
     private static LLVMValueRef _defaultAttributes;
     private static LLVMValueRef _defaultFields;
-    private static LLVMValueRef _defaultArguments;
 
     private static bool _emitDebug;
     private static LLVMDIBuilderRef _debugBuilder;
@@ -66,6 +66,12 @@ public static unsafe class LLVMBackend
     private static readonly LLVMValueRef _zeroInt = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), 0, false);
     private static readonly LLVMValueRef _interfaceTypeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Interface, 0);
     private static readonly LLVMValueRef _functionTypeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Function, 0);
+
+    private static LLVMTypeRef _stackSaveType;
+    private static LLVMValueRef _stackSave;
+
+    private static LLVMTypeRef _stackRestoreType;
+    private static LLVMValueRef _stackRestore;
 
     public static string Build()
     {
@@ -80,6 +86,7 @@ public static unsafe class LLVMBackend
         // 3. Declare types
         _types = new LLVMTypeRef[TypeTable.Count];
         _typeInfos = new LLVMValueRef[TypeTable.Count];
+        _interfaceTypes = new LLVMTypeRef[TypeTable.Count];
         _functionTypes = new LLVMTypeRef[TypeTable.FunctionCount];
         _functions = new LLVMValueRef[TypeTable.FunctionCount];
         _fileNames = new LLVMValueRef[BuildSettings.Files.Count];
@@ -110,7 +117,6 @@ public static unsafe class LLVMBackend
         _typeInfoPointerType = LLVM.PointerType(_typeInfoType, 0);
         _defaultAttributes = LLVMValueRef.CreateConstNamedStruct(_stringArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(_stringType, 0))});
         _defaultFields = LLVMValueRef.CreateConstNamedStruct(_typeFieldArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(_typeFieldType, 0))});
-        _defaultArguments = LLVMValueRef.CreateConstNamedStruct(_argumentArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(_argumentType, 0))});
 
         switch (BuildSettings.OutputTypeTable)
         {
@@ -249,7 +255,7 @@ public static unsafe class LLVMBackend
             _debugFunctions = new LLVMMetadataRef[TypeTable.FunctionCount];
         }
 
-        LLVM.ContextSetOpaquePointers(_context, 0);
+        LLVM.ContextSetOpaquePointers(_context, 1); // Can be removed once llvm gets rid of non-opaque pointers
         _u8PointerType = LLVM.PointerType(LLVM.Int8Type(), 0);
     }
 
@@ -406,7 +412,7 @@ public static unsafe class LLVMBackend
                 argumentValues[arg] = CreateArgumentType(argument, argumentTypeInfo);
             }
 
-            var functionType = LLVMTypeRef.CreateFunction(_types[interfaceAst.ReturnType.TypeIndex], argumentTypes, false);
+            var functionType = _interfaceTypes[interfaceAst.TypeIndex] = LLVMTypeRef.CreateFunction(_types[interfaceAst.ReturnType.TypeIndex], argumentTypes, false);
             _types[interfaceAst.TypeIndex] = LLVM.PointerType(functionType, 0);
 
             var returnType = _typeInfos[interfaceAst.ReturnType.TypeIndex];
@@ -561,7 +567,7 @@ public static unsafe class LLVMBackend
                 argumentTypes[arg] = _types[argument.Type.TypeIndex];
             }
 
-            var functionType = LLVMTypeRef.CreateFunction(_types[interfaceAst.ReturnType.TypeIndex], argumentTypes, false);
+            var functionType = _interfaceTypes[interfaceAst.TypeIndex] = LLVMTypeRef.CreateFunction(_types[interfaceAst.ReturnType.TypeIndex], argumentTypes, false);
             _types[interfaceAst.TypeIndex] = LLVM.PointerType(functionType, 0);
         }
 
@@ -707,7 +713,7 @@ public static unsafe class LLVMBackend
                 argumentTypes[arg] = _types[argument.Type.TypeIndex];
             }
 
-            var functionType = LLVMTypeRef.CreateFunction(_types[interfaceAst.ReturnType.TypeIndex], argumentTypes, false);
+            var functionType = _interfaceTypes[interfaceAst.TypeIndex] = LLVMTypeRef.CreateFunction(_types[interfaceAst.ReturnType.TypeIndex], argumentTypes, false);
             _types[interfaceAst.TypeIndex] = LLVM.PointerType(functionType, 0);
         }
 
@@ -1287,11 +1293,12 @@ public static unsafe class LLVMBackend
             }
 
             var file = _debugFiles[function.Source.FileIndex];
-            var functionType = _debugBuilder.CreateSubroutineType(file, debugArgumentTypes, LLVMDIFlags.LLVMDIFlagZero);
-            var debugFunction = _debugFunctions[function.Source.FunctionIndex] = _debugBuilder.CreateFunction(file, function.Source.Name, name, file, function.Source.Line, functionType, 0, 1, function.Source.Line, LLVMDIFlags.LLVMDIFlagPrototyped, 0);
+            var debugFunctionType = _debugBuilder.CreateSubroutineType(file, debugArgumentTypes, LLVMDIFlags.LLVMDIFlagZero);
+            var debugFunction = _debugFunctions[function.Source.FunctionIndex] = _debugBuilder.CreateFunction(file, function.Source.Name, name, file, function.Source.Line, debugFunctionType, 0, 1, function.Source.Line, LLVMDIFlags.LLVMDIFlagPrototyped, 0);
 
             // Declare the function
-            functionPointer = _module.AddFunction(name, LLVMTypeRef.CreateFunction(_types[function.Source.ReturnType.TypeIndex], argumentTypes, varargs));
+            var functionType = _functionTypes[function.Source.FunctionIndex] = LLVMTypeRef.CreateFunction(_types[function.Source.ReturnType.TypeIndex], argumentTypes, varargs);
+            functionPointer = _module.AddFunction(name, functionType);
             LLVM.SetSubprogram(functionPointer, debugFunction);
         }
         else
@@ -1381,16 +1388,15 @@ public static unsafe class LLVMBackend
         LLVMValueRef stackPointer = null;
         if (function.SaveStack)
         {
-            const string stackSaveIntrinsic = "llvm.stacksave";
             stackPointer = _builder.BuildAlloca(_u8PointerType);
 
-            var stackSave = _module.GetNamedFunction(stackSaveIntrinsic);
-            if (stackSave.Handle == IntPtr.Zero)
+            if (_stackSave == null)
             {
-                stackSave = _module.AddFunction(stackSaveIntrinsic, LLVMTypeRef.CreateFunction(_u8PointerType, Array.Empty<LLVMTypeRef>()));
+                _stackSaveType = LLVMTypeRef.CreateFunction(_u8PointerType, Array.Empty<LLVMTypeRef>());
+                _stackSave = _module.AddFunction("llvm.stacksave", _stackSaveType);
             }
 
-            var stackPointerValue = _builder.BuildCall(stackSave, Array.Empty<LLVMValueRef>(), "stackPointer");
+            var stackPointerValue = _builder.BuildCall2(_stackSaveType, _stackSave, Array.Empty<LLVMValueRef>(), "stackPointer");
             _builder.BuildStore(stackPointerValue, stackPointer);
         }
 
@@ -1472,7 +1478,7 @@ public static unsafe class LLVMBackend
                     case InstructionType.LoadPointer:
                     {
                         var value = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        values[instruction.ValueIndex] = _builder.BuildLoad(value);
+                        values[instruction.ValueIndex] = _builder.BuildLoad2(_types[instruction.LoadType.TypeIndex], value);
                         break;
                     }
                     case InstructionType.Store:
@@ -1486,13 +1492,14 @@ public static unsafe class LLVMBackend
                     {
                         var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
                         var index = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        values[instruction.ValueIndex] = _builder.BuildGEP(pointer, instruction.Flag ? new []{_zeroInt, index} : new []{index});
+                        var elementType = GetPointerElementType(instruction.LoadType);
+                        values[instruction.ValueIndex] = _builder.BuildGEP2(elementType, pointer, new []{index});
                         break;
                     }
                     case InstructionType.GetStructPointer:
                     {
                         var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        values[instruction.ValueIndex] = _builder.BuildStructGEP(pointer, (uint)instruction.Index);
+                        values[instruction.ValueIndex] = _builder.BuildStructGEP2(_types[instruction.LoadType.TypeIndex], pointer, (uint)instruction.Index);
                         break;
                     }
                     case InstructionType.GetUnionPointer:
@@ -1505,23 +1512,26 @@ public static unsafe class LLVMBackend
                     case InstructionType.Call:
                     {
                         var callFunction = GetOrCreateFunctionDefinition(instruction.Index);
+                        var callFunctionType = _functionTypes[instruction.Index];
                         var arguments = new LLVMValueRef[instruction.Value1.Values.Length];
                         for (var i = 0; i < instruction.Value1.Values.Length; i++)
                         {
                             arguments[i] = GetValue(instruction.Value1.Values[i], values, allocations, functionPointer);
                         }
-                        values[instruction.ValueIndex] = _builder.BuildCall(callFunction, arguments);
+                        values[instruction.ValueIndex] = _builder.BuildCall2(callFunctionType, callFunction, arguments);
                         break;
                     }
                     case InstructionType.CallFunctionPointer:
                     {
                         var callFunction = GetValue(instruction.Value1, values, allocations, functionPointer);
+                        var callFunctionType = _interfaceTypes[instruction.Value1.Type.TypeIndex];
+                        Debug.Assert(callFunctionType != null);
                         var arguments = new LLVMValueRef[instruction.Value2.Values.Length];
                         for (var i = 0; i < instruction.Value2.Values.Length; i++)
                         {
                             arguments[i] = GetValue(instruction.Value2.Values[i], values, allocations, functionPointer);
                         }
-                        values[instruction.ValueIndex] = _builder.BuildCall(callFunction, arguments);
+                        values[instruction.ValueIndex] = _builder.BuildCall2(callFunctionType, callFunction, arguments);
                         break;
                     }
                     case InstructionType.SystemCall:
@@ -1857,7 +1867,7 @@ public static unsafe class LLVMBackend
                     {
                         var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
                         var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        var diff = _builder.BuildPtrDiff(lhs, rhs);
+                        var diff = _builder.BuildPtrDiff2(lhs.TypeOf, lhs, rhs);
                         values[instruction.ValueIndex] = _builder.BuildICmp(LLVMIntPredicate.LLVMIntEQ, diff, LLVMValueRef.CreateConstInt(LLVM.TypeOf(diff), 0, false));
                         break;
                     }
@@ -1879,7 +1889,7 @@ public static unsafe class LLVMBackend
                     {
                         var lhs = GetValue(instruction.Value1, values, allocations, functionPointer);
                         var rhs = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        var diff = _builder.BuildPtrDiff(lhs, rhs);
+                        var diff = _builder.BuildPtrDiff2(lhs.TypeOf, lhs, rhs);
                         values[instruction.ValueIndex] = _builder.BuildICmp(LLVMIntPredicate.LLVMIntNE, diff, LLVMValueRef.CreateConstInt(LLVM.TypeOf(diff), 0, false));
                         break;
                     }
@@ -1985,7 +1995,8 @@ public static unsafe class LLVMBackend
                     {
                         var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
                         var index = GetValue(instruction.Value2, values, allocations, functionPointer);
-                        values[instruction.ValueIndex] = _builder.BuildGEP(pointer, new []{index});
+                        var elementType = GetPointerElementType(instruction.LoadType);
+                        values[instruction.ValueIndex] = _builder.BuildGEP2(elementType, pointer, new []{index});
                         break;
                     }
                     case InstructionType.IntegerAdd:
@@ -2007,7 +2018,8 @@ public static unsafe class LLVMBackend
                         var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
                         var index = GetValue(instruction.Value2, values, allocations, functionPointer);
                         index = _builder.BuildNeg(index);
-                        values[instruction.ValueIndex] = _builder.BuildGEP(pointer, new []{index});
+                        var elementType = GetPointerElementType(instruction.LoadType);
+                        values[instruction.ValueIndex] = _builder.BuildGEP2(elementType, pointer, new []{index});
                         break;
                     }
                     case InstructionType.IntegerSubtract:
@@ -2340,16 +2352,19 @@ public static unsafe class LLVMBackend
 
     private static void BuildStackRestore(LLVMValueRef stackPointer)
     {
-        const string stackRestoreIntrinsic = "llvm.stackrestore";
-
-        var stackRestore = _module.GetNamedFunction(stackRestoreIntrinsic);
-        if (stackRestore.Handle == IntPtr.Zero)
+        if (_stackRestore == null)
         {
-            stackRestore = _module.AddFunction(stackRestoreIntrinsic, LLVMTypeRef.CreateFunction(LLVM.VoidType(), new [] {_u8PointerType}));
+            _stackRestoreType = LLVMTypeRef.CreateFunction(LLVM.VoidType(), new [] {_u8PointerType});
+            _stackRestore = _module.AddFunction("llvm.stackrestore", _stackRestoreType);
         }
 
-        var stackPointerValue = _builder.BuildLoad(stackPointer);
-        _builder.BuildCall(stackRestore, new []{stackPointerValue});
+        var stackPointerValue = _builder.BuildLoad2(_u8PointerType, stackPointer);
+        _builder.BuildCall2(_stackRestoreType, _stackRestore, new []{stackPointerValue});
+    }
+
+    private static LLVMTypeRef GetPointerElementType(IType type)
+    {
+        return type.TypeKind == TypeKind.Void ? LLVM.Int8Type() : _types[type.TypeIndex];
     }
 
     private static string GetAddressSpace(int addressSpace)
