@@ -803,7 +803,7 @@ bool file_exists(string path) {
 }
 
 struct File {
-    handle: u64;
+    handle: s64;
 }
 
 enum FileFlags {
@@ -899,7 +899,7 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
             SetFilePointer(file_handle, 0, null, MoveMethod.FILE_END);
         }
 
-        file.handle = cast(u64, file_handle);
+        file.handle = cast(s64, file_handle);
     }
 
     return true, file;
