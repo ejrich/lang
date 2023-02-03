@@ -148,6 +148,10 @@ public static class Polymorpher
                 return CopyCompilerDirective(compilerDirective, genericTypes, generics);
             case AssemblyAst assembly:
                 return CopyAssembly(assembly, genericTypes, generics);
+            case SwitchAst switchAst:
+                return CopySwitch(switchAst, genericTypes, generics);
+            case DeferAst defer:
+                return CopyDefer(defer, genericTypes, generics);
             default:
                 return CopyExpression(ast, genericTypes, generics);
         }
@@ -226,6 +230,13 @@ public static class Polymorpher
     {
         var copy = CopyAst(scope);
         CopyAsts(copy.Children, scope.Children, genericTypes, generics);
+
+        if (scope.DeferCount > 0)
+        {
+            copy.DeferCount = scope.DeferCount;
+            copy.DeferredAsts = new(scope.DeferCount);
+        }
+
         return copy;
     }
 
@@ -298,6 +309,31 @@ public static class Polymorpher
 
             copy.OutValues.Add(outValueCopy);
         }
+
+        return copy;
+    }
+
+    private static SwitchAst CopySwitch(SwitchAst switchAst, IType[] genericTypes, List<string> generics)
+    {
+        var copy = CopyAst(switchAst);
+        copy.Value = CopyExpression(switchAst.Value, genericTypes, generics);
+
+        foreach (var (cases, caseScope) in switchAst.Cases)
+        {
+            var caseScopeCopy = CopyScope(caseScope, genericTypes, generics);
+            copy.Cases.Add((cases, caseScopeCopy));
+        }
+
+        if (switchAst.DefaultCase != null)
+            copy.DefaultCase = CopyScope(switchAst.DefaultCase, genericTypes, generics);
+
+        return copy;
+    }
+
+    private static DeferAst CopyDefer(DeferAst defer, IType[] genericTypes, List<string> generics)
+    {
+        var copy = CopyAst(defer);
+        copy.Statement = CopyScope(defer.Statement, genericTypes, generics);
 
         return copy;
     }
