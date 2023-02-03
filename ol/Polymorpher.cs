@@ -203,7 +203,7 @@ public static class Polymorpher
 
         if (declaration.Assignments != null)
         {
-            copy.Assignments = new();
+            copy.Assignments = new(declaration.Assignments.Count);
             foreach (var (name, assignment) in declaration.Assignments)
             {
                 copy.Assignments[name] = CopyAssignment(assignment, genericTypes, generics);
@@ -223,6 +223,20 @@ public static class Polymorpher
         copy.Reference = CopyExpression(assignment.Reference, genericTypes, generics);
         copy.Operator = assignment.Operator;
         copy.Value = CopyExpression(assignment.Value, genericTypes, generics);
+
+        if (assignment.Assignments != null)
+        {
+            copy.Assignments = new(assignment.Assignments.Count);
+            foreach (var (name, subAssignment) in assignment.Assignments)
+            {
+                copy.Assignments[name] = CopyAssignment(subAssignment, genericTypes, generics);
+            }
+        }
+        else if (assignment.ArrayValues != null)
+        {
+            copy.ArrayValues = assignment.ArrayValues.Select(value => CopyExpression(value, genericTypes, generics)).ToList();
+        }
+
         return copy;
     }
 
