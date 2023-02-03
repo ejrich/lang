@@ -123,7 +123,8 @@ public static class TypeChecker
 
                             if (!ProgramRunner.ExecuteCondition(condition, directive.Value))
                             {
-                                ErrorReporter.Report("Assertion failed", directive.Value);
+                                var message = directive.AssertMessage == null ? "Assertion failed" : $"Assertion failed, {directive.AssertMessage}";
+                                ErrorReporter.Report(message, directive.Value);
                             }
                         }
                         break;
@@ -1806,11 +1807,17 @@ public static class TypeChecker
                                 {
                                     if (function is FunctionAst functionAst)
                                     {
-                                        ErrorReporter.Report($"Assertion failed in function '{functionAst.Name}'", directive.Value);
+                                        var message = $"Assertion failed in function '{functionAst.Name}'";
+                                        if (directive.AssertMessage != null)
+                                            message += $", {directive.AssertMessage}";
+                                        ErrorReporter.Report(message, directive.Value);
                                     }
                                     else if (function is OperatorOverloadAst overload)
                                     {
-                                        ErrorReporter.Report($"Assertion failed in overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}'", directive.Value);
+                                        var message = $"Assertion failed in overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}'";
+                                        if (directive.AssertMessage != null)
+                                            message += $", {directive.AssertMessage}";
+                                        ErrorReporter.Report(message, directive.Value);
                                     }
                                 }
                             }
