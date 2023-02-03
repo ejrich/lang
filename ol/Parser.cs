@@ -763,9 +763,6 @@ public static class Parser
                 case "inline":
                     function.Flags |= FunctionFlags.Inline;
                     break;
-                case "macro":
-                    function.Flags |= FunctionFlags.Macro;
-                    break;
                 default:
                     ErrorReporter.Report($"Unexpected compiler directive '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
                     break;
@@ -2813,11 +2810,7 @@ public static class Parser
             case "insert":
                 directive.Type = DirectiveType.Insert;
                 enumerator.MoveNext();
-                directive.Value = ParseExpression(enumerator, currentFunction);
-                if (!currentFunction.Flags.HasFlag(FunctionFlags.Macro))
-                {
-                    ErrorReporter.Report($"Expected #insert to be in a macro", enumerator.FileIndex, token);
-                }
+                directive.Value = ParseScopeBody(enumerator, currentFunction);
                 break;
             default:
                 ErrorReporter.Report($"Unsupported function level compiler directive '{token.Value}'", enumerator.FileIndex, token);

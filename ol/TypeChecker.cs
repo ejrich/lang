@@ -43,7 +43,6 @@ public static class TypeChecker
         TypeTable.FloatType = AddPrimitive("float", TypeKind.Float, 4, true);
         TypeTable.Float64Type = AddPrimitive("float64", TypeKind.Float, 8, true);
         TypeTable.TypeType = AddPrimitive("Type", TypeKind.Type, 4, true);
-        TypeTable.CodeType = new() {Name = "Code"};
     }
 
     private static PrimitiveAst AddPrimitive(string name, TypeKind typeKind, uint size, bool signed = false)
@@ -137,15 +136,7 @@ public static class TypeChecker
             }
         } while (Parser.Directives.Head != null);
 
-        // 2. Verify the rest of the types
-        var astNode = Parser.Asts.Head;
-        while (astNode != null)
-        {
-            VerifyAst(astNode.Data);
-            astNode = astNode.Next;
-        }
-
-        // 3. Execute any other compiler directives
+        // 2. Execute any other compiler directives
         foreach (var runDirective in runQueue)
         {
             var scope = GetFileScope(runDirective);
@@ -163,6 +154,14 @@ public static class TypeChecker
 
                 ProgramRunner.RunProgram(function, scopeAst);
             }
+        }
+
+        // 3. Verify the rest of the types
+        var astNode = Parser.Asts.Head;
+        while (astNode != null)
+        {
+            VerifyAst(astNode.Data);
+            astNode = astNode.Next;
         }
 
         ClearAstQueue();
@@ -1188,10 +1187,6 @@ public static class TypeChecker
                 {
                     argument.Type = TypeTable.RawStringType;
                 }
-                else if (!function.Flags.HasFlag(FunctionFlags.Macro) && argument.Type?.TypeKind == TypeKind.Code)
-                {
-                    ErrorReporter.Report($"Cannot only pass Code argument '{argument.Name}' in a macro", argument);
-                }
             }
 
             // 3c. Check for default arguments
@@ -1262,34 +1257,6 @@ public static class TypeChecker
             else if (function.Flags.HasFlag(FunctionFlags.Syscall))
             {
                 ErrorReporter.Report("System calls are already inlined, remove #inline directive", function);
-            }
-            else if (function.Flags.HasFlag(FunctionFlags.Macro))
-            {
-                ErrorReporter.Report("Macros cannot be inlined, as they are expanded when evaluated", function);
-            }
-        }
-
-        if (function.Flags.HasFlag(FunctionFlags.Macro))
-        {
-            if (function.Generics.Any())
-            {
-                ErrorReporter.Report("Macros cannot have generics", function);
-            }
-            else if (function.Flags.HasFlag(FunctionFlags.Extern))
-            {
-                ErrorReporter.Report("Extern functions cannot be macros", function);
-            }
-            else if (function.Flags.HasFlag(FunctionFlags.Compiler))
-            {
-                ErrorReporter.Report("Functions that call the compiler are not macros", function);
-            }
-            else if (function.Flags.HasFlag(FunctionFlags.Syscall))
-            {
-                ErrorReporter.Report("System calls are are not macros", function);
-            }
-            else if (function.Flags.HasFlag(FunctionFlags.Inline))
-            {
-                ErrorReporter.Report("Macros cannot be inlined, as they are expanded when evaluated", function);
             }
         }
 
@@ -1660,7 +1627,7 @@ public static class TypeChecker
             }
         }
 
-        if (!ErrorReporter.Errors.Any() && !function.Flags.HasFlag(FunctionFlags.Inline) && !function.Flags.HasFlag(FunctionFlags.Macro))
+        if (!ErrorReporter.Errors.Any() && !function.Flags.HasFlag(FunctionFlags.Inline))
         {
             ThreadPool.QueueWork(WriteFunctionJob, function);
         }
@@ -1718,7 +1685,7 @@ public static class TypeChecker
         ProgramIRBuilder.AddOperatorOverload((OperatorOverloadAst)overload);
     }
 
-    private static void VerifyScope(ScopeAst scope, IFunction function, bool inDefer = false, bool canBreak = false)
+    private static void VerifyScope(ScopeAst scope, IFunction function, bool inDefer = false, bool canBreak = false, bool insert = false)
     {
         for (var i = 0; i < scope.Children.Count; i++)
         {
@@ -1727,7 +1694,7 @@ public static class TypeChecker
             {
                 case ScopeAst childScope:
                     childScope.Parent = scope;
-                    VerifyScope(childScope, function, inDefer, canBreak);
+                    VerifyScope(childScope, function, inDefer, canBreak, insert);
                     if (childScope.Returns)
                     {
                         scope.Returns = true;
@@ -1740,21 +1707,21 @@ public static class TypeChecker
                 case WhileAst whileAst:
                     whileAst.Body.Parent = scope;
                     VerifyCondition(whileAst.Condition, function, scope, out _);
-                    VerifyScope(whileAst.Body, function, inDefer, true);
+                    VerifyScope(whileAst.Body, function, inDefer, true, insert);
                     break;
                 case EachAst each:
                     each.Body.Parent = scope;
                     VerifyEach(each, function, scope);
-                    VerifyScope(each.Body, function, inDefer, true);
+                    VerifyScope(each.Body, function, inDefer, true, insert);
                     break;
                 case ConditionalAst conditional:
                     VerifyCondition(conditional.Condition, function, scope, out _);
                     conditional.IfBlock.Parent = scope;
-                    VerifyScope(conditional.IfBlock, function, inDefer, canBreak);
+                    VerifyScope(conditional.IfBlock, function, inDefer, canBreak, insert);
                     if (conditional.ElseBlock != null)
                     {
                         conditional.ElseBlock.Parent = scope;
-                        VerifyScope(conditional.ElseBlock, function, inDefer, canBreak);
+                        VerifyScope(conditional.ElseBlock, function, inDefer, canBreak, insert);
 
                         if (conditional.IfBlock.Returns && conditional.ElseBlock.Returns)
                         {
@@ -1823,11 +1790,15 @@ public static class TypeChecker
                             }
                             break;
                         case DirectiveType.Insert:
-                            var valueType = VerifyExpression(directive.Value, function, scope);
-                            if (valueType != null && valueType.TypeKind != TypeKind.Code)
+                            var insertScope = (ScopeAst)directive.Value;
+                            VerifyScope(insertScope, null, insert: true);
+                            if (!insertScope.Returns)
                             {
-                                ErrorReporter.Report($"Expected to insert type 'Code', but got '{valueType.Name}'", directive.Value);
+                                ErrorReporter.Report($"Expected #insert block to return a string", insertScope);
                             }
+                            // TODO Run the code in the block and parse the string into a code block
+                            // scope.Children[i] = ;
+                            scope.Children.RemoveAt(i--); // Remove later
                             break;
                     }
                     break;
@@ -1836,7 +1807,7 @@ public static class TypeChecker
                     {
                         ErrorReporter.Report("Cannot return in a defer statement", returnAst);
                     }
-                    VerifyReturnStatement(returnAst, function, scope);
+                    VerifyReturnStatement(returnAst, function, scope, insert);
                     scope.Returns = true;
                     break;
                 case DeclarationAst declaration:
@@ -1852,11 +1823,11 @@ public static class TypeChecker
                     VerifyInlineAssembly(assembly, scope);
                     break;
                 case SwitchAst switchAst:
-                    VerifySwitch(switchAst, function, scope, inDefer, canBreak);
+                    VerifySwitch(switchAst, function, scope, inDefer, canBreak, insert);
                     break;
                 case DeferAst defer:
                     defer.Statement.Parent = scope;
-                    VerifyScope(defer.Statement, function, true);
+                    VerifyScope(defer.Statement, function, true, false, insert);
                     break;
                 case BreakAst:
                     scope.Breaks = true;
@@ -1879,37 +1850,39 @@ public static class TypeChecker
         }
     }
 
-    private static void VerifyReturnStatement(ReturnAst returnAst, IFunction currentFunction, IScope scope)
+    private static void VerifyReturnStatement(ReturnAst returnAst, IFunction currentFunction, IScope scope, bool insert)
     {
-        if (currentFunction == null)
+        if (currentFunction == null && !insert)
         {
             ErrorReporter.Report("Cannot return in #run directive", returnAst);
             return;
         }
 
-        if (currentFunction.ReturnType != null)
+        var returnType = insert ? TypeTable.StringType : currentFunction.ReturnType;
+
+        if (returnType != null)
         {
             if (returnAst.Value == null)
             {
-                if (currentFunction.ReturnType.TypeKind != TypeKind.Void)
+                if (returnType.TypeKind != TypeKind.Void)
                 {
-                    ErrorReporter.Report($"Expected to return type '{currentFunction.ReturnType.Name}'", returnAst);
+                    ErrorReporter.Report($"Expected to return type '{returnType.Name}'", returnAst);
                 }
             }
             else if (returnAst.Value is NullAst nullAst)
             {
-                if (currentFunction.ReturnType.TypeKind == TypeKind.Pointer)
+                if (returnType.TypeKind == TypeKind.Pointer)
                 {
-                    nullAst.TargetType = currentFunction.ReturnType;
+                    nullAst.TargetType = returnType;
                 }
                 else
                 {
-                    ErrorReporter.Report($"Expected to return type '{currentFunction.ReturnType.Name}'", returnAst);
+                    ErrorReporter.Report($"Expected to return type '{returnType.Name}'", returnAst);
                 }
             }
             else if (returnAst.Value is CompoundExpressionAst compoundExpression)
             {
-                if (currentFunction.ReturnType is CompoundType compoundType && compoundType.Types.Length == compoundExpression.Children.Count)
+                if (returnType is CompoundType compoundType && compoundType.Types.Length == compoundExpression.Children.Count)
                 {
                     var error = false;
                     for (var i = 0; i < compoundType.Types.Length; i++)
@@ -1939,13 +1912,13 @@ public static class TypeChecker
                     }
                     if (error)
                     {
-                        ErrorReporter.Report($"Expected to return type '{currentFunction.ReturnType.Name}'", returnAst);
+                        ErrorReporter.Report($"Expected to return type '{returnType.Name}'", returnAst);
                     }
                 }
                 else
                 {
                     VerifyExpression(returnAst.Value, currentFunction, scope);
-                    ErrorReporter.Report($"Expected to return type '{currentFunction.ReturnType.Name}'", returnAst);
+                    ErrorReporter.Report($"Expected to return type '{returnType.Name}'", returnAst);
                 }
             }
             else
@@ -1953,12 +1926,12 @@ public static class TypeChecker
                 var returnValueType = VerifyExpression(returnAst.Value, currentFunction, scope);
                 // if (returnValueType == null)
                 // {
-                //     ErrorReporter.Report($"Expected to return type '{currentFunction.ReturnType.Name}'", returnAst);
+                //     ErrorReporter.Report($"Expected to return type '{returnType.Name}'", returnAst);
                 // }
-                // else if (!TypeEquals(currentFunction.ReturnType, returnValueType))
-                if (returnValueType != null && !TypeEquals(currentFunction.ReturnType, returnValueType))
+                // else if (!TypeEquals(returnType, returnValueType))
+                if (returnValueType != null && !TypeEquals(returnType, returnValueType))
                 {
-                    ErrorReporter.Report($"Expected to return type '{currentFunction.ReturnType.Name}', but returned type '{returnValueType.Name}'", returnAst.Value);
+                    ErrorReporter.Report($"Expected to return type '{returnType.Name}', but returned type '{returnValueType.Name}'", returnAst.Value);
                 }
             }
         }
@@ -3502,7 +3475,7 @@ public static class TypeChecker
         return value.Dereference == arg.Memory && value.RegisterDefinition.Type == arg.Type && value.RegisterDefinition.Size == arg.RegisterSize;
     }
 
-    private static void VerifySwitch(SwitchAst switchAst, IFunction currentFunction, IScope scope, bool inDefer, bool canBreak)
+    private static void VerifySwitch(SwitchAst switchAst, IFunction currentFunction, IScope scope, bool inDefer, bool canBreak, bool insert)
     {
         var valueType = VerifyExpression(switchAst.Value, currentFunction, scope);
         if (valueType != null)
@@ -3545,13 +3518,13 @@ public static class TypeChecker
             }
 
             body.Parent = scope;
-            VerifyScope(body, currentFunction, inDefer, canBreak);
+            VerifyScope(body, currentFunction, inDefer, canBreak, insert);
         }
 
         if (switchAst.DefaultCase != null)
         {
             switchAst.DefaultCase.Parent = scope;
-            VerifyScope(switchAst.DefaultCase, currentFunction, inDefer, canBreak);
+            VerifyScope(switchAst.DefaultCase, currentFunction, inDefer, canBreak, insert);
         }
     }
 
@@ -4387,7 +4360,7 @@ public static class TypeChecker
                 VerifyFunctionDefinition(function);
             }
 
-            if (VerifyArguments(call, arguments, specifiedArguments, function, function.Flags.HasFlag(FunctionFlags.Varargs), function.Flags.HasFlag(FunctionFlags.Params), function.ParamsElementType, function.Flags.HasFlag(FunctionFlags.Extern), function.Flags.HasFlag(FunctionFlags.Macro)))
+            if (VerifyArguments(call, arguments, specifiedArguments, function, function.Flags.HasFlag(FunctionFlags.Varargs), function.Flags.HasFlag(FunctionFlags.Params), function.ParamsElementType, function.Flags.HasFlag(FunctionFlags.Extern)))
             {
                 matchedFunction = function;
                 return true;
@@ -4625,7 +4598,7 @@ public static class TypeChecker
         return false;
     }
 
-    private static bool VerifyArguments(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments, IInterface function, bool varargs = false, bool Params = false, IType paramsElementType = null, bool Extern = false, bool macro = false)
+    private static bool VerifyArguments(CallAst call, IType[] arguments, Dictionary<string, IType> specifiedArguments, IInterface function, bool varargs = false, bool Params = false, IType paramsElementType = null, bool Extern = false)
     {
         var match = true;
         var callArgIndex = 0;
@@ -4641,7 +4614,7 @@ public static class TypeChecker
                     var functionArg = function.Arguments[argIndex];
                     if (functionArg.Name == name)
                     {
-                        if (VerifyArgument(argument, specifiedArguments[name], functionArg.Type, Extern, macro))
+                        if (VerifyArgument(argument, specifiedArguments[name], functionArg.Type, Extern))
                         {
                             found = true;
                         }
@@ -4678,7 +4651,7 @@ public static class TypeChecker
             }
             else
             {
-                if (VerifyArgument(argumentAst, arguments[callArgIndex], functionArg.Type, Extern, macro))
+                if (VerifyArgument(argumentAst, arguments[callArgIndex], functionArg.Type, Extern))
                 {
                     callArgIndex++;
                 }
@@ -4870,7 +4843,7 @@ public static class TypeChecker
         }
     }
 
-    private static bool VerifyArgument(IAst argumentAst, IType callType, IType argumentType, bool externCall = false, bool macro = false)
+    private static bool VerifyArgument(IAst argumentAst, IType callType, IType argumentType, bool externCall = false)
     {
         if (argumentType == null)
         {
@@ -4883,7 +4856,7 @@ public static class TypeChecker
                 return false;
             }
         }
-        else if (argumentType.TypeKind != TypeKind.Type && argumentType.TypeKind != TypeKind.Any && !(macro && argumentType.TypeKind == TypeKind.Code))
+        else if (argumentType.TypeKind != TypeKind.Type && argumentType.TypeKind != TypeKind.Any)
         {
             if (externCall && callType.TypeKind == TypeKind.String)
             {
@@ -5602,12 +5575,6 @@ public static class TypeChecker
                     ErrorReporter.Report("Type 'Any' cannot have generics", type);
                 }
                 return TypeTable.AnyType;
-            case "Code":
-                if (hasGenerics || depth > 0 || !allowParams)
-                {
-                    ErrorReporter.Report("Type 'Code' must be a standalone type used as an argument", type);
-                }
-                return TypeTable.CodeType;
             default:
                 if (hasGenerics)
                 {

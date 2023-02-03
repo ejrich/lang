@@ -59,8 +59,7 @@ public enum FunctionFlags
     ExternInitted = 0x1000,
     Queued = 0x2000,
     PassCallLocation = 0x4000,
-    Inline = 0x8000,
-    Macro = 0x10000
+    Inline = 0x8000
 }
 
 public interface IValues : IAst
@@ -688,19 +687,6 @@ public class TypeDefinition : IAst
     public IType BakedType { get; set; }
 }
 
-public class CodeType : IType
-{
-    public int FileIndex { get; set; }
-    public string Name { get; set; }
-    public int TypeIndex { get; set; }
-    public TypeKind TypeKind { get; set; } = TypeKind.Code;
-    // Fields not used
-    public uint Size { get; set; }
-    public uint Alignment { get; set; }
-    public bool Used { get; set; }
-    public bool Private { get; set; }
-}
-
 public enum Operator
 {
     None = 0,
@@ -766,6 +752,5 @@ public enum TypeKind
     Type,
     Any,
     Compound,
-    Function,
-    Code
+    Function
 }

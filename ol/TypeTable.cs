@@ -31,7 +31,6 @@ public unsafe static class TypeTable
     public static StructAst AnyType;
     public static IType TypeInfoPointerType;
     public static IType VoidPointerType;
-    public static CodeType CodeType;
 
     public static void Add(IType type)
     {
