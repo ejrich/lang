@@ -1594,7 +1594,7 @@ public static class TypeChecker
         do {
             if (scope.Identifiers.TryGetValue(name, out ast))
             {
-                global = scope.Parent == null;
+                global = scope is GlobalScope || scope is PrivateScope;
                 return true;
             }
             scope = scope.Parent;
