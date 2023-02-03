@@ -84,12 +84,12 @@ public static class ProgramIRBuilder
         }
     }
 
-    public static FunctionIR CreateRunnableFunction(ScopeAst scope)
+    public static FunctionIR CreateRunnableFunction(ScopeAst scope, IType returnType)
     {
         var function = new FunctionIR {Allocations = new(), Instructions = new(), BasicBlocks = new()};
         AddBasicBlock(function);
 
-        EmitScope(function, scope, null, null, null);
+        EmitScope(function, scope, returnType, null, null);
 
         if (!scope.Returns)
         {

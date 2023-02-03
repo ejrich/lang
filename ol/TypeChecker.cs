@@ -149,7 +149,7 @@ public static class TypeChecker
             {
                 ThreadPool.CompleteWork();
 
-                var function = ProgramIRBuilder.CreateRunnableFunction(scopeAst);
+                var function = ProgramIRBuilder.CreateRunnableFunction(scopeAst, TypeTable.VoidType);
                 ProgramRunner.Init();
 
                 ProgramRunner.RunProgram(function, scopeAst);
@@ -1795,10 +1795,26 @@ public static class TypeChecker
                             if (!insertScope.Returns)
                             {
                                 ErrorReporter.Report($"Expected #insert block to return a string", insertScope);
+                                scope.Children.RemoveAt(i--);
                             }
-                            // TODO Run the code in the block and parse the string into a code block
-                            // scope.Children[i] = ;
-                            scope.Children.RemoveAt(i--); // Remove later
+                            else
+                            {
+                                ClearAstQueue();
+
+                                if (!ErrorReporter.Errors.Any())
+                                {
+                                    ThreadPool.CompleteWork();
+
+                                    var insertFunction = ProgramIRBuilder.CreateRunnableFunction(insertScope, TypeTable.StringType);
+                                    ProgramRunner.Init();
+
+                                    var code = ProgramRunner.ExecuteInsert(insertFunction, insertScope);
+
+                                    // TODO Run the code in the block and parse the string into a code block
+                                    // scope.Children[i] = ;
+                                    scope.Children.RemoveAt(i--); // Remove
+                                }
+                            }
                             break;
                     }
                     break;

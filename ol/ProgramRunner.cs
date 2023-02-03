@@ -317,6 +317,24 @@ public static unsafe class ProgramRunner
         }
     }
 
+    public static string ExecuteInsert(FunctionIR function, IAst source)
+    {
+        try
+        {
+            var returnRegister = ExecuteFunction(function);
+            var code = Marshal.PtrToStructure<String>(returnRegister.Pointer);
+            return Marshal.PtrToStringAnsi(code.Data, (int)code.Length);
+        }
+        catch (Exception e)
+        {
+            ErrorReporter.Report("Internal compiler error executing insert code", source);
+            #if DEBUG
+            Console.WriteLine(e);
+            #endif
+            return string.Empty;
+        }
+    }
+
     private static void SetLinker(byte linker)
     {
         BuildSettings.Linker = (LinkerType)linker;
