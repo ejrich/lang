@@ -2661,6 +2661,11 @@ public static class Parser
                 directive.Type = DirectiveType.Assert;
                 enumerator.MoveNext();
                 directive.Value = ParseExpression(enumerator, null);
+                if (enumerator.Peek(out var message) && message.Type == TokenType.Literal)
+                {
+                    directive.AssertMessage = message.Value;
+                    enumerator.MoveNext();
+                }
                 break;
             case "import":
                 if (!enumerator.MoveNext())
@@ -2786,6 +2791,11 @@ public static class Parser
                 directive.Type = DirectiveType.Assert;
                 enumerator.MoveNext();
                 directive.Value = ParseExpression(enumerator, currentFunction);
+                if (enumerator.Peek(out var message) && message.Type == TokenType.Literal)
+                {
+                    directive.AssertMessage = message.Value;
+                    enumerator.MoveNext();
+                }
                 currentFunction.Flags |= FunctionFlags.HasDirectives;
                 break;
             case "inline":

@@ -523,6 +523,7 @@ public class CompilerDirectiveAst : IAst
     public IAst Value { get; set; }
     public Import Import { get; set; }
     public Library Library { get; set; }
+    public string AssertMessage { get; set; }
 }
 
 public class Import
