@@ -6,7 +6,7 @@ main() {
 
     i := 0;
 
-    #insert return macro_with_code("print(\"i = %\n\", i++)");
+    #insert return macro_with_code("print(\"i = %\\n\", i++)");
 }
 
 #run {
@@ -21,8 +21,5 @@ macro(string message) {
 }
 
 string macro_with_code(string code) {
-    return format_string(
-    "each i in 0..4 {
-        %
-    }", code);
+    return format_string("each i in 0..4 {\n    %;\n}", code);
 }
