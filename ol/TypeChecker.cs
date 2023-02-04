@@ -1796,12 +1796,12 @@ public static class TypeChecker
                             }
                             break;
                         case DirectiveType.Insert:
+                            scope.Children.RemoveAt(i);
                             var insertScope = (ScopeAst)directive.Value;
                             VerifyScope(insertScope, null, insert: true);
                             if (!insertScope.Returns)
                             {
                                 ErrorReporter.Report($"Expected #insert block to return a string", insertScope);
-                                scope.Children.RemoveAt(i--);
                             }
                             else
                             {
@@ -1816,13 +1816,12 @@ public static class TypeChecker
 
                                     var code = ProgramRunner.ExecuteInsert(insertFunction, insertScope);
                                     var line = AddCodeString(code, function, directive);
-                                    var insertedCode =  Parser.ParseInsertedCode(code, _generatedCodeFileIndex, line);
+                                    var insertedCode =  Parser.ParseInsertedCode(code, scope, _generatedCodeFileIndex, line);
 
-                                    insertedCode.Parent = scope;
-                                    VerifyScope(insertedCode, function, inDefer, canBreak, insert);
-                                    scope.Children[i] = insertedCode;
+                                    scope.Children.InsertRange(i, insertedCode);
                                 }
                             }
+                            i--;
                             break;
                     }
                     break;
