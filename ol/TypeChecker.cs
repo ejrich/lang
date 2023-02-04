@@ -20,6 +20,10 @@ public static class TypeChecker
 
     private static Queue<IAst> _astCompleteQueue = new();
 
+    private static int _generatedCodeFileIndex;
+    private static uint _generatedCodeLineCount;
+    private static StreamWriter _generatedCodeWriter;
+
     public static void Init()
     {
         GlobalScope = new();
@@ -178,10 +182,12 @@ public static class TypeChecker
             ErrorReporter.Report("'main' function of the program is not defined");
         }
 
-        foreach (var (name, inputVariable) in BuildSettings.InputVariables.Where(v => !v.Value.Used))
+        foreach (var (name, _) in BuildSettings.InputVariables.Where(v => !v.Value.Used))
         {
             ErrorReporter.Report($"Input variable '{name}' was not found as a global constant");
         }
+
+        _generatedCodeWriter?.Close();
     }
 
     private static void RemoveNode<T>(SafeLinkedList<T> list, Node<T> previous, Node<T> current)
@@ -1809,10 +1815,12 @@ public static class TypeChecker
                                     ProgramRunner.Init();
 
                                     var code = ProgramRunner.ExecuteInsert(insertFunction, insertScope);
+                                    var line = AddCodeString(code, function, directive);
+                                    var insertedCode =  Parser.ParseInsertedCode(code, _generatedCodeFileIndex, line);
 
-                                    // TODO Run the code in the block and parse the string into a code block
-                                    // scope.Children[i] = ;
-                                    scope.Children.RemoveAt(i--); // Remove
+                                    insertedCode.Parent = scope;
+                                    VerifyScope(insertedCode, function, inDefer, canBreak, insert);
+                                    scope.Children[i] = insertedCode;
                                 }
                             }
                             break;
@@ -1864,6 +1872,51 @@ public static class TypeChecker
                     break;
             }
         }
+    }
+
+    private static uint AddCodeString(string code, IFunction function, IAst source)
+    {
+        if (_generatedCodeWriter == null)
+        {
+            _generatedCodeWriter = new StreamWriter(BuildSettings.GeneratedCodeFile);
+            _generatedCodeLineCount = 1;
+            _generatedCodeFileIndex = BuildSettings.Files.Count;
+            BuildSettings.Files.Add(BuildSettings.GeneratedCodeFile);
+            PrivateScopes.Add(null);
+        }
+
+        string header;
+        if (function != null && source != null)
+        {
+            header = $"\n// Generated code for {function.Name} in {BuildSettings.FileName(source.FileIndex)} at line {source.Line}:{source.Column}\n\n";
+        }
+        else if (function != null)
+        {
+            header = $"\n// Generated code from calling {function.Name}\n\n";
+        }
+        else if (source != null)
+        {
+            header = $"\n// Generated code from {BuildSettings.FileName(source.FileIndex)} at line {source.Line}:{source.Column}\n\n";
+        }
+        else
+        {
+            header = $"\n// Generated code\n\n";
+        }
+
+        _generatedCodeWriter.Write(header);
+
+        _generatedCodeLineCount += 3;
+        var initialLine = _generatedCodeLineCount;
+
+        foreach (var c in code)
+        {
+            if (c == '\n')
+                _generatedCodeLineCount++;
+        }
+        _generatedCodeLineCount++;
+        _generatedCodeWriter.WriteLine(code);
+
+        return initialLine;
     }
 
     private static void VerifyReturnStatement(ReturnAst returnAst, IFunction currentFunction, IScope scope, bool insert)

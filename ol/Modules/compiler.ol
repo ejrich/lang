@@ -1,5 +1,7 @@
 //------------------- Compiler module --------------------
 
+///// Build configurations and options
+
 enum BuildEnv : u8 {
     None;
     Debug;
@@ -42,4 +44,11 @@ enum OutputArchitecture : u8 {
 
 set_output_architecture(OutputArchitecture arch) #compiler
 
-// insert_code(Scope* scope, Code code) #compiler
+
+///// Metaprogramming functions for code exploration and generation
+
+struct Function {} // Opaque struct to reference function and overload ASTs
+
+insert_code(Function* scope, string code) #compiler
+
+add_code(string code) #compiler

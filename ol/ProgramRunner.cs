@@ -209,7 +209,7 @@ public static unsafe class ProgramRunner
         {
             for (var i = _fileNames.Count; i < BuildSettings.Files.Count; i++)
             {
-                var fileName = Allocator.MakeString(BuildSettings.Files[i].Replace(BuildSettings.Path, string.Empty), false);
+                var fileName = Allocator.MakeString(BuildSettings.FileName(i), false);
                 _fileNames.Add(fileName);
             }
         }

@@ -52,16 +52,16 @@ public static class Lexer
     {
         var fileText = File.ReadAllText(filePath);
 
-        var tokens = new List<Token>();
+        var tokens = new List<Token>(fileText.Length / 5);
         ParseTokens(fileText, fileIndex, tokens);
 
         return tokens;
     }
 
-    public static void ParseTokens(string fileText, int fileIndex, List<Token> tokens)
+    public static void ParseTokens(string fileText, int fileIndex, List<Token> tokens, uint line = 1)
     {
         Token token;
-        uint line = 1, column = 0;
+        uint column = 0;
 
         for (var i = 0; i < fileText.Length; i++)
         {

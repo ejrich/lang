@@ -17,6 +17,7 @@ public static class BuildSettings
     public static string Path { get; set; }
     public static string ObjectDirectory { get; set; }
     public static string OutputDirectory { get; set; }
+    public static string GeneratedCodeFile { get; set; }
     public static List<string> Files { get; } = new();
     public static List<FileInfo> FilesToCopy { get; } = new();
     // These are the libraries that are linked in with -l{name}
@@ -26,6 +27,8 @@ public static class BuildSettings
     // These are additional dependencies that need to be linked with the executable
     public static HashSet<Library> Libraries { get; } = new();
     public static Dictionary<string, InputVariable> InputVariables { get; } = new();
+
+    public static string FileName(int index) => BuildSettings.Files[index].Replace(BuildSettings.Path, string.Empty);
 }
 
 public enum LinkerType : byte
@@ -121,6 +124,7 @@ public static class ol
                             entrypoint = Path.GetFullPath(arg);
                             BuildSettings.Path = Path.GetDirectoryName(entrypoint);
                             BuildSettings.ObjectDirectory = Path.Combine(BuildSettings.Path, "obj");
+                            BuildSettings.GeneratedCodeFile = Path.Combine(BuildSettings.ObjectDirectory, ".generated_code.ol");
                             if (!Directory.Exists(BuildSettings.ObjectDirectory))
                                 Directory.CreateDirectory(BuildSettings.ObjectDirectory);
                         }

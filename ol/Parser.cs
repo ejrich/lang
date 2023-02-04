@@ -305,6 +305,21 @@ public static class Parser
         }
     }
 
+    public static ScopeAst ParseInsertedCode(string code, int fileIndex, uint line)
+    {
+        var tokens = new List<Token>(code.Length / 5);
+        Lexer.ParseTokens(code, fileIndex, tokens, line);
+
+        var enumerator = new TokenEnumerator(fileIndex, tokens);
+        var scope = CreateAst<ScopeAst>(enumerator);
+        while (enumerator.MoveNext())
+        {
+            ParseLine(enumerator, scope, null);
+        }
+
+        return scope;
+    }
+
     private static IAst ParseTopLevelAst(TokenEnumerator enumerator, string directory)
     {
         var attributes = ParseAttributes(enumerator);

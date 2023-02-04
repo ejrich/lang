@@ -61,7 +61,7 @@ public static class ErrorReporter
             {
                 if (error.FileIndex.HasValue && error.FileIndex >= 0)
                 {
-                    Console.WriteLine($"{BuildSettings.Files[error.FileIndex.Value].Replace(BuildSettings.Path, string.Empty)}: {error.Message} at line {error.Line}:{error.Column}");
+                    Console.WriteLine($"{BuildSettings.FileName(error.FileIndex.Value)}: {error.Message} at line {error.Line}:{error.Column}");
                 }
                 else
                 {
