@@ -11,8 +11,6 @@ namespace ol;
 
 public static unsafe class LLVMBackend
 {
-    private const string ObjectDirectory = "obj";
-
     private static LLVMModuleRef _module;
     private static LLVMContextRef _context;
     private static LLVMBuilderRef _builder;
@@ -75,15 +73,10 @@ public static unsafe class LLVMBackend
 
     public static string Build()
     {
-        // 1. Verify obj directory exists
-        var objectPath = Path.Combine(BuildSettings.Path, ObjectDirectory);
-        if (!Directory.Exists(objectPath))
-            Directory.CreateDirectory(objectPath);
+        // 1. Initialize the LLVM module and builder
+        InitLLVM();
 
-        // 2. Initialize the LLVM module and builder
-        InitLLVM(objectPath);
-
-        // 3. Declare types
+        // 2. Declare types
         _types = new LLVMTypeRef[TypeTable.Count];
         _typeInfos = new LLVMValueRef[TypeTable.Count];
         _interfaceTypes = new LLVMTypeRef[TypeTable.Count];
@@ -141,7 +134,7 @@ public static unsafe class LLVMBackend
             }
         }
 
-        // 4. Declare global variables
+        // 3. Declare global variables
         LLVMValueRef typeTable = null;
         _globals = new LLVMValueRef[Program.GlobalVariables.Count];
         for (var i = 0; i < Program.GlobalVariables.Count; i++)
@@ -195,7 +188,7 @@ public static unsafe class LLVMBackend
             }
         }
 
-        // 5. Write the program beginning at the entrypoint
+        // 4. Write the program beginning at the entrypoint
         WriteFunctionDefinition("__start", Program.EntryPoint);
         while (_functionsToWrite.Any())
         {
@@ -203,16 +196,16 @@ public static unsafe class LLVMBackend
             WriteFunction(functionPointer, function);
         }
 
-        // 6. Write type table
+        // 5. Write type table
         var typeArray = CreateConstantArray(_typeInfoPointerType, _typeInfoArrayType, _typeInfos, "____type_array");
         LLVM.SetInitializer(typeTable, typeArray);
 
-        // 7. Compile to object file
-        var baseFileName = Path.Combine(objectPath, BuildSettings.Name);
+        // 6. Compile to object file
+        var baseFileName = Path.Combine(BuildSettings.ObjectDirectory, BuildSettings.Name);
         return Compile(baseFileName, BuildSettings.OutputAssembly);
     }
 
-    private static void InitLLVM(string objectPath)
+    private static void InitLLVM()
     {
         _module = LLVMModuleRef.CreateWithName(BuildSettings.Name);
         _context = _module.Context;

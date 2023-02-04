@@ -15,6 +15,7 @@ public static class BuildSettings
     public static bool EmitDebug { get; set; } = true;
     public static bool OutputAssembly { get; set; }
     public static string Path { get; set; }
+    public static string ObjectDirectory { get; set; }
     public static string OutputDirectory { get; set; }
     public static List<string> Files { get; } = new();
     public static List<FileInfo> FilesToCopy { get; } = new();
@@ -119,6 +120,9 @@ public static class ol
                             BuildSettings.Name = Path.GetFileNameWithoutExtension(arg);
                             entrypoint = Path.GetFullPath(arg);
                             BuildSettings.Path = Path.GetDirectoryName(entrypoint);
+                            BuildSettings.ObjectDirectory = Path.Combine(BuildSettings.Path, "obj");
+                            if (!Directory.Exists(BuildSettings.ObjectDirectory))
+                                Directory.CreateDirectory(BuildSettings.ObjectDirectory);
                         }
                     }
                     break;
