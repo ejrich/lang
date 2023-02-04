@@ -305,19 +305,19 @@ public static class Parser
         }
     }
 
-    public static ScopeAst ParseInsertedCode(string code, int fileIndex, uint line)
+    public static List<IAst> ParseInsertedCode(string code, ScopeAst scope, int fileIndex, uint line)
     {
         var tokens = new List<Token>(code.Length / 5);
         Lexer.ParseTokens(code, fileIndex, tokens, line);
 
         var enumerator = new TokenEnumerator(fileIndex, tokens);
-        var scope = CreateAst<ScopeAst>(enumerator);
+        var asts = new List<IAst>();
         while (enumerator.MoveNext())
         {
-            ParseLine(enumerator, scope, null);
+            asts.Add(ParseAst(enumerator, scope, null));
         }
 
-        return scope;
+        return asts;
     }
 
     private static IAst ParseTopLevelAst(TokenEnumerator enumerator, string directory)
