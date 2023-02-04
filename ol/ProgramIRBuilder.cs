@@ -242,7 +242,7 @@ public static class ProgramIRBuilder
             case InstructionValueType.CallArguments:
                 return string.Join(", ", value.Values.Select(PrintInstructionValue));
             case InstructionValueType.FileName:
-                return BuildSettings.Files[value.ValueIndex].Replace(BuildSettings.Path, string.Empty);
+                return BuildSettings.FileName(value.ValueIndex);
         }
 
         return string.Empty;

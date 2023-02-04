@@ -2199,7 +2199,7 @@ public static unsafe class LLVMBackend
                 var fileName = _fileNames[value.ValueIndex];
                 if (fileName.Handle == IntPtr.Zero)
                 {
-                    _fileNames[value.ValueIndex] = fileName = GetString(BuildSettings.Files[value.ValueIndex].Replace(BuildSettings.Path, string.Empty));
+                    _fileNames[value.ValueIndex] = fileName = GetString(BuildSettings.FileName(value.ValueIndex));
                 }
                 return fileName;
         }

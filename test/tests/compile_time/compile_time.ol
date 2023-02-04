@@ -13,7 +13,9 @@ main() {
     // TODO Add additional code in main to print something
     // main_function := get_function("main");
 
-    // insert_code(main_function.body, macro(main_function.name));
+    // insert_code(main_function, macro(main_function.name));
+
+    main();
 }
 
 macro(string message) {
@@ -21,5 +23,5 @@ macro(string message) {
 }
 
 string macro_with_code(string code) {
-    return format_string("each i in 0..4 {\n    %;\n}", code);
+    return format_string("each j in 0..4 {\n    %;\n}", code);
 }
