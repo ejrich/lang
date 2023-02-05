@@ -4,8 +4,9 @@
 main() {
     print("Hello world\n");
 
-    i := 0;
+    foo();
 
+    i := 0;
     #insert return macro_with_code("print(\"i = %\\n\", i++)");
 }
 
@@ -13,10 +14,11 @@ main() {
     // TODO Add additional code in main to print something
     // main_function := get_function("main");
 
-    // insert_code(main_function, macro(main_function.name));
-
-    main();
+    add_code("message := \"Hello from codegen\\n\";\nfoo() {\n    print(message);\n}");
+    // insert_code(main_function, format_string("print(\"%\\n\");", main_function.name));
 }
+
+#run main();
 
 macro(string message) {
     print(message);

@@ -68,10 +68,91 @@ public static class TypeChecker
         TypeTable.TypeInfoPointerType = GlobalScope.Types["TypeInfo*"];
         TypeTable.VoidPointerType = GlobalScope.Types["void*"];
 
-        var runQueue = new List<CompilerDirectiveAst>();
+        // 1. Verify and run top-level directives
+        ClearDirectiveQueue();
+
+        // 2. Execute any other compiler directives
+        var runNode = Parser.RunDirectives.Head;
+        Node<CompilerDirectiveAst> previous = null;
+        while (runNode != null)
+        {
+            var runDirective = runNode.Data;
+            RemoveNode(Parser.RunDirectives, previous, runNode);
+
+            var scope = GetFileScope(runDirective);
+            var scopeAst = (ScopeAst)runDirective.Value;
+            scopeAst.Parent = scope;
+            VerifyScope(scopeAst, null);
+
+            ClearAstQueue();
+            if (!ErrorReporter.Errors.Any())
+            {
+                ThreadPool.CompleteWork();
+
+                var function = ProgramIRBuilder.CreateRunnableFunction(scopeAst, TypeTable.VoidType);
+                ProgramRunner.Init();
+
+                ProgramRunner.RunProgram(function, scopeAst);
+            }
+
+            runNode = runNode.Next;
+        }
+
+        // 3. Verify the rest of the types
+        var astNode = Parser.Asts.Head;
+        while (astNode != null)
+        {
+            VerifyAst(astNode.Data);
+            astNode = astNode.Next;
+        }
+
+        ClearAstQueue();
+
+        if (GlobalScope.Functions.TryGetValue("main", out var functions))
+        {
+            if (functions.Count > 1)
+            {
+                ErrorReporter.Report("Only one main function can be defined", functions[1]);
+            }
+        }
+        else
+        {
+            ErrorReporter.Report("'main' function of the program is not defined");
+        }
+
+        foreach (var (name, _) in BuildSettings.InputVariables.Where(v => !v.Value.Used))
+        {
+            ErrorReporter.Report($"Input variable '{name}' was not found as a global constant");
+        }
+
+        _generatedCodeWriter?.Close();
+    }
+
+    private static void RemoveNode<T>(SafeLinkedList<T> list, Node<T> previous, Node<T> current)
+    {
+        if (previous == null)
+        {
+            list.Head = current.Next;
+            if (current.Next == null)
+            {
+                list.ReplaceEnd(null);
+            }
+        }
+        else if (current.Next == null)
+        {
+            list.ReplaceEnd(previous);
+            previous.Next = null;
+        }
+        else
+        {
+            previous.Next = current.Next;
+        }
+    }
+
+    private static void ClearDirectiveQueue()
+    {
         do
         {
-            // 1. Verify and run top-level directives
             var parsingAdditional = false;
             var node = Parser.Directives.Head;
             Node<CompilerDirectiveAst> previous = null;
@@ -81,9 +162,6 @@ public static class TypeChecker
                 RemoveNode(Parser.Directives, previous, node);
                 switch (directive.Type)
                 {
-                    case DirectiveType.Run:
-                        runQueue.Add(directive);
-                        break;
                     case DirectiveType.If:
                         var conditional = directive.Value as ConditionalAst;
                         if (VerifyCondition(conditional.Condition, null, GetFileScope(conditional), out var constant, true))
@@ -139,76 +217,6 @@ public static class TypeChecker
                 ThreadPool.CompleteWork();
             }
         } while (Parser.Directives.Head != null);
-
-        // 2. Execute any other compiler directives
-        foreach (var runDirective in runQueue)
-        {
-            var scope = GetFileScope(runDirective);
-            var scopeAst = (ScopeAst)runDirective.Value;
-            scopeAst.Parent = scope;
-            VerifyScope(scopeAst, null);
-
-            ClearAstQueue();
-            if (!ErrorReporter.Errors.Any())
-            {
-                ThreadPool.CompleteWork();
-
-                var function = ProgramIRBuilder.CreateRunnableFunction(scopeAst, TypeTable.VoidType);
-                ProgramRunner.Init();
-
-                ProgramRunner.RunProgram(function, scopeAst);
-            }
-        }
-
-        // 3. Verify the rest of the types
-        var astNode = Parser.Asts.Head;
-        while (astNode != null)
-        {
-            VerifyAst(astNode.Data);
-            astNode = astNode.Next;
-        }
-
-        ClearAstQueue();
-
-        if (GlobalScope.Functions.TryGetValue("main", out var functions))
-        {
-            if (functions.Count > 1)
-            {
-                ErrorReporter.Report("Only one main function can be defined", functions[1]);
-            }
-        }
-        else
-        {
-            ErrorReporter.Report("'main' function of the program is not defined");
-        }
-
-        foreach (var (name, _) in BuildSettings.InputVariables.Where(v => !v.Value.Used))
-        {
-            ErrorReporter.Report($"Input variable '{name}' was not found as a global constant");
-        }
-
-        _generatedCodeWriter?.Close();
-    }
-
-    private static void RemoveNode<T>(SafeLinkedList<T> list, Node<T> previous, Node<T> current)
-    {
-        if (previous == null)
-        {
-            list.Head = current.Next;
-            if (current.Next == null)
-            {
-                list.ReplaceEnd(null);
-            }
-        }
-        else if (current.Next == null)
-        {
-            list.ReplaceEnd(previous);
-            previous.Next = null;
-        }
-        else
-        {
-            previous.Next = current.Next;
-        }
     }
 
     private static void ClearAstQueue()
@@ -294,27 +302,28 @@ public static class TypeChecker
                 AddGlobalVariable(globalVariable);
                 break;
             case CompilerDirectiveAst directive:
-                if (directive.Type == DirectiveType.ImportModule)
+                switch (directive.Type)
                 {
-                    Parser.AddModule(directive);
-                    parsingAdditional = true;
-                }
-                else if (directive.Type == DirectiveType.ImportFile)
-                {
-                    Parser.AddFile(directive);
-                    parsingAdditional = true;
-                }
-                else if (directive.Type == DirectiveType.Library)
-                {
-                    AddLibrary(directive);
-                }
-                else if (directive.Type == DirectiveType.SystemLibrary)
-                {
-                    AddSystemLibrary(directive);
-                }
-                else
-                {
-                    Parser.Directives.Add(directive);
+                    case DirectiveType.Run:
+                        Parser.RunDirectives.Add(directive);
+                        break;
+                    case DirectiveType.ImportModule:
+                        Parser.AddModule(directive);
+                        parsingAdditional = true;
+                        break;
+                    case DirectiveType.ImportFile:
+                        Parser.AddFile(directive);
+                        parsingAdditional = true;
+                        break;
+                    case DirectiveType.Library:
+                        AddLibrary(directive);
+                        break;
+                    case DirectiveType.SystemLibrary:
+                        AddSystemLibrary(directive);
+                        break;
+                    default:
+                        Parser.Directives.Add(directive);
+                        break;
                 }
                 return;
         }
@@ -1873,6 +1882,13 @@ public static class TypeChecker
         }
     }
 
+    public static void AddCode(string code)
+    {
+        var line = AddCodeString(code, null, null);
+        Parser.ParseCode(code, _generatedCodeFileIndex, line);
+        ClearDirectiveQueue();
+    }
+
     private static uint AddCodeString(string code, IFunction function, IAst source)
     {
         if (_generatedCodeWriter == null)
@@ -1899,7 +1915,7 @@ public static class TypeChecker
         }
         else
         {
-            header = $"\n// Generated code\n\n";
+            header = $"\n// Generated code from call to add_code\n\n";
         }
 
         _generatedCodeWriter.Write(header);

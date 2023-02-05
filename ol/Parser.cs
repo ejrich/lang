@@ -12,6 +12,7 @@ public static class Parser
 
     public static SafeLinkedList<IAst> Asts = new();
     public static SafeLinkedList<CompilerDirectiveAst> Directives = new();
+    public static SafeLinkedList<CompilerDirectiveAst> RunDirectives = new();
 
     private class TokenEnumerator
     {
@@ -173,6 +174,34 @@ public static class Parser
         var directory = Path.GetDirectoryName(parseData.File);
 
         // 2. Iterate through tokens, tracking different ASTs
+        ParseGlobalAsts(fileIndex, tokens, directory);
+    }
+
+    public static List<IAst> ParseInsertedCode(string code, ScopeAst scope, int fileIndex, uint line)
+    {
+        var tokens = new List<Token>(code.Length / 5);
+        Lexer.ParseTokens(code, fileIndex, tokens, line);
+
+        var enumerator = new TokenEnumerator(fileIndex, tokens);
+        var asts = new List<IAst>();
+        while (enumerator.MoveNext())
+        {
+            asts.Add(ParseAst(enumerator, scope, null));
+        }
+
+        return asts;
+    }
+
+    public static void ParseCode(string code, int fileIndex, uint line)
+    {
+        var tokens = new List<Token>(code.Length / 5);
+        Lexer.ParseTokens(code, fileIndex, tokens, line);
+
+        ParseGlobalAsts(fileIndex, tokens, BuildSettings.ObjectDirectory);
+    }
+
+    private static void ParseGlobalAsts(int fileIndex, List<Token> tokens, string directory)
+    {
         var enumerator = new TokenEnumerator(fileIndex, tokens);
         while (enumerator.MoveNext())
         {
@@ -263,17 +292,20 @@ public static class Parser
                     var directive = ParseTopLevelDirective(enumerator, directory, true);
                     if (directive != null)
                     {
-                        if (directive.Type == DirectiveType.Library)
+                        switch (directive.Type)
                         {
-                            TypeChecker.AddLibrary(directive);
-                        }
-                        else if (directive.Type == DirectiveType.SystemLibrary)
-                        {
-                            TypeChecker.AddSystemLibrary(directive);
-                        }
-                        else
-                        {
-                            Directives.Add(directive);
+                            case DirectiveType.Library:
+                                TypeChecker.AddLibrary(directive);
+                                break;
+                            case DirectiveType.SystemLibrary:
+                                TypeChecker.AddSystemLibrary(directive);
+                                break;
+                            case DirectiveType.Run:
+                                RunDirectives.Add(directive);
+                                break;
+                            default:
+                                Directives.Add(directive);
+                                break;
                         }
                     }
                     break;
@@ -303,21 +335,6 @@ public static class Parser
                     break;
             }
         }
-    }
-
-    public static List<IAst> ParseInsertedCode(string code, ScopeAst scope, int fileIndex, uint line)
-    {
-        var tokens = new List<Token>(code.Length / 5);
-        Lexer.ParseTokens(code, fileIndex, tokens, line);
-
-        var enumerator = new TokenEnumerator(fileIndex, tokens);
-        var asts = new List<IAst>();
-        while (enumerator.MoveNext())
-        {
-            asts.Add(ParseAst(enumerator, scope, null));
-        }
-
-        return asts;
     }
 
     private static IAst ParseTopLevelAst(TokenEnumerator enumerator, string directory)
