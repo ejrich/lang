@@ -455,6 +455,11 @@ public static class ProgramIRBuilder
 
     private static void EmitScope(FunctionIR function, ScopeAst scope, IType returnType, BasicBlock breakBlock, BasicBlock continueBlock)
     {
+        if (scope.DeferCount > 0)
+        {
+            scope.DeferredAsts = new(scope.DeferCount);
+        }
+
         foreach (var ast in scope.Children)
         {
             switch (ast)
@@ -2474,6 +2479,11 @@ public static class ProgramIRBuilder
 
     private static void EmitScopeInline(FunctionIR function, ScopeAst scope, IType returnType, InstructionValue returnAllocation, BasicBlock returnBlock, BasicBlock breakBlock, BasicBlock continueBlock)
     {
+        if (scope.DeferCount > 0)
+        {
+            scope.DeferredAsts = new(scope.DeferCount);
+        }
+
         foreach (var ast in scope.Children)
         {
             switch (ast)

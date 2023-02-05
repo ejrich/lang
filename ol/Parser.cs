@@ -1533,10 +1533,6 @@ public static class Parser
             ParseLine(enumerator, scope, currentFunction);
         }
 
-        if (scope.DeferCount > 0)
-        {
-            scope.DeferredAsts = new(scope.DeferCount);
-        }
         return scope;
     }
 
@@ -1568,10 +1564,6 @@ public static class Parser
             ErrorReporter.Report("Scope not closed by '}'", enumerator.FileIndex, enumerator.Current);
         }
 
-        if (scope.DeferCount > 0)
-        {
-            scope.DeferredAsts = new(scope.DeferCount);
-        }
         return scope;
     }
 
