@@ -177,19 +177,16 @@ public static class Parser
         ParseGlobalAsts(fileIndex, tokens, directory);
     }
 
-    public static List<IAst> ParseInsertedCode(string code, ScopeAst scope, int fileIndex, uint line)
+    public static void ParseInsertedCode(string code, ScopeAst scope, int fileIndex, uint line, int index)
     {
         var tokens = new List<Token>(code.Length / 5);
         Lexer.ParseTokens(code, fileIndex, tokens, line);
 
         var enumerator = new TokenEnumerator(fileIndex, tokens);
-        var asts = new List<IAst>();
         while (enumerator.MoveNext())
         {
-            asts.Add(ParseAst(enumerator, scope, null));
+            scope.Children.Insert(index++, ParseAst(enumerator, scope, null));
         }
-
-        return asts;
     }
 
     public static void ParseCode(string code, int fileIndex, uint line)

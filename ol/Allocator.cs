@@ -159,7 +159,7 @@ public static class Allocator
         var pointer = Allocate(value.Length + 1);
         var bytePointer = (byte*)pointer;
 
-        if (value != "")
+        if (value != string.Empty)
         {
             var stringBytes = Encoding.ASCII.GetBytes(value);
             fixed (byte* p = &stringBytes[0])

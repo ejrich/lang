@@ -409,6 +409,36 @@ public static unsafe class ProgramRunner
         BuildSettings.OutputArchitecture = (OutputArchitecture)arch;
     }
 
+    private static IntPtr GetFunction(String name)
+    {
+        var functionName = Marshal.PtrToStringAnsi(name.Data, (int)name.Length);
+        if (!TypeChecker.GlobalScope.Functions.TryGetValue(functionName, out var functions)) return IntPtr.Zero;
+
+        var functionDef = functions[0];
+        var handle = GCHandle.Alloc(functionDef);
+        var function = new Function { Name = Allocator.MakeString(functionDef.Name), Source = GCHandle.ToIntPtr(handle) };
+
+        // TODO Use the pointer from messages
+        var pointer = Allocator.Allocate(Function.Size);
+        Marshal.StructureToPtr(function, pointer, false);
+
+        return pointer;
+    }
+
+    private static void InsertCode(IntPtr functionPointer, String code)
+    {
+        var codeString = Marshal.PtrToStringAnsi(code.Data, (int)code.Length);
+        var function = Marshal.PtrToStructure<Function>(functionPointer);
+
+        var handle = GCHandle.FromIntPtr(function.Source);
+        var functionDef = handle.Target as IFunction;
+
+        if (functionDef?.Body != null)
+        {
+            TypeChecker.InsertCode(codeString, functionDef, null, functionDef.Body);
+        }
+    }
+
     private static void AddCode(String code)
     {
         var codeString = Marshal.PtrToStringAnsi(code.Data, (int)code.Length);
@@ -1691,8 +1721,8 @@ public static unsafe class ProgramRunner
                 case "get_function":
                 {
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
-                    var functionName = Marshal.PtrToStructure<String>(value.Pointer);
-                    // TODO
+                    var name = Marshal.PtrToStructure<String>(value.Pointer);
+                    returnValue.Pointer = GetFunction(name);
                     break;
                 }
                 case "insert_code":
@@ -1700,7 +1730,7 @@ public static unsafe class ProgramRunner
                     var functionPointer = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
                     var value = GetValue(arguments[1], registers, stackPointer, function, functionArgs);
                     var code = Marshal.PtrToStructure<String>(value.Pointer);
-                    // TODO
+                    InsertCode(functionPointer.Pointer, code);
                     break;
                 }
                 case "add_code":
