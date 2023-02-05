@@ -45,9 +45,11 @@ enum OutputArchitecture : u8 {
 set_output_architecture(OutputArchitecture arch) #compiler
 
 
-///// Metaprogramming functions for code exploration and generation
+///// Metaprogramming features for code exploration and generation
 
 struct Function {} // Opaque struct to reference function and overload ASTs
+
+Function* get_function(string name) #compiler
 
 insert_code(Function* scope, string code) #compiler
 

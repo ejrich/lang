@@ -409,6 +409,12 @@ public static unsafe class ProgramRunner
         BuildSettings.OutputArchitecture = (OutputArchitecture)arch;
     }
 
+    private static void AddCode(String code)
+    {
+        var codeString = Marshal.PtrToStringAnsi(code.Data, (int)code.Length);
+        TypeChecker.AddCode(codeString);
+    }
+
     public static Register ExecuteFunction(FunctionIR function)
     {
         return ExecuteFunction(function, ReadOnlySpan<Register>.Empty);
@@ -1680,6 +1686,27 @@ public static unsafe class ProgramRunner
                 {
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
                     SetOutputArchitecture(value.Byte);
+                    break;
+                }
+                case "get_function":
+                {
+                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    // TODO
+                    break;
+                }
+                case "insert_code":
+                {
+                    var functionPointer = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    var value = GetValue(arguments[1], registers, stackPointer, function, functionArgs);
+                    var code = Marshal.PtrToStructure<String>(value.Pointer);
+                    // TODO
+                    break;
+                }
+                case "add_code":
+                {
+                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    var code = Marshal.PtrToStructure<String>(value.Pointer);
+                    AddCode(code);
                     break;
                 }
                 default:
