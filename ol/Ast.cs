@@ -525,6 +525,23 @@ public class CompilerDirectiveAst : IAst
     public string AssertMessage { get; set; }
 }
 
+public class RunDirectiveFunction : IFunction
+{
+    public int FileIndex { get; set; }
+    public uint Line { get; init; }
+    public uint Column { get; init; }
+    public string Name { get; set; }
+    public int ConstantCount { get; set; }
+    public int FunctionIndex { get; set; }
+    public FunctionFlags Flags { get; set; }
+    public IType ReturnType { get; set; }
+    public TypeDefinition ReturnTypeDefinition { get; set; }
+    public List<string> Generics { get; } = new();
+    public List<DeclarationAst> Arguments { get; } = new();
+    public int ArgumentCount { get; set; } = 2;
+    public ScopeAst Body { get; set; }
+}
+
 public class Import
 {
     public string Name { get; set; }

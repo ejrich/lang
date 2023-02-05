@@ -1691,6 +1691,7 @@ public static unsafe class ProgramRunner
                 case "get_function":
                 {
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    var functionName = Marshal.PtrToStructure<String>(value.Pointer);
                     // TODO
                     break;
                 }
