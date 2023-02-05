@@ -1827,10 +1827,7 @@ public static class TypeChecker
                                     ProgramRunner.Init();
 
                                     var code = ProgramRunner.ExecuteInsert(insertFunction, insertScope);
-                                    var line = AddCodeString(code, function, directive);
-                                    var insertedCode =  Parser.ParseInsertedCode(code, scope, _generatedCodeFileIndex, line);
-
-                                    scope.Children.InsertRange(i, insertedCode);
+                                    InsertCode(code, function, directive, scope, i);
                                 }
                             }
                             i--;
@@ -1892,6 +1889,12 @@ public static class TypeChecker
         ClearDirectiveQueue();
     }
 
+    public static void InsertCode(string code, IFunction function, IAst source, ScopeAst scope, int index = 0)
+    {
+        var line = AddCodeString(code, function, source);
+        Parser.ParseInsertedCode(code, scope, _generatedCodeFileIndex, line, index);
+    }
+
     private static uint AddCodeString(string code, IFunction function, IAst source)
     {
         if (_generatedCodeWriter == null)
@@ -1910,7 +1913,7 @@ public static class TypeChecker
         }
         else if (function != null)
         {
-            header = $"\n// Generated code from calling {function.Name}\n\n";
+            header = $"\n// Generated code in {function.Name}\n\n";
         }
         else if (source != null)
         {

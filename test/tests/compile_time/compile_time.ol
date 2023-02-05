@@ -14,7 +14,7 @@ main() {
     add_code("message := \"Hello from codegen\\n\";\nfoo() {\n    print(message);\n}");
 
     main_function := get_function("main");
-    // insert_code(main_function, format_string("print(\"%\\n\");", main_function.name));
+    insert_code(main_function, format_string("print(\"Executing function: %\\n\");", main_function.name));
 }
 
 #run main();

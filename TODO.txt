@@ -1,2 +1,1 @@
-- insert_code function to insert code string at the start of function
-- add_code function to insert code string in the global scope
+- Compiler messages and event loop
