@@ -82,14 +82,16 @@ public static class TypeChecker
             var scope = GetFileScope(runDirective);
             var scopeAst = (ScopeAst)runDirective.Value;
             scopeAst.Parent = scope;
-            VerifyScope(scopeAst, null);
+
+            var runDirectiveFunction = new RunDirectiveFunction { ReturnType = TypeTable.VoidType };
+            VerifyScope(scopeAst, runDirectiveFunction);
 
             ClearAstQueue();
             if (!ErrorReporter.Errors.Any())
             {
                 ThreadPool.CompleteWork();
 
-                var function = ProgramIRBuilder.CreateRunnableFunction(scopeAst, TypeTable.VoidType);
+                var function = ProgramIRBuilder.CreateRunnableFunction(scopeAst, runDirectiveFunction);
                 ProgramRunner.Init();
 
                 ProgramRunner.RunProgram(function, scopeAst);
@@ -675,21 +677,21 @@ public static class TypeChecker
     public static void AddLibrary(CompilerDirectiveAst directive)
     {
         var library = directive.Library;
-        #if _LINUX
+#if _LINUX
         library.HasLib = File.Exists($"{library.AbsolutePath}.a");
         library.HasDll = File.Exists($"{library.AbsolutePath}.so");
         if (!library.HasLib && !library.HasDll)
         {
             ErrorReporter.Report($"Unable to find .a/.so '{library.Path}' of library '{library.Name}'", directive);
         }
-        #elif _WINDOWS
+#elif _WINDOWS
         library.HasLib = File.Exists($"{library.AbsolutePath}.lib");
         library.HasDll = File.Exists($"{library.AbsolutePath}.dll");
         if (!library.HasLib && !library.HasDll)
         {
             ErrorReporter.Report($"Unable to find .lib/.dll '{library.Path}' of library '{library.Name}'", directive);
         }
-        #endif
+#endif
 
         if (!_libraries.TryAdd(library.Name, library))
         {
@@ -1700,7 +1702,7 @@ public static class TypeChecker
         ProgramIRBuilder.AddOperatorOverload((OperatorOverloadAst)overload);
     }
 
-    private static void VerifyScope(ScopeAst scope, IFunction function, bool inDefer = false, bool canBreak = false, bool insert = false)
+    private static void VerifyScope(ScopeAst scope, IFunction function, bool inDefer = false, bool canBreak = false)
     {
         for (var i = 0; i < scope.Children.Count; i++)
         {
@@ -1709,7 +1711,7 @@ public static class TypeChecker
             {
                 case ScopeAst childScope:
                     childScope.Parent = scope;
-                    VerifyScope(childScope, function, inDefer, canBreak, insert);
+                    VerifyScope(childScope, function, inDefer, canBreak);
                     if (childScope.Returns)
                     {
                         scope.Returns = true;
@@ -1722,21 +1724,21 @@ public static class TypeChecker
                 case WhileAst whileAst:
                     whileAst.Body.Parent = scope;
                     VerifyCondition(whileAst.Condition, function, scope, out _);
-                    VerifyScope(whileAst.Body, function, inDefer, true, insert);
+                    VerifyScope(whileAst.Body, function, inDefer, true);
                     break;
                 case EachAst each:
                     each.Body.Parent = scope;
                     VerifyEach(each, function, scope);
-                    VerifyScope(each.Body, function, inDefer, true, insert);
+                    VerifyScope(each.Body, function, inDefer, true);
                     break;
                 case ConditionalAst conditional:
                     VerifyCondition(conditional.Condition, function, scope, out _);
                     conditional.IfBlock.Parent = scope;
-                    VerifyScope(conditional.IfBlock, function, inDefer, canBreak, insert);
+                    VerifyScope(conditional.IfBlock, function, inDefer, canBreak);
                     if (conditional.ElseBlock != null)
                     {
                         conditional.ElseBlock.Parent = scope;
-                        VerifyScope(conditional.ElseBlock, function, inDefer, canBreak, insert);
+                        VerifyScope(conditional.ElseBlock, function, inDefer, canBreak);
 
                         if (conditional.IfBlock.Returns && conditional.ElseBlock.Returns)
                         {
@@ -1806,8 +1808,9 @@ public static class TypeChecker
                             break;
                         case DirectiveType.Insert:
                             scope.Children.RemoveAt(i);
+                            var insertDirectiveFunction = new RunDirectiveFunction { ReturnType = TypeTable.StringType };
                             var insertScope = (ScopeAst)directive.Value;
-                            VerifyScope(insertScope, null, insert: true);
+                            VerifyScope(insertScope, insertDirectiveFunction);
                             if (!insertScope.Returns)
                             {
                                 ErrorReporter.Report($"Expected #insert block to return a string", insertScope);
@@ -1820,7 +1823,7 @@ public static class TypeChecker
                                 {
                                     ThreadPool.CompleteWork();
 
-                                    var insertFunction = ProgramIRBuilder.CreateRunnableFunction(insertScope, TypeTable.StringType);
+                                    var insertFunction = ProgramIRBuilder.CreateRunnableFunction(insertScope, insertDirectiveFunction);
                                     ProgramRunner.Init();
 
                                     var code = ProgramRunner.ExecuteInsert(insertFunction, insertScope);
@@ -1839,7 +1842,7 @@ public static class TypeChecker
                     {
                         ErrorReporter.Report("Cannot return in a defer statement", returnAst);
                     }
-                    VerifyReturnStatement(returnAst, function, scope, insert);
+                    VerifyReturnStatement(returnAst, function, scope);
                     scope.Returns = true;
                     break;
                 case DeclarationAst declaration:
@@ -1855,11 +1858,11 @@ public static class TypeChecker
                     VerifyInlineAssembly(assembly, scope);
                     break;
                 case SwitchAst switchAst:
-                    VerifySwitch(switchAst, function, scope, inDefer, canBreak, insert);
+                    VerifySwitch(switchAst, function, scope, inDefer, canBreak);
                     break;
                 case DeferAst defer:
                     defer.Statement.Parent = scope;
-                    VerifyScope(defer.Statement, function, true, false, insert);
+                    VerifyScope(defer.Statement, function, true);
                     break;
                 case BreakAst:
                     scope.Breaks = true;
@@ -1934,15 +1937,9 @@ public static class TypeChecker
         return initialLine;
     }
 
-    private static void VerifyReturnStatement(ReturnAst returnAst, IFunction currentFunction, IScope scope, bool insert)
+    private static void VerifyReturnStatement(ReturnAst returnAst, IFunction currentFunction, IScope scope)
     {
-        if (currentFunction == null && !insert)
-        {
-            ErrorReporter.Report("Cannot return in #run directive", returnAst);
-            return;
-        }
-
-        var returnType = insert ? TypeTable.StringType : currentFunction.ReturnType;
+        var returnType = currentFunction.ReturnType;
 
         if (returnType != null)
         {
@@ -2790,7 +2787,7 @@ public static class TypeChecker
                                 ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
                             }
                             break;
-                        // Invalid assignment operators
+                            // Invalid assignment operators
                         case Operator.Equality:
                         case Operator.GreaterThan:
                         case Operator.LessThan:
@@ -2798,13 +2795,13 @@ public static class TypeChecker
                         case Operator.LessThanEqual:
                             ErrorReporter.Report($"Invalid operator '{PrintOperator(assignment.Operator)}' in assignment", assignment);
                             break;
-                        // Requires same types and returns more precise type
+                            // Requires same types and returns more precise type
                         case Operator.Add:
                         case Operator.Subtract:
                         case Operator.Multiply:
                         case Operator.Divide:
                             if (!(lhs == TypeKind.Integer && rhs == TypeKind.Integer) &&
-                                !(lhs == TypeKind.Float && (rhs == TypeKind.Float || rhs == TypeKind.Integer)))
+                                    !(lhs == TypeKind.Float && (rhs == TypeKind.Float || rhs == TypeKind.Integer)))
                             {
                                 ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
                             }
@@ -2815,7 +2812,7 @@ public static class TypeChecker
                                 ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
                             }
                             break;
-                        // Requires both integer or bool types and returns more same type
+                            // Requires both integer or bool types and returns more same type
                         case Operator.BitwiseAnd:
                         case Operator.BitwiseOr:
                         case Operator.Xor:
@@ -2831,7 +2828,7 @@ public static class TypeChecker
                                 ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
                             }
                             break;
-                        // Requires both to be integers
+                            // Requires both to be integers
                         case Operator.ShiftLeft:
                         case Operator.ShiftRight:
                         case Operator.RotateLeft:
@@ -3559,7 +3556,7 @@ public static class TypeChecker
         return value.Dereference == arg.Memory && value.RegisterDefinition.Type == arg.Type && value.RegisterDefinition.Size == arg.RegisterSize;
     }
 
-    private static void VerifySwitch(SwitchAst switchAst, IFunction currentFunction, IScope scope, bool inDefer, bool canBreak, bool insert)
+    private static void VerifySwitch(SwitchAst switchAst, IFunction currentFunction, IScope scope, bool inDefer, bool canBreak)
     {
         var valueType = VerifyExpression(switchAst.Value, currentFunction, scope);
         if (valueType != null)
@@ -3602,13 +3599,13 @@ public static class TypeChecker
             }
 
             body.Parent = scope;
-            VerifyScope(body, currentFunction, inDefer, canBreak, insert);
+            VerifyScope(body, currentFunction, inDefer, canBreak);
         }
 
         if (switchAst.DefaultCase != null)
         {
             switchAst.DefaultCase.Parent = scope;
-            VerifyScope(switchAst.DefaultCase, currentFunction, inDefer, canBreak, insert);
+            VerifyScope(switchAst.DefaultCase, currentFunction, inDefer, canBreak);
         }
     }
 
@@ -4203,7 +4200,7 @@ public static class TypeChecker
                 }
             }
 
-            if (currentFunction != null && !currentFunction.Flags.HasFlag(FunctionFlags.CallsCompiler) && (functionAst.Flags.HasFlag(FunctionFlags.Compiler) || functionAst.Flags.HasFlag(FunctionFlags.CallsCompiler)))
+            if (!currentFunction.Flags.HasFlag(FunctionFlags.CallsCompiler) && (functionAst.Flags.HasFlag(FunctionFlags.Compiler) || functionAst.Flags.HasFlag(FunctionFlags.CallsCompiler)))
             {
                 currentFunction.Flags |= FunctionFlags.CallsCompiler;
             }

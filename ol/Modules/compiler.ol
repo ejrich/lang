@@ -47,10 +47,12 @@ set_output_architecture(OutputArchitecture arch) #compiler
 
 ///// Metaprogramming features for code exploration and generation
 
-struct Function {} // Opaque struct to reference function and overload ASTs
+struct Function {
+    name: string;
+}
 
 Function* get_function(string name) #compiler
 
-insert_code(Function* scope, string code) #compiler
+insert_code(Function* function, string code) #compiler
 
 add_code(string code) #compiler
