@@ -89,8 +89,6 @@ public static class TypeChecker
             ClearAstQueue();
             if (!ErrorReporter.Errors.Any())
             {
-                ThreadPool.CompleteWork();
-
                 var function = ProgramIRBuilder.CreateRunnableFunction(scopeAst, runDirectiveFunction);
                 ProgramRunner.Init();
 
@@ -170,7 +168,7 @@ public static class TypeChecker
                         {
                             if (!constant)
                             {
-                                ThreadPool.CompleteWork();
+                                // ThreadPool.CompleteWork();
                             }
                             var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition);
                             ProgramRunner.Init();
@@ -199,7 +197,7 @@ public static class TypeChecker
                         {
                             if (!constant)
                             {
-                                ThreadPool.CompleteWork();
+                                // ThreadPool.CompleteWork();
                             }
                             var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value);
                             ProgramRunner.Init();
@@ -1582,7 +1580,7 @@ public static class TypeChecker
         return false;
     }
 
-    private static void VerifyFunction(FunctionAst function)
+    public static void VerifyFunction(FunctionAst function, bool queueBuild = true)
     {
         if (!function.Flags.HasFlag(FunctionFlags.DefinitionVerified))
         {
@@ -1638,7 +1636,7 @@ public static class TypeChecker
             }
         }
 
-        if (!ErrorReporter.Errors.Any() && !function.Flags.HasFlag(FunctionFlags.Inline))
+        if (queueBuild && !ErrorReporter.Errors.Any() && !function.Flags.HasFlag(FunctionFlags.Inline))
         {
             ThreadPool.QueueWork(WriteFunctionJob, function);
         }
@@ -1649,7 +1647,7 @@ public static class TypeChecker
         ProgramIRBuilder.BuildFunction((FunctionAst)function);
     }
 
-    private static void VerifyOperatorOverload(OperatorOverloadAst overload)
+    public static void VerifyOperatorOverload(OperatorOverloadAst overload, bool queueBuild = true)
     {
         if (!VerifyOperatorOverloadDefinition(overload))
         {
@@ -1685,7 +1683,7 @@ public static class TypeChecker
             ErrorReporter.Report($"Overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}' does not return type '{PrintTypeDefinition(overload.ReturnTypeDefinition)}' on all paths", overload);
         }
 
-        if (!ErrorReporter.Errors.Any())
+        if (queueBuild && !ErrorReporter.Errors.Any())
         {
             ThreadPool.QueueWork(WriteOverloadJob, overload);
         }
@@ -1756,7 +1754,7 @@ public static class TypeChecker
                             {
                                 if (!constant)
                                 {
-                                    ThreadPool.CompleteWork();
+                                    // ThreadPool.CompleteWork();
                                 }
                                 var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition);
                                 ProgramRunner.Init();
@@ -1781,7 +1779,7 @@ public static class TypeChecker
                             {
                                 if (!constant)
                                 {
-                                    ThreadPool.CompleteWork();
+                                    // ThreadPool.CompleteWork();
                                 }
                                 var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value);
                                 ProgramRunner.Init();
@@ -1821,7 +1819,7 @@ public static class TypeChecker
 
                                 if (!ErrorReporter.Errors.Any())
                                 {
-                                    ThreadPool.CompleteWork();
+                                    // ThreadPool.CompleteWork();
 
                                     var insertFunction = ProgramIRBuilder.CreateRunnableFunction(insertScope, insertDirectiveFunction);
                                     ProgramRunner.Init();

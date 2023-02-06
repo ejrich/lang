@@ -449,16 +449,15 @@ public static unsafe class ProgramRunner
                 if (!ErrorReporter.Errors.Any() && !functionDef.Flags.HasFlag(FunctionFlags.Inline))
                 {
                     TypeChecker.ClearAstQueue();
-                    ThreadPool.CompleteWork();
                     Init();
 
                     if (functionDef is FunctionAst functionAst)
                     {
-                        ProgramIRBuilder.BuildFunction(functionAst);
+                        ProgramIRBuilder.BuildFunction(functionAst, true);
                     }
                     else if (functionDef is OperatorOverloadAst overload)
                     {
-                        ProgramIRBuilder.BuildOperatorOverload(overload);
+                        ProgramIRBuilder.BuildOperatorOverload(overload, true);
                     }
                 }
             }
@@ -482,6 +481,32 @@ public static unsafe class ProgramRunner
 
     private static Register ExecuteFunction(FunctionIR function, ReadOnlySpan<Register> arguments)
     {
+        if (function.Source != null && !function.Written)
+        {
+            if (function.Writing)
+            {
+                while (!function.Written);
+            }
+            else if (function.Source is FunctionAst functionAst)
+            {
+                if (functionAst.Flags.HasFlag(FunctionFlags.Verified))
+                {
+                    TypeChecker.VerifyFunction(functionAst, false);
+                    Init();
+                }
+                ProgramIRBuilder.BuildFunction(functionAst);
+            }
+            else if (function.Source is OperatorOverloadAst overload)
+            {
+                if (!overload.Flags.HasFlag(FunctionFlags.Verified))
+                {
+                    TypeChecker.VerifyOperatorOverload(overload, false);
+                    Init();
+                }
+                ProgramIRBuilder.BuildOperatorOverload(overload);
+            }
+        }
+
         var instructionPointer = 0;
         Span<Register> registers = stackalloc Register[function.ValueCount];
 
@@ -2104,8 +2129,7 @@ public static unsafe class ProgramRunner
 
     private static Register ExecuteFunctionFromDelegate(FunctionIR function, object[] arguments)
     {
-        var args = new Register[arguments.Length];
-
+        Span<Register> args = stackalloc Register[arguments.Length];
         for (var i = 0; i < args.Length; i++)
         {
             args[i] = ConvertToRegister(arguments[i]);
