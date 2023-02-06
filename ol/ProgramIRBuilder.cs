@@ -24,11 +24,12 @@ public static class ProgramIRBuilder
         return index;
     }
 
-    public static void BuildFunction(FunctionAst function)
+    public static void BuildFunction(FunctionAst function, bool recompile = false)
     {
         var functionIR = Program.Functions[function.FunctionIndex];
-        functionIR.Writing = true;
+        if (functionIR.Written && !recompile) return;
 
+        functionIR.Writing = true;
         functionIR.Constants = new InstructionValue[function.ConstantCount];
         functionIR.Allocations = new();
         functionIR.Pointers = new();
@@ -70,11 +71,12 @@ public static class ProgramIRBuilder
         }
     }
 
-    public static void BuildOperatorOverload(OperatorOverloadAst overload)
+    public static void BuildOperatorOverload(OperatorOverloadAst overload, bool recompile = false)
     {
         var functionIR = Program.Functions[overload.FunctionIndex];
-        functionIR.Writing = true;
+        if (functionIR.Written && !recompile) return;
 
+        functionIR.Writing = true;
         functionIR.Constants = new InstructionValue[overload.ConstantCount];
         functionIR.Allocations = new();
         functionIR.Pointers = new();
